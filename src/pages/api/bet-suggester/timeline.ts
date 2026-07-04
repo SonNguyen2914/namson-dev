@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { proxy } from "./_proxy";
+import { proxy } from "../../../lib/suggesterProxy";
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const { match_id } = req.query;
