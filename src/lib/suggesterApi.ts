@@ -4,6 +4,7 @@
 export interface MarketPrediction {
   market_id: string;
   market_title: string;
+  outcome_key?: string | null;
   model_probability: number;
   kalshi_odds: number;
   implied_probability: number;
@@ -28,9 +29,12 @@ export interface PredictionResponse {
 
 export interface SuggestionRow {
   match_id: string;
+  home: string;
+  away: string;
   market_id: string;
   market_title: string;
-  kickoff: string | null;
+  outcome_key: string | null;
+  kickoff: string;
   kalshi_odds: number;
   model_probability: number;
   implied_probability: number;
@@ -38,7 +42,19 @@ export interface SuggestionRow {
   expected_value: number;
   confidence: number;
   is_final: boolean;
-  reason: string;
+}
+
+export interface SuggestionsResponse {
+  suggestions: SuggestionRow[];
+  tier_used: number | null; // 49, 40, or null when the board is honestly empty
+  generated_at: string;
+}
+
+export interface RefreshAllResponse {
+  refreshed: string[];
+  failed: string[];
+  duration_ms: number;
+  generated_at: string;
 }
 
 export interface UpcomingMatch {
@@ -107,8 +123,10 @@ async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  suggestions: () =>
-    getJson<{ suggestions: SuggestionRow[]; generated_at: string }>("/suggestions"),
+  suggestions: () => getJson<SuggestionsResponse>("/suggestions"),
+
+  refreshAll: () =>
+    getJson<RefreshAllResponse>("/refresh-all", { method: "POST" }),
 
   upcoming: (hoursAhead = 72) =>
     getJson<{ matches: UpcomingMatch[] }>(`/upcoming?hours_ahead=${hoursAhead}`),

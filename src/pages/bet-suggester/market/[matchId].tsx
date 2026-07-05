@@ -7,9 +7,14 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 import {
-  api, money, pct, signedPct,
+  api, pct, signedPct,
   PredictionResponse, TimelinePoint,
 } from "../../../lib/suggesterApi";
+
+// Same floors as the backend board — the pick is just row #1 of this
+// match's slice of the same likelihood-first ranking.
+const PRIMARY_FLOOR = 0.49;
+const FALLBACK_FLOOR = 0.40;
 
 export default function MatchDetail() {
   const router = useRouter();
@@ -50,6 +55,18 @@ export default function MatchDetail() {
   }
 
   useEffect(() => { load(false); }, [load]);
+
+  // Likelihood ↓ then edge ↓ — same ordering as the landing board
+  const sortedMarkets = pred
+    ? [...pred.markets].sort(
+        (a, b) => b.model_probability - a.model_probability || b.edge - a.edge)
+    : [];
+  let pick = sortedMarkets.find((m) => m.model_probability >= PRIMARY_FLOOR) ?? null;
+  let pickTier: 49 | 40 | null = pick ? 49 : null;
+  if (!pick) {
+    pick = sortedMarkets.find((m) => m.model_probability >= FALLBACK_FLOOR) ?? null;
+    pickTier = pick ? 40 : null;
+  }
 
   const freshnessBadge = pred && (
     <span className={`rounded px-2 py-1 text-xs ${
@@ -108,6 +125,38 @@ export default function MatchDetail() {
               <Stat label="model confidence" value={pct(pred.confidence)} />
             </section>
 
+            {/* Model's Pick — row #1 of this match's likelihood board */}
+            <section className={`mb-10 rounded-lg border p-5 ${
+              pick ? "border-emerald-900/60 bg-emerald-950/20"
+                   : "border-neutral-800"
+            }`}>
+              <p className="text-xs uppercase tracking-widest text-neutral-400">
+                Model&apos;s pick — most likely bet on this match
+              </p>
+              {pick ? (
+                <>
+                  <p className="mt-2 text-lg text-white">{pick.market_title}</p>
+                  <p className="mt-1 text-sm tabular-nums text-neutral-300">
+                    {pct(pick.model_probability)} likely ·{" "}
+                    <span className={pick.edge >= 0 ? "text-emerald-400" : "text-red-400"}>
+                      {signedPct(pick.edge)} edge
+                    </span>{" "}
+                    · {pick.kalshi_odds?.toFixed(2)}x payout
+                  </p>
+                  {pickTier === 40 && (
+                    <p className="mt-2 text-xs text-amber-400">
+                      Expanded to 40%+ likely — nothing on this match cleared 49%+.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="mt-2 text-sm text-neutral-500">
+                  Nothing on this match is 40%+ likely right now — no honest
+                  pick to make.
+                </p>
+              )}
+            </section>
+
             {/* Scoreline distribution */}
             <section className="mb-10">
               <h3 className="mb-3 text-sm uppercase tracking-widest text-neutral-400">
@@ -139,24 +188,24 @@ export default function MatchDetail() {
                   <thead className="bg-neutral-900 text-left text-xs uppercase tracking-wider text-neutral-500">
                     <tr>
                       <th className="px-4 py-3">Market</th>
-                      <th className="px-3 py-3 text-right">Odds</th>
-                      <th className="px-3 py-3 text-right">Model</th>
+                      <th className="px-3 py-3 text-right">Likelihood</th>
                       <th className="px-3 py-3 text-right">Edge</th>
-                      <th className="px-3 py-3 text-right">EV / $1</th>
+                      <th className="px-3 py-3 text-right">Multiplier</th>
                       <th className="px-4 py-3 text-center">Alert</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-800/70">
-                    {pred.markets.map((m) => (
+                    {sortedMarkets.map((m) => (
                       <tr key={m.market_id} className="hover:bg-neutral-900/60">
                         <td className="px-4 py-3 text-neutral-100">{m.market_title}</td>
-                        <td className="px-3 py-3 text-right">{m.kalshi_odds?.toFixed(2)}</td>
-                        <td className="px-3 py-3 text-right">{pct(m.model_probability)}</td>
+                        <td className="px-3 py-3 text-right text-neutral-100">
+                          {pct(m.model_probability)}
+                        </td>
                         <td className={`px-3 py-3 text-right ${m.edge >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                           {signedPct(m.edge)}
                         </td>
-                        <td className={`px-3 py-3 text-right ${m.expected_value >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                          {money(m.expected_value)}
+                        <td className="px-3 py-3 text-right">
+                          {m.kalshi_odds?.toFixed(2)}x
                         </td>
                         <td className="px-4 py-3 text-center">
                           <button
