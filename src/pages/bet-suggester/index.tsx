@@ -46,6 +46,11 @@ export default function BetSuggesterDashboard() {
     return () => clearInterval(id);
   }, [load]);
 
+  function matchLabel(matchId: string): string {
+    const m = matches.find((x) => x.match_id === matchId);
+    return m ? `${m.home} vs ${m.away}` : matchId.replace("_", " vs ");
+  }
+
   const next = matches[0];
 
   return (
@@ -214,6 +219,9 @@ export default function BetSuggesterDashboard() {
                         {s.is_final && (
                           <span className="ml-2 text-xs text-red-400">🔒 final</span>
                         )}
+                        <p className="mt-0.5 text-xs text-neutral-500">
+                          {matchLabel(s.match_id)}
+                        </p>
                       </td>
                       <td className="px-3 py-3 text-right">{s.kalshi_odds.toFixed(2)}</td>
                       <td className="px-3 py-3 text-right">{pct(s.model_probability)}</td>
