@@ -102,6 +102,24 @@ export interface LivePredictionResponse {
   disclaimer: string;
 }
 
+export interface LiveStateFetch {
+  available: boolean;
+  match_id: string;
+  current_home?: number;
+  current_away?: number;
+  minutes_elapsed?: number | null;
+  red_home?: boolean;
+  red_away?: boolean;
+  status_short?: string;
+  is_live?: boolean;
+  is_finished?: boolean;
+  reason?: string;
+  budget: {
+    calls_today: number; daily_cap: number;
+    remaining: number; key_configured: boolean;
+  };
+}
+
 export interface UpcomingMatch {
   match_id: string;
   home: string;
@@ -190,6 +208,9 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(state),
     }),
+
+  liveState: (matchId: string) =>
+    getJson<LiveStateFetch>(`/live-state?match_id=${matchId}`),
 
   // --- bet-timing / ripeness ------------------------------------------
   watchlist: () =>

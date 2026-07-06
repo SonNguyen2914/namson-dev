@@ -27,6 +27,38 @@ export default function LivePanel({ matchId }: { matchId: string }) {
   const [res, setRes] = useState<LivePredictionResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const [autoMsg, setAutoMsg] = useState("");
+  const [autoLoading, setAutoLoading] = useState(false);
+
+  async function autoFill() {
+    setAutoLoading(true);
+    setAutoMsg("");
+    try {
+      const s = await api.liveState(matchId);
+      if (!s.available) {
+        setAutoMsg(
+          s.reason === "feed not configured"
+            ? "Live feed not set up — enter the state manually below."
+            : "No live match found right now — enter the state manually below."
+        );
+        return;
+      }
+      setScoreH(s.current_home ?? 0);
+      setScoreA(s.current_away ?? 0);
+      if (s.minutes_elapsed != null) setMinute(Math.round(s.minutes_elapsed));
+      setRedH(!!s.red_home);
+      setRedA(!!s.red_away);
+      const fin = s.is_finished ? " (match finished)" : "";
+      setAutoMsg(
+        `Filled from live feed: ${s.current_home}-${s.current_away}, ${
+          s.minutes_elapsed ?? "?"}'${fin} · ${s.budget.remaining} feed calls left today`
+      );
+    } catch {
+      setAutoMsg("Couldn't reach the live feed — enter the state manually.");
+    } finally {
+      setAutoLoading(false);
+    }
+  }
 
   async function run() {
     setLoading(true);
@@ -75,6 +107,21 @@ export default function LivePanel({ matchId }: { matchId: string }) {
         rest of the match from here. Shown next to the market&apos;s own price —
         the gap is informational, not a betting edge.
       </p>
+
+      {/* auto-fill from the live feed (Layer 2) */}
+      <div className="mb-4">
+        <button
+          onClick={autoFill} disabled={autoLoading}
+          className={`rounded border px-3 py-1.5 text-xs uppercase tracking-wider transition ${
+            autoLoading
+              ? "cursor-not-allowed border-neutral-800 text-neutral-600"
+              : "border-emerald-800 text-emerald-400 hover:border-emerald-500"
+          }`}
+        >
+          {autoLoading ? "Fetching…" : "⟳ Auto-fill from live feed"}
+        </button>
+        {autoMsg && <p className="mt-2 text-xs text-neutral-400">{autoMsg}</p>}
+      </div>
 
       {/* --- state entry --- */}
       <div className="mb-4 grid gap-4 sm:grid-cols-2">
