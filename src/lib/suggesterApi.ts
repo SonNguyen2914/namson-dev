@@ -57,6 +57,51 @@ export interface RefreshAllResponse {
   generated_at: string;
 }
 
+export interface LiveStateInput {
+  current_home: number;
+  current_away: number;
+  minutes_elapsed: number;
+  red_home: boolean;
+  red_away: boolean;
+  attack_home_mult: number;
+  attack_away_mult: number;
+}
+
+export interface LiveMarketRow {
+  market_id: string;
+  market_title: string;
+  outcome_key: string | null;
+  kalshi_odds: number;
+  market_probability: number;
+  live_model_probability: number;
+  difference: number;
+  volume_24h: number;
+}
+
+export interface LivePredictionResponse {
+  match_id: string;
+  teams: { home: string; away: string };
+  stage: string;
+  live_state: {
+    score: string;
+    minutes_elapsed: number;
+    minutes_remaining: number;
+    red_home: boolean;
+    red_away: boolean;
+    lambda_remaining: { home: number; away: number };
+  };
+  live_outcomes: { home_win: number; draw: number; away_win: number };
+  live_advance: {
+    home: number; away: number;
+    p_reach_et: number; p_reach_pens: number; method: string;
+  } | null;
+  live_confidence: number;
+  user_attack_levers: { home: number; away: number };
+  markets: LiveMarketRow[];
+  generated_at: string;
+  disclaimer: string;
+}
+
 export interface UpcomingMatch {
   match_id: string;
   home: string;
@@ -138,6 +183,13 @@ export const api = {
 
   timeline: (matchId: string) =>
     getJson<{ points: TimelinePoint[] }>(`/timeline?match_id=${matchId}`),
+
+  livePrediction: (matchId: string, state: LiveStateInput) =>
+    getJson<LivePredictionResponse>(`/live?match_id=${matchId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(state),
+    }),
 
   // --- bet-timing / ripeness ------------------------------------------
   watchlist: () =>

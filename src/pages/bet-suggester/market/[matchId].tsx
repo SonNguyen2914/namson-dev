@@ -10,6 +10,7 @@ import {
   api, pct, signedPct,
   PredictionResponse, TimelinePoint,
 } from "../../../lib/suggesterApi";
+import LivePanel from "../../../components/LivePanel";
 
 // Same floors as the backend board — the pick is just row #1 of this
 // match's slice of the same likelihood-first ranking.
@@ -124,6 +125,9 @@ export default function MatchDetail() {
               <Stat label="away xG" value={pred.xg.away.toFixed(2)} />
               <Stat label="model confidence" value={pct(pred.confidence)} />
             </section>
+
+            {/* Live in-play read (Layer 3) */}
+            <LivePanel matchId={matchId as string} />
 
             {/* Model's Pick — row #1 of this match's likelihood board */}
             <section className={`mb-10 rounded-lg border p-5 ${
