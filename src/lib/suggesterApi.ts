@@ -157,6 +157,28 @@ export interface UpcomingMatch {
   has_prediction: boolean;
   is_final: boolean;
   confidence: number | null;
+  // bracket auto-resolution
+  tbd: boolean;                 // a QF side is still a "X/Y winner" placeholder
+  home_resolved: boolean;
+  away_resolved: boolean;
+  provisional_stats: string[];  // resolved teams running on default (unsourced) stats
+}
+
+export interface BracketQF {
+  match_id: string;
+  home: string;
+  home_resolved: boolean;
+  away: string;
+  away_resolved: boolean;
+  fully_resolved: boolean;
+  kickoff: string;
+  venue: string;
+}
+
+export interface BracketResponse {
+  quarterfinals: BracketQF[];
+  provisional_teams: string[];
+  generated_at: string;
 }
 
 export interface TimelinePoint {
@@ -218,6 +240,8 @@ export const api = {
 
   upcoming: (hoursAhead = 72) =>
     getJson<{ matches: UpcomingMatch[] }>(`/upcoming?hours_ahead=${hoursAhead}`),
+
+  bracket: () => getJson<BracketResponse>("/bracket"),
 
   prediction: (matchId: string, forceRefresh = false) =>
     getJson<PredictionResponse>(
