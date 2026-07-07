@@ -8,6 +8,7 @@ import {
   api, countdown, pct, signedPct,
   RipenessAlert, SuggestionRow, UpcomingMatch, WatchlistEntry,
 } from "../../lib/suggesterApi";
+import LiveScoreboard from "../../components/LiveScoreboard";
 
 const POLL_MS = 60 * 1000; // watchlist scores move every 30s poll; refresh often
 
@@ -169,6 +170,9 @@ export default function BetSuggesterDashboard() {
             </section>
           </Link>
         )}
+
+        {/* Live scoreboard — real feed-backed score cards (Apple-style) */}
+        <LiveScoreboard />
 
         {/* In-play matches — kicked off, odds still moving */}
         {inPlay.length > 0 && (

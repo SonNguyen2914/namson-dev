@@ -120,6 +120,31 @@ export interface LiveStateFetch {
   };
 }
 
+export interface LiveScoreEntry {
+  match_id: string;
+  home: string;
+  away: string;
+  home_goals: number;
+  away_goals: number;
+  minutes_elapsed: number | null;
+  status_short: string;
+  red_home: boolean;
+  red_away: boolean;
+  goals_list: {
+    team: "home" | "away";
+    player: string | null;
+    minute: number | null;
+    detail: string | null;
+  }[];
+}
+
+export interface LiveScoresResponse {
+  live: LiveScoreEntry[];
+  budget: { calls_today: number; daily_cap: number; remaining: number;
+            key_configured: boolean };
+  generated_at: string;
+}
+
 export interface UpcomingMatch {
   match_id: string;
   home: string;
@@ -211,6 +236,8 @@ export const api = {
 
   liveState: (matchId: string) =>
     getJson<LiveStateFetch>(`/live-state?match_id=${matchId}`),
+
+  liveScores: () => getJson<LiveScoresResponse>("/live-scores"),
 
   // --- bet-timing / ripeness ------------------------------------------
   watchlist: () =>
