@@ -275,3 +275,19 @@ export function countdown(seconds: number): string {
   const m = Math.floor((seconds % 3600) / 60);
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
+
+// National-team flag emoji, keyed by our schedule's team names. Dependency-
+// free and instantly recognizable — better than club-style logo PNGs for a
+// World Cup. Unknown teams fall back to a neutral marker.
+const FLAGS: Record<string, string> = {
+  "Argentina": "🇦🇷", "Egypt": "🇪🇬", "Brazil": "🇧🇷", "Norway": "🇳🇴",
+  "Mexico": "🇲🇽", "England": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Portugal": "🇵🇹", "Spain": "🇪🇸",
+  "United States": "🇺🇸", "Belgium": "🇧🇪", "Switzerland": "🇨🇭",
+  "Colombia": "🇨🇴", "France": "🇫🇷", "Morocco": "🇲🇦", "Paraguay": "🇵🇾",
+  "Netherlands": "🇳🇱", "Croatia": "🇭🇷", "Japan": "🇯🇵", "Senegal": "🇸🇳",
+  "Australia": "🇦🇺", "Cape Verde": "🇨🇻", "Ivory Coast": "🇨🇮",
+  "Algeria": "🇩🇿", "Austria": "🇦🇹", "Scotland": "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Haiti": "🇭🇹",
+  "DR Congo": "🇨🇩", "Canada": "🇨🇦",
+};
+
+export const flag = (team: string): string => FLAGS[team] ?? "⚽";

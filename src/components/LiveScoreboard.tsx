@@ -5,7 +5,7 @@
 // no match is live, so it never clutters the page pre-match.
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { api, LiveScoreEntry } from "../lib/suggesterApi";
+import { api, flag, LiveScoreEntry } from "../lib/suggesterApi";
 
 const POLL_MS = 30000; // live scores move fast; 30s keeps it fresh & cheap
 
@@ -60,9 +60,10 @@ function LiveCard({ m }: { m: LiveScoreEntry }) {
         {/* score line — big and centered like the reference */}
         <div className="flex items-center justify-between gap-4">
           <div className="flex-1 text-right">
-            <p className="text-lg text-neutral-200">
+            <p className="flex items-center justify-end gap-2 text-lg text-neutral-200">
               {m.home}
-              {m.red_home && <span className="ml-2 text-xs text-red-500">▮</span>}
+              <span className="text-2xl">{flag(m.home)}</span>
+              {m.red_home && <span className="text-xs text-red-500">▮</span>}
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -75,8 +76,9 @@ function LiveCard({ m }: { m: LiveScoreEntry }) {
             </span>
           </div>
           <div className="flex-1 text-left">
-            <p className="text-lg text-neutral-200">
-              {m.red_away && <span className="mr-2 text-xs text-red-500">▮</span>}
+            <p className="flex items-center gap-2 text-lg text-neutral-200">
+              {m.red_away && <span className="text-xs text-red-500">▮</span>}
+              <span className="text-2xl">{flag(m.away)}</span>
               {m.away}
             </p>
           </div>

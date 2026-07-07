@@ -84,28 +84,9 @@ export default function BetSuggesterDashboard() {
   // In-play: on the board (kickoff+4h tracking window) but past kickoff,
   // so absent from the pre-kickoff-only "upcoming" list. Derived from
   // suggestions since the upcoming endpoint intentionally drops them.
+  // nowMs powers the "● in play" tag on individual ranking-board rows.
+  // (The standalone in-play strip was replaced by the LiveScoreboard card.)
   const nowMs = Date.now();
-  const inPlayMap = new Map<
-    string, { home: string; away: string; kickoff: string; count: number }
-  >();
-  for (const s of suggestions) {
-    if (new Date(s.kickoff).getTime() <= nowMs) {
-      const e = inPlayMap.get(s.match_id);
-      if (e) e.count += 1;
-      else inPlayMap.set(s.match_id, {
-        home: s.home, away: s.away, kickoff: s.kickoff, count: 1,
-      });
-    }
-  }
-  const inPlay = Array.from(inPlayMap, ([match_id, v]) => ({ match_id, ...v }));
-
-  function kickedOffAgo(kickoff: string): string {
-    const mins = Math.max(0,
-      Math.floor((nowMs - new Date(kickoff).getTime()) / 60000));
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return h > 0 ? `${h}h ${m}m ago` : `${m}m ago`;
-  }
 
   async function toggleWatch(s: SuggestionRow) {
     try {
@@ -144,7 +125,10 @@ export default function BetSuggesterDashboard() {
           </div>
         )}
 
-        {/* Next match hero */}
+        {/* Live scoreboard — real feed-backed score cards, at the top */}
+        <LiveScoreboard />
+
+        {/* Next match hero — under the live board */}
         {next && (
           <Link href={`/bet-suggester/market/${next.match_id}`}>
             <section className="mb-10 cursor-pointer rounded-lg border border-emerald-900/60 bg-emerald-950/20 p-6 transition hover:border-emerald-700">
@@ -169,36 +153,6 @@ export default function BetSuggesterDashboard() {
               </div>
             </section>
           </Link>
-        )}
-
-        {/* Live scoreboard — real feed-backed score cards (Apple-style) */}
-        <LiveScoreboard />
-
-        {/* In-play matches — kicked off, odds still moving */}
-        {inPlay.length > 0 && (
-          <section className="mb-10">
-            {inPlay.map((m) => (
-              <Link key={m.match_id} href={`/bet-suggester/market/${m.match_id}`}>
-                <div className="mb-3 cursor-pointer rounded-lg border border-red-900/60 bg-red-950/20 p-4 transition hover:border-red-700">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <p className="text-neutral-100">
-                      <span className="mr-2 animate-pulse text-red-500">●</span>
-                      <span className="text-xs uppercase tracking-widest text-red-400">
-                        in play
-                      </span>
-                      <span className="ml-3">
-                        {m.home} <span className="text-neutral-500">vs</span> {m.away}
-                      </span>
-                    </p>
-                    <p className="text-xs tabular-nums text-neutral-400">
-                      kicked off {kickedOffAgo(m.kickoff)} · {m.count} live bet
-                      {m.count === 1 ? "" : "s"} on the board · odds still moving
-                    </p>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </section>
         )}
 
         {/* Ranking board — likelihood-first, all matches pooled */}
