@@ -7,10 +7,15 @@
 // separate from the pre-match board: this shows the model's live read NEXT
 // TO the market's own price, with the gap labelled informational — never as
 // exploitable edge, because the market already knows the score.
+//
+// Presentation note: the live W/D/L here is a SINGLE segmented bar (unlike
+// the pre-match stat bars) because these come from one simulation and sum
+// to 100% — a partition bar is honest for this data.
 import { useState } from "react";
 import {
   api, pct, LivePredictionResponse, LiveStateInput,
 } from "../lib/suggesterApi";
+import { Eyebrow } from "./ui";
 
 export default function LivePanel({ matchId }: { matchId: string }) {
   // Full team names arrive with the first live response; until then fall
@@ -70,7 +75,7 @@ export default function LivePanel({ matchId }: { matchId: string }) {
     };
     try {
       setRes(await api.livePrediction(matchId, state));
-    } catch (e) {
+    } catch {
       setErr("Could not compute a live read. Is the backend reachable?");
     } finally {
       setLoading(false);
@@ -81,92 +86,90 @@ export default function LivePanel({ matchId }: { matchId: string }) {
   const away = res?.teams?.away ?? codeA ?? "Away";
 
   const num = (v: number, set: (n: number) => void, min: number, max: number) => (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1.5">
       <button
         onClick={() => set(Math.max(min, v - 1))}
-        className="h-7 w-7 rounded border border-neutral-700 text-neutral-300 hover:border-neutral-500"
+        className="h-7 w-7 rounded-md border border-line text-ink-mid transition-colors hover:border-line-strong hover:text-ink-hi"
       >−</button>
-      <span className="w-8 text-center tabular-nums text-white">{v}</span>
+      <span className="w-8 text-center font-mono tabular-nums text-ink-hi">{v}</span>
       <button
         onClick={() => set(Math.min(max, v + 1))}
-        className="h-7 w-7 rounded border border-neutral-700 text-neutral-300 hover:border-neutral-500"
+        className="h-7 w-7 rounded-md border border-line text-ink-mid transition-colors hover:border-line-strong hover:text-ink-hi"
       >+</button>
     </div>
   );
 
   return (
-    <section className="mb-10 rounded-lg border border-sky-900/50 bg-sky-950/10 p-5">
-      <div className="mb-1 flex items-center gap-2">
-        <span className="animate-pulse text-sky-400">●</span>
-        <h3 className="text-sm uppercase tracking-widest text-sky-300">
-          Live read — experimental
-        </h3>
+    <section className="mb-14 rounded-2xl border border-skylive/25 bg-skylive/5 p-5 sm:p-6">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-skylive" />
+        <Eyebrow tone="sky">Live read — experimental</Eyebrow>
       </div>
-      <p className="mb-4 text-xs text-neutral-500">
+      <p className="mb-5 max-w-xl text-xs leading-relaxed text-ink-low">
         Enter the current state while watching. The model re-simulates the
         rest of the match from here. Shown next to the market&apos;s own price —
         the gap is informational, not a betting edge.
       </p>
 
       {/* auto-fill from the live feed (Layer 2) */}
-      <div className="mb-4">
+      <div className="mb-5">
         <button
           onClick={autoFill} disabled={autoLoading}
-          className={`rounded border px-3 py-1.5 text-xs uppercase tracking-wider transition ${
+          className={`rounded-lg border px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] transition-colors ${
             autoLoading
-              ? "cursor-not-allowed border-neutral-800 text-neutral-600"
-              : "border-emerald-800 text-emerald-400 hover:border-emerald-500"
+              ? "cursor-not-allowed border-line text-ink-faint"
+              : "border-accent/40 text-accent hover:border-accent hover:bg-accent/5"
           }`}
         >
           {autoLoading ? "Fetching…" : "⟳ Auto-fill from live feed"}
         </button>
-        {autoMsg && <p className="mt-2 text-xs text-neutral-400">{autoMsg}</p>}
+        {autoMsg && <p className="mt-2 text-xs text-ink-mid">{autoMsg}</p>}
       </div>
 
       {/* --- state entry --- */}
-      <div className="mb-4 grid gap-4 sm:grid-cols-2">
+      <div className="mb-5 grid gap-5 sm:grid-cols-2">
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-neutral-300">{home} goals</span>
+            <span className="text-sm text-ink-mid">{home} goals</span>
             {num(scoreH, setScoreH, 0, 20)}
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-neutral-300">{away} goals</span>
+            <span className="text-sm text-ink-mid">{away} goals</span>
             {num(scoreA, setScoreA, 0, 20)}
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-neutral-300">minute</span>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-ink-mid">minute</span>
             <input
               type="range" min={0} max={120} value={minute}
               onChange={(e) => setMinute(Number(e.target.value))}
-              className="w-32 accent-sky-500"
+              className="w-32 accent-skylive"
             />
-            <span className="w-10 text-right tabular-nums text-white">{minute}&apos;</span>
+            <span className="w-10 text-right font-mono tabular-nums text-ink-hi">{minute}&apos;</span>
           </div>
         </div>
 
         <div className="space-y-3">
-          <label className="flex items-center gap-2 text-sm text-neutral-300">
+          <label className="flex items-center gap-2 text-sm text-ink-mid">
             <input type="checkbox" checked={redH}
               onChange={(e) => setRedH(e.target.checked)}
-              className="accent-red-500" />
+              className="accent-live" />
             {home} red card
           </label>
-          <label className="flex items-center gap-2 text-sm text-neutral-300">
+          <label className="flex items-center gap-2 text-sm text-ink-mid">
             <input type="checkbox" checked={redA}
               onChange={(e) => setRedA(e.target.checked)}
-              className="accent-red-500" />
+              className="accent-live" />
             {away} red card
           </label>
         </div>
       </div>
 
       {/* --- optional qualitative levers --- */}
-      <details className="mb-4 rounded border border-neutral-800 p-3">
-        <summary className="cursor-pointer text-xs uppercase tracking-wider text-neutral-500">
+      <details className="mb-5 rounded-xl border border-line p-3.5">
+        <summary className="cursor-pointer font-mono text-[11px] uppercase tracking-[0.14em] text-ink-low">
           Attack intensity levers (optional — your read)
         </summary>
-        <p className="mt-2 mb-3 text-xs text-neutral-600">
+        <p className="mt-3 mb-3 text-xs leading-relaxed text-ink-faint">
           Seeing a team throw everyone forward? Nudge their attack. This is your
           transparent adjustment to the model&apos;s inputs — you can see exactly
           what it does. 1.0 = no change.
@@ -177,77 +180,124 @@ export default function LivePanel({ matchId }: { matchId: string }) {
 
       <button
         onClick={run} disabled={loading}
-        className={`rounded border px-4 py-2 text-sm uppercase tracking-wider transition ${
+        className={`rounded-lg border px-4 py-2 font-mono text-[11px] uppercase tracking-[0.14em] transition-colors ${
           loading
-            ? "cursor-not-allowed border-neutral-800 text-neutral-600"
-            : "border-sky-700 text-sky-300 hover:border-sky-500 hover:text-sky-200"
+            ? "cursor-not-allowed border-line text-ink-faint"
+            : "border-skylive/50 text-skylive hover:border-skylive hover:bg-skylive/5"
         }`}
       >
         {loading ? "Simulating…" : "Compute live read"}
       </button>
 
-      {err && <p className="mt-3 text-sm text-red-400">{err}</p>}
+      {err && <p className="mt-3 text-sm text-live">{err}</p>}
 
       {res && !loading && (
-        <div className="mt-5">
-          {/* live outcome summary */}
-          <div className="mb-4 grid grid-cols-3 gap-3 text-center">
-            <LiveStat label={`${home} win (90)`} value={pct(res.live_outcomes.home_win)} />
-            <LiveStat label="draw (90)" value={pct(res.live_outcomes.draw)} />
-            <LiveStat label={`${away} win (90)`} value={pct(res.live_outcomes.away_win)} />
+        <div className="mt-7">
+          {/* the entered state, score-as-hero */}
+          <div className="mb-6 text-center">
+            <p className="text-5xl font-semibold tracking-tight tabular-nums text-ink-hi sm:text-6xl">
+              {res.live_state.score}
+            </p>
+            <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-low">
+              {res.live_state.minutes_remaining}&prime; of regulation left
+              {res.live_state.red_home && ` · ${home} red card`}
+              {res.live_state.red_away && ` · ${away} red card`}
+            </p>
           </div>
+
+          {/* live W/D/L — one simulation, sums to 100%, so one honest bar */}
+          <div className="mb-5">
+            <Eyebrow className="mb-3">rest-of-match simulation · regulation</Eyebrow>
+            <SegBar segs={[
+              { label: `${home} win (90′)`, value: res.live_outcomes.home_win, color: "var(--accent)" },
+              { label: "draw (90′)", value: res.live_outcomes.draw, color: "rgba(255,255,255,0.22)" },
+              { label: `${away} win (90′)`, value: res.live_outcomes.away_win, color: "var(--skylive)" },
+            ]} />
+          </div>
+
           {res.live_advance && res.stage === "knockout" && (
-            <div className="mb-4 grid grid-cols-3 gap-3 text-center">
-              <LiveStat label={`${home} advance`} value={pct(res.live_advance.home)} accent />
-              <LiveStat label="reaches ET" value={pct(res.live_advance.p_reach_et)} />
-              <LiveStat label={`${away} advance`} value={pct(res.live_advance.away)} accent />
+            <div className="mb-6">
+              <Eyebrow className="mb-3">advance · with ET + penalties</Eyebrow>
+              <SegBar segs={[
+                { label: `${home} advance`, value: res.live_advance.home, color: "var(--accent)" },
+                { label: `${away} advance`, value: res.live_advance.away, color: "var(--skylive)" },
+              ]} />
+              <p className="mt-2.5 font-mono text-[11px] tabular-nums text-ink-faint">
+                reaches ET {pct(res.live_advance.p_reach_et)} · reaches pens {pct(res.live_advance.p_reach_pens)}
+              </p>
             </div>
           )}
 
-          <p className="mb-2 text-xs uppercase tracking-wider text-neutral-500">
+          <Eyebrow className="mb-3">
             Live read vs market — {res.live_state.score},{" "}
             {res.live_state.minutes_remaining}&apos; left
-          </p>
-          <div className="overflow-x-auto rounded-lg border border-neutral-800">
-            <table className="w-full text-sm tabular-nums">
-              <thead className="bg-neutral-900 text-left text-xs uppercase tracking-wider text-neutral-500">
+          </Eyebrow>
+          <div className="overflow-x-auto rounded-xl border border-line">
+            <table className="w-full text-sm">
+              <thead className="bg-elev text-left font-mono text-[11px] uppercase tracking-[0.14em] text-ink-low">
                 <tr>
-                  <th className="px-4 py-2">Market</th>
-                  <th className="px-3 py-2 text-right">Live model</th>
-                  <th className="px-3 py-2 text-right">Market</th>
-                  <th className="px-3 py-2 text-right">Diff</th>
-                  <th className="px-3 py-2 text-right">Multiplier</th>
+                  <th className="px-4 py-2.5 font-normal">Market</th>
+                  <th className="px-3 py-2.5 text-right font-normal">Live model</th>
+                  <th className="px-3 py-2.5 text-right font-normal">Market</th>
+                  <th className="px-3 py-2.5 text-right font-normal">Diff</th>
+                  <th className="px-3 py-2.5 text-right font-normal">Multiplier</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-neutral-800/70">
+              <tbody>
                 {res.markets.slice(0, 15).map((m) => (
-                  <tr key={m.market_id} className="hover:bg-neutral-900/60">
-                    <td className="px-4 py-2 text-neutral-100">{m.market_title}</td>
-                    <td className="px-3 py-2 text-right text-sky-300">
+                  <tr key={m.market_id} className="border-t border-line transition-colors hover:bg-elev">
+                    <td className="px-4 py-2.5 text-ink-hi">{m.market_title}</td>
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-skylive">
                       {pct(m.live_model_probability)}
                     </td>
-                    <td className="px-3 py-2 text-right text-neutral-400">
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink-mid">
                       {pct(m.market_probability)}
                     </td>
-                    <td className="px-3 py-2 text-right text-neutral-500">
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink-low">
                       {m.difference >= 0 ? "+" : ""}{(m.difference * 100).toFixed(1)}%
                     </td>
-                    <td className="px-3 py-2 text-right">{m.kalshi_odds.toFixed(2)}x</td>
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink-mid">{m.kalshi_odds.toFixed(2)}x</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           {res.markets.length === 0 && (
-            <p className="mt-2 text-xs text-neutral-500">
+            <p className="mt-2.5 text-xs text-ink-low">
               No live market prices available for this match right now (its books
               may be closed). The read above is simulation-only.
             </p>
           )}
-          <p className="mt-3 text-xs italic text-neutral-600">{res.disclaimer}</p>
+          <p className="mt-4 text-xs italic leading-relaxed text-ink-faint">{res.disclaimer}</p>
         </div>
       )}
     </section>
+  );
+}
+
+function SegBar({ segs }: {
+  segs: { label: string; value: number; color: string }[];
+}) {
+  return (
+    <div>
+      <div className="flex h-2 w-full overflow-hidden rounded-full bg-elev2">
+        {segs.map((s) => (
+          <div
+            key={s.label}
+            style={{ width: `${Math.max(s.value * 100, 0)}%`, background: s.color }}
+          />
+        ))}
+      </div>
+      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
+        {segs.map((s) => (
+          <span key={s.label} className="flex items-center gap-1.5 text-[11px] text-ink-low">
+            <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: s.color }} />
+            {s.label}
+            <span className="font-mono tabular-nums text-ink-mid">{pct(s.value)}</span>
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -255,29 +305,16 @@ function Lever({ label, v, set }: {
   label: string; v: number; set: (n: number) => void;
 }) {
   return (
-    <div className="mb-2 flex items-center gap-3">
-      <span className="w-28 text-xs text-neutral-400">{label}</span>
+    <div className="mb-2.5 flex items-center gap-3">
+      <span className="w-28 shrink-0 text-xs text-ink-mid">{label}</span>
       <input
         type="range" min={0.5} max={2.0} step={0.05} value={v}
         onChange={(e) => set(Number(e.target.value))}
-        className="flex-1 accent-amber-500"
+        className="flex-1 accent-warn"
       />
-      <span className="w-10 text-right text-xs tabular-nums text-neutral-300">
+      <span className="w-10 shrink-0 text-right font-mono text-xs tabular-nums text-ink-mid">
         {v.toFixed(2)}×
       </span>
-    </div>
-  );
-}
-
-function LiveStat({ label, value, accent }: {
-  label: string; value: string; accent?: boolean;
-}) {
-  return (
-    <div className={`rounded-lg border p-3 ${
-      accent ? "border-sky-900/50 bg-sky-950/20" : "border-neutral-800"
-    }`}>
-      <p className="text-lg text-white">{value}</p>
-      <p className="mt-0.5 text-xs text-neutral-500">{label}</p>
     </div>
   );
 }

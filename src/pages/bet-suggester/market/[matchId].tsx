@@ -1,4 +1,6 @@
 // Match detail — namson.dev/bet-suggester/market/BRA_SRB
+// Apple-Sports treatment: the matchup is the hero, outcome probabilities as
+// thin horizontal stat bars, everything else glanceable and subordinate.
 // On-demand predictions: cached by default, "Refresh" forces a fresh
 // Monte Carlo run against live odds. Shows xG, scoreline distribution,
 // every market priced, and how the prediction evolved over the day.
@@ -7,10 +9,11 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 import {
-  api, pct, signedPct,
+  api, flag, pct, signedPct,
   PredictionResponse, TimelinePoint,
 } from "../../../lib/suggesterApi";
 import LivePanel from "../../../components/LivePanel";
+import { Eyebrow, Reveal } from "../../../components/ui";
 
 // Same floors as the backend board — the pick is just row #1 of this
 // match's slice of the same likelihood-first ranking.
@@ -24,12 +27,12 @@ export default function MatchDetail() {
   const [pred, setPred] = useState<PredictionResponse | null>(null);
   const [timeline, setTimeline] = useState<TimelinePoint[]>([]);
   const [watched, setWatched] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(false);
+  const [teams, setTeams] = useState<{ home: string; away: string } | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const load = useCallback(async (force: boolean) => {
     if (!matchId) return;
-    setLoading(true);
     try {
       const p = await api.prediction(matchId, force);
       setPred(p);
@@ -44,6 +47,25 @@ export default function MatchDetail() {
     }
   }, [matchId]);
 
+  // Resolve full team names for the hero (best-effort — the id codes are
+  // the honest fallback). Pre-kickoff matches come from /upcoming; in-play
+  // ones from /live-scores (served from the backend's shared 20s cache).
+  useEffect(() => {
+    if (!matchId) return;
+    let alive = true;
+    (async () => {
+      try {
+        const u = await api.upcoming(72);
+        const m = u.matches.find((x) => x.match_id === matchId);
+        if (m && alive) { setTeams({ home: m.home, away: m.away }); return; }
+        const ls = await api.liveScores();
+        const l = ls.live.find((x) => x.match_id === matchId);
+        if (l && alive) setTeams({ home: l.home, away: l.away });
+      } catch { /* fall back to the id codes */ }
+    })();
+    return () => { alive = false; };
+  }, [matchId]);
+
   async function toggleWatch(marketId: string, marketTitle: string) {
     if (!matchId) return;
     if (watched.has(marketId)) {
@@ -55,7 +77,16 @@ export default function MatchDetail() {
     }
   }
 
-  useEffect(() => { load(false); }, [load]);
+  useEffect(() => {
+    // Scheduled so load()'s setState runs in an async callback, not sync
+    // inside the effect body (react-hooks/set-state-in-effect).
+    const t = setTimeout(() => load(false), 0);
+    return () => clearTimeout(t);
+  }, [load]);
+
+  const [codeH, codeA] = (matchId ?? "_").split("_");
+  const home = teams?.home ?? codeH ?? "Home";
+  const away = teams?.away ?? codeA ?? "Away";
 
   // Likelihood ↓ then edge ↓ — same ordering as the landing board
   const sortedMarkets = pred
@@ -69,13 +100,24 @@ export default function MatchDetail() {
     pickTier = pick ? 40 : null;
   }
 
+  // Outcome probabilities for the stat bars — read straight off the priced
+  // markets (post-anchoring), so the bars and the table can never disagree.
+  // Three separate bars, NOT one segmented bar: these are independent
+  // market-anchored numbers and don't necessarily sum to 100%.
+  const outcomeProb = (key: string) =>
+    sortedMarkets.find((m) => m.outcome_key === key)?.model_probability;
+  const pHome = outcomeProb("home_win");
+  const pDraw = outcomeProb("draw");
+  const pAway = outcomeProb("away_win");
+  const hasOutcomes = [pHome, pDraw, pAway].some((v) => v != null);
+
   const freshnessBadge = pred && (
-    <span className={`rounded px-2 py-1 text-xs ${
+    <span className={`rounded-md border px-2.5 py-1 font-mono text-[11px] tracking-wide ${
       pred.freshness === "fresh"
-        ? "bg-emerald-950 text-emerald-400"
+        ? "border-accent/40 text-accent"
         : pred.is_stale
-        ? "bg-amber-950 text-amber-400"
-        : "bg-neutral-800 text-neutral-400"
+        ? "border-warn/40 text-warn"
+        : "border-line text-ink-low"
     }`}>
       {pred.freshness === "fresh"
         ? `fresh · ${pred.inference_time_ms ?? "?"}ms inference`
@@ -86,129 +128,174 @@ export default function MatchDetail() {
   );
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-200 font-mono">
+    <div className="min-h-screen bg-bs font-sans text-ink-mid">
       <Head><title>{matchId ?? "Match"} · Bet Suggester</title></Head>
 
-      <div className="mx-auto max-w-4xl px-4 py-10">
-        <Link href="/bet-suggester" className="text-xs text-neutral-500 hover:text-emerald-400">
+      <div className="mx-auto max-w-4xl px-5 py-12">
+        <Link
+          href="/bet-suggester"
+          className="font-mono text-[11px] uppercase tracking-[0.18em] text-ink-low transition-colors hover:text-accent"
+        >
           ← all suggestions
         </Link>
 
-        <header className="mb-8 mt-4 flex flex-wrap items-center justify-between gap-4 border-b border-neutral-800 pb-6">
-          <div>
-            <h1 className="text-2xl text-white">{matchId?.replace("_", " vs ")}</h1>
-            <div className="mt-2 flex items-center gap-3">
-              {freshnessBadge}
-              {pred?.is_final && (
-                <span className="rounded bg-red-950 px-2 py-1 text-xs text-red-400">
-                  🔒 final decision locked
-                </span>
-              )}
-            </div>
+        {/* ============ HERO — the matchup ============ */}
+        <header className="hero-ambient mt-8 mb-12 rounded-3xl pb-2 text-center">
+          <Eyebrow className="mb-4">{matchId}</Eyebrow>
+          <h1 className="text-4xl font-semibold tracking-tight text-ink-hi sm:text-5xl">
+            {teams && <span className="mr-3">{flag(home)}</span>}
+            {home}
+            <span className="mx-3 text-xl font-normal text-ink-faint sm:text-2xl">vs</span>
+            {away}
+            {teams && <span className="ml-3">{flag(away)}</span>}
+          </h1>
+
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            {freshnessBadge}
+            {pred?.is_final && (
+              <span className="rounded-md border border-live/40 px-2.5 py-1 font-mono text-[11px] tracking-wide text-live">
+                🔒 final decision locked
+              </span>
+            )}
+            <button
+              onClick={() => { setLoading(true); load(true); }}
+              disabled={loading}
+              className={`rounded-lg border px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] transition-colors ${
+                loading
+                  ? "cursor-not-allowed border-line text-ink-faint"
+                  : "border-accent/40 text-accent hover:border-accent hover:bg-accent/5"
+              }`}
+            >
+              {loading ? "Simulating…" : "↻ Refresh (fresh simulation)"}
+            </button>
           </div>
-          <button
-            onClick={() => load(true)}
-            disabled={loading}
-            className="rounded border border-emerald-800 bg-emerald-950/40 px-4 py-2 text-sm text-emerald-400 transition hover:bg-emerald-900/40 disabled:opacity-50"
-          >
-            {loading ? "Simulating…" : "↻ Refresh (fresh simulation)"}
-          </button>
         </header>
 
-        {error && <p className="mb-6 text-sm text-red-400">{error}</p>}
+        {error && <p className="mb-8 text-center text-sm text-live">{error}</p>}
 
         {pred && (
           <>
+            {/* Outcome probabilities — thin stat bars, Apple-Sports style */}
+            {hasOutcomes && (
+              <Reveal>
+              <section className="mb-10 rounded-2xl border border-line bg-elev p-5 sm:p-6">
+                <Eyebrow className="mb-4">
+                  model outcome probabilities · market-anchored
+                </Eyebrow>
+                <div className="space-y-3">
+                  {pHome != null && <OutcomeBar label={`${home} win`} value={pHome} />}
+                  {pDraw != null && <OutcomeBar label="Draw" value={pDraw} />}
+                  {pAway != null && <OutcomeBar label={`${away} win`} value={pAway} />}
+                </div>
+                <p className="mt-4 text-[11px] leading-relaxed text-ink-faint">
+                  Read straight off the priced markets below — independent numbers,
+                  so they won&apos;t sum to exactly 100%.
+                </p>
+              </section>
+              </Reveal>
+            )}
+
             {/* xG + confidence */}
-            <section className="mb-8 grid grid-cols-3 gap-3">
+            <Reveal>
+            <section className="mb-10 grid grid-cols-3 gap-3">
               <Stat label="home xG" value={pred.xg.home.toFixed(2)} />
               <Stat label="away xG" value={pred.xg.away.toFixed(2)} />
               <Stat label="model confidence" value={pct(pred.confidence)} />
             </section>
+            </Reveal>
 
             {/* Live in-play read (Layer 3) */}
             <LivePanel matchId={matchId as string} />
 
             {/* Model's Pick — row #1 of this match's likelihood board */}
-            <section className={`mb-10 rounded-lg border p-5 ${
-              pick ? "border-emerald-900/60 bg-emerald-950/20"
-                   : "border-neutral-800"
+            <Reveal>
+            <section className={`glow mb-14 rounded-2xl border p-6 ${
+              pick ? "glow-accent border-accent/25 bg-elev"
+                   : "border-line"
             }`}>
-              <p className="text-xs uppercase tracking-widest text-neutral-400">
+              <Eyebrow>
                 Model&apos;s pick — most likely bet on this match
-              </p>
+              </Eyebrow>
               {pick ? (
                 <>
-                  <p className="mt-2 text-lg text-white">{pick.market_title}</p>
-                  <p className="mt-1 text-sm tabular-nums text-neutral-300">
+                  <p className="mt-3 text-xl font-medium text-ink-hi sm:text-2xl">{pick.market_title}</p>
+                  <p className="mt-2 font-mono text-sm tabular-nums text-ink-mid">
                     {pct(pick.model_probability)} likely ·{" "}
-                    <span className={pick.edge >= 0 ? "text-emerald-400" : "text-red-400"}>
+                    <span className={pick.edge >= 0 ? "text-accent" : "text-neg"}>
                       {signedPct(pick.edge)} edge
                     </span>{" "}
                     · {pick.kalshi_odds?.toFixed(2)}x payout
                   </p>
                   {pickTier === 40 && (
-                    <p className="mt-2 text-xs text-amber-400">
+                    <p className="mt-3 text-xs text-warn">
                       Expanded to 40%+ likely — nothing on this match cleared 49%+.
                     </p>
                   )}
                 </>
               ) : (
-                <p className="mt-2 text-sm text-neutral-500">
+                <p className="mt-3 text-sm text-ink-low">
                   Nothing on this match is 40%+ likely right now — no honest
                   pick to make.
                 </p>
               )}
             </section>
+            </Reveal>
 
             {/* Scoreline distribution */}
-            <section className="mb-10">
-              <h3 className="mb-3 text-sm uppercase tracking-widest text-neutral-400">
-                Most likely scorelines ({">"}10,000 simulations)
+            <Reveal>
+            <section className="mb-14">
+              <Eyebrow className="mb-2">simulation</Eyebrow>
+              <h3 className="mb-4 text-lg font-medium text-ink-hi">
+                Most likely scorelines <span className="text-sm font-normal text-ink-low">· {">"}10,000 simulations</span>
               </h3>
-              <div className="space-y-1.5">
+              <div className="space-y-2.5">
                 {pred.scorelines.slice(0, 8).map((s) => (
-                  <div key={s.score} className="flex items-center gap-3 text-sm tabular-nums">
-                    <span className="w-10 text-neutral-300">{s.score}</span>
-                    <div className="h-4 flex-1 overflow-hidden rounded-sm bg-neutral-900">
+                  <div key={s.score} className="flex items-center gap-3">
+                    <span className="w-10 shrink-0 font-mono text-sm tabular-nums text-ink-mid">{s.score}</span>
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-elev2">
                       <div
-                        className="h-full bg-emerald-600/70"
+                        className="h-full rounded-full bg-accent/70"
                         style={{ width: `${Math.min(s.prob * 400, 100)}%` }}
                       />
                     </div>
-                    <span className="w-14 text-right text-neutral-400">{pct(s.prob)}</span>
+                    <span className="w-14 shrink-0 text-right font-mono text-xs tabular-nums text-ink-low">{pct(s.prob)}</span>
                   </div>
                 ))}
               </div>
             </section>
+            </Reveal>
 
             {/* Every market priced */}
-            <section className="mb-10">
-              <h3 className="mb-3 text-sm uppercase tracking-widest text-neutral-400">
+            <Reveal>
+            <section className="mb-14">
+              <Eyebrow className="mb-2">markets</Eyebrow>
+              <h3 className="mb-4 text-lg font-medium text-ink-hi">
                 Every Kalshi market on this match
               </h3>
-              <div className="overflow-x-auto rounded-lg border border-neutral-800">
-                <table className="w-full text-sm tabular-nums">
-                  <thead className="bg-neutral-900 text-left text-xs uppercase tracking-wider text-neutral-500">
+              <div className="overflow-x-auto rounded-xl border border-line">
+                <table className="w-full text-sm">
+                  <thead className="bg-elev text-left font-mono text-[11px] uppercase tracking-[0.14em] text-ink-low">
                     <tr>
-                      <th className="px-4 py-3">Market</th>
-                      <th className="px-3 py-3 text-right">Likelihood</th>
-                      <th className="px-3 py-3 text-right">Edge</th>
-                      <th className="px-3 py-3 text-right">Multiplier</th>
-                      <th className="px-4 py-3 text-center">Alert</th>
+                      <th className="px-4 py-3 font-normal">Market</th>
+                      <th className="px-3 py-3 text-right font-normal">Likelihood</th>
+                      <th className="px-3 py-3 text-right font-normal">Edge</th>
+                      <th className="px-3 py-3 text-right font-normal">Multiplier</th>
+                      <th className="px-4 py-3 text-center font-normal">Alert</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-neutral-800/70">
+                  <tbody>
                     {sortedMarkets.map((m) => (
-                      <tr key={m.market_id} className="hover:bg-neutral-900/60">
-                        <td className="px-4 py-3 text-neutral-100">{m.market_title}</td>
-                        <td className="px-3 py-3 text-right text-neutral-100">
+                      <tr key={m.market_id} className="border-t border-line transition-colors hover:bg-elev">
+                        <td className="px-4 py-3 text-ink-hi">{m.market_title}</td>
+                        <td className="px-3 py-3 text-right font-mono tabular-nums text-ink-hi">
                           {pct(m.model_probability)}
                         </td>
-                        <td className={`px-3 py-3 text-right ${m.edge >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                        <td className={`px-3 py-3 text-right font-mono tabular-nums ${
+                          m.edge >= 0 ? "text-accent" : "text-neg"
+                        }`}>
                           {signedPct(m.edge)}
                         </td>
-                        <td className="px-3 py-3 text-right">
+                        <td className="px-3 py-3 text-right font-mono tabular-nums text-ink-mid">
                           {m.kalshi_odds?.toFixed(2)}x
                         </td>
                         <td className="px-4 py-3 text-center">
@@ -217,13 +304,13 @@ export default function MatchDetail() {
                             title={watched.has(m.market_id)
                               ? "Watching — you'll be pinged when the price is ripe. Click to stop."
                               : "Notify me when this bet's timing is ripe"}
-                            className={`rounded px-2 py-1 text-xs transition ${
+                            className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors ${
                               watched.has(m.market_id)
-                                ? "bg-amber-950 text-amber-400 hover:bg-amber-900"
-                                : "bg-neutral-800 text-neutral-500 hover:text-amber-400"
+                                ? "border-warn/50 text-warn hover:border-warn"
+                                : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"
                             }`}
                           >
-                            {watched.has(m.market_id) ? "🔔 watching" : "🔕 watch"}
+                            {watched.has(m.market_id) ? "Watching" : "Watch"}
                           </button>
                         </td>
                       </tr>
@@ -231,45 +318,50 @@ export default function MatchDetail() {
                   </tbody>
                 </table>
               </div>
-              <p className="mt-2 text-xs text-neutral-600">
+              <p className="mt-3 text-xs leading-relaxed text-ink-faint">
                 Watched bets are polled every 30s. You get a Discord ping + feed entry
                 the moment the ripeness score crosses the alert threshold with positive edge.
               </p>
             </section>
+            </Reveal>
 
             {/* Prediction timeline */}
             {timeline.length > 1 && (
+              <Reveal>
               <section>
-                <h3 className="mb-3 text-sm uppercase tracking-widest text-neutral-400">
+                <Eyebrow className="mb-2">history</Eyebrow>
+                <h3 className="mb-4 text-lg font-medium text-ink-hi">
                   How the home-win prediction evolved today
                 </h3>
-                <div className="overflow-x-auto rounded-lg border border-neutral-800">
-                  <table className="w-full text-sm tabular-nums">
-                    <thead className="bg-neutral-900 text-left text-xs uppercase tracking-wider text-neutral-500">
+                <div className="overflow-x-auto rounded-xl border border-line">
+                  <table className="w-full text-sm">
+                    <thead className="bg-elev text-left font-mono text-[11px] uppercase tracking-[0.14em] text-ink-low">
                       <tr>
-                        <th className="px-4 py-2">Time</th>
-                        <th className="px-3 py-2 text-right">Model</th>
-                        <th className="px-3 py-2 text-right">Market</th>
-                        <th className="px-3 py-2 text-right">Edge</th>
-                        <th className="px-3 py-2 text-right">Conf</th>
-                        <th className="px-4 py-2">Run</th>
+                        <th className="px-4 py-2.5 font-normal">Time</th>
+                        <th className="px-3 py-2.5 text-right font-normal">Model</th>
+                        <th className="px-3 py-2.5 text-right font-normal">Market</th>
+                        <th className="px-3 py-2.5 text-right font-normal">Edge</th>
+                        <th className="px-3 py-2.5 text-right font-normal">Conf</th>
+                        <th className="px-4 py-2.5 font-normal">Run</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-neutral-800/70">
+                    <tbody>
                       {timeline.map((p, i) => (
-                        <tr key={i} className={p.is_final ? "bg-red-950/20" : ""}>
-                          <td className="px-4 py-2 text-neutral-400">
+                        <tr key={i} className={`border-t border-line ${p.is_final ? "bg-live/5" : ""}`}>
+                          <td className="px-4 py-2.5 font-mono text-xs tabular-nums text-ink-low">
                             {new Date(p.timestamp).toLocaleTimeString()}
                           </td>
-                          <td className="px-3 py-2 text-right">{pct(p.model_probability)}</td>
-                          <td className="px-3 py-2 text-right text-neutral-500">
+                          <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink-hi">{pct(p.model_probability)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink-low">
                             {pct(p.implied_probability)}
                           </td>
-                          <td className={`px-3 py-2 text-right ${p.edge >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                          <td className={`px-3 py-2.5 text-right font-mono tabular-nums ${
+                            p.edge >= 0 ? "text-accent" : "text-neg"
+                          }`}>
                             {signedPct(p.edge)}
                           </td>
-                          <td className="px-3 py-2 text-right text-neutral-400">{pct(p.confidence)}</td>
-                          <td className="px-4 py-2 text-xs text-neutral-500">
+                          <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink-low">{pct(p.confidence)}</td>
+                          <td className="px-4 py-2.5 font-mono text-[11px] text-ink-low">
                             {p.is_final ? "🔒 FINAL" : p.source.replace("_", " ")}
                           </td>
                         </tr>
@@ -278,6 +370,7 @@ export default function MatchDetail() {
                   </table>
                 </div>
               </section>
+              </Reveal>
             )}
           </>
         )}
@@ -286,11 +379,28 @@ export default function MatchDetail() {
   );
 }
 
+function OutcomeBar({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span title={label} className="w-28 shrink-0 truncate text-xs text-ink-mid sm:w-32 sm:text-sm">{label}</span>
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-elev2">
+        <div
+          className="h-full rounded-full bg-accent/70"
+          style={{ width: `${Math.min(value * 100, 100)}%` }}
+        />
+      </div>
+      <span className="w-14 shrink-0 text-right font-mono text-sm tabular-nums text-ink-hi">
+        {pct(value)}
+      </span>
+    </div>
+  );
+}
+
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-neutral-800 p-4">
-      <p className="text-xs uppercase tracking-widest text-neutral-500">{label}</p>
-      <p className="mt-1 text-2xl tabular-nums text-white">{value}</p>
+    <div className="rounded-2xl border border-line bg-elev p-4 sm:p-5">
+      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low sm:text-[11px]">{label}</p>
+      <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums text-ink-hi sm:text-3xl">{value}</p>
     </div>
   );
 }

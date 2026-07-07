@@ -1,15 +1,43 @@
 @import "tailwindcss";
 
+/* ================================================================
+   Design tokens — bet-suggester visual system (July 2026 redesign)
+   Direction: Apple-grade showcase at the top of the page, Linear-
+   grade calm density in the tool zone. Near-black, one accent,
+   gray does the talking, white is scarce. Semantic colors are
+   data-ink (live/red, warn/amber, experimental/sky), never décor.
+   ================================================================ */
 :root {
+  /* portfolio home (unchanged) */
   --background: #ffffff;
   --foreground: #171717;
-}
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* surfaces */
+  --bs-bg: #050507;
+  --bs-elev: #0b0b10;
+  --bs-elev2: #121218;
+
+  /* hairlines */
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.16);
+
+  /* ink hierarchy — most text is gray; white is reserved */
+  --ink-hi: #f5f5f7;
+  --ink-mid: #a2a2ab;
+  --ink-low: #6e6e78;
+  --ink-faint: #4b4b54;
+
+  /* the one accent */
+  --accent: #34d399;
+  --accent-dim: rgba(52, 211, 153, 0.35);
+  --accent-faint: rgba(52, 211, 153, 0.10);
+
+  /* semantic data-ink */
+  --live: #ff453a;         /* Apple system red — in-play only */
+  --live-faint: rgba(255, 69, 58, 0.10);
+  --warn: #fbbf24;         /* watch / ripeness / tier notes */
+  --skylive: #38bdf8;      /* experimental live-read panel */
+  --neg: #f87171;          /* negative edge */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,8 +47,144 @@
   }
 }
 
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* expose tokens as Tailwind utilities (bg-bs, text-ink-mid, border-line…) */
+  --color-bs: var(--bs-bg);
+  --color-elev: var(--bs-elev);
+  --color-elev2: var(--bs-elev2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink-hi: var(--ink-hi);
+  --color-ink-mid: var(--ink-mid);
+  --color-ink-low: var(--ink-low);
+  --color-ink-faint: var(--ink-faint);
+  --color-accent: var(--accent);
+  --color-live: var(--live);
+  --color-warn: var(--warn);
+  --color-skylive: var(--skylive);
+  --color-neg: var(--neg);
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Arial, sans-serif;
+}
+
+/* quality floor: visible keyboard focus everywhere */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+::selection {
+  background: var(--accent-dim);
+  color: var(--ink-hi);
+}
+
+/* ---------------- showcase glows (depth, not flat black) -------- */
+.glow {
+  position: relative;
+}
+.glow::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+}
+.glow > * {
+  position: relative;
+  z-index: 1;
+}
+.glow-live::before {
+  background: radial-gradient(
+    120% 90% at 50% 0%,
+    rgba(255, 69, 58, 0.14),
+    transparent 62%
+  );
+}
+.glow-accent::before {
+  background: radial-gradient(
+    110% 90% at 50% 0%,
+    rgba(52, 211, 153, 0.10),
+    transparent 60%
+  );
+}
+/* page-top ambient glow behind the title lockup */
+.hero-ambient {
+  background: radial-gradient(
+    56rem 22rem at 50% -4rem,
+    rgba(52, 211, 153, 0.07),
+    transparent 70%
+  );
+}
+
+/* ---------------- motion ---------------------------------------- */
+/* scroll fade-up */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+.reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* live-number flash: value changed → brief tinted pulse, then settle */
+@keyframes bs-flash-accent {
+  0% { color: var(--accent); text-shadow: 0 0 16px var(--accent-dim); }
+  100% { text-shadow: none; }
+}
+@keyframes bs-flash-live {
+  0% { color: var(--live); text-shadow: 0 0 18px rgba(255, 69, 58, 0.45); }
+  100% { text-shadow: none; }
+}
+.flash-accent { animation: bs-flash-accent 0.9s ease-out; }
+.flash-live { animation: bs-flash-live 0.9s ease-out; }
+
+@keyframes bs-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.pulse-dot { animation: bs-pulse 1.6s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .flash-accent,
+  .flash-live,
+  .pulse-dot {
+    animation: none;
+  }
+}
+
+/* table rows: opacity-only fade (transforms on <tr> are unreliable in Safari) */
+.reveal-row {
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  transition-delay: var(--reveal-delay, 0ms);
+}
+.reveal-row.is-in {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal-row {
+    opacity: 1;
+    transition: none;
+  }
 }
