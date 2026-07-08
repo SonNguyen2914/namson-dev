@@ -197,12 +197,20 @@ export interface BracketMatch {
   venue: string;
   stage: string;
   probs: { home_win: number; draw: number; away_win: number } | null;
+  result: {
+    home_goals: number;
+    away_goals: number;
+    status_short: string;
+    winner: "home" | "away" | null;
+  } | null;
 }
 
 export interface BracketResponse {
   quarterfinals: BracketMatch[];
   semifinals: BracketMatch[];
+  third_place: BracketMatch[];
   final: BracketMatch[];
+  champion: string | null;
 }
 
 export interface TeamBlurb {

@@ -380,19 +380,6 @@ export default function BetSuggesterDashboard() {
           </Reveal>
         )}
 
-        {/* Upcoming matches */}
-        <Reveal>
-        <section>
-          <Eyebrow className="mb-2">schedule</Eyebrow>
-          <h3 className="mb-4 text-lg font-medium text-ink-hi">
-            Upcoming matches <span className="text-sm font-normal text-ink-low">· next 72h</span>
-          </h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {matches.map((m) => <MatchCard key={m.match_id} m={m} />)}
-          </div>
-        </section>
-        </Reveal>
-
         {/* Past matches — finished, with final scores */}
         {pastMatches.length > 0 && (
           <Reveal>
@@ -431,65 +418,4 @@ export default function BetSuggesterDashboard() {
       </div>
     </div>
   );
-}
-
-// One upcoming-match card. A resolved match links to its detail page and
-// shows flags + model confidence. A placeholder QF slot (a side still
-// "X/Y winner") is shown as a non-clickable TBD card — there's no team to
-// predict yet — and resolves automatically once the bracket fills in.
-// Teams running on provisional (unsourced) stats get a small honest badge.
-function MatchCard({ m }: { m: UpcomingMatch }) {
-  const hasProv = m.provisional_stats.length > 0;
-
-  const inner = (
-    <div className={`rounded-xl border p-4 transition-colors ${
-      m.tbd
-        ? "border-dashed border-line"
-        : "cursor-pointer border-line hover:border-line-strong hover:bg-elev"
-    }`}>
-      <div className="flex items-baseline justify-between gap-3">
-        {m.tbd ? (
-          <p className="text-sm text-ink-low">
-            {m.home_resolved ? `${flag(m.home)} ${m.home}` : m.home}
-            <span className="mx-1.5 text-ink-faint">vs</span>
-            {m.away_resolved ? `${flag(m.away)} ${m.away}` : m.away}
-          </p>
-        ) : (
-          <p className="text-sm text-ink-hi">
-            {flag(m.home)} {m.home} <span className="text-ink-faint">vs</span> {m.away} {flag(m.away)}
-          </p>
-        )}
-        <p className="font-mono text-sm tabular-nums text-accent">
-          {countdown(m.seconds_to_kickoff)}
-        </p>
-      </div>
-      <p className="mt-1.5 text-xs text-ink-low">
-        {m.group === "QF" ? "Quarter-final" : `Group ${m.group}`} · {m.venue}
-        {!m.tbd && m.has_prediction && m.confidence !== null &&
-          ` · model confidence ${pct(m.confidence)}`}
-      </p>
-      {(m.tbd || hasProv) && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {m.tbd && (
-            <span className="rounded-md border border-line px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-low">
-              awaiting bracket
-            </span>
-          )}
-          {hasProv && (
-            <span
-              title={`Running on provisional stats (no sourced data yet): ${m.provisional_stats.join(", ")}`}
-              className="rounded-md border border-warn/40 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-warn"
-            >
-              provisional stats
-            </span>
-          )}
-        </div>
-      )}
-    </div>
-  );
-
-  // Placeholder slots aren't clickable — no prediction exists to open.
-  return m.tbd
-    ? inner
-    : <Link href={`/bet-suggester/market/${m.match_id}`} className="block">{inner}</Link>;
 }
