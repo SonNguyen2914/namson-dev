@@ -11,6 +11,7 @@ import {
   RipenessAlert, SuggestionRow, UpcomingMatch, WatchlistEntry, PastMatch,
 } from "../../lib/suggesterApi";
 import LiveScoreboard from "../../components/LiveScoreboard";
+import BracketView from "../../components/BracketView";
 import { Eyebrow, Flash, Reveal, RevealRow } from "../../components/ui";
 
 const POLL_MS = 60 * 1000; // watchlist scores move every 30s poll; refresh often
@@ -173,6 +174,11 @@ export default function BetSuggesterDashboard() {
 
       {/* ===================== TOOL ZONE (Linear-style) ===================== */}
       <div className="mx-auto max-w-5xl px-5 pb-16 pt-20 sm:pt-24">
+
+        {/* Knockout bracket — reversed pyramid, model win probabilities */}
+        <div className="mb-20 border-t border-line pt-10">
+          <BracketView />
+        </div>
 
         {/* Ranking board — likelihood-first, all matches pooled */}
         <Reveal>

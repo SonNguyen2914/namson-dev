@@ -186,7 +186,7 @@ export interface UpcomingMatch {
   provisional_stats: string[];  // resolved teams running on default (unsourced) stats
 }
 
-export interface BracketQF {
+export interface BracketMatch {
   match_id: string;
   home: string;
   home_resolved: boolean;
@@ -195,12 +195,14 @@ export interface BracketQF {
   fully_resolved: boolean;
   kickoff: string;
   venue: string;
+  stage: string;
+  probs: { home_win: number; draw: number; away_win: number } | null;
 }
 
 export interface BracketResponse {
-  quarterfinals: BracketQF[];
-  provisional_teams: string[];
-  generated_at: string;
+  quarterfinals: BracketMatch[];
+  semifinals: BracketMatch[];
+  final: BracketMatch[];
 }
 
 export interface TeamBlurb {
