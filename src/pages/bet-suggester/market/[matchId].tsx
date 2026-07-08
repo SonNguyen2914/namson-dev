@@ -10,7 +10,7 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 import {
   api, flag, pct, signedPct,
-  PredictionResponse, TimelinePoint,
+  PredictionResponse, TimelinePoint, TeamInfoResponse, TeamBlurb,
 } from "../../../lib/suggesterApi";
 import LivePanel from "../../../components/LivePanel";
 import { Eyebrow, Reveal } from "../../../components/ui";
@@ -28,6 +28,7 @@ export default function MatchDetail() {
   const [timeline, setTimeline] = useState<TimelinePoint[]>([]);
   const [watched, setWatched] = useState<Set<string>>(new Set());
   const [teams, setTeams] = useState<{ home: string; away: string } | null>(null);
+  const [teamInfo, setTeamInfo] = useState<TeamInfoResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -57,11 +58,18 @@ export default function MatchDetail() {
       try {
         const u = await api.upcoming(72);
         const m = u.matches.find((x) => x.match_id === matchId);
-        if (m && alive) { setTeams({ home: m.home, away: m.away }); return; }
-        const ls = await api.liveScores();
-        const l = ls.live.find((x) => x.match_id === matchId);
-        if (l && alive) setTeams({ home: l.home, away: l.away });
+        if (m && alive) { setTeams({ home: m.home, away: m.away }); }
+        else {
+          const ls = await api.liveScores();
+          const l = ls.live.find((x) => x.match_id === matchId);
+          if (l && alive) setTeams({ home: l.home, away: l.away });
+        }
       } catch { /* fall back to the id codes */ }
+      // Scouting blurbs — independent of the name resolution above.
+      try {
+        const ti = await api.teamInfo(matchId);
+        if (alive) setTeamInfo(ti);
+      } catch { /* no blurbs — card just won't render */ }
     })();
     return () => { alive = false; };
   }, [matchId]);
@@ -172,6 +180,19 @@ export default function MatchDetail() {
         </header>
 
         {error && <p className="mb-8 text-center text-sm text-live">{error}</p>}
+
+        {/* How they play — scouting blurbs, a read aid (not a model input) */}
+        {teamInfo && (teamInfo.home.scouting || teamInfo.away.scouting) && (
+          <Reveal>
+            <section className="mb-10">
+              <Eyebrow className="mb-4">how they play · scouting</Eyebrow>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <ScoutCard blurb={teamInfo.home} fallbackName={home} />
+                <ScoutCard blurb={teamInfo.away} fallbackName={away} />
+              </div>
+            </section>
+          </Reveal>
+        )}
 
         {pred && (
           <>
@@ -375,6 +396,47 @@ export default function MatchDetail() {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function ScoutCard({ blurb, fallbackName }: {
+  blurb: TeamBlurb;
+  fallbackName: string;
+}) {
+  const name = blurb.team || fallbackName;
+  if (!blurb.scouting) {
+    return (
+      <div className="rounded-2xl border border-line bg-elev p-5">
+        <p className="text-sm font-medium text-ink-hi">{flag(name)} {name}</p>
+        <p className="mt-2 text-xs text-ink-low">No scouting note yet.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-2xl border border-line bg-elev p-5">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-sm font-medium text-ink-hi">{flag(name)} {name}</p>
+        {blurb.provisional && (
+          <span
+            title="Running on provisional (unsourced) stats"
+            className="rounded-md border border-warn/40 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-warn"
+          >
+            provisional
+          </span>
+        )}
+      </div>
+      <p className="text-xs leading-relaxed text-ink-mid">{blurb.scouting}</p>
+      {(blurb.attack != null && blurb.defence != null) && (
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-faint">
+          <span>atk {blurb.attack.toFixed(2)}</span>
+          <span>def {blurb.defence.toFixed(2)}</span>
+          {blurb.form != null && <span>form {(blurb.form * 100).toFixed(0)}%</span>}
+          {blurb.fatigue != null && blurb.fatigue >= 0.3 && (
+            <span className="text-warn">tired {(blurb.fatigue * 100).toFixed(0)}%</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

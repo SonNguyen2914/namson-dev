@@ -181,6 +181,23 @@ export interface BracketResponse {
   generated_at: string;
 }
 
+export interface TeamBlurb {
+  team: string;
+  scouting: string;
+  resolved: boolean;
+  provisional: boolean;
+  attack?: number;
+  defence?: number;
+  form?: number;
+  fatigue?: number;
+}
+
+export interface TeamInfoResponse {
+  match_id: string;
+  home: TeamBlurb;
+  away: TeamBlurb;
+}
+
 export interface TimelinePoint {
   timestamp: string;
   model_probability: number;
@@ -242,6 +259,9 @@ export const api = {
     getJson<{ matches: UpcomingMatch[] }>(`/upcoming?hours_ahead=${hoursAhead}`),
 
   bracket: () => getJson<BracketResponse>("/bracket"),
+
+  teamInfo: (matchId: string) =>
+    getJson<TeamInfoResponse>(`/team-info/${matchId}`),
 
   prediction: (matchId: string, forceRefresh = false) =>
     getJson<PredictionResponse>(
