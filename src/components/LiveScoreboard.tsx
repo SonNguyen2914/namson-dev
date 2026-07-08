@@ -46,19 +46,32 @@ export default function LiveScoreboard() {
 function LiveCard({ m }: { m: LiveScoreEntry }) {
   const homeGoals = m.goals_list.filter((g) => g.team === "home");
   const awayGoals = m.goals_list.filter((g) => g.team === "away");
-  const running = m.status_short !== "HT" && m.status_short !== "FT";
+  const finished = m.is_finished === true;
+  const running = !finished && m.status_short !== "HT";
+  // finished shows the full-time label (FT / AET / PEN); live shows the clock.
   const clock =
+    finished ? (m.status_short || "FT") :
     m.status_short === "HT" ? "HT" :
-    m.status_short === "FT" ? "FT" :
     m.minutes_elapsed != null ? `${Math.round(m.minutes_elapsed)}′` : m.status_short;
 
   return (
     <Link href={`/bet-suggester/market/${m.match_id}`} className="block">
-      <div className="glow glow-live cursor-pointer overflow-hidden rounded-3xl border border-line bg-elev px-6 py-8 transition-colors duration-300 hover:border-live/40 sm:px-10 sm:py-10">
-        {/* live badge */}
+      <div className={`glow cursor-pointer overflow-hidden rounded-3xl border bg-elev px-6 py-8 transition-colors duration-300 sm:px-10 sm:py-10 ${
+        finished
+          ? "border-line hover:border-line-strong"
+          : "glow-live border-line hover:border-live/40"
+      }`}>
+        {/* status badge: pulsing "live" vs quiet "final" */}
         <div className="mb-6 flex items-center justify-center gap-2">
-          <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-live" />
-          <Eyebrow tone="live">live</Eyebrow>
+          {finished ? (
+            <Eyebrow tone="low">{m.status_short === "AET" ? "after extra time"
+              : m.status_short === "PEN" ? "after penalties" : "full time"}</Eyebrow>
+          ) : (
+            <>
+              <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-live" />
+              <Eyebrow tone="live">live</Eyebrow>
+            </>
+          )}
         </div>
 
         {/* score line — the hero */}
@@ -76,8 +89,9 @@ function LiveCard({ m }: { m: LiveScoreEntry }) {
           <div className="flex items-center gap-4 sm:gap-7">
             <Flash
               value={m.home_goals}
-              tone="live"
-              className="text-6xl font-semibold tracking-tight tabular-nums text-ink-hi sm:text-8xl"
+              tone={finished ? "accent" : "live"}
+              className={`text-6xl font-semibold tracking-tight tabular-nums sm:text-8xl ${
+                finished ? "text-ink-mid" : "text-ink-hi"}`}
             />
             <span className={`font-mono text-sm tabular-nums sm:text-base ${
               running ? "text-live" : "text-ink-low"
@@ -86,8 +100,9 @@ function LiveCard({ m }: { m: LiveScoreEntry }) {
             </span>
             <Flash
               value={m.away_goals}
-              tone="live"
-              className="text-6xl font-semibold tracking-tight tabular-nums text-ink-hi sm:text-8xl"
+              tone={finished ? "accent" : "live"}
+              className={`text-6xl font-semibold tracking-tight tabular-nums sm:text-8xl ${
+                finished ? "text-ink-mid" : "text-ink-hi"}`}
             />
           </div>
 
@@ -131,7 +146,7 @@ function LiveCard({ m }: { m: LiveScoreEntry }) {
         )}
 
         <p className="mt-7 text-center font-mono text-[11px] uppercase tracking-[0.22em] text-ink-faint">
-          live model read &amp; markets →
+          {finished ? "final result →" : "live model read \u0026 markets →"}
         </p>
       </div>
     </Link>

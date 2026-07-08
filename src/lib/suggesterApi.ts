@@ -136,6 +136,28 @@ export interface LiveScoreEntry {
     minute: number | null;
     detail: string | null;
   }[];
+  is_finished?: boolean;
+}
+
+export interface PastMatch {
+  match_id: string;
+  home: string;
+  away: string;
+  home_goals: number;
+  away_goals: number;
+  status_short: string;
+  goals_list: {
+    team: "home" | "away";
+    player: string | null;
+    minute: number | null;
+    detail: string | null;
+  }[];
+  finished_at: string;
+}
+
+export interface PastMatchesResponse {
+  past: PastMatch[];
+  generated_at: string;
 }
 
 export interface LiveScoresResponse {
@@ -262,6 +284,8 @@ export const api = {
 
   teamInfo: (matchId: string) =>
     getJson<TeamInfoResponse>(`/team-info/${matchId}`),
+
+  pastMatches: () => getJson<PastMatchesResponse>("/past-matches"),
 
   prediction: (matchId: string, forceRefresh = false) =>
     getJson<PredictionResponse>(
