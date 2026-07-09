@@ -242,6 +242,30 @@ export interface BracketResponse {
   champion: string | null;
 }
 
+export interface PlayerProp {
+  player: string;
+  shirt: number;
+  share: number;        // smoothed share of team scoring (FIFA-PDF sourced)
+  goals: number;
+  attempts: number;
+  matches: number;
+  starts: number;
+  anytime: number;      // P(scores at any point, 90 min)
+  first_goal: number;   // P(scores the match's first goal)
+}
+
+export interface PlayerPropsResponse {
+  available: boolean;
+  match_id: string;
+  home_team?: string;
+  away_team?: string;
+  home?: PlayerProp[];
+  away?: PlayerProp[];
+  p_no_goal?: number;
+  disclaimer?: string;
+  reason?: string;
+}
+
 export interface TeamBlurb {
   team: string;
   scouting: string;
@@ -323,6 +347,9 @@ export const api = {
 
   teamInfo: (matchId: string) =>
     getJson<TeamInfoResponse>(`/team-info/${matchId}`),
+
+  playerProps: (matchId: string) =>
+    getJson<PlayerPropsResponse>(`/player-props/${matchId}`),
 
   pastMatches: () => getJson<PastMatchesResponse>("/past-matches"),
 

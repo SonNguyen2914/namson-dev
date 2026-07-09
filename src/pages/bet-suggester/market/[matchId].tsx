@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   api, flag, pct, signedPct,
   PredictionResponse, PredictionSummary, HalfDist, MarketPrediction,
+  PlayerPropsResponse,
   TimelinePoint, TeamInfoResponse, TeamBlurb,
 } from "../../../lib/suggesterApi";
 import LivePanel from "../../../components/LivePanel";
@@ -50,6 +51,7 @@ export default function MatchDetail() {
   const [watched, setWatched] = useState<Set<string>>(new Set());
   const [teams, setTeams] = useState<{ home: string; away: string } | null>(null);
   const [teamInfo, setTeamInfo] = useState<TeamInfoResponse | null>(null);
+  const [pProps, setPProps] = useState<PlayerPropsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   // grouped markets table: sort + collapsed groups
@@ -95,6 +97,11 @@ export default function MatchDetail() {
         const ti = await api.teamInfo(matchId);
         if (alive) setTeamInfo(ti);
       } catch { /* no blurbs — card just won't render */ }
+      // Player props — model estimates; section hides itself if unavailable.
+      try {
+        const pp = await api.playerProps(matchId);
+        if (alive && pp.available) setPProps(pp);
+      } catch { /* no player data — section won't render */ }
     })();
     return () => { alive = false; };
   }, [matchId]);
@@ -343,6 +350,13 @@ export default function MatchDetail() {
             <Reveal>
               <StrategySection markets={sortedMarkets} />
             </Reveal>
+
+            {/* Player props — model estimates (Poisson thinning of the sim) */}
+            {pProps && (
+              <Reveal>
+                <PlayerPropsSection pp={pProps} />
+              </Reveal>
+            )}
 
             {/* Every market priced — grouped by type, sortable, collapsible */}
             <Reveal>
@@ -846,6 +860,72 @@ function StrategySection({ markets }: { markets: MarketPrediction[] }) {
         Stakes are quarter-Kelly on the anchored model probability — bets with no
         positive expected value get $0 by design. Kelly assumes the model is right;
         it is an anchored estimate, so treat sizes as a ceiling, not a target.
+      </p>
+    </section>
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+// Player props — anytime & first-goalscorer model estimates. Poisson thinning
+// of the match sim's team xG by each player's FIFA-PDF scoring share. Honest
+// framing: 5-match samples, no minutes model, and NOT priced against Kalshi's
+// player markets (settlement rules unverified — the 16.67x lesson).
+function PlayerPropsSection({ pp }: { pp: PlayerPropsResponse }) {
+  const [tab, setTab] = useState<"home" | "away">("home");
+  const rows = (tab === "home" ? pp.home : pp.away) ?? [];
+  const teamName = tab === "home" ? pp.home_team : pp.away_team;
+  return (
+    <section className="mb-14 rounded-2xl border border-line bg-elev p-5 sm:p-6">
+      <Eyebrow className="mb-1">player props · model estimates</Eyebrow>
+      <p className="mb-4 text-[11px] leading-relaxed text-ink-faint">
+        Each player&apos;s slice of his team&apos;s expected goals (share sourced from
+        FIFA post-match data, 5 matches) — pure model, no market anchoring.
+      </p>
+      <div className="mb-4 flex gap-1.5">
+        {(["home", "away"] as const).map((side) => (
+          <button
+            key={side}
+            onClick={() => setTab(side)}
+            className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors ${
+              tab === side
+                ? "border-accent/60 bg-accent/10 text-accent"
+                : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"
+            }`}
+          >
+            {flag((side === "home" ? pp.home_team : pp.away_team) ?? "")}{" "}
+            {side === "home" ? pp.home_team : pp.away_team}
+          </button>
+        ))}
+      </div>
+      <div className="overflow-x-auto rounded-xl border border-line">
+        <div className="min-w-[540px]">
+          <div className="grid grid-cols-[minmax(0,1fr)_7rem_6rem_6.5rem] items-center gap-x-3 border-b border-line bg-bs px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
+            <span>Player · {teamName}</span>
+            <span className="text-right">Tournament</span>
+            <span className="text-right">Anytime</span>
+            <span className="text-right">First goal</span>
+          </div>
+          {rows.map((r) => (
+            <div key={r.shirt} className="grid grid-cols-[minmax(0,1fr)_7rem_6rem_6.5rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0">
+              <span className="min-w-0 truncate pr-2 text-ink-hi">
+                <span className="mr-2 font-mono text-[11px] text-ink-faint">#{r.shirt}</span>
+                {r.player}
+                {r.starts < r.matches && (
+                  <span className="ml-2 font-mono text-[9px] uppercase tracking-wider text-ink-faint">rotation</span>
+                )}
+              </span>
+              <span className="text-right font-mono text-xs tabular-nums text-ink-low">
+                {r.goals}g · {r.attempts} att
+              </span>
+              <span className="text-right font-mono tabular-nums text-ink-hi">{pct(r.anytime)}</span>
+              <span className="text-right font-mono tabular-nums text-ink-mid">{pct(r.first_goal)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <p className="mt-3 text-xs leading-relaxed text-ink-faint">
+        {pp.disclaimer} No goal at all: {pp.p_no_goal != null ? pct(pp.p_no_goal) : "—"}.
       </p>
     </section>
   );
