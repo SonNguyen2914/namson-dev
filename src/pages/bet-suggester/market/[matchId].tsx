@@ -14,7 +14,6 @@ import {
   ReferenceOddsResponse,
   TimelinePoint, TeamInfoResponse, TeamBlurb,
 } from "../../../lib/suggesterApi";
-import TeamNewsSection from "../../../components/TeamNews";
 import { Eyebrow, Reveal } from "../../../components/ui";
 import { Collapse, NavChip, SkeletonRows, TopBar } from "../../../components/chrome";
 
@@ -238,7 +237,6 @@ export default function MatchDetail() {
 
       <TopBar back={{ href: "/bet-suggester", label: "board" }}
         title={`${home} vs ${away}`}>
-        <NavChip href="#news">News</NavChip>
         <NavChip href="#prediction">Prediction</NavChip>
         <NavChip href="#strategy">Strategy</NavChip>
         <NavChip onClick={() => {
@@ -346,14 +344,9 @@ export default function MatchDetail() {
           </Reveal>
         )}
 
-        {/* Team news — official lineups (facts only), once ESPN posts them */}
-        {news && (
-          <Reveal>
-            <Collapse id="news" eyebrow="team news" title="Official lineups">
-              <TeamNewsSection news={news} home={home} away={away} />
-            </Collapse>
-          </Reveal>
-        )}
+        {/* Team news moved to the landing page's live match box. The
+            team-news fetch stays: the hero reads venue/kickoff/countdown
+            from it, and Player props keep their squad tags. */}
 
         {pred && (
           <>

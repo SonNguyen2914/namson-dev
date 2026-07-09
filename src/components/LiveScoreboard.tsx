@@ -13,7 +13,7 @@ import { Collapse } from "./chrome";
 import LivePanel from "./LivePanel";
 import TeamNewsSection from "./TeamNews";
 
-const POLL_MS = 30000; // live scores move fast; 30s keeps it fresh & cheap
+const POLL_MS = 15000; // matches the backend's 15s live tick; snapshot reads are free
 
 export default function LiveScoreboard() {
   const [live, setLive] = useState<LiveScoreEntry[]>([]);
@@ -40,19 +40,17 @@ export default function LiveScoreboard() {
       {live.map((m) => (
         <Reveal key={m.match_id}>
           <LiveCard m={m} />
-          {/* lineups + live read ride WITH the live match — outside the
-              card's Link so their controls don't navigate */}
-          {!m.is_finished && <LiveExtras m={m} />}
         </Reveal>
       ))}
     </section>
   );
 }
 
-// Lineups + the manual live read, attached under an in-progress match's
-// score card. Both are self-contained: lineups poll the facts-only
-// team-news endpoint (backend caches ESPN for 60s), the LivePanel manages
-// its own state per match id.
+// Lineups + the manual live read, INSIDE an in-progress match's score card.
+// Both are self-contained: lineups poll the facts-only team-news endpoint
+// (backend caches ESPN for 60s), the LivePanel manages its own state per
+// match id. Rendered outside the score block's Link so controls don't
+// navigate.
 function LiveExtras({ m }: { m: LiveScoreEntry }) {
   const [news, setNews] = useState<TeamNewsResponse | null>(null);
 
@@ -70,13 +68,13 @@ function LiveExtras({ m }: { m: LiveScoreEntry }) {
   }, [m.match_id]);
 
   return (
-    <div className="mt-5">
+    <div className="mt-8 border-t border-line pt-6">
       {news && (
-        <Collapse eyebrow="team news" title="Official lineups">
+        <Collapse eyebrow="team news" title="Official lineups" className="mb-6">
           <TeamNewsSection news={news} home={m.home} away={m.away} />
         </Collapse>
       )}
-      <Collapse eyebrow="in-play" title="Live read · what the model makes of the state">
+      <Collapse eyebrow="in-play" title="Live read · what the model makes of the state" className="mb-0">
         <LivePanel matchId={m.match_id} />
       </Collapse>
     </div>
@@ -95,12 +93,14 @@ function LiveCard({ m }: { m: LiveScoreEntry }) {
     m.minutes_elapsed != null ? `${Math.round(m.minutes_elapsed)}′` : m.status_short;
 
   return (
-    <Link href={`/bet-suggester/market/${m.match_id}`} className="block">
-      <div className={`glow cursor-pointer overflow-hidden rounded-3xl border bg-elev px-6 py-8 transition-colors duration-300 sm:px-10 sm:py-10 ${
-        finished
-          ? "border-line hover:border-line-strong"
-          : "glow-live border-line hover:border-live/40"
-      }`}>
+    <div className={`glow overflow-hidden rounded-3xl border bg-elev px-6 py-8 transition-colors duration-300 sm:px-10 sm:py-10 ${
+      finished
+        ? "border-line hover:border-line-strong"
+        : "glow-live border-line hover:border-live/40"
+    }`}>
+      {/* the score block links to the match page; the extras below it are
+          interactive and live INSIDE the same box, so they don't navigate */}
+      <Link href={`/bet-suggester/market/${m.match_id}`} className="block cursor-pointer">
         {/* status badge: pulsing "live" vs quiet "final" */}
         <div className="mb-6 flex items-center justify-center gap-2">
           {finished ? (
@@ -186,9 +186,12 @@ function LiveCard({ m }: { m: LiveScoreEntry }) {
         )}
 
         <p className="mt-7 text-center font-mono text-[11px] uppercase tracking-[0.22em] text-ink-faint">
-          {finished ? "final result →" : "live model read \u0026 markets →"}
+          {finished ? "final result →" : "full markets & strategy →"}
         </p>
-      </div>
-    </Link>
+      </Link>
+
+      {/* lineups + live read, inside the live match box */}
+      {!finished && <LiveExtras m={m} />}
+    </div>
   );
 }

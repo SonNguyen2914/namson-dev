@@ -60,16 +60,17 @@ export function SkeletonRows({ rows = 5, height = "h-11" }: {
   );
 }
 
-export function Collapse({ id, eyebrow, title, defaultOpen = true, children }: {
+export function Collapse({ id, eyebrow, title, defaultOpen = true, className = "mb-10", children }: {
   id?: string;
   eyebrow?: string;
   title: ReactNode;
   defaultOpen?: boolean;
+  className?: string;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div id={id} className="mb-10">
+    <div id={id} className={className}>
       <button onClick={() => setOpen((o) => !o)}
         className="group flex w-full items-baseline gap-3 border-b border-line pb-2.5 text-left">
         <span className={`text-ink-faint transition-transform ${open ? "rotate-90" : ""}`}>▸</span>
