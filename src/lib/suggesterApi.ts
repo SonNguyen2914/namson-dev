@@ -354,6 +354,20 @@ export function countdown(seconds: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
+// Local kickoff date + time in the viewer's timezone, e.g. "Thu, Jul 9 · 4:00 PM".
+// Used on the next-match hero and every bracket card so times read in local time.
+export function kickoffLocal(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const date = d.toLocaleDateString(undefined, {
+    weekday: "short", month: "short", day: "numeric",
+  });
+  const time = d.toLocaleTimeString(undefined, {
+    hour: "numeric", minute: "2-digit",
+  });
+  return `${date} · ${time}`;
+}
+
 // National-team flag emoji, keyed by our schedule's team names. Dependency-
 // free and instantly recognizable — better than club-style logo PNGs for a
 // World Cup. Unknown teams fall back to a neutral marker.

@@ -7,14 +7,21 @@ import Head from "next/head";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
-  api, countdown, flag, pct, signedPct,
+  api, countdown, flag, pct, signedPct, kickoffLocal,
   RipenessAlert, SuggestionRow, UpcomingMatch, WatchlistEntry, PastMatch,
 } from "../../lib/suggesterApi";
 import LiveScoreboard from "../../components/LiveScoreboard";
 import BracketView from "../../components/BracketView";
-import { Eyebrow, Flash, Reveal, RevealRow } from "../../components/ui";
+import { Eyebrow, Flash, Reveal } from "../../components/ui";
 
 const POLL_MS = 60 * 1000; // watchlist scores move every 30s poll; refresh often
+
+// Shared column template so the sortable header bar and every match group's
+// rows line up: Market (flex) | Likelihood | Edge | Multiplier | Alert.
+const BOARD_COLS =
+  "grid grid-cols-[minmax(0,1fr)_5.5rem_5rem_5rem_4.5rem] items-center gap-x-3";
+
+type SortKey = "likelihood" | "edge" | "multiplier";
 
 export default function BetSuggesterDashboard() {
   const [suggestions, setSuggestions] = useState<SuggestionRow[]>([]);
@@ -31,6 +38,10 @@ export default function BetSuggesterDashboard() {
   const [refreshMsg, setRefreshMsg] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  // Ranking-board sort (columns) + which match groups are collapsed.
+  const [sortKey, setSortKey] = useState<SortKey>("likelihood");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     try {
@@ -111,6 +122,44 @@ export default function BetSuggesterDashboard() {
 
   const next = matches[0];
 
+  // Group best-bets by match, ordered by kickoff (schedule). Columns sort
+  // within every group by the shared sort state; groups collapse independently.
+  const groupsMap = new Map<string, {
+    match_id: string; home: string; away: string;
+    kickoff: string; is_final: boolean; rows: SuggestionRow[];
+  }>();
+  for (const s of suggestions) {
+    let g = groupsMap.get(s.match_id);
+    if (!g) {
+      g = { match_id: s.match_id, home: s.home, away: s.away,
+            kickoff: s.kickoff, is_final: s.is_final, rows: [] };
+      groupsMap.set(s.match_id, g);
+    }
+    g.rows.push(s);
+  }
+  const groups = [...groupsMap.values()].sort(
+    (a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime()
+  );
+  const sortVal = (s: SuggestionRow) =>
+    sortKey === "likelihood" ? s.model_probability
+    : sortKey === "edge" ? s.edge : s.kalshi_odds;
+  const sortRows = (rows: SuggestionRow[]) => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...rows].sort((a, b) => (sortVal(a) - sortVal(b)) * dir);
+  };
+  const onSort = (k: SortKey) => {
+    if (k === sortKey) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(k); setSortDir("desc"); }
+  };
+  const arrow = (k: SortKey) =>
+    sortKey === k ? (sortDir === "asc" ? " ↑" : " ↓") : "";
+  const toggleCollapse = (id: string) =>
+    setCollapsed((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+
   return (
     <div className="min-h-screen bg-bs font-sans text-ink-mid">
       <Head><title>WC26 Bet Suggester · namson.dev</title></Head>
@@ -159,6 +208,9 @@ export default function BetSuggesterDashboard() {
                     <span className="ml-3">{flag(next.away)}</span>
                   </h2>
                   <p className="mt-3 text-xs text-ink-low">{next.venue}</p>
+                  <p className="mt-1 font-mono text-[11px] tracking-wide text-ink-faint">
+                    {kickoffLocal(next.kickoff)} · local time
+                  </p>
                   <p className="mt-8 text-6xl font-semibold tracking-tight tabular-nums text-accent sm:text-7xl">
                     {countdown(next.seconds_to_kickoff)}
                   </p>
@@ -185,10 +237,13 @@ export default function BetSuggesterDashboard() {
         <section className="mb-20 border-t border-line pt-10">
           <div className="mb-1 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <Eyebrow className="mb-2">ranking board · likelihood-first</Eyebrow>
+              <Eyebrow className="mb-2">ranking board · by match</Eyebrow>
               <h3 className="text-lg font-medium text-ink-hi">
-                Best bets — all matches, ranked by likelihood
+                Best bets — grouped by match, in kickoff order
               </h3>
+              <p className="mt-1 text-xs text-ink-low">
+                Click a column to sort · click a match to collapse
+              </p>
             </div>
             <button
               onClick={handleRefreshAll}
@@ -221,79 +276,100 @@ export default function BetSuggesterDashboard() {
           )}
           {loading ? (
             <p className="text-sm text-ink-low">Loading…</p>
-          ) : suggestions.length === 0 ? (
+          ) : groups.length === 0 ? (
             <p className="rounded-xl border border-line p-6 text-sm text-ink-low">
               No statistically likely value across any match right now — the
               markets are efficiently priced.
             </p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-line">
-              <table className="w-full text-sm">
-                <thead className="bg-elev text-left font-mono text-[11px] uppercase tracking-[0.14em] text-ink-low">
-                  <tr>
-                    <th className="px-4 py-3 font-normal">Market</th>
-                    <th className="px-3 py-3 text-right font-normal">Likelihood</th>
-                    <th className="px-3 py-3 text-right font-normal">Edge</th>
-                    <th className="px-3 py-3 text-right font-normal">Multiplier</th>
-                    <th className="px-4 py-3 text-right font-normal">Alert</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {suggestions.map((s, i) => (
-                    <RevealRow
-                      key={s.market_id}
-                      delay={(i % 12) * 35}
-                      className="border-t border-line transition-colors hover:bg-elev"
-                    >
-                      <td className="px-4 py-3">
-                        <Link
-                          href={`/bet-suggester/market/${s.match_id}`}
-                          className="font-medium text-ink-hi transition-colors hover:text-accent"
-                        >
-                          {s.market_title}
-                        </Link>
-                        {s.is_final && (
-                          <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-live">
-                            🔒 final
+              <div className="min-w-[600px]">
+                {/* sortable column header bar (aligns with every group's rows) */}
+                <div className={`${BOARD_COLS} border-b border-line bg-elev px-4 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-low`}>
+                  <span>Market</span>
+                  <button onClick={() => onSort("likelihood")} className="text-right transition-colors hover:text-ink-hi">
+                    Likelihood{arrow("likelihood")}
+                  </button>
+                  <button onClick={() => onSort("edge")} className="text-right transition-colors hover:text-ink-hi">
+                    Edge{arrow("edge")}
+                  </button>
+                  <button onClick={() => onSort("multiplier")} className="text-right transition-colors hover:text-ink-hi">
+                    Mult{arrow("multiplier")}
+                  </button>
+                  <span className="text-right">Alert</span>
+                </div>
+
+                {groups.map((g) => {
+                  const isCollapsed = collapsed.has(g.match_id);
+                  const inPlay = new Date(g.kickoff).getTime() <= nowMs;
+                  return (
+                    <div key={g.match_id}>
+                      {/* collapsible match header */}
+                      <button
+                        onClick={() => toggleCollapse(g.match_id)}
+                        className="flex w-full items-center gap-2.5 border-b border-line bg-elev/40 px-4 py-2.5 text-left transition-colors hover:bg-elev"
+                      >
+                        <span className={`text-ink-faint transition-transform ${isCollapsed ? "" : "rotate-90"}`}>▸</span>
+                        <span className="truncate text-sm text-ink-hi">
+                          {flag(g.home)} {g.home} <span className="text-ink-faint">vs</span> {g.away} {flag(g.away)}
+                        </span>
+                        {inPlay && (
+                          <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-live">
+                            <span className="pulse-dot mr-1 inline-block h-1 w-1 rounded-full bg-live align-middle" />
+                            in play
                           </span>
                         )}
-                        <p className="mt-0.5 text-xs text-ink-low">
-                          {s.home} vs {s.away}
-                          {new Date(s.kickoff).getTime() <= nowMs && (
-                            <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-live">
-                              <span className="pulse-dot mr-1 inline-block h-1 w-1 rounded-full bg-live align-middle" />
-                              in play
-                            </span>
-                          )}
-                        </p>
-                      </td>
-                      <td className="px-3 py-3 text-right font-mono tabular-nums text-ink-hi">
-                        <Flash value={pct(s.model_probability)} />
-                      </td>
-                      <td className={`px-3 py-3 text-right font-mono tabular-nums ${
-                        s.edge >= 0 ? "text-accent" : "text-neg"
-                      }`}>
-                        {signedPct(s.edge)}
-                      </td>
-                      <td className="px-3 py-3 text-right font-mono tabular-nums text-ink-mid">
-                        {s.kalshi_odds.toFixed(2)}x
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => toggleWatch(s)}
-                          className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors ${
-                            watchedIds.has(s.market_id)
-                              ? "border-warn/50 text-warn hover:border-warn"
-                              : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"
-                          }`}
+                        {g.is_final && (
+                          <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-live">🔒 final</span>
+                        )}
+                        <span className="ml-auto shrink-0 whitespace-nowrap pl-3 font-mono text-[11px] tracking-wide text-ink-faint">
+                          {kickoffLocal(g.kickoff)} · {g.rows.length} bet{g.rows.length === 1 ? "" : "s"}
+                        </span>
+                      </button>
+
+                      {/* rows (sorted by the active column) */}
+                      {!isCollapsed && sortRows(g.rows).map((s) => (
+                        <div
+                          key={s.market_id}
+                          className={`${BOARD_COLS} border-b border-line px-4 py-3 text-sm transition-colors hover:bg-elev`}
                         >
-                          {watchedIds.has(s.market_id) ? "Watching" : "Watch"}
-                        </button>
-                      </td>
-                    </RevealRow>
-                  ))}
-                </tbody>
-              </table>
+                          <div className="min-w-0 pr-2">
+                            <Link
+                              href={`/bet-suggester/market/${s.match_id}`}
+                              className="font-medium text-ink-hi transition-colors hover:text-accent"
+                            >
+                              {s.market_title}
+                            </Link>
+                          </div>
+                          <div className="text-right font-mono tabular-nums text-ink-hi">
+                            <Flash value={pct(s.model_probability)} />
+                          </div>
+                          <div className={`text-right font-mono tabular-nums ${
+                            s.edge >= 0 ? "text-accent" : "text-neg"
+                          }`}>
+                            {signedPct(s.edge)}
+                          </div>
+                          <div className="text-right font-mono tabular-nums text-ink-mid">
+                            {s.kalshi_odds.toFixed(2)}x
+                          </div>
+                          <div className="text-right">
+                            <button
+                              onClick={() => toggleWatch(s)}
+                              className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors ${
+                                watchedIds.has(s.market_id)
+                                  ? "border-warn/50 text-warn hover:border-warn"
+                                  : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"
+                              }`}
+                            >
+                              {watchedIds.has(s.market_id) ? "Watching" : "Watch"}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </section>
