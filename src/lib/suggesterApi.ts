@@ -12,6 +12,26 @@ export interface MarketPrediction {
   expected_value: number;
 }
 
+export interface HalfDist {
+  home_win: number;
+  draw: number;
+  away_win: number;
+  top_score: string;      // "home-away", e.g. "0-0"
+  top_score_prob: number;
+}
+
+export interface PredictionSummary {
+  full_time: { home_win: number; draw: number; away_win: number };
+  advance: {
+    home: number;
+    away: number;
+    p_reach_et: number;
+    p_reach_pens: number | null;
+    method: string;       // "simulated_et_pens" (knockout) | "half_draw_approx"
+  } | null;
+  halves: { first_half: HalfDist; second_half: HalfDist } | null;
+}
+
 export interface PredictionResponse {
   freshness: "cached" | "fresh";
   match_id: string;
@@ -23,6 +43,7 @@ export interface PredictionResponse {
   confidence: number;
   xg: { home: number; away: number };
   scorelines: { score: string; prob: number }[];
+  summary?: PredictionSummary | null;
   markets: MarketPrediction[];
   inference_time_ms?: number;
 }

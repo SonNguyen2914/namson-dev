@@ -10,7 +10,8 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 import {
   api, flag, pct, signedPct,
-  PredictionResponse, TimelinePoint, TeamInfoResponse, TeamBlurb,
+  PredictionResponse, PredictionSummary, HalfDist,
+  TimelinePoint, TeamInfoResponse, TeamBlurb,
 } from "../../../lib/suggesterApi";
 import LivePanel from "../../../components/LivePanel";
 import { Eyebrow, Reveal } from "../../../components/ui";
@@ -196,6 +197,18 @@ export default function MatchDetail() {
 
         {pred && (
           <>
+            {/* Model prediction — halves, full time, ET/pens, top scores */}
+            {pred.summary && (
+              <Reveal>
+                <ModelPrediction
+                  summary={pred.summary}
+                  scorelines={pred.scorelines}
+                  home={home}
+                  away={away}
+                />
+              </Reveal>
+            )}
+
             {/* Outcome probabilities — thin stat bars, Apple-Sports style */}
             {hasOutcomes && (
               <Reveal>
@@ -219,8 +232,8 @@ export default function MatchDetail() {
             {/* xG + confidence */}
             <Reveal>
             <section className="mb-10 grid grid-cols-3 gap-3">
-              <Stat label="home xG" value={pred.xg.home.toFixed(2)} />
-              <Stat label="away xG" value={pred.xg.away.toFixed(2)} />
+              <Stat label={`${home} xG`} value={pred.xg.home.toFixed(2)} />
+              <Stat label={`${away} xG`} value={pred.xg.away.toFixed(2)} />
               <Stat label="model confidence" value={pct(pred.confidence)} />
             </section>
             </Reveal>
@@ -463,6 +476,133 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="rounded-2xl border border-line bg-elev p-4 sm:p-5">
       <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low sm:text-[11px]">{label}</p>
       <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums text-ink-hi sm:text-3xl">{value}</p>
+    </div>
+  );
+}
+
+// Model prediction panel — the Monte Carlo forecast in plain terms: each half,
+// full time, whether it goes to ET/penalties (knockout), and the most likely
+// final scores. All derived from the same simulation as the priced markets.
+function ModelPrediction({ summary, scorelines, home, away }: {
+  summary: PredictionSummary;
+  scorelines: { score: string; prob: number }[];
+  home: string;
+  away: string;
+}) {
+  const ft = summary.full_time;
+  const adv = summary.advance;
+  const isKO = adv?.method === "simulated_et_pens";
+  const halves = summary.halves;
+  const topScores = scorelines.slice(0, 4);
+
+  // "home-away" score string -> "🇲🇦 0–0 🇫🇷"
+  const scoreLabel = (s: string) => {
+    const [h, a] = s.split("-");
+    return `${flag(home)} ${h}–${a} ${flag(away)}`;
+  };
+
+  return (
+    <section className="mb-10 rounded-2xl border border-line bg-elev p-5 sm:p-6">
+      <Eyebrow className="mb-1">model prediction · based on team data</Eyebrow>
+      <p className="mb-5 text-[11px] leading-relaxed text-ink-faint">
+        Monte Carlo forecast from each side&apos;s attack, defence, form, fatigue and Elo.
+      </p>
+
+      {halves && (
+        <div className="mb-6 grid gap-3 sm:grid-cols-2">
+          <HalfCard title="First half" d={halves.first_half} home={home} away={away} scoreLabel={scoreLabel} />
+          <HalfCard title="Second half" d={halves.second_half} home={home} away={away} scoreLabel={scoreLabel} />
+        </div>
+      )}
+
+      <div className="mb-6">
+        <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">
+          Full time · 90 min
+        </p>
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <FtCell label={home} value={ft.home_win} lead={ft.home_win >= ft.draw && ft.home_win >= ft.away_win} />
+          <FtCell label="Draw" value={ft.draw} lead={ft.draw > ft.home_win && ft.draw >= ft.away_win} />
+          <FtCell label={away} value={ft.away_win} lead={ft.away_win > ft.home_win && ft.away_win > ft.draw} />
+        </div>
+      </div>
+
+      {isKO && adv && (
+        <div className="mb-6 grid grid-cols-2 gap-3">
+          <ChanceChip label="Goes to extra time?" p={adv.p_reach_et} />
+          <ChanceChip label="Goes to penalties?" p={adv.p_reach_pens ?? 0} />
+        </div>
+      )}
+
+      <div>
+        <p className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">
+          Most likely final score · 90 min
+        </p>
+        <div className="space-y-2.5">
+          {topScores.map((s) => (
+            <div key={s.score} className="flex items-center gap-3">
+              <span className="w-32 shrink-0 font-mono text-sm tabular-nums text-ink-hi">{scoreLabel(s.score)}</span>
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-elev2">
+                <div className="h-full rounded-full bg-accent/70" style={{ width: `${Math.min(s.prob * 400, 100)}%` }} />
+              </div>
+              <span className="w-12 shrink-0 text-right font-mono text-xs tabular-nums text-ink-low">{pct(s.prob)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <p className="mt-5 text-[11px] leading-relaxed text-ink-faint">
+        Results are the 90-minute score.{isKO && " Extra time and penalties only apply if level at full time."}{" "}
+        Each half is modelled at half the match rate.
+      </p>
+    </section>
+  );
+}
+
+function HalfCard({ title, d, home, away, scoreLabel }: {
+  title: string;
+  d: HalfDist;
+  home: string;
+  away: string;
+  scoreLabel: (s: string) => string;
+}) {
+  const opts: [string, number][] = [
+    [`${home} win`, d.home_win], ["Draw", d.draw], [`${away} win`, d.away_win],
+  ];
+  opts.sort((a, b) => b[1] - a[1]);
+  const [label, prob] = opts[0];
+  return (
+    <div className="rounded-xl border border-line bg-bs p-4">
+      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">{title}</p>
+      <p className="mt-2 text-sm text-ink-hi">
+        {label} <span className="font-mono text-xs tabular-nums text-ink-low">{pct(prob)}</span>
+      </p>
+      <p className="mt-1.5 font-mono text-xs tabular-nums text-ink-mid">
+        {scoreLabel(d.top_score)} <span className="text-ink-faint">· {pct(d.top_score_prob)}</span>
+      </p>
+    </div>
+  );
+}
+
+function FtCell({ label, value, lead }: { label: string; value: number; lead: boolean }) {
+  return (
+    <div className={`rounded-lg border p-3 ${lead ? "border-accent/40 bg-accent/5" : "border-line"}`}>
+      <p className="truncate text-xs text-ink-mid" title={label}>{label}</p>
+      <p className={`mt-1 font-mono text-lg tabular-nums ${lead ? "text-accent" : "text-ink-hi"}`}>{pct(value)}</p>
+    </div>
+  );
+}
+
+function ChanceChip({ label, p }: { label: string; p: number }) {
+  return (
+    <div className="rounded-xl border border-line bg-bs p-4">
+      <p className="text-xs text-ink-mid">{label}</p>
+      <div className="mt-1.5 flex items-baseline gap-2">
+        <span className="font-mono text-2xl tabular-nums text-ink-hi">{pct(p)}</span>
+        <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">chance</span>
+      </div>
+      <div className="mt-2 h-1 overflow-hidden rounded-full bg-elev2">
+        <div className="h-full rounded-full bg-accent/60" style={{ width: `${Math.min(p * 100, 100)}%` }} />
+      </div>
     </div>
   );
 }
