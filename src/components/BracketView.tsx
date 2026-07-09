@@ -90,16 +90,19 @@ export default function BracketView() {
           <BranchLines />
 
           <RoundLabel>Final</RoundLabel>
-          {/* Final centered; 3rd-place floated to the side (not in the pyramid). */}
-          <div className="relative mx-auto max-w-4xl">
-            <div className="mx-auto max-w-md">
+          {/* Final centered; 3rd-place beside it (not in the pyramid). A grid
+              with symmetric side columns RESERVES the space, so the two cards
+              can never overlap at any width (absolute positioning could). */}
+          <div className="mx-auto max-w-4xl lg:grid lg:grid-cols-[1fr_minmax(0,26rem)_1fr] lg:items-start lg:gap-4">
+            <div className="hidden lg:block" aria-hidden />
+            <div className="mx-auto w-full max-w-md lg:mx-0 lg:max-w-none">
               {b.final.map((m) => (
                 <BracketCard key={m.match_id} m={m} edge={edges[m.match_id]} emphasis />
               ))}
             </div>
 
-            {b.third_place.length > 0 && (
-              <div className="mx-auto mt-6 max-w-xs opacity-90 lg:absolute lg:right-0 lg:top-0 lg:mt-0 lg:w-56">
+            {b.third_place.length > 0 ? (
+              <div className="mx-auto mt-6 max-w-xs opacity-90 lg:mx-0 lg:mt-0 lg:max-w-none">
                 <p className="mb-1.5 text-center font-mono text-[9px] uppercase tracking-[0.2em] text-ink-faint">
                   Third place
                 </p>
@@ -107,6 +110,8 @@ export default function BracketView() {
                   <BracketCard key={m.match_id} m={m} edge={edges[m.match_id]} small />
                 ))}
               </div>
+            ) : (
+              <div className="hidden lg:block" aria-hidden />
             )}
           </div>
 

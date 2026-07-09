@@ -188,3 +188,20 @@ body {
     transition: none;
   }
 }
+
+/* ---------------- print / PDF export ----------------------------- */
+/* Print engines flatten the low-alpha radial glow gradients into solid
+   color blocks (giant green blobs over the hero and pick cards in PDF
+   exports). Kill the decorative glows and reveal any scroll-hidden
+   content when printing — data stays, décor goes. */
+@media print {
+  .glow::before,
+  .hero-ambient {
+    background: none !important;
+  }
+  .reveal,
+  .reveal-row {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

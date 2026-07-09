@@ -364,8 +364,11 @@ export const api = {
 
 // -- formatting helpers -------------------------------------------------
 export const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
-export const signedPct = (x: number) =>
-  `${x >= 0 ? "+" : ""}${(x * 100).toFixed(1)}%`;
+export const signedPct = (x: number) => {
+  const v = (x * 100).toFixed(1);
+  if (v === "-0.0" || v === "0.0") return "+0.0%"; // avoid a signed zero
+  return `${x >= 0 ? "+" : ""}${v}%`;
+};
 export const money = (x: number) => `${x >= 0 ? "+" : "−"}$${Math.abs(x).toFixed(2)}`;
 
 export function countdown(seconds: number): string {
