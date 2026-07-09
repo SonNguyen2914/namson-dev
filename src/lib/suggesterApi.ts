@@ -252,6 +252,15 @@ export interface PlayerProp {
   starts: number;
   anytime: number;      // P(scores at any point, 90 min)
   first_goal: number;   // P(scores the match's first goal)
+  p2?: number;          // P(2+ goals this match)
+  p3?: number;          // P(3+ goals this match)
+  tournament_anytime?: number;  // P(scores in the remaining tournament)
+  already_scored?: boolean;     // Kalshi tournament market settles Yes
+  market_id?: string;   // Kalshi KXWCPLAYERGOALS ticker, when listed
+  implied?: number;     // buyable ask as probability
+  multiplier?: number | null;
+  likelihood?: number;  // anchored (0.6 model + 0.4 market)
+  edge?: number;
 }
 
 export interface PlayerPropsResponse {

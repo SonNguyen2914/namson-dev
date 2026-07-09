@@ -58,6 +58,7 @@ export default function MatchDetail() {
   const [mktSortKey, setMktSortKey] = useState<MktSortKey>("likelihood");
   const [mktSortDir, setMktSortDir] = useState<"asc" | "desc">("desc");
   const [mktCollapsed, setMktCollapsed] = useState<Set<string>>(new Set());
+  const [mktTab, setMktTab] = useState<"lines" | "players">("lines");
 
   const load = useCallback(async (force: boolean) => {
     if (!matchId) return;
@@ -351,20 +352,32 @@ export default function MatchDetail() {
               <StrategySection markets={sortedMarkets} />
             </Reveal>
 
-            {/* Player props — model estimates (Poisson thinning of the sim) */}
-            {pProps && (
-              <Reveal>
-                <PlayerPropsSection pp={pProps} />
-              </Reveal>
-            )}
-
             {/* Every market priced — grouped by type, sortable, collapsible */}
             <Reveal>
             <section className="mb-14">
-              <Eyebrow className="mb-2">markets · by type</Eyebrow>
-              <h3 className="mb-1 text-lg font-medium text-ink-hi">
+              <Eyebrow className="mb-2">markets</Eyebrow>
+              <h3 className="mb-3 text-lg font-medium text-ink-hi">
                 Every Kalshi market on this match
               </h3>
+              <div className="mb-4 flex gap-1.5">
+                {([["lines", "Game lines"], ["players", "Player props"]] as const).map(([id, label]) => (
+                  <button
+                    key={id}
+                    onClick={() => setMktTab(id)}
+                    className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors ${
+                      mktTab === id
+                        ? "border-accent/60 bg-accent/10 text-accent"
+                        : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {mktTab === "players" ? (
+                pProps ? <PlayerPropsTab pp={pProps} onWatch={toggleWatch} watched={watched} />
+                       : <p className="rounded-xl border border-line p-4 text-sm text-ink-low">Player data unavailable for this match.</p>
+              ) : (<>
               <p className="mb-4 text-xs text-ink-low">
                 Click a column to sort · click a group to collapse
               </p>
@@ -437,6 +450,7 @@ export default function MatchDetail() {
                 the moment the ripeness score crosses the alert threshold with positive edge.
                 Multipliers are the buyable ask price, not the midpoint.
               </p>
+              </>)}
             </section>
             </Reveal>
 
@@ -867,66 +881,111 @@ function StrategySection({ markets }: { markets: MarketPrediction[] }) {
 
 
 // ---------------------------------------------------------------------------
-// Player props — anytime & first-goalscorer model estimates. Poisson thinning
-// of the match sim's team xG by each player's FIFA-PDF scoring share. Honest
-// framing: 5-match samples, no minutes model, and NOT priced against Kalshi's
-// player markets (settlement rules unverified — the 16.67x lesson).
-function PlayerPropsSection({ pp }: { pp: PlayerPropsResponse }) {
+// Player props tab. TOP: Kalshi's real tournament-anytime scorer markets
+// ("Will X score a goal in the 2026 World Cup?") priced like every other
+// market — anchored likelihood, edge vs the buyable ask, multiplier; players
+// who already scored settle Yes and are labelled, not priced. BOTTOM: this
+// match's model estimates (1+/2+/3+ goals, first goal) — Kalshi lists no
+// per-match scorer or assist markets, and FIFA publishes no assist data, so
+// those cannot be priced without inventing numbers.
+function PlayerPropsTab({ pp, onWatch, watched }: {
+  pp: PlayerPropsResponse;
+  onWatch: (marketId: string, title: string) => void;
+  watched: Set<string>;
+}) {
   const [tab, setTab] = useState<"home" | "away">("home");
   const rows = (tab === "home" ? pp.home : pp.away) ?? [];
-  const teamName = tab === "home" ? pp.home_team : pp.away_team;
+  const priced = rows.filter((r) => r.market_id && !r.already_scored && r.likelihood != null);
+  const settled = rows.filter((r) => r.already_scored);
   return (
-    <section className="mb-14 rounded-2xl border border-line bg-elev p-5 sm:p-6">
-      <Eyebrow className="mb-1">player props · model estimates</Eyebrow>
-      <p className="mb-4 text-[11px] leading-relaxed text-ink-faint">
-        Each player&apos;s slice of his team&apos;s expected goals (share sourced from
-        FIFA post-match data, 5 matches) — pure model, no market anchoring.
-      </p>
+    <div>
       <div className="mb-4 flex gap-1.5">
         {(["home", "away"] as const).map((side) => (
-          <button
-            key={side}
-            onClick={() => setTab(side)}
+          <button key={side} onClick={() => setTab(side)}
             className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors ${
-              tab === side
-                ? "border-accent/60 bg-accent/10 text-accent"
-                : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"
-            }`}
-          >
+              tab === side ? "border-accent/60 bg-accent/10 text-accent"
+                           : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"}`}>
             {flag((side === "home" ? pp.home_team : pp.away_team) ?? "")}{" "}
             {side === "home" ? pp.home_team : pp.away_team}
           </button>
         ))}
       </div>
+
+      <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">
+        Kalshi market · scores a goal in the tournament
+      </p>
+      {priced.length === 0 && settled.length === 0 ? (
+        <p className="mb-5 rounded-xl border border-line p-4 text-sm text-ink-low">
+          No open Kalshi player markets matched for this team right now.
+        </p>
+      ) : (
+        <div className="mb-2 overflow-x-auto rounded-xl border border-line">
+          <div className="min-w-[560px]">
+            <div className="grid grid-cols-[minmax(0,1fr)_6rem_5rem_5.5rem_4.5rem] items-center gap-x-3 border-b border-line bg-bs px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
+              <span>Player</span><span className="text-right">Likelihood</span>
+              <span className="text-right">Edge</span><span className="text-right">Multiplier</span>
+              <span className="text-right">Alert</span>
+            </div>
+            {priced.map((r) => (
+              <div key={r.shirt} className="grid grid-cols-[minmax(0,1fr)_6rem_5rem_5.5rem_4.5rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm">
+                <span className="min-w-0 truncate pr-2 text-ink-hi">{r.player}</span>
+                <span className="text-right font-mono tabular-nums text-ink-hi">{pct(r.likelihood!)}</span>
+                <span className={`text-right font-mono tabular-nums ${r.edge! >= 0 ? "text-accent" : "text-neg"}`}>{signedPct(r.edge!)}</span>
+                <span className="text-right font-mono tabular-nums text-ink-mid">{r.multiplier != null ? `${r.multiplier.toFixed(2)}x` : "—"}</span>
+                <span className="text-right">
+                  <button onClick={() => onWatch(r.market_id!, `${r.player} to score (tournament)`)}
+                    className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors ${
+                      watched.has(r.market_id!) ? "border-warn/50 text-warn hover:border-warn"
+                        : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"}`}>
+                    {watched.has(r.market_id!) ? "Watching" : "Watch"}
+                  </button>
+                </span>
+              </div>
+            ))}
+            {settled.map((r) => (
+              <div key={r.shirt} className="grid grid-cols-[minmax(0,1fr)_6rem_5rem_5.5rem_4.5rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0 opacity-70">
+                <span className="min-w-0 truncate pr-2 text-ink-mid">{r.player}</span>
+                <span className="col-span-4 text-right font-mono text-[11px] uppercase tracking-wider text-accent">✓ already scored — settles yes</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <p className="mb-6 text-[11px] leading-relaxed text-ink-faint">
+        Likelihood is anchored (60% model · 40% market); the model is
+        P(scores in the team&apos;s remaining tournament run) from bracket-path
+        enumeration. Thin books make some asks extreme — edge is honest, not
+        an endorsement.
+      </p>
+
+      <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">
+        This match · model estimates (no Kalshi market exists)
+      </p>
       <div className="overflow-x-auto rounded-xl border border-line">
-        <div className="min-w-[540px]">
-          <div className="grid grid-cols-[minmax(0,1fr)_7rem_6rem_6.5rem] items-center gap-x-3 border-b border-line bg-bs px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
-            <span>Player · {teamName}</span>
-            <span className="text-right">Tournament</span>
-            <span className="text-right">Anytime</span>
+        <div className="min-w-[560px]">
+          <div className="grid grid-cols-[minmax(0,1fr)_5rem_5rem_5rem_5.5rem] items-center gap-x-3 border-b border-line bg-bs px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
+            <span>Player</span><span className="text-right">1+ goal</span>
+            <span className="text-right">2+ goals</span><span className="text-right">3+ goals</span>
             <span className="text-right">First goal</span>
           </div>
           {rows.map((r) => (
-            <div key={r.shirt} className="grid grid-cols-[minmax(0,1fr)_7rem_6rem_6.5rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0">
+            <div key={r.shirt} className="grid grid-cols-[minmax(0,1fr)_5rem_5rem_5rem_5.5rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0">
               <span className="min-w-0 truncate pr-2 text-ink-hi">
-                <span className="mr-2 font-mono text-[11px] text-ink-faint">#{r.shirt}</span>
-                {r.player}
-                {r.starts < r.matches && (
-                  <span className="ml-2 font-mono text-[9px] uppercase tracking-wider text-ink-faint">rotation</span>
-                )}
-              </span>
-              <span className="text-right font-mono text-xs tabular-nums text-ink-low">
-                {r.goals}g · {r.attempts} att
+                <span className="mr-2 font-mono text-[11px] text-ink-faint">#{r.shirt}</span>{r.player}
+                {r.starts < r.matches && <span className="ml-2 font-mono text-[9px] uppercase tracking-wider text-ink-faint">rotation</span>}
               </span>
               <span className="text-right font-mono tabular-nums text-ink-hi">{pct(r.anytime)}</span>
+              <span className="text-right font-mono tabular-nums text-ink-mid">{r.p2 != null ? pct(r.p2) : "—"}</span>
+              <span className="text-right font-mono tabular-nums text-ink-mid">{r.p3 != null ? pct(r.p3) : "—"}</span>
               <span className="text-right font-mono tabular-nums text-ink-mid">{pct(r.first_goal)}</span>
             </div>
           ))}
         </div>
       </div>
       <p className="mt-3 text-xs leading-relaxed text-ink-faint">
-        {pp.disclaimer} No goal at all: {pp.p_no_goal != null ? pct(pp.p_no_goal) : "—"}.
+        {pp.disclaimer} Assists: Kalshi lists no assist markets and FIFA&apos;s
+        match reports publish no assist data — not priced rather than invented.
       </p>
-    </section>
+    </div>
   );
 }
