@@ -224,6 +224,10 @@ export interface BracketMatch {
   kickoff: string;
   venue: string;
   stage: string;
+  forecast?: {
+    home: { team: string; p: number } | null;
+    away: { team: string; p: number } | null;
+  } | null;
   probs: {
     home_win: number; draw: number; away_win: number;
     // win-market edges served with the bracket so the UI needs no extra calls
@@ -238,6 +242,7 @@ export interface BracketMatch {
 }
 
 export interface BracketResponse {
+  champion_forecast?: { team: string; p: number } | null;
   quarterfinals: BracketMatch[];
   semifinals: BracketMatch[];
   third_place: BracketMatch[];
@@ -266,6 +271,7 @@ export interface PlayerProp {
   multiplier?: number | null;
   likelihood?: number;  // anchored (0.6 model + 0.4 market)
   edge?: number;
+  squad?: "starter" | "bench" | "out";  // matchday fact, once lineups post
   // per-match Kalshi props (KXWCGOAL 1+/2+/3+ priced; KXWCAST display-only)
   match_goal_markets?: { n: number; market_id: string; implied: number;
                          multiplier: number | null; likelihood?: number;
@@ -284,6 +290,24 @@ export interface PlayerPropsResponse {
   p_no_goal?: number;
   disclaimer?: string;
   reason?: string;
+}
+
+export interface LineupPlayer {
+  player: string;
+  shirt?: string | null;
+  pos?: string | null;
+}
+
+export interface TeamNewsResponse {
+  match_id: string;
+  home_team: string;
+  away_team: string;
+  kickoff: string;
+  venue: string;
+  available: boolean;
+  reason?: string;
+  home?: { starters: LineupPlayer[]; bench: LineupPlayer[] };
+  away?: { starters: LineupPlayer[]; bench: LineupPlayer[] };
 }
 
 export interface TeamBlurb {
@@ -370,6 +394,9 @@ export const api = {
 
   playerProps: (matchId: string) =>
     getJson<PlayerPropsResponse>(`/player-props/${matchId}`),
+
+  teamNews: (matchId: string) =>
+    getJson<TeamNewsResponse>(`/team-news/${matchId}`),
 
   pastMatches: () => getJson<PastMatchesResponse>("/past-matches"),
 

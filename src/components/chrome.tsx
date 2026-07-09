@@ -2,7 +2,7 @@
 // chips, and skeleton loaders so data-heavy sections show structure (never a
 // bare "Loading…") while they fetch.
 import Link from "next/link";
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 
 export function TopBar({ back, title, children }: {
   back?: { href: string; label: string };
@@ -56,6 +56,34 @@ export function SkeletonRows({ rows = 5, height = "h-11" }: {
       {Array.from({ length: rows }).map((_, i) => (
         <Skeleton key={i} className={`${height} w-full`} />
       ))}
+    </div>
+  );
+}
+
+export function Collapse({ id, eyebrow, title, defaultOpen = true, children }: {
+  id?: string;
+  eyebrow?: string;
+  title: ReactNode;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div id={id} className="mb-10">
+      <button onClick={() => setOpen((o) => !o)}
+        className="group flex w-full items-baseline gap-3 border-b border-line pb-2.5 text-left">
+        <span className={`text-ink-faint transition-transform ${open ? "rotate-90" : ""}`}>▸</span>
+        <span className="min-w-0">
+          {eyebrow && (
+            <span className="mr-3 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">{eyebrow}</span>
+          )}
+          <span className="text-base font-medium text-ink-hi transition-colors group-hover:text-accent">{title}</span>
+        </span>
+        {!open && (
+          <span className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">show</span>
+        )}
+      </button>
+      {open && <div className="pt-5">{children}</div>}
     </div>
   );
 }

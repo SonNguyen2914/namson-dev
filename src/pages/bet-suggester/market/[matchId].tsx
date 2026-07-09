@@ -8,14 +8,14 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 import {
-  api, flag, pct, signedPct,
+  api, flag, pct, signedPct, countdown, kickoffLocal,
   PredictionResponse, PredictionSummary, HalfDist, MarketPrediction,
-  PlayerPropsResponse,
+  PlayerPropsResponse, TeamNewsResponse, LineupPlayer,
   TimelinePoint, TeamInfoResponse, TeamBlurb,
 } from "../../../lib/suggesterApi";
 import LivePanel from "../../../components/LivePanel";
 import { Eyebrow, Reveal } from "../../../components/ui";
-import { NavChip, SkeletonRows, TopBar } from "../../../components/chrome";
+import { Collapse, NavChip, SkeletonRows, TopBar } from "../../../components/chrome";
 
 // Same floors as the backend board — the pick is just row #1 of this
 // match's slice of the same likelihood-first ranking.
@@ -46,6 +46,8 @@ export default function MatchDetail() {
   const [teams, setTeams] = useState<{ home: string; away: string } | null>(null);
   const [teamInfo, setTeamInfo] = useState<TeamInfoResponse | null>(null);
   const [pProps, setPProps] = useState<PlayerPropsResponse | null>(null);
+  const [news, setNews] = useState<TeamNewsResponse | null>(null);
+  const [, setClock] = useState(0); // 1s tick — drives the hero countdown
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   // grouped markets table: sort + collapsed groups
@@ -98,7 +100,21 @@ export default function MatchDetail() {
         if (alive && pp.available) setPProps(pp);
       } catch { /* no player data — section won't render */ }
     })();
-    return () => { alive = false; };
+    // Team news: kickoff/venue for the hero + official lineups once posted
+    // (~1h before kickoff). Polled so a viewer parked on the page catches the
+    // lineup drop; ESPN is keyless and the backend caches it for 60s.
+    const loadNews = async () => {
+      try {
+        const tn = await api.teamNews(matchId);
+        if (!alive) return;
+        setNews(tn);
+        setTeams((t) => t ?? { home: tn.home_team, away: tn.away_team });
+      } catch { /* hero just won't show venue/countdown */ }
+    };
+    loadNews();
+    const newsPoll = setInterval(loadNews, 120000);
+    const tick = setInterval(() => setClock((c) => c + 1), 1000);
+    return () => { alive = false; clearInterval(newsPoll); clearInterval(tick); };
   }, [matchId]);
 
   async function toggleWatch(marketId: string, marketTitle: string) {
@@ -122,6 +138,9 @@ export default function MatchDetail() {
   const [codeH, codeA] = (matchId ?? "_").split("_");
   const home = teams?.home ?? codeH ?? "Home";
   const away = teams?.away ?? codeA ?? "Away";
+  const secsToKick = news
+    ? Math.floor((new Date(news.kickoff).getTime() - Date.now()) / 1000)
+    : null;
 
   // Likelihood ↓ then edge ↓ — same ordering as the landing board
   const sortedMarkets = pred
@@ -201,6 +220,7 @@ export default function MatchDetail() {
 
       <TopBar back={{ href: "/bet-suggester", label: "board" }}
         title={`${home} vs ${away}`}>
+        <NavChip href="#news">News</NavChip>
         <NavChip href="#prediction">Prediction</NavChip>
         <NavChip href="#strategy">Strategy</NavChip>
         <NavChip onClick={() => {
@@ -222,6 +242,32 @@ export default function MatchDetail() {
             {away}
             {teams && <span className="ml-3">{flag(away)}</span>}
           </h1>
+
+          {/* Match details — local kickoff, stadium, ticking countdown */}
+          {news && (
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 font-mono text-xs tracking-wide text-ink-low">
+              <span>{kickoffLocal(news.kickoff)}</span>
+              {news.venue && (
+                <>
+                  <span className="text-ink-faint">·</span>
+                  <span>{news.venue}</span>
+                </>
+              )}
+              {secsToKick != null && secsToKick > 0 ? (
+                <>
+                  <span className="text-ink-faint">·</span>
+                  <span className="tabular-nums text-accent">
+                    kickoff in {countdown(secsToKick)}
+                  </span>
+                </>
+              ) : secsToKick != null && secsToKick > -3 * 3600 ? (
+                <>
+                  <span className="text-ink-faint">·</span>
+                  <span className="text-live">kicked off</span>
+                </>
+              ) : null}
+            </div>
+          )}
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             {freshnessBadge}
@@ -269,16 +315,25 @@ export default function MatchDetail() {
           </Reveal>
         )}
 
-        {/* How they play — scouting blurbs, a read aid (not a model input) */}
+        {/* How they play — scouting blurbs, a read aid (not a model input).
+            Collapsed by default: read-once background, not match-day signal. */}
         {teamInfo && (teamInfo.home.scouting || teamInfo.away.scouting) && (
           <Reveal>
-            <section className="mb-10">
-              <Eyebrow className="mb-4">how they play · scouting</Eyebrow>
+            <Collapse eyebrow="scouting" title="How they play" defaultOpen={false}>
               <div className="grid gap-3 sm:grid-cols-2">
                 <ScoutCard blurb={teamInfo.home} fallbackName={home} />
                 <ScoutCard blurb={teamInfo.away} fallbackName={away} />
               </div>
-            </section>
+            </Collapse>
+          </Reveal>
+        )}
+
+        {/* Team news — official lineups (facts only), once ESPN posts them */}
+        {news && (
+          <Reveal>
+            <Collapse id="news" eyebrow="team news" title="Official lineups">
+              <TeamNewsSection news={news} home={home} away={away} />
+            </Collapse>
           </Reveal>
         )}
 
@@ -287,14 +342,15 @@ export default function MatchDetail() {
             {/* Model prediction — halves, full time, ET/pens, top scores */}
             {pred.summary && (
               <Reveal>
-                <div id="prediction" />
-                <ModelPrediction
-                  summary={pred.summary}
-                  scorelines={pred.scorelines}
-                  xg={pred.xg}
-                  home={home}
-                  away={away}
-                />
+                <Collapse id="prediction" eyebrow="pure model" title="Model prediction">
+                  <ModelPrediction
+                    summary={pred.summary}
+                    scorelines={pred.scorelines}
+                    xg={pred.xg}
+                    home={home}
+                    away={away}
+                  />
+                </Collapse>
               </Reveal>
             )}
 
@@ -322,8 +378,11 @@ export default function MatchDetail() {
               </Reveal>
             )}
 
-            {/* Live in-play read (Layer 3) */}
-            <LivePanel matchId={matchId as string} />
+            {/* Live in-play read (Layer 3) — collapsed: manual dev tool,
+                only relevant while a match is actually running */}
+            <Collapse eyebrow="in-play" title="Live read · manual state entry" defaultOpen={false}>
+              <LivePanel matchId={matchId as string} />
+            </Collapse>
 
             {/* Model's Pick — row #1 of this match's likelihood board */}
             <Reveal>
@@ -360,9 +419,10 @@ export default function MatchDetail() {
             </Reveal>
 
             {/* Betting strategy — scenario engine + fund divider */}
-            <div id="strategy" />
             <Reveal>
-              <StrategySection markets={sortedMarkets} summary={pred.summary ?? null} home={home} away={away} />
+              <Collapse id="strategy" eyebrow="scenario engine" title="Betting strategy">
+                <StrategySection markets={sortedMarkets} summary={pred.summary ?? null} home={home} away={away} />
+              </Collapse>
             </Reveal>
 
             {/* Every market priced — grouped by type, sortable, collapsible */}
@@ -467,14 +527,11 @@ export default function MatchDetail() {
             </section>
             </Reveal>
 
-            {/* Prediction timeline */}
+            {/* Prediction timeline — collapsed: audit trail, not match-day
+                signal */}
             {timeline.length > 1 && (
               <Reveal>
-              <section>
-                <Eyebrow className="mb-2">history</Eyebrow>
-                <h3 className="mb-4 text-lg font-medium text-ink-hi">
-                  How the home-win prediction evolved today
-                </h3>
+              <Collapse eyebrow="history" title="How the home-win prediction evolved today" defaultOpen={false}>
                 <div className="overflow-x-auto rounded-xl border border-line">
                   <table className="w-full text-sm">
                     <thead className="bg-elev text-left font-mono text-[11px] uppercase tracking-[0.14em] text-ink-low">
@@ -511,7 +568,7 @@ export default function MatchDetail() {
                     </tbody>
                   </table>
                 </div>
-              </section>
+              </Collapse>
               </Reveal>
             )}
           </>
@@ -557,6 +614,85 @@ function ScoutCard({ blurb, fallbackName }: {
             <span className="text-warn">tired {(blurb.fatigue * 100).toFixed(0)}%</span>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+// Team news — FACTS ONLY. ESPN's official matchday squads, surfaced
+// verbatim: starters, bench, and (by omission) who is out. No sentiment or
+// rumor multipliers — a player left out of the squad has his per-match
+// scoring chances zeroed in Player props, and that is the only model effect.
+function TeamNewsSection({ news, home, away }: {
+  news: TeamNewsResponse;
+  home: string;
+  away: string;
+}) {
+  if (!news.available) {
+    return (
+      <div className="rounded-2xl border border-line bg-elev p-5">
+        <p className="text-sm text-ink-mid">
+          No official lineups yet — federations release them roughly an hour
+          before kickoff.
+        </p>
+        <p className="mt-2 text-xs leading-relaxed text-ink-faint">
+          Once they post, starters and bench appear here, and any player left
+          out of the matchday squad has this match&apos;s scoring chances zeroed
+          in Player props — a settled fact, never a rumor adjustment.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <LineupCard team={news.home_team || home} lu={news.home} />
+        <LineupCard team={news.away_team || away} lu={news.away} />
+      </div>
+      <p className="mt-3 text-xs leading-relaxed text-ink-faint">
+        Official matchday squads via ESPN. Players missing from the squad
+        entirely are tagged OUT in Player props with this match&apos;s scoring
+        chances set to zero — the only lineup effect the model applies.
+      </p>
+    </div>
+  );
+}
+
+function LineupCard({ team, lu }: {
+  team: string;
+  lu?: { starters: LineupPlayer[]; bench: LineupPlayer[] };
+}) {
+  if (!lu) return null;
+  return (
+    <div className="rounded-2xl border border-line bg-elev p-5">
+      <p className="mb-3 text-sm font-medium text-ink-hi">{flag(team)} {team}</p>
+      <p className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">
+        Starting XI
+      </p>
+      <ul className="space-y-1">
+        {lu.starters.map((p) => (
+          <li key={p.player} className="flex items-baseline gap-2 text-sm">
+            <span className="w-6 shrink-0 text-right font-mono text-xs tabular-nums text-ink-faint">
+              {p.shirt ?? ""}
+            </span>
+            <span className="min-w-0 truncate text-ink-hi">{p.player}</span>
+            {p.pos && (
+              <span className="ml-auto shrink-0 font-mono text-[10px] uppercase text-ink-faint">
+                {p.pos}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+      {lu.bench.length > 0 && (
+        <>
+          <p className="mb-1 mt-4 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">
+            Bench
+          </p>
+          <p className="text-xs leading-relaxed text-ink-low">
+            {lu.bench.map((p) => p.player).join(" · ")}
+          </p>
+        </>
       )}
     </div>
   );
@@ -645,8 +781,7 @@ function ModelPrediction({ summary, scorelines, xg, home, away }: {
   };
 
   return (
-    <section className="mb-10 rounded-2xl border border-line bg-elev p-5 sm:p-6">
-      <Eyebrow className="mb-1">model prediction · pure model</Eyebrow>
+    <section className="rounded-2xl border border-line bg-elev p-5 sm:p-6">
       <p className="mb-5 text-[11px] leading-relaxed text-ink-faint">
         Monte Carlo forecast from each side&apos;s attack, defence, form, fatigue
         and Elo — the model&apos;s own view, before any market anchoring.
@@ -874,8 +1009,7 @@ function StrategySection({ markets, summary, home, away }: {
   } as const;
 
   return (
-    <section className="mb-14 rounded-2xl border border-line bg-elev p-5 sm:p-6">
-      <Eyebrow className="mb-1">betting strategy · scenario engine</Eyebrow>
+    <section className="rounded-2xl border border-line bg-elev p-5 sm:p-6">
       <p className="mb-4 text-[11px] leading-relaxed text-ink-faint">
         Your whole fund is split across result-space contracts so every covered
         scenario returns the same profit. You lose only if a listed uncovered
@@ -1116,10 +1250,14 @@ function PlayerPropsTab({ pp, onWatch, watched }: {
             };
             const ast = r.assist_markets?.find((a) => a.n === 1);
             return (
-              <div key={r.shirt} className="grid grid-cols-[minmax(0,1fr)_6rem_6rem_6rem_5rem_5.5rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0">
+              <div key={r.shirt} className={`grid grid-cols-[minmax(0,1fr)_6rem_6rem_6rem_5rem_5.5rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0 ${
+                r.squad === "out" ? "opacity-50" : ""}`}>
                 <span className="min-w-0 truncate pr-2 text-ink-hi">
                   <span className="mr-2 font-mono text-[11px] text-ink-faint">#{r.shirt}</span>{r.player}
-                  {r.starts < r.matches && <span className="ml-2 font-mono text-[9px] uppercase tracking-wider text-ink-faint">rotation</span>}
+                  {r.squad === "starter" && <span className="ml-2 rounded border border-accent/40 px-1 font-mono text-[9px] uppercase tracking-wider text-accent">XI</span>}
+                  {r.squad === "bench" && <span className="ml-2 rounded border border-line px-1 font-mono text-[9px] uppercase tracking-wider text-ink-low">bench</span>}
+                  {r.squad === "out" && <span className="ml-2 rounded border border-neg/40 px-1 font-mono text-[9px] uppercase tracking-wider text-neg">out</span>}
+                  {r.squad == null && r.starts < r.matches && <span className="ml-2 font-mono text-[9px] uppercase tracking-wider text-ink-faint">rotation</span>}
                 </span>
                 {cell(r.anytime, 1)}
                 {cell(r.p2, 2)}
@@ -1136,7 +1274,9 @@ function PlayerPropsTab({ pp, onWatch, watched }: {
       <p className="mt-3 text-xs leading-relaxed text-ink-faint">
         {pp.disclaimer} Goal thresholds show the Kalshi price + anchored edge
         when a market is listed. Assists show the market price only — FIFA
-        publishes no assist data, so there is no honest assist model.
+        publishes no assist data, so there is no honest assist model. Once
+        official lineups post (~1h before kickoff), XI / bench / out tags
+        appear; out-of-squad players&apos; per-match chances drop to zero.
       </p>
     </div>
   );

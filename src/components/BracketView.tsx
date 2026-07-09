@@ -88,7 +88,7 @@ export default function BracketView() {
             )}
           </div>
 
-          <ChampionBox champion={b.champion} />
+          <ChampionBox champion={b.champion} forecast={b.champion_forecast} />
         </div>
       </section>
     </Reveal>
@@ -143,7 +143,7 @@ function BracketCard({ m, emphasis = false, small = false }: {
         prob={m.probs?.home_win} edge={m.probs?.home_edge} leader={homeLeads}
         score={m.result?.home_goals}
         state={finished ? (m.result!.winner === "home" ? "win" : "loss") : "none"}
-        small={small}
+        small={small} forecast={m.forecast?.home}
       />
       <div className="my-1.5 h-px bg-line" />
       <TeamLine
@@ -151,7 +151,7 @@ function BracketCard({ m, emphasis = false, small = false }: {
         prob={m.probs?.away_win} edge={m.probs?.away_edge} leader={!homeLeads}
         score={m.result?.away_goals}
         state={finished ? (m.result!.winner === "away" ? "win" : "loss") : "none"}
-        small={small}
+        small={small} forecast={m.forecast?.away}
       />
       <div className="mt-2 space-y-0.5 text-center font-mono text-[10px] tracking-wide text-ink-faint">
         <p>{kickoffLocal(m.kickoff)}</p>
@@ -170,7 +170,7 @@ function BracketCard({ m, emphasis = false, small = false }: {
   );
 }
 
-function TeamLine({ name, resolved, prob, edge, leader, score, state, small }: {
+function TeamLine({ name, resolved, prob, edge, leader, score, state, small, forecast }: {
   name: string;
   resolved: boolean;
   prob?: number;
@@ -179,6 +179,7 @@ function TeamLine({ name, resolved, prob, edge, leader, score, state, small }: {
   score?: number;
   state: "win" | "loss" | "none";
   small?: boolean;
+  forecast?: { team: string; p: number } | null;
 }) {
   // Finished: winner white, loser greyed. Upcoming: the leading side green.
   const textColor =
@@ -188,13 +189,22 @@ function TeamLine({ name, resolved, prob, edge, leader, score, state, small }: {
     : resolved ? "text-ink-mid"
     : "text-ink-low";
 
+  // Unresolved slot with a model forecast: ghost the predicted team's flag
+  // and show "model: <team> <p>" under the placeholder label.
+  const showForecast = !resolved && forecast != null;
+
   return (
     <div className="flex items-center gap-2">
-      <span className={`shrink-0 ${small ? "text-sm" : "text-base"}`}>
-        {resolved ? flag(name) : "•"}
+      <span className={`shrink-0 ${small ? "text-sm" : "text-base"} ${showForecast ? "opacity-60" : ""}`}>
+        {resolved ? flag(name) : showForecast ? flag(forecast!.team) : "•"}
       </span>
-      <span className={`flex-1 truncate ${small ? "text-xs" : "text-sm"} ${textColor}`}>
-        {name}
+      <span className={`min-w-0 flex-1 ${small ? "text-xs" : "text-sm"} ${textColor}`}>
+        <span className="block truncate">{name}</span>
+        {showForecast && (
+          <span className="block truncate font-mono text-[9px] uppercase tracking-[0.12em] text-ink-faint">
+            model: <span className="text-accent/80">{forecast!.team} {pct(forecast!.p)}</span>
+          </span>
+        )}
       </span>
       {state !== "none" ? (
         <span className={`shrink-0 font-mono tabular-nums ${small ? "text-sm" : "text-base"} ${
@@ -222,7 +232,10 @@ function TeamLine({ name, resolved, prob, edge, leader, score, state, small }: {
   );
 }
 
-function ChampionBox({ champion }: { champion: string | null }) {
+function ChampionBox({ champion, forecast }: {
+  champion: string | null;
+  forecast?: { team: string; p: number } | null;
+}) {
   return (
     <>
       <BranchLines />
@@ -239,9 +252,19 @@ function ChampionBox({ champion }: { champion: string | null }) {
               <span className="mr-2">{flag(champion)}</span>{champion}
             </p>
           ) : (
-            <p className="font-mono text-xs uppercase tracking-[0.18em] text-ink-faint">
-              to be decided
-            </p>
+            <>
+              <p className="font-mono text-xs uppercase tracking-[0.18em] text-ink-faint">
+                to be decided
+              </p>
+              {forecast != null && (
+                <p className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
+                  model pick:{" "}
+                  <span className="text-accent">
+                    {flag(forecast.team)} {forecast.team} {pct(forecast.p)}
+                  </span>
+                </p>
+              )}
+            </>
           )}
         </div>
       </div>
