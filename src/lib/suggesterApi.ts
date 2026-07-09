@@ -260,7 +260,9 @@ export interface PlayerProp {
   tournament_anytime?: number;  // P(scores in the remaining tournament)
   already_scored?: boolean;     // Kalshi tournament market settles Yes
   market_id?: string;   // Kalshi KXWCPLAYERGOALS ticker, when listed
-  implied?: number;     // buyable ask as probability
+  implied?: number;     // ask as probability
+  bid?: number | null;
+  tradeable?: boolean;  // false = dead book (huge spread) — never priced
   multiplier?: number | null;
   likelihood?: number;  // anchored (0.6 model + 0.4 market)
   edge?: number;

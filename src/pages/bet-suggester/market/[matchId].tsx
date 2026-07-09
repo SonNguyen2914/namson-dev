@@ -985,6 +985,7 @@ function PlayerPropsTab({ pp, onWatch, watched }: {
   const rows = (tab === "home" ? pp.home : pp.away) ?? [];
   const priced = rows.filter((r) => r.market_id && !r.already_scored && r.likelihood != null);
   const settled = rows.filter((r) => r.already_scored);
+  const dead = rows.filter((r) => r.market_id && !r.already_scored && r.tradeable === false);
   return (
     <div>
       <div className="mb-4 flex gap-1.5">
@@ -1002,7 +1003,7 @@ function PlayerPropsTab({ pp, onWatch, watched }: {
       <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">
         Kalshi market · scores a goal in the tournament
       </p>
-      {priced.length === 0 && settled.length === 0 ? (
+      {priced.length === 0 && settled.length === 0 && dead.length === 0 ? (
         <p className="mb-5 rounded-xl border border-line p-4 text-sm text-ink-low">
           No open Kalshi player markets matched for this team right now.
         </p>
@@ -1037,6 +1038,20 @@ function PlayerPropsTab({ pp, onWatch, watched }: {
                 </span>
               </div>
             ))}
+            {dead.map((r) => (
+              <div key={"d" + r.shirt} className="grid grid-cols-[minmax(0,1fr)_6rem_5rem_5.5rem_4.5rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm opacity-70">
+                <span className="min-w-0 truncate pr-2 text-ink-mid">{r.player}</span>
+                <span className="text-right">
+                  <span className="font-mono tabular-nums text-ink-mid">
+                    {r.tournament_anytime != null ? pct(r.tournament_anytime) : "—"}
+                  </span>
+                  <span className="block font-mono text-[9px] uppercase tracking-wider text-ink-faint">model</span>
+                </span>
+                <span className="col-span-3 text-right font-mono text-[11px] text-ink-faint">
+                  no real market — book {r.bid != null ? Math.round(r.bid * 100) + "¢" : "—"} / {r.implied != null ? Math.round(r.implied * 100) + "¢" : "—"}
+                </span>
+              </div>
+            ))}
             {settled.map((r) => (
               <div key={r.shirt} className="grid grid-cols-[minmax(0,1fr)_6rem_5rem_5.5rem_4.5rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0 opacity-70">
                 <span className="min-w-0 truncate pr-2 text-ink-mid">{r.player}</span>
@@ -1049,8 +1064,9 @@ function PlayerPropsTab({ pp, onWatch, watched }: {
       <p className="mb-6 text-[11px] leading-relaxed text-ink-faint">
         Likelihood is anchored (60% model · 40% market); the model is
         P(scores in the team&apos;s remaining tournament run) from bracket-path
-        enumeration. Thin books make some asks extreme — edge is honest, not
-        an endorsement.
+        enumeration. Books with a giant bid/ask spread are DEAD — nobody is
+        really offering that price — so they show the model and the raw book
+        instead of a fictional likelihood and edge.
       </p>
 
       <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">
