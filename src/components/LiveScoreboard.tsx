@@ -7,8 +7,11 @@
 // no match is live, so it never clutters the page pre-match.
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { api, flag, LiveScoreEntry } from "../lib/suggesterApi";
+import { api, flag, LiveScoreEntry, TeamNewsResponse } from "../lib/suggesterApi";
 import { Eyebrow, Flash, Reveal } from "./ui";
+import { Collapse } from "./chrome";
+import LivePanel from "./LivePanel";
+import TeamNewsSection from "./TeamNews";
 
 const POLL_MS = 30000; // live scores move fast; 30s keeps it fresh & cheap
 
@@ -37,9 +40,46 @@ export default function LiveScoreboard() {
       {live.map((m) => (
         <Reveal key={m.match_id}>
           <LiveCard m={m} />
+          {/* lineups + live read ride WITH the live match — outside the
+              card's Link so their controls don't navigate */}
+          {!m.is_finished && <LiveExtras m={m} />}
         </Reveal>
       ))}
     </section>
+  );
+}
+
+// Lineups + the manual live read, attached under an in-progress match's
+// score card. Both are self-contained: lineups poll the facts-only
+// team-news endpoint (backend caches ESPN for 60s), the LivePanel manages
+// its own state per match id.
+function LiveExtras({ m }: { m: LiveScoreEntry }) {
+  const [news, setNews] = useState<TeamNewsResponse | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const tn = await api.teamNews(m.match_id);
+        if (alive) setNews(tn);
+      } catch { /* no lineups — section shows nothing */ }
+    };
+    load();
+    const id = setInterval(load, 300000); // squads are settled; 5 min is plenty
+    return () => { alive = false; clearInterval(id); };
+  }, [m.match_id]);
+
+  return (
+    <div className="mt-5">
+      {news && (
+        <Collapse eyebrow="team news" title="Official lineups">
+          <TeamNewsSection news={news} home={m.home} away={m.away} />
+        </Collapse>
+      )}
+      <Collapse eyebrow="in-play" title="Live read · what the model makes of the state">
+        <LivePanel matchId={m.match_id} />
+      </Collapse>
+    </div>
   );
 }
 
