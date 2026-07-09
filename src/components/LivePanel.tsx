@@ -109,8 +109,9 @@ export default function LivePanel({ matchId }: { matchId: string }) {
         setMinute(m);
         setPhaseId(phaseForMinute(m));
       }
-      setRedH(s.red_home ? 1 : 0);   // feed reports presence, not counts
-      setRedA(s.red_away ? 1 : 0);
+      // feed now reports COUNTS (legacy responses may still send booleans)
+      setRedH(Math.min(3, Number(s.red_home) || 0));
+      setRedA(Math.min(3, Number(s.red_away) || 0));
       setSavedAt(new Date().toISOString());
       const fin = s.is_finished ? " (match finished)" : "";
       setAutoMsg(

@@ -133,8 +133,8 @@ export interface LiveStateFetch {
   current_home?: number;
   current_away?: number;
   minutes_elapsed?: number | null;
-  red_home?: boolean;
-  red_away?: boolean;
+  red_home?: number | boolean;   // count (legacy: boolean)
+  red_away?: number | boolean;
   status_short?: string;
   is_live?: boolean;
   is_finished?: boolean;
@@ -221,7 +221,11 @@ export interface BracketMatch {
   kickoff: string;
   venue: string;
   stage: string;
-  probs: { home_win: number; draw: number; away_win: number } | null;
+  probs: {
+    home_win: number; draw: number; away_win: number;
+    // win-market edges served with the bracket so the UI needs no extra calls
+    home_edge?: number | null; away_edge?: number | null;
+  } | null;
   result: {
     home_goals: number;
     away_goals: number;

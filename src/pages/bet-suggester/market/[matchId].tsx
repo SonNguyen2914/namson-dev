@@ -735,19 +735,26 @@ function StrategySection({ markets }: { markets: MarketPrediction[] }) {
   const [fund, setFund] = useState(100);
 
   const active = RISK_TIERS.find((t) => t.id === tier)!;
+  // Kalshi's trading fee is 0.07·P·(1−P) per contract, charged on the price —
+  // the true buy cost is P + fee, so the NET payout multiplier is 1/(P+fee).
+  // All EV/stake math below is net of fees (the raw table above is gross).
+  const netOdds = (impliedP: number) => {
+    const cost = impliedP + 0.07 * impliedP * (1 - impliedP);
+    return cost > 0 ? 1 / cost : 0;
+  };
   const rows = markets
     .filter((m) => active.test(m.model_probability) && m.kalshi_odds > 1)
-    .map((m) => ({
-      ...m,
-      ev: m.model_probability * m.kalshi_odds - 1, // EV per $1 staked
-    }))
+    .map((m) => {
+      const odds = netOdds(m.implied_probability);
+      return { ...m, netOdds: odds, ev: m.model_probability * odds - 1 };
+    })
     .sort((a, b) => b.ev - a.ev)
     .slice(0, 6);
 
   // Quarter-Kelly stake fraction per bet (clamped at 0 for negative edges):
-  // f* = (p·b − q) / b with b = payout−1; we bet f*/4 for humility.
+  // f* = (p·b − q) / b with b = NET payout−1; we bet f*/4 for humility.
   const withKelly = rows.map((m) => {
-    const b = m.kalshi_odds - 1;
+    const b = m.netOdds - 1;
     const f = b > 0 ? Math.max(0, (m.model_probability * b - (1 - m.model_probability)) / b) : 0;
     return { ...m, kelly: f * 0.25 };
   });
@@ -763,8 +770,8 @@ function StrategySection({ markets }: { markets: MarketPrediction[] }) {
     <section className="mb-14 rounded-2xl border border-line bg-elev p-5 sm:p-6">
       <Eyebrow className="mb-1">betting strategy · by risk</Eyebrow>
       <p className="mb-4 text-[11px] leading-relaxed text-ink-faint">
-        Ranked by expected value per $1 (anchored likelihood × buyable payout).
-        Model output, not financial advice.
+        Ranked by expected value per $1 — anchored likelihood × buyable payout,
+        net of Kalshi&apos;s 0.07·P·(1−P) trading fee. Model output, not financial advice.
       </p>
 
       {/* risk tabs */}
@@ -811,7 +818,7 @@ function StrategySection({ markets }: { markets: MarketPrediction[] }) {
             <div className="grid grid-cols-[minmax(0,1fr)_5rem_4.5rem_5.5rem_6rem] items-center gap-x-3 border-b border-line bg-bs px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
               <span>Market</span>
               <span className="text-right">Likely</span>
-              <span className="text-right">Mult</span>
+              <span className="text-right">Net mult</span>
               <span className="text-right">Stake</span>
               <span className="text-right">If it hits</span>
             </div>
@@ -822,12 +829,12 @@ function StrategySection({ markets }: { markets: MarketPrediction[] }) {
               >
                 <span className="min-w-0 truncate pr-2 text-ink-hi" title={m.market_title}>{m.market_title}</span>
                 <span className="text-right font-mono tabular-nums text-ink-mid">{pct(m.model_probability)}</span>
-                <span className="text-right font-mono tabular-nums text-ink-mid">{m.kalshi_odds.toFixed(2)}x</span>
+                <span className="text-right font-mono tabular-nums text-ink-mid">{m.netOdds.toFixed(2)}x</span>
                 <span className={`text-right font-mono tabular-nums ${m.stake >= 0.5 ? "text-accent" : "text-ink-faint"}`}>
                   ${m.stake.toFixed(2)}
                 </span>
                 <span className="text-right font-mono tabular-nums text-ink-mid">
-                  ${(m.stake * m.kalshi_odds).toFixed(2)}
+                  ${(m.stake * m.netOdds).toFixed(2)}
                 </span>
               </div>
             ))}
