@@ -214,6 +214,7 @@ export default function MatchDetail() {
                 <ModelPrediction
                   summary={pred.summary}
                   scorelines={pred.scorelines}
+                  xg={pred.xg}
                   home={home}
                   away={away}
                 />
@@ -465,9 +466,10 @@ function Stat({ label, value }: { label: string; value: string }) {
 // Model prediction panel — the Monte Carlo forecast in plain terms: each half,
 // full time, whether it goes to ET/penalties (knockout), and the most likely
 // final scores. All derived from the same simulation as the priced markets.
-function ModelPrediction({ summary, scorelines, home, away }: {
+function ModelPrediction({ summary, scorelines, xg, home, away }: {
   summary: PredictionSummary;
   scorelines: { score: string; prob: number }[];
+  xg: { home: number; away: number };
   home: string;
   away: string;
 }) {
@@ -476,6 +478,40 @@ function ModelPrediction({ summary, scorelines, home, away }: {
   const isKO = adv?.method === "simulated_et_pens";
   const halves = summary.halves;
   const topScores = scorelines.slice(0, 8);
+
+  // --- Plain-language "why" notes, derived from the model's own numbers ---
+  // Halves: 45 minutes rarely separates two sides, and goals skew after the
+  // break. If the second half's lean tips to a team, name it.
+  const sh = halves?.second_half;
+  const shLean =
+    sh == null ? null
+    : sh.home_win > sh.draw && sh.home_win > sh.away_win ? home
+    : sh.away_win > sh.draw && sh.away_win > sh.home_win ? away
+    : null;
+  const halfNote = halves && (
+    `Why: 45 minutes is rarely enough to separate two sides, so "level" ` +
+    `leads most halves. Goals skew after the break — tiring legs, ` +
+    `substitutions, stoppage time — which is why the second half carries ` +
+    `more expected goals` +
+    (shLean ? ` and tilts toward ${shLean}` : "") + `.`
+  );
+
+  // ET/pens: reaching ET *is* the 90-min draw; pens follow when ET stays
+  // level too. The xG gap says whether a level 90 is likely in this matchup.
+  const xgFav = xg.home >= xg.away ? home : away;
+  const xgHi = Math.max(xg.home, xg.away).toFixed(2);
+  const xgLo = Math.min(xg.home, xg.away).toFixed(2);
+  const gap = Math.abs(xg.home - xg.away);
+  const gapRead =
+    gap >= 0.4
+      ? `${xgFav}'s edge (${xgHi} vs ${xgLo} expected goals) usually settles it inside 90 minutes — that's what keeps these chances from climbing higher.`
+      : gap < 0.15
+      ? `The sides are nearly even (${xgHi} vs ${xgLo} expected goals), so a level 90 minutes is a real possibility — that's what pushes these chances up.`
+      : `The gap between the sides is modest (${xgHi} vs ${xgLo} expected goals), so a level 90 minutes stays live.`;
+  const etNote =
+    `Why: extra time happens only if the 90 minutes end level, so it equals ` +
+    `the draw chance above; penalties follow when 30 more minutes still ` +
+    `can't split them (roughly half the time). ${gapRead}`;
 
   // "home-away" score string -> "🇲🇦 0–0 🇫🇷"
   const scoreLabel = (s: string) => {
@@ -492,9 +528,14 @@ function ModelPrediction({ summary, scorelines, home, away }: {
       </p>
 
       {halves && (
-        <div className="mb-6 grid gap-3 sm:grid-cols-2">
-          <HalfCard title="First half" d={halves.first_half} home={home} away={away} />
-          <HalfCard title="Second half" d={halves.second_half} home={home} away={away} />
+        <div className="mb-6">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <HalfCard title="First half" d={halves.first_half} home={home} away={away} />
+            <HalfCard title="Second half" d={halves.second_half} home={home} away={away} />
+          </div>
+          <p className="mt-2.5 text-[11px] leading-relaxed text-ink-faint">
+            {halfNote}
+          </p>
         </div>
       )}
 
@@ -510,9 +551,14 @@ function ModelPrediction({ summary, scorelines, home, away }: {
       </div>
 
       {isKO && adv && (
-        <div className="mb-6 grid grid-cols-2 gap-3">
-          <ChanceChip label="Goes to extra time?" p={adv.p_reach_et} />
-          <ChanceChip label="Goes to penalties?" p={adv.p_reach_pens ?? 0} />
+        <div className="mb-6">
+          <div className="grid grid-cols-2 gap-3">
+            <ChanceChip label="Goes to extra time?" p={adv.p_reach_et} />
+            <ChanceChip label="Goes to penalties?" p={adv.p_reach_pens ?? 0} />
+          </div>
+          <p className="mt-2.5 text-[11px] leading-relaxed text-ink-faint">
+            {etNote}
+          </p>
         </div>
       )}
 
