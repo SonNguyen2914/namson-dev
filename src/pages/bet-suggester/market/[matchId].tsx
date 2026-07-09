@@ -11,6 +11,7 @@ import {
   api, flag, pct, signedPct, countdown, kickoffLocal,
   PredictionResponse, PredictionSummary, HalfDist, MarketPrediction,
   PlayerPropsResponse, TeamNewsResponse, LineupPlayer,
+  ReferenceOddsResponse,
   TimelinePoint, TeamInfoResponse, TeamBlurb,
 } from "../../../lib/suggesterApi";
 import LivePanel from "../../../components/LivePanel";
@@ -54,7 +55,8 @@ export default function MatchDetail() {
   const [mktSortKey, setMktSortKey] = useState<MktSortKey>("likelihood");
   const [mktSortDir, setMktSortDir] = useState<"asc" | "desc">("desc");
   const [mktCollapsed, setMktCollapsed] = useState<Set<string>>(new Set());
-  const [mktTab, setMktTab] = useState<"lines" | "players">("lines");
+  const [mktTab, setMktTab] = useState<"lines" | "players" | "reference">("lines");
+  const [refOdds, setRefOdds] = useState<ReferenceOddsResponse | null>(null);
 
   const load = useCallback(async (force: boolean) => {
     if (!matchId) return;
@@ -134,6 +136,22 @@ export default function MatchDetail() {
     const t = setTimeout(() => load(false), 0);
     return () => clearTimeout(t);
   }, [load]);
+
+  // Sportsbook reference odds — fetched ONLY when the tab is first opened
+  // (each uncached fetch spends the shared API-Football budget).
+  useEffect(() => {
+    if (mktTab !== "reference" || refOdds || !matchId) return;
+    let alive = true;
+    api.referenceOdds(matchId)
+      .then((r) => { if (alive) setRefOdds(r); })
+      .catch(() => {
+        if (alive) setRefOdds({
+          match_id: matchId, source: "api-football", home_team: "",
+          away_team: "", available: false, reason: "backend unreachable",
+        });
+      });
+    return () => { alive = false; };
+  }, [mktTab, refOdds, matchId]);
 
   const [codeH, codeA] = (matchId ?? "_").split("_");
   const home = teams?.home ?? codeH ?? "Home";
@@ -433,7 +451,7 @@ export default function MatchDetail() {
                 Every Kalshi market on this match
               </h3>
               <div className="mb-4 flex gap-1.5">
-                {([["lines", "Game lines"], ["players", "Player props"]] as const).map(([id, label]) => (
+                {([["lines", "Game lines"], ["players", "Player props"], ["reference", "Sportsbook ref"]] as const).map(([id, label]) => (
                   <button
                     key={id}
                     onClick={() => setMktTab(id)}
@@ -447,7 +465,9 @@ export default function MatchDetail() {
                   </button>
                 ))}
               </div>
-              {mktTab === "players" ? (
+              {mktTab === "reference" ? (
+                <ReferenceOddsTab ro={refOdds} />
+              ) : mktTab === "players" ? (
                 pProps ? <PlayerPropsTab pp={pProps} onWatch={toggleWatch} watched={watched} />
                        : <p className="rounded-xl border border-line p-4 text-sm text-ink-low">Player data unavailable for this match.</p>
               ) : (<>
@@ -615,6 +635,81 @@ function ScoutCard({ blurb, fallbackName }: {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// Sportsbook reference tab — what the wider betting market prices, via
+// API-Football's bookmaker aggregation (median odd across quoting books).
+// DISPLAY-ONLY: none of these are Kalshi contracts; they never touch the
+// board, the pick, or the strategy engine. Exists because Kalshi lists
+// some families (notably exact score) only 1-2 days before kickoff.
+function ReferenceOddsTab({ ro }: { ro: ReferenceOddsResponse | null }) {
+  if (!ro) {
+    return <SkeletonRows rows={5} />;
+  }
+  if (!ro.available) {
+    return (
+      <p className="rounded-xl border border-line p-4 text-sm text-ink-low">
+        No sportsbook reference odds right now — {ro.reason ?? "unavailable"}.
+      </p>
+    );
+  }
+  return (
+    <div>
+      <p className="mb-4 rounded-lg border border-warn/25 bg-warn/5 px-3 py-2 text-xs leading-relaxed text-warn">
+        Reference only — these are sportsbook odds, not Kalshi contracts.
+        Nothing here is buyable through this app, and none of it feeds the
+        board or the strategy engine.
+      </p>
+      {ro.groups?.map((g) => (
+        <div key={g.name} className="mb-5">
+          <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">
+            {g.name}
+          </p>
+          <div className="overflow-x-auto rounded-xl border border-line">
+            <div className="min-w-[480px]">
+              <div className="grid grid-cols-[minmax(0,1fr)_5.5rem_5.5rem_7.5rem] items-center gap-x-3 border-b border-line bg-bs px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
+                <span>Outcome</span>
+                <span className="text-right">Odds</span>
+                <span className="text-right">Implied</span>
+                <span className="text-right">Model</span>
+              </div>
+              {g.rows.map((r) => (
+                <div key={r.label} className="grid grid-cols-[minmax(0,1fr)_5.5rem_5.5rem_7.5rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0">
+                  <span className="min-w-0 truncate pr-2 text-ink-hi">
+                    {r.label}
+                    <span className="ml-2 font-mono text-[9px] uppercase tracking-wider text-ink-faint">
+                      {r.books} book{r.books === 1 ? "" : "s"}
+                    </span>
+                  </span>
+                  <span className="text-right font-mono tabular-nums text-ink-mid">{r.odd.toFixed(2)}x</span>
+                  <span className="text-right font-mono tabular-nums text-ink-hi">{pct(r.implied)}</span>
+                  <span className="text-right font-mono tabular-nums">
+                    {r.model != null ? (
+                      <>
+                        <span className="text-ink-hi">{pct(r.model)}</span>
+                        <span className={`ml-1.5 text-[10px] ${r.model - r.implied >= 0 ? "text-accent" : "text-neg"}`}>
+                          {signedPct(r.model - r.implied)}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-ink-faint">—</span>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
+      <p className="text-[11px] leading-relaxed text-ink-faint">
+        {ro.disclaimer} Aggregated from {ro.bookmaker_count} bookmaker
+        {(ro.bookmaker_count ?? 0) === 1 ? "" : "s"}. The model column joins
+        only where the simulation states that exact number (win/draw/win,
+        exact scorelines) — the difference includes the books&apos; vig, so it
+        is not a tradeable edge.
+      </p>
     </div>
   );
 }

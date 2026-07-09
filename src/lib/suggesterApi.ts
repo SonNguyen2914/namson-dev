@@ -317,6 +317,26 @@ export interface TeamNewsResponse {
   away?: { starters: LineupPlayer[]; bench: LineupPlayer[] };
 }
 
+export interface ReferenceOddsRow {
+  label: string;
+  odd: number;          // median decimal odd across quoting bookmakers
+  implied: number;      // 1/odd — includes the books' vig
+  books: number;        // how many bookmakers quote this outcome
+  model?: number;       // exact joins only (W/D/L, exact scorelines)
+}
+
+export interface ReferenceOddsResponse {
+  match_id: string;
+  source: string;
+  home_team: string;
+  away_team: string;
+  available: boolean;
+  reason?: string;
+  bookmaker_count?: number;
+  groups?: { name: string; rows: ReferenceOddsRow[] }[];
+  disclaimer?: string;
+}
+
 export interface TeamBlurb {
   team: string;
   scouting: string;
@@ -404,6 +424,9 @@ export const api = {
 
   teamNews: (matchId: string) =>
     getJson<TeamNewsResponse>(`/team-news/${matchId}`),
+
+  referenceOdds: (matchId: string) =>
+    getJson<ReferenceOddsResponse>(`/reference-odds/${matchId}`),
 
   pastMatches: () => getJson<PastMatchesResponse>("/past-matches"),
 
