@@ -5,7 +5,6 @@
 // Monte Carlo run against live odds. Shows xG, scoreline distribution,
 // every market priced, and how the prediction evolved over the day.
 import Head from "next/head";
-import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -16,6 +15,7 @@ import {
 } from "../../../lib/suggesterApi";
 import LivePanel from "../../../components/LivePanel";
 import { Eyebrow, Reveal } from "../../../components/ui";
+import { NavChip, SkeletonRows, TopBar } from "../../../components/chrome";
 
 // Same floors as the backend board — the pick is just row #1 of this
 // match's slice of the same likelihood-first ranking.
@@ -199,13 +199,18 @@ export default function MatchDetail() {
     <div className="min-h-screen bg-bs font-sans text-ink-mid">
       <Head><title>{matchId ?? "Match"} · Bet Suggester</title></Head>
 
-      <div className="mx-auto max-w-4xl px-5 py-12">
-        <Link
-          href="/bet-suggester"
-          className="font-mono text-[11px] uppercase tracking-[0.18em] text-ink-low transition-colors hover:text-accent"
-        >
-          ← all suggestions
-        </Link>
+      <TopBar back={{ href: "/bet-suggester", label: "board" }}
+        title={`${home} vs ${away}`}>
+        <NavChip href="#prediction">Prediction</NavChip>
+        <NavChip href="#strategy">Strategy</NavChip>
+        <NavChip onClick={() => {
+          setMktTab("players");
+          document.getElementById("markets")?.scrollIntoView();
+        }}>Players</NavChip>
+        <NavChip href="#markets">Markets</NavChip>
+      </TopBar>
+
+      <div className="mx-auto max-w-4xl px-5 py-10">
 
         {/* ============ HERO — the matchup ============ */}
         <header className="hero-ambient mt-8 mb-12 rounded-3xl pb-2 text-center">
@@ -241,6 +246,18 @@ export default function MatchDetail() {
 
         {error && <p className="mb-8 text-center text-sm text-live">{error}</p>}
 
+        {loading && !pred && !error && (
+          <div className="mb-10 space-y-6">
+            <SkeletonRows rows={1} height="h-24" />
+            <div className="grid grid-cols-3 gap-3">
+              <SkeletonRows rows={1} height="h-20" />
+              <SkeletonRows rows={1} height="h-20" />
+              <SkeletonRows rows={1} height="h-20" />
+            </div>
+            <SkeletonRows rows={4} />
+          </div>
+        )}
+
         {/* Headline stats — xG + confidence, right under the hero */}
         {pred && (
           <Reveal>
@@ -270,6 +287,7 @@ export default function MatchDetail() {
             {/* Model prediction — halves, full time, ET/pens, top scores */}
             {pred.summary && (
               <Reveal>
+                <div id="prediction" />
                 <ModelPrediction
                   summary={pred.summary}
                   scorelines={pred.scorelines}
@@ -342,13 +360,14 @@ export default function MatchDetail() {
             </Reveal>
 
             {/* Betting strategy — scenario engine + fund divider */}
+            <div id="strategy" />
             <Reveal>
               <StrategySection markets={sortedMarkets} summary={pred.summary ?? null} home={home} away={away} />
             </Reveal>
 
             {/* Every market priced — grouped by type, sortable, collapsible */}
             <Reveal>
-            <section className="mb-14">
+            <section id="markets" className="mb-14">
               <Eyebrow className="mb-2">markets</Eyebrow>
               <h3 className="mb-3 text-lg font-medium text-ink-hi">
                 Every Kalshi market on this match

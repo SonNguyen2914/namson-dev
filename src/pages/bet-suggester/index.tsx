@@ -13,6 +13,7 @@ import {
 import LiveScoreboard from "../../components/LiveScoreboard";
 import BracketView from "../../components/BracketView";
 import { Eyebrow, Flash, Reveal } from "../../components/ui";
+import { NavChip, SkeletonRows, TopBar } from "../../components/chrome";
 
 const POLL_MS = 60 * 1000; // watchlist scores move every 30s poll; refresh often
 
@@ -164,6 +165,12 @@ export default function BetSuggesterDashboard() {
     <div className="min-h-screen bg-bs font-sans text-ink-mid">
       <Head><title>WC26 Bet Suggester · namson.dev</title></Head>
 
+      <TopBar title="WC26 · Bet Suggester">
+        <NavChip href="#bracket">Bracket</NavChip>
+        <NavChip href="#board">Best bets</NavChip>
+        <NavChip href="#results">Results</NavChip>
+      </TopBar>
+
       {/* ===================== SHOWCASE ZONE ===================== */}
       <div className="hero-ambient">
         <div className="mx-auto max-w-5xl px-5 pt-20 sm:pt-24">
@@ -228,13 +235,13 @@ export default function BetSuggesterDashboard() {
       <div className="mx-auto max-w-5xl px-5 pb-16 pt-20 sm:pt-24">
 
         {/* Knockout bracket — reversed pyramid, model win probabilities */}
-        <div className="mb-20 border-t border-line pt-10">
+        <div id="bracket" className="mb-20 border-t border-line pt-10">
           <BracketView />
         </div>
 
         {/* Ranking board — likelihood-first, all matches pooled */}
         <Reveal>
-        <section className="mb-20 border-t border-line pt-10">
+        <section id="board" className="mb-20 border-t border-line pt-10">
           <div className="mb-1 flex flex-wrap items-end justify-between gap-3">
             <div>
               <Eyebrow className="mb-2">ranking board · by match</Eyebrow>
@@ -275,7 +282,7 @@ export default function BetSuggesterDashboard() {
             </p>
           )}
           {loading ? (
-            <p className="text-sm text-ink-low">Loading…</p>
+            <SkeletonRows rows={7} />
           ) : groups.length === 0 ? (
             <p className="rounded-xl border border-line p-6 text-sm text-ink-low">
               No statistically likely value across any match right now — the
@@ -459,7 +466,7 @@ export default function BetSuggesterDashboard() {
         {/* Past matches — finished, with final scores */}
         {pastMatches.length > 0 && (
           <Reveal>
-          <section className="mt-20">
+          <section id="results" className="mt-20">
             <Eyebrow className="mb-2">results</Eyebrow>
             <h3 className="mb-4 text-lg font-medium text-ink-hi">Past matches</h3>
             <div className="grid gap-3 sm:grid-cols-2">
