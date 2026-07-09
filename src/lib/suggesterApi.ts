@@ -82,8 +82,9 @@ export interface LiveStateInput {
   current_home: number;
   current_away: number;
   minutes_elapsed: number;
-  red_home: boolean;
-  red_away: boolean;
+  red_home: number;          // red-card COUNT (0-3)
+  red_away: number;
+  phase: string;             // auto | regulation | et | pens
   attack_home_mult: number;
   attack_away_mult: number;
 }
@@ -107,14 +108,17 @@ export interface LivePredictionResponse {
     score: string;
     minutes_elapsed: number;
     minutes_remaining: number;
-    red_home: boolean;
-    red_away: boolean;
+    phase?: string;                     // regulation | et | pens
+    red_home: number | boolean;        // count (legacy responses: boolean)
+    red_away: number | boolean;
     lambda_remaining: { home: number; away: number };
   };
   live_outcomes: { home_win: number; draw: number; away_win: number };
   live_advance: {
     home: number; away: number;
     p_reach_et: number; p_reach_pens: number; method: string;
+    home_win_et?: number; away_win_et?: number;
+    home_win_pens?: number; away_win_pens?: number;
   } | null;
   live_confidence: number;
   user_attack_levers: { home: number; away: number };

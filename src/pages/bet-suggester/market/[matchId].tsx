@@ -10,7 +10,7 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 import {
   api, flag, pct, signedPct,
-  PredictionResponse, PredictionSummary, HalfDist,
+  PredictionResponse, PredictionSummary, HalfDist, MarketPrediction,
   TimelinePoint, TeamInfoResponse, TeamBlurb,
 } from "../../../lib/suggesterApi";
 import LivePanel from "../../../components/LivePanel";
@@ -20,6 +20,26 @@ import { Eyebrow, Reveal } from "../../../components/ui";
 // match's slice of the same likelihood-first ranking.
 const PRIMARY_FLOOR = 0.49;
 const FALLBACK_FLOOR = 0.40;
+
+// Market families for the grouped table, in display order. A market that
+// matches no test lands in "Other" (visible, never silently dropped).
+const MARKET_GROUPS: { id: string; label: string; test: (k: string | null | undefined) => boolean }[] = [
+  { id: "winner", label: "Winner · 90 min", test: (k) => k === "home_win" || k === "away_win" || k === "draw" },
+  { id: "advance", label: "To advance", test: (k) => k === "home_advance" || k === "away_advance" },
+  { id: "goals", label: "Goals · totals + both teams to score", test: (k) => !!k && (/^over_|^under_/.test(k) || k === "btts") },
+  { id: "margin", label: "Margin of victory", test: (k) => !!k && /margin/.test(k) },
+  { id: "etpens", label: "Extra time / penalties", test: (k) => !!k && /_win_(et|pens)$/.test(k) },
+  { id: "score", label: "Exact score", test: (k) => !!k && /^score_/.test(k) },
+];
+
+type MktSortKey = "likelihood" | "edge" | "multiplier";
+
+// Risk tiers for the strategy tabs: LOW = high-likelihood bets, HIGH = longshots.
+const RISK_TIERS = [
+  { id: "low", label: "Low risk", test: (p: number) => p >= 0.65, blurb: "High-likelihood bets — small multipliers, most likely to land." },
+  { id: "med", label: "Medium risk", test: (p: number) => p >= 0.40 && p < 0.65, blurb: "Coin-flip territory — moderate multipliers." },
+  { id: "high", label: "High risk", test: (p: number) => p < 0.40, blurb: "Longshots — big multipliers, usually lose." },
+] as const;
 
 export default function MatchDetail() {
   const router = useRouter();
@@ -32,6 +52,10 @@ export default function MatchDetail() {
   const [teamInfo, setTeamInfo] = useState<TeamInfoResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // grouped markets table: sort + collapsed groups
+  const [mktSortKey, setMktSortKey] = useState<MktSortKey>("likelihood");
+  const [mktSortDir, setMktSortDir] = useState<"asc" | "desc">("desc");
+  const [mktCollapsed, setMktCollapsed] = useState<Set<string>>(new Set());
 
   const load = useCallback(async (force: boolean) => {
     if (!matchId) return;
@@ -108,6 +132,39 @@ export default function MatchDetail() {
     pick = sortedMarkets.find((m) => m.model_probability >= FALLBACK_FLOOR) ?? null;
     pickTier = pick ? 40 : null;
   }
+
+  // --- grouped markets table helpers -----------------------------------
+  const marketGroups = (() => {
+    const used = new Set<string>();
+    const out: { group: { id: string; label: string }; rows: MarketPrediction[] }[] = [];
+    for (const g of MARKET_GROUPS) {
+      const rows = sortedMarkets.filter((m) => g.test(m.outcome_key));
+      rows.forEach((m) => used.add(m.market_id));
+      if (rows.length) out.push({ group: g, rows });
+    }
+    const rest = sortedMarkets.filter((m) => !used.has(m.market_id));
+    if (rest.length) out.push({ group: { id: "other", label: "Other" }, rows: rest });
+    return out;
+  })();
+  const mktVal = (m: MarketPrediction) =>
+    mktSortKey === "likelihood" ? m.model_probability
+    : mktSortKey === "edge" ? m.edge : m.kalshi_odds;
+  const sortMkts = (rows: MarketPrediction[]) => {
+    const dir = mktSortDir === "asc" ? 1 : -1;
+    return [...rows].sort((a, b) => (mktVal(a) - mktVal(b)) * dir);
+  };
+  const onMktSort = (k: MktSortKey) => {
+    if (k === mktSortKey) setMktSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setMktSortKey(k); setMktSortDir("desc"); }
+  };
+  const mktArrow = (k: MktSortKey) =>
+    mktSortKey === k ? (mktSortDir === "asc" ? " ↑" : " ↓") : "";
+  const toggleMktGroup = (id: string) =>
+    setMktCollapsed((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
 
   // Outcome probabilities for the stat bars — read straight off the priced
   // markets (post-anchoring), so the bars and the table can never disagree.
@@ -282,62 +339,89 @@ export default function MatchDetail() {
             </section>
             </Reveal>
 
-            {/* Every market priced */}
+            {/* Betting strategy + fund divider */}
+            <Reveal>
+              <StrategySection markets={sortedMarkets} />
+            </Reveal>
+
+            {/* Every market priced — grouped by type, sortable, collapsible */}
             <Reveal>
             <section className="mb-14">
-              <Eyebrow className="mb-2">markets</Eyebrow>
-              <h3 className="mb-4 text-lg font-medium text-ink-hi">
+              <Eyebrow className="mb-2">markets · by type</Eyebrow>
+              <h3 className="mb-1 text-lg font-medium text-ink-hi">
                 Every Kalshi market on this match
               </h3>
+              <p className="mb-4 text-xs text-ink-low">
+                Click a column to sort · click a group to collapse
+              </p>
               <div className="overflow-x-auto rounded-xl border border-line">
-                <table className="w-full text-sm">
-                  <thead className="bg-elev text-left font-mono text-[11px] uppercase tracking-[0.14em] text-ink-low">
-                    <tr>
-                      <th className="px-4 py-3 font-normal">Market</th>
-                      <th className="px-3 py-3 text-right font-normal">Likelihood</th>
-                      <th className="px-3 py-3 text-right font-normal">Edge</th>
-                      <th className="px-3 py-3 text-right font-normal">Multiplier</th>
-                      <th className="px-4 py-3 text-center font-normal">Alert</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedMarkets.map((m) => (
-                      <tr key={m.market_id} className="border-t border-line transition-colors hover:bg-elev">
-                        <td className="px-4 py-3 text-ink-hi">{m.market_title}</td>
-                        <td className="px-3 py-3 text-right font-mono tabular-nums text-ink-hi">
-                          {pct(m.model_probability)}
-                        </td>
-                        <td className={`px-3 py-3 text-right font-mono tabular-nums ${
-                          m.edge >= 0 ? "text-accent" : "text-neg"
-                        }`}>
-                          {signedPct(m.edge)}
-                        </td>
-                        <td className="px-3 py-3 text-right font-mono tabular-nums text-ink-mid">
-                          {m.kalshi_odds?.toFixed(2)}x
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => toggleWatch(m.market_id, m.market_title)}
-                            title={watched.has(m.market_id)
-                              ? "Watching — you'll be pinged when the price is ripe. Click to stop."
-                              : "Notify me when this bet's timing is ripe"}
-                            className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors ${
-                              watched.has(m.market_id)
-                                ? "border-warn/50 text-warn hover:border-warn"
-                                : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"
-                            }`}
+                <div className="min-w-[560px]">
+                  {/* sortable header */}
+                  <div className="grid grid-cols-[minmax(0,1fr)_5.5rem_5rem_5.5rem_4.5rem] items-center gap-x-3 border-b border-line bg-elev px-4 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-low">
+                    <span>Market</span>
+                    <button onClick={() => onMktSort("likelihood")} className="text-right transition-colors hover:text-ink-hi">
+                      Likelihood{mktArrow("likelihood")}
+                    </button>
+                    <button onClick={() => onMktSort("edge")} className="text-right transition-colors hover:text-ink-hi">
+                      Edge{mktArrow("edge")}
+                    </button>
+                    <button onClick={() => onMktSort("multiplier")} className="text-right transition-colors hover:text-ink-hi">
+                      Mult{mktArrow("multiplier")}
+                    </button>
+                    <span className="text-right">Alert</span>
+                  </div>
+
+                  {marketGroups.map(({ group, rows }) => {
+                    const closed = mktCollapsed.has(group.id);
+                    return (
+                      <div key={group.id}>
+                        <button
+                          onClick={() => toggleMktGroup(group.id)}
+                          className="flex w-full items-center gap-2.5 border-b border-line bg-elev/40 px-4 py-2.5 text-left transition-colors hover:bg-elev"
+                        >
+                          <span className={`text-ink-faint transition-transform ${closed ? "" : "rotate-90"}`}>▸</span>
+                          <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-mid">{group.label}</span>
+                          <span className="ml-auto shrink-0 font-mono text-[11px] text-ink-faint">
+                            {rows.length} market{rows.length === 1 ? "" : "s"}
+                          </span>
+                        </button>
+                        {!closed && sortMkts(rows).map((m) => (
+                          <div
+                            key={m.market_id}
+                            className="grid grid-cols-[minmax(0,1fr)_5.5rem_5rem_5.5rem_4.5rem] items-center gap-x-3 border-b border-line px-4 py-3 text-sm transition-colors hover:bg-elev"
                           >
-                            {watched.has(m.market_id) ? "Watching" : "Watch"}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                            <span className="min-w-0 truncate pr-2 text-ink-hi" title={m.market_title}>{m.market_title}</span>
+                            <span className="text-right font-mono tabular-nums text-ink-hi">{pct(m.model_probability)}</span>
+                            <span className={`text-right font-mono tabular-nums ${m.edge >= 0 ? "text-accent" : "text-neg"}`}>
+                              {signedPct(m.edge)}
+                            </span>
+                            <span className="text-right font-mono tabular-nums text-ink-mid">{m.kalshi_odds?.toFixed(2)}x</span>
+                            <span className="text-right">
+                              <button
+                                onClick={() => toggleWatch(m.market_id, m.market_title)}
+                                title={watched.has(m.market_id)
+                                  ? "Watching — you'll be pinged when the price is ripe. Click to stop."
+                                  : "Notify me when this bet's timing is ripe"}
+                                className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors ${
+                                  watched.has(m.market_id)
+                                    ? "border-warn/50 text-warn hover:border-warn"
+                                    : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"
+                                }`}
+                              >
+                                {watched.has(m.market_id) ? "Watching" : "Watch"}
+                              </button>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
               <p className="mt-3 text-xs leading-relaxed text-ink-faint">
                 Watched bets are polled every 30s. You get a Discord ping + feed entry
                 the moment the ripeness score crosses the alert threshold with positive edge.
+                Multipliers are the buyable ask price, not the midpoint.
               </p>
             </section>
             </Reveal>
@@ -635,5 +719,127 @@ function ChanceChip({ label, p }: { label: string; p: number }) {
         <div className="h-full rounded-full bg-accent/60" style={{ width: `${Math.min(p * 100, 100)}%` }} />
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Betting strategy — max return per risk tier, plus a fund divider.
+// Tabs (LOW/MED/HIGH) save vertical space. Within a tier, bets are ranked by
+// expected value per $1 (model_p x payout - 1) using the market-anchored
+// probabilities and the buyable ask multiplier. The fund divider allocates a
+// user-entered bankroll across the tier's positive-EV bets by quarter-Kelly —
+// deliberately conservative, and always leaving the un-allocated remainder in
+// reserve. Honest framing: this is model output, not advice.
+function StrategySection({ markets }: { markets: MarketPrediction[] }) {
+  const [tier, setTier] = useState<(typeof RISK_TIERS)[number]["id"]>("low");
+  const [fund, setFund] = useState(100);
+
+  const active = RISK_TIERS.find((t) => t.id === tier)!;
+  const rows = markets
+    .filter((m) => active.test(m.model_probability) && m.kalshi_odds > 1)
+    .map((m) => ({
+      ...m,
+      ev: m.model_probability * m.kalshi_odds - 1, // EV per $1 staked
+    }))
+    .sort((a, b) => b.ev - a.ev)
+    .slice(0, 6);
+
+  // Quarter-Kelly stake fraction per bet (clamped at 0 for negative edges):
+  // f* = (p·b − q) / b with b = payout−1; we bet f*/4 for humility.
+  const withKelly = rows.map((m) => {
+    const b = m.kalshi_odds - 1;
+    const f = b > 0 ? Math.max(0, (m.model_probability * b - (1 - m.model_probability)) / b) : 0;
+    return { ...m, kelly: f * 0.25 };
+  });
+  const totalFrac = withKelly.reduce((s, m) => s + m.kelly, 0);
+  const scale = totalFrac > 1 ? 1 / totalFrac : 1; // never allocate >100%
+  const allocated = withKelly.map((m) => ({
+    ...m,
+    stake: m.kelly * scale * fund,
+  }));
+  const reserve = fund - allocated.reduce((s, m) => s + m.stake, 0);
+
+  return (
+    <section className="mb-14 rounded-2xl border border-line bg-elev p-5 sm:p-6">
+      <Eyebrow className="mb-1">betting strategy · by risk</Eyebrow>
+      <p className="mb-4 text-[11px] leading-relaxed text-ink-faint">
+        Ranked by expected value per $1 (anchored likelihood × buyable payout).
+        Model output, not financial advice.
+      </p>
+
+      {/* risk tabs */}
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        {RISK_TIERS.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTier(t.id)}
+            className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors ${
+              tier === t.id
+                ? "border-accent/60 bg-accent/10 text-accent"
+                : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <p className="mb-4 text-xs text-ink-low">{active.blurb}</p>
+
+      {/* fund divider input */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <span className="text-sm text-ink-mid">Fund to divide</span>
+        <div className="flex items-center gap-1">
+          <span className="font-mono text-sm text-ink-low">$</span>
+          <input
+            type="number" min={1} max={1000000} value={fund}
+            onChange={(e) => setFund(Math.max(1, Number(e.target.value) || 1))}
+            className="w-24 rounded-lg border border-line bg-bs px-2.5 py-1.5 font-mono text-sm tabular-nums text-ink-hi outline-none focus:border-accent/60"
+          />
+        </div>
+        <span className="font-mono text-[11px] text-ink-faint">
+          quarter-Kelly split · reserve stays unbet
+        </span>
+      </div>
+
+      {allocated.length === 0 ? (
+        <p className="rounded-xl border border-line p-4 text-sm text-ink-low">
+          No markets in this risk band right now.
+        </p>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-line">
+          <div className="min-w-[560px]">
+            <div className="grid grid-cols-[minmax(0,1fr)_5rem_4.5rem_5.5rem_6rem] items-center gap-x-3 border-b border-line bg-bs px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
+              <span>Market</span>
+              <span className="text-right">Likely</span>
+              <span className="text-right">Mult</span>
+              <span className="text-right">Stake</span>
+              <span className="text-right">If it hits</span>
+            </div>
+            {allocated.map((m) => (
+              <div
+                key={m.market_id}
+                className="grid grid-cols-[minmax(0,1fr)_5rem_4.5rem_5.5rem_6rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0"
+              >
+                <span className="min-w-0 truncate pr-2 text-ink-hi" title={m.market_title}>{m.market_title}</span>
+                <span className="text-right font-mono tabular-nums text-ink-mid">{pct(m.model_probability)}</span>
+                <span className="text-right font-mono tabular-nums text-ink-mid">{m.kalshi_odds.toFixed(2)}x</span>
+                <span className={`text-right font-mono tabular-nums ${m.stake >= 0.5 ? "text-accent" : "text-ink-faint"}`}>
+                  ${m.stake.toFixed(2)}
+                </span>
+                <span className="text-right font-mono tabular-nums text-ink-mid">
+                  ${(m.stake * m.kalshi_odds).toFixed(2)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <p className="mt-3 text-xs leading-relaxed text-ink-faint">
+        Reserve (unbet): <span className="font-mono tabular-nums text-ink-mid">${reserve.toFixed(2)}</span> of ${fund.toFixed(0)}.
+        Stakes are quarter-Kelly on the anchored model probability — bets with no
+        positive expected value get $0 by design. Kelly assumes the model is right;
+        it is an anchored estimate, so treat sizes as a ceiling, not a target.
+      </p>
+    </section>
   );
 }

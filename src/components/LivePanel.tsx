@@ -1,39 +1,93 @@
 // Live in-play panel (Layer 3 + Piece 5 honest presentation).
 //
-// The user enters the CURRENT match state — score, minute, red cards, and
-// optional attack "intensity" levers for qualitative reads ("team B is
-// chasing"). The backend re-simulates only the remaining match and prices
-// every current market against it. Deliberately kept visually and logically
-// separate from the pre-match board: this shows the model's live read NEXT
-// TO the market's own price, with the gap labelled informational — never as
-// exploitable edge, because the market already knows the score.
+// The user enters the CURRENT match state — phase (1st/2nd half, extra time,
+// penalties), score, minute, red-card counts, and optional attack "intensity"
+// levers for qualitative reads ("team B is chasing"). The backend re-simulates
+// only the remaining match and prices every current market against it.
+// Deliberately kept visually and logically separate from the pre-match board:
+// this shows the model's live read NEXT TO the market's own price, with the
+// gap labelled informational — never as exploitable edge, because the market
+// already knows the score.
 //
-// Presentation note: the live W/D/L here is a SINGLE segmented bar (unlike
-// the pre-match stat bars) because these come from one simulation and sum
-// to 100% — a partition bar is honest for this data.
-import { useState } from "react";
+// Inputs and the last computed read persist per-match in localStorage, so a
+// reload doesn't lose a state that was fetched from the feed (past states
+// never change).
+import { useEffect, useState } from "react";
 import {
   api, pct, LivePredictionResponse, LiveStateInput,
 } from "../lib/suggesterApi";
 import { Eyebrow } from "./ui";
 
+// Match phases. 1st/2nd half drive the remaining-90 simulation; extra time
+// simulates the remaining ET then 50/50 pens; penalties is the coin flip
+// itself (90-minute markets are settled facts by then).
+const PHASES = [
+  { id: "1h", label: "1st half", min: 0, max: 45, phase: "regulation" },
+  { id: "2h", label: "2nd half", min: 45, max: 90, phase: "regulation" },
+  { id: "et", label: "Extra time", min: 90, max: 120, phase: "et" },
+  { id: "pens", label: "Penalties", min: 120, max: 120, phase: "pens" },
+] as const;
+type PhaseId = (typeof PHASES)[number]["id"];
+
+type Saved = {
+  scoreH: number; scoreA: number; minute: number; phaseId: PhaseId;
+  redH: number; redA: number; attH: number; attA: number;
+  res: LivePredictionResponse | null; savedAt: string;
+};
+
+const storeKey = (matchId: string) => `bs-liveread-${matchId}`;
+
+function loadSaved(matchId: string): Saved | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(storeKey(matchId));
+    return raw ? (JSON.parse(raw) as Saved) : null;
+  } catch { return null; }
+}
+
 export default function LivePanel({ matchId }: { matchId: string }) {
   // Full team names arrive with the first live response; until then fall
   // back to the codes in the match id (e.g. "POR_ESP" -> POR / ESP).
   const [codeH, codeA] = (matchId || "_").split("_");
-  const [scoreH, setScoreH] = useState(0);
-  const [scoreA, setScoreA] = useState(0);
-  const [minute, setMinute] = useState(45);
-  const [redH, setRedH] = useState(false);
-  const [redA, setRedA] = useState(false);
-  const [attH, setAttH] = useState(1.0);
-  const [attA, setAttA] = useState(1.0);
+  const saved = loadSaved(matchId);
+  const [scoreH, setScoreH] = useState(saved?.scoreH ?? 0);
+  const [scoreA, setScoreA] = useState(saved?.scoreA ?? 0);
+  const [minute, setMinute] = useState(saved?.minute ?? 45);
+  const [phaseId, setPhaseId] = useState<PhaseId>(saved?.phaseId ?? "1h");
+  const [redH, setRedH] = useState(saved?.redH ?? 0);
+  const [redA, setRedA] = useState(saved?.redA ?? 0);
+  const [attH, setAttH] = useState(saved?.attH ?? 1.0);
+  const [attA, setAttA] = useState(saved?.attA ?? 1.0);
 
-  const [res, setRes] = useState<LivePredictionResponse | null>(null);
+  const [res, setRes] = useState<LivePredictionResponse | null>(saved?.res ?? null);
+  const [savedAt, setSavedAt] = useState(saved?.savedAt ?? "");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [autoMsg, setAutoMsg] = useState("");
   const [autoLoading, setAutoLoading] = useState(false);
+
+  const ph = PHASES.find((p) => p.id === phaseId)!;
+
+  // Persist inputs + last result per match; a fetched past state never
+  // changes, so surviving a reload is the honest default.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const s: Saved = { scoreH, scoreA, minute, phaseId, redH, redA,
+                         attH, attA, res, savedAt: savedAt || new Date().toISOString() };
+      localStorage.setItem(storeKey(matchId), JSON.stringify(s));
+    } catch { /* storage full/blocked — nothing to do */ }
+  }, [matchId, scoreH, scoreA, minute, phaseId, redH, redA, attH, attA, res, savedAt]);
+
+  function pickPhase(id: PhaseId) {
+    const p = PHASES.find((x) => x.id === id)!;
+    setPhaseId(id);
+    setMinute((m) => Math.min(Math.max(m, p.min), p.max));
+  }
+
+  function phaseForMinute(m: number): PhaseId {
+    return m <= 45 ? "1h" : m <= 90 ? "2h" : "et";
+  }
 
   async function autoFill() {
     setAutoLoading(true);
@@ -50,13 +104,18 @@ export default function LivePanel({ matchId }: { matchId: string }) {
       }
       setScoreH(s.current_home ?? 0);
       setScoreA(s.current_away ?? 0);
-      if (s.minutes_elapsed != null) setMinute(Math.round(s.minutes_elapsed));
-      setRedH(!!s.red_home);
-      setRedA(!!s.red_away);
+      if (s.minutes_elapsed != null) {
+        const m = Math.round(s.minutes_elapsed);
+        setMinute(m);
+        setPhaseId(phaseForMinute(m));
+      }
+      setRedH(s.red_home ? 1 : 0);   // feed reports presence, not counts
+      setRedA(s.red_away ? 1 : 0);
+      setSavedAt(new Date().toISOString());
       const fin = s.is_finished ? " (match finished)" : "";
       setAutoMsg(
         `Filled from live feed: ${s.current_home}-${s.current_away}, ${
-          s.minutes_elapsed ?? "?"}'${fin} · ${s.budget.remaining} feed calls left today`
+          s.minutes_elapsed ?? "?"}'${fin} · ${s.budget.remaining} feed calls left today · saved locally`
       );
     } catch {
       setAutoMsg("Couldn't reach the live feed — enter the state manually.");
@@ -69,12 +128,14 @@ export default function LivePanel({ matchId }: { matchId: string }) {
     setLoading(true);
     setErr("");
     const state: LiveStateInput = {
-      current_home: scoreH, current_away: scoreA, minutes_elapsed: minute,
-      red_home: redH, red_away: redA,
+      current_home: scoreH, current_away: scoreA,
+      minutes_elapsed: phaseId === "pens" ? 120 : minute,
+      red_home: redH, red_away: redA, phase: ph.phase,
       attack_home_mult: attH, attack_away_mult: attA,
     };
     try {
       setRes(await api.livePrediction(matchId, state));
+      setSavedAt(new Date().toISOString());
     } catch {
       setErr("Could not compute a live read. Is the backend reachable?");
     } finally {
@@ -84,6 +145,7 @@ export default function LivePanel({ matchId }: { matchId: string }) {
 
   const home = res?.teams?.home ?? codeH ?? "Home";
   const away = res?.teams?.away ?? codeA ?? "Away";
+  const resPhase = res?.live_state?.phase ?? "regulation";
 
   const num = (v: number, set: (n: number) => void, min: number, max: number) => (
     <div className="flex items-center gap-1.5">
@@ -101,9 +163,12 @@ export default function LivePanel({ matchId }: { matchId: string }) {
 
   return (
     <section className="mb-14 rounded-2xl border border-skylive/25 bg-skylive/5 p-5 sm:p-6">
-      <div className="mb-2 flex items-center gap-2">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-skylive" />
         <Eyebrow tone="sky">Live read — experimental</Eyebrow>
+        <span className="rounded-md border border-warn/40 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
+          developer use only
+        </span>
       </div>
       <p className="mb-5 max-w-xl text-xs leading-relaxed text-ink-low">
         Enter the current state while watching. The model re-simulates the
@@ -126,6 +191,30 @@ export default function LivePanel({ matchId }: { matchId: string }) {
         {autoMsg && <p className="mt-2 text-xs text-ink-mid">{autoMsg}</p>}
       </div>
 
+      {/* --- phase selector --- */}
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        {PHASES.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => pickPhase(p.id)}
+            className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors ${
+              phaseId === p.id
+                ? "border-skylive/60 bg-skylive/10 text-skylive"
+                : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      {(phaseId === "et" || phaseId === "pens") && (
+        <p className="mb-4 text-[11px] leading-relaxed text-ink-faint">
+          {phaseId === "et"
+            ? "Extra time: regulation ended level, so 90-minute markets are settled. The model simulates the remaining ET from the current score, then 50/50 penalties — only advancement is priced."
+            : "Penalty shootout: an honest coin flip (≈50/50). Nothing left to simulate — 90-minute markets are settled and no invented skill number is applied."}
+        </p>
+      )}
+
       {/* --- state entry --- */}
       <div className="mb-5 grid gap-5 sm:grid-cols-2">
         <div className="space-y-3">
@@ -137,30 +226,28 @@ export default function LivePanel({ matchId }: { matchId: string }) {
             <span className="text-sm text-ink-mid">{away} goals</span>
             {num(scoreA, setScoreA, 0, 20)}
           </div>
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-sm text-ink-mid">minute</span>
-            <input
-              type="range" min={0} max={120} value={minute}
-              onChange={(e) => setMinute(Number(e.target.value))}
-              className="w-32 accent-skylive"
-            />
-            <span className="w-10 text-right font-mono tabular-nums text-ink-hi">{minute}&apos;</span>
-          </div>
+          {phaseId !== "pens" && (
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-ink-mid">minute</span>
+              <input
+                type="range" min={ph.min} max={ph.max} value={minute}
+                onChange={(e) => setMinute(Number(e.target.value))}
+                className="w-32 accent-skylive"
+              />
+              <span className="w-10 text-right font-mono tabular-nums text-ink-hi">{minute}&apos;</span>
+            </div>
+          )}
         </div>
 
         <div className="space-y-3">
-          <label className="flex items-center gap-2 text-sm text-ink-mid">
-            <input type="checkbox" checked={redH}
-              onChange={(e) => setRedH(e.target.checked)}
-              className="accent-live" />
-            {home} red card
-          </label>
-          <label className="flex items-center gap-2 text-sm text-ink-mid">
-            <input type="checkbox" checked={redA}
-              onChange={(e) => setRedA(e.target.checked)}
-              className="accent-live" />
-            {away} red card
-          </label>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-ink-mid">{home} red cards</span>
+            {num(redH, setRedH, 0, 3)}
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-ink-mid">{away} red cards</span>
+            {num(redA, setRedA, 0, 3)}
+          </div>
         </div>
       </div>
 
@@ -170,7 +257,10 @@ export default function LivePanel({ matchId }: { matchId: string }) {
           Attack intensity levers (optional — your read)
         </summary>
         <p className="mt-3 mb-3 text-xs leading-relaxed text-ink-faint">
-          Seeing a team throw everyone forward? Nudge their attack. This is your
+          Seeing a team throw everyone forward? Nudge their attack up. Seeing a
+          team park the bus? Defence is covered by the same lever — lower the
+          OPPONENT&apos;s attack (each lever scales that team&apos;s whole goal rate,
+          which already includes what the defence allows). This is your
           transparent adjustment to the model&apos;s inputs — you can see exactly
           what it does. 1.0 = no change.
         </p>
@@ -193,44 +283,62 @@ export default function LivePanel({ matchId }: { matchId: string }) {
 
       {res && !loading && (
         <div className="mt-7">
+          {savedAt && (
+            <p className="mb-3 text-right font-mono text-[10px] tracking-wide text-ink-faint">
+              saved locally · {new Date(savedAt).toLocaleTimeString()}
+            </p>
+          )}
           {/* the entered state, score-as-hero */}
           <div className="mb-6 text-center">
             <p className="text-5xl font-semibold tracking-tight tabular-nums text-ink-hi sm:text-6xl">
               {res.live_state.score}
             </p>
             <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-low">
-              {res.live_state.minutes_remaining}&prime; of regulation left
-              {res.live_state.red_home && ` · ${home} red card`}
-              {res.live_state.red_away && ` · ${away} red card`}
+              {resPhase === "pens" ? "penalty shootout"
+                : resPhase === "et"
+                ? `${res.live_state.minutes_remaining}′ of extra time left`
+                : `${res.live_state.minutes_remaining}′ of regulation left`}
+              {Number(res.live_state.red_home) > 0 &&
+                ` · ${home} red ×${Number(res.live_state.red_home)}`}
+              {Number(res.live_state.red_away) > 0 &&
+                ` · ${away} red ×${Number(res.live_state.red_away)}`}
             </p>
           </div>
 
-          {/* live W/D/L — one simulation, sums to 100%, so one honest bar */}
-          <div className="mb-5">
-            <Eyebrow className="mb-3">rest-of-match simulation · regulation</Eyebrow>
-            <SegBar segs={[
-              { label: `${home} win (90′)`, value: res.live_outcomes.home_win, color: "var(--accent)" },
-              { label: "draw (90′)", value: res.live_outcomes.draw, color: "rgba(255,255,255,0.22)" },
-              { label: `${away} win (90′)`, value: res.live_outcomes.away_win, color: "var(--skylive)" },
-            ]} />
-          </div>
+          {/* live W/D/L — one simulation, sums to 100%, so one honest bar.
+              In ET/pens regulation is settled (draw), so skip the 90' bar. */}
+          {resPhase === "regulation" && (
+            <div className="mb-5">
+              <Eyebrow className="mb-3">rest-of-match simulation · regulation</Eyebrow>
+              <SegBar segs={[
+                { label: `${home} win (90′)`, value: res.live_outcomes.home_win, color: "var(--accent)" },
+                { label: "draw (90′)", value: res.live_outcomes.draw, color: "rgba(255,255,255,0.22)" },
+                { label: `${away} win (90′)`, value: res.live_outcomes.away_win, color: "var(--skylive)" },
+              ]} />
+            </div>
+          )}
 
           {res.live_advance && res.stage === "knockout" && (
             <div className="mb-6">
-              <Eyebrow className="mb-3">advance · with ET + penalties</Eyebrow>
+              <Eyebrow className="mb-3">
+                {resPhase === "pens" ? "shootout · 50/50 by design"
+                  : "advance · with ET + penalties"}
+              </Eyebrow>
               <SegBar segs={[
                 { label: `${home} advance`, value: res.live_advance.home, color: "var(--accent)" },
                 { label: `${away} advance`, value: res.live_advance.away, color: "var(--skylive)" },
               ]} />
-              <p className="mt-2.5 font-mono text-[11px] tabular-nums text-ink-faint">
-                reaches ET {pct(res.live_advance.p_reach_et)} · reaches pens {pct(res.live_advance.p_reach_pens)}
-              </p>
+              {resPhase !== "pens" && (
+                <p className="mt-2.5 font-mono text-[11px] tabular-nums text-ink-faint">
+                  reaches ET {pct(res.live_advance.p_reach_et)} · reaches pens {pct(res.live_advance.p_reach_pens)}
+                </p>
+              )}
             </div>
           )}
 
           <Eyebrow className="mb-3">
-            Live read vs market — {res.live_state.score},{" "}
-            {res.live_state.minutes_remaining}&apos; left
+            Live read vs market — {res.live_state.score}
+            {resPhase === "regulation" && `, ${res.live_state.minutes_remaining}′ left`}
           </Eyebrow>
           <div className="overflow-x-auto rounded-xl border border-line">
             <table className="w-full text-sm">
@@ -253,7 +361,9 @@ export default function LivePanel({ matchId }: { matchId: string }) {
                     <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink-mid">
                       {pct(m.market_probability)}
                     </td>
-                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink-low">
+                    <td className={`px-3 py-2.5 text-right font-mono tabular-nums ${
+                      m.difference >= 0 ? "text-accent" : "text-neg"
+                    }`}>
                       {m.difference >= 0 ? "+" : ""}{(m.difference * 100).toFixed(1)}%
                     </td>
                     <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink-mid">{m.kalshi_odds.toFixed(2)}x</td>
