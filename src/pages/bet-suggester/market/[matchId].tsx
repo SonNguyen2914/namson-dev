@@ -662,6 +662,11 @@ function ReferenceOddsTab({ ro }: { ro: ReferenceOddsResponse | null }) {
         Nothing here is buyable through this app, and none of it feeds the
         board or the strategy engine.
       </p>
+      {ro.note && (
+        <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
+          fallback source: {ro.source} · {ro.note}
+        </p>
+      )}
       {ro.groups?.map((g) => (
         <div key={g.name} className="mb-5">
           <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">

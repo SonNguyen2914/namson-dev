@@ -335,6 +335,7 @@ export interface ReferenceOddsResponse {
   bookmaker_count?: number;
   groups?: { name: string; rows: ReferenceOddsRow[] }[];
   disclaimer?: string;
+  note?: string;          // set when a fallback source served this payload
 }
 
 export interface TeamBlurb {
