@@ -77,6 +77,16 @@ body {
     "Segoe UI", Arial, sans-serif;
 }
 
+/* One overflowing element must never horizontal-scroll the whole app on a
+   phone (the page slides off onto the bare body background). clip, not
+   hidden: it doesn't create a scroll container, so position:sticky (the
+   top bar) keeps working. Wide content scrolls inside its own
+   overflow-x-auto wrappers. */
+html,
+body {
+  overflow-x: clip;
+}
+
 /* quality floor: visible keyboard focus everywhere */
 :focus-visible {
   outline: 2px solid var(--accent);

@@ -22,7 +22,10 @@ export function TopBar({ back, title, children }: {
           {title}
         </div>
         {children && (
-          <nav className="no-scrollbar ml-auto flex shrink-0 items-center gap-1.5 overflow-x-auto">
+          // min-w-0 (NOT shrink-0): the chip rail must compress and scroll
+          // within itself on phones — a rigid rail forced the whole page
+          // wider than the viewport, horizontal-scrolling the entire app.
+          <nav className="no-scrollbar ml-auto flex min-w-0 items-center gap-1.5 overflow-x-auto">
             {children}
           </nav>
         )}

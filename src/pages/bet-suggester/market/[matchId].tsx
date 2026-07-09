@@ -251,12 +251,18 @@ export default function MatchDetail() {
         {/* ============ HERO — the matchup ============ */}
         <header className="hero-ambient mt-8 mb-12 rounded-3xl pb-2 text-center">
           <Eyebrow className="mb-4">{matchId}</Eyebrow>
+          {/* each flag+name is an unbreakable unit, so a narrow screen wraps
+              between teams — never orphaning a flag onto its own line */}
           <h1 className="text-4xl font-semibold tracking-tight text-ink-hi sm:text-5xl">
-            {teams && <span className="mr-3">{flag(home)}</span>}
-            {home}
+            <span className="whitespace-nowrap">
+              {teams && <span className="mr-3">{flag(home)}</span>}
+              {home}
+            </span>
             <span className="mx-3 text-xl font-normal text-ink-faint sm:text-2xl">vs</span>
-            {away}
-            {teams && <span className="ml-3">{flag(away)}</span>}
+            <span className="whitespace-nowrap">
+              {away}
+              {teams && <span className="ml-3">{flag(away)}</span>}
+            </span>
           </h1>
 
           {/* Match details — local kickoff, stadium, ticking countdown */}
