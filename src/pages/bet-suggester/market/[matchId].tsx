@@ -1262,7 +1262,16 @@ function PlayerPropsTab({ pp, onWatch, watched }: {
                 {cell(r.anytime, 1)}
                 {cell(r.p2, 2)}
                 {cell(r.p3, 3)}
-                <span className="text-right font-mono tabular-nums text-ink-mid">{pct(r.first_goal)}</span>
+                <span className="text-right">
+                  <span className="font-mono tabular-nums text-ink-mid">{pct(r.first_goal)}</span>
+                  {r.first_goal_market?.multiplier != null && (
+                    <span className={`block font-mono text-[10px] tabular-nums ${
+                      (r.first_goal_market.edge ?? -1) >= 0 ? "text-accent" : "text-neg"}`}>
+                      @{r.first_goal_market.multiplier.toFixed(2)}x
+                      {r.first_goal_market.edge != null ? ` ${signedPct(r.first_goal_market.edge)}` : ""}
+                    </span>
+                  )}
+                </span>
                 <span className="text-right font-mono tabular-nums text-ink-mid">
                   {ast && ast.multiplier != null ? `@${ast.multiplier.toFixed(2)}x` : "—"}
                 </span>
@@ -1272,9 +1281,11 @@ function PlayerPropsTab({ pp, onWatch, watched }: {
         </div>
       </div>
       <p className="mt-3 text-xs leading-relaxed text-ink-faint">
-        {pp.disclaimer} Goal thresholds show the Kalshi price + anchored edge
-        when a market is listed. Assists show the market price only — FIFA
-        publishes no assist data, so there is no honest assist model. Once
+        {pp.disclaimer} Goal thresholds and First goal show the Kalshi price
+        + anchored edge when a market is listed (First goal prices Kalshi&apos;s
+        First Goalscorer books against the model&apos;s first-goal race).
+        Assists show the market price only — FIFA publishes no assist data,
+        so there is no honest assist model. Once
         official lineups post (~1h before kickoff), XI / bench / out tags
         appear; out-of-squad players&apos; per-match chances drop to zero.
       </p>

@@ -272,6 +272,13 @@ export interface PlayerProp {
   likelihood?: number;  // anchored (0.6 model + 0.4 market)
   edge?: number;
   squad?: "starter" | "bench" | "out";  // matchday fact, once lineups post
+  first_goal_market?: {                 // Kalshi KXWCFIRSTGOAL, when listed
+    market_id: string;
+    implied: number;
+    multiplier: number | null;
+    likelihood?: number;                // anchored vs the first-goal race
+    edge?: number;
+  };
   // per-match Kalshi props (KXWCGOAL 1+/2+/3+ priced; KXWCAST display-only)
   match_goal_markets?: { n: number; market_id: string; implied: number;
                          multiplier: number | null; likelihood?: number;
