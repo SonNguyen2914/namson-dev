@@ -182,6 +182,17 @@ export default function MatchDetail() {
 
         {error && <p className="mb-8 text-center text-sm text-live">{error}</p>}
 
+        {/* Headline stats — xG + confidence, right under the hero */}
+        {pred && (
+          <Reveal>
+            <section className="mb-10 grid grid-cols-3 gap-3">
+              <Stat label={`${home} xG`} value={pred.xg.home.toFixed(2)} />
+              <Stat label={`${away} xG`} value={pred.xg.away.toFixed(2)} />
+              <Stat label="model confidence" value={pct(pred.confidence)} />
+            </section>
+          </Reveal>
+        )}
+
         {/* How they play — scouting blurbs, a read aid (not a model input) */}
         {teamInfo && (teamInfo.home.scouting || teamInfo.away.scouting) && (
           <Reveal>
@@ -222,21 +233,16 @@ export default function MatchDetail() {
                   {pAway != null && <OutcomeBar label={`${away} win`} value={pAway} />}
                 </div>
                 <p className="mt-4 text-[11px] leading-relaxed text-ink-faint">
-                  Read straight off the priced markets below — independent numbers,
-                  so they won&apos;t sum to exactly 100%.
+                  The pure-model numbers above, shrunk 40% toward Kalshi&apos;s live
+                  price (60% model + 40% market) — liquid markets are usually
+                  right, so this is the humbler number the board runs on. That
+                  blend is why it differs from Full time above. Read straight
+                  off the priced markets below — independent numbers, so they
+                  won&apos;t sum to exactly 100%.
                 </p>
               </section>
               </Reveal>
             )}
-
-            {/* xG + confidence */}
-            <Reveal>
-            <section className="mb-10 grid grid-cols-3 gap-3">
-              <Stat label={`${home} xG`} value={pred.xg.home.toFixed(2)} />
-              <Stat label={`${away} xG`} value={pred.xg.away.toFixed(2)} />
-              <Stat label="model confidence" value={pct(pred.confidence)} />
-            </section>
-            </Reveal>
 
             {/* Live in-play read (Layer 3) */}
             <LivePanel matchId={matchId as string} />
@@ -272,30 +278,6 @@ export default function MatchDetail() {
                   pick to make.
                 </p>
               )}
-            </section>
-            </Reveal>
-
-            {/* Scoreline distribution */}
-            <Reveal>
-            <section className="mb-14">
-              <Eyebrow className="mb-2">simulation</Eyebrow>
-              <h3 className="mb-4 text-lg font-medium text-ink-hi">
-                Most likely scorelines <span className="text-sm font-normal text-ink-low">· {">"}10,000 simulations</span>
-              </h3>
-              <div className="space-y-2.5">
-                {pred.scorelines.slice(0, 8).map((s) => (
-                  <div key={s.score} className="flex items-center gap-3">
-                    <span className="w-10 shrink-0 font-mono text-sm tabular-nums text-ink-mid">{s.score}</span>
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-elev2">
-                      <div
-                        className="h-full rounded-full bg-accent/70"
-                        style={{ width: `${Math.min(s.prob * 400, 100)}%` }}
-                      />
-                    </div>
-                    <span className="w-14 shrink-0 text-right font-mono text-xs tabular-nums text-ink-low">{pct(s.prob)}</span>
-                  </div>
-                ))}
-              </div>
             </section>
             </Reveal>
 
@@ -493,7 +475,7 @@ function ModelPrediction({ summary, scorelines, home, away }: {
   const adv = summary.advance;
   const isKO = adv?.method === "simulated_et_pens";
   const halves = summary.halves;
-  const topScores = scorelines.slice(0, 4);
+  const topScores = scorelines.slice(0, 8);
 
   // "home-away" score string -> "🇲🇦 0–0 🇫🇷"
   const scoreLabel = (s: string) => {
@@ -503,9 +485,10 @@ function ModelPrediction({ summary, scorelines, home, away }: {
 
   return (
     <section className="mb-10 rounded-2xl border border-line bg-elev p-5 sm:p-6">
-      <Eyebrow className="mb-1">model prediction · based on team data</Eyebrow>
+      <Eyebrow className="mb-1">model prediction · pure model</Eyebrow>
       <p className="mb-5 text-[11px] leading-relaxed text-ink-faint">
-        Monte Carlo forecast from each side&apos;s attack, defence, form, fatigue and Elo.
+        Monte Carlo forecast from each side&apos;s attack, defence, form, fatigue
+        and Elo — the model&apos;s own view, before any market anchoring.
       </p>
 
       {halves && (
@@ -535,7 +518,7 @@ function ModelPrediction({ summary, scorelines, home, away }: {
 
       <div>
         <p className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">
-          Most likely final score · 90 min
+          Most likely final score · 90 min · {">"}10,000 simulations
         </p>
         <div className="space-y-2.5">
           {topScores.map((s) => (
