@@ -510,8 +510,8 @@ function ModelPrediction({ summary, scorelines, home, away }: {
 
       {halves && (
         <div className="mb-6 grid gap-3 sm:grid-cols-2">
-          <HalfCard title="First half" d={halves.first_half} home={home} away={away} scoreLabel={scoreLabel} />
-          <HalfCard title="Second half" d={halves.second_half} home={home} away={away} scoreLabel={scoreLabel} />
+          <HalfCard title="First half" d={halves.first_half} home={home} away={away} />
+          <HalfCard title="Second half" d={halves.second_half} home={home} away={away} />
         </div>
       )}
 
@@ -558,15 +558,17 @@ function ModelPrediction({ summary, scorelines, home, away }: {
   );
 }
 
-function HalfCard({ title, d, home, away, scoreLabel }: {
+function HalfCard({ title, d, home, away }: {
   title: string;
   d: HalfDist;
   home: string;
   away: string;
-  scoreLabel: (s: string) => string;
 }) {
+  // The lean: which side is more likely ahead at the break (usually level —
+  // most halves are tight). Reported alongside expected goals + goal chance,
+  // which are what actually differ between matchups and between the two halves.
   const opts: [string, number][] = [
-    [`${home} win`, d.home_win], ["Draw", d.draw], [`${away} win`, d.away_win],
+    [`${home} ahead`, d.home_win], ["Level", d.draw], [`${away} ahead`, d.away_win],
   ];
   opts.sort((a, b) => b[1] - a[1]);
   const [label, prob] = opts[0];
@@ -577,7 +579,7 @@ function HalfCard({ title, d, home, away, scoreLabel }: {
         {label} <span className="font-mono text-xs tabular-nums text-ink-low">{pct(prob)}</span>
       </p>
       <p className="mt-1.5 font-mono text-xs tabular-nums text-ink-mid">
-        {scoreLabel(d.top_score)} <span className="text-ink-faint">· {pct(d.top_score_prob)}</span>
+        ~{d.exp_goals.toFixed(1)} goals <span className="text-ink-faint">· {pct(d.goal_pct)} chance of a goal</span>
       </p>
     </div>
   );

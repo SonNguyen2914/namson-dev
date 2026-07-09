@@ -16,8 +16,8 @@ export interface HalfDist {
   home_win: number;
   draw: number;
   away_win: number;
-  top_score: string;      // "home-away", e.g. "0-0"
-  top_score_prob: number;
+  exp_goals: number;      // expected total goals in the half
+  goal_pct: number;       // chance of at least one goal in the half
 }
 
 export interface PredictionSummary {
