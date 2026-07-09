@@ -27,7 +27,7 @@ const FALLBACK_FLOOR = 0.40;
 const MARKET_GROUPS: { id: string; label: string; test: (k: string | null | undefined) => boolean }[] = [
   { id: "winner", label: "Winner · 90 min", test: (k) => k === "home_win" || k === "away_win" || k === "draw" },
   { id: "advance", label: "To advance", test: (k) => k === "home_advance" || k === "away_advance" },
-  { id: "goals", label: "Goals · totals + both teams to score", test: (k) => !!k && (/^over_|^under_/.test(k) || k === "btts") },
+  { id: "goals", label: "Goals · totals, BTTS, first goal", test: (k) => !!k && (/^over_|^under_/.test(k) || k === "btts" || /_first_goal$|^no_goal$/.test(k)) },
   { id: "margin", label: "Margin of victory", test: (k) => !!k && /margin/.test(k) },
   { id: "etpens", label: "Extra time / penalties", test: (k) => !!k && /_win_(et|pens)$/.test(k) },
   { id: "score", label: "Exact score", test: (k) => !!k && /^score_/.test(k) },
@@ -1017,7 +1017,14 @@ function PlayerPropsTab({ pp, onWatch, watched }: {
             {priced.map((r) => (
               <div key={r.shirt} className="grid grid-cols-[minmax(0,1fr)_6rem_5rem_5.5rem_4.5rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm">
                 <span className="min-w-0 truncate pr-2 text-ink-hi">{r.player}</span>
-                <span className="text-right font-mono tabular-nums text-ink-hi">{pct(r.likelihood!)}</span>
+                <span className="text-right">
+                  <span className="font-mono tabular-nums text-ink-hi">{pct(r.likelihood!)}</span>
+                  {r.tournament_anytime != null && (
+                    <span className="block font-mono text-[10px] tabular-nums text-ink-faint">
+                      model {pct(r.tournament_anytime)}
+                    </span>
+                  )}
+                </span>
                 <span className={`text-right font-mono tabular-nums ${r.edge! >= 0 ? "text-accent" : "text-neg"}`}>{signedPct(r.edge!)}</span>
                 <span className="text-right font-mono tabular-nums text-ink-mid">{r.multiplier != null ? `${r.multiplier.toFixed(2)}x` : "—"}</span>
                 <span className="text-right">
