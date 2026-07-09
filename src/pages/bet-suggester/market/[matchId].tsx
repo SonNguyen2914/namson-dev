@@ -35,12 +35,6 @@ const MARKET_GROUPS: { id: string; label: string; test: (k: string | null | unde
 
 type MktSortKey = "likelihood" | "edge" | "multiplier";
 
-// Risk tiers for the strategy tabs: LOW = high-likelihood bets, HIGH = longshots.
-const RISK_TIERS = [
-  { id: "low", label: "Low risk", test: (p: number) => p >= 0.65, blurb: "High-likelihood bets — small multipliers, most likely to land." },
-  { id: "med", label: "Medium risk", test: (p: number) => p >= 0.40 && p < 0.65, blurb: "Coin-flip territory — moderate multipliers." },
-  { id: "high", label: "High risk", test: (p: number) => p < 0.40, blurb: "Longshots — big multipliers, usually lose." },
-] as const;
 
 export default function MatchDetail() {
   const router = useRouter();
@@ -347,9 +341,9 @@ export default function MatchDetail() {
             </section>
             </Reveal>
 
-            {/* Betting strategy + fund divider */}
+            {/* Betting strategy — scenario engine + fund divider */}
             <Reveal>
-              <StrategySection markets={sortedMarkets} />
+              <StrategySection markets={sortedMarkets} summary={pred.summary ?? null} home={home} away={away} />
             </Reveal>
 
             {/* Every market priced — grouped by type, sortable, collapsible */}
@@ -751,134 +745,228 @@ function ChanceChip({ label, p }: { label: string; p: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// Betting strategy — max return per risk tier, plus a fund divider.
-// Tabs (LOW/MED/HIGH) save vertical space. Within a tier, bets are ranked by
-// expected value per $1 (model_p x payout - 1) using the market-anchored
-// probabilities and the buyable ask multiplier. The fund divider allocates a
-// user-entered bankroll across the tier's positive-EV bets by quarter-Kelly —
-// deliberately conservative, and always leaving the un-allocated remainder in
-// reserve. Honest framing: this is model output, not advice.
-function StrategySection({ markets }: { markets: MarketPrediction[] }) {
-  const [tier, setTier] = useState<(typeof RISK_TIERS)[number]["id"]>("low");
+// Betting strategy — a real SCENARIO engine, not a bet-picker.
+//
+// The match's result space is split into exhaustive, mutually exclusive
+// scenarios ("atoms") from the SAME simulation everything else runs on:
+//   home wins in 90' · away wins in 90' · draw then {home|away} wins in
+//   ET · draw then {home|away} wins on penalties.
+// Result-space contracts (winner / draw / advance / win-in-ET / win-on-pens)
+// each pay out on an exact set of atoms. A STRATEGY is a set of contracts
+// covering disjoint atom sets, dutched so every covered atom returns the
+// same profit: you WIN if any covered scenario happens and LOSE your stake
+// if and only if an uncovered scenario happens — those are listed, with
+// probabilities. Risk tiers = the strategy's total win probability: LOW
+// 60-100%, MEDIUM 40-60%, HIGH <40% (max return). Higher risk covers fewer
+// atoms, so the loss-scenario list grows. Goal-dependent markets (totals,
+// BTTS, exact scores) are excluded: their payoff isn't determined by the
+// result scenario, so they can't give an "I lose only if X" guarantee.
+function StrategySection({ markets, summary, home, away }: {
+  markets: MarketPrediction[];
+  summary: PredictionSummary | null;
+  home: string;
+  away: string;
+}) {
+  const [tier, setTier] = useState<"low" | "med" | "high">("low");
   const [fund, setFund] = useState(100);
 
-  const active = RISK_TIERS.find((t) => t.id === tier)!;
-  // Kalshi's trading fee is 0.07·P·(1−P) per contract, charged on the price —
-  // the true buy cost is P + fee, so the NET payout multiplier is 1/(P+fee).
-  // All EV/stake math below is net of fees (the raw table above is gross).
   const netOdds = (impliedP: number) => {
-    const cost = impliedP + 0.07 * impliedP * (1 - impliedP);
+    const cost = impliedP + 0.07 * impliedP * (1 - impliedP); // Kalshi fee
     return cost > 0 ? 1 / cost : 0;
   };
-  const rows = markets
-    .filter((m) => active.test(m.model_probability) && m.kalshi_odds > 1)
-    .map((m) => {
-      const odds = netOdds(m.implied_probability);
-      return { ...m, netOdds: odds, ev: m.model_probability * odds - 1 };
-    })
-    .sort((a, b) => b.ev - a.ev)
-    .slice(0, 6);
 
-  // Quarter-Kelly stake fraction per bet (clamped at 0 for negative edges):
-  // f* = (p·b − q) / b with b = NET payout−1; we bet f*/4 for humility.
-  const withKelly = rows.map((m) => {
-    const b = m.netOdds - 1;
-    const f = b > 0 ? Math.max(0, (m.model_probability * b - (1 - m.model_probability)) / b) : 0;
-    return { ...m, kelly: f * 0.25 };
-  });
-  const totalFrac = withKelly.reduce((s, m) => s + m.kelly, 0);
-  const scale = totalFrac > 1 ? 1 / totalFrac : 1; // never allocate >100%
-  const allocated = withKelly.map((m) => ({
-    ...m,
-    stake: m.kelly * scale * fund,
-  }));
-  const reserve = fund - allocated.reduce((s, m) => s + m.stake, 0);
+  // ---- scenario atoms from the sim ----
+  const ft = summary?.full_time;
+  const adv = summary?.advance;
+  const fine = adv?.home_win_et != null; // ET/pens breakdown available
+  type AtomT = { id: string; label: string; p: number };
+  const atoms: AtomT[] = !ft ? [] : fine ? [
+    { id: "H90", label: `${home} wins in 90′`, p: ft.home_win },
+    { id: "A90", label: `${away} wins in 90′`, p: ft.away_win },
+    { id: "DHet", label: `draw, then ${home} wins in extra time`, p: adv!.home_win_et! },
+    { id: "DAet", label: `draw, then ${away} wins in extra time`, p: adv!.away_win_et! },
+    { id: "DHp", label: `draw, then ${home} wins on penalties`, p: adv!.home_win_pens! },
+    { id: "DAp", label: `draw, then ${away} wins on penalties`, p: adv!.away_win_pens! },
+  ] : [
+    { id: "H90", label: `${home} wins in 90′`, p: ft.home_win },
+    { id: "D", label: "draw after 90′", p: ft.draw },
+    { id: "A90", label: `${away} wins in 90′`, p: ft.away_win },
+  ];
+  const atomIdx = new Map(atoms.map((a, i) => [a.id, i]));
+  const covers: Record<string, string[]> = fine ? {
+    home_win: ["H90"], away_win: ["A90"],
+    draw: ["DHet", "DAet", "DHp", "DAp"],
+    home_advance: ["H90", "DHet", "DHp"], away_advance: ["A90", "DAet", "DAp"],
+    home_win_et: ["DHet"], away_win_et: ["DAet"],
+    home_win_pens: ["DHp"], away_win_pens: ["DAp"],
+  } : { home_win: ["H90"], draw: ["D"], away_win: ["A90"] };
+
+  // ---- contracts: one per outcome_key, with fee-netted odds ----
+  const contracts = markets
+    .filter((m) => m.outcome_key && covers[m.outcome_key] && m.implied_probability > 0.005)
+    .map((m) => {
+      let mask = 0;
+      for (const id of covers[m.outcome_key!]) mask |= 1 << atomIdx.get(id)!;
+      return { key: m.outcome_key!, title: m.market_title, mask,
+               odds: netOdds(m.implied_probability), implied: m.implied_probability };
+    })
+    .filter((c) => c.odds > 1);
+
+  // ---- enumerate every disjoint cover; dutch it ----
+  type Cand = { legs: typeof contracts; mask: number; p: number; profit: number };
+  const cands: Cand[] = [];
+  const n = contracts.length;
+  for (let sset = 1; sset < 1 << n; sset++) {
+    let mask = 0, invSum = 0, ok = true;
+    const legs: typeof contracts = [];
+    for (let i = 0; i < n; i++) {
+      if (!(sset & (1 << i))) continue;
+      const c = contracts[i];
+      if (mask & c.mask) { ok = false; break; }   // overlap → not a clean cover
+      mask |= c.mask; invSum += 1 / c.odds; legs.push(c);
+    }
+    if (!ok || legs.length === 0) continue;
+    let p = 0;
+    atoms.forEach((a, i) => { if (mask & (1 << i)) p += a.p; });
+    cands.push({ legs, mask, p, profit: 1 / invSum - 1 });
+  }
+
+  const bands = { low: [0.60, 1.001], med: [0.40, 0.60], high: [0, 0.40] } as const;
+  const [lo, hi] = bands[tier];
+  const inBand = cands.filter((c) => c.p >= lo && c.p < hi);
+  inBand.sort((a, b) => b.profit - a.profit || b.p - a.p);
+  const best = inBand[0];
+
+  const invSum = best ? best.legs.reduce((s2, c) => s2 + 1 / c.odds, 0) : 1;
+  const rows = best ? best.legs.map((c) => ({
+    ...c, stake: (fund * (1 / c.odds)) / invSum,
+  })) : [];
+  const payoutIfWin = best ? fund * (1 + best.profit) : 0;
+  const lossAtoms = best
+    ? atoms.map((a, i) => ({ ...a, i })).filter((a) => !(best.mask & (1 << a.i)))
+        .sort((a, b) => b.p - a.p)
+    : [];
+  const ev = best ? best.p * best.profit * fund - (1 - best.p) * fund : 0;
+
+  const tierMeta = {
+    low: "Wins 60-100% of the time — covers most scenarios, small profit.",
+    med: "Wins 40-60% of the time — fewer scenarios covered, bigger profit.",
+    high: "Wins <40% of the time — few scenarios, maximum return.",
+  } as const;
 
   return (
     <section className="mb-14 rounded-2xl border border-line bg-elev p-5 sm:p-6">
-      <Eyebrow className="mb-1">betting strategy · by risk</Eyebrow>
+      <Eyebrow className="mb-1">betting strategy · scenario engine</Eyebrow>
       <p className="mb-4 text-[11px] leading-relaxed text-ink-faint">
-        Ranked by expected value per $1 — anchored likelihood × buyable payout,
-        net of Kalshi&apos;s 0.07·P·(1−P) trading fee. Model output, not financial advice.
+        Your whole fund is split across result-space contracts so every covered
+        scenario returns the same profit. You lose only if a listed uncovered
+        scenario happens. Odds are net of Kalshi&apos;s fee; probabilities are the
+        model&apos;s. Not financial advice.
       </p>
 
-      {/* risk tabs */}
-      <div className="mb-4 flex flex-wrap gap-1.5">
-        {RISK_TIERS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTier(t.id)}
+      <div className="mb-3 flex flex-wrap gap-1.5">
+        {(["low", "med", "high"] as const).map((t) => (
+          <button key={t} onClick={() => setTier(t)}
             className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors ${
-              tier === t.id
-                ? "border-accent/60 bg-accent/10 text-accent"
-                : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"
-            }`}
-          >
-            {t.label}
+              tier === t ? "border-accent/60 bg-accent/10 text-accent"
+                         : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"}`}>
+            {t === "low" ? "Low risk" : t === "med" ? "Medium risk" : "High risk"}
           </button>
         ))}
       </div>
-      <p className="mb-4 text-xs text-ink-low">{active.blurb}</p>
+      <p className="mb-4 text-xs text-ink-low">{tierMeta[tier]}</p>
 
-      {/* fund divider input */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <span className="text-sm text-ink-mid">Fund to divide</span>
         <div className="flex items-center gap-1">
           <span className="font-mono text-sm text-ink-low">$</span>
-          <input
-            type="number" min={1} max={1000000} value={fund}
+          <input type="number" min={1} max={1000000} value={fund}
             onChange={(e) => setFund(Math.max(1, Number(e.target.value) || 1))}
-            className="w-24 rounded-lg border border-line bg-bs px-2.5 py-1.5 font-mono text-sm tabular-nums text-ink-hi outline-none focus:border-accent/60"
-          />
+            className="w-24 rounded-lg border border-line bg-bs px-2.5 py-1.5 font-mono text-sm tabular-nums text-ink-hi outline-none focus:border-accent/60" />
         </div>
-        <span className="font-mono text-[11px] text-ink-faint">
-          quarter-Kelly split · reserve stays unbet
-        </span>
+        <span className="font-mono text-[11px] text-ink-faint">entire fund is staked</span>
       </div>
 
-      {allocated.length === 0 ? (
+      {!ft ? (
         <p className="rounded-xl border border-line p-4 text-sm text-ink-low">
-          No markets in this risk band right now.
+          Prediction summary unavailable — refresh the prediction first.
+        </p>
+      ) : !best ? (
+        <p className="rounded-xl border border-line p-4 text-sm text-ink-low">
+          No contract combination lands in this risk band on this match right
+          now — the required markets aren&apos;t all open.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-line">
-          <div className="min-w-[560px]">
-            <div className="grid grid-cols-[minmax(0,1fr)_5rem_4.5rem_5.5rem_6rem] items-center gap-x-3 border-b border-line bg-bs px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
-              <span>Market</span>
-              <span className="text-right">Likely</span>
-              <span className="text-right">Net mult</span>
-              <span className="text-right">Stake</span>
-              <span className="text-right">If it hits</span>
+        <>
+          <div className="mb-4 grid grid-cols-3 gap-3">
+            <div className="rounded-xl border border-line bg-bs p-3">
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">Strategy wins</p>
+              <p className={`mt-1 font-mono text-xl tabular-nums ${best.p >= 0.6 ? "text-accent" : "text-ink-hi"}`}>{pct(best.p)}</p>
             </div>
-            {allocated.map((m) => (
-              <div
-                key={m.market_id}
-                className="grid grid-cols-[minmax(0,1fr)_5rem_4.5rem_5.5rem_6rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0"
-              >
-                <span className="min-w-0 truncate pr-2 text-ink-hi" title={m.market_title}>{m.market_title}</span>
-                <span className="text-right font-mono tabular-nums text-ink-mid">{pct(m.model_probability)}</span>
-                <span className="text-right font-mono tabular-nums text-ink-mid">{m.netOdds.toFixed(2)}x</span>
-                <span className={`text-right font-mono tabular-nums ${m.stake >= 0.5 ? "text-accent" : "text-ink-faint"}`}>
-                  ${m.stake.toFixed(2)}
-                </span>
-                <span className="text-right font-mono tabular-nums text-ink-mid">
-                  ${(m.stake * m.netOdds).toFixed(2)}
-                </span>
-              </div>
-            ))}
+            <div className="rounded-xl border border-line bg-bs p-3">
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">Profit if it wins</p>
+              <p className={`mt-1 font-mono text-xl tabular-nums ${best.profit >= 0 ? "text-accent" : "text-neg"}`}>
+                {signedPct(best.profit)}
+              </p>
+              <p className="font-mono text-[10px] tabular-nums text-ink-faint">${fund.toFixed(0)} → ${payoutIfWin.toFixed(2)}</p>
+            </div>
+            <div className="rounded-xl border border-line bg-bs p-3">
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">Expected value</p>
+              <p className={`mt-1 font-mono text-xl tabular-nums ${ev >= 0 ? "text-accent" : "text-neg"}`}>
+                {ev >= 0 ? "+" : "−"}${Math.abs(ev).toFixed(2)}
+              </p>
+            </div>
           </div>
-        </div>
+          {best.profit < 0 && (
+            <p className="mb-4 rounded-lg border border-warn/25 bg-warn/5 px-3 py-2 text-xs text-warn">
+              Best available cover in this band is a guaranteed loss (the
+              market&apos;s vig) — there is no honest low-variance profit here.
+            </p>
+          )}
+
+          <div className="mb-4 overflow-x-auto rounded-xl border border-line">
+            <div className="min-w-[520px]">
+              <div className="grid grid-cols-[minmax(0,1fr)_5.5rem_6rem_6rem] items-center gap-x-3 border-b border-line bg-bs px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
+                <span>Buy</span><span className="text-right">Net mult</span>
+                <span className="text-right">Stake</span><span className="text-right">Returns</span>
+              </div>
+              {rows.map((r) => (
+                <div key={r.key} className="grid grid-cols-[minmax(0,1fr)_5.5rem_6rem_6rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0">
+                  <span className="min-w-0 truncate pr-2 text-ink-hi" title={r.title}>{r.title}</span>
+                  <span className="text-right font-mono tabular-nums text-ink-mid">{r.odds.toFixed(2)}x</span>
+                  <span className="text-right font-mono tabular-nums text-accent">${r.stake.toFixed(2)}</span>
+                  <span className="text-right font-mono tabular-nums text-ink-mid">${(r.stake * r.odds).toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-neg">
+            You lose your ${fund.toFixed(0)} only if ({lossAtoms.length} scenario{lossAtoms.length === 1 ? "" : "s"}):
+          </p>
+          <ul className="space-y-1.5">
+            {lossAtoms.map((a) => (
+              <li key={a.id} className="flex items-baseline justify-between gap-3 text-sm">
+                <span className="text-ink-mid">✗ {a.label}</span>
+                <span className="shrink-0 font-mono text-xs tabular-nums text-ink-low">{pct(a.p)}</span>
+              </li>
+            ))}
+            {lossAtoms.length === 0 && (
+              <li className="text-sm text-ink-mid">✓ nothing — every scenario is covered (profit is the vig-adjusted spread)</li>
+            )}
+          </ul>
+          <p className="mt-4 text-xs leading-relaxed text-ink-faint">
+            Scenario probabilities come from the pure-model simulation; stakes
+            are dutched so any covered outcome pays the same. Goal-based
+            markets (totals, BTTS, exact scores) are excluded — their payoff
+            isn&apos;t fixed by these scenarios, so they can&apos;t join a
+            lose-only-if guarantee.
+          </p>
+        </>
       )}
-      <p className="mt-3 text-xs leading-relaxed text-ink-faint">
-        Reserve (unbet): <span className="font-mono tabular-nums text-ink-mid">${reserve.toFixed(2)}</span> of ${fund.toFixed(0)}.
-        Stakes are quarter-Kelly on the anchored model probability — bets with no
-        positive expected value get $0 by design. Kelly assumes the model is right;
-        it is an anchored estimate, so treat sizes as a ceiling, not a target.
-      </p>
     </section>
   );
 }
-
 
 // ---------------------------------------------------------------------------
 // Player props tab. TOP: Kalshi's real tournament-anytime scorer markets
@@ -959,32 +1047,54 @@ function PlayerPropsTab({ pp, onWatch, watched }: {
       </p>
 
       <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">
-        This match · model estimates (no Kalshi market exists)
+        This match · goals 1+/2+/3+ (model, priced when Kalshi lists it) · assists (market only)
       </p>
       <div className="overflow-x-auto rounded-xl border border-line">
-        <div className="min-w-[560px]">
-          <div className="grid grid-cols-[minmax(0,1fr)_5rem_5rem_5rem_5.5rem] items-center gap-x-3 border-b border-line bg-bs px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
+        <div className="min-w-[640px]">
+          <div className="grid grid-cols-[minmax(0,1fr)_6rem_6rem_6rem_5rem_5.5rem] items-center gap-x-3 border-b border-line bg-bs px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
             <span>Player</span><span className="text-right">1+ goal</span>
             <span className="text-right">2+ goals</span><span className="text-right">3+ goals</span>
-            <span className="text-right">First goal</span>
+            <span className="text-right">First goal</span><span className="text-right">Assist 1+</span>
           </div>
-          {rows.map((r) => (
-            <div key={r.shirt} className="grid grid-cols-[minmax(0,1fr)_5rem_5rem_5rem_5.5rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0">
-              <span className="min-w-0 truncate pr-2 text-ink-hi">
-                <span className="mr-2 font-mono text-[11px] text-ink-faint">#{r.shirt}</span>{r.player}
-                {r.starts < r.matches && <span className="ml-2 font-mono text-[9px] uppercase tracking-wider text-ink-faint">rotation</span>}
-              </span>
-              <span className="text-right font-mono tabular-nums text-ink-hi">{pct(r.anytime)}</span>
-              <span className="text-right font-mono tabular-nums text-ink-mid">{r.p2 != null ? pct(r.p2) : "—"}</span>
-              <span className="text-right font-mono tabular-nums text-ink-mid">{r.p3 != null ? pct(r.p3) : "—"}</span>
-              <span className="text-right font-mono tabular-nums text-ink-mid">{pct(r.first_goal)}</span>
-            </div>
-          ))}
+          {rows.map((r) => {
+            const gm = (n: number) => r.match_goal_markets?.find((g) => g.n === n);
+            const cell = (model: number | undefined, n: number) => {
+              const m = gm(n);
+              return (
+                <span className="text-right">
+                  <span className="font-mono tabular-nums text-ink-hi">{model != null ? pct(model) : "—"}</span>
+                  {m && m.multiplier != null && (
+                    <span className={`block font-mono text-[10px] tabular-nums ${
+                      (m.edge ?? -1) >= 0 ? "text-accent" : "text-neg"}`}>
+                      @{m.multiplier.toFixed(2)}x{m.edge != null ? ` ${signedPct(m.edge)}` : ""}
+                    </span>
+                  )}
+                </span>
+              );
+            };
+            const ast = r.assist_markets?.find((a) => a.n === 1);
+            return (
+              <div key={r.shirt} className="grid grid-cols-[minmax(0,1fr)_6rem_6rem_6rem_5rem_5.5rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0">
+                <span className="min-w-0 truncate pr-2 text-ink-hi">
+                  <span className="mr-2 font-mono text-[11px] text-ink-faint">#{r.shirt}</span>{r.player}
+                  {r.starts < r.matches && <span className="ml-2 font-mono text-[9px] uppercase tracking-wider text-ink-faint">rotation</span>}
+                </span>
+                {cell(r.anytime, 1)}
+                {cell(r.p2, 2)}
+                {cell(r.p3, 3)}
+                <span className="text-right font-mono tabular-nums text-ink-mid">{pct(r.first_goal)}</span>
+                <span className="text-right font-mono tabular-nums text-ink-mid">
+                  {ast && ast.multiplier != null ? `@${ast.multiplier.toFixed(2)}x` : "—"}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
       <p className="mt-3 text-xs leading-relaxed text-ink-faint">
-        {pp.disclaimer} Assists: Kalshi lists no assist markets and FIFA&apos;s
-        match reports publish no assist data — not priced rather than invented.
+        {pp.disclaimer} Goal thresholds show the Kalshi price + anchored edge
+        when a market is listed. Assists show the market price only — FIFA
+        publishes no assist data, so there is no honest assist model.
       </p>
     </div>
   );

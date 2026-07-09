@@ -28,6 +28,9 @@ export interface PredictionSummary {
     p_reach_et: number;
     p_reach_pens: number | null;
     method: string;       // "simulated_et_pens" (knockout) | "half_draw_approx"
+    // method-of-victory breakdown (the strategy engine's scenario atoms)
+    home_win_et?: number; away_win_et?: number;
+    home_win_pens?: number; away_win_pens?: number;
   } | null;
   halves: { first_half: HalfDist; second_half: HalfDist } | null;
 }
@@ -261,6 +264,12 @@ export interface PlayerProp {
   multiplier?: number | null;
   likelihood?: number;  // anchored (0.6 model + 0.4 market)
   edge?: number;
+  // per-match Kalshi props (KXWCGOAL 1+/2+/3+ priced; KXWCAST display-only)
+  match_goal_markets?: { n: number; market_id: string; implied: number;
+                         multiplier: number | null; likelihood?: number;
+                         edge?: number }[];
+  assist_markets?: { n: number; market_id: string; implied: number;
+                     multiplier: number | null }[];
 }
 
 export interface PlayerPropsResponse {
