@@ -96,11 +96,14 @@ export interface LiveMarketRow {
   market_id: string;
   market_title: string;
   outcome_key: string | null;
-  kalshi_odds: number;
-  market_probability: number;
+  // market columns are null on MODEL-ONLY rows (Kalshi closed/settled the
+  // book in play; the live read still shows the model's number)
+  kalshi_odds: number | null;
+  market_probability: number | null;
   live_model_probability: number;
-  difference: number;
+  difference: number | null;
   volume_24h: number;
+  model_only?: boolean;
 }
 
 export interface LivePredictionResponse {

@@ -353,21 +353,25 @@ export default function LivePanel({ matchId }: { matchId: string }) {
                 </tr>
               </thead>
               <tbody>
-                {res.markets.slice(0, 15).map((m) => (
+                {res.markets.map((m) => (
                   <tr key={m.market_id} className="border-t border-line transition-colors hover:bg-elev">
                     <td className="px-4 py-2.5 text-ink-hi">{m.market_title}</td>
                     <td className="px-3 py-2.5 text-right font-mono tabular-nums text-skylive">
                       {pct(m.live_model_probability)}
                     </td>
                     <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink-mid">
-                      {pct(m.market_probability)}
+                      {m.market_probability != null ? pct(m.market_probability) : "—"}
                     </td>
                     <td className={`px-3 py-2.5 text-right font-mono tabular-nums ${
-                      m.difference >= 0 ? "text-accent" : "text-neg"
+                      m.difference == null ? "text-ink-faint"
+                        : m.difference >= 0 ? "text-accent" : "text-neg"
                     }`}>
-                      {m.difference >= 0 ? "+" : ""}{(m.difference * 100).toFixed(1)}%
+                      {m.difference == null ? "—"
+                        : `${m.difference >= 0 ? "+" : ""}${(m.difference * 100).toFixed(1)}%`}
                     </td>
-                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink-mid">{m.kalshi_odds.toFixed(2)}x</td>
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink-mid">
+                      {m.kalshi_odds != null ? `${m.kalshi_odds.toFixed(2)}x` : "—"}
+                    </td>
                   </tr>
                 ))}
               </tbody>

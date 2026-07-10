@@ -96,9 +96,13 @@ function LiveMarketStream({ a, home, away }: {
             <div key={r.market_id} className="grid grid-cols-[minmax(0,1fr)_6rem_5.5rem_5rem] items-center gap-x-3 border-b border-line px-4 py-2 text-sm last:border-b-0">
               <span className="min-w-0 truncate pr-2 text-ink-mid" title={r.market_title}>{r.market_title}</span>
               <span className="text-right font-mono tabular-nums text-ink-hi">{pct(r.live_model_probability)}</span>
-              <span className="text-right font-mono tabular-nums text-ink-low">{pct(r.market_probability)}</span>
-              <span className={`text-right font-mono tabular-nums ${r.difference >= 0 ? "text-accent" : "text-neg"}`}>
-                {signedPct(r.difference)}
+              <span className="text-right font-mono tabular-nums text-ink-low">
+                {r.market_probability != null ? pct(r.market_probability) : "—"}
+              </span>
+              <span className={`text-right font-mono tabular-nums ${
+                r.difference == null ? "text-ink-faint"
+                  : r.difference >= 0 ? "text-accent" : "text-neg"}`}>
+                {r.difference != null ? signedPct(r.difference) : "—"}
               </span>
             </div>
           ))}
