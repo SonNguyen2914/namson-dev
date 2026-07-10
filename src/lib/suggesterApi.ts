@@ -36,7 +36,7 @@ export interface PredictionSummary {
 }
 
 export interface PredictionResponse {
-  freshness: "cached" | "fresh";
+  freshness: "cached" | "fresh" | "locked";
   match_id: string;
   generated_at: string;
   age_seconds: number;
