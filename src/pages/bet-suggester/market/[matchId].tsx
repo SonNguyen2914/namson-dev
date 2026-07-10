@@ -949,8 +949,15 @@ function StrategySection({ markets, summary, home, away }: {
 }) {
   const [tier, setTier] = useState<"low" | "med" | "high">("low");
   const [fund, setFund] = useState(100);
+  // sizing: dutch the WHOLE fund, or stake the Kelly fraction of it.
+  // Kelly for a strategy winning with prob p at net profit b per $1:
+  // f* = p - (1-p)/b — the growth-optimal stake; 0 when the EV is negative.
+  const [sizing, setSizing] = useState<"full" | "kelly">("full");
   // build-it-yourself: the user's own contract selection, same math
   const [sel, setSel] = useState<Set<string>>(new Set());
+
+  const kellyF = (p: number, b: number) =>
+    b > 0 ? Math.max(0, p - (1 - p) / b) : 0;
 
   const netOdds = (impliedP: number) => {
     const cost = impliedP + 0.07 * impliedP * (1 - impliedP); // Kalshi fee
@@ -1033,15 +1040,17 @@ function StrategySection({ markets, summary, home, away }: {
   const best = inBand[0];
 
   const invSum = best ? best.legs.reduce((s2, c) => s2 + 1 / c.odds, 0) : 1;
+  const autoF = best ? (sizing === "kelly" ? kellyF(best.p, best.profit) : 1) : 1;
+  const staked = fund * autoF;
   const rows = best ? best.legs.map((c) => ({
-    ...c, stake: (fund * (1 / c.odds)) / invSum,
+    ...c, stake: (staked * (1 / c.odds)) / invSum,
   })) : [];
-  const payoutIfWin = best ? fund * (1 + best.profit) : 0;
+  const payoutIfWin = best ? staked * (1 + best.profit) : 0;
   const lossAtoms = best
     ? atoms.map((a, i) => ({ ...a, i })).filter((a) => !(best.mask & (1 << a.i)))
         .sort((a, b) => b.p - a.p)
     : [];
-  const ev = best ? best.p * best.profit * fund - (1 - best.p) * fund : 0;
+  const ev = best ? best.p * best.profit * staked - (1 - best.p) * staked : 0;
 
   const tierMeta = {
     low: "Wins 60-100% of the time — covers most scenarios, small profit.",
@@ -1056,11 +1065,13 @@ function StrategySection({ markets, summary, home, away }: {
   const selP = atoms.reduce(
     (s2, a, i) => (selMask & (1 << i) ? s2 + a.p : s2), 0);
   const selProfit = selLegs.length ? 1 / selInv - 1 : 0;
+  const selF = sizing === "kelly" ? kellyF(selP, selProfit) : 1;
+  const selStaked = fund * selF;
   const selRows = selLegs.map((c) => ({
-    ...c, stake: (fund * (1 / c.odds)) / selInv,
+    ...c, stake: (selStaked * (1 / c.odds)) / selInv,
   }));
-  const selPayout = fund * (1 + selProfit);
-  const selEv = selP * selProfit * fund - (1 - selP) * fund;
+  const selPayout = selStaked * (1 + selProfit);
+  const selEv = selP * selProfit * selStaked - (1 - selP) * selStaked;
   const selLoss = atoms.map((a, i) => ({ ...a, i }))
     .filter((a) => !(selMask & (1 << a.i))).sort((a, b) => b.p - a.p);
   const selMixesEt = selLegs.some((c) => ET_REFINEMENT_KEYS.has(c.key))
@@ -1101,7 +1112,23 @@ function StrategySection({ markets, summary, home, away }: {
             onChange={(e) => setFund(Math.max(1, Number(e.target.value) || 1))}
             className="w-24 rounded-lg border border-line bg-bs px-2.5 py-1.5 font-mono text-sm tabular-nums text-ink-hi outline-none focus:border-accent/60" />
         </div>
-        <span className="font-mono text-[11px] text-ink-faint">entire fund is staked</span>
+        <div className="flex gap-1.5">
+          {([["full", "Stake it all"], ["kelly", "Kelly sizing"]] as const).map(([id, label]) => (
+            <button key={id} onClick={() => setSizing(id)}
+              title={id === "kelly"
+                ? "Stake the growth-optimal fraction: f* = p − (1−p)/profit. $0 when the strategy is negative-EV."
+                : "Dutch the entire fund across the legs"}
+              className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors ${
+                sizing === id ? "border-accent/60 bg-accent/10 text-accent"
+                              : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <span className="font-mono text-[11px] text-ink-faint">
+          {sizing === "full" ? "entire fund is staked"
+            : "stake only the Kelly fraction — the rest stays in your pocket"}
+        </span>
       </div>
 
       {!ft ? (
@@ -1115,6 +1142,19 @@ function StrategySection({ markets, summary, home, away }: {
         </p>
       ) : (
         <>
+          {sizing === "kelly" && (
+            autoF > 0 ? (
+              <p className="mb-4 rounded-lg border border-accent/25 bg-accent/5 px-3 py-2 font-mono text-xs text-accent">
+                Kelly stakes {pct(autoF)} of your fund → ${staked.toFixed(2)} in
+                play, ${(fund - staked).toFixed(2)} stays in your pocket.
+              </p>
+            ) : (
+              <p className="mb-4 rounded-lg border border-warn/25 bg-warn/5 px-3 py-2 text-xs text-warn">
+                Kelly stakes $0 — this strategy is negative-EV at current
+                prices, so the growth-optimal bet is no bet.
+              </p>
+            )
+          )}
           <div className="mb-4 grid grid-cols-3 gap-3">
             <div className="rounded-xl border border-line bg-bs p-3">
               <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">Strategy wins</p>
@@ -1125,7 +1165,7 @@ function StrategySection({ markets, summary, home, away }: {
               <p className={`mt-1 font-mono text-xl tabular-nums ${best.profit >= 0 ? "text-accent" : "text-neg"}`}>
                 {signedPct(best.profit)}
               </p>
-              <p className="font-mono text-[10px] tabular-nums text-ink-faint">${fund.toFixed(0)} → ${payoutIfWin.toFixed(2)}</p>
+              <p className="font-mono text-[10px] tabular-nums text-ink-faint">${staked.toFixed(2)} → ${payoutIfWin.toFixed(2)}</p>
             </div>
             <div className="rounded-xl border border-line bg-bs p-3">
               <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">Expected value</p>
@@ -1159,7 +1199,7 @@ function StrategySection({ markets, summary, home, away }: {
           </div>
 
           <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-neg">
-            You lose your ${fund.toFixed(0)} only if ({lossAtoms.length} scenario{lossAtoms.length === 1 ? "" : "s"}):
+            You lose your ${staked.toFixed(staked % 1 ? 2 : 0)} only if ({lossAtoms.length} scenario{lossAtoms.length === 1 ? "" : "s"}):
           </p>
           <ul className="space-y-1.5">
             {lossAtoms.map((a) => (
@@ -1233,6 +1273,19 @@ function StrategySection({ markets, summary, home, away }: {
                   your fund.
                 </p>
               )}
+              {sizing === "kelly" && (
+                selF > 0 ? (
+                  <p className="mb-4 rounded-lg border border-accent/25 bg-accent/5 px-3 py-2 font-mono text-xs text-accent">
+                    Kelly stakes {pct(selF)} of your fund → ${selStaked.toFixed(2)} in
+                    play, ${(fund - selStaked).toFixed(2)} stays in your pocket.
+                  </p>
+                ) : (
+                  <p className="mb-4 rounded-lg border border-warn/25 bg-warn/5 px-3 py-2 text-xs text-warn">
+                    Kelly stakes $0 — this build is negative-EV at current
+                    prices, so the growth-optimal bet is no bet.
+                  </p>
+                )
+              )}
               <div className="mb-4 grid grid-cols-3 gap-3">
                 <div className="rounded-xl border border-line bg-bs p-3">
                   <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">Strategy wins</p>
@@ -1243,7 +1296,7 @@ function StrategySection({ markets, summary, home, away }: {
                   <p className={`mt-1 font-mono text-xl tabular-nums ${selProfit >= 0 ? "text-accent" : "text-neg"}`}>
                     {signedPct(selProfit)}
                   </p>
-                  <p className="font-mono text-[10px] tabular-nums text-ink-faint">${fund.toFixed(0)} → ${selPayout.toFixed(2)}</p>
+                  <p className="font-mono text-[10px] tabular-nums text-ink-faint">${selStaked.toFixed(2)} → ${selPayout.toFixed(2)}</p>
                 </div>
                 <div className="rounded-xl border border-line bg-bs p-3">
                   <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">Expected value</p>
@@ -1271,7 +1324,7 @@ function StrategySection({ markets, summary, home, away }: {
               </div>
 
               <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-neg">
-                You lose your ${fund.toFixed(0)} only if ({selLoss.length} scenario{selLoss.length === 1 ? "" : "s"}):
+                You lose your ${selStaked.toFixed(selStaked % 1 ? 2 : 0)} only if ({selLoss.length} scenario{selLoss.length === 1 ? "" : "s"}):
               </p>
               <ul className="space-y-1.5">
                 {selLoss.map((a) => (
