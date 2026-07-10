@@ -1222,27 +1222,73 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
     return [...best.values()];
   })();
 
+  // Overlapping legs are ALLOWED — that's real betting ("Spain to win" plus
+  // "exact 2-0" boosts the 2-0 scenario, paying both). The engine just
+  // refuses to pretend the payout is flat: it computes each scenario's NET
+  // (every leg that pays, minus the whole stake) and presents the honest
+  // PAYOUT LADDER. Stakes auto-split ∝ 1/odds across your legs; when the
+  // legs happen to be disjoint the ladder collapses to the classic flat
+  // dutch with a single win rung.
   const selLegs = diyContracts.filter((c) => sel.has(c.key));
-  const selMask = selLegs.reduce((m2, c) => m2 | c.mask, 0n);
   const selInv = selLegs.reduce((s2, c) => s2 + 1 / c.odds, 0);
-  const selP = fineAtoms.reduce(
-    (s2, at, i) => (selMask & (1n << BigInt(i))) !== 0n ? s2 + at.p : s2, 0);
-  const selProfit = selLegs.length ? 1 / selInv - 1 : 0;
-  const selF = sizing === "kelly" ? kellyF(selP, selProfit) : 1;
+  // full-stake ($fund) net PnL per scenario
+  const atomPnlFull = fineAtoms.map((at, i) => {
+    let ret = 0;
+    for (const c of selLegs) {
+      if ((c.mask & (1n << BigInt(i))) !== 0n) {
+        ret += (fund * (1 / c.odds) / selInv) * c.odds;
+      }
+    }
+    return ret - fund;
+  });
+  // Kelly over the ladder: maximize E[ln(1 + f·r)] numerically (the closed
+  // formula only covers flat two-outcome payoffs). Golden-ish ternary search
+  // is plenty at this scale.
+  const kellyLadder = (): number => {
+    const r = atomPnlFull.map((v) => v / fund);
+    const growth = (f: number) => fineAtoms.reduce(
+      (s2, at, i) => s2 + at.p * Math.log(Math.max(1e-9, 1 + f * r[i])), 0);
+    let lo = 0, hi = 0.999;
+    for (let it = 0; it < 80; it++) {
+      const a = lo + (hi - lo) / 3, b = hi - (hi - lo) / 3;
+      if (growth(a) < growth(b)) lo = a; else hi = b;
+    }
+    const f = (lo + hi) / 2;
+    return growth(f) > growth(0) + 1e-12 ? f : 0;
+  };
+  const selF = selLegs.length === 0 ? 1
+    : sizing === "kelly" ? kellyLadder() : 1;
   const selStaked = fund * selF;
   const selRows = selLegs.map((c) => ({
     ...c, stake: (selStaked * (1 / c.odds)) / selInv,
   }));
-  const selPayout = selStaked * (1 + selProfit);
-  const selEv = selP * selProfit * selStaked - (1 - selP) * selStaked;
+  // the ladder at the chosen sizing: distinct net outcomes, grouped
+  type Rung = { pnl: number; p: number; labels: string[] };
+  const rungMap = new Map<number, Rung>();
+  fineAtoms.forEach((at, i) => {
+    const pnl = Math.round(selF * atomPnlFull[i] * 100) / 100;
+    const r = rungMap.get(pnl) ?? { pnl, p: 0, labels: [] };
+    r.p += at.p;
+    if (r.labels.length < 3) r.labels.push(at.label);
+    else if (r.labels.length === 3) r.labels.push("…");
+    rungMap.set(pnl, r);
+  });
+  const rungs = selLegs.length
+    ? [...rungMap.values()].sort((a, b) => b.pnl - a.pnl) : [];
+  const selP = rungs.filter((r) => r.pnl > 1e-9)
+    .reduce((s2, r) => s2 + r.p, 0);
+  const selEv = rungs.reduce((s2, r) => s2 + r.p * r.pnl, 0);
+  const selBest = rungs.length ? rungs[0] : null;
+  // losing scenarios, individually (existing style): amount + probability
   const selLossAll = fineAtoms
-    .map((at, i) => ({ ...at, i }))
-    .filter((at) => (selMask & (1n << BigInt(at.i))) === 0n)
+    .map((at, i) => ({ ...at, i, pnl: selF * atomPnlFull[i] }))
+    .filter((at) => at.pnl < -1e-9)
     .sort((x, y) => y.p - x.p);
-  // keep the page calm: top scenarios named, the tail aggregated
   const selLoss = selLossAll.slice(0, 8);
   const selLossRest = selLossAll.slice(8);
   const selLossRestP = selLossRest.reduce((s2, at) => s2 + at.p, 0);
+  const selMaxLoss = selLossAll.length
+    ? Math.min(...selLossAll.map((a) => a.pnl)) : 0;
   const toggleSel = (k: string) =>
     setSel((prev) => {
       const n = new Set(prev);
@@ -1324,14 +1370,15 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
         ) : (
           <>
             <p className="mb-4 text-[11px] leading-relaxed text-ink-faint">
-              Pick any legs; the engine dutches your stake so every covered
-              scenario pays the same, and lists exactly when you lose.
-              Scenarios here are exact 90-minute scorelines (drawn ones split
-              by how the tie is decided), so totals, BTTS, exact scores and
-              margins can all join. Legs overlapping a scenario you already
-              hold are greyed out. First-goal markets can&apos;t join — their
-              payoff depends on the path, not the score — and rare unlisted
-              scorelines count AGAINST you, always shown as a loss scenario.
+              Pick any legs — overlapping ones included: &quot;Spain to
+              win&quot; plus &quot;exact 2-0&quot; boosts the 2-0 scenario and
+              the payout ladder below shows each distinct outcome honestly.
+              Stakes auto-split across legs ∝ 1/odds. Scenarios are exact
+              90-minute scorelines (drawn ones split by how the tie is
+              decided), so totals, BTTS, exact scores and margins all join.
+              First-goal markets can&apos;t — their payoff depends on the
+              path, not the score — and rare unlisted scorelines count
+              AGAINST you, always listed as losses.
             </p>
             {DIY_GROUPS.map((g) => {
               const items = diyContracts.filter((c) => g.test(c.key));
@@ -1349,15 +1396,11 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
                     <div className="grid gap-1.5 sm:grid-cols-2">
                       {items.map((c) => {
                         const picked = sel.has(c.key);
-                        const overlaps = !picked && (selMask & c.mask) !== 0n;
                         return (
-                          <button key={c.key} onClick={() => !overlaps && toggleSel(c.key)}
-                            disabled={overlaps}
+                          <button key={c.key} onClick={() => toggleSel(c.key)}
                             className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
                               picked ? "border-accent/60 bg-accent/10 text-ink-hi"
-                                : overlaps ? "cursor-not-allowed border-line text-ink-faint opacity-50"
-                                : "border-line text-ink-mid hover:border-line-strong hover:text-ink-hi"}`}
-                            title={overlaps ? "Overlaps a scenario your current picks already cover" : undefined}>
+                                : "border-line text-ink-mid hover:border-line-strong hover:text-ink-hi"}`}>
                             <span className={`inline-block h-3.5 w-3.5 shrink-0 rounded border ${
                               picked ? "border-accent bg-accent/70" : "border-line-strong"}`} />
                             <span className="min-w-0 flex-1 truncate">{c.title}</span>
@@ -1398,17 +1441,46 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
                     <p className={`mt-1 font-mono text-xl tabular-nums ${selP >= 0.6 ? "text-accent" : "text-ink-hi"}`}>{pct(selP)}</p>
                   </div>
                   <div className="rounded-xl border border-line bg-bs p-3">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">Profit if it wins</p>
-                    <p className={`mt-1 font-mono text-xl tabular-nums ${selProfit >= 0 ? "text-accent" : "text-neg"}`}>
-                      {signedPct(selProfit)}
+                    <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">Best case</p>
+                    <p className={`mt-1 font-mono text-xl tabular-nums ${(selBest?.pnl ?? 0) >= 0 ? "text-accent" : "text-neg"}`}>
+                      {(selBest?.pnl ?? 0) >= 0 ? "+" : "−"}${Math.abs(selBest?.pnl ?? 0).toFixed(2)}
                     </p>
-                    <p className="font-mono text-[10px] tabular-nums text-ink-faint">${selStaked.toFixed(2)} → ${selPayout.toFixed(2)}</p>
+                    <p className="font-mono text-[10px] tabular-nums text-ink-faint">
+                      {selBest ? `${pct(selBest.p)} chance` : ""}
+                    </p>
                   </div>
                   <div className="rounded-xl border border-line bg-bs p-3">
                     <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">Expected value</p>
                     <p className={`mt-1 font-mono text-xl tabular-nums ${selEv >= 0 ? "text-accent" : "text-neg"}`}>
                       {selEv >= 0 ? "+" : "−"}${Math.abs(selEv).toFixed(2)}
                     </p>
+                  </div>
+                </div>
+
+                {/* the payout ladder — every distinct net outcome this build
+                    can produce; one flat rung when the legs are disjoint,
+                    boosted rungs when they overlap */}
+                <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">
+                  Payout ladder
+                </p>
+                <div className="mb-4 overflow-x-auto rounded-xl border border-line">
+                  <div className="min-w-[480px]">
+                    <div className="grid grid-cols-[minmax(0,1fr)_5rem_6rem] items-center gap-x-3 border-b border-line bg-bs px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
+                      <span>Outcome</span>
+                      <span className="text-right">Chance</span>
+                      <span className="text-right">Net</span>
+                    </div>
+                    {rungs.map((r) => (
+                      <div key={r.pnl} className="grid grid-cols-[minmax(0,1fr)_5rem_6rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0">
+                        <span className="min-w-0 truncate pr-2 text-ink-mid" title={r.labels.join(" · ")}>
+                          {r.labels.join(" · ")}
+                        </span>
+                        <span className="text-right font-mono tabular-nums text-ink-low">{pct(r.p)}</span>
+                        <span className={`text-right font-mono tabular-nums ${r.pnl >= 0 ? "text-accent" : "text-neg"}`}>
+                          {r.pnl >= 0 ? "+" : "−"}${Math.abs(r.pnl).toFixed(2)}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -1430,13 +1502,15 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
                 </div>
 
                 <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-neg">
-                  You lose your ${selStaked.toFixed(selStaked % 1 ? 2 : 0)} only if ({selLossAll.length} scenario{selLossAll.length === 1 ? "" : "s"}):
+                  You lose money only if ({selLossAll.length} scenario{selLossAll.length === 1 ? "" : "s"}, worst −${Math.abs(selMaxLoss).toFixed(2)}):
                 </p>
                 <ul className="space-y-1.5">
                   {selLoss.map((a) => (
                     <li key={a.id} className="flex items-baseline justify-between gap-3 text-sm">
                       <span className="text-ink-mid">✗ {a.label}</span>
-                      <span className="shrink-0 font-mono text-xs tabular-nums text-ink-low">{pct(a.p)}</span>
+                      <span className="shrink-0 font-mono text-xs tabular-nums text-ink-low">
+                        {pct(a.p)} · <span className="text-neg">−${Math.abs(a.pnl).toFixed(2)}</span>
+                      </span>
                     </li>
                   ))}
                   {selLossRest.length > 0 && (
@@ -1446,7 +1520,7 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
                     </li>
                   )}
                   {selLossAll.length === 0 && (
-                    <li className="text-sm text-ink-mid">✓ nothing — every scenario is covered (profit is the vig-adjusted spread)</li>
+                    <li className="text-sm text-ink-mid">✓ nothing — every scenario nets positive (profit is the vig-adjusted spread)</li>
                   )}
                 </ul>
                 <button onClick={() => setSel(new Set())}
