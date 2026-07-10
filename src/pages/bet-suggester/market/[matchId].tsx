@@ -999,6 +999,39 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
   const kellyF = (p: number, b: number) =>
     b > 0 ? Math.max(0, p - (1 - p) / b) : 0;
 
+  // Canonical picker order — reads like a bet menu, not a price dump:
+  // home / draw / away, then advance, then the draw's method legs (ET
+  // before pens, home before away); totals ascending, overs before
+  // unders; margins home-then-away ascending; exact scores as home wins
+  // (1-0, 2-0, 2-1, 3-0…), draws (0-0, 1-1…), then away wins (0-1, 0-2…).
+  const diyRank = (k: string): number => {
+    const fixed: Record<string, number> = {
+      home_win: 0, draw: 1, away_win: 2,
+      home_advance: 3, away_advance: 4,
+      home_win_et: 5, home_win_pens: 6,
+      away_win_et: 7, away_win_pens: 8,
+      btts: 40, no_goal: 41,
+    };
+    if (k in fixed) return fixed[k];
+    let m = k.match(/^over_(\d+)_5$/);
+    if (m) return 10 + Number(m[1]);
+    m = k.match(/^under_(\d+)_5$/);
+    if (m) return 20 + Number(m[1]);
+    m = k.match(/^home_margin_(\d+)$/);
+    if (m) return 50 + Number(m[1]);
+    m = k.match(/^away_margin_(\d+)$/);
+    if (m) return 60 + Number(m[1]);
+    m = k.match(/^score_(\d+)_(\d+)$/);
+    if (m) {
+      const h = Number(m[1]), a = Number(m[2]);
+      if (h > a) return 100 + h * 10 + a;
+      if (h === a) return 300 + h;
+      return 400 + a * 10 + h;
+    }
+    return 999;
+  };
+
+
   const netOdds = (impliedP: number) => {
     const cost = impliedP + 0.07 * impliedP * (1 - impliedP); // Kalshi fee
     return cost > 0 ? 1 / cost : 0;
@@ -1259,9 +1292,9 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
   const selF = selLegs.length === 0 ? 1
     : sizing === "kelly" ? kellyLadder() : 1;
   const selStaked = fund * selF;
-  const selRows = selLegs.map((c) => ({
-    ...c, stake: (selStaked * (1 / c.odds)) / selInv,
-  }));
+  const selRows = [...selLegs]
+    .sort((x, y) => diyRank(x.key) - diyRank(y.key))
+    .map((c) => ({ ...c, stake: (selStaked * (1 / c.odds)) / selInv }));
   // the ladder at the chosen sizing: distinct net outcomes, grouped
   type Rung = { pnl: number; p: number; labels: string[] };
   const rungMap = new Map<number, Rung>();
@@ -1381,7 +1414,8 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
               AGAINST you, always listed as losses.
             </p>
             {DIY_GROUPS.map((g) => {
-              const items = diyContracts.filter((c) => g.test(c.key));
+              const items = diyContracts.filter((c) => g.test(c.key))
+                .sort((x, y) => diyRank(x.key) - diyRank(y.key));
               if (!items.length) return null;
               const open = diyOpen.has(g.label);
               return (
