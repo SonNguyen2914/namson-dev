@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   api, countdown, flag, pct, signedPct, kickoffLocal,
-  RipenessAlert, SuggestionRow, UpcomingMatch, WatchlistEntry, PastMatch,
+  RipenessAlert, SuggestionRow, UpcomingMatch, WatchlistEntry,
 } from "../../lib/suggesterApi";
 import LiveScoreboard from "../../components/LiveScoreboard";
 import BracketView from "../../components/BracketView";
@@ -28,7 +28,6 @@ export default function BetSuggesterDashboard() {
   const [suggestions, setSuggestions] = useState<SuggestionRow[]>([]);
   const [tierUsed, setTierUsed] = useState<number | null>(null);
   const [matches, setMatches] = useState<UpcomingMatch[]>([]);
-  const [pastMatches, setPastMatches] = useState<PastMatch[]>([]);
   const [watchlist, setWatchlist] = useState<WatchlistEntry[]>([]);
   const [ripeAlerts, setRipeAlerts] = useState<RipenessAlert[]>([]);
   const [alertThreshold, setAlertThreshold] = useState(75);
@@ -46,9 +45,8 @@ export default function BetSuggesterDashboard() {
 
   const load = useCallback(async () => {
     try {
-      const [s, m, wl, al, pm] = await Promise.all([
+      const [s, m, wl, al] = await Promise.all([
         api.suggestions(), api.upcoming(72), api.watchlist(), api.alerts(),
-        api.pastMatches().catch(() => ({ past: [], generated_at: "" })),
       ]);
       setSuggestions(s.suggestions);
       setTierUsed(s.tier_used);
@@ -56,7 +54,6 @@ export default function BetSuggesterDashboard() {
       setWatchlist(wl.watchlist);
       setAlertThreshold(wl.alert_threshold);
       setRipeAlerts(al.alerts);
-      setPastMatches(pm.past);
       setUpdatedAt(new Date());
       setSecsToRefresh(POLL_MS / 1000);
       setError("");
@@ -168,7 +165,6 @@ export default function BetSuggesterDashboard() {
       <TopBar title="WC26 · Bet Suggester">
         <NavChip href="#bracket">Bracket</NavChip>
         <NavChip href="#board">Best bets</NavChip>
-        <NavChip href="#results">Results</NavChip>
       </TopBar>
 
       {/* ===================== SHOWCASE ZONE ===================== */}
@@ -457,37 +453,6 @@ export default function BetSuggesterDashboard() {
                     </span>
                   </div>
                 </div>
-              ))}
-            </div>
-          </section>
-          </Reveal>
-        )}
-
-        {/* Past matches — finished, with final scores */}
-        {pastMatches.length > 0 && (
-          <Reveal>
-          <section id="results" className="mt-20">
-            <Eyebrow className="mb-2">results</Eyebrow>
-            <h3 className="mb-4 text-lg font-medium text-ink-hi">Past matches</h3>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {pastMatches.map((p) => (
-                <Link key={p.match_id} href={`/bet-suggester/market/${p.match_id}`} className="block">
-                  <div className="cursor-pointer rounded-xl border border-line p-4 transition-colors hover:border-line-strong hover:bg-elev">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="truncate text-sm text-ink-mid">
-                        {flag(p.home)} {p.home} <span className="text-ink-faint">vs</span> {p.away} {flag(p.away)}
-                      </p>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <span className="font-mono text-base tabular-nums text-ink-hi">
-                          {p.home_goals}–{p.away_goals}
-                        </span>
-                        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
-                          {p.status_short}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
               ))}
             </div>
           </section>

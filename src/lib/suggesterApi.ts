@@ -243,6 +243,7 @@ export interface BracketMatch {
 
 export interface BracketResponse {
   champion_forecast?: { team: string; p: number } | null;
+  round_of_16?: BracketMatch[];
   quarterfinals: BracketMatch[];
   semifinals: BracketMatch[];
   third_place: BracketMatch[];
@@ -315,6 +316,44 @@ export interface TeamNewsResponse {
   reason?: string;
   home?: { starters: LineupPlayer[]; bench: LineupPlayer[] };
   away?: { starters: LineupPlayer[]; bench: LineupPlayer[] };
+}
+
+export interface ResearchLockRow {
+  market_id: string;
+  market_title?: string | null;
+  outcome_key?: string | null;
+  model_probability: number;
+  kalshi_odds?: number | null;
+  implied_probability?: number | null;
+  edge?: number | null;
+  confidence?: number | null;
+  locked_at?: string | null;
+}
+
+export interface ResearchClosingRow {
+  market_id: string;
+  title?: string | null;
+  status?: string | null;
+  result?: string | null;       // "yes" | "no" | "" while unsettled
+  yes_bid?: string | null;
+  yes_ask?: string | null;
+  last_price?: string | number | null;
+  volume?: number | null;
+}
+
+export interface ResearchResponse {
+  match_id: string;
+  home_team: string;
+  away_team: string;
+  result: {
+    home_goals: number; away_goals: number; status_short: string;
+    finished_at?: string | null;
+    goals: { team: string; player?: string | null; minute?: number | null }[];
+  } | null;
+  final_lock: ResearchLockRow[];
+  closing: ResearchClosingRow[];
+  last_readings: { market_id: string; yes_price: number;
+    model_probability?: number | null; edge?: number | null }[];
 }
 
 export interface ReferenceOddsRow {
@@ -428,6 +467,9 @@ export const api = {
 
   referenceOdds: (matchId: string) =>
     getJson<ReferenceOddsResponse>(`/reference-odds/${matchId}`),
+
+  research: (matchId: string) =>
+    getJson<ResearchResponse>(`/research/${matchId}`),
 
   pastMatches: () => getJson<PastMatchesResponse>("/past-matches"),
 

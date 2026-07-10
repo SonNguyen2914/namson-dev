@@ -11,7 +11,7 @@ import {
   api, flag, pct, signedPct, countdown, kickoffLocal,
   PredictionResponse, PredictionSummary, HalfDist, MarketPrediction,
   PlayerPropsResponse, TeamNewsResponse,
-  ReferenceOddsResponse,
+  ReferenceOddsResponse, ResearchResponse,
   TimelinePoint, TeamInfoResponse, TeamBlurb,
 } from "../../../lib/suggesterApi";
 import { Eyebrow, Reveal } from "../../../components/ui";
@@ -56,6 +56,7 @@ export default function MatchDetail() {
   const [teamInfo, setTeamInfo] = useState<TeamInfoResponse | null>(null);
   const [pProps, setPProps] = useState<PlayerPropsResponse | null>(null);
   const [news, setNews] = useState<TeamNewsResponse | null>(null);
+  const [research, setResearch] = useState<ResearchResponse | null>(null);
   const [, setClock] = useState(0); // 1s tick — drives the hero countdown
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -109,6 +110,12 @@ export default function MatchDetail() {
         const pp = await api.playerProps(matchId);
         if (alive && pp.available) setPProps(pp);
       } catch { /* no player data — section won't render */ }
+      // Post-match research record (result + settlement); renders only
+      // once the match is over and a closing snapshot exists.
+      try {
+        const rs = await api.research(matchId);
+        if (alive && rs.result && rs.closing.length) setResearch(rs);
+      } catch { /* no settlement view */ }
     })();
     // Team news: kickoff/venue for the hero + official lineups once posted
     // (~1h before kickoff). Polled so a viewer parked on the page catches the
@@ -343,6 +350,16 @@ export default function MatchDetail() {
               <Stat label={`${away} xG`} value={pred.xg.away.toFixed(2)} />
               <Stat label="model confidence" value={pct(pred.confidence)} />
             </section>
+          </Reveal>
+        )}
+
+        {/* Settlement — the research record, once the match is over: what
+            settled, at what closing price, vs the T-10 locked model view */}
+        {research && research.result && (
+          <Reveal>
+            <Collapse eyebrow="research" title={`Settlement · ${research.home_team} ${research.result.home_goals}–${research.result.away_goals} ${research.away_team} (${research.result.status_short})`}>
+              <SettlementSection rs={research} />
+            </Collapse>
           </Reveal>
         )}
 
@@ -720,6 +737,64 @@ function ReferenceOddsTab({ ro }: { ro: ReferenceOddsResponse | null }) {
         only where the simulation states that exact number (win/draw/win,
         exact scorelines) — the difference includes the books&apos; vig, so it
         is not a tradeable edge.
+      </p>
+    </div>
+  );
+}
+
+// Settlement table — one row per market from the post-match closing
+// snapshot, with the T-10 LOCKED model probability beside it when the lock
+// survived (it lives in the DB; wiped-era matches honestly show a dash).
+function SettlementSection({ rs }: { rs: ResearchResponse }) {
+  const lockById = new Map(rs.final_lock.map((l) => [l.market_id, l]));
+  const rows = [...rs.closing].sort((a, b) =>
+    (b.result === "yes" ? 1 : 0) - (a.result === "yes" ? 1 : 0)
+    || (a.title || a.market_id).localeCompare(b.title || b.market_id));
+  const won = rows.filter((r) => r.result === "yes").length;
+  return (
+    <div>
+      <p className="mb-3 text-[11px] leading-relaxed text-ink-faint">
+        Every priced market&apos;s settlement and closing price, captured when
+        the match froze. The model column is the T-10 locked probability —
+        the number the model committed to 10 minutes before kickoff.
+        {rs.final_lock.length === 0 &&
+          " (No lock survived for this match — it predates persistent storage.)"}
+      </p>
+      <div className="overflow-x-auto rounded-xl border border-line">
+        <div className="min-w-[560px]">
+          <div className="grid grid-cols-[minmax(0,1fr)_5rem_5.5rem_6.5rem] items-center gap-x-3 border-b border-line bg-bs px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
+            <span>Market</span>
+            <span className="text-right">Settled</span>
+            <span className="text-right">Close</span>
+            <span className="text-right">Model (T-10)</span>
+          </div>
+          {rows.map((r) => {
+            const lock = lockById.get(r.market_id);
+            const close = r.last_price != null && r.last_price !== ""
+              ? Number(r.last_price) : null;
+            return (
+              <div key={r.market_id} className="grid grid-cols-[minmax(0,1fr)_5rem_5.5rem_6.5rem] items-center gap-x-3 border-b border-line px-4 py-2 text-sm last:border-b-0">
+                <span className="min-w-0 truncate pr-2 text-ink-mid" title={r.market_id}>
+                  {r.title || r.market_id}
+                </span>
+                <span className={`text-right font-mono text-xs uppercase tracking-wider ${
+                  r.result === "yes" ? "text-accent" : r.result === "no" ? "text-ink-faint" : "text-warn"}`}>
+                  {r.result || "open"}
+                </span>
+                <span className="text-right font-mono tabular-nums text-ink-mid">
+                  {close != null && !Number.isNaN(close) ? `${Math.round(close * 100)}¢` : "—"}
+                </span>
+                <span className="text-right font-mono tabular-nums text-ink-hi">
+                  {lock ? pct(lock.model_probability) : "—"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <p className="mt-3 text-xs leading-relaxed text-ink-faint">
+        {won} of {rows.length} markets settled yes. This is the raw research
+        record: locked model vs closing price vs what actually happened.
       </p>
     </div>
   );
