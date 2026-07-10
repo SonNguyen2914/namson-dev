@@ -7,7 +7,7 @@
 // no match is live, so it never clutters the page pre-match.
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { api, flag, LiveScoreEntry, TeamNewsResponse } from "../lib/suggesterApi";
+import { api, flag, LiveScoreEntry, LiveStatsResponse, TeamNewsResponse } from "../lib/suggesterApi";
 import { Eyebrow, Flash, Reveal } from "./ui";
 import { Collapse } from "./chrome";
 import LivePanel from "./LivePanel";
@@ -53,6 +53,7 @@ export default function LiveScoreboard() {
 // navigate.
 function LiveExtras({ m }: { m: LiveScoreEntry }) {
   const [news, setNews] = useState<TeamNewsResponse | null>(null);
+  const [stats, setStats] = useState<LiveStatsResponse | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -64,11 +65,48 @@ function LiveExtras({ m }: { m: LiveScoreEntry }) {
     };
     load();
     const id = setInterval(load, 300000); // squads are settled; 5 min is plenty
-    return () => { alive = false; clearInterval(id); };
+    // broadcast stat card — moves with the match, 30s cadence
+    const loadStats = async () => {
+      try {
+        const st = await api.liveStats(m.match_id);
+        if (alive && st.available) setStats(st);
+      } catch { /* stats stay hidden */ }
+    };
+    loadStats();
+    const id2 = setInterval(loadStats, 30000);
+    return () => { alive = false; clearInterval(id); clearInterval(id2); };
   }, [m.match_id]);
 
   return (
     <div className="mt-8 border-t border-line pt-6">
+      {stats && stats.rows.length > 0 && (
+        <Collapse eyebrow="live" title="Match stats" className="mb-6">
+          <div className="space-y-2.5">
+            {stats.rows.map((r) => {
+              const h = parseFloat(r.home) || 0;
+              const a = parseFloat(r.away) || 0;
+              const tot = h + a;
+              const pctH = tot > 0 ? (h / tot) * 100 : 50;
+              return (
+                <div key={r.key}>
+                  <div className="flex items-baseline justify-between gap-3 text-sm">
+                    <span className="w-14 shrink-0 font-mono tabular-nums text-ink-hi">{r.home}</span>
+                    <span className="min-w-0 truncate text-center text-xs text-ink-low">{r.label}</span>
+                    <span className="w-14 shrink-0 text-right font-mono tabular-nums text-ink-hi">{r.away}</span>
+                  </div>
+                  <div className="mt-1 flex h-1 gap-0.5 overflow-hidden rounded-full">
+                    <div className="rounded-full bg-accent/70" style={{ width: `${pctH}%` }} />
+                    <div className="flex-1 rounded-full bg-elev2" />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-3 text-[11px] text-ink-faint">
+            {stats.home_team} left · {stats.away_team} right — via ESPN, ~30s behind the broadcast.
+          </p>
+        </Collapse>
+      )}
       {news && (
         <Collapse eyebrow="team news" title="Official lineups" className="mb-6">
           <TeamNewsSection news={news} home={m.home} away={m.away} />

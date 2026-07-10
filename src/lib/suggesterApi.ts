@@ -306,6 +306,14 @@ export interface LineupPlayer {
   pos?: string | null;
 }
 
+export interface LiveStatsResponse {
+  match_id: string;
+  home_team: string;
+  away_team: string;
+  available: boolean;
+  rows: { key: string; label: string; home: string; away: string }[];
+}
+
 export interface TeamNewsResponse {
   match_id: string;
   home_team: string;
@@ -464,6 +472,9 @@ export const api = {
 
   teamNews: (matchId: string) =>
     getJson<TeamNewsResponse>(`/team-news/${matchId}`),
+
+  liveStats: (matchId: string) =>
+    getJson<LiveStatsResponse>(`/live-stats/${matchId}`),
 
   referenceOdds: (matchId: string) =>
     getJson<ReferenceOddsResponse>(`/reference-odds/${matchId}`),
