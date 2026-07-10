@@ -988,7 +988,10 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
   away: string;
 }) {
   const [tier, setTier] = useState<"low" | "med" | "high" | "diy">("low");
-  const [fund, setFund] = useState(100);
+  // The fund input holds a STRING so the field can be fully cleared while
+  // typing a new amount; the math uses the clamped numeric view.
+  const [fundStr, setFundStr] = useState("100");
+  const fund = Math.max(1, Math.min(1000000, Number(fundStr) || 0));
   // sizing: dutch the WHOLE fund, or stake the Kelly fraction of it.
   // Kelly for a strategy winning with prob p at net profit b per $1:
   // f* = p - (1-p)/b — the growth-optimal stake; 0 when the EV is negative.
@@ -1131,10 +1134,35 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
     ...c, stake: (staked * (1 / c.odds)) / invSum,
   })) : [];
   const payoutIfWin = best ? staked * (1 + best.profit) : 0;
-  const lossAtoms = best
-    ? atoms.map((a, i) => ({ ...a, i })).filter((a) => !(best.mask & (1 << a.i)))
-        .sort((a, b) => b.p - a.p)
-    : [];
+  // Merge near-identical loss rows: the four "draw, then X in ET/pens"
+  // lines collapse to one when the whole draw region is lost, or to a
+  // per-side line when that side's ET+pens pair is lost together — the
+  // same outcome either way, with far less noise.
+  const lossAtoms = (() => {
+    if (!best) return [] as { id: string; label: string; p: number }[];
+    const lost = atoms
+      .map((a, i) => ({ ...a, i }))
+      .filter((a) => !(best.mask & (1 << a.i)));
+    const ids = new Set(lost.map((a) => a.id));
+    const merged: { id: string; label: string; p: number }[] = [];
+    const used = new Set<string>();
+    const take = (group: string[], label: string) => {
+      if (group.every((g) => ids.has(g) && !used.has(g))) {
+        merged.push({
+          id: group.join("+"), label,
+          p: lost.filter((a) => group.includes(a.id))
+            .reduce((s2, a) => s2 + a.p, 0),
+        });
+        group.forEach((g) => used.add(g));
+      }
+    };
+    take(["DHet", "DAet", "DHp", "DAp"],
+         "draw after 90′ — however it gets decided");
+    take(["DHet", "DHp"], `draw, then ${home} wins it (ET or pens)`);
+    take(["DAet", "DAp"], `draw, then ${away} wins it (ET or pens)`);
+    for (const a of lost) if (!used.has(a.id)) merged.push(a);
+    return merged.sort((a, b) => b.p - a.p);
+  })();
   const ev = best ? best.p * best.profit * staked - (1 - best.p) * staked : 0;
 
   const tierMeta = {
@@ -1295,17 +1323,51 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
   const selRows = [...selLegs]
     .sort((x, y) => diyRank(x.key) - diyRank(y.key))
     .map((c) => ({ ...c, stake: (selStaked * (1 / c.odds)) / selInv }));
+  // Display atoms: a drawn score's four decider variants merge back into
+  // ONE row whenever they all land the same net — "1-1 then home in ET /
+  // 1-1 then home on pens / …" is near-identical noise unless an ET/pens
+  // leg actually makes the decider matter.
+  type Disp = { id: string; label: string; p: number; pnl: number };
+  const dispAtoms: Disp[] = (() => {
+    if (!selLegs.length) return [];
+    const out: Disp[] = [];
+    const byScore = new Map<string, Disp[]>();
+    fineAtoms.forEach((at, i) => {
+      const row: Disp = {
+        id: at.id, label: at.label, p: at.p,
+        pnl: Math.round(selF * atomPnlFull[i] * 100) / 100,
+      };
+      if (at.h === at.a && !at.other) {
+        const k = `${at.h}_${at.a}`;
+        byScore.set(k, [...(byScore.get(k) ?? []), row]);
+      } else {
+        out.push(row);
+      }
+    });
+    for (const [k, group] of byScore) {
+      if (group.length > 1 && group.every((g) => g.pnl === group[0].pnl)) {
+        const score = k.replace("_", "-");
+        out.push({ id: `D${k}`,
+                   label: `${score} draw — however it gets decided`,
+                   p: group.reduce((s2, g) => s2 + g.p, 0),
+                   pnl: group[0].pnl });
+      } else {
+        out.push(...group);
+      }
+    }
+    return out;
+  })();
+
   // the ladder at the chosen sizing: distinct net outcomes, grouped
   type Rung = { pnl: number; p: number; labels: string[] };
   const rungMap = new Map<number, Rung>();
-  fineAtoms.forEach((at, i) => {
-    const pnl = Math.round(selF * atomPnlFull[i] * 100) / 100;
-    const r = rungMap.get(pnl) ?? { pnl, p: 0, labels: [] };
+  for (const at of dispAtoms) {
+    const r = rungMap.get(at.pnl) ?? { pnl: at.pnl, p: 0, labels: [] };
     r.p += at.p;
     if (r.labels.length < 3) r.labels.push(at.label);
     else if (r.labels.length === 3) r.labels.push("…");
-    rungMap.set(pnl, r);
-  });
+    rungMap.set(at.pnl, r);
+  }
   const rungs = selLegs.length
     ? [...rungMap.values()].sort((a, b) => b.pnl - a.pnl) : [];
   const selP = rungs.filter((r) => r.pnl > 1e-9)
@@ -1313,9 +1375,8 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
   const selEv = rungs.reduce((s2, r) => s2 + r.p * r.pnl, 0);
   const selBest = rungs.length ? rungs[0] : null;
   // losing scenarios, individually (existing style): amount + probability
-  const selLossAll = fineAtoms
-    .map((at, i) => ({ ...at, i, pnl: selF * atomPnlFull[i] }))
-    .filter((at) => at.pnl < -1e-9)
+  const selLossAll = dispAtoms
+    .filter((at) => at.pnl < -0.005)
     .sort((x, y) => y.p - x.p);
   const selLoss = selLossAll.slice(0, 8);
   const selLossRest = selLossAll.slice(8);
@@ -1372,8 +1433,9 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
         <span className="text-sm text-ink-mid">Fund to divide</span>
         <div className="flex items-center gap-1">
           <span className="font-mono text-sm text-ink-low">$</span>
-          <input type="number" min={1} max={1000000} value={fund}
-            onChange={(e) => setFund(Math.max(1, Number(e.target.value) || 1))}
+          <input type="number" min={1} max={1000000} value={fundStr}
+            onChange={(e) => setFundStr(e.target.value)}
+            onBlur={() => setFundStr(String(fund))}
             className="w-24 rounded-lg border border-line bg-bs px-2.5 py-1.5 font-mono text-sm tabular-nums text-ink-hi outline-none focus:border-accent/60" />
         </div>
         <div className="flex gap-1.5">
