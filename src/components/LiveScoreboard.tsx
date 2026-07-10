@@ -7,7 +7,7 @@
 // no match is live, so it never clutters the page pre-match.
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { api, flag, LiveScoreEntry, LiveStatsResponse, TeamNewsResponse } from "../lib/suggesterApi";
+import { api, flag, pct, signedPct, LiveAutoResponse, LiveScoreEntry, LiveStatsResponse, TeamNewsResponse } from "../lib/suggesterApi";
 import { Eyebrow, Flash, Reveal } from "./ui";
 import { Collapse } from "./chrome";
 import LivePanel from "./LivePanel";
@@ -51,9 +51,72 @@ export default function LiveScoreboard() {
 // (backend caches ESPN for 60s), the LivePanel manages its own state per
 // match id. Rendered outside the score block's Link so controls don't
 // navigate.
+// The hands-free live read: the backend re-simulates the remainder every
+// ~30s from the real state + live shot stats (levers derived, echoed, and
+// capped) and prices every open market. Informational — the market already
+// knows the score, so differences are a read, not a signal.
+function LiveMarketStream({ a, home, away }: {
+  a: LiveAutoResponse; home: string; away: string;
+}) {
+  const adv = a.live_advance;
+  const lev = a.levers;
+  const rows = [...(a.markets ?? [])]
+    .sort((x, y) => y.live_model_probability - x.live_model_probability);
+  return (
+    <div>
+      {adv && (
+        <div className="mb-3 grid grid-cols-2 gap-3">
+          <div className="rounded-xl border border-line bg-bs p-3">
+            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">{home} advances</p>
+            <p className="mt-1 font-mono text-xl tabular-nums text-ink-hi">{pct(adv.home)}</p>
+          </div>
+          <div className="rounded-xl border border-line bg-bs p-3">
+            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">{away} advances</p>
+            <p className="mt-1 font-mono text-xl tabular-nums text-ink-hi">{pct(adv.away)}</p>
+          </div>
+        </div>
+      )}
+      {lev && (
+        <p className="mb-3 font-mono text-[11px] text-ink-low"
+          title={lev.basis
+            ? `SoT ${lev.basis.sot_home}-${lev.basis.sot_away} · shots ${lev.basis.shots_home}-${lev.basis.shots_away} · share ${lev.basis.actual_share_home} vs expected ${lev.basis.expected_share_home} · weight ${lev.basis.weight}`
+            : undefined}>
+          auto levers · {lev.source}: {home} {lev.home.toFixed(2)}× / {away} {lev.away.toFixed(2)}×
+        </p>
+      )}
+      <div className="overflow-x-auto rounded-xl border border-line">
+        <div className="min-w-[520px]">
+          <div className="grid grid-cols-[minmax(0,1fr)_6rem_5.5rem_5rem] items-center gap-x-3 border-b border-line bg-bs px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
+            <span>Market</span>
+            <span className="text-right">Live model</span>
+            <span className="text-right">Market</span>
+            <span className="text-right">Δ</span>
+          </div>
+          {rows.map((r) => (
+            <div key={r.market_id} className="grid grid-cols-[minmax(0,1fr)_6rem_5.5rem_5rem] items-center gap-x-3 border-b border-line px-4 py-2 text-sm last:border-b-0">
+              <span className="min-w-0 truncate pr-2 text-ink-mid" title={r.market_title}>{r.market_title}</span>
+              <span className="text-right font-mono tabular-nums text-ink-hi">{pct(r.live_model_probability)}</span>
+              <span className="text-right font-mono tabular-nums text-ink-low">{pct(r.market_probability)}</span>
+              <span className={`text-right font-mono tabular-nums ${r.difference >= 0 ? "text-accent" : "text-neg"}`}>
+                {signedPct(r.difference)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
+        Re-simulated every ~30s from the live state and shot stats. The
+        market already knows the score — differences are a read, not an
+        edge. Hover the levers for their full derivation.
+      </p>
+    </div>
+  );
+}
+
 function LiveExtras({ m }: { m: LiveScoreEntry }) {
   const [news, setNews] = useState<TeamNewsResponse | null>(null);
   const [stats, setStats] = useState<LiveStatsResponse | null>(null);
+  const [auto, setAuto] = useState<LiveAutoResponse | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -74,11 +137,25 @@ function LiveExtras({ m }: { m: LiveScoreEntry }) {
     };
     loadStats();
     const id2 = setInterval(loadStats, 30000);
-    return () => { alive = false; clearInterval(id); clearInterval(id2); };
+    // the self-running live read: same 30s cycle as the stats
+    const loadAuto = async () => {
+      try {
+        const la = await api.liveAuto(m.match_id);
+        if (alive && la.available) setAuto(la);
+      } catch { /* stream stays hidden */ }
+    };
+    loadAuto();
+    const id3 = setInterval(loadAuto, 30000);
+    return () => { alive = false; clearInterval(id); clearInterval(id2); clearInterval(id3); };
   }, [m.match_id]);
 
   return (
     <div className="mt-8 border-t border-line pt-6">
+      {auto && auto.available && (
+        <Collapse eyebrow="live model" title="Live market read · auto" className="mb-6">
+          <LiveMarketStream a={auto} home={m.home} away={m.away} />
+        </Collapse>
+      )}
       {stats && stats.rows.length > 0 && (
         <Collapse eyebrow="live" title="Match stats" className="mb-6">
           <div className="space-y-2.5">

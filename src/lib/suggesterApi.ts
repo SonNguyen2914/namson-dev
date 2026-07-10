@@ -130,6 +130,30 @@ export interface LivePredictionResponse {
   disclaimer: string;
 }
 
+export interface LiveAutoResponse {
+  match_id: string;
+  available: boolean;
+  reason?: string;
+  teams?: { home: string; away: string };
+  live_state?: LivePredictionResponse["live_state"];
+  live_outcomes?: { home_win: number; draw: number; away_win: number };
+  live_advance?: LivePredictionResponse["live_advance"];
+  markets?: LiveMarketRow[];
+  levers?: {
+    home: number; away: number; source: string;
+    basis?: {
+      sot_home: number; sot_away: number;
+      shots_home: number; shots_away: number;
+      actual_share_home: number; expected_share_home: number;
+      minutes: number; weight: number; cap: number[];
+    } | null;
+  };
+  status_short?: string;
+  stats_available?: boolean;
+  generated_at?: string;
+  disclaimer?: string;
+}
+
 export interface LiveStateFetch {
   available: boolean;
   match_id: string;
@@ -475,6 +499,9 @@ export const api = {
 
   liveStats: (matchId: string) =>
     getJson<LiveStatsResponse>(`/live-stats/${matchId}`),
+
+  liveAuto: (matchId: string) =>
+    getJson<LiveAutoResponse>(`/live-auto/${matchId}`),
 
   referenceOdds: (matchId: string) =>
     getJson<ReferenceOddsResponse>(`/reference-odds/${matchId}`),
