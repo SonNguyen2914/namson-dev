@@ -35,6 +35,15 @@ const MARKET_GROUPS: { id: string; label: string; test: (k: string | null | unde
 
 type MktSortKey = "likelihood" | "edge" | "multiplier";
 
+// ET/pens contracts are a REFINEMENT of a draw-first thesis, never a side
+// bet: "France wins in extra time" is only a sane leg once you've already
+// decided the 90 minutes end level. The strategy engine therefore allows
+// them only in candidates made ENTIRELY of ET/pens legs (main bet = the
+// draw, next step = who wins it), never mixed with 90-minute winners.
+const ET_REFINEMENT_KEYS = new Set([
+  "home_win_et", "away_win_et", "home_win_pens", "away_win_pens",
+]);
+
 
 export default function MatchDetail() {
   const router = useRouter();
@@ -940,6 +949,8 @@ function StrategySection({ markets, summary, home, away }: {
 }) {
   const [tier, setTier] = useState<"low" | "med" | "high">("low");
   const [fund, setFund] = useState(100);
+  // build-it-yourself: the user's own contract selection, same math
+  const [sel, setSel] = useState<Set<string>>(new Set());
 
   const netOdds = (impliedP: number) => {
     const cost = impliedP + 0.07 * impliedP * (1 - impliedP); // Kalshi fee
@@ -973,15 +984,25 @@ function StrategySection({ markets, summary, home, away }: {
   } : { home_win: ["H90"], draw: ["D"], away_win: ["A90"] };
 
   // ---- contracts: one per outcome_key, with fee-netted odds ----
-  const contracts = markets
-    .filter((m) => m.outcome_key && covers[m.outcome_key] && m.implied_probability > 0.005)
-    .map((m) => {
-      let mask = 0;
-      for (const id of covers[m.outcome_key!]) mask |= 1 << atomIdx.get(id)!;
-      return { key: m.outcome_key!, title: m.market_title, mask,
-               odds: netOdds(m.implied_probability), implied: m.implied_probability };
-    })
-    .filter((c) => c.odds > 1);
+  // Dedupe to the best (highest net) odds per outcome_key: two tickers for
+  // the same real bet should never appear as separate strategy legs.
+  const contracts = (() => {
+    const raw = markets
+      .filter((m) => m.outcome_key && covers[m.outcome_key] && m.implied_probability > 0.005)
+      .map((m) => {
+        let mask = 0;
+        for (const id of covers[m.outcome_key!]) mask |= 1 << atomIdx.get(id)!;
+        return { key: m.outcome_key!, title: m.market_title, mask,
+                 odds: netOdds(m.implied_probability), implied: m.implied_probability };
+      })
+      .filter((c) => c.odds > 1);
+    const best = new Map<string, (typeof raw)[number]>();
+    for (const c of raw) {
+      const cur = best.get(c.key);
+      if (!cur || c.odds > cur.odds) best.set(c.key, c);
+    }
+    return [...best.values()];
+  })();
 
   // ---- enumerate every disjoint cover; dutch it ----
   type Cand = { legs: typeof contracts; mask: number; p: number; profit: number };
@@ -997,6 +1018,9 @@ function StrategySection({ markets, summary, home, away }: {
       mask |= c.mask; invSum += 1 / c.odds; legs.push(c);
     }
     if (!ok || legs.length === 0) continue;
+    // draw-first rule: ET/pens legs only in pure draw-refinement candidates
+    const hasEt = legs.some((c) => ET_REFINEMENT_KEYS.has(c.key));
+    if (hasEt && legs.some((c) => !ET_REFINEMENT_KEYS.has(c.key))) continue;
     let p = 0;
     atoms.forEach((a, i) => { if (mask & (1 << i)) p += a.p; });
     cands.push({ legs, mask, p, profit: 1 / invSum - 1 });
@@ -1024,6 +1048,29 @@ function StrategySection({ markets, summary, home, away }: {
     med: "Wins 40-60% of the time — fewer scenarios covered, bigger profit.",
     high: "Wins <40% of the time — few scenarios, maximum return.",
   } as const;
+
+  // ---- build-it-yourself derived values (same math as the auto strategy) ----
+  const selLegs = contracts.filter((c) => sel.has(c.key));
+  const selMask = selLegs.reduce((m2, c) => m2 | c.mask, 0);
+  const selInv = selLegs.reduce((s2, c) => s2 + 1 / c.odds, 0);
+  const selP = atoms.reduce(
+    (s2, a, i) => (selMask & (1 << i) ? s2 + a.p : s2), 0);
+  const selProfit = selLegs.length ? 1 / selInv - 1 : 0;
+  const selRows = selLegs.map((c) => ({
+    ...c, stake: (fund * (1 / c.odds)) / selInv,
+  }));
+  const selPayout = fund * (1 + selProfit);
+  const selEv = selP * selProfit * fund - (1 - selP) * fund;
+  const selLoss = atoms.map((a, i) => ({ ...a, i }))
+    .filter((a) => !(selMask & (1 << a.i))).sort((a, b) => b.p - a.p);
+  const selMixesEt = selLegs.some((c) => ET_REFINEMENT_KEYS.has(c.key))
+    && selLegs.some((c) => !ET_REFINEMENT_KEYS.has(c.key));
+  const toggleSel = (k: string) =>
+    setSel((prev) => {
+      const n = new Set(prev);
+      if (n.has(k)) n.delete(k); else n.add(k);
+      return n;
+    });
 
   return (
     <section className="rounded-2xl border border-line bg-elev p-5 sm:p-6">
@@ -1130,9 +1177,120 @@ function StrategySection({ markets, summary, home, away }: {
             are dutched so any covered outcome pays the same. Goal-based
             markets (totals, BTTS, exact scores) are excluded — their payoff
             isn&apos;t fixed by these scenarios, so they can&apos;t join a
-            lose-only-if guarantee.
+            lose-only-if guarantee. Extra-time / penalty legs appear only as
+            the second step of a draw-first thesis, never mixed with
+            90-minute winners.
           </p>
         </>
+      )}
+
+      {/* ---- build it yourself: pick the legs, get the same math ---- */}
+      {ft && contracts.length > 0 && (
+        <div className="mt-8 border-t border-line pt-6">
+          <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">
+            build it yourself
+          </p>
+          <p className="mb-4 text-[11px] leading-relaxed text-ink-faint">
+            Pick your own contracts; the engine dutches your fund across them
+            and shows exactly when you win and when you lose. Legs that cover
+            a scenario you already hold are greyed out — overlapping legs
+            can&apos;t give a lose-only-if guarantee.
+          </p>
+          <div className="mb-4 grid gap-1.5 sm:grid-cols-2">
+            {contracts.map((c) => {
+              const picked = sel.has(c.key);
+              const overlaps = !picked && (selMask & c.mask) !== 0;
+              return (
+                <button key={c.key} onClick={() => !overlaps && toggleSel(c.key)}
+                  disabled={overlaps}
+                  className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                    picked ? "border-accent/60 bg-accent/10 text-ink-hi"
+                      : overlaps ? "cursor-not-allowed border-line text-ink-faint opacity-50"
+                      : "border-line text-ink-mid hover:border-line-strong hover:text-ink-hi"}`}
+                  title={overlaps ? "Overlaps a scenario your current picks already cover" : undefined}>
+                  <span className={`inline-block h-3.5 w-3.5 shrink-0 rounded border ${
+                    picked ? "border-accent bg-accent/70" : "border-line-strong"}`} />
+                  <span className="min-w-0 flex-1 truncate">{c.title}</span>
+                  <span className="shrink-0 font-mono text-xs tabular-nums text-ink-low">
+                    {c.odds.toFixed(2)}x
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {selLegs.length === 0 ? (
+            <p className="rounded-xl border border-line p-4 text-sm text-ink-low">
+              Pick one or more contracts above to price your strategy.
+            </p>
+          ) : (
+            <>
+              {selMixesEt && (
+                <p className="mb-4 rounded-lg border border-warn/25 bg-warn/5 px-3 py-2 text-xs text-warn">
+                  You&apos;re mixing an extra-time/penalty leg with a 90-minute
+                  winner. ET/pens bets are the second step of a draw-first
+                  thesis — the auto strategies never mix them, but it&apos;s
+                  your fund.
+                </p>
+              )}
+              <div className="mb-4 grid grid-cols-3 gap-3">
+                <div className="rounded-xl border border-line bg-bs p-3">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">Strategy wins</p>
+                  <p className={`mt-1 font-mono text-xl tabular-nums ${selP >= 0.6 ? "text-accent" : "text-ink-hi"}`}>{pct(selP)}</p>
+                </div>
+                <div className="rounded-xl border border-line bg-bs p-3">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">Profit if it wins</p>
+                  <p className={`mt-1 font-mono text-xl tabular-nums ${selProfit >= 0 ? "text-accent" : "text-neg"}`}>
+                    {signedPct(selProfit)}
+                  </p>
+                  <p className="font-mono text-[10px] tabular-nums text-ink-faint">${fund.toFixed(0)} → ${selPayout.toFixed(2)}</p>
+                </div>
+                <div className="rounded-xl border border-line bg-bs p-3">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">Expected value</p>
+                  <p className={`mt-1 font-mono text-xl tabular-nums ${selEv >= 0 ? "text-accent" : "text-neg"}`}>
+                    {selEv >= 0 ? "+" : "−"}${Math.abs(selEv).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mb-4 overflow-x-auto rounded-xl border border-line">
+                <div className="min-w-[520px]">
+                  <div className="grid grid-cols-[minmax(0,1fr)_5.5rem_6rem_6rem] items-center gap-x-3 border-b border-line bg-bs px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
+                    <span>Buy</span><span className="text-right">Net mult</span>
+                    <span className="text-right">Stake</span><span className="text-right">Returns</span>
+                  </div>
+                  {selRows.map((r) => (
+                    <div key={r.key} className="grid grid-cols-[minmax(0,1fr)_5.5rem_6rem_6rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0">
+                      <span className="min-w-0 truncate pr-2 text-ink-hi" title={r.title}>{r.title}</span>
+                      <span className="text-right font-mono tabular-nums text-ink-mid">{r.odds.toFixed(2)}x</span>
+                      <span className="text-right font-mono tabular-nums text-accent">${r.stake.toFixed(2)}</span>
+                      <span className="text-right font-mono tabular-nums text-ink-mid">${(r.stake * r.odds).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-neg">
+                You lose your ${fund.toFixed(0)} only if ({selLoss.length} scenario{selLoss.length === 1 ? "" : "s"}):
+              </p>
+              <ul className="space-y-1.5">
+                {selLoss.map((a) => (
+                  <li key={a.id} className="flex items-baseline justify-between gap-3 text-sm">
+                    <span className="text-ink-mid">✗ {a.label}</span>
+                    <span className="shrink-0 font-mono text-xs tabular-nums text-ink-low">{pct(a.p)}</span>
+                  </li>
+                ))}
+                {selLoss.length === 0 && (
+                  <li className="text-sm text-ink-mid">✓ nothing — every scenario is covered (profit is the vig-adjusted spread)</li>
+                )}
+              </ul>
+              <button onClick={() => setSel(new Set())}
+                className="mt-4 rounded-lg border border-line px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-ink-low transition-colors hover:border-line-strong hover:text-ink-mid">
+                Clear picks
+              </button>
+            </>
+          )}
+        </div>
       )}
     </section>
   );
