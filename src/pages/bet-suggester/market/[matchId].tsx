@@ -444,7 +444,8 @@ export default function MatchDetail() {
             {/* Betting strategy — scenario engine + fund divider */}
             <Reveal>
               <Collapse id="strategy" eyebrow="scenario engine" title="Betting strategy">
-                <StrategySection markets={sortedMarkets} summary={pred.summary ?? null} home={home} away={away} />
+                <StrategySection markets={sortedMarkets} summary={pred.summary ?? null}
+                  scorelines={pred.scorelines} home={home} away={away} />
               </Collapse>
             </Reveal>
 
@@ -941,13 +942,14 @@ function ChanceChip({ label, p }: { label: string; p: number }) {
 // atoms, so the loss-scenario list grows. Goal-dependent markets (totals,
 // BTTS, exact scores) are excluded: their payoff isn't determined by the
 // result scenario, so they can't give an "I lose only if X" guarantee.
-function StrategySection({ markets, summary, home, away }: {
+function StrategySection({ markets, summary, scorelines, home, away }: {
   markets: MarketPrediction[];
   summary: PredictionSummary | null;
+  scorelines: { score: string; prob: number }[];
   home: string;
   away: string;
 }) {
-  const [tier, setTier] = useState<"low" | "med" | "high">("low");
+  const [tier, setTier] = useState<"low" | "med" | "high" | "diy">("low");
   const [fund, setFund] = useState(100);
   // sizing: dutch the WHOLE fund, or stake the Kelly fraction of it.
   // Kelly for a strategy winning with prob p at net profit b per $1:
@@ -1025,16 +1027,28 @@ function StrategySection({ markets, summary, home, away }: {
       mask |= c.mask; invSum += 1 / c.odds; legs.push(c);
     }
     if (!ok || legs.length === 0) continue;
-    // draw-first rule: ET/pens legs only in pure draw-refinement candidates
-    const hasEt = legs.some((c) => ET_REFINEMENT_KEYS.has(c.key));
-    if (hasEt && legs.some((c) => !ET_REFINEMENT_KEYS.has(c.key))) continue;
+    // Draw-first rule, strict form: ET/pens legs are only valid when the
+    // candidate's ET/pens legs TOGETHER hold the entire draw region — the
+    // draw is literally the main bet, bought via its method split. A lone
+    // "Belgium wins in ET" is not a thesis: your "main bet" (the draw) can
+    // land and you still lose to penalties.
+    const etMask = legs.reduce(
+      (mm, c) => (ET_REFINEMENT_KEYS.has(c.key) ? mm | c.mask : mm), 0);
+    if (etMask !== 0) {
+      let drawMask = 0;
+      for (const id of ["DHet", "DAet", "DHp", "DAp"]) {
+        const idx = atomIdx.get(id);
+        if (idx != null) drawMask |= 1 << idx;
+      }
+      if (etMask !== drawMask) continue;
+    }
     let p = 0;
     atoms.forEach((a, i) => { if (mask & (1 << i)) p += a.p; });
     cands.push({ legs, mask, p, profit: 1 / invSum - 1 });
   }
 
   const bands = { low: [0.60, 1.001], med: [0.40, 0.60], high: [0, 0.40] } as const;
-  const [lo, hi] = bands[tier];
+  const [lo, hi] = bands[tier === "diy" ? "low" : tier];
   const inBand = cands.filter((c) => c.p >= lo && c.p < hi);
   inBand.sort((a, b) => b.profit - a.profit || b.p - a.p);
   const best = inBand[0];
@@ -1056,14 +1070,125 @@ function StrategySection({ markets, summary, home, away }: {
     low: "Wins 60-100% of the time — covers most scenarios, small profit.",
     med: "Wins 40-60% of the time — fewer scenarios covered, bigger profit.",
     high: "Wins <40% of the time — few scenarios, maximum return.",
+    diy: "Pick your own legs across (almost) every market — the engine prices your thesis with the same math.",
   } as const;
 
-  // ---- build-it-yourself derived values (same math as the auto strategy) ----
-  const selLegs = contracts.filter((c) => sel.has(c.key));
-  const selMask = selLegs.reduce((m2, c) => m2 | c.mask, 0);
+  // ---- build-it-yourself: a FINER scenario space so (almost) every market
+  // can join. Atoms are exact 90-minute scorelines from the simulation;
+  // drawn scores additionally split by method (ET/pens, each side) using
+  // the advance breakdown. Winner/advance/ET/totals/BTTS/exact-score/margin
+  // settlement is a pure function of these atoms. Whatever probability the
+  // top-scoreline list doesn't carry becomes an explicit "any other
+  // scoreline" atom that every leg LOSES on — conservative, and always
+  // listed as a loss scenario, so the guarantee stays honest. First-goal
+  // markets stay out: their payoff depends on the path, not the score.
+  type FineAtom = { id: string; label: string; p: number;
+                    h: number; a: number; method: string; other?: boolean };
+  const fineAtoms: FineAtom[] = (() => {
+    if (!ft) return [];
+    const out: FineAtom[] = [];
+    let listed = 0;
+    const drawTot = (adv?.home_win_et ?? 0) + (adv?.away_win_et ?? 0)
+      + (adv?.home_win_pens ?? 0) + (adv?.away_win_pens ?? 0);
+    for (const s of scorelines) {
+      const [h, a] = s.score.split("-").map(Number);
+      if (Number.isNaN(h) || Number.isNaN(a) || s.prob <= 0) continue;
+      listed += s.prob;
+      if (h !== a) {
+        out.push({ id: `S${h}_${a}`, p: s.prob, h, a,
+                   method: h > a ? "H90" : "A90",
+                   label: `${h > a ? home : away} wins ${h}-${a}` });
+      } else if (fine && drawTot > 0) {
+        const parts: [string, string, number][] = [
+          ["DHet", `then ${home} wins in extra time`, adv!.home_win_et!],
+          ["DAet", `then ${away} wins in extra time`, adv!.away_win_et!],
+          ["DHp", `then ${home} wins on penalties`, adv!.home_win_pens!],
+          ["DAp", `then ${away} wins on penalties`, adv!.away_win_pens!],
+        ];
+        for (const [mth, lbl, w] of parts) {
+          if (w <= 0) continue;
+          out.push({ id: `S${h}_${a}_${mth}`, p: s.prob * (w / drawTot),
+                     h, a, method: mth, label: `${h}-${a}, ${lbl}` });
+        }
+      } else {
+        out.push({ id: `S${h}_${a}_D`, p: s.prob, h, a, method: "D",
+                   label: `${h}-${a} draw after 90′` });
+      }
+    }
+    const rest = Math.max(0, 1 - listed);
+    if (rest > 0.0005) {
+      out.push({ id: "OTHER", p: rest, h: -1, a: -1, method: "OTHER",
+                 other: true,
+                 label: "any other scoreline (unlisted — treated as a loss)" });
+    }
+    return out;
+  })();
+
+  // Does outcome_key k pay on atom `at`? null = not scenario-determined.
+  const coverFine = (k: string, at: FineAtom): boolean | null => {
+    if (at.other) return false;
+    const d = at.h - at.a;
+    if (k === "home_win") return at.method === "H90";
+    if (k === "away_win") return at.method === "A90";
+    if (k === "draw") return at.method.startsWith("D");
+    if (k === "home_advance")
+      return at.method === "H90" || at.method === "DHet" || at.method === "DHp";
+    if (k === "away_advance")
+      return at.method === "A90" || at.method === "DAet" || at.method === "DAp";
+    if (ET_REFINEMENT_KEYS.has(k)) {
+      if (at.method === "D") return null;   // no method split available
+      const map: Record<string, string> = {
+        home_win_et: "DHet", away_win_et: "DAet",
+        home_win_pens: "DHp", away_win_pens: "DAp",
+      };
+      return at.method === map[k];
+    }
+    let m = k.match(/^over_(\d+)_5$/);
+    if (m) return at.h + at.a > Number(m[1]) + 0.5;
+    m = k.match(/^under_(\d+)_5$/);
+    if (m) return at.h + at.a < Number(m[1]) + 0.5;
+    if (k === "btts") return at.h > 0 && at.a > 0;
+    if (k === "no_goal") return at.h === 0 && at.a === 0;
+    m = k.match(/^score_(\d+)_(\d+)$/);
+    if (m) return at.h === Number(m[1]) && at.a === Number(m[2]);
+    m = k.match(/^home_margin_(\d+)$/);
+    if (m) return d >= Number(m[1]);
+    m = k.match(/^away_margin_(\d+)$/);
+    if (m) return -d >= Number(m[1]);
+    return null;
+  };
+
+  const diyContracts = (() => {
+    type Diy = { key: string; title: string; mask: bigint; odds: number };
+    const raw: Diy[] = [];
+    for (const mm of markets) {
+      const k = mm.outcome_key;
+      if (!k || mm.implied_probability <= 0.005) continue;
+      let mask = 0n;
+      let decidable = true;
+      fineAtoms.forEach((at, i) => {
+        const c = coverFine(k, at);
+        if (c === null) decidable = false;
+        else if (c) mask |= 1n << BigInt(i);
+      });
+      const odds = netOdds(mm.implied_probability);
+      if (decidable && mask !== 0n && odds > 1) {
+        raw.push({ key: k, title: mm.market_title, mask, odds });
+      }
+    }
+    const best = new Map<string, Diy>();
+    for (const c of raw) {
+      const cur = best.get(c.key);
+      if (!cur || c.odds > cur.odds) best.set(c.key, c);
+    }
+    return [...best.values()];
+  })();
+
+  const selLegs = diyContracts.filter((c) => sel.has(c.key));
+  const selMask = selLegs.reduce((m2, c) => m2 | c.mask, 0n);
   const selInv = selLegs.reduce((s2, c) => s2 + 1 / c.odds, 0);
-  const selP = atoms.reduce(
-    (s2, a, i) => (selMask & (1 << i) ? s2 + a.p : s2), 0);
+  const selP = fineAtoms.reduce(
+    (s2, at, i) => (selMask & (1n << BigInt(i))) !== 0n ? s2 + at.p : s2, 0);
   const selProfit = selLegs.length ? 1 / selInv - 1 : 0;
   const selF = sizing === "kelly" ? kellyF(selP, selProfit) : 1;
   const selStaked = fund * selF;
@@ -1072,14 +1197,35 @@ function StrategySection({ markets, summary, home, away }: {
   }));
   const selPayout = selStaked * (1 + selProfit);
   const selEv = selP * selProfit * selStaked - (1 - selP) * selStaked;
-  const selLoss = atoms.map((a, i) => ({ ...a, i }))
-    .filter((a) => !(selMask & (1 << a.i))).sort((a, b) => b.p - a.p);
-  const selMixesEt = selLegs.some((c) => ET_REFINEMENT_KEYS.has(c.key))
-    && selLegs.some((c) => !ET_REFINEMENT_KEYS.has(c.key));
+  const selLossAll = fineAtoms
+    .map((at, i) => ({ ...at, i }))
+    .filter((at) => (selMask & (1n << BigInt(at.i))) === 0n)
+    .sort((x, y) => y.p - x.p);
+  // keep the page calm: top scenarios named, the tail aggregated
+  const selLoss = selLossAll.slice(0, 8);
+  const selLossRest = selLossAll.slice(8);
+  const selLossRestP = selLossRest.reduce((s2, at) => s2 + at.p, 0);
   const toggleSel = (k: string) =>
     setSel((prev) => {
       const n = new Set(prev);
       if (n.has(k)) n.delete(k); else n.add(k);
+      return n;
+    });
+  // picker groups (exact scores collapsed by default — 25 rows)
+  const DIY_GROUPS: { label: string; test: (k: string) => boolean; startOpen: boolean }[] = [
+    { label: "Winner · advance · ET/pens", startOpen: true,
+      test: (k) => ["home_win", "draw", "away_win", "home_advance", "away_advance"].includes(k) || ET_REFINEMENT_KEYS.has(k) },
+    { label: "Goals · totals, BTTS", startOpen: true,
+      test: (k) => /^over_|^under_/.test(k) || k === "btts" || k === "no_goal" },
+    { label: "Margins", startOpen: true, test: (k) => /_margin_/.test(k) },
+    { label: "Exact score", startOpen: false, test: (k) => /^score_/.test(k) },
+  ];
+  const [diyOpen, setDiyOpen] = useState<Set<string>>(
+    new Set(DIY_GROUPS.filter((g) => g.startOpen).map((g) => g.label)));
+  const toggleDiyGroup = (label: string) =>
+    setDiyOpen((prev) => {
+      const n = new Set(prev);
+      if (n.has(label)) n.delete(label); else n.add(label);
       return n;
     });
 
@@ -1093,12 +1239,13 @@ function StrategySection({ markets, summary, home, away }: {
       </p>
 
       <div className="mb-3 flex flex-wrap gap-1.5">
-        {(["low", "med", "high"] as const).map((t) => (
+        {(["low", "med", "high", "diy"] as const).map((t) => (
           <button key={t} onClick={() => setTier(t)}
             className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors ${
               tier === t ? "border-accent/60 bg-accent/10 text-accent"
                          : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"}`}>
-            {t === "low" ? "Low risk" : t === "med" ? "Medium risk" : "High risk"}
+            {t === "low" ? "Low risk" : t === "med" ? "Medium risk"
+              : t === "high" ? "High risk" : "Build your own"}
           </button>
         ))}
       </div>
@@ -1131,7 +1278,148 @@ function StrategySection({ markets, summary, home, away }: {
         </span>
       </div>
 
-      {!ft ? (
+      {tier === "diy" ? (
+        !ft || fineAtoms.length === 0 || diyContracts.length === 0 ? (
+          <p className="rounded-xl border border-line p-4 text-sm text-ink-low">
+            Nothing to build from yet — refresh the prediction first.
+          </p>
+        ) : (
+          <>
+            <p className="mb-4 text-[11px] leading-relaxed text-ink-faint">
+              Pick any legs; the engine dutches your stake so every covered
+              scenario pays the same, and lists exactly when you lose.
+              Scenarios here are exact 90-minute scorelines (drawn ones split
+              by how the tie is decided), so totals, BTTS, exact scores and
+              margins can all join. Legs overlapping a scenario you already
+              hold are greyed out. First-goal markets can&apos;t join — their
+              payoff depends on the path, not the score — and rare unlisted
+              scorelines count AGAINST you, always shown as a loss scenario.
+            </p>
+            {DIY_GROUPS.map((g) => {
+              const items = diyContracts.filter((c) => g.test(c.key));
+              if (!items.length) return null;
+              const open = diyOpen.has(g.label);
+              return (
+                <div key={g.label} className="mb-3">
+                  <button onClick={() => toggleDiyGroup(g.label)}
+                    className="mb-1.5 flex w-full items-center gap-2 text-left">
+                    <span className={`text-ink-faint transition-transform ${open ? "rotate-90" : ""}`}>▸</span>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-low">{g.label}</span>
+                    <span className="font-mono text-[10px] text-ink-faint">{items.length}</span>
+                  </button>
+                  {open && (
+                    <div className="grid gap-1.5 sm:grid-cols-2">
+                      {items.map((c) => {
+                        const picked = sel.has(c.key);
+                        const overlaps = !picked && (selMask & c.mask) !== 0n;
+                        return (
+                          <button key={c.key} onClick={() => !overlaps && toggleSel(c.key)}
+                            disabled={overlaps}
+                            className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                              picked ? "border-accent/60 bg-accent/10 text-ink-hi"
+                                : overlaps ? "cursor-not-allowed border-line text-ink-faint opacity-50"
+                                : "border-line text-ink-mid hover:border-line-strong hover:text-ink-hi"}`}
+                            title={overlaps ? "Overlaps a scenario your current picks already cover" : undefined}>
+                            <span className={`inline-block h-3.5 w-3.5 shrink-0 rounded border ${
+                              picked ? "border-accent bg-accent/70" : "border-line-strong"}`} />
+                            <span className="min-w-0 flex-1 truncate">{c.title}</span>
+                            <span className="shrink-0 font-mono text-xs tabular-nums text-ink-low">
+                              {c.odds.toFixed(2)}x
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {selLegs.length === 0 ? (
+              <p className="mt-4 rounded-xl border border-line p-4 text-sm text-ink-low">
+                Pick one or more contracts above to price your strategy.
+              </p>
+            ) : (
+              <div className="mt-5">
+                {sizing === "kelly" && (
+                  selF > 0 ? (
+                    <p className="mb-4 rounded-lg border border-accent/25 bg-accent/5 px-3 py-2 font-mono text-xs text-accent">
+                      Kelly stakes {pct(selF)} of your fund → ${selStaked.toFixed(2)} in
+                      play, ${(fund - selStaked).toFixed(2)} stays in your pocket.
+                    </p>
+                  ) : (
+                    <p className="mb-4 rounded-lg border border-warn/25 bg-warn/5 px-3 py-2 text-xs text-warn">
+                      Kelly stakes $0 — this build is negative-EV at current
+                      prices, so the growth-optimal bet is no bet.
+                    </p>
+                  )
+                )}
+                <div className="mb-4 grid grid-cols-3 gap-3">
+                  <div className="rounded-xl border border-line bg-bs p-3">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">Strategy wins</p>
+                    <p className={`mt-1 font-mono text-xl tabular-nums ${selP >= 0.6 ? "text-accent" : "text-ink-hi"}`}>{pct(selP)}</p>
+                  </div>
+                  <div className="rounded-xl border border-line bg-bs p-3">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">Profit if it wins</p>
+                    <p className={`mt-1 font-mono text-xl tabular-nums ${selProfit >= 0 ? "text-accent" : "text-neg"}`}>
+                      {signedPct(selProfit)}
+                    </p>
+                    <p className="font-mono text-[10px] tabular-nums text-ink-faint">${selStaked.toFixed(2)} → ${selPayout.toFixed(2)}</p>
+                  </div>
+                  <div className="rounded-xl border border-line bg-bs p-3">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">Expected value</p>
+                    <p className={`mt-1 font-mono text-xl tabular-nums ${selEv >= 0 ? "text-accent" : "text-neg"}`}>
+                      {selEv >= 0 ? "+" : "−"}${Math.abs(selEv).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mb-4 overflow-x-auto rounded-xl border border-line">
+                  <div className="min-w-[520px]">
+                    <div className="grid grid-cols-[minmax(0,1fr)_5.5rem_6rem_6rem] items-center gap-x-3 border-b border-line bg-bs px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
+                      <span>Buy</span><span className="text-right">Net mult</span>
+                      <span className="text-right">Stake</span><span className="text-right">Returns</span>
+                    </div>
+                    {selRows.map((r) => (
+                      <div key={r.key} className="grid grid-cols-[minmax(0,1fr)_5.5rem_6rem_6rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0">
+                        <span className="min-w-0 truncate pr-2 text-ink-hi" title={r.title}>{r.title}</span>
+                        <span className="text-right font-mono tabular-nums text-ink-mid">{r.odds.toFixed(2)}x</span>
+                        <span className="text-right font-mono tabular-nums text-accent">${r.stake.toFixed(2)}</span>
+                        <span className="text-right font-mono tabular-nums text-ink-mid">${(r.stake * r.odds).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-neg">
+                  You lose your ${selStaked.toFixed(selStaked % 1 ? 2 : 0)} only if ({selLossAll.length} scenario{selLossAll.length === 1 ? "" : "s"}):
+                </p>
+                <ul className="space-y-1.5">
+                  {selLoss.map((a) => (
+                    <li key={a.id} className="flex items-baseline justify-between gap-3 text-sm">
+                      <span className="text-ink-mid">✗ {a.label}</span>
+                      <span className="shrink-0 font-mono text-xs tabular-nums text-ink-low">{pct(a.p)}</span>
+                    </li>
+                  ))}
+                  {selLossRest.length > 0 && (
+                    <li className="flex items-baseline justify-between gap-3 text-sm">
+                      <span className="text-ink-low">✗ …{selLossRest.length} more rare scoreline scenarios</span>
+                      <span className="shrink-0 font-mono text-xs tabular-nums text-ink-low">{pct(selLossRestP)}</span>
+                    </li>
+                  )}
+                  {selLossAll.length === 0 && (
+                    <li className="text-sm text-ink-mid">✓ nothing — every scenario is covered (profit is the vig-adjusted spread)</li>
+                  )}
+                </ul>
+                <button onClick={() => setSel(new Set())}
+                  className="mt-4 rounded-lg border border-line px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-ink-low transition-colors hover:border-line-strong hover:text-ink-mid">
+                  Clear picks
+                </button>
+              </div>
+            )}
+          </>
+        )
+      ) : !ft ? (
         <p className="rounded-xl border border-line p-4 text-sm text-ink-low">
           Prediction summary unavailable — refresh the prediction first.
         </p>
@@ -1215,136 +1503,14 @@ function StrategySection({ markets, summary, home, away }: {
           <p className="mt-4 text-xs leading-relaxed text-ink-faint">
             Scenario probabilities come from the pure-model simulation; stakes
             are dutched so any covered outcome pays the same. Goal-based
-            markets (totals, BTTS, exact scores) are excluded — their payoff
-            isn&apos;t fixed by these scenarios, so they can&apos;t join a
-            lose-only-if guarantee. Extra-time / penalty legs appear only as
-            the second step of a draw-first thesis, never mixed with
-            90-minute winners.
+            markets stay out of the AUTO tiers (use Build your own to combine
+            them). Extra-time / penalty legs appear only when together they
+            hold the entire draw region — the draw is the main bet, bought
+            via its method split — never as a lone side bet.
           </p>
         </>
       )}
 
-      {/* ---- build it yourself: pick the legs, get the same math ---- */}
-      {ft && contracts.length > 0 && (
-        <div className="mt-8 border-t border-line pt-6">
-          <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">
-            build it yourself
-          </p>
-          <p className="mb-4 text-[11px] leading-relaxed text-ink-faint">
-            Pick your own contracts; the engine dutches your fund across them
-            and shows exactly when you win and when you lose. Legs that cover
-            a scenario you already hold are greyed out — overlapping legs
-            can&apos;t give a lose-only-if guarantee.
-          </p>
-          <div className="mb-4 grid gap-1.5 sm:grid-cols-2">
-            {contracts.map((c) => {
-              const picked = sel.has(c.key);
-              const overlaps = !picked && (selMask & c.mask) !== 0;
-              return (
-                <button key={c.key} onClick={() => !overlaps && toggleSel(c.key)}
-                  disabled={overlaps}
-                  className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                    picked ? "border-accent/60 bg-accent/10 text-ink-hi"
-                      : overlaps ? "cursor-not-allowed border-line text-ink-faint opacity-50"
-                      : "border-line text-ink-mid hover:border-line-strong hover:text-ink-hi"}`}
-                  title={overlaps ? "Overlaps a scenario your current picks already cover" : undefined}>
-                  <span className={`inline-block h-3.5 w-3.5 shrink-0 rounded border ${
-                    picked ? "border-accent bg-accent/70" : "border-line-strong"}`} />
-                  <span className="min-w-0 flex-1 truncate">{c.title}</span>
-                  <span className="shrink-0 font-mono text-xs tabular-nums text-ink-low">
-                    {c.odds.toFixed(2)}x
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {selLegs.length === 0 ? (
-            <p className="rounded-xl border border-line p-4 text-sm text-ink-low">
-              Pick one or more contracts above to price your strategy.
-            </p>
-          ) : (
-            <>
-              {selMixesEt && (
-                <p className="mb-4 rounded-lg border border-warn/25 bg-warn/5 px-3 py-2 text-xs text-warn">
-                  You&apos;re mixing an extra-time/penalty leg with a 90-minute
-                  winner. ET/pens bets are the second step of a draw-first
-                  thesis — the auto strategies never mix them, but it&apos;s
-                  your fund.
-                </p>
-              )}
-              {sizing === "kelly" && (
-                selF > 0 ? (
-                  <p className="mb-4 rounded-lg border border-accent/25 bg-accent/5 px-3 py-2 font-mono text-xs text-accent">
-                    Kelly stakes {pct(selF)} of your fund → ${selStaked.toFixed(2)} in
-                    play, ${(fund - selStaked).toFixed(2)} stays in your pocket.
-                  </p>
-                ) : (
-                  <p className="mb-4 rounded-lg border border-warn/25 bg-warn/5 px-3 py-2 text-xs text-warn">
-                    Kelly stakes $0 — this build is negative-EV at current
-                    prices, so the growth-optimal bet is no bet.
-                  </p>
-                )
-              )}
-              <div className="mb-4 grid grid-cols-3 gap-3">
-                <div className="rounded-xl border border-line bg-bs p-3">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">Strategy wins</p>
-                  <p className={`mt-1 font-mono text-xl tabular-nums ${selP >= 0.6 ? "text-accent" : "text-ink-hi"}`}>{pct(selP)}</p>
-                </div>
-                <div className="rounded-xl border border-line bg-bs p-3">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">Profit if it wins</p>
-                  <p className={`mt-1 font-mono text-xl tabular-nums ${selProfit >= 0 ? "text-accent" : "text-neg"}`}>
-                    {signedPct(selProfit)}
-                  </p>
-                  <p className="font-mono text-[10px] tabular-nums text-ink-faint">${selStaked.toFixed(2)} → ${selPayout.toFixed(2)}</p>
-                </div>
-                <div className="rounded-xl border border-line bg-bs p-3">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">Expected value</p>
-                  <p className={`mt-1 font-mono text-xl tabular-nums ${selEv >= 0 ? "text-accent" : "text-neg"}`}>
-                    {selEv >= 0 ? "+" : "−"}${Math.abs(selEv).toFixed(2)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mb-4 overflow-x-auto rounded-xl border border-line">
-                <div className="min-w-[520px]">
-                  <div className="grid grid-cols-[minmax(0,1fr)_5.5rem_6rem_6rem] items-center gap-x-3 border-b border-line bg-bs px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
-                    <span>Buy</span><span className="text-right">Net mult</span>
-                    <span className="text-right">Stake</span><span className="text-right">Returns</span>
-                  </div>
-                  {selRows.map((r) => (
-                    <div key={r.key} className="grid grid-cols-[minmax(0,1fr)_5.5rem_6rem_6rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0">
-                      <span className="min-w-0 truncate pr-2 text-ink-hi" title={r.title}>{r.title}</span>
-                      <span className="text-right font-mono tabular-nums text-ink-mid">{r.odds.toFixed(2)}x</span>
-                      <span className="text-right font-mono tabular-nums text-accent">${r.stake.toFixed(2)}</span>
-                      <span className="text-right font-mono tabular-nums text-ink-mid">${(r.stake * r.odds).toFixed(2)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-neg">
-                You lose your ${selStaked.toFixed(selStaked % 1 ? 2 : 0)} only if ({selLoss.length} scenario{selLoss.length === 1 ? "" : "s"}):
-              </p>
-              <ul className="space-y-1.5">
-                {selLoss.map((a) => (
-                  <li key={a.id} className="flex items-baseline justify-between gap-3 text-sm">
-                    <span className="text-ink-mid">✗ {a.label}</span>
-                    <span className="shrink-0 font-mono text-xs tabular-nums text-ink-low">{pct(a.p)}</span>
-                  </li>
-                ))}
-                {selLoss.length === 0 && (
-                  <li className="text-sm text-ink-mid">✓ nothing — every scenario is covered (profit is the vig-adjusted spread)</li>
-                )}
-              </ul>
-              <button onClick={() => setSel(new Set())}
-                className="mt-4 rounded-lg border border-line px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-ink-low transition-colors hover:border-line-strong hover:text-ink-mid">
-                Clear picks
-              </button>
-            </>
-          )}
-        </div>
-      )}
     </section>
   );
 }
