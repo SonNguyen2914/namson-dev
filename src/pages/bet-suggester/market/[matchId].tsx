@@ -361,6 +361,16 @@ export default function MatchDetail() {
               </span>
             )}
             <button
+              onClick={() => {
+                navigator.clipboard?.writeText(window.location.href)
+                  .then(() => toast("Match link copied."))
+                  .catch(() => toast("Couldn't copy — long-press the URL bar instead."));
+              }}
+              className="rounded-lg border border-line px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-low transition-colors hover:border-line-strong hover:text-ink-mid"
+            >
+              Share
+            </button>
+            <button
               onClick={() => { setLoading(true); load(true); }}
               disabled={loading}
               className={`rounded-lg border px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] transition-colors ${
@@ -501,6 +511,17 @@ export default function MatchDetail() {
                       Expanded to 40%+ likely — nothing on this match cleared 49%+.
                     </p>
                   )}
+                  {!settledMap && (
+                    <button
+                      onClick={() => toggleWatch(pick!.market_id, pick!.market_title)}
+                      className={`mt-4 rounded-lg border px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] transition-colors ${
+                        watched.has(pick.market_id)
+                          ? "border-warn/50 text-warn hover:border-warn"
+                          : "border-accent/40 text-accent hover:border-accent hover:bg-accent/5"}`}
+                    >
+                      {watched.has(pick.market_id) ? "Watching this pick" : "Watch this pick"}
+                    </button>
+                  )}
                 </>
               ) : (
                 <p className="mt-3 text-sm text-ink-low">
@@ -573,6 +594,13 @@ export default function MatchDetail() {
                   </div>
                 );
               })()}
+              {!settledMap && sortedMarkets.length === 0 && (
+                <p className="mb-4 rounded-xl border border-line p-4 text-sm text-ink-low">
+                  No Kalshi books priced yet for this match — hit Refresh for
+                  a fresh simulation, or check back once Kalshi lists the
+                  markets.
+                </p>
+              )}
               {settledMap && sortedMarkets.length === 0 && (
                 <p className="mb-4 rounded-xl border border-line p-4 text-sm text-ink-low">
                   The pre-match model view for this match was lost in a

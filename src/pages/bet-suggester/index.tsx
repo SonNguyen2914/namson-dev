@@ -331,6 +331,11 @@ export default function BetSuggesterDashboard() {
                           <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-live">🔒 final</span>
                         )}
                         <span className="ml-auto shrink-0 whitespace-nowrap pl-3 font-mono text-[11px] tracking-wide text-ink-faint">
+                          {!inPlay && (
+                            <span className="mr-2 text-accent">
+                              in {countdown(Math.max(0, Math.floor((new Date(g.kickoff).getTime() - nowMs) / 1000)))}
+                            </span>
+                          )}
                           {kickoffLocal(g.kickoff)} · {g.rows.length} bet{g.rows.length === 1 ? "" : "s"}
                         </span>
                       </button>
