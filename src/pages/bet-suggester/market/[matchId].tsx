@@ -16,22 +16,13 @@ import {
 } from "../../../lib/suggesterApi";
 import { Eyebrow, Reveal } from "../../../components/ui";
 import { Collapse, NavChip, RouteProgress, SkeletonRows, Toaster, TopBar, toast, useScrollSpy } from "../../../components/chrome";
+import { MARKET_GROUPS } from "../../../lib/marketGroups";
 
 // Same floors as the backend board — the pick is just row #1 of this
 // match's slice of the same likelihood-first ranking.
 const PRIMARY_FLOOR = 0.49;
 const FALLBACK_FLOOR = 0.40;
 
-// Market families for the grouped table, in display order. A market that
-// matches no test lands in "Other" (visible, never silently dropped).
-const MARKET_GROUPS: { id: string; label: string; test: (k: string | null | undefined) => boolean }[] = [
-  { id: "winner", label: "Winner · 90 min", test: (k) => k === "home_win" || k === "away_win" || k === "draw" },
-  { id: "advance", label: "To advance", test: (k) => k === "home_advance" || k === "away_advance" },
-  { id: "goals", label: "Goals · totals, BTTS, first goal", test: (k) => !!k && (/^over_|^under_/.test(k) || k === "btts" || /_first_goal$|^no_goal$/.test(k)) },
-  { id: "margin", label: "Margin of victory", test: (k) => !!k && /margin/.test(k) },
-  { id: "etpens", label: "Extra time / penalties", test: (k) => !!k && /_win_(et|pens)$/.test(k) },
-  { id: "score", label: "Exact score", test: (k) => !!k && /^score_/.test(k) },
-];
 
 type MktSortKey = "likelihood" | "edge" | "multiplier";
 

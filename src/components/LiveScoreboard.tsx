@@ -8,6 +8,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, flag, pct, signedPct, LiveAutoResponse, LiveScoreEntry, LiveStatsResponse, TeamNewsResponse } from "../lib/suggesterApi";
+import { groupMarkets } from "../lib/marketGroups";
+import { matchColors } from "../lib/teamColors";
 import { Eyebrow, Flash, Reveal } from "./ui";
 import { Collapse } from "./chrome";
 import LivePanel from "./LivePanel";
@@ -60,8 +62,12 @@ function LiveMarketStream({ a, home, away }: {
 }) {
   const adv = a.live_advance;
   const lev = a.levers;
-  const rows = [...(a.markets ?? [])]
-    .sort((x, y) => y.live_model_probability - x.live_model_probability);
+  // same canonical grouping as the match page's markets table; rows
+  // inside each group sorted by the live model's number
+  const grouped = groupMarkets(
+    [...(a.markets ?? [])]
+      .sort((x, y) => y.live_model_probability - x.live_model_probability),
+    (r) => r.outcome_key);
   return (
     <div>
       {adv && (
@@ -92,18 +98,26 @@ function LiveMarketStream({ a, home, away }: {
             <span className="text-right">Market</span>
             <span className="text-right">Δ</span>
           </div>
-          {rows.map((r) => (
-            <div key={r.market_id} className="grid grid-cols-[minmax(0,1fr)_6rem_5.5rem_5rem] items-center gap-x-3 border-b border-line px-4 py-2 text-sm last:border-b-0">
-              <span className="min-w-0 truncate pr-2 text-ink-mid" title={r.market_title}>{r.market_title}</span>
-              <span className="text-right font-mono tabular-nums text-ink-hi">{pct(r.live_model_probability)}</span>
-              <span className="text-right font-mono tabular-nums text-ink-low">
-                {r.market_probability != null ? pct(r.market_probability) : "—"}
-              </span>
-              <span className={`text-right font-mono tabular-nums ${
-                r.difference == null ? "text-ink-faint"
-                  : r.difference >= 0 ? "text-accent" : "text-neg"}`}>
-                {r.difference != null ? signedPct(r.difference) : "—"}
-              </span>
+          {grouped.map((g) => (
+            <div key={g.label}>
+              <div className="flex items-center gap-2.5 border-b border-line bg-elev/40 px-4 py-2">
+                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-mid">{g.label}</span>
+                <span className="ml-auto font-mono text-[10px] text-ink-faint">{g.rows.length}</span>
+              </div>
+              {g.rows.map((r) => (
+                <div key={r.market_id} className="grid grid-cols-[minmax(0,1fr)_6rem_5.5rem_5rem] items-center gap-x-3 border-b border-line px-4 py-2 text-sm last:border-b-0">
+                  <span className="min-w-0 truncate pr-2 text-ink-mid" title={r.market_title}>{r.market_title}</span>
+                  <span className="text-right font-mono tabular-nums text-ink-hi">{pct(r.live_model_probability)}</span>
+                  <span className="text-right font-mono tabular-nums text-ink-low">
+                    {r.market_probability != null ? pct(r.market_probability) : "—"}
+                  </span>
+                  <span className={`text-right font-mono tabular-nums ${
+                    r.difference == null ? "text-ink-faint"
+                      : r.difference >= 0 ? "text-accent" : "text-neg"}`}>
+                    {r.difference != null ? signedPct(r.difference) : "—"}
+                  </span>
+                </div>
+              ))}
             </div>
           ))}
         </div>
@@ -163,29 +177,46 @@ function LiveExtras({ m }: { m: LiveScoreEntry }) {
       {stats && stats.rows.length > 0 && (
         <Collapse eyebrow="live" title="Match stats" className="mb-6">
           <div className="space-y-2.5">
-            {stats.rows.map((r) => {
-              const h = parseFloat(r.home) || 0;
-              const a = parseFloat(r.away) || 0;
-              const tot = h + a;
-              const pctH = tot > 0 ? (h / tot) * 100 : 50;
-              return (
-                <div key={r.key}>
-                  <div className="flex items-baseline justify-between gap-3 text-sm">
-                    <span className="w-14 shrink-0 font-mono tabular-nums text-ink-hi">{r.home}</span>
-                    <span className="min-w-0 truncate text-center text-xs text-ink-low">{r.label}</span>
-                    <span className="w-14 shrink-0 text-right font-mono tabular-nums text-ink-hi">{r.away}</span>
+            {(() => {
+              const colors = matchColors(stats.home_team || m.home,
+                                         stats.away_team || m.away);
+              return stats.rows.map((r) => {
+                const h = parseFloat(r.home) || 0;
+                const a = parseFloat(r.away) || 0;
+                const tot = h + a;
+                const pctH = tot > 0 ? (h / tot) * 100 : 50;
+                return (
+                  <div key={r.key}>
+                    <div className="flex items-baseline justify-between gap-3 text-sm">
+                      <span className="w-14 shrink-0 font-mono tabular-nums text-ink-hi">{r.home}</span>
+                      <span className="min-w-0 truncate text-center text-xs text-ink-low">{r.label}</span>
+                      <span className="w-14 shrink-0 text-right font-mono tabular-nums text-ink-hi">{r.away}</span>
+                    </div>
+                    <div className="mt-1 flex h-1.5 gap-0.5 overflow-hidden rounded-full">
+                      <div className="rounded-full" style={{
+                        width: `${pctH}%`, background: colors.home, opacity: 0.85 }} />
+                      <div className="flex-1 rounded-full" style={{
+                        background: colors.away, opacity: 0.85 }} />
+                    </div>
                   </div>
-                  <div className="mt-1 flex h-1 gap-0.5 overflow-hidden rounded-full">
-                    <div className="rounded-full bg-accent/70" style={{ width: `${pctH}%` }} />
-                    <div className="flex-1 rounded-full bg-elev2" />
-                  </div>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
           </div>
-          <p className="mt-3 text-[11px] text-ink-faint">
-            {stats.home_team} left · {stats.away_team} right — via ESPN, ~30s behind the broadcast.
-          </p>
+          {(() => {
+            const colors = matchColors(stats.home_team || m.home,
+                                       stats.away_team || m.away);
+            return (
+              <p className="mt-3 flex items-center gap-2 text-[11px] text-ink-faint">
+                <span className="inline-block h-2 w-2 rounded-full" style={{ background: colors.home }} />
+                {stats.home_team} left
+                <span className="mx-1">·</span>
+                <span className="inline-block h-2 w-2 rounded-full" style={{ background: colors.away }} />
+                {stats.away_team} right
+                <span className="mx-1">·</span> via ESPN, ~30s behind the broadcast
+              </p>
+            );
+          })()}
         </Collapse>
       )}
       {news && (
