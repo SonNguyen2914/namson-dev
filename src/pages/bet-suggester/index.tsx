@@ -13,7 +13,7 @@ import {
 import LiveScoreboard from "../../components/LiveScoreboard";
 import BracketView from "../../components/BracketView";
 import { Eyebrow, Flash, Reveal } from "../../components/ui";
-import { NavChip, SkeletonRows, TopBar } from "../../components/chrome";
+import { NavChip, RouteProgress, SkeletonRows, Toaster, TopBar, useScrollSpy } from "../../components/chrome";
 
 const POLL_MS = 60 * 1000; // watchlist scores move every 30s poll; refresh often
 
@@ -158,13 +158,18 @@ export default function BetSuggesterDashboard() {
       return n;
     });
 
+  // active chip follows the section in view
+  const activeSection = useScrollSpy(["bracket", "board"], [loading]);
+
   return (
     <div className="min-h-screen bg-bs font-sans text-ink-mid">
       <Head><title>WC26 Bet Suggester · namson.dev</title></Head>
 
+      <RouteProgress />
+      <Toaster />
       <TopBar title="WC26 · Bet Suggester">
-        <NavChip href="#bracket">Bracket</NavChip>
-        <NavChip href="#board">Best bets</NavChip>
+        <NavChip href="#bracket" active={activeSection === "bracket"}>Bracket</NavChip>
+        <NavChip href="#board" active={activeSection === "board"}>Best bets</NavChip>
       </TopBar>
 
       {/* ===================== SHOWCASE ZONE ===================== */}

@@ -10,12 +10,12 @@ import { useCallback, useEffect, useState } from "react";
 import {
   api, flag, pct, signedPct, countdown, kickoffLocal,
   PredictionResponse, PredictionSummary, HalfDist, MarketPrediction,
-  PlayerPropsResponse, TeamNewsResponse,
+  PlayerPropsResponse, TeamNewsResponse, LiveScoreEntry,
   ReferenceOddsResponse, ResearchResponse,
   TimelinePoint, TeamInfoResponse, TeamBlurb,
 } from "../../../lib/suggesterApi";
 import { Eyebrow, Reveal } from "../../../components/ui";
-import { Collapse, NavChip, SkeletonRows, TopBar } from "../../../components/chrome";
+import { Collapse, NavChip, RouteProgress, SkeletonRows, Toaster, TopBar, toast, useScrollSpy } from "../../../components/chrome";
 
 // Same floors as the backend board — the pick is just row #1 of this
 // match's slice of the same likelihood-first ranking.
@@ -70,12 +70,16 @@ export default function MatchDetail() {
   const load = useCallback(async (force: boolean) => {
     if (!matchId) return;
     try {
-      const p = await api.prediction(matchId, force);
+      const [p, t, wl] = await Promise.all([
+        api.prediction(matchId, force),
+        api.timeline(matchId),
+        api.watchlist(),
+      ]);
       setPred(p);
-      const [t, wl] = await Promise.all([api.timeline(matchId), api.watchlist()]);
       setTimeline(t.points);
       setWatched(new Set(wl.watchlist.map((w) => w.market_id)));
       setError("");
+      if (force) toast("Fresh simulation done — board repriced.");
     } catch {
       setError("Could not reach the prediction backend.");
     } finally {
@@ -139,9 +143,11 @@ export default function MatchDetail() {
     if (watched.has(marketId)) {
       await api.unwatch(marketId);
       setWatched((prev) => { const n = new Set(prev); n.delete(marketId); return n; });
+      toast(`Stopped watching: ${marketTitle}`);
     } else {
       await api.watch(matchId, marketId, marketTitle);
       setWatched((prev) => new Set(prev).add(marketId));
+      toast(`Watching: ${marketTitle} — you'll be pinged when the timing is ripe.`);
     }
   }
 
@@ -257,19 +263,49 @@ export default function MatchDetail() {
     ? new Map(research.closing.map((c) => [c.market_id, c.result]))
     : null;
 
+  // Site-wide live awareness: a small score chip in the top bar whenever
+  // ANY match is in play (links home to the live box).
+  const [liveNow, setLiveNow] = useState<LiveScoreEntry | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const check = async () => {
+      try {
+        const r = await api.liveScores();
+        if (alive) setLiveNow(r.live.find((l) => !l.is_finished) ?? null);
+      } catch { /* chip just stays hidden */ }
+    };
+    check();
+    const id = setInterval(check, 45000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+
+  // the chip for the section you're reading lights up
+  const activeSection = useScrollSpy(
+    ["prediction", "strategy", "markets"], [pred != null]);
+
   return (
     <div className="min-h-screen bg-bs font-sans text-ink-mid">
       <Head><title>{matchId ?? "Match"} · Bet Suggester</title></Head>
 
+      <RouteProgress />
+      <Toaster />
       <TopBar back={{ href: "/bet-suggester", label: "board" }}
         title={`${home} vs ${away}`}>
-        <NavChip href="#prediction">Prediction</NavChip>
-        <NavChip href="#strategy">Strategy</NavChip>
+        {liveNow && (
+          <NavChip href="/bet-suggester">
+            <span className="pulse-dot mr-1 inline-block h-1 w-1 rounded-full bg-live align-middle" />
+            <span className="text-live">
+              {liveNow.home.slice(0, 3)} {liveNow.home_goals}–{liveNow.away_goals} {liveNow.away.slice(0, 3)}
+            </span>
+          </NavChip>
+        )}
+        <NavChip href="#prediction" active={activeSection === "prediction"}>Prediction</NavChip>
+        <NavChip href="#strategy" active={activeSection === "strategy"}>Strategy</NavChip>
         <NavChip onClick={() => {
           setMktTab("players");
           document.getElementById("markets")?.scrollIntoView();
         }}>Players</NavChip>
-        <NavChip href="#markets">Markets</NavChip>
+        <NavChip href="#markets" active={activeSection === "markets"}>Markets</NavChip>
       </TopBar>
 
       <div className="mx-auto max-w-4xl px-5 py-10">
@@ -355,10 +391,27 @@ export default function MatchDetail() {
         {/* Headline stats — xG + confidence, right under the hero */}
         {pred && (
           <Reveal>
-            <section className="mb-10 grid grid-cols-3 gap-3">
-              <Stat label={`${home} xG`} value={pred.xg.home.toFixed(2)} />
-              <Stat label={`${away} xG`} value={pred.xg.away.toFixed(2)} />
-              <Stat label="model confidence" value={pct(pred.confidence)} />
+            <section className="mb-10">
+              <div className="grid grid-cols-3 gap-3">
+                <Stat label={`${home} xG`} value={pred.xg.home.toFixed(2)} />
+                <Stat label={`${away} xG`} value={pred.xg.away.toFixed(2)} />
+                <Stat label="model confidence" value={pct(pred.confidence)}
+                  bar={pred.confidence} />
+              </div>
+              {/* the xG duel at a glance — one bar, two shares */}
+              {pred.xg.home + pred.xg.away > 0 && (
+                <div className="mt-3">
+                  <div className="flex h-1.5 gap-0.5 overflow-hidden rounded-full">
+                    <div className="rounded-full bg-accent/75"
+                      style={{ width: `${(pred.xg.home / (pred.xg.home + pred.xg.away)) * 100}%` }} />
+                    <div className="flex-1 rounded-full bg-elev2" />
+                  </div>
+                  <div className="mt-1 flex justify-between font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
+                    <span>{home} {pct(pred.xg.home / (pred.xg.home + pred.xg.away))} of expected goals</span>
+                    <span>{away}</span>
+                  </div>
+                </div>
+              )}
             </section>
           </Reveal>
         )}
@@ -497,6 +550,29 @@ export default function MatchDetail() {
               <p className="mb-4 text-xs text-ink-low">
                 Click a column to sort · click a group to collapse
               </p>
+              {settledMap && research && research.final_lock.length > 0 && sortedMarkets.length > 0 && (() => {
+                const rows = research.final_lock
+                  .map((l) => ({ l, res: settledMap.get(l.market_id) }))
+                  .filter((x) => x.res === "yes" || x.res === "no");
+                if (!rows.length) return null;
+                const modelRight = rows.filter(
+                  (x) => (x.l.model_probability >= 0.5) === (x.res === "yes")).length;
+                const mktRight = rows.filter(
+                  (x) => ((x.l.implied_probability ?? 0.5) >= 0.5) === (x.res === "yes")).length;
+                const brier = rows.reduce((s2, x) =>
+                  s2 + Math.pow(x.l.model_probability - (x.res === "yes" ? 1 : 0), 2), 0) / rows.length;
+                return (
+                  <div className="mb-4 rounded-xl border border-accent/25 bg-accent/5 px-4 py-3">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent">T-10 scorecard</p>
+                    <p className="mt-1 text-sm text-ink-mid">
+                      The locked model called <span className="font-mono text-ink-hi">{modelRight}/{rows.length}</span> settled
+                      markets right (market favourite: <span className="font-mono">{mktRight}/{rows.length}</span>) ·
+                      Brier <span className="font-mono text-ink-hi">{brier.toFixed(3)}</span>
+                      <span className="text-ink-faint"> (lower is better; 0.25 = coin flips)</span>
+                    </p>
+                  </div>
+                );
+              })()}
               {settledMap && sortedMarkets.length === 0 && (
                 <p className="mb-4 rounded-xl border border-line p-4 text-sm text-ink-low">
                   The pre-match model view for this match was lost in a
@@ -780,11 +856,19 @@ function OutcomeBar({ label, value }: { label: string; value: number }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, bar }: {
+  label: string; value: string; bar?: number;
+}) {
   return (
     <div className="rounded-2xl border border-line bg-elev p-4 sm:p-5">
       <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low sm:text-[11px]">{label}</p>
       <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums text-ink-hi sm:text-3xl">{value}</p>
+      {bar != null && (
+        <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-elev2">
+          <div className="h-full rounded-full bg-accent/70"
+            style={{ width: `${Math.min(bar * 100, 100)}%` }} />
+        </div>
+      )}
     </div>
   );
 }
@@ -1487,6 +1571,14 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
                     <span className={`text-ink-faint transition-transform ${open ? "rotate-90" : ""}`}>▸</span>
                     <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-low">{g.label}</span>
                     <span className="font-mono text-[10px] text-ink-faint">{items.length}</span>
+                    {(() => {
+                      const n = items.filter((c) => sel.has(c.key)).length;
+                      return n > 0 ? (
+                        <span className="rounded border border-accent/40 bg-accent/10 px-1.5 font-mono text-[10px] text-accent">
+                          {n} picked
+                        </span>
+                      ) : null;
+                    })()}
                   </button>
                   {open && (
                     <div className="grid gap-1.5 sm:grid-cols-2">
@@ -1566,8 +1658,9 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
                       <span className="text-right">Chance</span>
                       <span className="text-right">Net</span>
                     </div>
-                    {rungs.map((r) => (
-                      <div key={r.pnl} className="grid grid-cols-[minmax(0,1fr)_5rem_6rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0">
+                    {rungs.map((r, ri) => (
+                      <div key={r.pnl} className={`grid grid-cols-[minmax(0,1fr)_5rem_6rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0 ${
+                        ri === 0 && r.pnl > 0 ? "bg-accent/5" : ""}`}>
                         <span className="min-w-0 truncate pr-2 text-ink-mid" title={r.labels.join(" · ")}>
                           {r.labels.join(" · ")}
                         </span>

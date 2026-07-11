@@ -144,12 +144,14 @@ function BracketCard({ m, emphasis = false, small = false }: {
 
   const pad = small ? "p-2.5" : "p-3";
   const border = emphasis && !finished ? "border-accent/30" : "border-line";
+  // the next kickoff draws the eye: matches inside 24h get a soft ring
+  const soon = !tbd && !finished && secs > 0 && secs < 24 * 3600;
 
   const inner = (
     <div className={`rounded-xl border ${pad} transition-colors ${
       tbd ? "border-dashed border-line"
           : `cursor-pointer ${border} hover:border-line-strong hover:bg-elev`
-    } ${emphasis ? "bg-elev" : ""}`}>
+    } ${emphasis ? "bg-elev" : ""} ${soon ? "ring-soon" : ""}`}>
       <TeamLine
         name={m.home} resolved={m.home_resolved}
         prob={m.probs?.home_win} edge={m.probs?.home_edge} leader={homeLeads}
@@ -170,7 +172,11 @@ function BracketCard({ m, emphasis = false, small = false }: {
         <p>
           {tbd ? "awaiting bracket"
             : finished ? (m.result!.status_short || "FT")
-            : secs > 0 ? countdown(secs)
+            : secs > 0 ? (
+              <span className={secs < 24 * 3600 ? "text-accent" : undefined}>
+                {countdown(secs)}
+              </span>
+            )
             : "kickoff"}
         </p>
       </div>

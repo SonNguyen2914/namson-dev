@@ -276,3 +276,84 @@ html {
 *::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.22); }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
+
+/* --- V4 polish layer ------------------------------------------------- */
+
+/* Route-change progress: a thin accent line that sweeps under the top bar. */
+.route-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 100%;
+  z-index: 60;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: bs-route-sweep 0.9s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes bs-route-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .route-progress { animation: none; opacity: 0.5; }
+}
+
+/* Toasts: quiet, bottom-center, self-dismissing. */
+.toast-wrap {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+  pointer-events: none;
+  max-width: min(92vw, 26rem);
+}
+.toast {
+  pointer-events: auto;
+  background: color-mix(in srgb, var(--background) 82%, #34d399 6%);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  color: var(--foreground);
+  border-radius: 0.75rem;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  animation: bs-toast-in 0.18s ease-out, bs-toast-out 0.25s ease-in forwards;
+  animation-delay: 0s, var(--toast-life, 2.6s);
+  backdrop-filter: blur(6px);
+}
+@keyframes bs-toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes bs-toast-out {
+  to { opacity: 0; transform: translateY(6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+}
+
+/* Live minute progress under the score clock. */
+.minutebar {
+  height: 3px;
+  border-radius: 9999px;
+  background: var(--elev2, rgba(255, 255, 255, 0.08));
+  overflow: hidden;
+}
+.minutebar > div {
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--live, #f87171);
+  transition: width 0.6s ease;
+}
+
+/* "Next up" ring for bracket cards kicking off soon. */
+.ring-soon {
+  box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.35),
+              0 0 18px rgba(52, 211, 153, 0.12);
+}

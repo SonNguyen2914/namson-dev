@@ -252,10 +252,18 @@ function LiveCard({ m }: { m: LiveScoreEntry }) {
               className={`text-6xl font-semibold tracking-tight tabular-nums sm:text-8xl ${
                 finished ? "text-ink-mid" : "text-ink-hi"}`}
             />
-            <span className={`font-mono text-sm tabular-nums sm:text-base ${
-              running ? "text-live" : "text-ink-low"
-            }`}>
-              {clock}
+            <span className="flex flex-col items-center gap-1.5">
+              <span className={`font-mono text-sm tabular-nums sm:text-base ${
+                running ? "text-live" : "text-ink-low"
+              }`}>
+                {clock}
+              </span>
+              {!finished && m.minutes_elapsed != null && (
+                <span className="minutebar w-14" aria-hidden>
+                  <div style={{ width: `${Math.min(100,
+                    (m.minutes_elapsed / (["ET", "BT", "P"].includes(m.status_short) ? 120 : 90)) * 100)}%` }} />
+                </span>
+              )}
             </span>
             <Flash
               value={m.away_goals}
