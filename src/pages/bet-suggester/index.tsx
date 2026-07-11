@@ -298,10 +298,14 @@ export default function BetSuggesterDashboard() {
                   <button onClick={() => onSort("likelihood")} className="text-right transition-colors hover:text-ink-hi">
                     Likelihood{arrow("likelihood")}
                   </button>
-                  <button onClick={() => onSort("edge")} className="text-right transition-colors hover:text-ink-hi">
+                  <button onClick={() => onSort("edge")}
+                    title="Model probability minus the market's implied probability — positive means the model sees value"
+                    className="text-right transition-colors hover:text-ink-hi">
                     Edge{arrow("edge")}
                   </button>
-                  <button onClick={() => onSort("multiplier")} className="text-right transition-colors hover:text-ink-hi">
+                  <button onClick={() => onSort("multiplier")}
+                    title="Payout multiple at the buyable ask price (not the midpoint)"
+                    className="text-right transition-colors hover:text-ink-hi">
                     Mult{arrow("multiplier")}
                   </button>
                   <span className="text-right">Alert</span>

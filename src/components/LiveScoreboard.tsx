@@ -193,7 +193,7 @@ function LiveExtras({ m }: { m: LiveScoreEntry }) {
           <TeamNewsSection news={news} home={m.home} away={m.away} />
         </Collapse>
       )}
-      <Collapse eyebrow="in-play" title="Live read · what the model makes of the state" className="mb-0">
+      <Collapse eyebrow="what-if" title="Manual override · test your own state" defaultOpen={false} className="mb-0">
         <LivePanel matchId={m.match_id} />
       </Collapse>
     </div>

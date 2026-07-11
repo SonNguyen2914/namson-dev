@@ -617,10 +617,14 @@ export default function MatchDetail() {
                     <button onClick={() => onMktSort("likelihood")} className="text-right transition-colors hover:text-ink-hi">
                       Likelihood{mktArrow("likelihood")}
                     </button>
-                    <button onClick={() => onMktSort("edge")} className="text-right transition-colors hover:text-ink-hi">
+                    <button onClick={() => onMktSort("edge")}
+                      title="Model probability minus the market's implied probability — positive means the model sees value"
+                      className="text-right transition-colors hover:text-ink-hi">
                       Edge{mktArrow("edge")}
                     </button>
-                    <button onClick={() => onMktSort("multiplier")} className="text-right transition-colors hover:text-ink-hi">
+                    <button onClick={() => onMktSort("multiplier")}
+                      title="Payout multiple at the buyable ask price (not the midpoint)"
+                      className="text-right transition-colors hover:text-ink-hi">
                       Mult{mktArrow("multiplier")}
                     </button>
                     <span className="text-right">{settledMap ? "Settled" : "Alert"}</span>
