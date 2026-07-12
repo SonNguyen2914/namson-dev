@@ -86,9 +86,12 @@ function LiveMarketStream({ a, home, away, signals }: {
       {lev && (
         <p className="mb-3 font-mono text-[11px] text-ink-low"
           title={lev.basis
-            ? `SoT ${lev.basis.sot_home}-${lev.basis.sot_away} · shots ${lev.basis.shots_home}-${lev.basis.shots_away} · share ${lev.basis.actual_share_home} vs expected ${lev.basis.expected_share_home} · weight ${lev.basis.weight}`
+            ? `SoT ${lev.basis.sot_home}-${lev.basis.sot_away} · shots ${lev.basis.shots_home}-${lev.basis.shots_away} · share ${lev.basis.actual_share_home} vs expected ${lev.basis.expected_share_home} · volume ${lev.basis.volume_actual ?? "?"} vs expected ${lev.basis.volume_expected ?? "?"} · weight ${lev.basis.weight}`
             : undefined}>
-          auto levers · {lev.source}: {home} {lev.home.toFixed(2)}× / {away} {lev.away.toFixed(2)}×
+          auto levers · {lev.source}: attack {home} {lev.home.toFixed(2)}× / {away} {lev.away.toFixed(2)}×
+          {lev.def_home != null && lev.def_home !== 1 && (
+            <> · openness {lev.def_home.toFixed(2)}×</>
+          )}
         </p>
       )}
       <div className="overflow-x-auto rounded-xl border border-line">
@@ -114,11 +117,15 @@ function LiveMarketStream({ a, home, away, signals }: {
                     {sg && (
                       <span
                         className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider ${
-                          sg.side === "BUY"
-                            ? "bg-accent/15 text-accent"
-                            : "bg-neg/15 text-neg"}`}
-                        title={`${sg.side} signal on your watched market — live model ${pct(sg.live_probability)} vs market ${pct(sg.market_probability)}${sg.minute != null ? ` at ${Math.round(sg.minute)}'` : ""}`}>
-                        {sg.side}{sg.minute != null ? ` ${Math.round(sg.minute)}'` : ""}
+                          sg.kind === "easy_win"
+                            ? "bg-warn/15 text-warn"
+                            : sg.side === "BUY"
+                              ? "bg-accent/15 text-accent"
+                              : "bg-neg/15 text-neg"}`}
+                        title={`${sg.kind === "easy_win"
+                          ? "Easy win — live model calls this near-certain while the price still pays"
+                          : `${sg.side} signal on your watched market`} — live model ${pct(sg.live_probability)} vs market ${pct(sg.market_probability)}${sg.minute != null ? ` at ${Math.round(sg.minute)}'` : ""}`}>
+                        {sg.kind === "easy_win" ? "💰 easy" : sg.side}{sg.minute != null ? ` ${Math.round(sg.minute)}'` : ""}
                       </span>
                     )}
                   </span>
@@ -202,7 +209,9 @@ function LiveExtras({ m }: { m: LiveScoreEntry }) {
           if (!seen.has(s.id)) {
             seen.add(s.id);
             if (!priming) {
-              toast(`${s.side === "BUY" ? "🟢 BUY" : "🔴 SELL"} signal — ${s.market_title}: live ${pct(s.live_probability)} vs market ${pct(s.market_probability)}`);
+              toast(s.kind === "easy_win"
+                ? `💰 EASY WIN — ${s.market_title}: live ${pct(s.live_probability)} vs market ${pct(s.market_probability)}`
+                : `${s.side === "BUY" ? "🟢 BUY" : "🔴 SELL"} signal — ${s.market_title}: live ${pct(s.live_probability)} vs market ${pct(s.market_probability)}`);
             }
           }
         }
@@ -272,7 +281,10 @@ function LiveExtras({ m }: { m: LiveScoreEntry }) {
         </Collapse>
       )}
       <Collapse eyebrow="what-if" title="Manual override · test your own state" defaultOpen={false} className="mb-0">
-        <LivePanel matchId={m.match_id} />
+        <LivePanel matchId={m.match_id}
+          liveLevers={auto?.levers && auto.levers.source !== "neutral"
+            ? { home: auto.levers.home, away: auto.levers.away }
+            : null} />
       </Collapse>
     </div>
   );

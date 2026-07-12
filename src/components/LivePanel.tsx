@@ -32,6 +32,7 @@ type PhaseId = (typeof PHASES)[number]["id"];
 type Saved = {
   scoreH: number; scoreA: number; minute: number; phaseId: PhaseId;
   redH: number; redA: number; attH: number; attA: number;
+  trackLive?: boolean;
   res: LivePredictionResponse | null; savedAt: string;
 };
 
@@ -45,7 +46,12 @@ function loadSaved(matchId: string): Saved | null {
   } catch { return null; }
 }
 
-export default function LivePanel({ matchId }: { matchId: string }) {
+export default function LivePanel({ matchId, liveLevers }: {
+  matchId: string;
+  // the auto stream's live-stats-derived levers; when present, the attack
+  // sliders track them until the user grabs a slider (manual override)
+  liveLevers?: { home: number; away: number } | null;
+}) {
   // Full team names arrive with the first live response; until then fall
   // back to the codes in the match id (e.g. "POR_ESP" -> POR / ESP).
   const [codeH, codeA] = (matchId || "_").split("_");
@@ -58,6 +64,18 @@ export default function LivePanel({ matchId }: { matchId: string }) {
   const [redA, setRedA] = useState(saved?.redA ?? 0);
   const [attH, setAttH] = useState(saved?.attH ?? 1.0);
   const [attA, setAttA] = useState(saved?.attA ?? 1.0);
+  const [trackLive, setTrackLive] = useState(saved?.trackLive ?? true);
+
+  // auto-track: follow the live-derived levers as the stats change, until
+  // the user takes a slider (then their read wins until they re-enable)
+  useEffect(() => {
+    if (!trackLive || !liveLevers) return;
+    setAttH(liveLevers.home);
+    setAttA(liveLevers.away);
+  }, [trackLive, liveLevers]);
+
+  const manualAttH = (v: number) => { setTrackLive(false); setAttH(v); };
+  const manualAttA = (v: number) => { setTrackLive(false); setAttA(v); };
 
   const [res, setRes] = useState<LivePredictionResponse | null>(saved?.res ?? null);
   const [savedAt, setSavedAt] = useState(saved?.savedAt ?? "");
@@ -74,10 +92,11 @@ export default function LivePanel({ matchId }: { matchId: string }) {
     if (typeof window === "undefined") return;
     try {
       const s: Saved = { scoreH, scoreA, minute, phaseId, redH, redA,
-                         attH, attA, res, savedAt: savedAt || new Date().toISOString() };
+                         attH, attA, trackLive, res,
+                         savedAt: savedAt || new Date().toISOString() };
       localStorage.setItem(storeKey(matchId), JSON.stringify(s));
     } catch { /* storage full/blocked — nothing to do */ }
-  }, [matchId, scoreH, scoreA, minute, phaseId, redH, redA, attH, attA, res, savedAt]);
+  }, [matchId, scoreH, scoreA, minute, phaseId, redH, redA, attH, attA, trackLive, res, savedAt]);
 
   function pickPhase(id: PhaseId) {
     const p = PHASES.find((x) => x.id === id)!;
@@ -265,8 +284,21 @@ export default function LivePanel({ matchId }: { matchId: string }) {
           transparent adjustment to the model&apos;s inputs — you can see exactly
           what it does. 1.0 = no change.
         </p>
-        <Lever label={`${home} attack`} v={attH} set={setAttH} />
-        <Lever label={`${away} attack`} v={attA} set={setAttA} />
+        {liveLevers && (
+          <button
+            onClick={() => setTrackLive(!trackLive)}
+            className={`mb-3 rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] transition-colors ${
+              trackLive
+                ? "border-skylive/50 bg-skylive/10 text-skylive"
+                : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"
+            }`}
+            title="ON: the sliders follow the live read's stats-derived levers as the match evolves. Touching a slider switches to your manual read."
+          >
+            {trackLive ? "● tracking live stats" : "○ track live stats"}
+          </button>
+        )}
+        <Lever label={`${home} attack`} v={attH} set={manualAttH} />
+        <Lever label={`${away} attack`} v={attA} set={manualAttA} />
       </details>
 
       <button

@@ -143,12 +143,19 @@ export interface LiveAutoResponse {
   live_advance?: LivePredictionResponse["live_advance"];
   markets?: LiveMarketRow[];
   levers?: {
-    home: number; away: number; source: string;
+    home: number; away: number;
+    // openness: symmetric defence multipliers from total shot volume vs
+    // the xG-implied expectation (>1 = open game, more goals both ways)
+    def_home?: number; def_away?: number;
+    source: string;
     basis?: {
       sot_home: number; sot_away: number;
       shots_home: number; shots_away: number;
       actual_share_home: number; expected_share_home: number;
+      volume_actual?: number; volume_expected?: number;
+      openness_raw?: number; openness?: number;
       minutes: number; weight: number; cap: number[];
+      def_cap?: number[];
     } | null;
   };
   status_short?: string;
@@ -481,6 +488,9 @@ export interface LiveSignalRow {
   market_id: string;
   market_title: string;
   side: "BUY" | "SELL";
+  // watched = BUY/SELL on a market you watch; easy_win = any open book
+  // the live model calls near-certain while the price still pays
+  kind: "watched" | "easy_win";
   live_probability: number;
   market_probability: number;
   difference: number;
