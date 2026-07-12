@@ -5,13 +5,13 @@
 // Polls the feed-backed /live-scores endpoint (one API-Football call covers
 // every live match at once, so this is budget-cheap). Renders nothing when
 // no match is live, so it never clutters the page pre-match.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { api, flag, pct, signedPct, LiveAutoResponse, LiveScoreEntry, LiveStatsResponse, TeamNewsResponse } from "../lib/suggesterApi";
+import { api, flag, pct, signedPct, LiveAutoResponse, LiveScoreEntry, LiveSignalRow, LiveStatsResponse, TeamNewsResponse } from "../lib/suggesterApi";
 import { groupMarkets } from "../lib/marketGroups";
 import { matchColors } from "../lib/teamColors";
 import { Eyebrow, Flash, Reveal } from "./ui";
-import { Collapse } from "./chrome";
+import { Collapse, toast } from "./chrome";
 import LivePanel from "./LivePanel";
 import TeamNewsSection from "./TeamNews";
 
@@ -57,8 +57,9 @@ export default function LiveScoreboard() {
 // ~30s from the real state + live shot stats (levers derived, echoed, and
 // capped) and prices every open market. Informational — the market already
 // knows the score, so differences are a read, not a signal.
-function LiveMarketStream({ a, home, away }: {
+function LiveMarketStream({ a, home, away, signals }: {
   a: LiveAutoResponse; home: string; away: string;
+  signals?: Map<string, LiveSignalRow>;
 }) {
   const adv = a.live_advance;
   const lev = a.levers;
@@ -104,9 +105,23 @@ function LiveMarketStream({ a, home, away }: {
                 <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-mid">{g.label}</span>
                 <span className="ml-auto font-mono text-[10px] text-ink-faint">{g.rows.length}</span>
               </div>
-              {g.rows.map((r) => (
+              {g.rows.map((r) => {
+                const sg = signals?.get(r.market_id);
+                return (
                 <div key={r.market_id} className="grid grid-cols-[minmax(0,1fr)_6rem_5.5rem_5rem] items-center gap-x-3 border-b border-line px-4 py-2 text-sm last:border-b-0">
-                  <span className="min-w-0 truncate pr-2 text-ink-mid" title={r.market_title}>{r.market_title}</span>
+                  <span className="flex min-w-0 items-center gap-2 pr-2 text-ink-mid">
+                    <span className="min-w-0 truncate" title={r.market_title}>{r.market_title}</span>
+                    {sg && (
+                      <span
+                        className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider ${
+                          sg.side === "BUY"
+                            ? "bg-accent/15 text-accent"
+                            : "bg-neg/15 text-neg"}`}
+                        title={`${sg.side} signal on your watched market — live model ${pct(sg.live_probability)} vs market ${pct(sg.market_probability)}${sg.minute != null ? ` at ${Math.round(sg.minute)}'` : ""}`}>
+                        {sg.side}{sg.minute != null ? ` ${Math.round(sg.minute)}'` : ""}
+                      </span>
+                    )}
+                  </span>
                   <span className="text-right font-mono tabular-nums text-ink-hi">{pct(r.live_model_probability)}</span>
                   <span className="text-right font-mono tabular-nums text-ink-low">
                     {r.market_probability != null ? pct(r.market_probability) : "—"}
@@ -117,7 +132,8 @@ function LiveMarketStream({ a, home, away }: {
                     {r.difference != null ? signedPct(r.difference) : "—"}
                   </span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           ))}
         </div>
@@ -135,6 +151,11 @@ function LiveExtras({ m }: { m: LiveScoreEntry }) {
   const [news, setNews] = useState<TeamNewsResponse | null>(null);
   const [stats, setStats] = useState<LiveStatsResponse | null>(null);
   const [auto, setAuto] = useState<LiveAutoResponse | null>(null);
+  // latest BUY/SELL signal per watched market (badges); seen ids so each
+  // signal toasts exactly once, and the first fetch primes silently — old
+  // signals from before the page opened shouldn't greet you with a storm
+  const [signals, setSignals] = useState<Map<string, LiveSignalRow>>(new Map());
+  const seenSignals = useRef<Set<number> | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -164,14 +185,40 @@ function LiveExtras({ m }: { m: LiveScoreEntry }) {
     };
     loadAuto();
     const id3 = setInterval(loadAuto, 30000);
-    return () => { alive = false; clearInterval(id); clearInterval(id2); clearInterval(id3); };
+    // watched-market BUY/SELL signals — same 30s cadence as the read that
+    // produces them; the backend job also pushes to Discord, this poll is
+    // just the on-page mirror (toast fresh ones, badge the rows)
+    const loadSignals = async () => {
+      try {
+        const sr = await api.liveSignals(m.match_id);
+        if (!alive) return;
+        const priming = seenSignals.current === null;
+        if (priming) seenSignals.current = new Set();
+        const seen = seenSignals.current!;
+        const latest = new Map<string, LiveSignalRow>();
+        // newest first from the API — keep the first row seen per market
+        for (const s of sr.signals) {
+          if (!latest.has(s.market_id)) latest.set(s.market_id, s);
+          if (!seen.has(s.id)) {
+            seen.add(s.id);
+            if (!priming) {
+              toast(`${s.side === "BUY" ? "🟢 BUY" : "🔴 SELL"} signal — ${s.market_title}: live ${pct(s.live_probability)} vs market ${pct(s.market_probability)}`);
+            }
+          }
+        }
+        setSignals(latest);
+      } catch { /* signals stay hidden */ }
+    };
+    loadSignals();
+    const id4 = setInterval(loadSignals, 30000);
+    return () => { alive = false; clearInterval(id); clearInterval(id2); clearInterval(id3); clearInterval(id4); };
   }, [m.match_id]);
 
   return (
     <div className="mt-8 border-t border-line pt-6">
       {auto && auto.available && (
         <Collapse eyebrow="live model" title="Live market read · auto" className="mb-6">
-          <LiveMarketStream a={auto} home={m.home} away={m.away} />
+          <LiveMarketStream a={auto} home={m.home} away={m.away} signals={signals} />
         </Collapse>
       )}
       {stats && stats.rows.length > 0 && (

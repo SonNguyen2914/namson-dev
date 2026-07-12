@@ -472,6 +472,27 @@ export interface RipenessAlert {
   fired_at: string;
 }
 
+// In-play BUY/SELL signal on a WATCHED market: fired server-side when the
+// live remainder-simulation diverges from the market price beyond the
+// configured threshold (with cooldowns, so each one is meaningful).
+export interface LiveSignalRow {
+  id: number;
+  match_id: string;
+  market_id: string;
+  market_title: string;
+  side: "BUY" | "SELL";
+  live_probability: number;
+  market_probability: number;
+  difference: number;
+  minute: number | null;
+  fired_at: string;
+}
+
+export interface LiveSignalsResponse {
+  min_diff: number;
+  signals: LiveSignalRow[];
+}
+
 const base = "/api/bet-suggester";
 
 async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -556,6 +577,10 @@ export const api = {
     getJson<TimingScore>(`/timing?match_id=${matchId}&market_id=${marketId}`),
 
   alerts: () => getJson<{ alerts: RipenessAlert[] }>("/alerts"),
+
+  liveSignals: (matchId?: string) =>
+    getJson<LiveSignalsResponse>(
+      matchId ? `/live-signals?match_id=${matchId}` : "/live-signals"),
 };
 
 // -- formatting helpers -------------------------------------------------
