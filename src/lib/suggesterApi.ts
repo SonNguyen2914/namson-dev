@@ -515,6 +515,43 @@ export interface LiveSignalsResponse {
   signals: LiveSignalRow[];
 }
 
+// --- Bot Arena (paper-trading strategy lab) -----------------------------
+export interface BotPositionRow {
+  match_id: string;
+  market_id: string;
+  market_title: string;
+  entry_price: number;
+  contracts: number;
+  cost: number;
+  note?: string | null;
+  opened_at: string | null;
+  closed_at?: string;
+  close_price?: number;
+  close_reason?: string;
+  net?: number;
+}
+
+export interface BotLedger {
+  bot: string;
+  name: string;
+  emoji: string;
+  tagline: string;
+  style: string;
+  bankroll: number;
+  equity: number;
+  net_pnl: number;
+  open: BotPositionRow[];
+  closed: BotPositionRow[];
+  trades: number;
+  wins: number;
+}
+
+export interface BotsResponse {
+  start_bankroll: number;
+  bots: BotLedger[];
+  generated_at: string;
+}
+
 const base = "/api/bet-suggester";
 
 async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -603,6 +640,8 @@ export const api = {
   liveSignals: (matchId?: string) =>
     getJson<LiveSignalsResponse>(
       matchId ? `/live-signals?match_id=${matchId}` : "/live-signals"),
+
+  bots: () => getJson<BotsResponse>("/bots"),
 };
 
 // -- formatting helpers -------------------------------------------------

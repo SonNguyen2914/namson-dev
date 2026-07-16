@@ -181,6 +181,7 @@ export default function BetSuggesterDashboard() {
       <TopBar title="WC26 · Bet Suggester">
         <NavChip href="#bracket" active={activeSection === "bracket"}>Bracket</NavChip>
         <NavChip href="#board" active={activeSection === "board"}>Best bets</NavChip>
+        <NavChip href="/bet-suggester/bots" active={false}>Bots</NavChip>
       </TopBar>
 
       {/* ===================== SHOWCASE ZONE ===================== */}
