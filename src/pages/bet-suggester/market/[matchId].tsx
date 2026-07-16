@@ -998,17 +998,45 @@ function ModelPrediction({ summary, scorelines, xg, home, away }: {
         <p className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">
           Most likely final score · 90 min · {">"}10,000 simulations
         </p>
-        <div className="space-y-2.5">
-          {topScores.map((s) => (
-            <div key={s.score} className="flex items-center gap-3">
-              <span className="w-32 shrink-0 font-mono text-sm tabular-nums text-ink-hi">{scoreLabel(s.score)}</span>
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-elev2">
-                <div className="h-full rounded-full bg-accent/70" style={{ width: `${Math.min(s.prob * 400, 100)}%` }} />
+        {(() => {
+          // the sweet spot: the modal score plus every neighbour within
+          // 60% of the mode's probability, max 4 — the same cluster rule
+          // the Sweetspot bot bets. Marked with 🍯 below and summed here.
+          const modeP = topScores[0]?.prob ?? 0;
+          const cluster = new Set(
+            topScores.filter((s) => s.prob >= 0.6 * modeP).slice(0, 4)
+              .map((s) => s.score));
+          const cover = topScores.filter((s) => cluster.has(s.score))
+            .reduce((t, s) => t + s.prob, 0);
+          return (
+            <>
+              <p className="mb-3 text-[11px] leading-relaxed text-ink-low">
+                <span className="mr-1">🍯</span>
+                sweet spot: {topScores.filter((s) => cluster.has(s.score))
+                  .map((s) => s.score.replace("-", "–")).join(" · ")}{" "}
+                — together {pct(cover)} of simulations. Betting the
+                neighbourhood, not just the top line, is what covers the
+                cluster.
+              </p>
+              <div className="space-y-2.5">
+                {topScores.map((s) => (
+                  <div key={s.score} className="flex items-center gap-3">
+                    <span className="w-32 shrink-0 font-mono text-sm tabular-nums text-ink-hi">
+                      {scoreLabel(s.score)}
+                    </span>
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-elev2">
+                      <div className={`h-full rounded-full ${cluster.has(s.score) ? "bg-accent" : "bg-accent/40"}`}
+                        style={{ width: `${Math.min(s.prob * 400, 100)}%` }} />
+                    </div>
+                    <span className="w-14 shrink-0 text-right font-mono text-xs tabular-nums text-ink-low">
+                      {cluster.has(s.score) && <span title="in the sweet-spot cluster">🍯</span>} {pct(s.prob)}
+                    </span>
+                  </div>
+                ))}
               </div>
-              <span className="w-12 shrink-0 text-right font-mono text-xs tabular-nums text-ink-low">{pct(s.prob)}</span>
-            </div>
-          ))}
-        </div>
+            </>
+          );
+        })()}
       </div>
 
       <p className="mt-5 text-[11px] leading-relaxed text-ink-faint">
