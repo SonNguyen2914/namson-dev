@@ -24,6 +24,17 @@ const BOARD_COLS =
 
 type SortKey = "likelihood" | "edge" | "multiplier";
 
+// The schedule's `group` field is a group letter ("A"–"L") through the group
+// stage but a round code from the knockouts on — label each accordingly
+// ("group 3P" read like a fourth group stage).
+function stageLabel(group: string): string {
+  const rounds: Record<string, string> = {
+    R16: "round of 16", QF: "quarter-final", SF: "semi-final",
+    "3P": "third place", F: "final",
+  };
+  return rounds[group] ?? `group ${group}`;
+}
+
 export default function BetSuggesterDashboard() {
   const [suggestions, setSuggestions] = useState<SuggestionRow[]>([]);
   const [tierUsed, setTierUsed] = useState<number | null>(null);
@@ -206,7 +217,7 @@ export default function BetSuggesterDashboard() {
               <Link href={`/bet-suggester/market/${next.match_id}`} className="block">
                 <section className="glow glow-accent cursor-pointer rounded-3xl border border-line bg-elev px-6 py-12 text-center transition-colors duration-300 hover:border-accent/40 sm:py-14">
                   <Eyebrow tone="accent">
-                    next match · group {next.group}
+                    next match · {stageLabel(next.group)}
                   </Eyebrow>
                   <h2 className="mt-5 text-3xl font-semibold tracking-tight text-ink-hi sm:text-5xl">
                     <span className="mr-3">{flag(next.home)}</span>
