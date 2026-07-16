@@ -147,6 +147,13 @@ export interface LiveAutoResponse {
     // openness: symmetric defence multipliers from total shot volume vs
     // the xG-implied expectation (>1 = open game, more goals both ways)
     def_home?: number; def_away?: number;
+    // recent-pattern read from the play-by-play: who is attacking NOW
+    momentum?: {
+      recent_share_home: number;
+      pressure_home: number; pressure_away: number;
+      window_min: number; as_of_minute: number;
+      mult_home: number; mult_away: number;
+    } | null;
     source: string;
     basis?: {
       sot_home: number; sot_away: number;
@@ -160,6 +167,11 @@ export interface LiveAutoResponse {
   };
   status_short?: string;
   stats_available?: boolean;
+  // last few threat plays from the ESPN commentary, newest first
+  recent_plays?: {
+    minute: number; side: "home" | "away"; kind: string;
+    weight: number; text: string;
+  }[];
   generated_at?: string;
   disclaimer?: string;
 }

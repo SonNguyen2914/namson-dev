@@ -84,7 +84,7 @@ function LiveMarketStream({ a, home, away, signals }: {
         </div>
       )}
       {lev && (
-        <p className="mb-3 font-mono text-[11px] text-ink-low"
+        <p className="mb-1.5 font-mono text-[11px] text-ink-low"
           title={lev.basis
             ? `SoT ${lev.basis.sot_home}-${lev.basis.sot_away} · shots ${lev.basis.shots_home}-${lev.basis.shots_away} · share ${lev.basis.actual_share_home} vs expected ${lev.basis.expected_share_home} · volume ${lev.basis.volume_actual ?? "?"} vs expected ${lev.basis.volume_expected ?? "?"} · weight ${lev.basis.weight}`
             : undefined}>
@@ -92,6 +92,20 @@ function LiveMarketStream({ a, home, away, signals }: {
           {lev.def_home != null && lev.def_home !== 1 && (
             <> · openness {lev.def_home.toFixed(2)}×</>
           )}
+        </p>
+      )}
+      {lev?.momentum && (
+        <p className="mb-3 font-mono text-[11px] text-ink-low"
+          title={`Decayed threat pressure ${lev.momentum.pressure_home} vs ${lev.momentum.pressure_away} over the last ${lev.momentum.window_min}' — tilts the attack levers ×${lev.momentum.mult_home}/${lev.momentum.mult_away}, capped ±12%`}>
+          pattern · last {lev.momentum.window_min}&apos;:{" "}
+          <span className={lev.momentum.recent_share_home >= 0.5 ? "text-ink-hi" : ""}>
+            {home} {Math.round(lev.momentum.recent_share_home * 100)}%
+          </span>
+          {" / "}
+          <span className={lev.momentum.recent_share_home < 0.5 ? "text-ink-hi" : ""}>
+            {away} {Math.round((1 - lev.momentum.recent_share_home) * 100)}%
+          </span>
+          {" of the threat"}
         </p>
       )}
       <div className="overflow-x-auto rounded-xl border border-line">
@@ -145,10 +159,32 @@ function LiveMarketStream({ a, home, away, signals }: {
           ))}
         </div>
       </div>
+      {(a.recent_plays?.length ?? 0) > 0 && (
+        <div className="mt-3 rounded-xl border border-line bg-bs/60 px-4 py-3">
+          <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
+            recent threat · newest first
+          </p>
+          <ul className="space-y-1">
+            {a.recent_plays!.map((p, i) => (
+              <li key={`${p.minute}-${i}`}
+                className="flex items-baseline gap-2 text-[11px] leading-snug text-ink-low">
+                <span className="w-8 shrink-0 text-right font-mono tabular-nums text-ink-faint">
+                  {Math.round(p.minute)}&apos;
+                </span>
+                <span className="shrink-0 font-mono text-[10px] uppercase text-ink-faint">
+                  {p.side === "home" ? home : away}
+                </span>
+                <span className="min-w-0 truncate" title={p.text}>{p.text}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
-        Re-simulated every ~30s from the live state and shot stats. The
-        market already knows the score — differences are a read, not an
-        edge. Hover the levers for their full derivation.
+        Re-simulated every ~30s from the live state, shot stats, and the
+        play-by-play pattern (who&apos;s attacking now). The market already
+        knows the score — differences are a read, not an edge. Hover the
+        levers for their full derivation.
       </p>
     </div>
   );
