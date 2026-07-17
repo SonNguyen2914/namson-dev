@@ -57,8 +57,10 @@ function BotCard({ b, start }: { b: BotLedger; start: number }) {
               {b.open.map((p) => (
                 <li key={p.market_id} className="flex items-baseline gap-2 text-xs text-ink-mid">
                   <span className="min-w-0 flex-1 truncate" title={`${p.market_title} — ${p.note ?? ""}`}>{p.market_title}</span>
-                  <span className="shrink-0 font-mono tabular-nums text-ink-low">{p.contracts}× @ {pct(p.entry_price)}</span>
-                  <span className="shrink-0 font-mono tabular-nums text-ink-faint">{money(p.cost)}</span>
+                  <span className="shrink-0 font-mono tabular-nums text-ink-low"
+                    title={`${p.contracts} contracts bought at the ${pct(p.entry_price)} ask — each pays $1 if YES`}>
+                    {money(p.cost)} → {money(p.contracts)} @ {pct(p.entry_price)}
+                  </span>
                 </li>
               ))}
             </ul>
