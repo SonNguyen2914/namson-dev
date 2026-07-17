@@ -1,4 +1,4 @@
-// The Bot Arena — five paper-trading bots, each a betting philosophy,
+// The Bot Arena — the paper-trading bots, each a betting philosophy,
 // scored against the same real Kalshi books the model prices. Hypothetical
 // money by design: this page is a strategy laboratory, not a broker.
 // Ledger polls every 60s (the backend bot tick's cadence).
@@ -128,13 +128,13 @@ export default function BotArena() {
       <main className="mx-auto max-w-5xl px-5 pb-24 pt-10">
         <Eyebrow>strategy laboratory</Eyebrow>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-ink-hi">
-          Five bots, five philosophies
+          Seven bots, seven philosophies
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-low">
           Paper money, real markets. Each bot bets the same Kalshi books the
           model prices — pre-match value, favourites, longshots, live
-          momentum, live contrarian — with the same fee model as the strategy
-          page. Every position starts from a ${data?.start_bankroll ?? 1000}
+          momentum, live contrarian, and two exact-score recipes — with the
+          same fee model as the strategy page. Every position starts from a ${data?.start_bankroll ?? 1000}
           {" "}bankroll. Nothing here is real money or advice; it&apos;s a
           scoreboard for instincts.
         </p>
