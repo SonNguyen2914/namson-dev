@@ -59,7 +59,7 @@ function BotCard({ b, start }: { b: BotLedger; start: number }) {
                   <span className="min-w-0 flex-1 truncate" title={`${p.market_title} — ${p.note ?? ""}`}>{p.market_title}</span>
                   <span className="shrink-0 font-mono tabular-nums text-ink-low"
                     title={`${p.contracts} contracts at the ${pct(p.entry_price)} ask — each pays $1 if YES (multiplier is net of the fee)`}>
-                    {money(p.cost)} ×{(p.contracts / p.cost).toFixed(1)} → {money(p.contracts)} ({pct(p.entry_price)})
+                    {money(p.cost)} at ×{(p.contracts / p.cost).toFixed(1)} ({pct(p.entry_price)}) → {money(p.contracts)}
                   </span>
                 </li>
               ))}
