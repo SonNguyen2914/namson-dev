@@ -161,13 +161,16 @@ export default function BotArena() {
       <main className="mx-auto max-w-5xl px-5 pb-24 pt-10">
         <Eyebrow>strategy laboratory</Eyebrow>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-ink-hi">
-          Seven bots, seven philosophies
+          Twelve bots, twelve philosophies
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-low">
           Paper money, real markets. Each bot bets the same Kalshi books the
           model prices — pre-match value, favourites, longshots, live
-          momentum, live contrarian, and two exact-score recipes — with the
-          same fee model as the strategy page. Every position starts from a ${data?.start_bankroll ?? 1000}
+          momentum, live contrarian, two exact-score recipes — plus the
+          control group: a coin-flip placebo, a model-blind price follower,
+          a last-15-minutes sniper, a martingale cautionary tale, and a
+          scholar that copies whatever the winning ledgers hold. Same fee
+          model as the strategy page; every bot starts from a ${data?.start_bankroll ?? 1000}
           {" "}bankroll. Nothing here is real money or advice; it&apos;s a
           scoreboard for instincts.
         </p>
