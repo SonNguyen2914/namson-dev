@@ -4,7 +4,7 @@
 // Ledger polls every 60s (the backend bot tick's cadence).
 import Head from "next/head";
 import { useEffect, useState } from "react";
-import { api, pct, BotLedger, BotsResponse } from "../../lib/suggesterApi";
+import { api, pct, BotLedger, BotPositionRow, BotsResponse } from "../../lib/suggesterApi";
 import { Eyebrow, Reveal } from "../../components/ui";
 import { RouteProgress, TopBar } from "../../components/chrome";
 
@@ -13,6 +13,25 @@ const POLL_MS = 60 * 1000;
 function money(v: number): string {
   const sign = v < 0 ? "−" : "";
   return `${sign}$${Math.abs(v).toFixed(2)}`;
+}
+
+// Holdings grouped per match (groups and rows both in entry-time order),
+// so a card reads as one sub-ledger per fixture instead of a mixed list.
+function groupHoldings(open: BotPositionRow[]) {
+  const byMatch = new Map<string, BotPositionRow[]>();
+  for (const p of open) {
+    const g = byMatch.get(p.match_id) ?? [];
+    g.push(p);
+    byMatch.set(p.match_id, g);
+  }
+  const groups = [...byMatch.entries()].map(([matchId, items]) => ({
+    matchId,
+    items: [...items].sort((a, b) =>
+      (a.opened_at ?? "").localeCompare(b.opened_at ?? "")),
+  }));
+  groups.sort((a, b) =>
+    (a.items[0].opened_at ?? "").localeCompare(b.items[0].opened_at ?? ""));
+  return groups;
 }
 
 function BotCard({ b, start }: { b: BotLedger; start: number }) {
@@ -53,17 +72,31 @@ function BotCard({ b, start }: { b: BotLedger; start: number }) {
             <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
               holding · {b.open.length}
             </p>
-            <ul className="space-y-1.5">
-              {b.open.map((p) => (
-                <li key={p.market_id} className="flex items-baseline gap-2 text-xs text-ink-mid">
-                  <span className="min-w-0 flex-1 truncate" title={`${p.market_title} — ${p.note ?? ""}`}>{p.market_title}</span>
-                  <span className="shrink-0 font-mono tabular-nums text-ink-low"
-                    title={`${p.contracts} contracts at the ${pct(p.entry_price)} ask — each pays $1 if YES (multiplier is net of the fee)`}>
-                    {money(p.cost)} at ×{(p.contracts / p.cost).toFixed(1)} ({pct(p.entry_price)}) → {money(p.contracts)}
-                  </span>
-                </li>
+            <div className="space-y-2">
+              {groupHoldings(b.open).map((g) => (
+                <details key={g.matchId} open className="group">
+                  <summary className="flex cursor-pointer select-none list-none items-baseline gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint [&::-webkit-details-marker]:hidden">
+                    <span aria-hidden className="inline-block transition-transform group-open:rotate-90">▸</span>
+                    <span className="text-ink-low">{g.matchId.replace(/_/g, " ")}</span>
+                    <span>· {g.items.length}</span>
+                    <span className="ml-auto tabular-nums">
+                      {money(g.items.reduce((s, p) => s + p.cost, 0))} → {money(g.items.reduce((s, p) => s + p.contracts, 0))}
+                    </span>
+                  </summary>
+                  <ul className="mt-1.5 space-y-1.5 pl-4">
+                    {g.items.map((p) => (
+                      <li key={p.market_id} className="flex items-baseline gap-2 text-xs text-ink-mid">
+                        <span className="min-w-0 flex-1 truncate" title={`${p.market_title} — ${p.note ?? ""}`}>{p.market_title}</span>
+                        <span className="shrink-0 font-mono tabular-nums text-ink-low"
+                          title={`${p.contracts} contracts at the ${pct(p.entry_price)} ask — each pays $1 if YES (multiplier is net of the fee)`}>
+                          {money(p.cost)} at ×{(p.contracts / p.cost).toFixed(1)} ({pct(p.entry_price)}) → {money(p.contracts)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
               ))}
-            </ul>
+            </div>
           </div>
         )}
 
