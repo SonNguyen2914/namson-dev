@@ -153,7 +153,7 @@ export default function BotArena() {
   const ranked = [...bots].sort((a, b) => b.net_pnl - a.net_pnl);
 
   return (
-    <>
+    <div className="min-h-screen bg-bs font-sans text-ink-mid">
       <Head><title>Bot Arena · WC26 Bet Suggester</title></Head>
       <RouteProgress />
       <TopBar back={{ href: "/bet-suggester", label: "dashboard" }}
@@ -183,6 +183,6 @@ export default function BotArena() {
           ))}
         </div>
       </main>
-    </>
+    </div>
   );
 }
