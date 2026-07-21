@@ -48,7 +48,7 @@ const LEAGUES = [
     eyebrow: "engine adaptation · in season",
     accent: "#d50032", dim: "rgba(213,0,50,0.35)", faint: "rgba(213,0,50,0.10)",
     ambient: "rgba(213,0,50,0.07)", modeMs: 1150,
-    logo: "/leagues/mls.png", glyph: "rich",
+    logo: "/leagues/mls.svg", glyph: "rich",
     tagline: "Crest red. The same engine, rewired for MLS — fixtures, books and twelve fresh bot ledgers." },
   { id: "epl", name: "Premier League", top: "EPL · Bet Suggester",
     eyebrow: "engine adaptation · season 26/27",
@@ -60,7 +60,7 @@ const LEAGUES = [
     eyebrow: "engine adaptation · season 26/27",
     accent: "#ff4b44", dim: "rgba(255,75,68,0.35)", faint: "rgba(255,75,68,0.10)",
     ambient: "rgba(255,75,68,0.07)", modeMs: 1000,
-    logo: "/leagues/laliga.webp", glyph: "rich",
+    logo: "/leagues/laliga.png", glyph: "rich",
     tagline: "Crest coral. The world champions’ home league is the obvious next room." },
 ];
 
