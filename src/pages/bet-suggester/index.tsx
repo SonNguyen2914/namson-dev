@@ -227,6 +227,24 @@ export default function BetSuggesterDashboard() {
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const league = LEAGUES[leagueIdx];
   const isWC = league.id === "wc26";
+  // curtain-up: play the current league's transition once on page load
+  const didIntro = useRef(false);
+  useEffect(() => {
+    if (didIntro.current) return;
+    didIntro.current = true;
+    switching.current = true;
+    const l = LEAGUES[0];
+    setSwapClass(`mode-reveal-${l.id}`);
+    setFxOn(true);
+    setFxKey((k) => k + 1);
+    const t = setTimeout(() => {
+      setSwapClass("");
+      setFxOn(false);
+      switching.current = false;
+    }, l.modeMs);
+    return () => clearTimeout(t);
+  }, []);
+
   const goLeague = (target: number, _dirName: "next" | "prev") => {
     if (switching.current || target === leagueIdx) return;
     switching.current = true;

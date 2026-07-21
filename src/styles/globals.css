@@ -572,10 +572,15 @@ img.glyph-soft   { opacity: 0.11; filter: grayscale(1) brightness(1.1); }
     var(--accent) 0deg, var(--accent-dim) 5deg, var(--accent-faint) 10deg,
     transparent 16deg, transparent 350deg,
     var(--accent-faint) 354deg, var(--accent-dim) 358deg, var(--accent) 360deg);
-  opacity: 0.8; will-change: transform;
+  opacity: 0; will-change: transform, opacity;
   animation: armSpin 1s cubic-bezier(0.5, 0.05, 0.3, 1) both;
 }
-@keyframes armSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes armSpin {
+  0% { opacity: 0; transform: rotate(0deg); }
+  9% { opacity: 0.8; }
+  74% { opacity: 0.8; }
+  100% { opacity: 0; transform: rotate(360deg); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .mode-reveal-wc26, .mode-reveal-mls, .mode-reveal-epl, .mode-reveal-laliga {
