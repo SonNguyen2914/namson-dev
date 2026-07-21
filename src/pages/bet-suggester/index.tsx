@@ -5,7 +5,7 @@
 // Scoped to this route so it doesn't fight the rest of the portfolio.
 import Head from "next/head";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import {
   api, countdown, flag, pct, signedPct, kickoffLocal,
   RipenessAlert, SuggestionRow, UpcomingMatch, WatchlistEntry,
@@ -35,6 +35,47 @@ function stageLabel(group: string): string {
   return rounds[group] ?? `group ${group}`;
 }
 
+// League "drive modes": each carries the primary color of its competition's
+// logo (tuned where needed so the accent reads on the near-black canvas).
+const LEAGUES = [
+  { id: "wc26", name: "World Cup 26", top: "WC26 \u00b7 Bet Suggester",
+    eyebrow: "live model \u00b7 kalshi markets",
+    accent: "#34d399", dim: "rgba(52,211,153,0.35)", faint: "rgba(52,211,153,0.10)",
+    tagline: "" },
+  { id: "mls", name: "MLS", top: "MLS \u00b7 Bet Suggester",
+    eyebrow: "engine adaptation \u00b7 in season",
+    accent: "#d50032", dim: "rgba(213,0,50,0.35)", faint: "rgba(213,0,50,0.10)",
+    tagline: "Crest red. The same engine, rewired for MLS \u2014 fixtures, books and twelve fresh bot ledgers." },
+  { id: "epl", name: "Premier League", top: "EPL \u00b7 Bet Suggester",
+    eyebrow: "engine adaptation \u00b7 season 26/27",
+    accent: "#b18cff", dim: "rgba(177,140,255,0.35)", faint: "rgba(177,140,255,0.10)",
+    tagline: "Lion purple, lifted for the dark. Thirty-eight matches of honest calibration sample." },
+  { id: "laliga", name: "La Liga", top: "La Liga \u00b7 Bet Suggester",
+    eyebrow: "engine adaptation \u00b7 season 26/27",
+    accent: "#ff4b44", dim: "rgba(255,75,68,0.35)", faint: "rgba(255,75,68,0.10)",
+    tagline: "Crest coral. The world champions\u2019 home league is the obvious next room." },
+];
+
+function LeagueComingSoon({ league }: { league: (typeof LEAGUES)[number] }) {
+  return (
+    <Reveal>
+      <section className="glow glow-accent mx-auto max-w-2xl rounded-3xl border border-line bg-elev px-6 py-14 text-center">
+        <Eyebrow tone="accent">mode \u00b7 scaffolded</Eyebrow>
+        <p className="mt-5 text-lg text-ink-hi">
+          The engine that priced World Cup 26 is being adapted for {league.name}.
+        </p>
+        <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-ink-low">
+          Fixtures pipeline \u00b7 Kalshi market mapping \u00b7 per-match xG sourcing
+          \u00b7 twelve fresh bot ledgers.
+        </p>
+        <p className="mt-10 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-faint">
+          arriving pre-season
+        </p>
+      </section>
+    </Reveal>
+  );
+}
+
 export default function BetSuggesterDashboard() {
   const [suggestions, setSuggestions] = useState<SuggestionRow[]>([]);
   const [tierUsed, setTierUsed] = useState<number | null>(null);
@@ -53,6 +94,34 @@ export default function BetSuggesterDashboard() {
   const [sortKey, setSortKey] = useState<SortKey>("likelihood");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // League drive-mode switcher: out-wipe, accent snap under the light
+  // sweep, in-slide from the direction of travel.
+  const [leagueIdx, setLeagueIdx] = useState(0);
+  const [swapClass, setSwapClass] = useState("");
+  const [sweep, setSweep] = useState<null | "next" | "prev">(null);
+  const [sweepKey, setSweepKey] = useState(0);
+  const switching = useRef(false);
+  const league = LEAGUES[leagueIdx];
+  const isWC = league.id === "wc26";
+  const goLeague = (target: number, dirName: "next" | "prev") => {
+    if (switching.current || target === leagueIdx) return;
+    switching.current = true;
+    setSwapClass(dirName === "next" ? "mode-swap-out-left" : "mode-swap-out-right");
+    setTimeout(() => {
+      setLeagueIdx(target);
+      setSwapClass(dirName === "next" ? "mode-swap-in-right" : "mode-swap-in-left");
+      setSweep(dirName);
+      setSweepKey((k) => k + 1);
+      setTimeout(() => {
+        setSwapClass("");
+        setSweep(null);
+        switching.current = false;
+      }, 430);
+    }, 220);
+  };
+  const switchLeague = (delta: number) =>
+    goLeague((leagueIdx + delta + LEAGUES.length) % LEAGUES.length,
+             delta > 0 ? "next" : "prev");
 
   const load = useCallback(async () => {
     try {
@@ -173,36 +242,71 @@ export default function BetSuggesterDashboard() {
   const activeSection = useScrollSpy(["bracket", "board"], [loading]);
 
   return (
-    <div className="min-h-screen bg-bs font-sans text-ink-mid">
-      <Head><title>WC26 Bet Suggester · namson.dev</title></Head>
+    <div className="min-h-screen bg-bs font-sans text-ink-mid"
+      style={{ "--accent": league.accent, "--accent-dim": league.dim,
+               "--accent-faint": league.faint } as CSSProperties}>
+      <Head><title>{league.name} Bet Suggester · namson.dev</title></Head>
 
       <RouteProgress />
       <Toaster />
-      <TopBar title="WC26 · Bet Suggester">
-        <NavChip href="#bracket" active={activeSection === "bracket"}>Bracket</NavChip>
-        <NavChip href="#board" active={activeSection === "board"}>Best bets</NavChip>
-        <NavChip href="/bet-suggester/bots" active={false}>Bots</NavChip>
+      <TopBar title={league.top}>
+        {isWC && (
+          <>
+            <NavChip href="#bracket" active={activeSection === "bracket"}>Bracket</NavChip>
+            <NavChip href="#board" active={activeSection === "board"}>Best bets</NavChip>
+            <NavChip href="/bet-suggester/bots" active={false}>Bots</NavChip>
+          </>
+        )}
       </TopBar>
 
       {/* ===================== SHOWCASE ZONE ===================== */}
       <div className="hero-ambient">
         <div className="mx-auto max-w-5xl px-5 pt-20 sm:pt-24">
           {/* Title lockup */}
-          <header className="mb-16 text-center sm:mb-20">
-            <Eyebrow tone="accent" className="mb-5">
-              live model · kalshi markets
-            </Eyebrow>
-            <h1 className="text-5xl font-semibold leading-[1.02] tracking-tighter sm:text-7xl">
-              <span className="block text-ink-hi">World Cup 26</span>
-              <span className="block text-ink-low">Bet Suggester</span>
-            </h1>
-            <p className="mx-auto mt-6 max-w-md text-sm leading-relaxed text-ink-low">
-              Monte Carlo match simulation vs. live market prices.
-              {updatedAt && ` Updated ${updatedAt.toLocaleTimeString()}.`}
-              {" "}For research — not financial advice.
-            </p>
+          <header className="relative mb-16 text-center sm:mb-20">
+            <button aria-label="previous league" onClick={() => switchLeague(-1)}
+              className="group absolute left-0 top-1/2 z-10 -translate-y-1/2 p-3 text-ink-faint transition-colors duration-300 hover:text-accent sm:left-2">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                className="transition-transform duration-300 group-hover:-translate-x-0.5">
+                <polyline points="15 18 9 12 15 6" /></svg>
+            </button>
+            <button aria-label="next league" onClick={() => switchLeague(1)}
+              className="group absolute right-0 top-1/2 z-10 -translate-y-1/2 p-3 text-ink-faint transition-colors duration-300 hover:text-accent sm:right-2">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                className="transition-transform duration-300 group-hover:translate-x-0.5">
+                <polyline points="9 18 15 12 9 6" /></svg>
+            </button>
+            <div className="relative">
+              {sweep && <div key={sweepKey} className={`mode-sweep${sweep === "prev" ? " rev" : ""}`} />}
+              <div className={swapClass}>
+                <Eyebrow tone="accent" className="mb-5">{league.eyebrow}</Eyebrow>
+                <h1 className="text-5xl font-semibold leading-[1.02] tracking-tighter sm:text-7xl">
+                  <span className="block text-ink-hi">{league.name}</span>
+                  <span className="block text-ink-low">Bet Suggester</span>
+                </h1>
+                <p className="mx-auto mt-6 max-w-md text-sm leading-relaxed text-ink-low">
+                  {isWC ? (
+                    <>Monte Carlo match simulation vs. live market prices.
+                    {updatedAt && ` Updated ${updatedAt.toLocaleTimeString()}.`}
+                    {" "}For research — not financial advice.</>
+                  ) : league.tagline}
+                </p>
+              </div>
+            </div>
+            <div className="mt-7 flex items-center justify-center gap-2">
+              {LEAGUES.map((l, i) => (
+                <button key={l.id} aria-label={`switch to ${l.name}`}
+                  onClick={() => goLeague(i, i > leagueIdx ? "next" : "prev")}
+                  className={`h-1 rounded-full transition-all duration-300 ${
+                    i === leagueIdx ? "w-6 bg-accent"
+                    : "w-2 bg-[color:var(--line-strong)] hover:bg-ink-faint"}`} />
+              ))}
+            </div>
           </header>
 
+          {!isWC ? <LeagueComingSoon league={league} /> : <>
           {error && (
             <div className="mb-10 rounded-xl border border-live/30 bg-live/5 p-4 text-center text-sm text-live">
               {error}
@@ -241,10 +345,12 @@ export default function BetSuggesterDashboard() {
               </Link>
             </Reveal>
           )}
+          </>}
         </div>
       </div>
 
       {/* ===================== TOOL ZONE (Linear-style) ===================== */}
+      {isWC && (
       <div className="mx-auto max-w-5xl px-5 pb-16 pt-20 sm:pt-24">
 
         {/* Knockout bracket — reversed pyramid, model win probabilities */}
@@ -490,6 +596,7 @@ export default function BetSuggesterDashboard() {
           Predictions refresh hourly; final decisions lock 10 minutes before kickoff.
         </footer>
       </div>
+      )}
     </div>
   );
 }

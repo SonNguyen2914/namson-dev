@@ -357,3 +357,25 @@ html {
   box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.35),
               0 0 18px rgba(52, 211, 153, 0.12);
 }
+
+/* ---- League switcher: drive-mode change (cluster wipe + light sweep) ---- */
+.mode-swap-out-left  { animation: modeOutLeft 0.22s ease-in forwards; }
+.mode-swap-out-right { animation: modeOutRight 0.22s ease-in forwards; }
+.mode-swap-in-right  { animation: modeInRight 0.38s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.mode-swap-in-left   { animation: modeInLeft 0.38s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes modeOutLeft  { to { opacity: 0; transform: translateX(-30px); filter: blur(6px); } }
+@keyframes modeOutRight { to { opacity: 0; transform: translateX(30px);  filter: blur(6px); } }
+@keyframes modeInRight  { from { opacity: 0; transform: translateX(30px);  filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes modeInLeft   { from { opacity: 0; transform: translateX(-30px); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+
+.mode-sweep { position: absolute; inset: -20% 0; pointer-events: none; overflow: hidden; }
+.mode-sweep::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 42%; left: -48%;
+  background: linear-gradient(90deg, transparent, var(--accent-faint),
+              var(--accent-dim), var(--accent-faint), transparent);
+  filter: blur(16px);
+  animation: modeSweep 0.55s ease-out forwards;
+}
+.mode-sweep.rev::after { left: 106%; animation: modeSweepRev 0.55s ease-out forwards; }
+@keyframes modeSweep    { to { left: 106%; } }
+@keyframes modeSweepRev { to { left: -48%; } }
