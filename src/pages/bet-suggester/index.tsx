@@ -53,6 +53,7 @@ const LEAGUES = [
     ambient: "rgba(52,211,153,0.07)", modeMs: 1300,
     logo: "/leagues/wc26.png", glyph: "rich",
     font: wcFont,
+    tracking: "0.025em",
     tagline: "" },
   { id: "mls", name: "MLS", top: "MLS · Bet Suggester",
     eyebrow: "engine adaptation · in season",
@@ -60,6 +61,7 @@ const LEAGUES = [
     ambient: "rgba(213,0,50,0.07)", modeMs: 600,
     logo: "/leagues/mls.svg", glyph: "soft",
     font: mlsFont,
+    tracking: "0.05em",
     tagline: "Crest red. The same engine, rewired for MLS — fixtures, books and twelve fresh bot ledgers." },
   { id: "epl", name: "Premier League", top: "EPL · Bet Suggester",
     eyebrow: "engine adaptation · season 26/27",
@@ -421,7 +423,8 @@ export default function BetSuggesterDashboard() {
                 <LeagueMark league={league} />
                 <Eyebrow tone="accent" className="mb-5">{`bet suggester · ${league.eyebrow}`}</Eyebrow>
                 <h1 className="text-5xl font-semibold leading-[1.02] tracking-tighter sm:text-7xl lg:text-8xl">
-                  <span className={`league-title block text-accent ${league.font.className}`}>{league.name}</span>
+                  <span className={`league-title block text-accent ${league.font.className}`}
+                    style={"tracking" in league ? { letterSpacing: (league as { tracking?: string }).tracking } : undefined}>{league.name}</span>
                 </h1>
                 <p className="mx-auto mt-6 max-w-md text-sm leading-relaxed text-ink-low">
                   {isWC ? (
