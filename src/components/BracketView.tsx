@@ -44,33 +44,9 @@ export default function BracketView() {
         </h3>
 
         <div className="mx-auto max-w-4xl">
-          {(b.round_of_16?.length ?? 0) > 0 && (
-            <>
-              <RoundLabel>Round of 16</RoundLabel>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {b.round_of_16!.map((m) => (
-                  <BracketCard key={m.match_id} m={m} small />
-                ))}
-              </div>
-              <BranchLines />
-            </>
-          )}
-
-          <RoundLabel>Quarter-finals</RoundLabel>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-            {b.quarterfinals.map((m) => (
-              <BracketCard key={m.match_id} m={m} />
-            ))}
-          </div>
-
-          <BranchLines />
-
-          <RoundLabel>Semi-finals</RoundLabel>
-          <div className="mx-auto grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-2">
-            {b.semifinals.map((m) => (
-              <BracketCard key={m.match_id} m={m} />
-            ))}
-          </div>
+          {/* flipped pyramid: the champion crowns the page, the road
+              unfolds beneath — final, semis, quarters, down to the R16 */}
+          <ChampionBox champion={b.champion} forecast={b.champion_forecast} />
 
           <BranchLines />
 
@@ -100,7 +76,35 @@ export default function BracketView() {
             )}
           </div>
 
-          <ChampionBox champion={b.champion} forecast={b.champion_forecast} />
+          <BranchLines />
+
+          <RoundLabel>Semi-finals</RoundLabel>
+          <div className="mx-auto grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-2">
+            {b.semifinals.map((m) => (
+              <BracketCard key={m.match_id} m={m} />
+            ))}
+          </div>
+
+          <BranchLines />
+
+          <RoundLabel>Quarter-finals</RoundLabel>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+            {b.quarterfinals.map((m) => (
+              <BracketCard key={m.match_id} m={m} />
+            ))}
+          </div>
+
+          {(b.round_of_16?.length ?? 0) > 0 && (
+            <>
+              <BranchLines />
+              <RoundLabel>Round of 16</RoundLabel>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {b.round_of_16!.map((m) => (
+                  <BracketCard key={m.match_id} m={m} small />
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </section>
     </Reveal>
