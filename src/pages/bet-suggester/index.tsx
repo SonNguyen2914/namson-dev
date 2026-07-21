@@ -50,7 +50,7 @@ const LEAGUES = [
   { id: "wc26", name: "World Cup 26", top: "WC26 · Bet Suggester",
     eyebrow: "live model · kalshi markets",
     accent: "#34d399", dim: "rgba(52,211,153,0.35)", faint: "rgba(52,211,153,0.10)",
-    ambient: "rgba(52,211,153,0.07)", modeMs: 1600,
+    ambient: "rgba(52,211,153,0.07)", modeMs: 2500,
     logo: "/leagues/wc26.png", glyph: "rich",
     font: wcFont,
     tracking: "0.025em",
@@ -122,7 +122,8 @@ function LeagueFX({ id }: { id: string }) {
     <div ref={ref} className="fxx fxx-wc26">
       <i className="bloom" /><i className="burst" />
       {Array.from({ length: 24 }, (_, i) => <span key={i} className="c" />)}
-      <b className="r" /><b className="r" /><b className="r" />
+      {Array.from({ length: 6 }, (_, i) => <b key={`r${i}`} className="r" />)}
+      {Array.from({ length: 6 }, (_, i) => <u key={`f${i}`} className="f" />)}
     </div>
   );
 }
@@ -435,8 +436,12 @@ export default function BetSuggesterDashboard() {
                   ) : league.tagline}
                 </p>
                 {isWC && (
-                  <p className="champ-line mt-4 font-mono text-[11px] uppercase">
-                    ★ ★&ensp;campeones · españa
+                  <p className="mt-5 flex justify-center">
+                    <span className="champ-badge font-mono text-xs uppercase">
+                      <span className="flag" aria-hidden />
+                      ★ ★ campeones · españa
+                      <span className="flag" aria-hidden />
+                    </span>
                   </p>
                 )}
               </div>
