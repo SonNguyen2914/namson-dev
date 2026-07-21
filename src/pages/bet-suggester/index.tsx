@@ -50,7 +50,7 @@ const LEAGUES = [
   { id: "wc26", name: "World Cup 26", top: "WC26 · Bet Suggester",
     eyebrow: "live model · kalshi markets",
     accent: "#34d399", dim: "rgba(52,211,153,0.35)", faint: "rgba(52,211,153,0.10)",
-    ambient: "rgba(52,211,153,0.07)", modeMs: 1300,
+    ambient: "rgba(52,211,153,0.07)", modeMs: 1600,
     logo: "/leagues/wc26.png", glyph: "rich",
     font: wcFont,
     tracking: "0.025em",
@@ -119,9 +119,9 @@ function LeagueFX({ id }: { id: string }) {
   if (id === "epl") return <div className="fxx fxx-epl"><i /><i /><i /></div>;
   if (id === "laliga") return <div ref={ref} className="fxx fxx-laliga"><i /></div>;
   return (
-    <div className="fxx fxx-wc26">
-      <span className="col" /><span className="col" /><span className="col" />
-      <span className="col" /><span className="col" />
+    <div ref={ref} className="fxx fxx-wc26">
+      <i className="bloom" /><i className="burst" />
+      {Array.from({ length: 24 }, (_, i) => <span key={i} className="c" />)}
     </div>
   );
 }
