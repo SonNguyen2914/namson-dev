@@ -51,7 +51,7 @@ const LEAGUES = [
     eyebrow: "live model · kalshi markets",
     accent: "#34d399", dim: "rgba(52,211,153,0.35)", faint: "rgba(52,211,153,0.10)",
     ambient: "rgba(52,211,153,0.07)", modeMs: 3200,
-    logo: "/leagues/wc26-emblem.png", glyph: "rich",
+    logo: "/leagues/wc26-official.png", glyph: "rich",
     font: wcFont,
     tracking: "0.025em",
     tagline: "" },
