@@ -28,9 +28,9 @@
   --ink-faint: #4b4b54;
 
   /* the one accent */
-  --accent: #34d399;
-  --accent-dim: rgba(52, 211, 153, 0.35);
-  --accent-faint: rgba(52, 211, 153, 0.10);
+  --accent: #f5c542;
+  --accent-dim: rgba(245, 197, 66, 0.35);
+  --accent-faint: rgba(245, 197, 66, 0.10);
 
   /* semantic data-ink */
   --live: #ff453a;         /* Apple system red — in-play only */
@@ -125,7 +125,7 @@ body {
 .glow-accent::before {
   background: radial-gradient(
     110% 90% at 50% 0%,
-    rgba(52, 211, 153, 0.10),
+    rgba(245, 197, 66, 0.10),
     transparent 60%
   );
 }
@@ -133,7 +133,7 @@ body {
 .hero-ambient {
   background: radial-gradient(
     56rem 22rem at 50% -4rem,
-    var(--accent-ambient, rgba(52, 211, 153, 0.07)),
+    var(--accent-ambient, rgba(245, 197, 66, 0.07)),
     transparent 70%
   );
   transition: background 0.6s ease;
@@ -316,8 +316,8 @@ html {
 }
 .toast {
   pointer-events: auto;
-  background: color-mix(in srgb, var(--background) 82%, #34d399 6%);
-  border: 1px solid rgba(52, 211, 153, 0.35);
+  background: color-mix(in srgb, var(--background) 82%, #f5c542 6%);
+  border: 1px solid rgba(245, 197, 66, 0.35);
   color: var(--foreground);
   border-radius: 0.75rem;
   padding: 0.55rem 0.9rem;
@@ -355,8 +355,8 @@ html {
 
 /* "Next up" ring for bracket cards kicking off soon. */
 .ring-soon {
-  box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.35),
-              0 0 18px rgba(52, 211, 153, 0.12);
+  box-shadow: 0 0 0 1px rgba(245, 197, 66, 0.35),
+              0 0 18px rgba(245, 197, 66, 0.12);
 }
 
 /* ================= League mode transitions v2 ==========================

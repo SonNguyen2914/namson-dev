@@ -49,8 +49,8 @@ const laligaFont = Baloo_2({ weight: "700", subsets: ["latin"] });
 const LEAGUES = [
   { id: "wc26", name: "World Cup 26", top: "WC26 · Bet Suggester",
     eyebrow: "live model · kalshi markets",
-    accent: "#34d399", dim: "rgba(52,211,153,0.35)", faint: "rgba(52,211,153,0.10)",
-    ambient: "rgba(52,211,153,0.07)", modeMs: 3200,
+    accent: "#f5c542", dim: "rgba(245,197,66,0.35)", faint: "rgba(245,197,66,0.10)",
+    ambient: "rgba(245,197,66,0.07)", modeMs: 3200,
     logo: "/leagues/wc26-official.png", glyph: "rich",
     font: wcFont,
     tracking: "0.025em",
