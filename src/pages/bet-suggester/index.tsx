@@ -113,7 +113,7 @@ function LeagueFX({ id }: { id: string }) {
     el.style.setProperty("--fx-x", `${r.left + r.width / 2}px`);
     el.style.setProperty("--fx-y", `${r.top + r.height / 2}px`);
   }, [id]);
-  if (id === "mls") return <div className="fxx fxx-mls"><span /></div>;
+  if (id === "mls") return <div className="fxx fxx-mls"><span className="curtain" /></div>;
   if (id === "epl") return <div className="fxx fxx-epl"><i /><i /><i /></div>;
   if (id === "laliga") return <div ref={ref} className="fxx fxx-laliga"><i /></div>;
   return (

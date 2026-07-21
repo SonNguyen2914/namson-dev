@@ -388,11 +388,8 @@ img.glyph-soft   { opacity: 0.11; filter: grayscale(1) brightness(1.1); }
 .mode-reveal-wc26 { animation: stageIn 0.15s ease-out both; }
 
 
-.mode-reveal-mls { animation: revealSlash 0.55s cubic-bezier(0.75, 0, 0.15, 1) both; }
-@keyframes revealSlash {
-  from { clip-path: polygon(-20% 0%, 5% 0%, -20% 100%, -45% 100%); }
-  to   { clip-path: polygon(-20% 0%, 170% 0%, 145% 100%, -45% 100%); }
-}
+.mode-reveal-mls { animation: stageIn 0.1s ease-out both; }
+
 
 .mode-reveal-epl { animation: stageIn 0.35s ease-out both; }
 @keyframes stageIn { from { opacity: 0; } to { opacity: 1; } }
@@ -434,15 +431,19 @@ img.glyph-soft   { opacity: 0.11; filter: grayscale(1) brightness(1.1); }
   56% { opacity: 0.35; } 70% { opacity: 0.8; } 100% { opacity: 0; }
 }
 
-.fxx-mls span {
-  position: absolute; top: -16%; bottom: -16%; left: -30vw; width: 19vw;
-  background: linear-gradient(90deg, transparent,
-    var(--accent-dim) 30%, var(--accent) 62%,
-    rgba(255, 255, 255, 0.65) 66%, transparent 70%);
-  transform: skewX(-14deg); filter: blur(1px);
-  animation: slashSweep 0.55s cubic-bezier(0.75, 0, 0.15, 1) both;
+.fxx-mls .curtain {
+  position: absolute; top: -22%; bottom: -22%; left: -12vw; width: 155vw;
+  background: #050507; will-change: transform;
+  transform: skewX(-14deg) translateX(0);
+  animation: curtainOut 0.55s cubic-bezier(0.75, 0, 0.15, 1) both;
 }
-@keyframes slashSweep { from { left: -30vw; } to { left: 126vw; } }
+.fxx-mls .curtain::before {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -13vw; width: 14vw;
+  background: linear-gradient(90deg, transparent,
+    var(--accent-dim) 35%, var(--accent) 70%,
+    rgba(255, 255, 255, 0.65) 88%, #050507 100%);
+}
+@keyframes curtainOut { to { transform: skewX(-14deg) translateX(185vw); } }
 
 .fxx-epl i {
   position: absolute; left: 50%; top: 20rem; width: 14vmax; height: 14vmax;
