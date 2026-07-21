@@ -50,14 +50,14 @@ const LEAGUES = [
   { id: "wc26", name: "World Cup 26", top: "WC26 · Bet Suggester",
     eyebrow: "live model · kalshi markets",
     accent: "#34d399", dim: "rgba(52,211,153,0.35)", faint: "rgba(52,211,153,0.10)",
-    ambient: "rgba(52,211,153,0.07)", modeMs: 1000,
+    ambient: "rgba(52,211,153,0.07)", modeMs: 1300,
     logo: "/leagues/wc26.png", glyph: "rich",
     font: wcFont,
     tagline: "" },
   { id: "mls", name: "MLS", top: "MLS · Bet Suggester",
     eyebrow: "engine adaptation · in season",
     accent: "#d50032", dim: "rgba(213,0,50,0.35)", faint: "rgba(213,0,50,0.10)",
-    ambient: "rgba(213,0,50,0.07)", modeMs: 700,
+    ambient: "rgba(213,0,50,0.07)", modeMs: 600,
     logo: "/leagues/mls.svg", glyph: "soft",
     font: mlsFont,
     tagline: "Crest red. The same engine, rewired for MLS — fixtures, books and twelve fresh bot ledgers." },
@@ -106,7 +106,12 @@ function LeagueFX({ id }: { id: string }) {
   if (id === "mls") return <div className="fxx fxx-mls"><span /></div>;
   if (id === "epl") return <div className="fxx fxx-epl"><i /><i /><i /></div>;
   if (id === "laliga") return <div className="fxx fxx-laliga"><i /></div>;
-  return <div className="fxx fxx-wc26"><span /><span /><span /></div>;
+  return (
+    <div className="fxx fxx-wc26">
+      <span className="col" /><span className="col" /><span className="col" />
+      <span className="col" /><span className="col" />
+    </div>
+  );
 }
 
 // Watermark behind the league title. Prefers a real logo file dropped at

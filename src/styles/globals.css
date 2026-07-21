@@ -385,19 +385,10 @@ img.glyph-soft   { opacity: 0.11; filter: grayscale(1) brightness(1.1); }
 /* ---- reveals on the stage ------------------------------------------- */
 
 
-.mode-reveal-wc26 {
-  -webkit-mask-image: linear-gradient(100deg, #000 42%, rgba(0,0,0,0) 58%);
-          mask-image: linear-gradient(100deg, #000 42%, rgba(0,0,0,0) 58%);
-  -webkit-mask-size: 260% 100%; mask-size: 260% 100%;
-  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
-  animation: revealSweep 1s cubic-bezier(0.6, 0.05, 0.25, 1) both;
-}
-@keyframes revealSweep {
-  from { -webkit-mask-position: 100% 0; mask-position: 100% 0; }
-  to   { -webkit-mask-position: 0% 0;   mask-position: 0% 0; }
-}
+.mode-reveal-wc26 { animation: stageIn 0.15s ease-out both; }
 
-.mode-reveal-mls { animation: revealSlash 0.7s cubic-bezier(0.7, 0, 0.2, 1) both; }
+
+.mode-reveal-mls { animation: revealSlash 0.55s cubic-bezier(0.75, 0, 0.15, 1) both; }
 @keyframes revealSlash {
   from { clip-path: polygon(-20% 0%, 5% 0%, -20% 100%, -45% 100%); }
   to   { clip-path: polygon(-20% 0%, 170% 0%, 145% 100%, -45% 100%); }
@@ -412,27 +403,44 @@ img.glyph-soft   { opacity: 0.11; filter: grayscale(1) brightness(1.1); }
 /* ---- full-viewport effects riding the reveals ------------------------ */
 .fxx { position: fixed; inset: 0; z-index: 40; pointer-events: none; overflow: hidden; }
 
-.fxx-wc26 span {
-  position: absolute; top: -12%; bottom: -12%; left: -28vw; width: 17vw;
-  background: linear-gradient(90deg, transparent,
-    var(--accent-dim), rgba(255, 255, 255, 0.30), var(--accent-dim), transparent);
-  transform: skewX(-8deg); filter: blur(7px);
+.fxx-wc26 .col {
+  position: absolute; top: 0; bottom: 0; width: 21vw;
+  background: #050507;
 }
-.fxx-wc26 span:nth-child(1) { animation: beamSweep 1s cubic-bezier(0.6, 0.05, 0.25, 1) both; }
-.fxx-wc26 span:nth-child(2) { width: 10vw; opacity: 0.6;
-  animation: beamSweep 1s cubic-bezier(0.6, 0.05, 0.25, 1) 0.06s both; }
-.fxx-wc26 span:nth-child(3) { width: 6vw; opacity: 0.4;
-  animation: beamSweep 1s cubic-bezier(0.6, 0.05, 0.25, 1) 0.12s both; }
-@keyframes beamSweep { from { left: -28vw; } to { left: 118vw; } }
+.fxx-wc26 .col::before {
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(120% 60% at 50% -8%,
+    rgba(255, 255, 255, 0.34), var(--accent-dim) 35%, transparent 68%);
+  opacity: 0;
+}
+.fxx-wc26 .col:nth-child(1) { left: 0;    animation: bankOff 0.5s ease-out 0.00s both; }
+.fxx-wc26 .col:nth-child(2) { left: 20vw; animation: bankOff 0.5s ease-out 0.13s both; }
+.fxx-wc26 .col:nth-child(3) { left: 40vw; animation: bankOff 0.5s ease-out 0.26s both; }
+.fxx-wc26 .col:nth-child(4) { left: 60vw; animation: bankOff 0.5s ease-out 0.39s both; }
+.fxx-wc26 .col:nth-child(5) { left: 80vw; animation: bankOff 0.5s ease-out 0.52s both; }
+.fxx-wc26 .col:nth-child(1)::before { animation: coneStrike 0.7s ease-out 0.00s both; }
+.fxx-wc26 .col:nth-child(2)::before { animation: coneStrike 0.7s ease-out 0.13s both; }
+.fxx-wc26 .col:nth-child(3)::before { animation: coneStrike 0.7s ease-out 0.26s both; }
+.fxx-wc26 .col:nth-child(4)::before { animation: coneStrike 0.7s ease-out 0.39s both; }
+.fxx-wc26 .col:nth-child(5)::before { animation: coneStrike 0.7s ease-out 0.52s both; }
+@keyframes bankOff {
+  0% { opacity: 1; } 30% { opacity: 1; } 42% { opacity: 0.45; }
+  54% { opacity: 0.8; } 68% { opacity: 0.15; } 100% { opacity: 0; }
+}
+@keyframes coneStrike {
+  0% { opacity: 0; } 34% { opacity: 0; } 44% { opacity: 1; }
+  56% { opacity: 0.35; } 70% { opacity: 0.8; } 100% { opacity: 0; }
+}
 
 .fxx-mls span {
-  position: absolute; top: -16%; bottom: -16%; left: -32vw; width: 24vw;
+  position: absolute; top: -16%; bottom: -16%; left: -30vw; width: 19vw;
   background: linear-gradient(90deg, transparent,
-    var(--accent-dim), var(--accent) 55%, var(--accent-dim), transparent);
-  transform: skewX(-14deg); filter: blur(3px); opacity: 0.95;
-  animation: slashSweep 0.7s cubic-bezier(0.7, 0, 0.2, 1) both;
+    var(--accent-dim) 30%, var(--accent) 62%,
+    rgba(255, 255, 255, 0.65) 66%, transparent 70%);
+  transform: skewX(-14deg); filter: blur(1px);
+  animation: slashSweep 0.55s cubic-bezier(0.75, 0, 0.15, 1) both;
 }
-@keyframes slashSweep { from { left: -32vw; } to { left: 122vw; } }
+@keyframes slashSweep { from { left: -30vw; } to { left: 126vw; } }
 
 .fxx-epl i {
   position: absolute; left: 50%; top: 20rem; width: 14vmax; height: 14vmax;
