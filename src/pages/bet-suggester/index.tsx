@@ -96,46 +96,73 @@ function LeagueFX({ id }: { id: string }) {
   return <div className="fx-wc26" />;
 }
 
-// Faint identity watermark: trophy / slash+stars / crown / orbital arcs.
-// Abstract motifs drawn from each competition's mark — evocative, not copies.
+// Watermark behind the league title. Prefers a real logo file dropped at
+// public/leagues/{id}.svg (or .png via rename); until one exists, falls
+// back to a built-in one-color recreation of the mark.
+function LeagueMark({ id }: { id: string }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [id]);
+  if (!failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={`/leagues/${id}.svg`} alt="" aria-hidden
+        onError={() => setFailed(true)}
+        className="league-glyph object-contain" />
+    );
+  }
+  return <LeagueGlyph id={id} />;
+}
+
+// Built-in one-color recreations (single-stroke, watermark duty).
 function LeagueGlyph({ id }: { id: string }) {
   const common = { className: "league-glyph", viewBox: "0 0 100 100",
-    fill: "none", stroke: "currentColor", strokeWidth: 2.5,
+    fill: "none", stroke: "currentColor", strokeWidth: 2.2,
     strokeLinecap: "round" as const, strokeLinejoin: "round" as const,
     "aria-hidden": true };
   if (id === "mls") {
     return (
       <svg {...common}>
-        <path d="M62 6 L34 94" strokeWidth="7" />
-        <path d="M30 14 l2.2 4.6 5 .7 -3.6 3.5 .9 5 -4.5 -2.4 -4.5 2.4 .9 -5 -3.6 -3.5 5 -.7 z" strokeWidth="2" />
-        <path d="M47 8 l2.2 4.6 5 .7 -3.6 3.5 .9 5 -4.5 -2.4 -4.5 2.4 .9 -5 -3.6 -3.5 5 -.7 z" strokeWidth="2" />
-        <path d="M64 14 l2.2 4.6 5 .7 -3.6 3.5 .9 5 -4.5 -2.4 -4.5 2.4 .9 -5 -3.6 -3.5 5 -.7 z" strokeWidth="2" />
+        {/* the crest: shield, diagonal slash, three stars in the field */}
+        <path d="M22 12 h56 v42 c0 18 -14 28 -28 34 c-14 -6 -28 -16 -28 -34 z" />
+        <path d="M64 12 L36 86" strokeWidth="4.5" />
+        <path d="M31 24 l1.8 3.7 4 .6 -2.9 2.8 .7 4 -3.6 -1.9 -3.6 1.9 .7 -4 -2.9 -2.8 4 -.6 z" strokeWidth="1.6" />
+        <path d="M40 38 l1.8 3.7 4 .6 -2.9 2.8 .7 4 -3.6 -1.9 -3.6 1.9 .7 -4 -2.9 -2.8 4 -.6 z" strokeWidth="1.6" />
+        <path d="M33 54 l1.8 3.7 4 .6 -2.9 2.8 .7 4 -3.6 -1.9 -3.6 1.9 .7 -4 -2.9 -2.8 4 -.6 z" strokeWidth="1.6" />
       </svg>
     );
   }
   if (id === "epl") {
     return (
       <svg {...common}>
-        <path d="M18 68 V38 l16 14 16 -26 16 26 16 -14 v30 z" />
-        <path d="M18 76 h64" />
+        {/* the crowned lion, reduced to its geometry */}
+        <path d="M30 30 v-12 l8 7 12 -11 12 11 8 -7 v12 z" />
+        <path d="M30 34 c-6 8 -8 18 -4 27 c4 10 14 17 24 17 c6 0 11 -2 15 -5 l-6 -8 c5 -2 9 -6 11 -11 l-9 -3 c1 -6 0 -12 -3 -17 z" />
+        <path d="M44 48 a2.5 2.5 0 1 0 0.1 0 z" fill="currentColor" stroke="none" />
+        <path d="M58 62 l10 3" />
       </svg>
     );
   }
   if (id === "laliga") {
     return (
       <svg {...common}>
-        <circle cx="50" cy="50" r="34" strokeDasharray="70 145" transform="rotate(-30 50 50)" />
-        <circle cx="50" cy="50" r="24" strokeDasharray="50 102" transform="rotate(110 50 50)" />
-        <circle cx="50" cy="50" r="14" strokeDasharray="30 58" transform="rotate(250 50 50)" />
+        {/* the segmented pelota */}
+        <circle cx="50" cy="50" r="36" />
+        <path d="M50 14 c-14 10 -20 24 -16 40 c3 12 12 20 16 32" />
+        <path d="M50 14 c14 10 20 24 16 40 c-3 12 -12 20 -16 32" />
+        <path d="M16 42 c12 -6 30 -8 46 -4 c8 2 16 6 22 10" />
+        <path d="M18 64 c14 2 32 0 46 -8 c6 -3 12 -8 16 -13" />
       </svg>
     );
   }
   return (
     <svg {...common}>
-      <path d="M32 18 h36 v14 a18 18 0 0 1 -36 0 z" />
-      <path d="M32 22 h-10 a10 12 0 0 0 10 14" />
-      <path d="M68 22 h10 a10 12 0 0 1 -10 14" />
-      <path d="M50 50 v14 M40 72 h20 M36 80 h28" />
+      {/* the trophy, and the year it was lifted */}
+      <path d="M34 12 h32 v12 a16 16 0 0 1 -32 0 z" />
+      <path d="M34 16 h-9 a9 11 0 0 0 9 13" />
+      <path d="M66 16 h9 a9 11 0 0 1 -9 13" />
+      <path d="M50 40 v10 M42 56 h16 M38 63 h24" />
+      <text x="50" y="88" textAnchor="middle" fontSize="26" fontWeight="700"
+        fill="currentColor" stroke="none" fontFamily="inherit">26</text>
     </svg>
   );
 }
@@ -362,7 +389,7 @@ export default function BetSuggesterDashboard() {
             <div className="relative">
               {fxOn && <div key={fxKey} className="absolute inset-0 pointer-events-none"><LeagueFX id={league.id} /></div>}
               <div className={`relative ${swapClass}`}>
-                <LeagueGlyph id={league.id} />
+                <LeagueMark id={league.id} />
                 <Eyebrow tone="accent" className="mb-5">{`bet suggester \u00b7 ${league.eyebrow}`}</Eyebrow>
                 <h1 className="text-5xl font-semibold leading-[1.02] tracking-tighter sm:text-7xl lg:text-8xl">
                   <span className="league-title block text-ink-hi">{league.name}</span>
