@@ -502,6 +502,14 @@ html {
   color: var(--accent); opacity: 0.09; pointer-events: none;
   filter: drop-shadow(0 0 30px var(--accent-faint));
 }
+/* official logo files: neutralize their brand colors into a bright
+   monochrome silhouette so the shape reads on near-black while the
+   TITLE keeps the league theme color; glow stays accent-tinted */
+img.league-glyph {
+  opacity: 0.11;
+  filter: grayscale(1) brightness(1.9)
+          drop-shadow(0 0 34px var(--accent-faint));
+}
 
 @media (prefers-reduced-motion: reduce) {
   .mode-swap-out-left, .mode-swap-out-right,
