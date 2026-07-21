@@ -359,144 +359,17 @@ html {
               0 0 18px rgba(52, 211, 153, 0.12);
 }
 
-/* ================= League drive modes ==================================
-   Each league's mode-change is its own animation, built from its identity.
-   Tuned to HIT: bigger amplitudes, brighter effects, impact settles. */
+/* ================= League mode transitions v2 ==========================
+   The effect IS the transition. The incoming league mounts immediately
+   and a full-page REVEAL uncovers it while a matching full-viewport
+   effect rides the reveal edge:
+     WC26    spotlight beams sweep L->R, lighting up the page they pass
+     MLS     the crest slash is a hard angled wipe across the screen
+     EPL     glass droplets expand over everything, refracting the page
+     LaLiga  a radial arm sweeps a full turn, loading what it passes   */
 
-.mode-stage { transform-origin: 50% 22rem; will-change: transform, opacity; }
-.mode-swap-out-left  { animation: modeOutLeft 0.18s ease-in forwards; }
-.mode-swap-out-right { animation: modeOutRight 0.18s ease-in forwards; }
-@keyframes modeOutLeft  { to { opacity: 0; transform: translateX(-64px) scale(0.985); } }
-@keyframes modeOutRight { to { opacity: 0; transform: translateX(64px) scale(0.985); } }
-
-/* the league name carries its color's glow at all times */
 .league-title { text-shadow: 0 0 38px var(--accent-dim), 0 0 90px var(--accent-faint); }
 
-/* -- WC26: floodlight ignition + trophy rise with overshoot -------------- */
-.mode-in-wc26 { animation: wcRise 0.65s cubic-bezier(0.16, 1, 0.3, 1) both; }
-@keyframes wcRise {
-  from { opacity: 0; transform: translateY(48px) scale(0.99); }
-  62%  { transform: translateY(-6px) scale(1.004); }
-  to   { opacity: 1; transform: none; }
-}
-.fx-wc26 {
-  position: absolute; inset: -40% -8%; pointer-events: none;
-  background: repeating-linear-gradient(90deg,
-    transparent 0 8%, var(--accent-dim) 8% 11.5%, transparent 11.5% 21%);
-  mask-image: linear-gradient(180deg, rgba(0,0,0,1), transparent 82%);
-  -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,1), transparent 82%);
-  animation: wcLights 1.05s ease-out forwards;
-}
-@keyframes wcLights {
-  0% { opacity: 0; } 10% { opacity: 1; } 20% { opacity: 0.15; }
-  34% { opacity: 1; } 55% { opacity: 0.85; } 100% { opacity: 0; }
-}
-
-/* -- MLS: double crest-slash + skew-kick with follow-through + stars ----- */
-.mode-in-mls { animation: mlsKick 0.5s cubic-bezier(0.2, 1.4, 0.3, 1) both; }
-@keyframes mlsKick {
-  from { opacity: 0; transform: translateX(72px) skewX(-6deg); }
-  70%  { opacity: 1; transform: translateX(-9px) skewX(1.5deg); }
-  to   { opacity: 1; transform: none; }
-}
-.fx-mls { position: absolute; inset: -32% 0; pointer-events: none; overflow: hidden; }
-.fx-mls::before, .fx-mls::after {
-  content: ""; position: absolute; top: -28%; bottom: -28%; left: -48%;
-  transform: skewX(-18deg); animation: mlsSlash 0.48s cubic-bezier(0.7, 0, 0.2, 1) forwards;
-}
-.fx-mls::before {
-  width: 40%; opacity: 0.85; filter: blur(1px);
-  background: linear-gradient(90deg, transparent,
-    var(--accent-dim), var(--accent) 55%, var(--accent-dim), transparent);
-}
-.fx-mls::after {
-  width: 14%; opacity: 0.6; filter: blur(3px); animation-delay: 0.09s;
-  background: linear-gradient(90deg, transparent, var(--accent), transparent);
-}
-@keyframes mlsSlash { to { left: 115%; } }
-.fx-mls .star {
-  position: absolute; top: 7%; color: var(--accent); font-size: 19px;
-  opacity: 0; animation: mlsStar 0.55s cubic-bezier(0.2, 1.4, 0.3, 1) forwards;
-  text-shadow: 0 0 16px var(--accent), 0 0 40px var(--accent-dim);
-}
-.fx-mls .star:nth-child(1) { left: 41%; animation-delay: 0.30s; }
-.fx-mls .star:nth-child(2) { left: 49%; top: 1.5%; animation-delay: 0.44s; }
-.fx-mls .star:nth-child(3) { left: 57%; animation-delay: 0.58s; }
-@keyframes mlsStar {
-  from { opacity: 0; transform: scale(0.1) rotate(-45deg); }
-  65%  { opacity: 1; transform: scale(1.6) rotate(10deg); }
-  to   { opacity: 0.95; transform: scale(1) rotate(0); }
-}
-
-/* -- EPL: heavy pounce with impact dip + triple roar + flash ------------- */
-.mode-in-epl { animation: eplPounce 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
-@keyframes eplPounce {
-  from { opacity: 0; transform: scale(1.09); }
-  70%  { opacity: 1; transform: scale(0.993); }
-  to   { opacity: 1; transform: scale(1); }
-}
-.fx-epl {
-  position: absolute; inset: 0; pointer-events: none;
-  display: flex; align-items: center; justify-content: center;
-}
-.fx-epl::before {
-  content: ""; position: absolute; inset: -20%;
-  background: radial-gradient(closest-side, var(--accent-dim), transparent 70%);
-  opacity: 0; animation: eplFlash 0.5s ease-out 0.16s forwards;
-}
-@keyframes eplFlash { 0% { opacity: 0; } 30% { opacity: 0.65; } 100% { opacity: 0; } }
-.fx-epl i {
-  position: absolute; width: 140px; height: 140px; border-radius: 9999px;
-  border: 2.5px solid var(--accent); opacity: 0;
-  box-shadow: 0 0 24px var(--accent-dim), inset 0 0 24px var(--accent-faint);
-}
-.fx-epl i:nth-child(1) { animation: eplRing 0.75s ease-out 0.05s forwards; }
-.fx-epl i:nth-child(2) { animation: eplRing 0.75s ease-out 0.22s forwards; }
-.fx-epl i:nth-child(3) { animation: eplRing 0.75s ease-out 0.39s forwards; }
-@keyframes eplRing {
-  0%   { opacity: 0.9; transform: scale(0.3); }
-  100% { opacity: 0; transform: scale(5.6); }
-}
-
-/* -- La Liga: fast double orbit + spin-in with momentum ------------------ */
-.mode-in-laliga { animation: llSpin 0.62s cubic-bezier(0.16, 1, 0.3, 1) both; }
-@keyframes llSpin {
-  from { opacity: 0; transform: rotate(-3.5deg) scale(0.955); }
-  72%  { opacity: 1; transform: rotate(0.7deg) scale(1.006); }
-  to   { opacity: 1; transform: none; }
-}
-.fx-laliga {
-  position: absolute; inset: 0; pointer-events: none;
-  display: flex; align-items: center; justify-content: center;
-}
-.fx-laliga i {
-  position: absolute; border-radius: 9999px; opacity: 0;
-  background: conic-gradient(from 0deg, transparent 0 62%,
-    var(--accent-dim) 74%, var(--accent) 90%, transparent 100%);
-}
-.fx-laliga i:nth-child(1) {
-  width: 360px; height: 360px;
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
-  animation: llOrbit 0.8s cubic-bezier(0.45, 0, 0.2, 1) forwards;
-  filter: drop-shadow(0 0 14px var(--accent-dim));
-}
-.fx-laliga i:nth-child(2) {
-  width: 250px; height: 250px;
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px));
-  animation: llOrbitRev 0.85s cubic-bezier(0.45, 0, 0.2, 1) 0.08s forwards;
-}
-@keyframes llOrbit {
-  0% { opacity: 0; transform: rotate(-160deg); } 15% { opacity: 1; }
-  80% { opacity: 0.9; } 100% { opacity: 0; transform: rotate(300deg); }
-}
-@keyframes llOrbitRev {
-  0% { opacity: 0; transform: rotate(200deg) scaleX(-1); } 15% { opacity: 0.8; }
-  80% { opacity: 0.7; } 100% { opacity: 0; transform: rotate(-260deg) scaleX(-1); }
-}
-
-/* faint identity watermark behind the lockup */
 .league-glyph {
   position: absolute; left: 50%; top: 44%;
   width: clamp(190px, 52vw, 340px); height: clamp(190px, 52vw, 340px);
@@ -504,19 +377,99 @@ html {
   color: var(--accent); opacity: 0.09; pointer-events: none;
   filter: drop-shadow(0 0 30px var(--accent-faint));
 }
-/* official logo files. screen blend makes black/transparent vanish on
-   the near-black canvas; "rich" keeps the mark's own colors (the gold
-   trophy, the crest, the pelota), "invert" flips dark-on-white art into
-   a light silhouette. The TITLE keeps the league theme color. */
 img.league-glyph { mix-blend-mode: screen; }
 img.glyph-rich   { opacity: 0.42; }
 img.glyph-invert { opacity: 0.14; filter: grayscale(1) invert(1) brightness(1.6); }
 img.glyph-soft   { opacity: 0.11; filter: grayscale(1) brightness(1.1); }
 
+/* ---- reveals on the stage ------------------------------------------- */
+@property --rev { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+
+.mode-reveal-wc26 {
+  -webkit-mask-image: linear-gradient(100deg, #000 42%, rgba(0,0,0,0) 58%);
+          mask-image: linear-gradient(100deg, #000 42%, rgba(0,0,0,0) 58%);
+  -webkit-mask-size: 260% 100%; mask-size: 260% 100%;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  animation: revealSweep 1s cubic-bezier(0.6, 0.05, 0.25, 1) both;
+}
+@keyframes revealSweep {
+  from { -webkit-mask-position: 100% 0; mask-position: 100% 0; }
+  to   { -webkit-mask-position: 0% 0;   mask-position: 0% 0; }
+}
+
+.mode-reveal-mls { animation: revealSlash 0.7s cubic-bezier(0.7, 0, 0.2, 1) both; }
+@keyframes revealSlash {
+  from { clip-path: polygon(-20% 0%, 5% 0%, -20% 100%, -45% 100%); }
+  to   { clip-path: polygon(-20% 0%, 170% 0%, 145% 100%, -45% 100%); }
+}
+
+.mode-reveal-epl { animation: stageIn 0.35s ease-out both; }
+@keyframes stageIn { from { opacity: 0; } to { opacity: 1; } }
+
+.mode-reveal-laliga {
+  -webkit-mask-image: conic-gradient(from -90deg at 50% 24rem, #000 var(--rev), rgba(0,0,0,0) 0deg);
+          mask-image: conic-gradient(from -90deg at 50% 24rem, #000 var(--rev), rgba(0,0,0,0) 0deg);
+  animation: revealSpin 1s cubic-bezier(0.5, 0.05, 0.3, 1) both;
+}
+@keyframes revealSpin { from { --rev: 0deg; } to { --rev: 360deg; } }
+
+/* ---- full-viewport effects riding the reveals ------------------------ */
+.fxx { position: fixed; inset: 0; z-index: 40; pointer-events: none; overflow: hidden; }
+
+.fxx-wc26 span {
+  position: absolute; top: -12%; bottom: -12%; left: -28vw; width: 17vw;
+  background: linear-gradient(90deg, transparent,
+    var(--accent-dim), rgba(255, 255, 255, 0.30), var(--accent-dim), transparent);
+  transform: skewX(-8deg); filter: blur(7px);
+}
+.fxx-wc26 span:nth-child(1) { animation: beamSweep 1s cubic-bezier(0.6, 0.05, 0.25, 1) both; }
+.fxx-wc26 span:nth-child(2) { width: 10vw; opacity: 0.6;
+  animation: beamSweep 1s cubic-bezier(0.6, 0.05, 0.25, 1) 0.06s both; }
+.fxx-wc26 span:nth-child(3) { width: 6vw; opacity: 0.4;
+  animation: beamSweep 1s cubic-bezier(0.6, 0.05, 0.25, 1) 0.12s both; }
+@keyframes beamSweep { from { left: -28vw; } to { left: 118vw; } }
+
+.fxx-mls span {
+  position: absolute; top: -16%; bottom: -16%; left: -32vw; width: 24vw;
+  background: linear-gradient(90deg, transparent,
+    var(--accent-dim), var(--accent) 55%, var(--accent-dim), transparent);
+  transform: skewX(-14deg); filter: blur(3px); opacity: 0.95;
+  animation: slashSweep 0.7s cubic-bezier(0.7, 0, 0.2, 1) both;
+}
+@keyframes slashSweep { from { left: -32vw; } to { left: 122vw; } }
+
+.fxx-epl i {
+  position: absolute; left: 50%; top: 20rem; width: 14vmax; height: 14vmax;
+  margin: -7vmax 0 0 -7vmax; border-radius: 9999px;
+  border: 2px solid var(--accent-dim);
+  -webkit-backdrop-filter: blur(10px) saturate(1.35) brightness(1.12);
+          backdrop-filter: blur(10px) saturate(1.35) brightness(1.12);
+  opacity: 0;
+}
+.fxx-epl i:nth-child(1) { animation: glassDrop 0.9s ease-out both; }
+.fxx-epl i:nth-child(2) { animation: glassDrop 0.9s ease-out 0.18s both; }
+.fxx-epl i:nth-child(3) { animation: glassDrop 0.9s ease-out 0.36s both; }
+@keyframes glassDrop {
+  0%   { opacity: 0.95; transform: scale(0.1); }
+  60%  { opacity: 0.75; }
+  100% { opacity: 0; transform: scale(15); }
+}
+
+.fxx-laliga i {
+  position: absolute; inset: -25%;
+  background: conic-gradient(from -90deg at 50% 24rem,
+    var(--accent) 0deg, var(--accent-dim) 6deg, transparent 14deg,
+    transparent 352deg, var(--accent-dim) 358deg, var(--accent) 360deg);
+  filter: blur(2px); opacity: 0.8;
+  animation: armSpin 1s cubic-bezier(0.5, 0.05, 0.3, 1) both;
+}
+@keyframes armSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
 @media (prefers-reduced-motion: reduce) {
-  .mode-swap-out-left, .mode-swap-out-right,
-  .mode-in-wc26, .mode-in-mls, .mode-in-epl, .mode-in-laliga {
+  .mode-reveal-wc26, .mode-reveal-mls, .mode-reveal-epl, .mode-reveal-laliga {
     animation: none !important;
+    -webkit-mask-image: none !important; mask-image: none !important;
+    clip-path: none !important;
   }
-  .fx-wc26, .fx-mls, .fx-epl, .fx-laliga { display: none !important; }
+  .fxx { display: none !important; }
 }

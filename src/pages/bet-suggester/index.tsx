@@ -50,14 +50,14 @@ const LEAGUES = [
   { id: "wc26", name: "World Cup 26", top: "WC26 · Bet Suggester",
     eyebrow: "live model · kalshi markets",
     accent: "#34d399", dim: "rgba(52,211,153,0.35)", faint: "rgba(52,211,153,0.10)",
-    ambient: "rgba(52,211,153,0.07)", modeMs: 1050,
+    ambient: "rgba(52,211,153,0.07)", modeMs: 1000,
     logo: "/leagues/wc26.png", glyph: "rich",
     font: wcFont,
     tagline: "" },
   { id: "mls", name: "MLS", top: "MLS · Bet Suggester",
     eyebrow: "engine adaptation · in season",
     accent: "#d50032", dim: "rgba(213,0,50,0.35)", faint: "rgba(213,0,50,0.10)",
-    ambient: "rgba(213,0,50,0.07)", modeMs: 1150,
+    ambient: "rgba(213,0,50,0.07)", modeMs: 700,
     logo: "/leagues/mls.svg", glyph: "soft",
     font: mlsFont,
     tagline: "Crest red. The same engine, rewired for MLS — fixtures, books and twelve fresh bot ledgers." },
@@ -98,19 +98,15 @@ function LeagueComingSoon({ league }: { league: (typeof LEAGUES)[number] }) {
 }
 
 // Bespoke entrance effect per league (rendered only during a mode change).
+// Full-viewport transition effects. Each rides its league's reveal:
+// WC26 spotlight beams sweep with the wipe edge; the MLS slash band is
+// the wipe edge; EPL glass droplets refract the page as they expand;
+// the La Liga arm rotates at the boundary of the radial reveal.
 function LeagueFX({ id }: { id: string }) {
-  if (id === "mls") {
-    return (
-      <div className="fx-mls">
-        <span className="star">✦</span>
-        <span className="star">✦</span>
-        <span className="star">✦</span>
-      </div>
-    );
-  }
-  if (id === "epl") return <div className="fx-epl"><i /><i /></div>;
-  if (id === "laliga") return <div className="fx-laliga"><i /></div>;
-  return <div className="fx-wc26" />;
+  if (id === "mls") return <div className="fxx fxx-mls"><span /></div>;
+  if (id === "epl") return <div className="fxx fxx-epl"><i /><i /><i /></div>;
+  if (id === "laliga") return <div className="fxx fxx-laliga"><i /></div>;
+  return <div className="fxx fxx-wc26"><span /><span /><span /></div>;
 }
 
 // Watermark behind the league title. Prefers a real logo file dropped at
@@ -212,22 +208,21 @@ export default function BetSuggesterDashboard() {
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const league = LEAGUES[leagueIdx];
   const isWC = league.id === "wc26";
-  const goLeague = (target: number, dirName: "next" | "prev") => {
+  const goLeague = (target: number, _dirName: "next" | "prev") => {
     if (switching.current || target === leagueIdx) return;
     switching.current = true;
-    setSwapClass(dirName === "next" ? "mode-swap-out-left" : "mode-swap-out-right");
+    const to = LEAGUES[target];
+    // the new league mounts immediately; its reveal animation and the
+    // matching full-screen effect uncover it together
+    setLeagueIdx(target);
+    setSwapClass(`mode-reveal-${to.id}`);
+    setFxOn(true);
+    setFxKey((k) => k + 1);
     setTimeout(() => {
-      const to = LEAGUES[target];
-      setLeagueIdx(target);
-      setSwapClass(`mode-in-${to.id}`);
-      setFxOn(true);
-      setFxKey((k) => k + 1);
-      setTimeout(() => {
-        setSwapClass("");
-        setFxOn(false);
-        switching.current = false;
-      }, to.modeMs);
-    }, 220);
+      setSwapClass("");
+      setFxOn(false);
+      switching.current = false;
+    }, to.modeMs);
   };
   const switchLeague = (delta: number) =>
     goLeague((leagueIdx + delta + LEAGUES.length) % LEAGUES.length,
@@ -370,6 +365,7 @@ export default function BetSuggesterDashboard() {
         )}
       </TopBar>
 
+      {fxOn && <LeagueFX key={fxKey} id={league.id} />}
       {/* ============ MODE STAGE: the whole page is the cluster ============ */}
       <div className={`mode-stage ${swapClass}`}
         onTouchStart={(e) => {
@@ -406,7 +402,6 @@ export default function BetSuggesterDashboard() {
                 <polyline points="9 18 15 12 9 6" /></svg>
             </button>
             <div className="relative">
-              {fxOn && <div key={fxKey} className="absolute inset-0 pointer-events-none"><LeagueFX id={league.id} /></div>}
               <div className="relative">
                 <LeagueMark league={league} />
                 <Eyebrow tone="accent" className="mb-5">{`bet suggester · ${league.eyebrow}`}</Eyebrow>
