@@ -165,6 +165,7 @@ export default function BetSuggesterDashboard() {
   const [fxOn, setFxOn] = useState(false);
   const [fxKey, setFxKey] = useState(0);
   const switching = useRef(false);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
   const league = LEAGUES[leagueIdx];
   const isWC = league.id === "wc26";
   const goLeague = (target: number, dirName: "next" | "prev") => {
@@ -329,17 +330,31 @@ export default function BetSuggesterDashboard() {
       <div className="hero-ambient">
         <div className="mx-auto max-w-5xl px-5 pt-20 sm:pt-24">
           {/* Title lockup */}
-          <header className="relative mb-16 text-center sm:mb-20">
+          <header className="relative mb-16 select-none text-center sm:mb-20"
+            onTouchStart={(e) => {
+              touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }}
+            onTouchEnd={(e) => {
+              const t = touchStart.current;
+              touchStart.current = null;
+              if (!t) return;
+              const dx = e.changedTouches[0].clientX - t.x;
+              const dy = e.changedTouches[0].clientY - t.y;
+              // horizontal-dominant swipes only — vertical scroll stays free
+              if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+                switchLeague(dx < 0 ? 1 : -1);
+              }
+            }}>
             <button aria-label="previous league" onClick={() => switchLeague(-1)}
-              className="group absolute left-0 top-1/2 z-10 -translate-y-1/2 p-3 text-ink-faint transition-colors duration-300 hover:text-accent sm:left-2">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              className="group absolute left-0 top-1/2 z-10 -translate-y-1/2 p-3 text-ink-low transition-all duration-300 hover:text-accent hover:drop-shadow-[0_0_10px_var(--accent-dim)] sm:left-2">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
                 className="transition-transform duration-300 group-hover:-translate-x-0.5">
                 <polyline points="15 18 9 12 15 6" /></svg>
             </button>
             <button aria-label="next league" onClick={() => switchLeague(1)}
-              className="group absolute right-0 top-1/2 z-10 -translate-y-1/2 p-3 text-ink-faint transition-colors duration-300 hover:text-accent sm:right-2">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              className="group absolute right-0 top-1/2 z-10 -translate-y-1/2 p-3 text-ink-low transition-all duration-300 hover:text-accent hover:drop-shadow-[0_0_10px_var(--accent-dim)] sm:right-2">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
                 className="transition-transform duration-300 group-hover:translate-x-0.5">
                 <polyline points="9 18 15 12 9 6" /></svg>
@@ -348,10 +363,9 @@ export default function BetSuggesterDashboard() {
               {fxOn && <div key={fxKey} className="absolute inset-0 pointer-events-none"><LeagueFX id={league.id} /></div>}
               <div className={`relative ${swapClass}`}>
                 <LeagueGlyph id={league.id} />
-                <Eyebrow tone="accent" className="mb-5">{league.eyebrow}</Eyebrow>
-                <h1 className="text-5xl font-semibold leading-[1.02] tracking-tighter sm:text-7xl">
-                  <span className="block text-ink-hi">{league.name}</span>
-                  <span className="block text-ink-low">Bet Suggester</span>
+                <Eyebrow tone="accent" className="mb-5">{`bet suggester \u00b7 ${league.eyebrow}`}</Eyebrow>
+                <h1 className="text-5xl font-semibold leading-[1.02] tracking-tighter sm:text-7xl lg:text-8xl">
+                  <span className="league-title block text-ink-hi">{league.name}</span>
                 </h1>
                 <p className="mx-auto mt-6 max-w-md text-sm leading-relaxed text-ink-low">
                   {isWC ? (
@@ -366,9 +380,9 @@ export default function BetSuggesterDashboard() {
               {LEAGUES.map((l, i) => (
                 <button key={l.id} aria-label={`switch to ${l.name}`}
                   onClick={() => goLeague(i, i > leagueIdx ? "next" : "prev")}
-                  className={`h-1 rounded-full transition-all duration-300 ${
-                    i === leagueIdx ? "w-6 bg-accent"
-                    : "w-2 bg-[color:var(--line-strong)] hover:bg-ink-faint"}`} />
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    i === leagueIdx ? "w-9 bg-accent shadow-[0_0_12px_var(--accent-dim)]"
+                    : "w-2.5 bg-[color:var(--line-strong)] hover:bg-ink-faint"}`} />
               ))}
             </div>
           </header>
