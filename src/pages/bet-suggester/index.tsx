@@ -72,7 +72,7 @@ const LEAGUES = [
     eyebrow: "engine adaptation · season 26/27",
     accent: "#ff4b44", dim: "rgba(255,75,68,0.35)", faint: "rgba(255,75,68,0.10)",
     ambient: "rgba(255,75,68,0.07)", modeMs: 1000,
-    logo: "/leagues/laliga.png", glyph: "rich",
+    logo: "/leagues/laliga.png", glyph: "soft",
     font: laligaFont,
     tagline: "Crest coral. The world champions’ home league is the obvious next room." },
 ];
