@@ -38,39 +38,39 @@ function stageLabel(group: string): string {
 // League "drive modes": each carries the primary color of its competition's
 // logo (tuned where needed so the accent reads on the near-black canvas).
 const LEAGUES = [
-  { id: "wc26", name: "World Cup 26", top: "WC26 \u00b7 Bet Suggester",
-    eyebrow: "live model \u00b7 kalshi markets",
+  { id: "wc26", name: "World Cup 26", top: "WC26 · Bet Suggester",
+    eyebrow: "live model · kalshi markets",
     accent: "#34d399", dim: "rgba(52,211,153,0.35)", faint: "rgba(52,211,153,0.10)",
     ambient: "rgba(52,211,153,0.07)", modeMs: 1050,
     tagline: "" },
-  { id: "mls", name: "MLS", top: "MLS \u00b7 Bet Suggester",
-    eyebrow: "engine adaptation \u00b7 in season",
+  { id: "mls", name: "MLS", top: "MLS · Bet Suggester",
+    eyebrow: "engine adaptation · in season",
     accent: "#d50032", dim: "rgba(213,0,50,0.35)", faint: "rgba(213,0,50,0.10)",
     ambient: "rgba(213,0,50,0.07)", modeMs: 1150,
-    tagline: "Crest red. The same engine, rewired for MLS \u2014 fixtures, books and twelve fresh bot ledgers." },
-  { id: "epl", name: "Premier League", top: "EPL \u00b7 Bet Suggester",
-    eyebrow: "engine adaptation \u00b7 season 26/27",
+    tagline: "Crest red. The same engine, rewired for MLS — fixtures, books and twelve fresh bot ledgers." },
+  { id: "epl", name: "Premier League", top: "EPL · Bet Suggester",
+    eyebrow: "engine adaptation · season 26/27",
     accent: "#b18cff", dim: "rgba(177,140,255,0.35)", faint: "rgba(177,140,255,0.10)",
     ambient: "rgba(177,140,255,0.07)", modeMs: 1000,
     tagline: "Lion purple, lifted for the dark. Thirty-eight matches of honest calibration sample." },
-  { id: "laliga", name: "La Liga", top: "La Liga \u00b7 Bet Suggester",
-    eyebrow: "engine adaptation \u00b7 season 26/27",
+  { id: "laliga", name: "La Liga", top: "La Liga · Bet Suggester",
+    eyebrow: "engine adaptation · season 26/27",
     accent: "#ff4b44", dim: "rgba(255,75,68,0.35)", faint: "rgba(255,75,68,0.10)",
     ambient: "rgba(255,75,68,0.07)", modeMs: 1000,
-    tagline: "Crest coral. The world champions\u2019 home league is the obvious next room." },
+    tagline: "Crest coral. The world champions’ home league is the obvious next room." },
 ];
 
 function LeagueComingSoon({ league }: { league: (typeof LEAGUES)[number] }) {
   return (
     <Reveal>
       <section className="glow glow-accent mx-auto max-w-2xl rounded-3xl border border-line bg-elev px-6 py-14 text-center">
-        <Eyebrow tone="accent">mode \u00b7 scaffolded</Eyebrow>
+        <Eyebrow tone="accent">mode · scaffolded</Eyebrow>
         <p className="mt-5 text-lg text-ink-hi">
           The engine that priced World Cup 26 is being adapted for {league.name}.
         </p>
         <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-ink-low">
-          Fixtures pipeline \u00b7 Kalshi market mapping \u00b7 per-match xG sourcing
-          \u00b7 twelve fresh bot ledgers.
+          Fixtures pipeline · Kalshi market mapping · per-match xG sourcing
+          · twelve fresh bot ledgers.
         </p>
         <p className="mt-10 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-faint">
           arriving pre-season
@@ -85,9 +85,9 @@ function LeagueFX({ id }: { id: string }) {
   if (id === "mls") {
     return (
       <div className="fx-mls">
-        <span className="star">\u2726</span>
-        <span className="star">\u2726</span>
-        <span className="star">\u2726</span>
+        <span className="star">✦</span>
+        <span className="star">✦</span>
+        <span className="star">✦</span>
       </div>
     );
   }
@@ -390,7 +390,7 @@ export default function BetSuggesterDashboard() {
               {fxOn && <div key={fxKey} className="absolute inset-0 pointer-events-none"><LeagueFX id={league.id} /></div>}
               <div className={`relative ${swapClass}`}>
                 <LeagueMark id={league.id} />
-                <Eyebrow tone="accent" className="mb-5">{`bet suggester \u00b7 ${league.eyebrow}`}</Eyebrow>
+                <Eyebrow tone="accent" className="mb-5">{`bet suggester · ${league.eyebrow}`}</Eyebrow>
                 <h1 className="text-5xl font-semibold leading-[1.02] tracking-tighter sm:text-7xl lg:text-8xl">
                   <span className="league-title block text-ink-hi">{league.name}</span>
                 </h1>
