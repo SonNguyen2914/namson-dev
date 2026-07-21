@@ -498,7 +498,8 @@ html {
 /* faint identity watermark behind the lockup */
 .league-glyph {
   position: absolute; left: 50%; top: 44%;
-  width: 340px; height: 340px; transform: translate(-50%, -50%);
+  width: clamp(190px, 52vw, 340px); height: clamp(190px, 52vw, 340px);
+  transform: translate(-50%, -50%);
   color: var(--accent); opacity: 0.09; pointer-events: none;
   filter: drop-shadow(0 0 30px var(--accent-faint));
 }
@@ -509,6 +510,7 @@ html {
 img.league-glyph { mix-blend-mode: screen; }
 img.glyph-rich   { opacity: 0.42; }
 img.glyph-invert { opacity: 0.14; filter: grayscale(1) invert(1) brightness(1.6); }
+img.glyph-soft   { opacity: 0.11; filter: grayscale(1) brightness(1.1); }
 
 @media (prefers-reduced-motion: reduce) {
   .mode-swap-out-left, .mode-swap-out-right,

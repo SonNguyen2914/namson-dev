@@ -58,7 +58,7 @@ const LEAGUES = [
     eyebrow: "engine adaptation · in season",
     accent: "#d50032", dim: "rgba(213,0,50,0.35)", faint: "rgba(213,0,50,0.10)",
     ambient: "rgba(213,0,50,0.07)", modeMs: 1150,
-    logo: "/leagues/mls.svg", glyph: "rich",
+    logo: "/leagues/mls.svg", glyph: "soft",
     font: mlsFont,
     tagline: "Crest red. The same engine, rewired for MLS — fixtures, books and twelve fresh bot ledgers." },
   { id: "epl", name: "Premier League", top: "EPL · Bet Suggester",
