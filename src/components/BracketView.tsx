@@ -1,8 +1,8 @@
 // Knockout bracket — the single source of truth for the whole knockout
-// picture. Reversed-pyramid layout: quarterfinals wide across the top,
-// narrowing through semifinals to the final at the bottom point. The
-// 3rd-place match sits OFF TO THE SIDE of the final (not in the pyramid),
-// and a champion box caps the tip.
+// picture. Flipped-pyramid layout: the champion crowns the top, then the
+// final, widening through semifinals and quarterfinals down to the round
+// of 16 at the base. The 3rd-place match sits OFF TO THE SIDE of the
+// final (not in the pyramid).
 //
 // Card states:
 //   upcoming (resolved, not played) -> win probabilities (higher side green)
