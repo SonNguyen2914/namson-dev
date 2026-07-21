@@ -363,10 +363,11 @@ html {
    Each league's mode-change is its own animation, built from its identity.
    Tuned to HIT: bigger amplitudes, brighter effects, impact settles. */
 
+.mode-stage { transform-origin: 50% 22rem; will-change: transform, opacity; }
 .mode-swap-out-left  { animation: modeOutLeft 0.18s ease-in forwards; }
 .mode-swap-out-right { animation: modeOutRight 0.18s ease-in forwards; }
-@keyframes modeOutLeft  { to { opacity: 0; transform: translateX(-48px) scale(0.97); filter: blur(9px); } }
-@keyframes modeOutRight { to { opacity: 0; transform: translateX(48px) scale(0.97);  filter: blur(9px); } }
+@keyframes modeOutLeft  { to { opacity: 0; transform: translateX(-64px) scale(0.985); } }
+@keyframes modeOutRight { to { opacity: 0; transform: translateX(64px) scale(0.985); } }
 
 /* the league name carries its color's glow at all times */
 .league-title { text-shadow: 0 0 38px var(--accent-dim), 0 0 90px var(--accent-faint); }
@@ -374,8 +375,8 @@ html {
 /* -- WC26: floodlight ignition + trophy rise with overshoot -------------- */
 .mode-in-wc26 { animation: wcRise 0.65s cubic-bezier(0.16, 1, 0.3, 1) both; }
 @keyframes wcRise {
-  from { opacity: 0; transform: translateY(40px) scale(0.98); filter: blur(6px); }
-  62%  { filter: none; transform: translateY(-5px) scale(1.005); }
+  from { opacity: 0; transform: translateY(48px) scale(0.99); }
+  62%  { transform: translateY(-6px) scale(1.004); }
   to   { opacity: 1; transform: none; }
 }
 .fx-wc26 {
@@ -394,8 +395,8 @@ html {
 /* -- MLS: double crest-slash + skew-kick with follow-through + stars ----- */
 .mode-in-mls { animation: mlsKick 0.5s cubic-bezier(0.2, 1.4, 0.3, 1) both; }
 @keyframes mlsKick {
-  from { opacity: 0; transform: translateX(56px) skewX(-12deg); }
-  70%  { opacity: 1; transform: translateX(-7px) skewX(2deg); }
+  from { opacity: 0; transform: translateX(72px) skewX(-6deg); }
+  70%  { opacity: 1; transform: translateX(-9px) skewX(1.5deg); }
   to   { opacity: 1; transform: none; }
 }
 .fx-mls { position: absolute; inset: -32% 0; pointer-events: none; overflow: hidden; }
@@ -430,8 +431,8 @@ html {
 /* -- EPL: heavy pounce with impact dip + triple roar + flash ------------- */
 .mode-in-epl { animation: eplPounce 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
 @keyframes eplPounce {
-  from { opacity: 0; transform: scale(1.32); filter: blur(12px); }
-  70%  { opacity: 1; transform: scale(0.982); filter: none; }
+  from { opacity: 0; transform: scale(1.09); }
+  70%  { opacity: 1; transform: scale(0.993); }
   to   { opacity: 1; transform: scale(1); }
 }
 .fx-epl {
@@ -460,8 +461,8 @@ html {
 /* -- La Liga: fast double orbit + spin-in with momentum ------------------ */
 .mode-in-laliga { animation: llSpin 0.62s cubic-bezier(0.16, 1, 0.3, 1) both; }
 @keyframes llSpin {
-  from { opacity: 0; transform: rotate(-9deg) scale(0.88); }
-  72%  { opacity: 1; transform: rotate(1.2deg) scale(1.01); }
+  from { opacity: 0; transform: rotate(-3.5deg) scale(0.955); }
+  72%  { opacity: 1; transform: rotate(0.7deg) scale(1.006); }
   to   { opacity: 1; transform: none; }
 }
 .fx-laliga {
