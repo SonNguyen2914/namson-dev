@@ -511,6 +511,41 @@ img.glyph-soft   { opacity: 0.11; filter: grayscale(1) brightness(1.1); }
 @keyframes rFall2 { 0% { opacity: 0; transform: translate(0, 0) rotate(12deg); }
   10% { opacity: 1; } 82% { opacity: 1; }
   100% { opacity: 0; transform: translate(7vw, 115vh) rotate(-32deg); } }
+/* falling escudos */
+.fxx-wc26 .crest {
+  position: absolute; top: -9vh; width: 30px; height: 38px; opacity: 0;
+  will-change: transform, opacity;
+  filter: drop-shadow(0 0 9px rgba(245, 197, 66, 0.4));
+}
+.fxx-wc26 svg.crest:nth-of-type(1) { left: 22vw; animation: rFall 1.75s cubic-bezier(0.35, 0, 0.65, 1) 0.25s both; }
+.fxx-wc26 svg.crest:nth-of-type(2) { left: 58vw; animation: rFall2 1.9s cubic-bezier(0.35, 0, 0.65, 1) 0.55s both; }
+.fxx-wc26 svg.crest:nth-of-type(3) { left: 78vw; animation: rFall 1.8s cubic-bezier(0.35, 0, 0.65, 1) 0.8s both; }
+/* the terraces, falling in letters */
+.fxx-wc26 .chant {
+  position: absolute; top: -6vh; opacity: 0; white-space: nowrap;
+  font-weight: 800; font-style: normal; font-size: 15px;
+  letter-spacing: 0.16em; color: #ffc400;
+  text-shadow: 0 0 12px rgba(198, 11, 30, 0.65), 0 0 20px rgba(245, 197, 66, 0.4);
+  will-change: transform, opacity;
+}
+.fxx-wc26 em.chant:nth-of-type(1) { left: 6vw;  animation: chantFall 1.9s cubic-bezier(0.35, 0, 0.65, 1) 0.30s both; }
+.fxx-wc26 em.chant:nth-of-type(2) { left: 34vw; animation: chantFall2 2.05s cubic-bezier(0.35, 0, 0.65, 1) 0.55s both; }
+.fxx-wc26 em.chant:nth-of-type(3) { left: 58vw; animation: chantFall 1.95s cubic-bezier(0.35, 0, 0.65, 1) 0.78s both; }
+.fxx-wc26 em.chant:nth-of-type(4) { left: 74vw; animation: chantFall2 2.1s cubic-bezier(0.35, 0, 0.65, 1) 0.95s both; }
+@keyframes chantFall {
+  0% { opacity: 0; transform: translate(0, 0) rotate(-5deg); }
+  9% { opacity: 1; }
+  45% { transform: translate(2.5vw, 52vh) rotate(4deg); }
+  86% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-2vw, 114vh) rotate(-6deg); }
+}
+@keyframes chantFall2 {
+  0% { opacity: 0; transform: translate(0, 0) rotate(5deg); }
+  9% { opacity: 1; }
+  45% { transform: translate(-2.5vw, 52vh) rotate(-4deg); }
+  86% { opacity: 1; }
+  100% { opacity: 0; transform: translate(2vw, 114vh) rotate(6deg); }
+}
 /* champions badge: readable over anything */
 .champ-badge {
   display: inline-flex; align-items: center; gap: 0.65em;

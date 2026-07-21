@@ -50,7 +50,7 @@ const LEAGUES = [
   { id: "wc26", name: "World Cup 26", top: "WC26 · Bet Suggester",
     eyebrow: "live model · kalshi markets",
     accent: "#34d399", dim: "rgba(52,211,153,0.35)", faint: "rgba(52,211,153,0.10)",
-    ambient: "rgba(52,211,153,0.07)", modeMs: 2500,
+    ambient: "rgba(52,211,153,0.07)", modeMs: 3200,
     logo: "/leagues/wc26-trophy.png", glyph: "rich",
     font: wcFont,
     tracking: "0.025em",
@@ -124,6 +124,19 @@ function LeagueFX({ id }: { id: string }) {
       {Array.from({ length: 24 }, (_, i) => <span key={i} className="c" />)}
       {Array.from({ length: 6 }, (_, i) => <b key={`r${i}`} className="r" />)}
       {Array.from({ length: 6 }, (_, i) => <u key={`f${i}`} className="f" />)}
+      {Array.from({ length: 3 }, (_, i) => (
+        <svg key={`e${i}`} className="crest" viewBox="0 0 24 30" aria-hidden>
+          <path d="M4 7 h16 v11 c0 6 -5 9 -8 10 c-3 -1 -8 -4 -8 -10 z" fill="#c60b1e" />
+          <path d="M12 7 h8 v11 c0 6 -5 9 -8 10 z" fill="#ffc400" />
+          <path d="M4 7 h16 v11 c0 6 -5 9 -8 10 c-3 -1 -8 -4 -8 -10 z"
+            fill="none" stroke="#f5c542" strokeWidth="1.4" />
+          <path d="M6 6 l2 -3.4 2 2.2 2 -3.4 2 3.4 2 -2.2 2 3.4 z" fill="#f5c542" />
+        </svg>
+      ))}
+      <em className="chant">¡CAMPEONES!</em>
+      <em className="chant">¡VIVA ESPAÑA!</em>
+      <em className="chant">OÉ OÉ OÉ</em>
+      <em className="chant">¡A POR ELLOS!</em>
     </div>
   );
 }
