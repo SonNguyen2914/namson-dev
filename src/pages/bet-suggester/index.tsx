@@ -64,7 +64,7 @@ const LEAGUES = [
   { id: "epl", name: "Premier League", top: "EPL · Bet Suggester",
     eyebrow: "engine adaptation · season 26/27",
     accent: "#b18cff", dim: "rgba(177,140,255,0.35)", faint: "rgba(177,140,255,0.10)",
-    ambient: "rgba(177,140,255,0.07)", modeMs: 1000,
+    ambient: "rgba(177,140,255,0.07)", modeMs: 1450,
     logo: "/leagues/epl.png", glyph: "invert",
     font: eplFont,
     tagline: "Lion purple, lifted for the dark. Thirty-eight matches of honest calibration sample." },
