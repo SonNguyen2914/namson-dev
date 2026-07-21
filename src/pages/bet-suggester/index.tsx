@@ -41,18 +41,22 @@ const LEAGUES = [
   { id: "wc26", name: "World Cup 26", top: "WC26 \u00b7 Bet Suggester",
     eyebrow: "live model \u00b7 kalshi markets",
     accent: "#34d399", dim: "rgba(52,211,153,0.35)", faint: "rgba(52,211,153,0.10)",
+    ambient: "rgba(52,211,153,0.07)", modeMs: 1050,
     tagline: "" },
   { id: "mls", name: "MLS", top: "MLS \u00b7 Bet Suggester",
     eyebrow: "engine adaptation \u00b7 in season",
     accent: "#d50032", dim: "rgba(213,0,50,0.35)", faint: "rgba(213,0,50,0.10)",
+    ambient: "rgba(213,0,50,0.07)", modeMs: 1150,
     tagline: "Crest red. The same engine, rewired for MLS \u2014 fixtures, books and twelve fresh bot ledgers." },
   { id: "epl", name: "Premier League", top: "EPL \u00b7 Bet Suggester",
     eyebrow: "engine adaptation \u00b7 season 26/27",
     accent: "#b18cff", dim: "rgba(177,140,255,0.35)", faint: "rgba(177,140,255,0.10)",
+    ambient: "rgba(177,140,255,0.07)", modeMs: 1000,
     tagline: "Lion purple, lifted for the dark. Thirty-eight matches of honest calibration sample." },
   { id: "laliga", name: "La Liga", top: "La Liga \u00b7 Bet Suggester",
     eyebrow: "engine adaptation \u00b7 season 26/27",
     accent: "#ff4b44", dim: "rgba(255,75,68,0.35)", faint: "rgba(255,75,68,0.10)",
+    ambient: "rgba(255,75,68,0.07)", modeMs: 1000,
     tagline: "Crest coral. The world champions\u2019 home league is the obvious next room." },
 ];
 
@@ -73,6 +77,66 @@ function LeagueComingSoon({ league }: { league: (typeof LEAGUES)[number] }) {
         </p>
       </section>
     </Reveal>
+  );
+}
+
+// Bespoke entrance effect per league (rendered only during a mode change).
+function LeagueFX({ id }: { id: string }) {
+  if (id === "mls") {
+    return (
+      <div className="fx-mls">
+        <span className="star">\u2726</span>
+        <span className="star">\u2726</span>
+        <span className="star">\u2726</span>
+      </div>
+    );
+  }
+  if (id === "epl") return <div className="fx-epl"><i /><i /></div>;
+  if (id === "laliga") return <div className="fx-laliga"><i /></div>;
+  return <div className="fx-wc26" />;
+}
+
+// Faint identity watermark: trophy / slash+stars / crown / orbital arcs.
+// Abstract motifs drawn from each competition's mark — evocative, not copies.
+function LeagueGlyph({ id }: { id: string }) {
+  const common = { className: "league-glyph", viewBox: "0 0 100 100",
+    fill: "none", stroke: "currentColor", strokeWidth: 2.5,
+    strokeLinecap: "round" as const, strokeLinejoin: "round" as const,
+    "aria-hidden": true };
+  if (id === "mls") {
+    return (
+      <svg {...common}>
+        <path d="M62 6 L34 94" strokeWidth="7" />
+        <path d="M30 14 l2.2 4.6 5 .7 -3.6 3.5 .9 5 -4.5 -2.4 -4.5 2.4 .9 -5 -3.6 -3.5 5 -.7 z" strokeWidth="2" />
+        <path d="M47 8 l2.2 4.6 5 .7 -3.6 3.5 .9 5 -4.5 -2.4 -4.5 2.4 .9 -5 -3.6 -3.5 5 -.7 z" strokeWidth="2" />
+        <path d="M64 14 l2.2 4.6 5 .7 -3.6 3.5 .9 5 -4.5 -2.4 -4.5 2.4 .9 -5 -3.6 -3.5 5 -.7 z" strokeWidth="2" />
+      </svg>
+    );
+  }
+  if (id === "epl") {
+    return (
+      <svg {...common}>
+        <path d="M18 68 V38 l16 14 16 -26 16 26 16 -14 v30 z" />
+        <path d="M18 76 h64" />
+      </svg>
+    );
+  }
+  if (id === "laliga") {
+    return (
+      <svg {...common}>
+        <circle cx="50" cy="50" r="34" strokeDasharray="70 145" transform="rotate(-30 50 50)" />
+        <circle cx="50" cy="50" r="24" strokeDasharray="50 102" transform="rotate(110 50 50)" />
+        <circle cx="50" cy="50" r="14" strokeDasharray="30 58" transform="rotate(250 50 50)" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...common}>
+      <path d="M32 18 h36 v14 a18 18 0 0 1 -36 0 z" />
+      <path d="M32 22 h-10 a10 12 0 0 0 10 14" />
+      <path d="M68 22 h10 a10 12 0 0 1 -10 14" />
+      <path d="M50 50 v14 M40 72 h20 M36 80 h28" />
+    </svg>
   );
 }
 
@@ -98,8 +162,8 @@ export default function BetSuggesterDashboard() {
   // sweep, in-slide from the direction of travel.
   const [leagueIdx, setLeagueIdx] = useState(0);
   const [swapClass, setSwapClass] = useState("");
-  const [sweep, setSweep] = useState<null | "next" | "prev">(null);
-  const [sweepKey, setSweepKey] = useState(0);
+  const [fxOn, setFxOn] = useState(false);
+  const [fxKey, setFxKey] = useState(0);
   const switching = useRef(false);
   const league = LEAGUES[leagueIdx];
   const isWC = league.id === "wc26";
@@ -108,15 +172,16 @@ export default function BetSuggesterDashboard() {
     switching.current = true;
     setSwapClass(dirName === "next" ? "mode-swap-out-left" : "mode-swap-out-right");
     setTimeout(() => {
+      const to = LEAGUES[target];
       setLeagueIdx(target);
-      setSwapClass(dirName === "next" ? "mode-swap-in-right" : "mode-swap-in-left");
-      setSweep(dirName);
-      setSweepKey((k) => k + 1);
+      setSwapClass(`mode-in-${to.id}`);
+      setFxOn(true);
+      setFxKey((k) => k + 1);
       setTimeout(() => {
         setSwapClass("");
-        setSweep(null);
+        setFxOn(false);
         switching.current = false;
-      }, 430);
+      }, to.modeMs);
     }, 220);
   };
   const switchLeague = (delta: number) =>
@@ -244,7 +309,8 @@ export default function BetSuggesterDashboard() {
   return (
     <div className="min-h-screen bg-bs font-sans text-ink-mid"
       style={{ "--accent": league.accent, "--accent-dim": league.dim,
-               "--accent-faint": league.faint } as CSSProperties}>
+               "--accent-faint": league.faint,
+               "--accent-ambient": league.ambient } as CSSProperties}>
       <Head><title>{league.name} Bet Suggester · namson.dev</title></Head>
 
       <RouteProgress />
@@ -279,8 +345,9 @@ export default function BetSuggesterDashboard() {
                 <polyline points="9 18 15 12 9 6" /></svg>
             </button>
             <div className="relative">
-              {sweep && <div key={sweepKey} className={`mode-sweep${sweep === "prev" ? " rev" : ""}`} />}
-              <div className={swapClass}>
+              {fxOn && <div key={fxKey} className="absolute inset-0 pointer-events-none"><LeagueFX id={league.id} /></div>}
+              <div className={`relative ${swapClass}`}>
+                <LeagueGlyph id={league.id} />
                 <Eyebrow tone="accent" className="mb-5">{league.eyebrow}</Eyebrow>
                 <h1 className="text-5xl font-semibold leading-[1.02] tracking-tighter sm:text-7xl">
                   <span className="block text-ink-hi">{league.name}</span>
