@@ -122,6 +122,7 @@ function LeagueFX({ id }: { id: string }) {
     <div ref={ref} className="fxx fxx-wc26">
       <i className="bloom" /><i className="burst" />
       {Array.from({ length: 24 }, (_, i) => <span key={i} className="c" />)}
+      <b className="r" /><b className="r" /><b className="r" />
     </div>
   );
 }
@@ -433,6 +434,11 @@ export default function BetSuggesterDashboard() {
                     {" "}For research — not financial advice.</>
                   ) : league.tagline}
                 </p>
+                {isWC && (
+                  <p className="champ-line mt-4 font-mono text-[11px] uppercase">
+                    ★ ★&ensp;campeones · españa
+                  </p>
+                )}
               </div>
             </div>
             <div className="mt-7 flex items-center justify-center gap-2">
