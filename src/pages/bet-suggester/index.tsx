@@ -4,6 +4,7 @@
 // zone for the ranking board. One accent, gray hierarchy, mono for data.
 // Scoped to this route so it doesn't fight the rest of the portfolio.
 import Head from "next/head";
+import { Anton, Baloo_2, Exo_2, Poppins } from "next/font/google";
 import Link from "next/link";
 import { CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -35,6 +36,14 @@ function stageLabel(group: string): string {
   return rounds[group] ?? `group ${group}`;
 }
 
+// Wordmark-adjacent faces: Anton for the WC26 emblem's condensed weight,
+// Exo 2 heavy italic for MLS's slanted crest letters, Poppins for the
+// Premier League's rounded geometric, Baloo 2 for LaLiga's rounded quirk.
+const wcFont = Anton({ weight: "400", subsets: ["latin"] });
+const mlsFont = Exo_2({ weight: "800", style: "italic", subsets: ["latin"] });
+const eplFont = Poppins({ weight: "600", subsets: ["latin"] });
+const laligaFont = Baloo_2({ weight: "700", subsets: ["latin"] });
+
 // League "drive modes": each carries the primary color of its competition's
 // logo (tuned where needed so the accent reads on the near-black canvas).
 const LEAGUES = [
@@ -43,24 +52,28 @@ const LEAGUES = [
     accent: "#34d399", dim: "rgba(52,211,153,0.35)", faint: "rgba(52,211,153,0.10)",
     ambient: "rgba(52,211,153,0.07)", modeMs: 1050,
     logo: "/leagues/wc26.png", glyph: "rich",
+    font: wcFont,
     tagline: "" },
   { id: "mls", name: "MLS", top: "MLS · Bet Suggester",
     eyebrow: "engine adaptation · in season",
     accent: "#d50032", dim: "rgba(213,0,50,0.35)", faint: "rgba(213,0,50,0.10)",
     ambient: "rgba(213,0,50,0.07)", modeMs: 1150,
     logo: "/leagues/mls.svg", glyph: "rich",
+    font: mlsFont,
     tagline: "Crest red. The same engine, rewired for MLS — fixtures, books and twelve fresh bot ledgers." },
   { id: "epl", name: "Premier League", top: "EPL · Bet Suggester",
     eyebrow: "engine adaptation · season 26/27",
     accent: "#b18cff", dim: "rgba(177,140,255,0.35)", faint: "rgba(177,140,255,0.10)",
     ambient: "rgba(177,140,255,0.07)", modeMs: 1000,
     logo: "/leagues/epl.png", glyph: "invert",
+    font: eplFont,
     tagline: "Lion purple, lifted for the dark. Thirty-eight matches of honest calibration sample." },
   { id: "laliga", name: "La Liga", top: "La Liga · Bet Suggester",
     eyebrow: "engine adaptation · season 26/27",
     accent: "#ff4b44", dim: "rgba(255,75,68,0.35)", faint: "rgba(255,75,68,0.10)",
     ambient: "rgba(255,75,68,0.07)", modeMs: 1000,
     logo: "/leagues/laliga.png", glyph: "rich",
+    font: laligaFont,
     tagline: "Crest coral. The world champions’ home league is the obvious next room." },
 ];
 
@@ -396,7 +409,7 @@ export default function BetSuggesterDashboard() {
                 <LeagueMark league={league} />
                 <Eyebrow tone="accent" className="mb-5">{`bet suggester · ${league.eyebrow}`}</Eyebrow>
                 <h1 className="text-5xl font-semibold leading-[1.02] tracking-tighter sm:text-7xl lg:text-8xl">
-                  <span className="league-title block text-ink-hi">{league.name}</span>
+                  <span className={`league-title block text-accent ${league.font.className}`}>{league.name}</span>
                 </h1>
                 <p className="mx-auto mt-6 max-w-md text-sm leading-relaxed text-ink-low">
                   {isWC ? (
