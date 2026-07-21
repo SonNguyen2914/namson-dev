@@ -259,37 +259,34 @@ function ChampionBox({ champion, forecast }: {
   forecast?: { team: string; p: number } | null;
 }) {
   return (
-    <>
-      <BranchLines />
-      <div className="mx-auto max-w-xs">
-        <p className="mb-1.5 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-accent">
-          Champion
-        </p>
-        <div className={`rounded-xl border p-4 text-center ${
-          champion ? "glow glow-accent border-accent/40 bg-elev"
-                   : "border-dashed border-line"
-        }`}>
-          {champion ? (
-            <p className="text-lg font-semibold tracking-tight text-ink-hi">
-              <span className="mr-2">{flag(champion)}</span>{champion}
+    <div className="mx-auto max-w-xs">
+      <p className="mb-1.5 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-accent">
+        Champion
+      </p>
+      <div className={`rounded-xl border p-4 text-center ${
+        champion ? "glow glow-accent border-accent/40 bg-elev"
+                 : "border-dashed border-line"
+      }`}>
+        {champion ? (
+          <p className="text-lg font-semibold tracking-tight text-ink-hi">
+            <span className="mr-2">{flag(champion)}</span>{champion}
+          </p>
+        ) : (
+          <>
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-ink-faint">
+              to be decided
             </p>
-          ) : (
-            <>
-              <p className="font-mono text-xs uppercase tracking-[0.18em] text-ink-faint">
-                to be decided
+            {forecast != null && (
+              <p className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
+                model pick:{" "}
+                <span className="text-accent">
+                  {flag(forecast.team)} {forecast.team} {pct(forecast.p)}
+                </span>
               </p>
-              {forecast != null && (
-                <p className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
-                  model pick:{" "}
-                  <span className="text-accent">
-                    {flag(forecast.team)} {forecast.team} {pct(forecast.p)}
-                  </span>
-                </p>
-              )}
-            </>
-          )}
-        </div>
+            )}
+          </>
+        )}
       </div>
-    </>
+    </div>
   );
 }
