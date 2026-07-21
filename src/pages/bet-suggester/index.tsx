@@ -103,9 +103,19 @@ function LeagueComingSoon({ league }: { league: (typeof LEAGUES)[number] }) {
 // the wipe edge; EPL glass droplets refract the page as they expand;
 // the La Liga arm rotates at the boundary of the radial reveal.
 function LeagueFX({ id }: { id: string }) {
+  // anchor rotation/origin effects on the league logo's real position
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    const g = document.querySelector(".league-glyph");
+    if (!el || !g) return;
+    const r = g.getBoundingClientRect();
+    el.style.setProperty("--fx-x", `${r.left + r.width / 2}px`);
+    el.style.setProperty("--fx-y", `${r.top + r.height / 2}px`);
+  }, [id]);
   if (id === "mls") return <div className="fxx fxx-mls"><span /></div>;
   if (id === "epl") return <div className="fxx fxx-epl"><i /><i /><i /></div>;
-  if (id === "laliga") return <div className="fxx fxx-laliga"><i /></div>;
+  if (id === "laliga") return <div ref={ref} className="fxx fxx-laliga"><i /></div>;
   return (
     <div className="fxx fxx-wc26">
       <span className="col" /><span className="col" /><span className="col" />
