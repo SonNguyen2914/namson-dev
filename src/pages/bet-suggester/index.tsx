@@ -42,21 +42,25 @@ const LEAGUES = [
     eyebrow: "live model · kalshi markets",
     accent: "#34d399", dim: "rgba(52,211,153,0.35)", faint: "rgba(52,211,153,0.10)",
     ambient: "rgba(52,211,153,0.07)", modeMs: 1050,
+    logo: "/leagues/wc26.png", glyph: "rich",
     tagline: "" },
   { id: "mls", name: "MLS", top: "MLS · Bet Suggester",
     eyebrow: "engine adaptation · in season",
     accent: "#d50032", dim: "rgba(213,0,50,0.35)", faint: "rgba(213,0,50,0.10)",
     ambient: "rgba(213,0,50,0.07)", modeMs: 1150,
+    logo: "/leagues/mls.png", glyph: "rich",
     tagline: "Crest red. The same engine, rewired for MLS — fixtures, books and twelve fresh bot ledgers." },
   { id: "epl", name: "Premier League", top: "EPL · Bet Suggester",
     eyebrow: "engine adaptation · season 26/27",
     accent: "#b18cff", dim: "rgba(177,140,255,0.35)", faint: "rgba(177,140,255,0.10)",
     ambient: "rgba(177,140,255,0.07)", modeMs: 1000,
+    logo: "/leagues/epl.png", glyph: "invert",
     tagline: "Lion purple, lifted for the dark. Thirty-eight matches of honest calibration sample." },
   { id: "laliga", name: "La Liga", top: "La Liga · Bet Suggester",
     eyebrow: "engine adaptation · season 26/27",
     accent: "#ff4b44", dim: "rgba(255,75,68,0.35)", faint: "rgba(255,75,68,0.10)",
     ambient: "rgba(255,75,68,0.07)", modeMs: 1000,
+    logo: "/leagues/laliga.webp", glyph: "rich",
     tagline: "Crest coral. The world champions’ home league is the obvious next room." },
 ];
 
@@ -99,18 +103,18 @@ function LeagueFX({ id }: { id: string }) {
 // Watermark behind the league title. Prefers a real logo file dropped at
 // public/leagues/{id}.svg (or .png via rename); until one exists, falls
 // back to a built-in one-color recreation of the mark.
-function LeagueMark({ id }: { id: string }) {
+function LeagueMark({ league }: { league: (typeof LEAGUES)[number] }) {
   const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [id]);
+  useEffect(() => setFailed(false), [league.id]);
   if (!failed) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={`/leagues/${id}.svg`} alt="" aria-hidden
+      <img src={league.logo} alt="" aria-hidden
         onError={() => setFailed(true)}
-        className="league-glyph object-contain" />
+        className={`league-glyph object-contain glyph-${league.glyph}`} />
     );
   }
-  return <LeagueGlyph id={id} />;
+  return <LeagueGlyph id={league.id} />;
 }
 
 // Built-in one-color recreations (single-stroke, watermark duty).
@@ -389,7 +393,7 @@ export default function BetSuggesterDashboard() {
             <div className="relative">
               {fxOn && <div key={fxKey} className="absolute inset-0 pointer-events-none"><LeagueFX id={league.id} /></div>}
               <div className={`relative ${swapClass}`}>
-                <LeagueMark id={league.id} />
+                <LeagueMark league={league} />
                 <Eyebrow tone="accent" className="mb-5">{`bet suggester · ${league.eyebrow}`}</Eyebrow>
                 <h1 className="text-5xl font-semibold leading-[1.02] tracking-tighter sm:text-7xl lg:text-8xl">
                   <span className="league-title block text-ink-hi">{league.name}</span>

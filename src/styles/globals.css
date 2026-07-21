@@ -502,14 +502,13 @@ html {
   color: var(--accent); opacity: 0.09; pointer-events: none;
   filter: drop-shadow(0 0 30px var(--accent-faint));
 }
-/* official logo files: neutralize their brand colors into a bright
-   monochrome silhouette so the shape reads on near-black while the
-   TITLE keeps the league theme color; glow stays accent-tinted */
-img.league-glyph {
-  opacity: 0.11;
-  filter: grayscale(1) brightness(1.9)
-          drop-shadow(0 0 34px var(--accent-faint));
-}
+/* official logo files. screen blend makes black/transparent vanish on
+   the near-black canvas; "rich" keeps the mark's own colors (the gold
+   trophy, the crest, the pelota), "invert" flips dark-on-white art into
+   a light silhouette. The TITLE keeps the league theme color. */
+img.league-glyph { mix-blend-mode: screen; }
+img.glyph-rich   { opacity: 0.42; }
+img.glyph-invert { opacity: 0.14; filter: grayscale(1) invert(1) brightness(1.6); }
 
 @media (prefers-reduced-motion: reduce) {
   .mode-swap-out-left, .mode-swap-out-right,
