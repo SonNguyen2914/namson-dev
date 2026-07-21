@@ -443,7 +443,8 @@ export default function BetSuggesterDashboard() {
             </div>
           </header>
 
-          {!isWC ? <LeagueComingSoon league={league} /> : <>
+          {!isWC && <LeagueComingSoon league={league} />}
+          <div className={isWC ? undefined : "hidden"}>
           {error && (
             <div className="mb-10 rounded-xl border border-live/30 bg-live/5 p-4 text-center text-sm text-live">
               {error}
@@ -482,13 +483,12 @@ export default function BetSuggesterDashboard() {
               </Link>
             </Reveal>
           )}
-          </>}
+          </div>
         </div>
       </div>
 
       {/* ===================== TOOL ZONE (Linear-style) ===================== */}
-      {isWC && (
-      <div className="mx-auto max-w-5xl px-5 pb-16 pt-20 sm:pt-24">
+      <div className={`mx-auto max-w-5xl px-5 pb-16 pt-20 sm:pt-24${isWC ? "" : " hidden"}`}>
 
         {/* Knockout bracket — reversed pyramid, model win probabilities */}
         <div id="bracket" className="mb-20 border-t border-line pt-10">
@@ -733,7 +733,6 @@ export default function BetSuggesterDashboard() {
           Predictions refresh hourly; final decisions lock 10 minutes before kickoff.
         </footer>
       </div>
-      )}
       </div>
     </div>
   );
