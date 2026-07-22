@@ -3,6 +3,7 @@
 // Kalshi's real KXMLSGAME 3-way books (both sides shown — ask to buy,
 // bid to exit). No model numbers yet: the engine adaptation follows the
 // V7 Part H acceptance gates, and this page never pretends otherwise.
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Eyebrow, Reveal } from "./ui";
 
@@ -177,7 +178,8 @@ function TeamLine({ s, live }: { s: Side; live: boolean }) {
 function FixtureCard({ f }: { f: Fixture }) {
   const live = f.state === "in";
   return (
-    <div className={`rounded-xl border p-3 ${
+    <Link href={`/bet-suggester/mls/${f.id}`}
+      className={`block cursor-pointer rounded-xl border p-3 transition-colors hover:border-accent/50 ${
       live ? "glow glow-accent border-accent/40 bg-elev" : "border-line"}`}>
       <TeamLine s={f.home} live={live} />
       <div className="my-1.5 h-px bg-line" />
@@ -188,7 +190,7 @@ function FixtureCard({ f }: { f: Fixture }) {
         </span>
         <span className="truncate pl-2">{f.venue}</span>
       </div>
-    </div>
+    </Link>
   );
 }
 
