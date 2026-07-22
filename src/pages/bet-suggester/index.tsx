@@ -13,6 +13,7 @@ import {
 } from "../../lib/suggesterApi";
 import LiveScoreboard from "../../components/LiveScoreboard";
 import BracketView from "../../components/BracketView";
+import MlsDashboard from "../../components/MlsDashboard";
 import { Eyebrow, Flash, Reveal } from "../../components/ui";
 import { NavChip, RouteProgress, SkeletonRows, Toaster, TopBar, useScrollSpy } from "../../components/chrome";
 
@@ -488,7 +489,8 @@ export default function BetSuggesterDashboard() {
             </div>
           </header>
 
-          {!isWC && <LeagueComingSoon league={league} />}
+          {!isWC && league.id === "mls" && <MlsDashboard />}
+          {!isWC && league.id !== "mls" && <LeagueComingSoon league={league} />}
           <div className={isWC ? undefined : "hidden"}>
           {error && (
             <div className="mb-10 rounded-xl border border-live/30 bg-live/5 p-4 text-center text-sm text-live">
