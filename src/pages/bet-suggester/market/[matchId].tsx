@@ -389,8 +389,11 @@ export default function MatchDetail() {
           </div>
         )}
 
-        {/* Headline stats — xG + confidence, right under the hero */}
-        {pred && (
+        {/* Headline stats — xG + confidence, right under the hero.
+            Canonical-archive payloads carry xg: null (the frozen lock
+            rows never archived xG and the backend refuses to invent it
+            — V7 evaluation F1), so this whole block is provenance-aware. */}
+        {pred && pred.xg && (
           <Reveal>
             <section className="mb-10">
               <div className="grid grid-cols-3 gap-3">
@@ -436,8 +439,10 @@ export default function MatchDetail() {
 
         {pred && (
           <>
-            {/* Model prediction — halves, full time, ET/pens, top scores */}
-            {pred.summary && (
+            {/* Model prediction — halves, full time, ET/pens, top scores.
+                Only DB batches carry a summary AND xg; canonical-archive
+                payloads have neither, so the panel simply doesn't render. */}
+            {pred.summary && pred.xg && (
               <Reveal>
                 <Collapse id="prediction" eyebrow="pure model" title="Model prediction">
                   <ModelPrediction

@@ -44,7 +44,8 @@ export interface PredictionResponse {
   is_final: boolean;
   source: string;
   confidence: number;
-  xg: { home: number; away: number };
+  xg: { home: number; away: number } | null;
+  archive_note?: string;
   scorelines: { score: string; prob: number }[];
   summary?: PredictionSummary | null;
   markets: MarketPrediction[];
