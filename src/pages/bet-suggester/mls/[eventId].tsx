@@ -561,7 +561,7 @@ function MarketsTable({ m, run, book, families }: {
               <span>Market</span>
               <span className="text-right" title="mls-2026-v0 shadow probability">Likelihood</span>
               <span className="text-right"
-                title="Model probability minus the ask's implied probability">Edge</span>
+                title="Model probability minus ask minus Kalshi's entry fee — the executable gap, not the gross one">Net edge</span>
               <span className="text-right"
                 title="Payout multiple at the buyable ask price">Mult</span>
               <span className="text-right">Ask / Bid</span>
