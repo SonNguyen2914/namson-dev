@@ -1,7 +1,9 @@
-// MLS match stat page — live per-event view (ESPN summary, 30s poll).
-// Data-only like the rest of the MLS mode: stats and timeline, honestly
-// labeled, no model overlay. Theme pinned to the MLS red regardless of
-// the dashboard's currently-selected league mode.
+// MLS match hub — live stats + the fixture's real Kalshi book + a
+// fee-aware scenario engine + ESPN scouting (form, last five, H2H).
+// Everything here is data or market arithmetic; there are NO model
+// probabilities — that slot stays empty until the engine adaptation
+// clears the V7 Part H gates, and the page says so where the model
+// panel would live.
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
@@ -12,11 +14,20 @@ type Side = { name?: string; abbrev?: string; logo?: string; score?: string };
 type StatRow = { key: string; label: string; home?: string; away?: string };
 type Ev = { minute?: string; type?: string; team?: string; text?: string;
   scoring?: boolean };
+type FiveGame = { result?: string; score?: string; at_vs?: string;
+  opponent?: string; date?: string };
+type LastFive = { team?: string; abbrev?: string; form?: string;
+  games: FiveGame[] };
+type H2H = { perspective?: string; result?: string; home_score?: string;
+  away_score?: string; at_vs?: string; opponent?: string; date?: string };
 type Match = { id: string; date?: string; state?: string; detail?: string;
   minute?: string; venue?: string; home: Side; away: Side;
-  stats: StatRow[]; events: Ev[] };
+  stats: StatRow[]; events: Ev[];
+  scouting?: { last_five: LastFive[]; head_to_head: H2H[] } };
+type BookRow = { ticker: string; label?: string; yes_ask?: string;
+  yes_bid?: string; status?: string };
+type Book = { event_ticker: string; title?: string; markets: BookRow[] };
 
-// the MLS mode theme, pinned locally (matches LEAGUES config on index)
 const MLS_VARS = {
   "--accent": "#d50032",
   "--accent-dim": "rgba(213,0,50,0.35)",
@@ -24,11 +35,14 @@ const MLS_VARS = {
   "--accent-ambient": "rgba(213,0,50,0.07)",
 } as React.CSSProperties;
 
+const fee = (p: number) => 0.07 * p * (1 - p);
+
 export default function MlsMatchPage() {
   const router = useRouter();
   const eventId = typeof router.query.eventId === "string"
     ? router.query.eventId : null;
   const [m, setM] = useState<Match | null>(null);
+  const [book, setBook] = useState<Book | null>(null);
   const [err, setErr] = useState(false);
 
   useEffect(() => {
@@ -37,7 +51,10 @@ export default function MlsMatchPage() {
     const load = () =>
       fetch(`/api/mls/match/${eventId}`)
         .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-        .then((d) => { if (alive) { setM(d.match); setErr(false); } })
+        .then((d) => {
+          if (!alive) return;
+          setM(d.match); setBook(d.book ?? null); setErr(false);
+        })
         .catch(() => alive && setErr(true));
     load();
     const poll = setInterval(load, 30000);
@@ -56,7 +73,7 @@ export default function MlsMatchPage() {
           ← mls dashboard
         </Link>
 
-        {err && (
+        {err && !m && (
           <p className="mt-10 rounded-2xl border border-dashed border-line px-4 py-8 text-center font-mono text-[11px] uppercase tracking-[0.15em] text-ink-faint">
             match feed unavailable — retrying every 30s
           </p>
@@ -85,13 +102,25 @@ export default function MlsMatchPage() {
               </section>
             </Reveal>
 
+            <MarketSection book={book} />
+            <ScenarioSection book={book} />
+
             <Reveal>
-              <section className="mt-8">
+              <section className="mt-10">
+                <Eyebrow className="mb-4" tone="accent">model outcome probabilities</Eyebrow>
+                <p className="rounded-2xl border border-dashed border-line px-4 py-6 text-center font-mono text-[10px] uppercase leading-relaxed tracking-[0.15em] text-ink-faint">
+                  the wc26 engine is not yet adapted to league play —<br />
+                  no simulated probabilities are shown until it clears the
+                  acceptance gates
+                </p>
+              </section>
+            </Reveal>
+
+            <Reveal>
+              <section className="mt-10">
                 <Eyebrow className="mb-4" tone="accent">match stats · espn live</Eyebrow>
                 {m.stats.length === 0 ? (
-                  <p className="rounded-2xl border border-dashed border-line px-4 py-6 text-center font-mono text-[11px] uppercase tracking-wide text-ink-faint">
-                    stats populate after kickoff
-                  </p>
+                  <Empty>stats populate after kickoff</Empty>
                 ) : (
                   <div className="space-y-3">
                     {m.stats.map((s) => <StatBar key={s.key} s={s} />)}
@@ -104,9 +133,7 @@ export default function MlsMatchPage() {
               <section className="mt-10">
                 <Eyebrow className="mb-4" tone="accent">timeline</Eyebrow>
                 {m.events.length === 0 ? (
-                  <p className="rounded-2xl border border-dashed border-line px-4 py-6 text-center font-mono text-[11px] uppercase tracking-wide text-ink-faint">
-                    no key events yet
-                  </p>
+                  <Empty>no key events yet</Empty>
                 ) : (
                   <div className="divide-y divide-line rounded-2xl border border-line">
                     {m.events.map((e, i) => (
@@ -128,14 +155,238 @@ export default function MlsMatchPage() {
               </section>
             </Reveal>
 
+            <ScoutingSection m={m} />
+
             <p className="mt-12 text-center font-mono text-[10px] uppercase tracking-[0.15em] text-ink-faint">
-              data only · no model overlay — the engine adaptation is gated
+              live data + real market prices · fee-aware arithmetic only ·
+              no model output
             </p>
           </>
         )}
       </div>
     </div>
   );
+}
+
+/* ---------- market ---------- */
+
+function MarketSection({ book }: { book: Book | null }) {
+  const rows = book?.markets ?? [];
+  const mids = rows.map((r) => {
+    const a = parseFloat(r.yes_ask ?? ""), b = parseFloat(r.yes_bid ?? "");
+    return Number.isFinite(a) && Number.isFinite(b) ? (a + b) / 2
+      : Number.isFinite(a) ? a : NaN;
+  });
+  const midSum = mids.reduce((s, v) => s + (Number.isFinite(v) ? v : 0), 0);
+  return (
+    <Reveal>
+      <section className="mt-10">
+        <Eyebrow className="mb-2" tone="accent">market · kalshi three-way</Eyebrow>
+        <p className="mb-4 max-w-xl text-xs leading-relaxed text-ink-low">
+          Implied % is the bid/ask midpoint normalized across the book — it
+          contains the exchange&apos;s spread and is <em>not</em> a model
+          probability.
+        </p>
+        {!book ? (
+          <Empty>no open kalshi book matched to this fixture</Empty>
+        ) : (
+          <div className="divide-y divide-line rounded-2xl border border-line">
+            {rows.map((r, i) => {
+              const implied = Number.isFinite(mids[i]) && midSum > 0
+                ? (mids[i] / midSum) * 100 : null;
+              return (
+                <div key={r.ticker}
+                  className="grid grid-cols-[1fr_auto_auto] items-center gap-3 px-4 py-2.5">
+                  <span className="truncate text-sm text-ink-hi">{r.label}</span>
+                  <span className="font-mono text-[11px] tabular-nums text-accent">
+                    {implied != null ? `${implied.toFixed(1)}%` : "—"}
+                  </span>
+                  <span className="w-24 text-right font-mono text-[11px] tabular-nums text-ink-low">
+                    {cents(r.yes_ask)} / {cents(r.yes_bid)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    </Reveal>
+  );
+}
+
+/* ---------- scenario engine ---------- */
+
+function ScenarioSection({ book }: { book: Book | null }) {
+  const [stakes, setStakes] = useState<Record<string, string>>({});
+  if (!book) return null;
+  const rows = book.markets.filter((r) =>
+    Number.isFinite(parseFloat(r.yes_ask ?? "")));
+  const picks = rows.map((r) => {
+    const ask = parseFloat(r.yes_ask!);
+    const stake = parseFloat(stakes[r.ticker] ?? "") || 0;
+    const unit = ask + fee(ask);
+    const contracts = stake > 0 ? Math.floor(stake / unit) : 0;
+    const cost = contracts * unit;
+    return { r, ask, stake, contracts, cost };
+  });
+  const totalCost = picks.reduce((s, p) => s + p.cost, 0);
+  return (
+    <Reveal>
+      <section className="mt-10">
+        <Eyebrow className="mb-2" tone="accent">scenario engine · price-only</Eyebrow>
+        <p className="mb-4 max-w-xl text-xs leading-relaxed text-ink-low">
+          Stake any mix of outcomes at the real ask plus Kalshi&apos;s
+          0.07·P·(1−P) fee. Pure execution arithmetic — the engine does not
+          opine on which outcome is likely.
+        </p>
+        <div className="rounded-2xl border border-line p-4">
+          <div className="space-y-2">
+            {picks.map(({ r, ask, contracts, cost }) => (
+              <div key={r.ticker}
+                className="grid grid-cols-[1fr_5rem_auto] items-center gap-3">
+                <span className="truncate text-sm text-ink-hi">{r.label}
+                  <span className="pl-2 font-mono text-[10px] text-ink-faint">
+                    @{cents(r.yes_ask)}
+                  </span>
+                </span>
+                <input
+                  inputMode="decimal"
+                  placeholder="$0"
+                  value={stakes[r.ticker] ?? ""}
+                  onChange={(e) => setStakes((s) => (
+                    { ...s, [r.ticker]: e.target.value }))}
+                  className="rounded-lg border border-line bg-canvas px-2 py-1 text-right font-mono text-xs text-ink-hi outline-none focus:border-accent/60"
+                />
+                <span className="w-36 text-right font-mono text-[11px] tabular-nums text-ink-low">
+                  {contracts > 0
+                    ? `${contracts}× · cost $${cost.toFixed(2)}`
+                    : "—"}
+                </span>
+              </div>
+            ))}
+          </div>
+          {totalCost > 0 && (
+            <div className="mt-4 border-t border-line pt-3">
+              <p className="mb-2 font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+                total outlay ${totalCost.toFixed(2)} · net if each outcome
+                settles yes:
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {picks.map(({ r, contracts }) => {
+                  const net = contracts * 1 - totalCost;
+                  return (
+                    <div key={r.ticker}
+                      className="rounded-lg border border-line px-2 py-1.5 text-center">
+                      <p className="truncate font-mono text-[10px] text-ink-faint">
+                        {r.label}
+                      </p>
+                      <p className={`font-mono text-sm tabular-nums ${
+                        net >= 0 ? "text-accent" : "text-ink-low"}`}>
+                        {net >= 0 ? "+" : ""}{net.toFixed(2)}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+    </Reveal>
+  );
+}
+
+/* ---------- scouting ---------- */
+
+function ScoutingSection({ m }: { m: Match }) {
+  const lf = m.scouting?.last_five ?? [];
+  const h2h = m.scouting?.head_to_head ?? [];
+  if (lf.length === 0 && h2h.length === 0) return null;
+  return (
+    <Reveal>
+      <section className="mt-10">
+        <Eyebrow className="mb-4" tone="accent">scouting · espn form + h2h</Eyebrow>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {lf.map((t) => (
+            <div key={t.abbrev} className="rounded-2xl border border-line p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="truncate text-sm font-medium text-ink-hi">{t.team}</p>
+                <FormChips form={t.form} />
+              </div>
+              <div className="space-y-1">
+                {t.games.map((g, i) => (
+                  <div key={i} className="flex justify-between font-mono text-[11px]">
+                    <span className={g.result === "W" ? "text-accent"
+                      : g.result === "L" ? "text-ink-faint" : "text-ink-low"}>
+                      {g.result}
+                    </span>
+                    <span className="text-ink-low">
+                      {g.at_vs} {g.opponent}
+                    </span>
+                    <span className="tabular-nums text-ink-hi">{g.score}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        {h2h.length > 0 && (
+          <div className="mt-4 rounded-2xl border border-line p-4">
+            <p className="mb-2 font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+              recent meetings · from {h2h[0].perspective}&apos;s side
+            </p>
+            <div className="space-y-1">
+              {h2h.map((g, i) => (
+                <div key={i} className="flex justify-between font-mono text-[11px]">
+                  <span className={g.result === "W" ? "text-accent"
+                    : g.result === "L" ? "text-ink-faint" : "text-ink-low"}>
+                    {g.result}
+                  </span>
+                  <span className="text-ink-low">{g.at_vs} {g.opponent}</span>
+                  <span className="tabular-nums text-ink-hi">
+                    {g.home_score}–{g.away_score}
+                  </span>
+                  <span className="text-ink-faint">{(g.date || "").slice(0, 10)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+    </Reveal>
+  );
+}
+
+function FormChips({ form }: { form?: string }) {
+  if (!form) return null;
+  return (
+    <span className="flex gap-1">
+      {form.split(" ").map((c, i) => (
+        <span key={i}
+          className={`inline-flex h-5 w-5 items-center justify-center rounded font-mono text-[10px] ${
+            c === "W" ? "bg-accent/20 text-accent"
+              : c === "L" ? "bg-elev2 text-ink-faint"
+                : "bg-elev2 text-ink-low"}`}>
+          {c}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/* ---------- shared bits ---------- */
+
+function Empty({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="rounded-2xl border border-dashed border-line px-4 py-6 text-center font-mono text-[11px] uppercase tracking-wide text-ink-faint">
+      {children}
+    </p>
+  );
+}
+
+function cents(v?: string) {
+  const n = v ? Math.round(parseFloat(v) * 100) : NaN;
+  return Number.isFinite(n) ? `${n}¢` : "—";
 }
 
 function TeamBlock({ s, right = false }: { s: Side; right?: boolean }) {
