@@ -443,8 +443,8 @@ function HowTheyPlay({ m, run }: { m: Match; run?: ModelRun }) {
   ];
   return (
     <Reveal>
-      <section className="mt-8">
-        <Eyebrow className="mb-3" tone="accent">scouting · how they play</Eyebrow>
+      <Collapse eyebrow="scouting" title="How they play"
+        defaultOpen={false} className="mt-8 mb-0">
         <div className="grid gap-3 sm:grid-cols-2">
           {cards.map((c) => (
             <div key={c.s.abbrev} className="rounded-2xl border border-line p-4">
@@ -467,7 +467,7 @@ function HowTheyPlay({ m, run }: { m: Match; run?: ModelRun }) {
           fitted mls-2026-v0 goal rates, shrunk toward league average —
           recency-weighted, no hand-sourced narratives
         </p>
-      </section>
+      </Collapse>
     </Reveal>
   );
 }
@@ -714,8 +714,8 @@ function ScoutingSection({ m }: { m: Match }) {
   }
   return (
     <Reveal>
-      <section className="mt-8">
-        <Eyebrow className="mb-3" tone="accent">scouting · espn form + h2h</Eyebrow>
+      <Collapse eyebrow="scouting" title="ESPN form + H2H"
+        defaultOpen={false} className="mt-8 mb-0">
         <div className="grid gap-4 sm:grid-cols-2">
           {sc.last_five.map((t) => (
             <div key={t.team} className="rounded-2xl border border-line p-4">
@@ -767,7 +767,7 @@ function ScoutingSection({ m }: { m: Match }) {
             </div>
           </div>
         )}
-      </section>
+      </Collapse>
     </Reveal>
   );
 }
