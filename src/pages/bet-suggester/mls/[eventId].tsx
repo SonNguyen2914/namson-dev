@@ -30,8 +30,10 @@ type Match = { id: string; date?: string; state?: string; detail?: string;
   stats: StatRow[]; events: Ev[];
   scouting?: { last_five: LastFive[]; head_to_head: H2H[] } };
 type BookRow = { ticker: string; label?: string; yes_ask?: string;
-  yes_bid?: string; status?: string };
+  yes_bid?: string; status?: string; model_key?: string | null };
 type Book = { event_ticker: string; title?: string; markets: BookRow[] };
+type Family = { key: string; label: string; event_ticker: string;
+  markets: BookRow[] };
 type Basis = { home_games?: number; away_games?: number;
   league_gpg?: number; venue_home?: number;
   home_attack?: number; home_defence?: number;
@@ -76,6 +78,7 @@ export default function MlsMatchPage() {
     ? router.query.eventId : null;
   const [m, setM] = useState<Match | null>(null);
   const [book, setBook] = useState<Book | null>(null);
+  const [books, setBooks] = useState<Family[]>([]);
   const [model, setModel] = useState<ModelInfo | null>(null);
   const [err, setErr] = useState(false);
   const [now, setNow] = useState(() => Date.now());   // 1s countdown tick
@@ -89,6 +92,7 @@ export default function MlsMatchPage() {
         .then((d) => {
           if (!alive) return;
           setM(d.match); setBook(d.book ?? null);
+          setBooks(d.books ?? []);
           setModel(d.model ?? null); setErr(false);
         })
         .catch(() => alive && setErr(true));
@@ -242,7 +246,7 @@ export default function MlsMatchPage() {
                 </div>
               </Reveal>
 
-              <MarketsTable m={m} run={run} book={book} />
+              <MarketsTable m={m} run={run} book={book} families={books} />
             </section>
 
             {/* ===== model prediction: scorelines + chance chips ===== */}
@@ -472,83 +476,133 @@ function HowTheyPlay({ m, run }: { m: Match; run?: ModelRun }) {
   );
 }
 
-/* ---------- model vs market table (unchanged core) ---------- */
+/* ---------- the every-market table ---------- */
 
-type MarketJoin = {
-  ticker: string; label: string; outcome: string | null;
-  modelP: number | null; ask: number | null; bid: number | null;
-};
+// families whose long tails read better folded away until asked for
+const COLLAPSED_FAMILIES = new Set(
+  ["score", "mov", "h1", "h1_total", "h1_spread", "h1_btts"]);
 
-function joinMarkets(m: Match, run?: ModelRun, book?: Book | null): MarketJoin[] {
-  const rows = book?.markets ?? [];
-  const byTicker = new Map(
-    Object.entries(run?.tickers ?? {}).map(([o, t]) => [t, o]));
-  return rows.map((r) => {
-    let outcome = byTicker.get(r.ticker) ?? null;
-    if (!outcome && (r.label ?? "").trim().toLowerCase() === "tie") {
-      outcome = "draw";
-    }
-    const modelP = outcome != null ? run?.outcomes?.[outcome] ?? null : null;
-    const ask = r.yes_ask ? parseFloat(r.yes_ask) : null;
-    const bid = r.yes_bid ? parseFloat(r.yes_bid) : null;
-    const outcomeLabel = outcome === "home_win" ? `${m.home.name} win`
-      : outcome === "away_win" ? `${m.away.name} win`
-      : outcome === "draw" ? "Draw" : r.label ?? r.ticker;
-    return { ticker: r.ticker, label: outcomeLabel, outcome,
-      modelP, ask: Number.isFinite(ask!) ? ask : null,
-      bid: Number.isFinite(bid!) ? bid : null };
-  });
-}
-
-function MarketsTable({ m, run, book }: {
-  m: Match; run?: ModelRun; book: Book | null;
+function MarketsTable({ m, run, book, families }: {
+  m: Match; run?: ModelRun; book: Book | null; families: Family[];
 }) {
-  const joined = joinMarkets(m, run, book)
-    .sort((a, b) => (b.modelP ?? -1) - (a.modelP ?? -1));
-  if (joined.length === 0) return null;
+  const [closed, setClosed] = useState<Set<string>>(
+    () => new Set(COLLAPSED_FAMILIES));
+  // every probability the stored run knows, keyed the way the backend
+  // keys each market row (model_key)
+  const probs: Record<string, number> = {
+    ...(run?.outcomes ?? {}), ...(run?.props ?? {}),
+  };
+  for (const s of run?.scorelines ?? []) {
+    const [h, a] = s.score.split("-");
+    probs[`score_${h}_${a}`] = s.prob;
+  }
+  // the winner family joins by ticker through the approved mapping
+  const winnerByTicker = new Map(
+    Object.entries(run?.tickers ?? {}).map(([o, t]) => [t, o]));
+
+  const fams = families.length > 0 ? families
+    : book ? [{ key: "winner", label: "Winner · 3-way",
+                event_ticker: book.event_ticker,
+                markets: book.markets }] : [];
+  if (fams.length === 0) return null;
+  const nMarkets = fams.reduce((n, f) => n + f.markets.length, 0);
+
+  const toggle = (key: string) => setClosed((c) => {
+    const next = new Set(c);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+
+  const rowsFor = (f: Family) => f.markets.map((r) => {
+    let mk = r.model_key ?? null;
+    if (f.key === "winner") mk = winnerByTicker.get(r.ticker) ?? null;
+    const modelP = mk != null ? probs[mk] ?? null : null;
+    const ask = r.yes_ask ? parseFloat(r.yes_ask) : NaN;
+    const bid = r.yes_bid ? parseFloat(r.yes_bid) : NaN;
+    let label = r.label ?? r.ticker;
+    if (f.key === "winner") {
+      label = mk === "home_win" ? `${m.home.name} win`
+        : mk === "away_win" ? `${m.away.name} win`
+        : mk === "draw" ? "Draw" : label;
+    }
+    return { ticker: r.ticker, label, modelP,
+      ask: Number.isFinite(ask) ? ask : null,
+      bid: Number.isFinite(bid) ? bid : null };
+  }).sort((a, b) => (b.modelP ?? -1) - (a.modelP ?? -1));
+
   return (
     <Reveal>
-      <div className="mt-4 overflow-x-auto rounded-xl border border-line">
-        <div className="min-w-[560px]">
-          <div className="grid grid-cols-[minmax(0,1fr)_5.5rem_5rem_5.5rem_5.5rem] items-center gap-x-3 border-b border-line bg-elev px-4 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-low">
-            <span>Market</span>
-            <span className="text-right" title="mls-2026-v0 shadow probability">Likelihood</span>
-            <span className="text-right"
-              title="Model probability minus the ask's implied probability">Edge</span>
-            <span className="text-right"
-              title="Payout multiple at the buyable ask price">Mult</span>
-            <span className="text-right">Ask / Bid</span>
+      <div className="mt-4">
+        <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
+          every kalshi market on this match · {nMarkets} markets across{" "}
+          {fams.length} families · click a group to fold
+        </p>
+        <div className="overflow-x-auto rounded-xl border border-line">
+          <div className="min-w-[560px]">
+            <div className="grid grid-cols-[minmax(0,1fr)_5.5rem_5rem_5.5rem_5.5rem] items-center gap-x-3 border-b border-line bg-elev px-4 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-low">
+              <span>Market</span>
+              <span className="text-right" title="mls-2026-v0 shadow probability">Likelihood</span>
+              <span className="text-right"
+                title="Model probability minus the ask's implied probability">Edge</span>
+              <span className="text-right"
+                title="Payout multiple at the buyable ask price">Mult</span>
+              <span className="text-right">Ask / Bid</span>
+            </div>
+            {fams.map((f) => {
+              const fold = closed.has(f.key);
+              return (
+                <div key={f.key}>
+                  <button onClick={() => toggle(f.key)}
+                    className="flex w-full items-center gap-2.5 border-b border-line bg-elev/40 px-4 py-2.5 text-left transition-colors hover:bg-elev">
+                    <span className={`text-ink-faint transition-transform ${
+                      fold ? "" : "rotate-90"}`}>▸</span>
+                    <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-mid">
+                      {f.label}
+                    </span>
+                    <span className="ml-auto shrink-0 font-mono text-[11px] text-ink-faint">
+                      {f.markets.length} market{f.markets.length === 1 ? "" : "s"}
+                    </span>
+                  </button>
+                  {!fold && rowsFor(f).map((j) => {
+                    const edge = j.modelP != null && j.ask != null
+                      ? j.modelP - j.ask : null;
+                    return (
+                      <div key={j.ticker}
+                        className="grid grid-cols-[minmax(0,1fr)_5.5rem_5rem_5.5rem_5.5rem] items-center gap-x-3 border-b border-line px-4 py-3 text-sm transition-colors hover:bg-elev">
+                        <span className="min-w-0 truncate pr-2 text-ink-hi" title={j.ticker}>
+                          {j.label}
+                        </span>
+                        <span className="text-right font-mono tabular-nums text-ink-hi">
+                          {j.modelP != null ? pct(j.modelP) : "—"}
+                        </span>
+                        <span className={`text-right font-mono tabular-nums ${
+                          edge == null ? "text-ink-faint"
+                            : edge >= 0 ? "text-accent" : "text-neg"}`}>
+                          {edge != null ? signedPct(edge) : "—"}
+                        </span>
+                        <span className="text-right font-mono tabular-nums text-ink-mid">
+                          {j.ask != null && j.ask > 0 ? `${(1 / j.ask).toFixed(2)}x` : "—"}
+                        </span>
+                        <span className="text-right font-mono tabular-nums text-ink-mid">
+                          {j.ask != null ? `${Math.round(j.ask * 100)}¢` : "—"}
+                          <span className="text-ink-faint">
+                            {j.bid != null ? ` / ${Math.round(j.bid * 100)}¢` : ""}
+                          </span>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
           </div>
-          {joined.map((j) => {
-            const edge = j.modelP != null && j.ask != null
-              ? j.modelP - j.ask : null;
-            return (
-              <div key={j.ticker}
-                className="grid grid-cols-[minmax(0,1fr)_5.5rem_5rem_5.5rem_5.5rem] items-center gap-x-3 border-b border-line px-4 py-3 text-sm transition-colors hover:bg-elev">
-                <span className="min-w-0 truncate pr-2 text-ink-hi" title={j.ticker}>
-                  {j.label}
-                </span>
-                <span className="text-right font-mono tabular-nums text-ink-hi">
-                  {j.modelP != null ? pct(j.modelP) : "—"}
-                </span>
-                <span className={`text-right font-mono tabular-nums ${
-                  edge == null ? "text-ink-faint"
-                    : edge >= 0 ? "text-accent" : "text-neg"}`}>
-                  {edge != null ? signedPct(edge) : "—"}
-                </span>
-                <span className="text-right font-mono tabular-nums text-ink-mid">
-                  {j.ask != null ? `${(1 / j.ask).toFixed(2)}x` : "—"}
-                </span>
-                <span className="text-right font-mono tabular-nums text-ink-mid">
-                  {j.ask != null ? `${Math.round(j.ask * 100)}¢` : "—"}
-                  <span className="text-ink-faint">
-                    {j.bid != null ? ` / ${Math.round(j.bid * 100)}¢` : ""}
-                  </span>
-                </span>
-              </div>
-            );
-          })}
         </div>
+        <p className="mt-2 font-mono text-[9px] uppercase leading-relaxed tracking-[0.12em] text-ink-faint">
+          likelihood = the stored shadow run&apos;s probability where the model
+          prices the market (&quot;—&quot; where it doesn&apos;t: method of
+          victory + 1st-half families are market-only for now) · shadow,
+          not advice
+        </p>
       </div>
     </Reveal>
   );
