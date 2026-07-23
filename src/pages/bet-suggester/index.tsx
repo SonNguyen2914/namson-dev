@@ -146,9 +146,14 @@ function LeagueFX({ id }: { id: string }) {
 // Watermark behind the league title. Prefers a real logo file dropped at
 // public/leagues/{id}.svg (or .png via rename); until one exists, falls
 // back to a built-in one-color recreation of the mark.
+// Inner holds the img-failed state; the wrapper re-keys it per league so
+// the state resets on league change WITHOUT a setState-in-effect.
 function LeagueMark({ league }: { league: (typeof LEAGUES)[number] }) {
+  return <LeagueMarkInner key={league.id} league={league} />;
+}
+
+function LeagueMarkInner({ league }: { league: (typeof LEAGUES)[number] }) {
   const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [league.id]);
   if (!failed) {
     return (
       // eslint-disable-next-line @next/next/no-img-element

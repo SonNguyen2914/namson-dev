@@ -67,12 +67,19 @@ export default function LivePanel({ matchId, liveLevers }: {
   const [trackLive, setTrackLive] = useState(saved?.trackLive ?? true);
 
   // auto-track: follow the live-derived levers as the stats change, until
-  // the user takes a slider (then their read wins until they re-enable)
-  useEffect(() => {
-    if (!trackLive || !liveLevers) return;
+  // the user takes a slider (then their read wins until they re-enable).
+  // React's "adjust state when input changes" pattern — a conditional
+  // setState during render (compared by VALUE so a re-created liveLevers
+  // object doesn't loop), never a setState-in-effect.
+  const [trackedLevers, setTrackedLevers] =
+    useState<{ home: number; away: number } | null>(null);
+  if (trackLive && liveLevers &&
+      (!trackedLevers || trackedLevers.home !== liveLevers.home
+       || trackedLevers.away !== liveLevers.away)) {
+    setTrackedLevers({ home: liveLevers.home, away: liveLevers.away });
     setAttH(liveLevers.home);
     setAttA(liveLevers.away);
-  }, [trackLive, liveLevers]);
+  }
 
   const manualAttH = (v: number) => { setTrackLive(false); setAttH(v); };
   const manualAttA = (v: number) => { setTrackLive(false); setAttA(v); };

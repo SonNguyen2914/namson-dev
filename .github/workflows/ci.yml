@@ -1,0 +1,34 @@
+name: CI
+
+# V8.1 evaluation — the frontend build/typecheck/lint was never
+# independently reproduced. This makes it automatic and blocking, with
+# the lockfile enforced (npm ci) so a fresh runner resolves the exact
+# dependency stack.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install (exact lockfile)
+        run: npm ci
+
+      - name: TypeScript typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Production build
+        run: npm run build

@@ -48,7 +48,7 @@ export default function MatchDetail() {
   const [pProps, setPProps] = useState<PlayerPropsResponse | null>(null);
   const [news, setNews] = useState<TeamNewsResponse | null>(null);
   const [research, setResearch] = useState<ResearchResponse | null>(null);
-  const [, setClock] = useState(0); // 1s tick — drives the hero countdown
+  const [nowMs, setNowMs] = useState(() => Date.now()); // 1s countdown tick
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   // grouped markets table: sort + collapsed groups
@@ -125,7 +125,7 @@ export default function MatchDetail() {
     };
     loadNews();
     const newsPoll = setInterval(loadNews, 120000);
-    const tick = setInterval(() => setClock((c) => c + 1), 1000);
+    const tick = setInterval(() => setNowMs(Date.now()), 1000);
     return () => { alive = false; clearInterval(newsPoll); clearInterval(tick); };
   }, [matchId]);
 
@@ -168,8 +168,8 @@ export default function MatchDetail() {
   const [codeH, codeA] = (matchId ?? "_").split("_");
   const home = teams?.home ?? codeH ?? "Home";
   const away = teams?.away ?? codeA ?? "Away";
-  const secsToKick = news
-    ? Math.floor((new Date(news.kickoff).getTime() - Date.now()) / 1000)
+  const secsToKick = news && nowMs > 0
+    ? Math.floor((new Date(news.kickoff).getTime() - nowMs) / 1000)
     : null;
 
   // Likelihood ↓ then edge ↓ — same ordering as the landing board
