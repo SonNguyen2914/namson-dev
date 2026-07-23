@@ -691,6 +691,15 @@ function StatBar({ s, m }: { s: StatRow; m: Match }) {
 
 /* ---------- scouting (ESPN form + H2H) ---------- */
 
+function fmtShortDate(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return Number.isFinite(d.getTime())
+    ? d.toLocaleDateString(undefined,
+        { month: "short", day: "numeric", year: "numeric" })
+    : iso;
+}
+
 function FormChips({ form }: { form?: string }) {
   if (!form) return null;
   return (
@@ -733,40 +742,53 @@ function ScoutingSection({ m }: { m: Match }) {
                     </span>
                     <span className="w-10 tabular-nums text-ink-hi">{g.score}</span>
                     <span className="min-w-0 flex-1 truncate text-ink-low">
-                      {g.at_vs} {g.opponent}
+                      {g.at_vs === "@" ? "away at" : "home vs"} {g.opponent}
                     </span>
-                    <span className="shrink-0 text-ink-faint">{g.date}</span>
+                    <span className="shrink-0 text-ink-faint">{fmtShortDate(g.date)}</span>
                   </div>
                 ))}
               </div>
             </div>
           ))}
         </div>
-        {sc.head_to_head.length > 0 && (
-          <div className="mt-4 rounded-2xl border border-line p-4">
-            <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.15em] text-ink-faint">
-              recent meetings · from {sc.head_to_head[0]?.perspective ?? "home"}&apos;s side
-            </p>
-            <div className="space-y-1.5">
-              {sc.head_to_head.map((g, i) => (
-                <div key={i} className="flex items-center gap-2 font-mono text-[11px]">
-                  <span className={`w-4 text-center ${
-                    g.result === "W" ? "text-accent"
-                      : g.result === "L" ? "text-neg" : "text-ink-low"}`}>
-                    {g.result}
-                  </span>
-                  <span className="w-12 tabular-nums text-ink-hi">
-                    {g.home_score}–{g.away_score}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-ink-low">
-                    {g.at_vs} {g.opponent}
-                  </span>
-                  <span className="shrink-0 text-ink-faint">{g.date}</span>
-                </div>
-              ))}
+        {sc.head_to_head.length > 0 && (() => {
+          const persp = sc.head_to_head[0]?.perspective ?? "";
+          return (
+            <div className="mt-4 rounded-2xl border border-line p-4">
+              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.15em] text-ink-faint">
+                recent meetings · {persp} score always shown first
+              </p>
+              <div className="space-y-1.5">
+                {sc.head_to_head.map((g, i) => {
+                  // ESPN gives the score in that MATCH's home-away
+                  // order; reorder it to perspective-first so W/L/D
+                  // always agrees with the numbers the eye reads
+                  const away = g.at_vs === "@";
+                  const mine = away ? g.away_score : g.home_score;
+                  const theirs = away ? g.home_score : g.away_score;
+                  return (
+                    <div key={i} className="flex items-center gap-2 font-mono text-[11px]">
+                      <span className={`w-4 text-center ${
+                        g.result === "W" ? "text-accent"
+                          : g.result === "L" ? "text-neg" : "text-ink-low"}`}>
+                        {g.result}
+                      </span>
+                      <span className="w-24 tabular-nums text-ink-hi">
+                        {persp} {mine}–{theirs} {g.opponent}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-ink-low">
+                        {away ? `away at ${g.opponent}` : "at home"}
+                      </span>
+                      <span className="shrink-0 text-ink-faint">
+                        {fmtShortDate(g.date)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </Collapse>
     </Reveal>
   );
