@@ -1,8 +1,9 @@
 // MLS dashboard — the first next-league surface (Jul 22, 2026).
-// Data only, honestly labeled: live ESPN fixtures/scores/standings and
-// Kalshi's real KXMLSGAME 3-way books (both sides shown — ask to buy,
-// bid to exit). No model numbers yet: the engine adaptation follows the
-// V7 Part H acceptance gates, and this page never pretends otherwise.
+// Live ESPN fixtures/scores/standings, Kalshi's real KXMLSGAME 3-way
+// books (both sides shown — ask to buy, bid to exit), and mls-2026-v0
+// SHADOW odds where a completed prediction run exists. Shadow means
+// observational: every model number is labeled, none is a
+// recommendation, and real-money signals stay disabled server-side.
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Eyebrow, Reveal } from "./ui";
@@ -18,6 +19,8 @@ type Conference = { conference: string; entries: StandingEntry[] };
 type BookRow = { ticker: string; label?: string; yes_ask?: string;
   yes_bid?: string; status?: string };
 type GameBook = { event_ticker: string; title?: string; markets: BookRow[] };
+type OddsRow = { espn_event_id: string; run_type?: string; locked?: boolean;
+  outcomes?: Record<string, number> };
 
 const j = (r: Response) => (r.ok ? r.json() : Promise.reject(r.status));
 
@@ -26,6 +29,7 @@ export default function MlsDashboard() {
   const [week, setWeek] = useState<Fixture[] | null>(null);
   const [tables, setTables] = useState<Conference[] | null>(null);
   const [books, setBooks] = useState<GameBook[] | null>(null);
+  const [odds, setOdds] = useState<Record<string, OddsRow>>({});
 
   useEffect(() => {
     let alive = true;
@@ -34,6 +38,13 @@ export default function MlsDashboard() {
         .then((d) => alive && setToday(d.fixtures)).catch(() => {});
       fetch("/api/mls/markets").then(j)
         .then((d) => alive && setBooks(d.games)).catch(() => {});
+      fetch("/api/mls/odds").then(j)
+        .then((d) => {
+          if (!alive) return;
+          const map: Record<string, OddsRow> = {};
+          for (const o of d.odds ?? []) map[o.espn_event_id] = o;
+          setOdds(map);
+        }).catch(() => {});
     };
     load();
     fetch("/api/mls/schedule?days=7").then(j)
@@ -61,7 +72,9 @@ export default function MlsDashboard() {
             <Empty>no MLS fixtures today</Empty>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {today.map((f) => <FixtureCard key={f.id} f={f} />)}
+              {today.map((f) => (
+                <FixtureCard key={f.id} f={f} o={odds[f.id]} />
+              ))}
             </div>
           )}
         </section>
@@ -77,10 +90,10 @@ export default function MlsDashboard() {
             </span>
           </h3>
           <p className="mb-6 max-w-2xl text-xs leading-relaxed text-ink-low">
-            Raw exchange prices — no model overlay yet. The engine that
-            priced WC26 adapts to league play behind the V7 acceptance
-            gates; until it clears them, this page shows the market and
-            only the market.
+            Raw exchange prices. Where a fixture shows model numbers they
+            come from mls-2026-v0 running in <em>shadow mode</em> —
+            observational output logged for prospective validation, never
+            a recommendation. Real-money signals are disabled server-side.
           </p>
           {books === null ? (
             <Empty>loading books…</Empty>
@@ -103,8 +116,8 @@ export default function MlsDashboard() {
           ) : (
             <div className="divide-y divide-line rounded-2xl border border-line">
               {week.slice(0, 30).map((f) => (
-                <div key={f.id}
-                  className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                <Link key={f.id} href={`/bet-suggester/mls/${f.id}`}
+                  className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-accent/5">
                   <span className="w-28 shrink-0 font-mono text-[11px] uppercase tracking-wide text-ink-faint">
                     {fmtDate(f.date)}
                   </span>
@@ -113,10 +126,18 @@ export default function MlsDashboard() {
                     <span className="text-ink-faint"> vs </span>
                     {f.away.short || f.away.name}
                   </span>
+                  {odds[f.id]?.outcomes && (
+                    <span className="shrink-0 font-mono text-[10px] tabular-nums text-ink-low"
+                      title="mls-2026-v0 shadow odds — not advice">
+                      {Math.round((odds[f.id].outcomes!.home_win ?? 0) * 100)}
+                      /{Math.round((odds[f.id].outcomes!.draw ?? 0) * 100)}
+                      /{Math.round((odds[f.id].outcomes!.away_win ?? 0) * 100)}
+                    </span>
+                  )}
                   <span className="hidden truncate font-mono text-[10px] text-ink-faint sm:block">
                     {f.venue}
                   </span>
-                </div>
+                </Link>
               ))}
             </div>
           )}
@@ -175,7 +196,24 @@ function TeamLine({ s, live }: { s: Side; live: boolean }) {
   );
 }
 
-function FixtureCard({ f }: { f: Fixture }) {
+function OddsChip({ o }: { o?: OddsRow }) {
+  const p = o?.outcomes;
+  if (!p) return null;
+  const pct = (k: string) =>
+    p[k] != null ? `${Math.round(p[k] * 100)}` : "—";
+  return (
+    <div className="mt-2 flex items-center justify-between rounded-lg bg-accent/10 px-2 py-1 font-mono text-[10px] tabular-nums">
+      <span className="text-ink-low">
+        H {pct("home_win")} · D {pct("draw")} · A {pct("away_win")}
+      </span>
+      <span className="uppercase tracking-wide text-ink-faint">
+        {o?.locked ? "t-10 lock" : "shadow"}
+      </span>
+    </div>
+  );
+}
+
+function FixtureCard({ f, o }: { f: Fixture; o?: OddsRow }) {
   const live = f.state === "in";
   return (
     <Link href={`/bet-suggester/mls/${f.id}`}
@@ -190,6 +228,7 @@ function FixtureCard({ f }: { f: Fixture }) {
         </span>
         <span className="truncate pl-2">{f.venue}</span>
       </div>
+      <OddsChip o={o} />
     </Link>
   );
 }

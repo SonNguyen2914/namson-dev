@@ -1,9 +1,8 @@
 // MLS match hub — live stats + the fixture's real Kalshi book + a
-// fee-aware scenario engine + ESPN scouting (form, last five, H2H).
-// Everything here is data or market arithmetic; there are NO model
-// probabilities — that slot stays empty until the engine adaptation
-// clears the V7 Part H gates, and the page says so where the model
-// panel would live.
+// fee-aware scenario engine + ESPN scouting (form, last five, H2H) +
+// the mls-2026-v0 SHADOW model. Model probabilities are observational
+// only: every panel carries the shadow label, and nothing here is a
+// recommendation while real-money signals stay disabled.
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
@@ -27,6 +26,10 @@ type Match = { id: string; date?: string; state?: string; detail?: string;
 type BookRow = { ticker: string; label?: string; yes_ask?: string;
   yes_bid?: string; status?: string };
 type Book = { event_ticker: string; title?: string; markets: BookRow[] };
+type ModelRun = { run_type?: string; captured_at?: string; seed?: number;
+  n_simulations?: number; outcomes?: Record<string, number> };
+type ModelInfo = { model_version?: string; shadow?: boolean;
+  latest?: ModelRun; t10_lock?: ModelRun | null };
 
 const MLS_VARS = {
   "--accent": "#d50032",
@@ -43,6 +46,7 @@ export default function MlsMatchPage() {
     ? router.query.eventId : null;
   const [m, setM] = useState<Match | null>(null);
   const [book, setBook] = useState<Book | null>(null);
+  const [model, setModel] = useState<ModelInfo | null>(null);
   const [err, setErr] = useState(false);
 
   useEffect(() => {
@@ -53,7 +57,8 @@ export default function MlsMatchPage() {
         .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
         .then((d) => {
           if (!alive) return;
-          setM(d.match); setBook(d.book ?? null); setErr(false);
+          setM(d.match); setBook(d.book ?? null);
+          setModel(d.model ?? null); setErr(false);
         })
         .catch(() => alive && setErr(true));
     load();
@@ -65,7 +70,9 @@ export default function MlsMatchPage() {
   return (
     <div style={MLS_VARS} className="min-h-screen bg-canvas px-4 py-10">
       <Head><title>
-        {m ? `${m.home.abbrev} ${m.home.score}–${m.away.score} ${m.away.abbrev} · MLS` : "MLS match"}
+        {m ? (m.home.score != null && m.away.score != null
+          ? `${m.home.abbrev} ${m.home.score}–${m.away.score} ${m.away.abbrev} · MLS`
+          : `${m.home.abbrev} vs ${m.away.abbrev} · MLS`) : "MLS match"}
       </title></Head>
       <div className="mx-auto max-w-2xl">
         <Link href="/bet-suggester"
@@ -105,16 +112,7 @@ export default function MlsMatchPage() {
             <MarketSection book={book} />
             <ScenarioSection book={book} />
 
-            <Reveal>
-              <section className="mt-10">
-                <Eyebrow className="mb-4" tone="accent">model outcome probabilities</Eyebrow>
-                <p className="rounded-2xl border border-dashed border-line px-4 py-6 text-center font-mono text-[10px] uppercase leading-relaxed tracking-[0.15em] text-ink-faint">
-                  the wc26 engine is not yet adapted to league play —<br />
-                  no simulated probabilities are shown until it clears the
-                  acceptance gates
-                </p>
-              </section>
-            </Reveal>
+            <ModelSection model={model} m={m} />
 
             <Reveal>
               <section className="mt-10">
@@ -158,13 +156,81 @@ export default function MlsMatchPage() {
             <ScoutingSection m={m} />
 
             <p className="mt-12 text-center font-mono text-[10px] uppercase tracking-[0.15em] text-ink-faint">
-              live data + real market prices · fee-aware arithmetic only ·
-              no model output
+              live data + real market prices · shadow model, observational
+              only · not betting advice
             </p>
           </>
         )}
       </div>
     </div>
+  );
+}
+
+/* ---------- model (shadow) ---------- */
+
+const OUTCOME_ROWS: Array<[string, "home" | "away" | null, string]> = [
+  ["home_win", "home", "home win"],
+  ["draw", null, "draw"],
+  ["away_win", "away", "away win"],
+];
+
+function ModelSection({ model, m }: { model: ModelInfo | null; m: Match }) {
+  const run = model?.latest;
+  return (
+    <Reveal>
+      <section className="mt-10">
+        <div className="mb-4 flex items-center justify-between">
+          <Eyebrow tone="accent">model outcome probabilities</Eyebrow>
+          <span className="rounded-full border border-line px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.15em] text-ink-faint">
+            shadow · not advice
+          </span>
+        </div>
+        {!run?.outcomes ? (
+          <p className="rounded-2xl border border-dashed border-line px-4 py-6 text-center font-mono text-[10px] uppercase leading-relaxed tracking-[0.15em] text-ink-faint">
+            mls data collection active — this fixture has no completed
+            prediction run yet
+          </p>
+        ) : (
+          <div className="rounded-2xl border border-line bg-elev p-4">
+            <div className="space-y-2.5">
+              {OUTCOME_ROWS.map(([key, side, fallback]) => {
+                const p = run.outcomes?.[key];
+                if (p == null) return null;
+                const label = side
+                  ? (m[side].abbrev || m[side].name || fallback)
+                  : fallback;
+                return (
+                  <div key={key} className="grid grid-cols-[6rem_1fr_3.5rem] items-center gap-3">
+                    <span className="truncate font-mono text-[11px] uppercase tracking-wide text-ink-low">
+                      {label}
+                    </span>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-accent/10">
+                      <div className="h-full rounded-full bg-accent"
+                        style={{ width: `${Math.round(p * 100)}%` }} />
+                    </div>
+                    <span className="text-right font-mono text-sm tabular-nums text-ink-hi">
+                      {(p * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-4 border-t border-line pt-3 font-mono text-[9px] uppercase leading-relaxed tracking-[0.12em] text-ink-faint">
+              {model?.model_version} · {run.n_simulations?.toLocaleString()} sims
+              · seed {run.seed}
+              {run.captured_at &&
+                ` · ${new Date(run.captured_at).toLocaleString([], {
+                  month: "short", day: "numeric",
+                  hour: "2-digit", minute: "2-digit" })}`}
+              {model?.t10_lock ? " · t-10 locked" : ""}
+              <br />
+              shadow mode — real-money recommendations are disabled until the
+              mls model passes prospective validation
+            </p>
+          </div>
+        )}
+      </section>
+    </Reveal>
   );
 }
 
