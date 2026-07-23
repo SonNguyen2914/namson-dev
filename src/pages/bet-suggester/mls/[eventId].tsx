@@ -43,7 +43,8 @@ type ModelRun = { run_type?: string; captured_at?: string; seed?: number;
   tickers?: Record<string, string>;
   xg?: { home: number; away: number } | null;
   scorelines?: Array<{ score: string; prob: number }>;
-  props?: Record<string, number>; basis?: Basis };
+  props?: Record<string, number>; basis?: Basis;
+  input_quality?: Record<string, boolean> | null };
 type ModelInfo = { model_version?: string; shadow?: boolean;
   primary?: ModelRun; latest?: ModelRun; t10_lock?: ModelRun | null };
 
@@ -238,6 +239,7 @@ export default function MlsMatchPage() {
                       caption={run ? `mls-2026-v0 · ${run.n_simulations?.toLocaleString()} sims · seed ${run.seed}${run.run_type === "t10" ? " · T-10 LOCK — frozen pre-kickoff" : ""}` : undefined}
                       emptyText="no completed prediction run yet" />
                   </div>
+                  <InputQuality run={run} />
                   <p className="mt-4 font-mono text-[9px] uppercase leading-relaxed tracking-[0.12em] text-ink-faint">
                     same scale, read vertically — where the boundaries disagree
                     is where model and market disagree · shadow mode, real-money
@@ -334,6 +336,42 @@ function Stat({ label, value }: { label: string; value: string }) {
       <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
         {label}
       </p>
+    </div>
+  );
+}
+
+/* ---------- input-quality honesty row (Phase 5) ---------- */
+
+// Shows what team-selection data existed when the run was made. The
+// model does NOT use lineups yet; this exists so missing data reads as
+// PENDING, never as silent confidence.
+const QUALITY_LABELS: Array<[string, string]> = [
+  ["LINEUP_CONFIRMED", "lineup"],
+  ["GOALKEEPER_CONFIRMED", "keeper"],
+  ["TEAM_DATA_FRESH", "team form"],
+];
+
+function InputQuality({ run }: { run?: ModelRun }) {
+  const q = run?.input_quality;
+  if (!q) return null;
+  return (
+    <div className="mt-4 border-t border-line pt-3">
+      <p className="mb-2 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+        input quality at run time
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {QUALITY_LABELS.map(([key, label]) => {
+          const ok = q[key];
+          return (
+            <span key={key}
+              className={`rounded-md border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide ${
+                ok ? "border-accent/40 text-accent"
+                   : "border-line text-ink-faint"}`}>
+              {ok ? "✓" : "·"} {label} {ok ? "" : "pending"}
+            </span>
+          );
+        })}
+      </div>
     </div>
   );
 }
