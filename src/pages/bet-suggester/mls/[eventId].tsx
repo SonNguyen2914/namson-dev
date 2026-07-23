@@ -245,8 +245,6 @@ export default function MlsMatchPage() {
                   </p>
                 </div>
               </Reveal>
-
-              <MarketsTable m={m} run={run} book={book} families={books} />
             </section>
 
             {/* ===== model prediction: scorelines + chance chips ===== */}
@@ -281,6 +279,9 @@ export default function MlsMatchPage() {
                 </Collapse>
               </Reveal>
             )}
+
+            {/* ===== every market, right under the pure-model view ===== */}
+            <MarketsTable m={m} run={run} book={book} families={books} />
 
             {/* ===== scenario engine ===== */}
             <Reveal>
