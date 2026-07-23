@@ -21,8 +21,14 @@ jobs:
           node-version: "20"
           cache: "npm"
 
-      - name: Install (exact lockfile)
-        run: npm ci
+      # npm install, not npm ci: Tailwind v4 pulls platform-specific
+      # native binaries (@tailwindcss/oxide, lightningcss) whose
+      # transitive optional deps (@emnapi/*) can't all be captured in a
+      # single lockfile generated on one OS — a known npm limitation.
+      # install still pins versions from the committed lockfile and
+      # resolves the Linux-only optional deps the runner needs.
+      - name: Install
+        run: npm install --no-audit --no-fund
 
       - name: TypeScript typecheck
         run: npx tsc --noEmit
