@@ -113,7 +113,7 @@ export default function MlsMatchPage() {
   const activeSection = useScrollSpy(["prediction", "strategy", "markets", "stats"]);
 
   return (
-    <div style={MLS_VARS} className="min-h-screen bg-canvas">
+    <div style={MLS_VARS} className="min-h-screen bg-bs font-sans text-ink-mid">
       <Head><title>
         {m ? (m.home.score != null && m.away.score != null
           ? `${m.home.abbrev} ${m.home.score}–${m.away.score} ${m.away.abbrev} · MLS`
