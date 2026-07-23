@@ -113,7 +113,7 @@ export default function MlsMatchPage() {
           : `${m.home.abbrev} vs ${m.away.abbrev} · MLS`) : "MLS match"}
       </title></Head>
 
-      <TopBar back={{ href: "/bet-suggester", label: "mls board" }}
+      <TopBar back={{ href: "/bet-suggester?league=mls", label: "mls board" }}
         title={m ? `${m.home.abbrev} vs ${m.away.abbrev}` : "MLS"}>
         {live && (
           <NavChip href="#stats">

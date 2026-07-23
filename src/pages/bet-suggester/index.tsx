@@ -6,6 +6,7 @@
 import Head from "next/head";
 import { Anton, Baloo_2, Exo_2, Poppins } from "next/font/google";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import {
   api, countdown, flag, pct, signedPct, kickoffLocal,
@@ -241,13 +242,21 @@ export default function BetSuggesterDashboard() {
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const league = LEAGUES[leagueIdx];
   const isWC = league.id === "wc26";
-  // curtain-up: play the current league's transition once on page load
+  // curtain-up: play the landing league's transition once on page load.
+  // ?league=<id> deep-links a mode (the match hubs' "back to board" links
+  // return to THEIR league, not the WC26 default) — wait for the router
+  // so the query param is actually readable on this auto-static route.
+  const router = useRouter();
   const didIntro = useRef(false);
   useEffect(() => {
-    if (didIntro.current) return;
+    if (!router.isReady || didIntro.current) return;
     didIntro.current = true;
     switching.current = true;
-    const l = LEAGUES[0];
+    const wanted = typeof router.query.league === "string"
+      ? router.query.league : "wc26";
+    const idx = Math.max(0, LEAGUES.findIndex((l) => l.id === wanted));
+    const l = LEAGUES[idx];
+    setLeagueIdx(idx);
     setSwapClass(`mode-reveal-${l.id}`);
     setFxOn(true);
     setFxKey((k) => k + 1);
@@ -257,12 +266,17 @@ export default function BetSuggesterDashboard() {
       switching.current = false;
     }, l.modeMs);
     return () => clearTimeout(t);
-  }, []);
+  }, [router.isReady, router.query.league]);
 
   const goLeague = (target: number, _dirName: "next" | "prev") => {
     if (switching.current || target === leagueIdx) return;
     switching.current = true;
     const to = LEAGUES[target];
+    // keep the mode in the URL (shallow — no data reload) so refresh,
+    // share, and the match hubs' back links all land in this league
+    router.replace(
+      { query: to.id === "wc26" ? {} : { league: to.id } },
+      undefined, { shallow: true });
     // the new league mounts immediately; its reveal animation and the
     // matching full-screen effect uncover it together
     setLeagueIdx(target);
