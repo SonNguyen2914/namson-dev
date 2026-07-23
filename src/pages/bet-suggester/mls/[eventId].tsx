@@ -45,7 +45,7 @@ type ModelRun = { run_type?: string; captured_at?: string; seed?: number;
   scorelines?: Array<{ score: string; prob: number }>;
   props?: Record<string, number>; basis?: Basis };
 type ModelInfo = { model_version?: string; shadow?: boolean;
-  latest?: ModelRun; t10_lock?: ModelRun | null };
+  primary?: ModelRun; latest?: ModelRun; t10_lock?: ModelRun | null };
 
 const MLS_VARS = {
   "--accent": "#d50032",
@@ -104,7 +104,9 @@ export default function MlsMatchPage() {
 
   const live = m?.state === "in";
   const post = m?.state === "post";
-  const run = model?.latest;
+  // the canonical T-10 lock is the fixture's model once it exists —
+  // a later scheduled run must never silently supersede it (V8 eval F9)
+  const run = model?.primary ?? model?.latest;
   const secsToKick = m?.date && now > 0
     ? Math.floor((new Date(m.date).getTime() - now) / 1000) : null;
   const activeSection = useScrollSpy(["prediction", "strategy", "markets", "stats"]);
@@ -229,13 +231,11 @@ export default function MlsMatchPage() {
                       shadow · not advice
                     </span>
                   </div>
-                  <TripleBar m={m} probs={impliedProbs(m, run, book)}
-                    caption="implied % — normalized bid/ask midpoints; contains the exchange's spread"
-                    emptyText="no open kalshi book matched to this fixture" />
+                  <MarketBar m={m} book={book} run={run} />
                   <div className="mt-5 border-t border-line pt-4">
                     <Eyebrow className="mb-1">model outcome probabilities</Eyebrow>
                     <TripleBar m={m} probs={modelProbs(run)}
-                      caption={run ? `mls-2026-v0 · ${run.n_simulations?.toLocaleString()} sims · seed ${run.seed}` : undefined}
+                      caption={run ? `mls-2026-v0 · ${run.n_simulations?.toLocaleString()} sims · seed ${run.seed}${run.run_type === "t10" ? " · T-10 LOCK — frozen pre-kickoff" : ""}` : undefined}
                       emptyText="no completed prediction run yet" />
                   </div>
                   <p className="mt-4 font-mono text-[9px] uppercase leading-relaxed tracking-[0.12em] text-ink-faint">
@@ -340,7 +340,8 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 /* ---------- the three-way stacked bar ---------- */
 
-type Triple = { home: number; draw: number; away: number } | null;
+type Triple = { home: number; draw: number; away: number;
+  method?: string } | null;
 
 function modelProbs(run?: ModelRun): Triple {
   const o = run?.outcomes;
@@ -355,6 +356,7 @@ function impliedProbs(m: Match, run?: ModelRun, book?: Book | null): Triple {
   const byTicker = new Map(
     Object.entries(run?.tickers ?? {}).map(([o, t]) => [t, o]));
   const mids: Record<string, number> = {};
+  let askOnly = 0;
   for (const r of rows) {
     let outcome = byTicker.get(r.ticker);
     if (!outcome && (r.label ?? "").trim().toLowerCase() === "tie") outcome = "draw";
@@ -367,15 +369,30 @@ function impliedProbs(m: Match, run?: ModelRun, book?: Book | null): Triple {
     }
     const ask = parseFloat(r.yes_ask ?? "");
     const bid = parseFloat(r.yes_bid ?? "");
-    const mid = Number.isFinite(ask) && Number.isFinite(bid) ? (ask + bid) / 2
-      : Number.isFinite(ask) ? ask : NaN;
+    let mid = NaN;
+    if (Number.isFinite(ask) && Number.isFinite(bid)) mid = (ask + bid) / 2;
+    else if (Number.isFinite(ask)) { mid = ask; askOnly += 1; }
     if (outcome && Number.isFinite(mid)) mids[outcome] = mid;
   }
   if (mids.home_win == null || mids.draw == null || mids.away_win == null) return null;
   const total = mids.home_win + mids.draw + mids.away_win;
   if (total <= 0) return null;
   return { home: mids.home_win / total, draw: mids.draw / total,
-    away: mids.away_win / total };
+    away: mids.away_win / total,
+    method: askOnly > 0
+      ? `${askOnly} side${askOnly > 1 ? "s" : ""} ask-only (no bid)`
+      : "bid/ask midpoints" };
+}
+
+function MarketBar({ m, book, run }: {
+  m: Match; book: Book | null; run?: ModelRun;
+}) {
+  const probs = impliedProbs(m, run, book);
+  const caption = probs
+    ? `implied % — normalized ${probs.method}; contains the exchange's spread`
+    : undefined;
+  return <TripleBar m={m} probs={probs} caption={caption}
+    emptyText="no open kalshi book matched to this fixture" />;
 }
 
 function TripleBar({ m, probs, caption, emptyText }: {
@@ -566,7 +583,7 @@ function MarketsTable({ m, run, book, families }: {
                   </button>
                   {!fold && rowsFor(f).map((j) => {
                     const edge = j.modelP != null && j.ask != null
-                      ? j.modelP - j.ask : null;
+                      ? j.modelP - (j.ask + fee(j.ask)) : null;
                     return (
                       <div key={j.ticker}
                         className="grid grid-cols-[minmax(0,1fr)_5.5rem_5rem_5.5rem_5.5rem] items-center gap-x-3 border-b border-line px-4 py-3 text-sm transition-colors hover:bg-elev">
