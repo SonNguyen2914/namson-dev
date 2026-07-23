@@ -16,18 +16,25 @@ export function TopBar({ back, title, children }: {
     <header className="topbar">
       <div className="mx-auto flex h-12 max-w-5xl items-center gap-4 px-5">
         {back && (
-          <Link href={back.href}
+          <Link href={back.href} aria-label={back.label}
             className="shrink-0 font-mono text-[11px] uppercase tracking-[0.16em] text-ink-low transition-colors hover:text-accent">
-            ← {back.label}
+            {/* arrow always; the label only where there's room (sm+),
+                so the nav chip rail gets the full width on phones */}
+            ←<span className="hidden sm:inline"> {back.label}</span>
           </Link>
         )}
-        <div className="min-w-0 truncate font-mono text-[11px] uppercase tracking-[0.2em] text-ink-mid">
+        {/* Title is hidden on phones: the match-info card directly below
+            already shows the matchup, so a truncated "RBNY …" here only
+            stole room from the nav rail (leaving chips cut off). Shows
+            again from sm+, where there's width for it. */}
+        <div className="hidden min-w-0 truncate font-mono text-[11px] uppercase tracking-[0.2em] text-ink-mid sm:block">
           {title}
         </div>
         {children && (
           // min-w-0 (NOT shrink-0): the chip rail must compress and scroll
           // within itself on phones — a rigid rail forced the whole page
           // wider than the viewport, horizontal-scrolling the entire app.
+          // On mobile the title is hidden, so the rail gets the full width.
           <nav className="no-scrollbar ml-auto flex min-w-0 items-center gap-1.5 overflow-x-auto">
             {children}
           </nav>
@@ -43,7 +50,7 @@ export function NavChip({ href, onClick, active, children }: {
   active?: boolean;
   children: ReactNode;
 }) {
-  const cls = "whitespace-nowrap rounded-md border px-2.5 py-1 " +
+  const cls = "whitespace-nowrap rounded-md border px-2 py-1 sm:px-2.5 " +
     "font-mono text-[10px] uppercase tracking-[0.14em] transition-colors " +
     (active
       ? "border-accent/50 bg-accent/10 text-accent"
