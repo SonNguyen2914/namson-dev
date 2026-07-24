@@ -19,7 +19,11 @@ type Side = { name?: string; abbrev?: string; logo?: string; score?: string;
 type StatRow = { key: string; label: string; home?: string; away?: string };
 type Ev = { minute?: string; type?: string; team?: string; text?: string;
   scoring?: boolean };
-type FiveGame = { result?: string; score?: string; at_vs?: string;
+// team_score/opponent_score are THIS team's goals first. Never render the
+// provider's `score` string: ESPN formats it winner-first, so a 0-1 loss
+// arrives as "1-0" and reads as a win (reported Jul 24, 2026).
+type FiveGame = { result?: string; team_score?: number | null;
+  opponent_score?: number | null; score?: string; at_vs?: string;
   opponent?: string; date?: string };
 type LastFive = { team?: string; abbrev?: string; form?: string;
   games: FiveGame[] };
@@ -1021,10 +1025,13 @@ function ScoutingSection({ m }: { m: Match }) {
         <div className="grid gap-4 sm:grid-cols-2">
           {sc.last_five.map((t) => (
             <div key={t.team} className="rounded-2xl border border-line p-4">
-              <div className="mb-3 flex items-center justify-between">
+              <div className="mb-1 flex items-center justify-between">
                 <p className="text-sm font-medium text-ink-hi">{t.team}</p>
                 <FormChips form={t.form?.replace(/ /g, "")} />
               </div>
+              <p className="mb-2 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+                {t.abbrev ?? "their"} score first · oldest to newest
+              </p>
               <div className="space-y-1.5">
                 {t.games.map((g, i) => (
                   <div key={i} className="flex items-center gap-2 font-mono text-[11px]">
@@ -1033,7 +1040,10 @@ function ScoutingSection({ m }: { m: Match }) {
                         : g.result === "L" ? "text-neg" : "text-ink-low"}`}>
                       {g.result}
                     </span>
-                    <span className="w-10 tabular-nums text-ink-hi">{g.score}</span>
+                    <span className="w-10 tabular-nums text-ink-hi">
+                      {g.team_score != null && g.opponent_score != null
+                        ? `${g.team_score}–${g.opponent_score}` : "–"}
+                    </span>
                     <span className="min-w-0 flex-1 truncate text-ink-low">
                       {g.at_vs === "@" ? "away at" : "home vs"} {g.opponent}
                     </span>
