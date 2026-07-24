@@ -29,6 +29,15 @@ type Match = { id: string; date?: string; state?: string; detail?: string;
   minute?: string; venue?: string; home: Side; away: Side;
   stats: StatRow[]; events: Ev[];
   scouting?: { last_five: LastFive[]; head_to_head: H2H[] } };
+type XiPlayer = { name?: string; position?: string; jersey?: string;
+  xg90?: number | null; apps?: number | null; is_goalkeeper?: boolean };
+type Absence = { name?: string; xg90?: number; apps?: number;
+  status?: "bench" | "out" };
+type SideLineup = { formation?: string; confirmed?: boolean;
+  released?: boolean; starters: XiPlayer[]; bench: XiPlayer[];
+  goalkeeper?: string | null; key_absences: Absence[] };
+type Lineups = { home: SideLineup | null; away: SideLineup | null;
+  strength_available?: boolean };
 type BookRow = { ticker: string; label?: string; yes_ask?: string;
   yes_bid?: string; status?: string; model_key?: string | null };
 type Book = { event_ticker: string; title?: string; markets: BookRow[] };
@@ -89,6 +98,7 @@ export default function MlsMatchPage() {
   const [book, setBook] = useState<Book | null>(null);
   const [books, setBooks] = useState<Family[]>([]);
   const [model, setModel] = useState<ModelInfo | null>(null);
+  const [lineups, setLineups] = useState<Lineups | null>(null);
   const [err, setErr] = useState(false);
   const [now, setNow] = useState(() => Date.now());   // 1s countdown tick
   const [fetchedAt, setFetchedAt] = useState(0);      // when `book` was pulled
@@ -103,7 +113,8 @@ export default function MlsMatchPage() {
           if (!alive) return;
           setM(d.match); setBook(d.book ?? null);
           setBooks(d.books ?? []);
-          setModel(d.model ?? null); setErr(false);
+          setModel(d.model ?? null); setLineups(d.lineups ?? null);
+          setErr(false);
           setFetchedAt(Date.now());
         })
         .catch(() => alive && setErr(true));
@@ -228,6 +239,9 @@ export default function MlsMatchPage() {
 
             {/* ===== how they play — fitted ratings, no hand-waving ===== */}
             <HowTheyPlay m={m} run={run} />
+
+            {/* ===== team news: announced XI + notable absentees ===== */}
+            <LineupSection lu={lineups} m={m} />
 
             {/* ===== ESPN scouting: form + H2H ===== */}
             <ScoutingSection m={m} />
@@ -859,6 +873,112 @@ function StatBar({ s, m }: { s: StatRow; m: Match }) {
         <div className="flex-1 rounded-full bg-elev2" />
       </div>
     </div>
+  );
+}
+
+/* ---------- team news: announced XI + notable absentees ----------
+   DISPLAY CONTEXT ONLY. The walk-forward tests were explicit: an
+   XI-strength adjustment does not beat team-xG, and key-attacker
+   availability (+0.0034) is not significant — so nothing here moves a
+   probability. It answers "who is actually playing?", nothing more.
+   xG/90 is each player's own season rate from the official MLS feed. */
+
+function XiRow({ p }: { p: XiPlayer }) {
+  return (
+    <div className="flex items-baseline gap-2 font-mono text-[11px]">
+      <span className="w-5 shrink-0 text-right tabular-nums text-ink-faint">
+        {p.jersey ?? ""}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-ink-hi">
+        {p.name}
+        {p.is_goalkeeper && (
+          <span className="ml-1 text-ink-faint">(GK)</span>
+        )}
+      </span>
+      <span className="w-10 shrink-0 text-ink-faint">{p.position ?? ""}</span>
+      <span className="w-12 shrink-0 text-right tabular-nums text-ink-low">
+        {typeof p.xg90 === "number" ? p.xg90.toFixed(2) : "—"}
+      </span>
+    </div>
+  );
+}
+
+function SideXi({ side, team }: { side: SideLineup | null; team?: string }) {
+  return (
+    <div className="rounded-2xl border border-line p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="truncate text-sm font-medium text-ink-hi">{team}</p>
+        {side?.formation && (
+          <span className="shrink-0 rounded-full border border-line px-2 py-0.5 font-mono text-[9px] tracking-[0.1em] text-ink-low">
+            {side.formation}
+          </span>
+        )}
+      </div>
+
+      {!side?.released ? (
+        <p className="rounded-xl border border-dashed border-line px-3 py-4 text-center font-mono text-[10px] uppercase tracking-[0.15em] text-ink-faint">
+          awaiting team news
+        </p>
+      ) : (
+        <>
+          <div className="mb-1 flex items-baseline gap-2 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+            <span className="w-5 shrink-0" />
+            <span className="min-w-0 flex-1">starting xi</span>
+            <span className="w-10 shrink-0">pos</span>
+            <span className="w-12 shrink-0 text-right">xg/90</span>
+          </div>
+          <div className="space-y-1">
+            {side.starters.map((p, i) => <XiRow key={i} p={p} />)}
+          </div>
+        </>
+      )}
+
+      {side && side.key_absences.length > 0 && (
+        <div className="mt-3 border-t border-line pt-3">
+          <p className="mb-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+            not starting
+          </p>
+          <div className="space-y-1">
+            {side.key_absences.map((a, i) => (
+              <div key={i} className="flex items-baseline gap-2 font-mono text-[11px]">
+                <span className="min-w-0 flex-1 truncate text-ink-hi">
+                  {a.name}
+                </span>
+                <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] uppercase tracking-[0.1em] ${
+                  a.status === "bench"
+                    ? "bg-elev2 text-ink-low" : "bg-neg/15 text-neg"}`}>
+                  {a.status === "bench" ? "bench" : "out"}
+                </span>
+                <span className="w-12 shrink-0 text-right tabular-nums text-ink-low">
+                  {typeof a.xg90 === "number" ? a.xg90.toFixed(2) : "—"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LineupSection({ lu, m }: { lu: Lineups | null; m: Match }) {
+  if (!lu || (!lu.home && !lu.away)) return null;
+  const anyReleased = Boolean(lu.home?.released || lu.away?.released);
+  return (
+    <Reveal>
+      <Collapse eyebrow="team news" title="lineups + absentees"
+        defaultOpen={anyReleased} className="mt-8 mb-0">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <SideXi side={lu.home} team={m.home?.name} />
+          <SideXi side={lu.away} team={m.away?.name} />
+        </div>
+        <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+          xi from espn · xg/90 from official mls stats ·
+          {lu.strength_available ? " " : " strength unavailable · "}
+          context only — the model does not use lineups
+        </p>
+      </Collapse>
+    </Reveal>
   );
 }
 
