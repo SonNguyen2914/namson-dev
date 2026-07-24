@@ -58,6 +58,14 @@ const MLS_VARS = {
 const fee = (p: number) => 0.07 * p * (1 - p);
 const DRAW_COLOR = "#52525b";          // neutral — no club owns the draw
 
+function fmtTime(iso?: string | number | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString(undefined, {
+    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 /* club signature colors: ESPN hex, alternate when the primary would
    vanish on the near-black canvas */
 function luminance(hex: string): number {
@@ -83,6 +91,7 @@ export default function MlsMatchPage() {
   const [model, setModel] = useState<ModelInfo | null>(null);
   const [err, setErr] = useState(false);
   const [now, setNow] = useState(() => Date.now());   // 1s countdown tick
+  const [fetchedAt, setFetchedAt] = useState(0);      // when `book` was pulled
 
   useEffect(() => {
     if (!eventId) return;
@@ -95,6 +104,7 @@ export default function MlsMatchPage() {
           setM(d.match); setBook(d.book ?? null);
           setBooks(d.books ?? []);
           setModel(d.model ?? null); setErr(false);
+          setFetchedAt(Date.now());
         })
         .catch(() => alive && setErr(true));
     load();
@@ -232,6 +242,7 @@ export default function MlsMatchPage() {
                       shadow · not advice
                     </span>
                   </div>
+                  <TemporalBasis model={model} run={run} fetchedAt={fetchedAt} />
                   <MarketBar m={m} book={book} run={run} />
                   <div className="mt-5 border-t border-line pt-4">
                     <Eyebrow className="mb-1">model outcome probabilities</Eyebrow>
@@ -422,6 +433,58 @@ function impliedProbs(m: Match, run?: ModelRun, book?: Book | null): Triple {
       : "bid/ask midpoints" };
 }
 
+/* The four temporal objects the evaluator asked to be labeled explicitly
+   (V9 eval F16): the frozen T-10 model, the T-10 frozen book, the latest
+   diagnostic model, and the CURRENT market book — so a reader never
+   mistakes "frozen model vs current market" for a same-moment edge. */
+function TemporalBasis({ model, run, fetchedAt }: {
+  model: ModelInfo | null; run?: ModelRun; fetchedAt: number;
+}) {
+  const lock = model?.t10_lock ?? null;
+  const latest = model?.latest ?? null;
+  const showingLock = run?.run_type === "t10";
+  const modelUsed = showingLock ? "T-10 lock" : "latest diagnostic";
+  type Row = { label: string; value: string; active: boolean };
+  const rows: Row[] = [
+    { label: "canonical T-10 model",
+      value: lock ? `frozen ${fmtTime(lock.captured_at)}` : "not locked yet",
+      active: showingLock },
+  ];
+  if (latest && (!lock || latest.captured_at !== lock.captured_at))
+    rows.push({ label: "latest diagnostic model",
+      value: fmtTime(latest.captured_at), active: !showingLock });
+  rows.push({ label: "canonical T-10 frozen book",
+    value: lock ? "recorded with the lock" : "—", active: false });
+  rows.push({ label: "current market book",
+    value: `live · ${fmtTime(fetchedAt || undefined)}`, active: true });
+  return (
+    <div className="mb-4 rounded-xl border border-line bg-elev2 p-3">
+      <Eyebrow className="mb-2">temporal basis</Eyebrow>
+      <div className="grid gap-1.5 sm:grid-cols-2">
+        {rows.map((r) => (
+          <div key={r.label}
+            className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-low">
+              <span aria-hidden className={`inline-block h-1.5 w-1.5 rounded-full ${
+                r.active ? "bg-accent" : "bg-line-strong"}`} />
+              {r.label}
+            </span>
+            <span className="font-mono text-[10px] tabular-nums text-ink-mid">
+              {r.value}
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2.5 font-mono text-[9px] uppercase leading-relaxed tracking-[0.12em] text-ink-faint">
+        edge below = {modelUsed} model ({fmtTime(run?.captured_at)}) vs the
+        CURRENT market ask ({fmtTime(fetchedAt || undefined)}) — two different
+        moments. the T-10 frozen book is recorded (in the corpus) but is not
+        the comparator shown here.
+      </p>
+    </div>
+  );
+}
+
 function MarketBar({ m, book, run }: {
   m: Match; book: Book | null; run?: ModelRun;
 }) {
@@ -599,7 +662,7 @@ function MarketsTable({ m, run, book, families }: {
               <span>Market</span>
               <span className="text-right" title="mls-2026-v0 shadow probability">Likelihood</span>
               <span className="text-right"
-                title="Model probability minus ask minus Kalshi's entry fee — the executable gap, not the gross one">Net edge</span>
+                title="Frozen/latest MODEL probability minus the CURRENT ask minus Kalshi's entry fee — a frozen-model-vs-current-market gap across two moments, not the T-10 frozen-book edge">Net edge</span>
               <span className="text-right"
                 title="Payout multiple at the buyable ask price">Mult</span>
               <span className="text-right">Ask / Bid</span>
