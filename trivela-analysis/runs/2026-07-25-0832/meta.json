@@ -1,0 +1,3045 @@
+{
+  "run_id": "2026-07-25-0832",
+  "script": {
+    "name": "fetch_and_score.py",
+    "sha256": "0691f2af97fc0d925abacf719ea09e1c6d10cddac4b64b92fa73efd0edc72a0f"
+  },
+  "api": {
+    "base_url": "https://wc26-bet-suggester-production.up.railway.app",
+    "version": null,
+    "git_sha": null,
+    "version_source": "/api/health",
+    "version_payload": {
+      "status": "ok",
+      "demo_mode": false,
+      "time": "2026-07-25T08:32:09.864189+00:00"
+    },
+    "version_probe_note": "no version/SHA endpoint answered \u2014 this run is pinned by snapshot SHA-256 instead",
+    "endpoints_tried": [
+      {
+        "path": "/api/version",
+        "http_status": 404
+      },
+      {
+        "path": "/api/health",
+        "http_status": 200
+      },
+      {
+        "path": "/health",
+        "http_status": 404
+      },
+      {
+        "path": "/version",
+        "http_status": 404
+      },
+      {
+        "path": "/",
+        "http_status": 404
+      }
+    ]
+  },
+  "timing": {
+    "started_at_utc": "2026-07-25T08:32:08Z",
+    "odds_pulled_at_utc": "2026-07-25T08:32:10Z",
+    "finished_at_utc": "2026-07-25T08:32:52Z"
+  },
+  "boards_requested": [
+    "wc26",
+    "mls"
+  ],
+  "boards": {
+    "wc26": {
+      "endpoint": "/api/suggestions?limit=100",
+      "http_status": 200,
+      "markets_seen": 0,
+      "markets_priced": 0,
+      "generated_at": "2026-07-25T08:32:11.170332+00:00",
+      "tier_used": null,
+      "note": "board returned no suggestions (tier_used=None)"
+    },
+    "mls": {
+      "endpoints": [
+        "/api/mls/scoreboard",
+        "/api/mls/schedule?days=3",
+        "/api/mls/match/{event_id}"
+      ],
+      "fixtures_seen": 15,
+      "fixtures_fetched": 15,
+      "markets_seen": 868,
+      "markets_priced": 490,
+      "model_version": "mls-2026-v0",
+      "shadow": true
+    }
+  },
+  "counts": {
+    "markets_seen": 868,
+    "markets_priced": 490,
+    "markets_skipped": 379,
+    "anomalies": 0
+  },
+  "skipped": [
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25CLBCIN-CLB5CIN2",
+      "reason": "model run has no probability for key 'score_5_2'",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25CLBCIN-CLB2CIN4",
+      "reason": "model run has no probability for key 'score_2_4'",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25CLBCIN-CLB2CIN5",
+      "reason": "model run has no probability for key 'score_2_5'",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25CLBCIN-CLB3CIN4",
+      "reason": "model run has no probability for key 'score_3_4'",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25CLBCIN-CLB0CIN0",
+      "reason": "model run has no probability for key 'score_0_0'",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25CLBCIN-CLB5CIN1",
+      "reason": "model run has no probability for key 'score_5_1'",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25CLBCIN-CLB0CIN4",
+      "reason": "model run has no probability for key 'score_0_4'",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25CLBCIN-CLB4CIN0",
+      "reason": "model run has no probability for key 'score_4_0'",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25CLBCIN-CLB1CIN4",
+      "reason": "model run has no probability for key 'score_1_4'",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25CLBCIN-CLB0CIN5",
+      "reason": "model run has no probability for key 'score_0_5'",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25CLBCIN-CLB4CIN2",
+      "reason": "model run has no probability for key 'score_4_2'",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25CLBCIN-CLB1CIN5",
+      "reason": "model run has no probability for key 'score_1_5'",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25CLBCIN-CLB4CIN1",
+      "reason": "model run has no probability for key 'score_4_1'",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25CLBCIN-CLB5CIN0",
+      "reason": "model run has no probability for key 'score_5_0'",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25CLBCIN-CLB4CIN3",
+      "reason": "model run has no probability for key 'score_4_3'",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25CLBCIN-CLB0CIN3",
+      "reason": "model run has no probability for key 'score_0_3'",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25CLBCIN-CLB3CIN3",
+      "reason": "model run has no probability for key 'score_3_3'",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25CLBCIN-CLB0CIN2",
+      "reason": "model run has no probability for key 'score_0_2'",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25CLBCIN-CIN",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25CLBCIN-TIE",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25CLBCIN-CLB",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25CLBCIN-1",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25CLBCIN-2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25CLBCIN-3",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25CLBCIN-CIN2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25CLBCIN-CLB2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HBTTS-26JUL25CLBCIN-BTTS",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Columbus Crew v FC Cincinnati",
+      "family": "h1_btts"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25DCUTOR-DCU1TOR4",
+      "reason": "model run has no probability for key 'score_1_4'",
+      "market": "D.C. United v Toronto FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25DCUTOR-DCU2TOR5",
+      "reason": "model run has no probability for key 'score_2_5'",
+      "market": "D.C. United v Toronto FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25DCUTOR-DCU3TOR4",
+      "reason": "model run has no probability for key 'score_3_4'",
+      "market": "D.C. United v Toronto FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25DCUTOR-DCU4TOR2",
+      "reason": "model run has no probability for key 'score_4_2'",
+      "market": "D.C. United v Toronto FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25DCUTOR-DCU4TOR3",
+      "reason": "model run has no probability for key 'score_4_3'",
+      "market": "D.C. United v Toronto FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25DCUTOR-DCU5TOR2",
+      "reason": "model run has no probability for key 'score_5_2'",
+      "market": "D.C. United v Toronto FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25DCUTOR-DCU2TOR4",
+      "reason": "model run has no probability for key 'score_2_4'",
+      "market": "D.C. United v Toronto FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25DCUTOR-DCU1TOR5",
+      "reason": "model run has no probability for key 'score_1_5'",
+      "market": "D.C. United v Toronto FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25DCUTOR-DCU3TOR3",
+      "reason": "model run has no probability for key 'score_3_3'",
+      "market": "D.C. United v Toronto FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25DCUTOR-DCU5TOR1",
+      "reason": "model run has no probability for key 'score_5_1'",
+      "market": "D.C. United v Toronto FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25DCUTOR-DCU5TOR0",
+      "reason": "model run has no probability for key 'score_5_0'",
+      "market": "D.C. United v Toronto FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25DCUTOR-DCU1TOR3",
+      "reason": "model run has no probability for key 'score_1_3'",
+      "market": "D.C. United v Toronto FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25DCUTOR-DCU0TOR4",
+      "reason": "model run has no probability for key 'score_0_4'",
+      "market": "D.C. United v Toronto FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25DCUTOR-DCU4TOR1",
+      "reason": "model run has no probability for key 'score_4_1'",
+      "market": "D.C. United v Toronto FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25DCUTOR-DCU0TOR5",
+      "reason": "model run has no probability for key 'score_0_5'",
+      "market": "D.C. United v Toronto FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25DCUTOR-DCU4TOR0",
+      "reason": "model run has no probability for key 'score_4_0'",
+      "market": "D.C. United v Toronto FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25DCUTOR-DCU0TOR3",
+      "reason": "model run has no probability for key 'score_0_3'",
+      "market": "D.C. United v Toronto FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25DCUTOR-DCU2TOR3",
+      "reason": "model run has no probability for key 'score_2_3'",
+      "market": "D.C. United v Toronto FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25DCUTOR-TIE",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "D.C. United v Toronto FC",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25DCUTOR-TOR",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "D.C. United v Toronto FC",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25DCUTOR-DCU",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "D.C. United v Toronto FC",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25DCUTOR-1",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "D.C. United v Toronto FC",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25DCUTOR-3",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "D.C. United v Toronto FC",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25DCUTOR-2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "D.C. United v Toronto FC",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25DCUTOR-TOR2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "D.C. United v Toronto FC",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25DCUTOR-DCU2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "D.C. United v Toronto FC",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HBTTS-26JUL25DCUTOR-BTTS",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "D.C. United v Toronto FC",
+      "family": "h1_btts"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NEATL-NE1ATL3",
+      "reason": "model run has no probability for key 'score_1_3'",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NEATL-NE2ATL3",
+      "reason": "model run has no probability for key 'score_2_3'",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NEATL-NE0ATL3",
+      "reason": "model run has no probability for key 'score_0_3'",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NEATL-NE4ATL2",
+      "reason": "model run has no probability for key 'score_4_2'",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NEATL-NE5ATL0",
+      "reason": "model run has no probability for key 'score_5_0'",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NEATL-NE1ATL4",
+      "reason": "model run has no probability for key 'score_1_4'",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NEATL-NE4ATL0",
+      "reason": "model run has no probability for key 'score_4_0'",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NEATL-NE3ATL4",
+      "reason": "model run has no probability for key 'score_3_4'",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NEATL-NE5ATL1",
+      "reason": "model run has no probability for key 'score_5_1'",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NEATL-NE2ATL5",
+      "reason": "model run has no probability for key 'score_2_5'",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NEATL-NE1ATL5",
+      "reason": "model run has no probability for key 'score_1_5'",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NEATL-NE5ATL2",
+      "reason": "model run has no probability for key 'score_5_2'",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NEATL-NE3ATL3",
+      "reason": "model run has no probability for key 'score_3_3'",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NEATL-NE4ATL1",
+      "reason": "model run has no probability for key 'score_4_1'",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NEATL-NE0ATL5",
+      "reason": "model run has no probability for key 'score_0_5'",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NEATL-NE2ATL4",
+      "reason": "model run has no probability for key 'score_2_4'",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NEATL-NE0ATL4",
+      "reason": "model run has no probability for key 'score_0_4'",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NEATL-NE4ATL3",
+      "reason": "model run has no probability for key 'score_4_3'",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25NEATL-TIE",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25NEATL-NE",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25NEATL-ATL",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25NEATL-3",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25NEATL-2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25NEATL-1",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25NEATL-ATL2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25NEATL-NE2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HBTTS-26JUL25NEATL-BTTS",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "New England Revolution v Atlanta United FC",
+      "family": "h1_btts"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYCCHI-NYC3CHI0",
+      "reason": "model run has no probability for key 'score_3_0'",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYCCHI-NYC0CHI0",
+      "reason": "model run has no probability for key 'score_0_0'",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYCCHI-NYC3CHI4",
+      "reason": "model run has no probability for key 'score_3_4'",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYCCHI-NYC4CHI0",
+      "reason": "model run has no probability for key 'score_4_0'",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYCCHI-NYC0CHI4",
+      "reason": "model run has no probability for key 'score_0_4'",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYCCHI-NYC4CHI1",
+      "reason": "model run has no probability for key 'score_4_1'",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYCCHI-NYC1CHI5",
+      "reason": "model run has no probability for key 'score_1_5'",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYCCHI-NYC2CHI5",
+      "reason": "model run has no probability for key 'score_2_5'",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYCCHI-NYC5CHI0",
+      "reason": "model run has no probability for key 'score_5_0'",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYCCHI-NYC5CHI1",
+      "reason": "model run has no probability for key 'score_5_1'",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYCCHI-NYC2CHI4",
+      "reason": "model run has no probability for key 'score_2_4'",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYCCHI-NYC1CHI4",
+      "reason": "model run has no probability for key 'score_1_4'",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYCCHI-NYC5CHI2",
+      "reason": "model run has no probability for key 'score_5_2'",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYCCHI-NYC0CHI3",
+      "reason": "model run has no probability for key 'score_0_3'",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYCCHI-NYC4CHI3",
+      "reason": "model run has no probability for key 'score_4_3'",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYCCHI-NYC0CHI5",
+      "reason": "model run has no probability for key 'score_0_5'",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYCCHI-NYC4CHI2",
+      "reason": "model run has no probability for key 'score_4_2'",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYCCHI-NYC3CHI3",
+      "reason": "model run has no probability for key 'score_3_3'",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25NYCCHI-CHI",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25NYCCHI-NYC",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25NYCCHI-TIE",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25NYCCHI-1",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25NYCCHI-2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25NYCCHI-3",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25NYCCHI-NYC2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25NYCCHI-CHI2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HBTTS-26JUL25NYCCHI-BTTS",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "New York City FC v Chicago Fire FC",
+      "family": "h1_btts"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25ORLNSH-ORL0NSH3",
+      "reason": "model run has no probability for key 'score_0_3'",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25ORLNSH-ORL3NSH4",
+      "reason": "model run has no probability for key 'score_3_4'",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25ORLNSH-ORL2NSH4",
+      "reason": "model run has no probability for key 'score_2_4'",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25ORLNSH-ORL5NSH2",
+      "reason": "model run has no probability for key 'score_5_2'",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25ORLNSH-ORL5NSH0",
+      "reason": "model run has no probability for key 'score_5_0'",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25ORLNSH-ORL1NSH5",
+      "reason": "model run has no probability for key 'score_1_5'",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25ORLNSH-ORL0NSH5",
+      "reason": "model run has no probability for key 'score_0_5'",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25ORLNSH-ORL0NSH4",
+      "reason": "model run has no probability for key 'score_0_4'",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25ORLNSH-ORL1NSH4",
+      "reason": "model run has no probability for key 'score_1_4'",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25ORLNSH-ORL5NSH1",
+      "reason": "model run has no probability for key 'score_5_1'",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25ORLNSH-ORL4NSH0",
+      "reason": "model run has no probability for key 'score_4_0'",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25ORLNSH-ORL4NSH2",
+      "reason": "model run has no probability for key 'score_4_2'",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25ORLNSH-ORL3NSH0",
+      "reason": "model run has no probability for key 'score_3_0'",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25ORLNSH-ORL4NSH1",
+      "reason": "model run has no probability for key 'score_4_1'",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25ORLNSH-ORL2NSH5",
+      "reason": "model run has no probability for key 'score_2_5'",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25ORLNSH-ORL4NSH3",
+      "reason": "model run has no probability for key 'score_4_3'",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25ORLNSH-ORL2NSH3",
+      "reason": "model run has no probability for key 'score_2_3'",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25ORLNSH-ORL3NSH3",
+      "reason": "model run has no probability for key 'score_3_3'",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25ORLNSH-NSH",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25ORLNSH-ORL",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25ORLNSH-TIE",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25ORLNSH-3",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25ORLNSH-1",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25ORLNSH-2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25ORLNSH-NSH2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25ORLNSH-ORL2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HBTTS-26JUL25ORLNSH-BTTS",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Orlando City SC v Nashville SC",
+      "family": "h1_btts"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYRBCLT-NYRB3CLT0",
+      "reason": "model run has no probability for key 'score_3_0'",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYRBCLT-NYRB1CLT4",
+      "reason": "model run has no probability for key 'score_1_4'",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYRBCLT-NYRB3CLT3",
+      "reason": "model run has no probability for key 'score_3_3'",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYRBCLT-NYRB2CLT5",
+      "reason": "model run has no probability for key 'score_2_5'",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYRBCLT-NYRB4CLT3",
+      "reason": "model run has no probability for key 'score_4_3'",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYRBCLT-NYRB5CLT2",
+      "reason": "model run has no probability for key 'score_5_2'",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYRBCLT-NYRB3CLT4",
+      "reason": "model run has no probability for key 'score_3_4'",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYRBCLT-NYRB4CLT0",
+      "reason": "model run has no probability for key 'score_4_0'",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYRBCLT-NYRB0CLT4",
+      "reason": "model run has no probability for key 'score_0_4'",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYRBCLT-NYRB5CLT0",
+      "reason": "model run has no probability for key 'score_5_0'",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYRBCLT-NYRB4CLT2",
+      "reason": "model run has no probability for key 'score_4_2'",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYRBCLT-NYRB4CLT1",
+      "reason": "model run has no probability for key 'score_4_1'",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYRBCLT-NYRB0CLT0",
+      "reason": "model run has no probability for key 'score_0_0'",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYRBCLT-NYRB0CLT5",
+      "reason": "model run has no probability for key 'score_0_5'",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYRBCLT-NYRB1CLT5",
+      "reason": "model run has no probability for key 'score_1_5'",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYRBCLT-NYRB2CLT4",
+      "reason": "model run has no probability for key 'score_2_4'",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYRBCLT-NYRB5CLT1",
+      "reason": "model run has no probability for key 'score_5_1'",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25NYRBCLT-NYRB0CLT3",
+      "reason": "model run has no probability for key 'score_0_3'",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25NYRBCLT-CLT",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25NYRBCLT-NYRB",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25NYRBCLT-TIE",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25NYRBCLT-2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25NYRBCLT-1",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25NYRBCLT-3",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25NYRBCLT-CLT2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25NYRBCLT-NYRB2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HBTTS-26JUL25NYRBCLT-BTTS",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Red Bull New York v Charlotte FC",
+      "family": "h1_btts"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PHISEA-PHI2SEA5",
+      "reason": "model run has no probability for key 'score_2_5'",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PHISEA-PHI4SEA1",
+      "reason": "model run has no probability for key 'score_4_1'",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PHISEA-PHI1SEA3",
+      "reason": "model run has no probability for key 'score_1_3'",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PHISEA-PHI0SEA5",
+      "reason": "model run has no probability for key 'score_0_5'",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PHISEA-PHI1SEA4",
+      "reason": "model run has no probability for key 'score_1_4'",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PHISEA-PHI2SEA4",
+      "reason": "model run has no probability for key 'score_2_4'",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PHISEA-PHI0SEA3",
+      "reason": "model run has no probability for key 'score_0_3'",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PHISEA-PHI4SEA2",
+      "reason": "model run has no probability for key 'score_4_2'",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PHISEA-PHI5SEA0",
+      "reason": "model run has no probability for key 'score_5_0'",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PHISEA-PHI1SEA5",
+      "reason": "model run has no probability for key 'score_1_5'",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PHISEA-PHI0SEA4",
+      "reason": "model run has no probability for key 'score_0_4'",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PHISEA-PHI5SEA1",
+      "reason": "model run has no probability for key 'score_5_1'",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PHISEA-PHI2SEA3",
+      "reason": "model run has no probability for key 'score_2_3'",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PHISEA-PHI4SEA0",
+      "reason": "model run has no probability for key 'score_4_0'",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PHISEA-PHI5SEA2",
+      "reason": "model run has no probability for key 'score_5_2'",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PHISEA-PHI4SEA3",
+      "reason": "model run has no probability for key 'score_4_3'",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PHISEA-PHI3SEA4",
+      "reason": "model run has no probability for key 'score_3_4'",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PHISEA-PHI3SEA3",
+      "reason": "model run has no probability for key 'score_3_3'",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25PHISEA-PHI",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25PHISEA-TIE",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25PHISEA-SEA",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25PHISEA-1",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25PHISEA-3",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25PHISEA-2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25PHISEA-SEA2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25PHISEA-PHI2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HBTTS-26JUL25PHISEA-BTTS",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Philadelphia Union v Seattle Sounders FC",
+      "family": "h1_btts"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MTLMIA-MTL3MIA3",
+      "reason": "model run has no probability for key 'score_3_3'",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MTLMIA-MTL3MIA4",
+      "reason": "model run has no probability for key 'score_3_4'",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MTLMIA-MTL5MIA2",
+      "reason": "model run has no probability for key 'score_5_2'",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MTLMIA-MTL0MIA3",
+      "reason": "model run has no probability for key 'score_0_3'",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MTLMIA-MTL2MIA5",
+      "reason": "model run has no probability for key 'score_2_5'",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MTLMIA-MTL4MIA3",
+      "reason": "model run has no probability for key 'score_4_3'",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MTLMIA-MTL5MIA1",
+      "reason": "model run has no probability for key 'score_5_1'",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MTLMIA-MTL4MIA0",
+      "reason": "model run has no probability for key 'score_4_0'",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MTLMIA-MTL5MIA0",
+      "reason": "model run has no probability for key 'score_5_0'",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MTLMIA-MTL0MIA5",
+      "reason": "model run has no probability for key 'score_0_5'",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MTLMIA-MTL0MIA4",
+      "reason": "model run has no probability for key 'score_0_4'",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MTLMIA-MTL4MIA1",
+      "reason": "model run has no probability for key 'score_4_1'",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MTLMIA-MTL3MIA0",
+      "reason": "model run has no probability for key 'score_3_0'",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MTLMIA-MTL0MIA0",
+      "reason": "model run has no probability for key 'score_0_0'",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MTLMIA-MTL1MIA5",
+      "reason": "model run has no probability for key 'score_1_5'",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MTLMIA-MTL1MIA4",
+      "reason": "model run has no probability for key 'score_1_4'",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MTLMIA-MTL4MIA2",
+      "reason": "model run has no probability for key 'score_4_2'",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MTLMIA-MTL2MIA4",
+      "reason": "model run has no probability for key 'score_2_4'",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25MTLMIA-MTL",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25MTLMIA-MIA",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25MTLMIA-TIE",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25MTLMIA-2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25MTLMIA-1",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25MTLMIA-3",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25MTLMIA-MIA2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25MTLMIA-MTL2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HBTTS-26JUL25MTLMIA-BTTS",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "CF Montr\u00e9al v Inter Miami CF",
+      "family": "h1_btts"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25STLCOL-STL1COL5",
+      "reason": "model run has no probability for key 'score_1_5'",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25STLCOL-STL4COL2",
+      "reason": "model run has no probability for key 'score_4_2'",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25STLCOL-STL2COL3",
+      "reason": "model run has no probability for key 'score_2_3'",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25STLCOL-STL4COL1",
+      "reason": "model run has no probability for key 'score_4_1'",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25STLCOL-STL1COL3",
+      "reason": "model run has no probability for key 'score_1_3'",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25STLCOL-STL0COL4",
+      "reason": "model run has no probability for key 'score_0_4'",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25STLCOL-STL2COL5",
+      "reason": "model run has no probability for key 'score_2_5'",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25STLCOL-STL3COL4",
+      "reason": "model run has no probability for key 'score_3_4'",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25STLCOL-STL4COL3",
+      "reason": "model run has no probability for key 'score_4_3'",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25STLCOL-STL5COL2",
+      "reason": "model run has no probability for key 'score_5_2'",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25STLCOL-STL1COL4",
+      "reason": "model run has no probability for key 'score_1_4'",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25STLCOL-STL5COL1",
+      "reason": "model run has no probability for key 'score_5_1'",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25STLCOL-STL0COL5",
+      "reason": "model run has no probability for key 'score_0_5'",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25STLCOL-STL3COL3",
+      "reason": "model run has no probability for key 'score_3_3'",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25STLCOL-STL0COL3",
+      "reason": "model run has no probability for key 'score_0_3'",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25STLCOL-STL5COL0",
+      "reason": "model run has no probability for key 'score_5_0'",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25STLCOL-STL2COL4",
+      "reason": "model run has no probability for key 'score_2_4'",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25STLCOL-STL4COL0",
+      "reason": "model run has no probability for key 'score_4_0'",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25STLCOL-TIE",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25STLCOL-STL",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25STLCOL-COL",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25STLCOL-3",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25STLCOL-2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25STLCOL-1",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25STLCOL-STL2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25STLCOL-COL2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HBTTS-26JUL25STLCOL-BTTS",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "St. Louis CITY SC v Colorado Rapids",
+      "family": "h1_btts"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25HOUATX-HOU1ATX5",
+      "reason": "model run has no probability for key 'score_1_5'",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25HOUATX-HOU2ATX5",
+      "reason": "model run has no probability for key 'score_2_5'",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25HOUATX-HOU0ATX3",
+      "reason": "model run has no probability for key 'score_0_3'",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25HOUATX-HOU3ATX3",
+      "reason": "model run has no probability for key 'score_3_3'",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25HOUATX-HOU4ATX3",
+      "reason": "model run has no probability for key 'score_4_3'",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25HOUATX-HOU0ATX5",
+      "reason": "model run has no probability for key 'score_0_5'",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25HOUATX-HOU2ATX3",
+      "reason": "model run has no probability for key 'score_2_3'",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25HOUATX-HOU2ATX4",
+      "reason": "model run has no probability for key 'score_2_4'",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25HOUATX-HOU3ATX4",
+      "reason": "model run has no probability for key 'score_3_4'",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25HOUATX-HOU4ATX2",
+      "reason": "model run has no probability for key 'score_4_2'",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25HOUATX-HOU1ATX4",
+      "reason": "model run has no probability for key 'score_1_4'",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25HOUATX-HOU0ATX4",
+      "reason": "model run has no probability for key 'score_0_4'",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25HOUATX-HOU4ATX1",
+      "reason": "model run has no probability for key 'score_4_1'",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25HOUATX-HOU5ATX2",
+      "reason": "model run has no probability for key 'score_5_2'",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25HOUATX-HOU5ATX0",
+      "reason": "model run has no probability for key 'score_5_0'",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25HOUATX-HOU4ATX0",
+      "reason": "model run has no probability for key 'score_4_0'",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25HOUATX-HOU5ATX1",
+      "reason": "model run has no probability for key 'score_5_1'",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25HOUATX-HOU1ATX3",
+      "reason": "model run has no probability for key 'score_1_3'",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25HOUATX-HOU",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25HOUATX-ATX",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25HOUATX-TIE",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25HOUATX-1",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25HOUATX-2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25HOUATX-3",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25HOUATX-HOU2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25HOUATX-ATX2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HBTTS-26JUL25HOUATX-BTTS",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Houston Dynamo FC v Austin FC",
+      "family": "h1_btts"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MINVAN-MIN3VAN3",
+      "reason": "model run has no probability for key 'score_3_3'",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MINVAN-MIN3VAN0",
+      "reason": "model run has no probability for key 'score_3_0'",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MINVAN-MIN0VAN5",
+      "reason": "model run has no probability for key 'score_0_5'",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MINVAN-MIN5VAN0",
+      "reason": "model run has no probability for key 'score_5_0'",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MINVAN-MIN1VAN5",
+      "reason": "model run has no probability for key 'score_1_5'",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MINVAN-MIN5VAN1",
+      "reason": "model run has no probability for key 'score_5_1'",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MINVAN-MIN2VAN5",
+      "reason": "model run has no probability for key 'score_2_5'",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MINVAN-MIN4VAN1",
+      "reason": "model run has no probability for key 'score_4_1'",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MINVAN-MIN5VAN2",
+      "reason": "model run has no probability for key 'score_5_2'",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MINVAN-MIN2VAN4",
+      "reason": "model run has no probability for key 'score_2_4'",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MINVAN-MIN3VAN4",
+      "reason": "model run has no probability for key 'score_3_4'",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MINVAN-MIN4VAN0",
+      "reason": "model run has no probability for key 'score_4_0'",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MINVAN-MIN3VAN2",
+      "reason": "model run has no probability for key 'score_3_2'",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MINVAN-MIN2VAN3",
+      "reason": "model run has no probability for key 'score_2_3'",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MINVAN-MIN1VAN4",
+      "reason": "model run has no probability for key 'score_1_4'",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MINVAN-MIN4VAN3",
+      "reason": "model run has no probability for key 'score_4_3'",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MINVAN-MIN4VAN2",
+      "reason": "model run has no probability for key 'score_4_2'",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25MINVAN-MIN0VAN4",
+      "reason": "model run has no probability for key 'score_0_4'",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25MINVAN-MIN",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25MINVAN-VAN",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25MINVAN-TIE",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25MINVAN-2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25MINVAN-1",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25MINVAN-3",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25MINVAN-VAN2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25MINVAN-MIN2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HBTTS-26JUL25MINVAN-BTTS",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Minnesota United FC v Vancouver Whitecaps",
+      "family": "h1_btts"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SDDAL-SD3DAL0",
+      "reason": "model run has no probability for key 'score_3_0'",
+      "market": "San Diego FC v FC Dallas",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SDDAL-SD0DAL0",
+      "reason": "model run has no probability for key 'score_0_0'",
+      "market": "San Diego FC v FC Dallas",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SDDAL-SD0DAL3",
+      "reason": "model run has no probability for key 'score_0_3'",
+      "market": "San Diego FC v FC Dallas",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SDDAL-SD3DAL3",
+      "reason": "model run has no probability for key 'score_3_3'",
+      "market": "San Diego FC v FC Dallas",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SDDAL-SD5DAL1",
+      "reason": "model run has no probability for key 'score_5_1'",
+      "market": "San Diego FC v FC Dallas",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SDDAL-SD4DAL0",
+      "reason": "model run has no probability for key 'score_4_0'",
+      "market": "San Diego FC v FC Dallas",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SDDAL-SD4DAL2",
+      "reason": "model run has no probability for key 'score_4_2'",
+      "market": "San Diego FC v FC Dallas",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SDDAL-SD3DAL4",
+      "reason": "model run has no probability for key 'score_3_4'",
+      "market": "San Diego FC v FC Dallas",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SDDAL-SD2DAL4",
+      "reason": "model run has no probability for key 'score_2_4'",
+      "market": "San Diego FC v FC Dallas",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SDDAL-SD0DAL5",
+      "reason": "model run has no probability for key 'score_0_5'",
+      "market": "San Diego FC v FC Dallas",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SDDAL-SD5DAL2",
+      "reason": "model run has no probability for key 'score_5_2'",
+      "market": "San Diego FC v FC Dallas",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SDDAL-SD5DAL0",
+      "reason": "model run has no probability for key 'score_5_0'",
+      "market": "San Diego FC v FC Dallas",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SDDAL-SD1DAL5",
+      "reason": "model run has no probability for key 'score_1_5'",
+      "market": "San Diego FC v FC Dallas",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SDDAL-SD4DAL3",
+      "reason": "model run has no probability for key 'score_4_3'",
+      "market": "San Diego FC v FC Dallas",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SDDAL-SD4DAL1",
+      "reason": "model run has no probability for key 'score_4_1'",
+      "market": "San Diego FC v FC Dallas",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SDDAL-SD2DAL5",
+      "reason": "model run has no probability for key 'score_2_5'",
+      "market": "San Diego FC v FC Dallas",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SDDAL-SD0DAL4",
+      "reason": "model run has no probability for key 'score_0_4'",
+      "market": "San Diego FC v FC Dallas",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SDDAL-SD1DAL4",
+      "reason": "model run has no probability for key 'score_1_4'",
+      "market": "San Diego FC v FC Dallas",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25SDDAL-TIE",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "San Diego FC v FC Dallas",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25SDDAL-DAL",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "San Diego FC v FC Dallas",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25SDDAL-SD",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "San Diego FC v FC Dallas",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25SDDAL-2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "San Diego FC v FC Dallas",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25SDDAL-1",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "San Diego FC v FC Dallas",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25SDDAL-3",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "San Diego FC v FC Dallas",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25SDDAL-DAL2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "San Diego FC v FC Dallas",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25SDDAL-SD2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "San Diego FC v FC Dallas",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HBTTS-26JUL25SDDAL-BTTS",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "San Diego FC v FC Dallas",
+      "family": "h1_btts"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PORRSL-POR3RSL3",
+      "reason": "model run has no probability for key 'score_3_3'",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PORRSL-POR0RSL3",
+      "reason": "model run has no probability for key 'score_0_3'",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PORRSL-POR2RSL4",
+      "reason": "model run has no probability for key 'score_2_4'",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PORRSL-POR1RSL4",
+      "reason": "model run has no probability for key 'score_1_4'",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PORRSL-POR3RSL4",
+      "reason": "model run has no probability for key 'score_3_4'",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PORRSL-POR1RSL5",
+      "reason": "model run has no probability for key 'score_1_5'",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PORRSL-POR4RSL0",
+      "reason": "model run has no probability for key 'score_4_0'",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PORRSL-POR0RSL5",
+      "reason": "model run has no probability for key 'score_0_5'",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PORRSL-POR4RSL2",
+      "reason": "model run has no probability for key 'score_4_2'",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PORRSL-POR5RSL1",
+      "reason": "model run has no probability for key 'score_5_1'",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PORRSL-POR5RSL0",
+      "reason": "model run has no probability for key 'score_5_0'",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PORRSL-POR0RSL4",
+      "reason": "model run has no probability for key 'score_0_4'",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PORRSL-POR4RSL1",
+      "reason": "model run has no probability for key 'score_4_1'",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PORRSL-POR2RSL5",
+      "reason": "model run has no probability for key 'score_2_5'",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PORRSL-POR5RSL2",
+      "reason": "model run has no probability for key 'score_5_2'",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PORRSL-POR4RSL3",
+      "reason": "model run has no probability for key 'score_4_3'",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PORRSL-POR2RSL3",
+      "reason": "model run has no probability for key 'score_2_3'",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25PORRSL-POR0RSL0",
+      "reason": "model run has no probability for key 'score_0_0'",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25PORRSL-TIE",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25PORRSL-POR",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25PORRSL-RSL",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25PORRSL-2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25PORRSL-3",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25PORRSL-1",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25PORRSL-POR2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25PORRSL-RSL2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HBTTS-26JUL25PORRSL-BTTS",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "Portland Timbers v Real Salt Lake",
+      "family": "h1_btts"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SJLAG-SJ2LAG3",
+      "reason": "model run has no probability for key 'score_2_3'",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SJLAG-SJ3LAG4",
+      "reason": "model run has no probability for key 'score_3_4'",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SJLAG-SJ1LAG4",
+      "reason": "model run has no probability for key 'score_1_4'",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SJLAG-SJ4LAG1",
+      "reason": "model run has no probability for key 'score_4_1'",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SJLAG-SJ4LAG0",
+      "reason": "model run has no probability for key 'score_4_0'",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SJLAG-SJ4LAG2",
+      "reason": "model run has no probability for key 'score_4_2'",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SJLAG-SJ0LAG5",
+      "reason": "model run has no probability for key 'score_0_5'",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SJLAG-SJ1LAG5",
+      "reason": "model run has no probability for key 'score_1_5'",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SJLAG-SJ2LAG4",
+      "reason": "model run has no probability for key 'score_2_4'",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SJLAG-SJ2LAG5",
+      "reason": "model run has no probability for key 'score_2_5'",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SJLAG-SJ4LAG3",
+      "reason": "model run has no probability for key 'score_4_3'",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SJLAG-SJ5LAG2",
+      "reason": "model run has no probability for key 'score_5_2'",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SJLAG-SJ0LAG3",
+      "reason": "model run has no probability for key 'score_0_3'",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SJLAG-SJ1LAG3",
+      "reason": "model run has no probability for key 'score_1_3'",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SJLAG-SJ0LAG4",
+      "reason": "model run has no probability for key 'score_0_4'",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SJLAG-SJ3LAG3",
+      "reason": "model run has no probability for key 'score_3_3'",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SJLAG-SJ5LAG1",
+      "reason": "model run has no probability for key 'score_5_1'",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLSSCORE-26JUL25SJLAG-SJ5LAG0",
+      "reason": "model run has no probability for key 'score_5_0'",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "score"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25SJLAG-LAG",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25SJLAG-TIE",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1H-26JUL25SJLAG-SJ",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "h1"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25SJLAG-2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25SJLAG-3",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HTOTAL-26JUL25SJLAG-1",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "h1_total"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25SJLAG-SJ2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HSPREAD-26JUL25SJLAG-LAG2",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "h1_spread"
+    },
+    {
+      "board": "mls",
+      "market_id": "KXMLS1HBTTS-26JUL25SJLAG-BTTS",
+      "reason": "no model_key \u2014 cannot join to a model probability",
+      "market": "San Jose Earthquakes v LA Galaxy",
+      "family": "h1_btts"
+    },
+    {
+      "board": "mls",
+      "market_id": "event:761694",
+      "reason": "no Kalshi book on this fixture",
+      "market": "LAFC v Sporting Kansas City"
+    }
+  ],
+  "anomalies": [],
+  "snapshots": [
+    {
+      "name": "version_probe_api_version",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/version",
+      "path": "data/snapshots/2026-07-25-0832/version_probe_api_version.json",
+      "http_status": 404,
+      "bytes": 22,
+      "sha256": "37ec4665a8102d115ffd1ac20dae94c98b4dac64b0c1a68228aa2a531caeb35d",
+      "fetched_at_utc": "2026-07-25T08:32:09Z",
+      "elapsed_ms": 600,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:09 GMT",
+      "error": "HTTP 404",
+      "optional": true
+    },
+    {
+      "name": "version_probe_api_health",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/health",
+      "path": "data/snapshots/2026-07-25-0832/version_probe_api_health.json",
+      "http_status": 200,
+      "bytes": 75,
+      "sha256": "0d65312a97e05cb9d2d2715ec977f29d040fa9eb5412daa1d6fbb3fa3b6b3401",
+      "fetched_at_utc": "2026-07-25T08:32:09Z",
+      "elapsed_ms": 327,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:09 GMT",
+      "error": null,
+      "optional": true
+    },
+    {
+      "name": "version_probe_health",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/health",
+      "path": "data/snapshots/2026-07-25-0832/version_probe_health.json",
+      "http_status": 404,
+      "bytes": 22,
+      "sha256": "37ec4665a8102d115ffd1ac20dae94c98b4dac64b0c1a68228aa2a531caeb35d",
+      "fetched_at_utc": "2026-07-25T08:32:10Z",
+      "elapsed_ms": 324,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:10 GMT",
+      "error": "HTTP 404",
+      "optional": true
+    },
+    {
+      "name": "version_probe_version",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/version",
+      "path": "data/snapshots/2026-07-25-0832/version_probe_version.json",
+      "http_status": 404,
+      "bytes": 22,
+      "sha256": "37ec4665a8102d115ffd1ac20dae94c98b4dac64b0c1a68228aa2a531caeb35d",
+      "fetched_at_utc": "2026-07-25T08:32:10Z",
+      "elapsed_ms": 310,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:10 GMT",
+      "error": "HTTP 404",
+      "optional": true
+    },
+    {
+      "name": "version_probe_",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/",
+      "path": "data/snapshots/2026-07-25-0832/version_probe_.json",
+      "http_status": 404,
+      "bytes": 22,
+      "sha256": "37ec4665a8102d115ffd1ac20dae94c98b4dac64b0c1a68228aa2a531caeb35d",
+      "fetched_at_utc": "2026-07-25T08:32:10Z",
+      "elapsed_ms": 342,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:10 GMT",
+      "error": "HTTP 404",
+      "optional": true
+    },
+    {
+      "name": "wc26_suggestions",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/suggestions?limit=100",
+      "path": "data/snapshots/2026-07-25-0832/wc26_suggestions.json",
+      "http_status": 200,
+      "bytes": 85,
+      "sha256": "8a7b633bc1eb6c1f93d3bd9a2e2985ba6eb5fd46942f21bc3572e04179a6b51d",
+      "fetched_at_utc": "2026-07-25T08:32:11Z",
+      "elapsed_ms": 326,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:11 GMT",
+      "error": null,
+      "optional": false
+    },
+    {
+      "name": "mls_scoreboard",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/mls/scoreboard",
+      "path": "data/snapshots/2026-07-25-0832/mls_scoreboard.json",
+      "http_status": 200,
+      "bytes": 6635,
+      "sha256": "9f838abeaaa42eb41cca88eededd7eee418ab4e1380af494c77c779de2b73cb8",
+      "fetched_at_utc": "2026-07-25T08:32:11Z",
+      "elapsed_ms": 338,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:11 GMT",
+      "error": null,
+      "optional": false
+    },
+    {
+      "name": "mls_schedule",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/mls/schedule?days=3",
+      "path": "data/snapshots/2026-07-25-0832/mls_schedule.json",
+      "http_status": 200,
+      "bytes": 6635,
+      "sha256": "30d420a6814ad67fe1b4f2fe0b3a319b27ae0d377f5634df55b6fd500967d2b5",
+      "fetched_at_utc": "2026-07-25T08:32:11Z",
+      "elapsed_ms": 390,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:11 GMT",
+      "error": null,
+      "optional": true
+    },
+    {
+      "name": "mls_match_761680",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/mls/match/761680",
+      "path": "data/snapshots/2026-07-25-0832/mls_match_761680.json",
+      "http_status": 200,
+      "bytes": 17564,
+      "sha256": "869c14c91c361261eeb8ae4047e87db2b7906517ca7d7f5fd23031772f500bc3",
+      "fetched_at_utc": "2026-07-25T08:32:14Z",
+      "elapsed_ms": 2946,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:14 GMT",
+      "error": null,
+      "optional": false
+    },
+    {
+      "name": "mls_match_761681",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/mls/match/761681",
+      "path": "data/snapshots/2026-07-25-0832/mls_match_761681.json",
+      "http_status": 200,
+      "bytes": 17416,
+      "sha256": "5bffb225d735288eaecccf4d03d595fa9fef94854275d9a074410a3fa58433ae",
+      "fetched_at_utc": "2026-07-25T08:32:17Z",
+      "elapsed_ms": 2824,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:17 GMT",
+      "error": null,
+      "optional": false
+    },
+    {
+      "name": "mls_match_761682",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/mls/match/761682",
+      "path": "data/snapshots/2026-07-25-0832/mls_match_761682.json",
+      "http_status": 200,
+      "bytes": 17629,
+      "sha256": "4abbbaf18946ff19055eea96f35f9ed565e1b5154d06f49de233c7bd7f0beaae",
+      "fetched_at_utc": "2026-07-25T08:32:20Z",
+      "elapsed_ms": 2878,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:20 GMT",
+      "error": null,
+      "optional": false
+    },
+    {
+      "name": "mls_match_761683",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/mls/match/761683",
+      "path": "data/snapshots/2026-07-25-0832/mls_match_761683.json",
+      "http_status": 200,
+      "bytes": 17644,
+      "sha256": "d16308fef1aaf1d6ac5df69fc1cd23c26bb5ba9207a54c7d4928ae8b94e693cc",
+      "fetched_at_utc": "2026-07-25T08:32:23Z",
+      "elapsed_ms": 2762,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:23 GMT",
+      "error": null,
+      "optional": false
+    },
+    {
+      "name": "mls_match_761684",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/mls/match/761684",
+      "path": "data/snapshots/2026-07-25-0832/mls_match_761684.json",
+      "http_status": 200,
+      "bytes": 17554,
+      "sha256": "fe70c68949031a5a566a6f3d6f3fcd3be0a4e475e7500d156738f265475dde72",
+      "fetched_at_utc": "2026-07-25T08:32:26Z",
+      "elapsed_ms": 2757,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:26 GMT",
+      "error": null,
+      "optional": false
+    },
+    {
+      "name": "mls_match_761685",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/mls/match/761685",
+      "path": "data/snapshots/2026-07-25-0832/mls_match_761685.json",
+      "http_status": 200,
+      "bytes": 17763,
+      "sha256": "3757892c1065614430ad9356ba6a7a8cdfdbc352120a4d0830da17bd80b96701",
+      "fetched_at_utc": "2026-07-25T08:32:28Z",
+      "elapsed_ms": 2834,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:28 GMT",
+      "error": null,
+      "optional": false
+    },
+    {
+      "name": "mls_match_761686",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/mls/match/761686",
+      "path": "data/snapshots/2026-07-25-0832/mls_match_761686.json",
+      "http_status": 200,
+      "bytes": 17696,
+      "sha256": "da3be10dfe4b21cc490e74bc50bf88b2fc73f4588423199e5966535e64e72156",
+      "fetched_at_utc": "2026-07-25T08:32:31Z",
+      "elapsed_ms": 2904,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:31 GMT",
+      "error": null,
+      "optional": false
+    },
+    {
+      "name": "mls_match_761687",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/mls/match/761687",
+      "path": "data/snapshots/2026-07-25-0832/mls_match_761687.json",
+      "http_status": 200,
+      "bytes": 17496,
+      "sha256": "1d7de3ff0443a55f73a4765d9173ca6e8c097a47be20c8b07f89195322e0f8c3",
+      "fetched_at_utc": "2026-07-25T08:32:34Z",
+      "elapsed_ms": 2747,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:34 GMT",
+      "error": null,
+      "optional": false
+    },
+    {
+      "name": "mls_match_761688",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/mls/match/761688",
+      "path": "data/snapshots/2026-07-25-0832/mls_match_761688.json",
+      "http_status": 200,
+      "bytes": 17686,
+      "sha256": "c9815485f08885c4a0af444c5b834b8c845c720490b61fef4c1cd92f6491e018",
+      "fetched_at_utc": "2026-07-25T08:32:37Z",
+      "elapsed_ms": 2904,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:37 GMT",
+      "error": null,
+      "optional": false
+    },
+    {
+      "name": "mls_match_761689",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/mls/match/761689",
+      "path": "data/snapshots/2026-07-25-0832/mls_match_761689.json",
+      "http_status": 200,
+      "bytes": 17473,
+      "sha256": "a7fce47c1d4466a184f7cfe8b8587cca603096b84fe403e817d3a5b94a460733",
+      "fetched_at_utc": "2026-07-25T08:32:40Z",
+      "elapsed_ms": 2735,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:40 GMT",
+      "error": null,
+      "optional": false
+    },
+    {
+      "name": "mls_match_761690",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/mls/match/761690",
+      "path": "data/snapshots/2026-07-25-0832/mls_match_761690.json",
+      "http_status": 200,
+      "bytes": 17779,
+      "sha256": "33f4bf996497591e417102e9f9b80723924fcdb38f9b8b0eb895dc71220a4e16",
+      "fetched_at_utc": "2026-07-25T08:32:43Z",
+      "elapsed_ms": 2858,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:43 GMT",
+      "error": null,
+      "optional": false
+    },
+    {
+      "name": "mls_match_761691",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/mls/match/761691",
+      "path": "data/snapshots/2026-07-25-0832/mls_match_761691.json",
+      "http_status": 200,
+      "bytes": 17092,
+      "sha256": "b11ec9d7dc3bf74446bc70a5d2f91ac0320d5ce63c2baa5c05e4527cbe3c504d",
+      "fetched_at_utc": "2026-07-25T08:32:45Z",
+      "elapsed_ms": 2883,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:45 GMT",
+      "error": null,
+      "optional": false
+    },
+    {
+      "name": "mls_match_761692",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/mls/match/761692",
+      "path": "data/snapshots/2026-07-25-0832/mls_match_761692.json",
+      "http_status": 200,
+      "bytes": 17612,
+      "sha256": "5ae8b8d321ba5a076d2523d274ed1b0e463e5aed952efe1714c6ce2c93e34a3c",
+      "fetched_at_utc": "2026-07-25T08:32:48Z",
+      "elapsed_ms": 2785,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:48 GMT",
+      "error": null,
+      "optional": false
+    },
+    {
+      "name": "mls_match_761693",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/mls/match/761693",
+      "path": "data/snapshots/2026-07-25-0832/mls_match_761693.json",
+      "http_status": 200,
+      "bytes": 17624,
+      "sha256": "303486cb11b18725358919f5682280a3f18bb7ea088927c9cb6fa0e2d04baa29",
+      "fetched_at_utc": "2026-07-25T08:32:51Z",
+      "elapsed_ms": 2770,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:51 GMT",
+      "error": null,
+      "optional": false
+    },
+    {
+      "name": "mls_match_761694",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/mls/match/761694",
+      "path": "data/snapshots/2026-07-25-0832/mls_match_761694.json",
+      "http_status": 200,
+      "bytes": 6263,
+      "sha256": "4f89fed9cdffa33547d9899806f78d9209a282a9c758bd5cae1611fd7b12f635",
+      "fetched_at_utc": "2026-07-25T08:32:52Z",
+      "elapsed_ms": 717,
+      "server_date_header": "Sat, 25 Jul 2026 08:32:52 GMT",
+      "error": null,
+      "optional": false
+    }
+  ],
+  "environment": {
+    "python": "3.11.15",
+    "platform": "Linux-6.18.5-x86_64-with-glibc2.39"
+  },
+  "notes": [
+    "Raw responses were written to data/snapshots/<run_id>/ and made read-only before parsing. Re-derive this run from those bytes.",
+    "MLS edge is net of Kalshi's 0.07*P*(1-P) entry fee. WC26 edge is NOT, because it is unconfirmed whether kalshi_odds is already net of fees \u2014 see CLAUDE.md.",
+    "Anomalies are reported, never corrected (CLAUDE.md rule 4)."
+  ]
+}
