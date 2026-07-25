@@ -245,7 +245,7 @@ export default function MlsMatchPage() {
             <HowTheyPlay m={m} run={run} />
 
             {/* ===== team news: announced XI + notable absentees ===== */}
-            <LineupSection lu={lineups} m={m} />
+            <LineupSection lu={lineups} m={m} run={run} />
 
             {/* ===== ESPN scouting: form + H2H ===== */}
             <ScoutingSection m={m} />
@@ -965,13 +965,35 @@ function SideXi({ side, team }: { side: SideLineup | null; team?: string }) {
   );
 }
 
-function LineupSection({ lu, m }: { lu: Lineups | null; m: Match }) {
+function LineupSection({ lu, m, run }: {
+  lu: Lineups | null; m: Match; run?: ModelRun }) {
   if (!lu || (!lu.home && !lu.away)) return null;
   const anyReleased = Boolean(lu.home?.released || lu.away?.released);
+  const post = m.state === "post";
   return (
     <Reveal>
       <Collapse eyebrow="team news" title="lineups + absentees"
         defaultOpen={anyReleased} className="mt-8 mb-0">
+        {/* V9.3 eval F19: this block is CURRENT team news, fetched now —
+            it is NOT the lineup evidence frozen into the T-10 lock. A
+            reader must never attribute information to the model that was
+            not available when the lock was created. */}
+        <div className="mb-3 rounded-xl border border-line bg-elev2 px-3 py-2">
+          <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-low">
+            {post ? "as-played / latest" : "current team news"} — fetched now,
+            not the lineup frozen at T-10
+          </p>
+          <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+            {run?.captured_at
+              ? `the model's frozen input is the ${run.run_type === "t10"
+                  ? "T-10 lock" : "latest run"} of ${fmtTime(run.captured_at)}`
+              : "no model run frozen for this fixture yet"}
+            {run?.input_quality
+              ? ` · lineup at run time: ${run.input_quality.LINEUP_CONFIRMED
+                  ? "confirmed" : "pending"}`
+              : ""}
+          </p>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <SideXi side={lu.home} team={m.home?.name} />
           <SideXi side={lu.away} team={m.away?.name} />
