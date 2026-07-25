@@ -369,15 +369,28 @@ def devig_three_way(book_rows: list[dict], winner_by_ticker: dict) -> tuple[dict
 
 def score_mls(fetcher: Fetcher, run: Run, days: int, include_final: bool) -> None:
     board = {"endpoints": ["/api/mls/scoreboard", f"/api/mls/schedule?days={days}",
-                           "/api/mls/match/{event_id}"],
+                           "/api/mls/match/{event_id}", "/api/mls/markets"],
              "fixtures_seen": 0, "fixtures_fetched": 0,
              "markets_seen": 0, "markets_priced": 0, "model_version": None,
-             "shadow": None}
+             "shadow": None, "fixtures_book_from_fallback": 0}
     run.boards["mls"] = board
 
     scoreboard, sb_rec = fetcher.get("/api/mls/scoreboard", "mls_scoreboard")
     schedule, _ = fetcher.get(f"/api/mls/schedule?days={days}", "mls_schedule",
                               optional=True)
+    # The standalone markets feed carries the same Kalshi books as the per-match
+    # payload, and has been observed to hold a fixture the match endpoint omits
+    # (event 761694, LAFC v Sporting KC). Pull it so a fixture whose match feed
+    # ships no book is priced from the API rather than dropped.
+    markets_feed, _ = fetcher.get("/api/mls/markets", "mls_markets", optional=True)
+    fallback_games = []
+    for game in ((markets_feed or {}).get("games") or []):
+        game_rows = game.get("markets") or []
+        fallback_games.append({
+            "event_ticker": game.get("event_ticker"),
+            "markets": game_rows,
+            "tickers": {r.get("ticker") for r in game_rows if r.get("ticker")},
+        })
 
     fixtures: dict[str, dict] = {}
     for payload in (scoreboard, schedule):
@@ -470,8 +483,50 @@ def score_mls(fetcher: Fetcher, run: Run, days: int, include_final: bool) -> Non
             families = [{"key": "winner", "label": "Winner · 3-way",
                          "event_ticker": book.get("event_ticker"),
                          "markets": book.get("markets") or []}]
+
+        # join this fixture to the standalone markets feed by ticker — the model
+        # run's own ticker map is the authority, so no string parsing is needed
+        fallback = next((g for g in fallback_games
+                         if g["tickers"] & set(tickers.values())), None)
+
+        if not families and fallback:
+            # the match endpoint shipped no book but the API does carry one.
+            # Price it from the fallback and say so loudly: this is a backend
+            # inconsistency, and it previously vanished into `skipped` looking
+            # like an absent market.
+            families = [{"key": "winner", "label": "Winner · 3-way",
+                         "event_ticker": fallback["event_ticker"],
+                         "markets": fallback["markets"]}]
+            board["fixtures_book_from_fallback"] += 1
+            run.flag("book_missing_from_match_endpoint",
+                     f"event {event_id} ({match}): /api/mls/match/{event_id} shipped "
+                     f"no book, but /api/mls/markets carries "
+                     f"{fallback['event_ticker']} with {len(fallback['markets'])} "
+                     "market(s) — priced from the fallback feed, 3-way only",
+                     board="mls", market_id=f"event:{event_id}")
+        elif families and fallback:
+            # both endpoints serve this fixture; a price disagreement between
+            # them is reported, never reconciled (CLAUDE.md rule 4)
+            match_rows = {r["ticker"]: r for fam in families
+                          if (fam.get("key") or "winner") == "winner"
+                          for r in (fam.get("markets") or []) if r.get("ticker")}
+            for r in fallback["markets"]:
+                other = match_rows.get(r.get("ticker"))
+                if not other:
+                    continue
+                a_match, a_feed = fnum(other.get("yes_ask")), fnum(r.get("yes_ask"))
+                if a_match is None or a_feed is None or a_match == a_feed:
+                    continue
+                run.flag("book_endpoints_disagree",
+                         f"{r['ticker']}: /api/mls/match yes_ask={a_match} vs "
+                         f"/api/mls/markets yes_ask={a_feed} "
+                         f"({(a_feed - a_match) * 100:+.1f}c) — priced from the "
+                         "match endpoint",
+                         board="mls", market_id=r["ticker"])
+
         if not families:
-            run.skip("mls", f"event:{event_id}", "no Kalshi book on this fixture",
+            run.skip("mls", f"event:{event_id}", "no Kalshi book on this fixture "
+                     "(absent from both /api/mls/match and /api/mls/markets)",
                      market=match)
             continue
 
@@ -685,6 +740,12 @@ def write_meta(run: Run, fetcher: Fetcher, out_dir: Path, version: dict,
             "NOT, because it is unconfirmed whether kalshi_odds is already net "
             "of fees — see CLAUDE.md.",
             "Anomalies are reported, never corrected (CLAUDE.md rule 4).",
+            "A fixture whose /api/mls/match payload ships no book is priced from "
+            "/api/mls/markets instead of being dropped; those fixtures are "
+            "counted in boards.mls.fixtures_book_from_fallback, flagged as "
+            "book_missing_from_match_endpoint, and carry the 3-way only. Where "
+            "both endpoints serve a fixture, a price disagreement is flagged as "
+            "book_endpoints_disagree and the match endpoint is used.",
         ],
     }
     path = out_dir / "meta.json"
