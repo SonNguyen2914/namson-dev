@@ -88,6 +88,58 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def input_fingerprint(model_run: dict) -> str:
+    """Hash of everything the model actually consumed for one fixture.
+
+    The deployed model is deterministic: same inputs and seed produce the same
+    probabilities. `captured_at` therefore advances on every scheduled re-run
+    whether or not anything was learned, and clock age is a bad proxy for how
+    current a model is. This fingerprint is what changes when the model has
+    genuinely seen something new.
+    """
+    payload = json.dumps({
+        "xg": model_run.get("xg"),
+        "basis": model_run.get("basis"),
+        "input_quality": model_run.get("input_quality"),
+        "seed": model_run.get("seed"),
+        "n_simulations": model_run.get("n_simulations"),
+    }, sort_keys=True, default=str)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def output_fingerprint(model_run: dict) -> str:
+    """Hash of the probabilities a bet would actually be priced off.
+
+    Inputs can jitter in the fourth decimal without moving anything decision-
+    relevant, so the input hash alone under-reports. This is the stricter test
+    of whether a re-capture changed the numbers you would act on.
+    """
+    payload = json.dumps({
+        "outcomes": {k: round(v, 4) for k, v in
+                     sorted((model_run.get("outcomes") or {}).items())
+                     if isinstance(v, (int, float))},
+        "props": {k: round(v, 4) for k, v in
+                  sorted((model_run.get("props") or {}).items())
+                  if isinstance(v, (int, float))},
+    }, sort_keys=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def prior_model_inputs() -> tuple[str | None, dict]:
+    """Fingerprints recorded by the most recent completed run, if any."""
+    if not RUNS_DIR.exists():
+        return None, {}
+    done = sorted(p for p in RUNS_DIR.iterdir()
+                  if p.is_dir() and (p / "meta.json").exists())
+    if not done:
+        return None, {}
+    try:
+        meta = json.loads((done[-1] / "meta.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None, {}
+    return done[-1].name, (meta.get("model_inputs") or {})
+
+
 class Fetcher:
     """GETs the deployed API and snapshots every response before parsing."""
 
@@ -208,6 +260,9 @@ class Run:
         self.skipped: list[dict] = []
         self.anomalies: list[dict] = []
         self.boards: dict[str, dict] = {}
+        # event_id -> {fingerprint, captured_at, run_type}; compared against the
+        # previous run so a re-capture that learned nothing is visible
+        self.model_inputs: dict[str, dict] = {}
 
     def skip(self, board: str, market_id: str, reason: str, **extra) -> None:
         self.skipped.append({"board": board, "market_id": market_id,
@@ -375,6 +430,10 @@ def score_mls(fetcher: Fetcher, run: Run, days: int, include_final: bool) -> Non
              "shadow": None, "fixtures_book_from_fallback": 0}
     run.boards["mls"] = board
 
+    prior_run_id, prior_inputs = prior_model_inputs()
+    if prior_run_id:
+        board["compared_against_run"] = prior_run_id
+
     scoreboard, sb_rec = fetcher.get("/api/mls/scoreboard", "mls_scoreboard")
     schedule, _ = fetcher.get(f"/api/mls/schedule?days={days}", "mls_schedule",
                               optional=True)
@@ -441,6 +500,31 @@ def score_mls(fetcher: Fetcher, run: Run, days: int, include_final: bool) -> Non
 
         run_type = model_run.get("run_type") or "unknown"
         captured_at = parse_iso(model_run.get("captured_at"))
+
+        # information age, not clock age: a model that re-ran on identical
+        # inputs is no fresher than the run before it, however new its
+        # captured_at looks
+        self_inputs = {"fingerprint": input_fingerprint(model_run),
+                       "output_fingerprint": output_fingerprint(model_run),
+                       "captured_at": model_run.get("captured_at") or "",
+                       "run_type": run_type}
+        run.model_inputs[str(event_id)] = self_inputs
+        was = prior_inputs.get(str(event_id))
+        if was and was.get("captured_at") != self_inputs["captured_at"]:
+            same_out = was.get("output_fingerprint") == self_inputs["output_fingerprint"]
+            same_in = was.get("fingerprint") == self_inputs["fingerprint"]
+            if same_out:
+                detail = ("every outcome and prop is identical to 4dp"
+                          if not same_in else
+                          "xg, basis, seed, input_quality AND every probability "
+                          "are identical")
+                run.flag("model_recaptured_without_new_output",
+                         f"event {event_id} ({match}): captured_at advanced "
+                         f"{was.get('captured_at', '')[:19]} -> "
+                         f"{self_inputs['captured_at'][:19]} but {detail} "
+                         f"(vs run {prior_run_id}) — this model is no fresher "
+                         "than the previous one, whatever its timestamp says",
+                         board="mls", market_id=f"event:{event_id}")
 
         outcomes = model_run.get("outcomes") or {}
         if outcomes:
@@ -728,6 +812,7 @@ def write_meta(run: Run, fetcher: Fetcher, out_dir: Path, version: dict,
         },
         "skipped": run.skipped,
         "anomalies": run.anomalies,
+        "model_inputs": run.model_inputs,
         "snapshots": fetcher.records,
         "environment": {
             "python": platform.python_version(),

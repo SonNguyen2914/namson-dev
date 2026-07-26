@@ -1,0 +1,212 @@
+{
+  "run_id": "2026-07-26-0621",
+  "script": {
+    "name": "fetch_and_score.py",
+    "sha256": "8ac5a8abd64d25d16e9240136c115249c01b14858d7bff8126cc7bc1ff7c3a06"
+  },
+  "api": {
+    "base_url": "https://wc26-bet-suggester-production.up.railway.app",
+    "version": null,
+    "git_sha": null,
+    "version_source": "/api/health",
+    "version_payload": {
+      "status": "ok",
+      "demo_mode": false,
+      "time": "2026-07-26T06:21:11.247278+00:00"
+    },
+    "version_probe_note": "no version/SHA endpoint answered \u2014 this run is pinned by snapshot SHA-256 instead",
+    "endpoints_tried": [
+      {
+        "path": "/api/version",
+        "http_status": 404
+      },
+      {
+        "path": "/api/health",
+        "http_status": 200
+      },
+      {
+        "path": "/health",
+        "http_status": 404
+      },
+      {
+        "path": "/version",
+        "http_status": 404
+      },
+      {
+        "path": "/",
+        "http_status": 404
+      }
+    ]
+  },
+  "timing": {
+    "started_at_utc": "2026-07-26T06:21:10Z",
+    "odds_pulled_at_utc": "2026-07-26T06:21:12Z",
+    "finished_at_utc": "2026-07-26T06:21:18Z"
+  },
+  "boards_requested": [
+    "mls"
+  ],
+  "boards": {
+    "mls": {
+      "endpoints": [
+        "/api/mls/scoreboard",
+        "/api/mls/schedule?days=3",
+        "/api/mls/match/{event_id}",
+        "/api/mls/markets"
+      ],
+      "fixtures_seen": 1,
+      "fixtures_fetched": 1,
+      "markets_seen": 0,
+      "markets_priced": 0,
+      "model_version": null,
+      "shadow": null,
+      "fixtures_book_from_fallback": 0,
+      "compared_against_run": "2026-07-25-2225"
+    }
+  },
+  "counts": {
+    "markets_seen": 0,
+    "markets_priced": 0,
+    "markets_skipped": 1,
+    "anomalies": 0
+  },
+  "skipped": [
+    {
+      "board": "mls",
+      "market_id": "event:401864004",
+      "reason": "no model run stored for fixture",
+      "market": "MLS All-Stars v Liga MX All-Stars"
+    }
+  ],
+  "anomalies": [],
+  "model_inputs": {},
+  "snapshots": [
+    {
+      "name": "version_probe_api_version",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/version",
+      "path": "data/snapshots/2026-07-26-0621/version_probe_api_version.json",
+      "http_status": 404,
+      "bytes": 22,
+      "sha256": "37ec4665a8102d115ffd1ac20dae94c98b4dac64b0c1a68228aa2a531caeb35d",
+      "fetched_at_utc": "2026-07-26T06:21:10Z",
+      "elapsed_ms": 553,
+      "server_date_header": "Sun, 26 Jul 2026 06:21:10 GMT",
+      "error": "HTTP 404",
+      "optional": true
+    },
+    {
+      "name": "version_probe_api_health",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/health",
+      "path": "data/snapshots/2026-07-26-0621/version_probe_api_health.json",
+      "http_status": 200,
+      "bytes": 75,
+      "sha256": "289795ce13ffe29975aaded178449388e3e26a51a853aed49e0fc0237ab2ab93",
+      "fetched_at_utc": "2026-07-26T06:21:11Z",
+      "elapsed_ms": 286,
+      "server_date_header": "Sun, 26 Jul 2026 06:21:11 GMT",
+      "error": null,
+      "optional": true
+    },
+    {
+      "name": "version_probe_health",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/health",
+      "path": "data/snapshots/2026-07-26-0621/version_probe_health.json",
+      "http_status": 404,
+      "bytes": 22,
+      "sha256": "37ec4665a8102d115ffd1ac20dae94c98b4dac64b0c1a68228aa2a531caeb35d",
+      "fetched_at_utc": "2026-07-26T06:21:11Z",
+      "elapsed_ms": 296,
+      "server_date_header": "Sun, 26 Jul 2026 06:21:11 GMT",
+      "error": "HTTP 404",
+      "optional": true
+    },
+    {
+      "name": "version_probe_version",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/version",
+      "path": "data/snapshots/2026-07-26-0621/version_probe_version.json",
+      "http_status": 404,
+      "bytes": 22,
+      "sha256": "37ec4665a8102d115ffd1ac20dae94c98b4dac64b0c1a68228aa2a531caeb35d",
+      "fetched_at_utc": "2026-07-26T06:21:11Z",
+      "elapsed_ms": 304,
+      "server_date_header": "Sun, 26 Jul 2026 06:21:11 GMT",
+      "error": "HTTP 404",
+      "optional": true
+    },
+    {
+      "name": "version_probe_",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/",
+      "path": "data/snapshots/2026-07-26-0621/version_probe_.json",
+      "http_status": 404,
+      "bytes": 22,
+      "sha256": "37ec4665a8102d115ffd1ac20dae94c98b4dac64b0c1a68228aa2a531caeb35d",
+      "fetched_at_utc": "2026-07-26T06:21:12Z",
+      "elapsed_ms": 329,
+      "server_date_header": "Sun, 26 Jul 2026 06:21:12 GMT",
+      "error": "HTTP 404",
+      "optional": true
+    },
+    {
+      "name": "mls_scoreboard",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/mls/scoreboard",
+      "path": "data/snapshots/2026-07-26-0621/mls_scoreboard.json",
+      "http_status": 200,
+      "bytes": 532,
+      "sha256": "5a1b56378836bd4c7c6d91aef8f7aa85f05e01442789ed21ad6742509717768c",
+      "fetched_at_utc": "2026-07-26T06:21:12Z",
+      "elapsed_ms": 321,
+      "server_date_header": "Sun, 26 Jul 2026 06:21:12 GMT",
+      "error": null,
+      "optional": false
+    },
+    {
+      "name": "mls_schedule",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/mls/schedule?days=3",
+      "path": "data/snapshots/2026-07-26-0621/mls_schedule.json",
+      "http_status": 200,
+      "bytes": 65,
+      "sha256": "c9bdcfadcf41aeac39a134728c20610b6839f0c987455b8680a228053874418b",
+      "fetched_at_utc": "2026-07-26T06:21:12Z",
+      "elapsed_ms": 362,
+      "server_date_header": "Sun, 26 Jul 2026 06:21:12 GMT",
+      "error": null,
+      "optional": true
+    },
+    {
+      "name": "mls_markets",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/mls/markets",
+      "path": "data/snapshots/2026-07-26-0621/mls_markets.json",
+      "http_status": 200,
+      "bytes": 141,
+      "sha256": "adcf31bbf68e09750c5e96df1841eb3d13812d816fbe463fce607769079f269f",
+      "fetched_at_utc": "2026-07-26T06:21:18Z",
+      "elapsed_ms": 5292,
+      "server_date_header": "Sun, 26 Jul 2026 06:21:18 GMT",
+      "error": null,
+      "optional": true
+    },
+    {
+      "name": "mls_match_401864004",
+      "url": "https://wc26-bet-suggester-production.up.railway.app/api/mls/match/401864004",
+      "path": "data/snapshots/2026-07-26-0621/mls_match_401864004.json",
+      "http_status": 200,
+      "bytes": 2753,
+      "sha256": "8dba807b2091b7b25ceaee7ba3fac728737f81b346d82734b40879732686a5c4",
+      "fetched_at_utc": "2026-07-26T06:21:18Z",
+      "elapsed_ms": 562,
+      "server_date_header": "Sun, 26 Jul 2026 06:21:18 GMT",
+      "error": null,
+      "optional": false
+    }
+  ],
+  "environment": {
+    "python": "3.11.15",
+    "platform": "Linux-6.18.5-x86_64-with-glibc2.39"
+  },
+  "notes": [
+    "Raw responses were written to data/snapshots/<run_id>/ and made read-only before parsing. Re-derive this run from those bytes.",
+    "MLS edge is net of Kalshi's 0.07*P*(1-P) entry fee. WC26 edge is NOT, because it is unconfirmed whether kalshi_odds is already net of fees \u2014 see CLAUDE.md.",
+    "Anomalies are reported, never corrected (CLAUDE.md rule 4).",
+    "A fixture whose /api/mls/match payload ships no book is priced from /api/mls/markets instead of being dropped; those fixtures are counted in boards.mls.fixtures_book_from_fallback, flagged as book_missing_from_match_endpoint, and carry the 3-way only. Where both endpoints serve a fixture, a price disagreement is flagged as book_endpoints_disagree and the match endpoint is used."
+  ]
+}

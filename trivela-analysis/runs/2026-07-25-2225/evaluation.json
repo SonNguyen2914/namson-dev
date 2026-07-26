@@ -1,0 +1,120 @@
+{
+  "evaluated_run": "2026-07-25-2225",
+  "evaluated_at_utc": "2026-07-26T06:20:52Z",
+  "fixtures_final": 15,
+  "fixtures_seen": 15,
+  "settlement_file": "runs/2026-07-25-2225/settlement-2026-07-26.csv",
+  "calibration": {
+    "fixtures": 15,
+    "model_brier": 0.54912,
+    "book_brier": 0.521561,
+    "better": "book",
+    "per_fixture": [
+      {
+        "match": "San Jose Earthquakes v LA Galaxy",
+        "score": "1-1",
+        "model_brier": 0.876,
+        "book_brier": 0.9345,
+        "model_minus_book": -0.0585
+      },
+      {
+        "match": "New York City FC v Chicago Fire FC",
+        "score": "3-1",
+        "model_brier": 0.5821,
+        "book_brier": 0.6372,
+        "model_minus_book": -0.0551
+      },
+      {
+        "match": "Red Bull New York v Charlotte FC",
+        "score": "0-2",
+        "model_brier": 0.6519,
+        "book_brier": 0.7046,
+        "model_minus_book": -0.0527
+      },
+      {
+        "match": "Portland Timbers v Real Salt Lake",
+        "score": "2-1",
+        "model_brier": 0.5223,
+        "book_brier": 0.571,
+        "model_minus_book": -0.0488
+      },
+      {
+        "match": "Minnesota United FC v Vancouver Whitecaps",
+        "score": "0-0",
+        "model_brier": 0.8313,
+        "book_brier": 0.8796,
+        "model_minus_book": -0.0484
+      },
+      {
+        "match": "Columbus Crew v FC Cincinnati",
+        "score": "2-1",
+        "model_brier": 0.4582,
+        "book_brier": 0.4955,
+        "model_minus_book": -0.0373
+      },
+      {
+        "match": "Orlando City SC v Nashville SC",
+        "score": "1-0",
+        "model_brier": 0.6425,
+        "book_brier": 0.6442,
+        "model_minus_book": -0.0017
+      },
+      {
+        "match": "St. Louis CITY SC v Colorado Rapids",
+        "score": "1-0",
+        "model_brier": 0.4225,
+        "book_brier": 0.402,
+        "model_minus_book": 0.0205
+      },
+      {
+        "match": "New England Revolution v Atlanta United FC",
+        "score": "4-1",
+        "model_brier": 0.4885,
+        "book_brier": 0.4585,
+        "model_minus_book": 0.03
+      },
+      {
+        "match": "D.C. United v Toronto FC",
+        "score": "2-1",
+        "model_brier": 0.501,
+        "book_brier": 0.4494,
+        "model_minus_book": 0.0515
+      },
+      {
+        "match": "San Diego FC v FC Dallas",
+        "score": "1-0",
+        "model_brier": 0.5973,
+        "book_brier": 0.5138,
+        "model_minus_book": 0.0836
+      },
+      {
+        "match": "Houston Dynamo FC v Austin FC",
+        "score": "3-0",
+        "model_brier": 0.3818,
+        "book_brier": 0.2867,
+        "model_minus_book": 0.0951
+      },
+      {
+        "match": "Philadelphia Union v Seattle Sounders FC",
+        "score": "1-0",
+        "model_brier": 0.4681,
+        "book_brier": 0.3355,
+        "model_minus_book": 0.1326
+      },
+      {
+        "match": "CF Montr\u00e9al v Inter Miami CF",
+        "score": "0-1",
+        "model_brier": 0.5712,
+        "book_brier": 0.4371,
+        "model_minus_book": 0.1341
+      },
+      {
+        "match": "LAFC v Sporting Kansas City",
+        "score": "4-0",
+        "model_brier": 0.2422,
+        "book_brier": 0.0738,
+        "model_minus_book": 0.1684
+      }
+    ]
+  }
+}

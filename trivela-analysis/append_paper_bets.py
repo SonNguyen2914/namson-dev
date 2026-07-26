@@ -28,12 +28,15 @@ RUNS_DIR = ROOT / "runs"
 LEDGER = ROOT / "paper_bets.csv"
 
 LEDGER_COLUMNS = [
-    "bet_id", "appended_at_utc", "run_id", "board", "match", "kickoff",
-    "market_id", "market", "model_key", "model_prob", "implied_prob",
-    "entry_cost", "edge", "kelly_quarter", "stake", "contracts",
-    "confidence_note", "note",
-    # reserved for settlement, filled by a later step — present from the start
-    # so settling never requires rewriting an existing row
+    "bet_id", "appended_at_utc", "run_id", "board", "portfolio", "match",
+    "kickoff", "market_id", "market", "model_key", "model_prob",
+    "implied_prob", "entry_cost", "edge", "kelly_quarter", "stake",
+    "contracts", "confidence_note", "note",
+    # Vestigial. These were meant to be filled in place at settlement, but
+    # filling a column IS rewriting the row, and CLAUDE.md says this file is
+    # append-only and never rewritten. The two rules contradict each other, so
+    # settlement is written to runs/settlement-<date>.csv by evaluate.py and
+    # these stay empty. Kept only so existing rows keep their shape.
     "settled", "result", "pnl", "settled_at_utc",
 ]
 
@@ -42,8 +45,19 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def bet_id(run_id: str, board: str, market_id: str, model_key: str) -> str:
+def bet_id(run_id: str, board: str, market_id: str, model_key: str,
+           portfolio: str = "") -> str:
+    """Identity of one logged bet.
+
+    Two portfolios can legitimately back the same market from the same run —
+    that happened on 2026-07-25, where A2 shared two ids with A and B and
+    `bet_id` stopped being unique. Including the portfolio separates them, so
+    settlement can key on bet_id alone again. Omitting it reproduces the old
+    hash byte-for-byte, so rows logged before this change still verify.
+    """
     raw = f"{run_id}|{board}|{market_id}|{model_key}"
+    if portfolio:
+        raw += f"|{portfolio}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
 
@@ -97,6 +111,9 @@ def main() -> int:
     size.add_argument("--bankroll", type=float,
                       help="size each bet at quarter-Kelly of this bankroll")
 
+    ap.add_argument("--portfolio", default="",
+                    help="portfolio tag, e.g. B2. Folded into bet_id so two "
+                         "portfolios backing the same market stay distinct")
     ap.add_argument("--note", default="", help="free-text note on every bet")
     ap.add_argument("--list", action="store_true", help="show rows and exit")
     ap.add_argument("--dry-run", action="store_true",
@@ -160,7 +177,8 @@ def main() -> int:
     to_append, skipped = [], []
 
     for r in selected:
-        bid = bet_id(r["run_id"], r["board"], r["market_id"], r["model_key"])
+        bid = bet_id(r["run_id"], r["board"], r["market_id"], r["model_key"],
+                     args.portfolio)
         if bid in already and not args.allow_duplicate:
             skipped.append((bid, r))
             continue
@@ -182,6 +200,7 @@ def main() -> int:
             "appended_at_utc": now,
             "run_id": r["run_id"],
             "board": r["board"],
+            "portfolio": args.portfolio,
             "match": r["match"],
             "kickoff": r.get("kickoff", ""),
             "market_id": r["market_id"],
