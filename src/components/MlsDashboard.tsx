@@ -169,10 +169,15 @@ function Empty({ children }: { children: React.ReactNode }) {
   );
 }
 
-function fmtDate(iso: string) {
+// One date formatter for the whole dashboard, in the VIEWER's timezone.
+// `month: "short"` is used on the fixture cards because a bare 7/29 is
+// ambiguous outside the US and the card has room for three letters.
+function fmtDate(iso?: string, month: "short" | "numeric" = "numeric") {
+  if (!iso) return "";
   const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
   return d.toLocaleString(undefined, {
-    weekday: "short", month: "numeric", day: "numeric",
+    weekday: "short", month, day: "numeric",
     hour: "numeric", minute: "2-digit",
   });
 }
@@ -215,6 +220,15 @@ function OddsChip({ o }: { o?: OddsRow }) {
 
 function FixtureCard({ f, o }: { f: Fixture; o?: OddsRow }) {
   const live = f.state === "in";
+  // A finished match keeps its result detail (FT); anything not yet
+  // under way shows WHEN it kicks off. "Scheduled" said nothing — least
+  // of all that the card under "Today's slate" can be days away, which
+  // is exactly what ESPN's scoreboard returns when nothing is on today.
+  // Local time is safe here: every fixture is fetched in useEffect, so
+  // these cards only ever render client-side and cannot mismatch SSR.
+  const when = f.state === "post"
+    ? f.detail
+    : (fmtDate(f.date, "short") || f.detail);
   return (
     <Link href={`/bet-suggester/mls/${f.id}`}
       className={`block cursor-pointer rounded-xl border p-3 transition-colors hover:border-accent/50 ${
@@ -224,7 +238,7 @@ function FixtureCard({ f, o }: { f: Fixture; o?: OddsRow }) {
       <TeamLine s={f.away} live={live} />
       <div className="mt-2 flex justify-between font-mono text-[10px] uppercase tracking-wide text-ink-faint">
         <span className={live ? "text-accent" : undefined}>
-          {live ? `LIVE ${f.minute ?? ""}` : f.detail}
+          {live ? `LIVE ${f.minute ?? ""}` : when}
         </span>
         <span className="truncate pl-2">{f.venue}</span>
       </div>
