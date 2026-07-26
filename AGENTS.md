@@ -47,7 +47,14 @@ advice:
 - never let copy call a point estimate an established edge. The standing
   result is +0.0269, n=177, CI [−0.0043, +0.0605] — **not significant**
 
-Enforced by `e2e/decision-safety.spec.ts`.
+Enforcement is split, and is **not** complete:
+
+- shadow framing and the bare-`TAKE` ban — `e2e/decision-safety.spec.ts`
+- the empty state — `e2e/contract-deterministic.spec.ts`
+- the significance-language rule has **no automated assertion**. It is
+  reviewed by eye. Treat any copy change touching edge or performance
+  claims as needing manual scrutiny, and do not assume a green suite
+  cleared it.
 
 ## 3. Derive what you display from the numbers beside it
 
@@ -67,11 +74,29 @@ The Next dev client wedges pre-hydration in the preview pane, and
 backend. Use `npx playwright test` — the config self-serves on port 3123
 and honours `SUGGESTER_BACKEND_URL`.
 
+**But Playwright defaults to production too.** `playwright.config.ts`
+falls back to the production Railway URL when `SUGGESTER_BACKEND_URL` is
+unset, so the bare command is not the local-only run it reads as. The
+requests are read-only GETs against the public shadow API — nothing is
+written — but the results depend on a live service and on volatile data,
+which is precisely the rot §6 below warns about.
+
+Set it explicitly unless you mean to smoke-test live:
+
+```bash
+SUGGESTER_BACKEND_URL=http://localhost:8000 npx playwright test
+```
+
+`e2e/contract-deterministic.spec.ts` needs no backend at all; the other
+four specs do.
+
 ## 5. Hydration
 
-Dashboard data is fetched in `useEffect`, so those components only ever
-render client-side — local-time formatting is safe there. Anything
-rendered during SSR must not depend on the viewer's clock or locale.
+Dashboard components **do** render during SSR — what is missing then is
+the *fetched data*, which only arrives after `useEffect` runs on the
+client. So local-time formatting of fetched values is safe; anything
+rendered in the initial SSR pass must not depend on the viewer's clock
+or locale.
 
 ## 6. Prefer hermetic tests to live-data tests
 
@@ -85,4 +110,3 @@ have it skip with a stated reason rather than fail.
 
 A test that passes both before and after a fix proves nothing. Before
 trusting a new assertion, confirm it fails against the previous build.
-
