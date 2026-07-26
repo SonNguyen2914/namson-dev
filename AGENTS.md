@@ -27,6 +27,14 @@ file.
 Vercel deploys from a push to the default branch. Do not push without
 Son's explicit say-so.
 
+Pushing a *non-default* branch builds a Vercel **preview** only — a
+preview URL, production domain untouched. That is how a GitHub-backed
+reviewer gets to see the diff at all, so it is expected rather than
+risky. `.github/workflows/ci.yml` here triggers on push to `main` and on
+`pull_request`, so a branch push with no open PR runs **no CI**: local
+`npx tsc --noEmit`, `npm run build` and `npx playwright test` are the
+only signal until a PR exists.
+
 ## 2. Decision safety is a frontend invariant
 
 Model output is **observational**. The UI must never present it as
