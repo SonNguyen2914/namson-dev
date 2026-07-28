@@ -47,10 +47,28 @@ const STANDINGS = {
   ],
 };
 
-async function serve(page: import("@playwright/test").Page) {
+// A fixture N days out, pinned to a UTC hour. 12:00Z and 13:00Z fall on
+// the same LOCAL calendar day at every offset from -12 to +14, so a
+// one-evening assertion holds wherever the suite runs. Building the
+// payload relative to now also stops it rotting the way a hard-coded
+// matchday would.
+function inDays(n: number, utcHour = 12) {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + n);
+  d.setUTCHours(utcHour, 0, 0, 0);
+  return d.toISOString();
+}
+
+function fixture(id: string, date: string, home: string, away: string) {
+  return { id, date, state: "pre", detail: "Scheduled",
+           venue: "Test Ground", home: { name: home }, away: { name: away } };
+}
+
+async function serve(page: import("@playwright/test").Page,
+                     scoreboard: unknown = SCOREBOARD) {
   await page.route("**/api/mls/scoreboard", (r) =>
     r.fulfill({ status: 200, contentType: "application/json",
-                body: JSON.stringify(SCOREBOARD) }));
+                body: JSON.stringify(scoreboard) }));
   await page.route("**/api/mls/standings", (r) =>
     r.fulfill({ status: 200, contentType: "application/json",
                 body: JSON.stringify(STANDINGS) }));
@@ -107,4 +125,56 @@ test.describe("MLS hub", () => {
       expect(eastBlock).not.toMatch(/Vancouver/);
       expect(eastBlock).toMatch(/Nashville SC/);
     });
+
+  // The heading was ASSERTED, not derived: ESPN's bucket is a matchday,
+  // so "Today's slate" sat above fixtures days away. Same defect class as
+  // rendering ESPN's winner-first score string — display a claim the
+  // data beside it does not support.
+  const tonight = (page: import("@playwright/test").Page) =>
+    page.locator("section").filter({ hasText: "ESPN live feed" }).first();
+
+  test("a future matchday is not labelled Today's slate", async ({ page }) => {
+    await serve(page, { fixtures: [
+      fixture("f1", inDays(3), "Austin FC", "St. Louis CITY")] });
+    await page.goto("/bet-suggester?league=mls");
+    const sec = tonight(page);
+    await expect(sec.getByText("Austin FC")).toBeVisible();
+    await expect(sec.locator("h3")).toContainText("Next matchday");
+    await expect(sec.locator("h3")).not.toContainText("Today's slate");
+    // and the day it actually is must be stated
+    await expect(sec.locator("h4")).toHaveCount(1);
+  });
+
+  test("today's fixtures keep the Today's slate heading", async ({ page }) => {
+    await serve(page, { fixtures: [
+      fixture("f1", new Date().toISOString(), "Austin FC", "St. Louis CITY")] });
+    await page.goto("/bet-suggester?league=mls");
+    const sec = tonight(page);
+    await expect(sec.getByText("Austin FC")).toBeVisible();
+    await expect(sec.locator("h3")).toContainText("Today's slate");
+    // no day sub-heading — the h3 already said it
+    await expect(sec.locator("h4")).toHaveCount(0);
+  });
+
+  test("one evening stays one group, even across two UTC dates",
+    async ({ page }) => {
+      await serve(page, { fixtures: [
+        fixture("f1", inDays(3, 12), "Austin FC", "St. Louis CITY"),
+        fixture("f2", inDays(3, 13), "LA Galaxy", "Portland Timbers")] });
+      await page.goto("/bet-suggester?league=mls");
+      const sec = tonight(page);
+      await expect(sec.getByText("Austin FC")).toBeVisible();
+      await expect(sec.getByText("LA Galaxy")).toBeVisible();
+      await expect(sec.locator("h4")).toHaveCount(1);
+    });
+
+  test("fixtures on different days are separated", async ({ page }) => {
+    await serve(page, { fixtures: [
+      fixture("f1", inDays(3), "Austin FC", "St. Louis CITY"),
+      fixture("f2", inDays(5), "LA Galaxy", "Portland Timbers")] });
+    await page.goto("/bet-suggester?league=mls");
+    const sec = tonight(page);
+    await expect(sec.getByText("Austin FC")).toBeVisible();
+    await expect(sec.locator("h4")).toHaveCount(2);
+  });
 });
