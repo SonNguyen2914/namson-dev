@@ -55,25 +55,48 @@ export default function MlsDashboard() {
     return () => { alive = false; clearInterval(poll); };
   }, []);
 
+  // ESPN's scoreboard bucket is a MATCHDAY, not a calendar day: when
+  // nothing is on today it returns the next one instead. So the heading
+  // is derived from the fixtures rather than asserted — the same rule as
+  // deriving a result letter from the score beside it. Grouping is by
+  // LOCAL day: a Saturday-night slate straddles two UTC dates but is one
+  // evening to the viewer, and splitting it would be an artefact of the
+  // wire format, not a fact about the football.
+  const days = today ? groupByDay(today) : [];
+  const allToday = days.length === 0
+    || days.every((g) => localDay(g.list[0].date) === dayKeyOf(new Date()));
+  const showDayLabels = days.length > 1 || !allToday;
+
   return (
     <div className="space-y-14">
       <Reveal>
         <section>
           <Eyebrow className="mb-2" tone="accent">tonight · live data</Eyebrow>
           <h3 className="mb-6 text-lg font-medium text-ink-hi">
-            Today&apos;s slate{" "}
+            {allToday ? "Today's slate" : "Next matchday"}{" "}
             <span className="text-sm font-normal text-ink-low">
               · ESPN live feed, 60s poll
             </span>
           </h3>
           {today === null ? (
             <Empty>loading fixtures…</Empty>
-          ) : today.length === 0 ? (
-            <Empty>no MLS fixtures today</Empty>
+          ) : days.length === 0 ? (
+            <Empty>no MLS fixtures scheduled</Empty>
           ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {today.map((f) => (
-                <FixtureCard key={f.id} f={f} o={odds[f.id]} />
+            <div className="space-y-8">
+              {days.map((g) => (
+                <div key={g.key}>
+                  {showDayLabels && (
+                    <h4 className="mb-3 font-mono text-[11px] uppercase tracking-wide text-ink-faint">
+                      {dayLabel(g.list[0].date)}
+                    </h4>
+                  )}
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {g.list.map((f) => (
+                      <FixtureCard key={f.id} f={f} o={odds[f.id]} />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -172,6 +195,35 @@ function Empty({ children }: { children: React.ReactNode }) {
 // One date formatter for the whole dashboard, in the VIEWER's timezone.
 // `month: "short"` is used on the fixture cards because a bare 7/29 is
 // ambiguous outside the US and the card has room for three letters.
+// Local calendar-day identity. Deliberately not the ISO date: the wire
+// format is UTC, and a 23:30Z kickoff and a 00:30Z one are the same
+// evening in the Americas.
+const dayKeyOf = (d: Date) =>
+  `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+
+function localDay(iso: string) {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : dayKeyOf(d);
+}
+
+function dayLabel(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, {
+    weekday: "long", month: "short", day: "numeric",
+  });
+}
+
+function groupByDay(fixtures: Fixture[]) {
+  const groups = new Map<string, Fixture[]>();
+  for (const f of [...fixtures].sort((a, b) => a.date.localeCompare(b.date))) {
+    const list = groups.get(localDay(f.date));
+    if (list) list.push(f);
+    else groups.set(localDay(f.date), [f]);
+  }
+  return [...groups.entries()].map(([key, list]) => ({ key, list }));
+}
+
 function fmtDate(iso?: string, month: "short" | "numeric" = "numeric") {
   if (!iso) return "";
   const d = new Date(iso);
