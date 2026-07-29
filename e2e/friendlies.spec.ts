@@ -561,8 +561,11 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
 
   test("a non-mapped fixture renders no implied block at all",
     async ({ page }) => {
-      // the mapping status already says why in words; an empty block
-      // would invite a zero bar that reads as a real number
+      // CONTROL, not evidence: this asserts an ABSENCE, so it passes
+      // against origin/main too (which renders no implied block at all).
+      // Kept because it is the regression that would matter later — the
+      // mapping status already says why in words, and an empty block
+      // would invite a zero bar that reads as a real number.
       await serve(page, {
         scoreboard: { fixtures: [
           fixture("26", NOW(), "Al Nassr", "Mérida")] },
