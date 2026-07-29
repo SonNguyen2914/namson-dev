@@ -18,10 +18,12 @@ type Fixture = { id: string; date: string; state: "pre" | "in" | "post" | null;
 type BookRow = { ticker: string; label?: string; yes_ask?: string;
   yes_bid?: string; status?: string };
 type GameBook = { event_ticker: string; title?: string; markets: BookRow[] };
+type Freshness = { state?: string; age_seconds?: number } | null;
 type MappedRow = { fixture_id?: string; home?: string; away?: string;
-  status: "mapped" | "unmapped" | "ambiguous" | "no_open_markets";
-  book: GameBook | null; candidates: string[] };
-type Listed = { count?: number; truncated?: boolean };
+  status: "mapped" | "unmapped" | "ambiguous" | "no_open_markets"
+    | "unresolved_name" | "unavailable" | "registry_incomplete";
+  book: GameBook | null; candidates: string[]; freshness?: Freshness };
+type Listed = { count?: number; truncated?: boolean; complete?: boolean };
 
 const j = (r: Response) => (r.ok ? r.json() : Promise.reject(r.status));
 
@@ -35,6 +37,18 @@ export default function FriendliesDashboard() {
   // of skeleton-loading forever.
   const [notDeployed, setNotDeployed] = useState(false);
   const [unreachable, setUnreachable] = useState(false);
+  // The market hunter is a separate surface that may not be deployed on
+  // this build: link to it only when its API actually answers, so the
+  // page never points at a 404 (probed once, client-side).
+  const [hunterUp, setHunterUp] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/hunter/findings")
+      .then((r) => { if (alive) setHunterUp(r.ok); })
+      .catch(() => { if (alive) setHunterUp(false); });
+    return () => { alive = false; };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -109,11 +123,18 @@ export default function FriendliesDashboard() {
           <p className="mt-3 max-w-2xl text-xs leading-relaxed text-ink-low">
             Prices are the exchange&apos;s own, shown ask / bid —
             observational, not advice.{" "}
-            <Link href="/bet-suggester/hunter"
-              className="text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent">
-              Structural findings across these markets live in the market
-              hunter
-            </Link>, not here.
+            {hunterUp ? (
+              <>
+                <Link href="/bet-suggester/hunter"
+                  className="text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent">
+                  Structural findings across these markets live in the
+                  market hunter
+                </Link>, not here.
+              </>
+            ) : (
+              <>Structural findings across these markets belong to the
+              market hunter, not here.</>
+            )}
           </p>
         </section>
       </Reveal>
@@ -151,15 +172,29 @@ export default function FriendliesDashboard() {
           )}
           {listed?.count != null && (
             <p className="mt-6 max-w-2xl text-xs leading-relaxed text-ink-low">
-              Kalshi lists{" "}
-              {`${listed.count}${listed.truncated ? "+" : ""} club-friendly match events`}
-              {" "}— far more than ESPN&apos;s bucket carries. Books shown above are
-              only those matched to an ESPN fixture by date and both team
-              names; the rest are visible from the{" "}
-              <Link href="/bet-suggester/hunter"
-                className="text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent">
-                market hunter
-              </Link>.
+              {listed.complete === false ? (
+                // a failed registry page makes the count a FLOOR — say
+                // so rather than presenting a partial census as the
+                // census (P0-2)
+                <>Kalshi census incomplete — a fetch failed partway, so{" "}
+                {`${listed.count} club-friendly match events`}
+                {" "}listed is a floor, not the count. </>
+              ) : (
+                <>Kalshi lists{" "}
+                {`${listed.count}${listed.truncated ? "+" : ""} club-friendly match events`}
+                {" "}— far more than ESPN&apos;s bucket carries. </>
+              )}
+              Books shown above are only those matched to an ESPN fixture
+              by date and both team names
+              {hunterUp ? (
+                <>; the rest are visible from the{" "}
+                <Link href="/bet-suggester/hunter"
+                  className="text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent">
+                  market hunter
+                </Link>.</>
+              ) : (
+                <>.</>
+              )}
             </p>
           )}
         </section>
@@ -231,40 +266,69 @@ function TeamLine({ s, live }: { s: Side; live: boolean }) {
   );
 }
 
-// The fixture's Kalshi state, in words when there is no book to show.
-// An ambiguous match REFUSES to render a price: two same-day titles
-// matched this fixture's names and picking one silently is exactly the
-// bug this surface exists to avoid.
+// The fixture's Kalshi state, in words when there is no price to show —
+// and each non-priced state is a DIFFERENT set of words, because they
+// are different truths (review P0-1/P0-2, 2026-07-29):
+//   unmapped            no listed event matched at all
+//   ambiguous           more than one matched; picking one silently is
+//                       the bug this surface exists to avoid
+//   unresolved_name     one candidate, but only a near-miss name match
+//                       (B-team shape) — never priced on a guess
+//   no_open_markets     the book was FETCHED and nothing trades
+//   unavailable         the fetch FAILED — "couldn't look" is not
+//                       "closed"
+//   registry_incomplete the event registry itself was partial — absence
+//                       cannot be claimed
+// A mapped-but-stale book prices WITH its age on display.
+function StateLine({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="mt-2 font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+      {children}
+    </p>
+  );
+}
+
 function BookState({ m }: { m?: MappedRow }) {
   if (!m) {
-    return (
-      <p className="mt-2 font-mono text-[10px] uppercase tracking-wide text-ink-faint">
-        no kalshi book matched
-      </p>
-    );
+    return <StateLine>kalshi state unknown — no mapping data</StateLine>;
   }
-  if (m.status === "ambiguous") {
-    return (
-      <p className="mt-2 font-mono text-[10px] uppercase tracking-wide text-ink-faint">
-        ambiguous kalshi match ({m.candidates.length} candidates) — not
-        guessing, no price shown
-      </p>
-    );
+  switch (m.status) {
+    case "ambiguous":
+      return (
+        <StateLine>
+          ambiguous kalshi match ({m.candidates.length} candidates) — not
+          guessing, no price shown
+        </StateLine>
+      );
+    case "unresolved_name":
+      return (
+        <StateLine>
+          name not exact on kalshi ({m.candidates[0] ?? "candidate"}) —
+          not pricing a near-miss
+        </StateLine>
+      );
+    case "unavailable":
+      return (
+        <StateLine>
+          kalshi book unavailable — fetch failed, no claim about the book
+        </StateLine>
+      );
+    case "registry_incomplete":
+      return (
+        <StateLine>
+          kalshi registry incomplete — couldn&apos;t check this fixture
+        </StateLine>
+      );
+    case "no_open_markets":
+      return <StateLine>kalshi book closed — nothing trades</StateLine>;
+    case "unmapped":
+      return <StateLine>no kalshi book matched</StateLine>;
   }
-  if (m.status === "no_open_markets") {
-    return (
-      <p className="mt-2 font-mono text-[10px] uppercase tracking-wide text-ink-faint">
-        kalshi book closed
-      </p>
-    );
+  if (!m.book) {
+    // an unknown status never masquerades as an absence claim
+    return <StateLine>kalshi state unknown — no mapping data</StateLine>;
   }
-  if (m.status !== "mapped" || !m.book) {
-    return (
-      <p className="mt-2 font-mono text-[10px] uppercase tracking-wide text-ink-faint">
-        no kalshi book matched
-      </p>
-    );
-  }
+  const stale = m.freshness?.state === "stale";
   return (
     <div className="mt-2 space-y-1 rounded-lg bg-accent/10 px-2 py-1.5">
       {m.book.markets.map((r) => (
@@ -278,6 +342,11 @@ function BookState({ m }: { m?: MappedRow }) {
         </div>
       ))}
       <p className="pt-0.5 text-right font-mono text-[9px] uppercase tracking-wide text-ink-faint">
+        {stale && (
+          <span className="mr-2 rounded bg-elev px-1 py-0.5 text-live">
+            stale · {m.freshness?.age_seconds ?? "?"}s old
+          </span>
+        )}
         ask / bid · exchange prices, not advice
       </p>
     </div>

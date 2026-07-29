@@ -6,19 +6,28 @@ import { expect, test } from "@playwright/test";
 //    coming; no bare TAKE/BUY/SELL anywhere;
 //  - the matchday heading is DERIVED from fixtures (ESPN's bucket is a
 //    matchday, not a calendar day);
-//  - a mapped fixture shows the book, an unmapped one says so in words,
-//    and an AMBIGUOUS mapping refuses to show a price at all;
+//  - a mapped fixture shows the book; every non-mapped state is DISTINCT
+//    words: unmapped, ambiguous, unresolved_name (a near-miss is never
+//    priced), unavailable (a failed fetch is never "closed"),
+//    registry_incomplete (a partial registry never claims absence), and
+//    a stale cache shows its age (review P0-2, 2026-07-29);
 //  - the not-deployed (404) and unreachable states are explicit;
-//  - structural findings are linked out to the market hunter.
+//  - the market-hunter link renders only where the hunter API answers.
 
-// A fixture N days out at 12:00Z: same LOCAL calendar day at every UTC
-// offset from -12 to +14, so day assertions hold wherever the suite runs.
+// A fixture N days out at 12:00Z: 12:00Z fixtures built for the SAME n
+// share one local calendar day at every UTC offset, and n >= 2 is never
+// "today" anywhere (worst case, offset -12 sees day n at n-1 local).
 function inDays(n: number, utcHour = 12) {
   const d = new Date();
   d.setUTCDate(d.getUTCDate() + n);
   d.setUTCHours(utcHour, 0, 0, 0);
   return d.toISOString();
 }
+
+// "Today" at EVERY offset is only guaranteed by NOW itself: a pinned
+// 12:00Z is already tomorrow at UTC+13/+14. Heading tests that assert
+// today therefore use the current instant, not a pinned hour.
+const NOW = () => new Date().toISOString();
 
 function fixture(id: string, date: string, home: string, away: string,
                  over: Record<string, unknown> = {}) {
@@ -40,10 +49,17 @@ const BOOK = {
   ],
 };
 
+function row(fixture_id: string, home: string, away: string,
+             status: string, over: Record<string, unknown> = {}) {
+  return { fixture_id, home, away, status, book: null, candidates: [],
+           freshness: null, ...over };
+}
+
 type ServeOpts = {
   scoreboard?: unknown;
   markets?: unknown;
   schedule?: unknown;
+  hunter?: boolean;          // does /api/hunter/findings answer 200?
 };
 
 async function serve(page: import("@playwright/test").Page,
@@ -58,6 +74,12 @@ async function serve(page: import("@playwright/test").Page,
     r.fulfill(json(opts.markets ?? { fixtures: [], listed: null })));
   await page.route("**/api/friendlies/schedule**", (r) =>
     r.fulfill(json(opts.schedule ?? { fixtures: [] })));
+  if (opts.hunter) {
+    await page.route("**/api/hunter/findings", (r) =>
+      r.fulfill(json({ findings: [] })));
+  }
+  // when opts.hunter is falsy the probe hits the app's real route
+  // table, which has no /api/hunter — an honest 404
 }
 
 test.describe("club friendlies viewer (recorded payloads)", () => {
@@ -65,7 +87,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
     async ({ page }) => {
       await serve(page, {
         scoreboard: { fixtures: [
-          fixture("1", inDays(0), "Liverpool", "Wrexham")] },
+          fixture("1", NOW(), "Liverpool", "Wrexham")] },
       });
       await page.goto("/bet-suggester/friendlies");
       await expect(page.getByText("Liverpool").first()).toBeVisible();
@@ -81,20 +103,34 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
       expect(body).not.toMatch(/NaN|undefined|Infinity/);
     });
 
-  test("hunter panel is linked as the home of structural findings",
-    async ({ page }) => {
-      await serve(page);
-      await page.goto("/bet-suggester/friendlies");
-      const link = page.locator('a[href="/bet-suggester/hunter"]').first();
-      await expect(link).toBeVisible();
-      await expect(link).toContainText(/structural findings/i);
+  test("hunter link renders when the hunter API answers", async ({ page }) => {
+    await serve(page, { hunter: true });
+    await page.goto("/bet-suggester/friendlies");
+    const link = page.locator('a[href="/bet-suggester/hunter"]').first();
+    await expect(link).toBeVisible();
+    await expect(link).toContainText(/structural findings/i);
+  });
+
+  test("hunter link is absent when the hunter API 404s", async ({ page }) => {
+    // this build has no /api/hunter route, so the probe 404s for real —
+    // the page must not link a surface this deployment cannot serve
+    await serve(page, {
+      markets: { fixtures: [],
+                 listed: { count: 200, truncated: true, complete: true } },
     });
+    await page.goto("/bet-suggester/friendlies");
+    // census renders (so the link WOULD have had a home)...
+    await expect(page.getByText(/club-friendly match events/i)).toBeVisible();
+    // ...but no hunter link anywhere
+    await expect(page.locator('a[href="/bet-suggester/hunter"]'))
+      .toHaveCount(0);
+  });
 
   test("heading derives from the fixtures: today reads as today",
     async ({ page }) => {
       await serve(page, {
         scoreboard: { fixtures: [
-          fixture("1", inDays(0), "Liverpool", "Wrexham")] },
+          fixture("1", NOW(), "Liverpool", "Wrexham")] },
       });
       await page.goto("/bet-suggester/friendlies");
       await expect(page.getByText(/today's friendlies/i)).toBeVisible();
@@ -120,16 +156,14 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
     async ({ page }) => {
       await serve(page, {
         scoreboard: { fixtures: [
-          fixture("10", inDays(0), "Liverpool", "Wrexham"),
-          fixture("11", inDays(0), "Al Nassr", "Mérida"),
+          fixture("10", NOW(), "Liverpool", "Wrexham"),
+          fixture("11", NOW(), "Al Nassr", "Mérida"),
         ] },
         markets: { fixtures: [
-          { fixture_id: "10", home: "Liverpool", away: "Wrexham",
-            status: "mapped", book: BOOK,
-            candidates: [BOOK.event_ticker] },
-          { fixture_id: "11", home: "Al Nassr", away: "Mérida",
-            status: "unmapped", book: null, candidates: [] },
-        ], listed: { count: 200, truncated: true } },
+          row("10", "Liverpool", "Wrexham", "mapped",
+              { book: BOOK, candidates: [BOOK.event_ticker] }),
+          row("11", "Al Nassr", "Mérida", "unmapped"),
+        ], listed: { count: 200, truncated: true, complete: true } },
       });
       await page.goto("/bet-suggester/friendlies");
       // mapped: prices render in cents, labelled ask/bid
@@ -147,12 +181,11 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
     async ({ page }) => {
       await serve(page, {
         scoreboard: { fixtures: [
-          fixture("12", inDays(0), "Albacete", "Real Madrid Castilla")] },
+          fixture("12", NOW(), "Albacete", "Real Madrid Castilla")] },
         markets: { fixtures: [
-          { fixture_id: "12", home: "Albacete",
-            away: "Real Madrid Castilla", status: "ambiguous", book: null,
-            candidates: ["KXCLUBFGAME-26JUL31ALBRM",
-                         "KXCLUBFGAME-26JUL31ALBRMA"] },
+          row("12", "Albacete", "Real Madrid Castilla", "ambiguous",
+              { candidates: ["KXCLUBFGAME-26JUL31ALBRM",
+                             "KXCLUBFGAME-26JUL31ALBRMA"] }),
         ], listed: null },
       });
       await page.goto("/bet-suggester/friendlies");
@@ -163,13 +196,89 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
       expect(await card.innerText()).not.toMatch(/¢/);
     });
 
+  test("a near-miss name (B-team shape) is words, never a price",
+    async ({ page }) => {
+      // review P0-1 at the page boundary: unresolved_name is its own
+      // state — not "unmapped", and absolutely not a priced book
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("13", NOW(), "Albacete", "Real Madrid")] },
+        markets: { fixtures: [
+          row("13", "Albacete", "Real Madrid", "unresolved_name",
+              { candidates: ["KXCLUBFGAME-26JUL31ALBRMA"] }),
+        ], listed: null },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      const card = page.locator("div.rounded-xl", { hasText: "Albacete" });
+      await expect(card.getByText(/name not exact/i)).toBeVisible();
+      await expect(card.getByText(/not pricing/i)).toBeVisible();
+      const txt = await card.innerText();
+      expect(txt).not.toMatch(/¢/);
+      expect(txt).not.toMatch(/no kalshi book matched/i);
+    });
+
+  test("a failed market fetch reads unavailable, never closed",
+    async ({ page }) => {
+      // review P0-2: "we couldn't look" must never render as an
+      // authoritative absence
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("14", NOW(), "Liverpool", "Wrexham")] },
+        markets: { fixtures: [
+          row("14", "Liverpool", "Wrexham", "unavailable",
+              { candidates: [BOOK.event_ticker] }),
+        ], listed: null },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      const card = page.locator("div.rounded-xl", { hasText: "Liverpool" });
+      await expect(card.getByText(/book unavailable/i)).toBeVisible();
+      await expect(card.getByText(/fetch failed/i)).toBeVisible();
+      const txt = await card.innerText();
+      expect(txt).not.toMatch(/no kalshi book matched|book closed/i);
+      expect(txt).not.toMatch(/¢/);
+    });
+
+  test("an incomplete registry never claims unmapped", async ({ page }) => {
+    await serve(page, {
+      scoreboard: { fixtures: [
+        fixture("15", NOW(), "Al Nassr", "Mérida")] },
+      markets: { fixtures: [
+        row("15", "Al Nassr", "Mérida", "registry_incomplete"),
+      ], listed: { count: 118, truncated: false, complete: false } },
+    });
+    await page.goto("/bet-suggester/friendlies");
+    const card = page.locator("div.rounded-xl", { hasText: "Al Nassr" });
+    await expect(card.getByText(/registry incomplete/i)).toBeVisible();
+    await expect(card.getByText(/couldn't check/i)).toBeVisible();
+    expect(await card.innerText()).not.toMatch(/no kalshi book matched/i);
+    // and the census says it is a floor, not a count
+    await expect(page.getByText(/census incomplete/i)).toBeVisible();
+  });
+
+  test("a stale book is priced WITH its age on display", async ({ page }) => {
+    await serve(page, {
+      scoreboard: { fixtures: [
+        fixture("16", NOW(), "Liverpool", "Wrexham")] },
+      markets: { fixtures: [
+        row("16", "Liverpool", "Wrexham", "mapped",
+            { book: BOOK, candidates: [BOOK.event_ticker],
+              freshness: { state: "stale", age_seconds: 42 } }),
+      ], listed: null },
+    });
+    await page.goto("/bet-suggester/friendlies");
+    const card = page.locator("div.rounded-xl", { hasText: "Liverpool" });
+    await expect(card.getByText("69¢").first()).toBeVisible();
+    await expect(card.getByText(/stale/i)).toBeVisible();
+    await expect(card.getByText(/42s/i)).toBeVisible();
+  });
+
   test("live fixture renders its scores from the two per-side fields",
     async ({ page }) => {
       // never a provider composite string: home and away scores arrive
       // and render as separate fields beside their own team names
       await serve(page, {
         scoreboard: { fixtures: [
-          fixture("13", inDays(0), "PSV Eindhoven", "FC Eindhoven", {
+          fixture("17", NOW(), "PSV Eindhoven", "FC Eindhoven", {
             state: "in", minute: "61'",
             home: { name: "PSV Eindhoven", score: "3" },
             away: { name: "FC Eindhoven", score: "1" },
