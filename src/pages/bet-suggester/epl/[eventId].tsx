@@ -11,6 +11,8 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { countdown, pct, signedPct } from "../../../lib/suggesterApi";
+import { FEE_NOT_MODELED, maxContractsForStake, orderCostDollars,
+  unitFeeDollars } from "../../../lib/fee";
 import { Eyebrow, Reveal } from "../../../components/ui";
 import { Collapse, NavChip, TopBar, useScrollSpy } from "../../../components/chrome";
 
@@ -61,7 +63,9 @@ const EPL_VARS = {
   "--accent-ambient": "rgba(177,140,255,0.07)",
 } as React.CSSProperties;
 
-const fee = (p: number) => 0.07 * p * (1 - p);
+// the net-edge gate's per-contract fee, unquantized — the same quantity
+// the backend compares against a probability (src/lib/fee.ts)
+const fee = unitFeeDollars;
 const DRAW_COLOR = "#52525b";          // neutral — no club owns the draw
 const HOME_FALLBACK = "#b18cff";
 const AWAY_FALLBACK = "#a1a1aa";
@@ -602,11 +606,17 @@ function ScenarioSection({ book }: { book: Book | null }) {
   if (rows.length === 0) {
     return <Empty>no open book to run scenarios against</Empty>;
   }
+  // The CANONICAL fee policy (src/lib/fee.ts), which mirrors the
+  // backend's order_fee_dollars: ONE ceil-to-centicent fee on the whole
+  // order, in integer arithmetic. This used to apply 0.07·P·(1−P) per
+  // contract in binary floating point, which both disagreed with the
+  // policy and lost a whole contract to rounding ($10.63 at 10c buys
+  // 100, not 99).
   const legs = rows.map((r) => {
     const ask = parseFloat(r.yes_ask!);
     const stake = parseFloat(stakes[r.ticker] ?? "") || 0;
-    const contracts = ask > 0 ? Math.floor(stake / (ask + fee(ask))) : 0;
-    const cost = contracts * (ask + fee(ask));
+    const contracts = maxContractsForStake(ask, stake);
+    const cost = orderCostDollars(ask, contracts);
     return { ...r, ask, stake, contracts, cost };
   });
   const totalCost = legs.reduce((s, l) => s + l.cost, 0);
@@ -614,8 +624,10 @@ function ScenarioSection({ book }: { book: Book | null }) {
     <div>
       <p className="mb-4 text-xs leading-relaxed text-ink-low">
         Stake any mix of outcomes at the real ask plus Kalshi&apos;s
-        0.07·P·(1−P) fee. Pure execution arithmetic — this table does not
-        opine on which outcome is likely.
+        general taker fee — ceil-to-centicent of 0.07·C·P·(1−P), charged
+        once on the whole order, exactly as the backend&apos;s fee policy
+        computes it. Pure execution arithmetic — this table does not
+        opine on which outcome is likely. Not modelled: {FEE_NOT_MODELED}.
       </p>
       <div className="space-y-2">
         {legs.map((l) => (
@@ -632,7 +644,8 @@ function ScenarioSection({ book }: { book: Book | null }) {
               onChange={(e) => setStakes((s) => ({ ...s, [l.ticker]: e.target.value }))}
               className="rounded-lg border border-line bg-transparent px-2 py-1.5 text-right font-mono text-sm text-ink-hi outline-none focus:border-accent/60"
             />
-            <span className="text-right font-mono text-[11px] tabular-nums text-ink-low">
+            <span data-testid={`scenario-contracts-${l.ticker}`}
+              className="text-right font-mono text-[11px] tabular-nums text-ink-low">
               {l.contracts > 0 ? `${l.contracts} × → $${l.contracts.toFixed(0)}` : "—"}
             </span>
           </div>

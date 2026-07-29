@@ -23,8 +23,20 @@ type GameBook = { event_ticker: string; title?: string; markets: BookRow[] };
 type OddsRow = { espn_event_id: string; run_type?: string; locked?: boolean;
   outcomes?: Record<string, number> };
 type Discovery = { game_series?: string; series_exists?: boolean | null;
-  open_events?: number | null; mapped_events?: number;
+  open_events?: number | null; open_events_in_horizon?: number | null;
+  mapped_events?: number;
   unmapped_upcoming?: number; upcoming_48h?: number };
+
+// P0-5. These are THREE different facts and must never render as one:
+//   dark              the backend says the model is explicitly unapproved
+//   approved_no_runs  approved, but nothing has been produced yet
+//   approved          approved, with runs
+//   unavailable       we could not find out — a failure, not a decision
+// "loading" is the pre-answer state and is deliberately distinct from
+// "unavailable"; the previous build initialised to dark and never left
+// it on failure, so a broken backend looked like a design choice.
+type ModelState = "loading" | "dark" | "approved_no_runs" | "approved"
+  | "unavailable";
 
 const j = (r: Response) => (r.ok ? r.json() : Promise.reject(r.status));
 
@@ -34,7 +46,7 @@ export default function EplDashboard() {
   const [tables, setTables] = useState<LeagueTable[] | null>(null);
   const [books, setBooks] = useState<GameBook[] | null>(null);
   const [odds, setOdds] = useState<Record<string, OddsRow>>({});
-  const [modelDark, setModelDark] = useState(true);
+  const [modelState, setModelState] = useState<ModelState>("loading");
   const [disco, setDisco] = useState<Discovery | null>(null);
 
   useEffect(() => {
@@ -50,8 +62,13 @@ export default function EplDashboard() {
           const map: Record<string, OddsRow> = {};
           for (const o of d.odds ?? []) map[o.espn_event_id] = o;
           setOdds(map);
-          setModelDark(Boolean(d.model_dark));
-        }).catch(() => {});
+          // trust the backend's explicit state; fall back to
+          // "unavailable" rather than inventing "dark" from an absence
+          const s = d.model_state as ModelState | undefined;
+          setModelState(s && s !== "loading" ? s : "unavailable");
+        })
+        // a REJECTED fetch is a failure, not a dark model
+        .catch(() => alive && setModelState("unavailable"));
     };
     load();
     fetch("/api/epl/schedule?days=7").then(j)
@@ -119,10 +136,25 @@ export default function EplDashboard() {
             </span>
           </h3>
           <p className="mb-6 max-w-2xl text-xs leading-relaxed text-ink-low">
-            Raw exchange prices. epl-2026-v0 is scaffolded but{" "}
-            <em>dark</em> — unapproved, structurally refused by the
-            backend — so no model number appears anywhere on this page
-            until it earns approval through prospective evaluation.
+            Raw exchange prices.{" "}
+            {modelState === "dark" ? (
+              <>
+                epl-2026-v0 is scaffolded but <em>dark</em> — unapproved,
+                structurally refused by the backend — so no model number
+                appears anywhere on this page until it earns approval
+                through prospective evaluation.
+              </>
+            ) : modelState === "unavailable" ? (
+              <>
+                The model&apos;s state could not be read, so this page
+                makes no claim about it either way.
+              </>
+            ) : (
+              <>
+                Any model number shown beside them is epl-2026-v0 shadow
+                output — observational, never advice.
+              </>
+            )}{" "}
             Real-money signals are disabled server-side.
           </p>
           {books === null ? (
@@ -202,24 +234,53 @@ export default function EplDashboard() {
         </section>
       </Reveal>
 
-      {modelDark && (
-        <Reveal>
-          <section className="rounded-2xl border border-line bg-elev px-5 py-4">
-            <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-ink-low">
-              model status · epl-2026-v0 — dark
-            </p>
-            <p className="mt-2 max-w-2xl text-xs leading-relaxed text-ink-low">
-              The engine is wired end-to-end (fixtures, identity, market
-              discovery, lock machinery) but the model is unapproved and
-              produces no output. Approval is earned through the same
-              evaluation ladder MLS passed — on real 2026-27 results,
-              which don&apos;t exist yet. Until then this hub shows data,
-              never predictions.
-            </p>
-          </section>
-        </Reveal>
-      )}
+      <ModelStatus state={modelState} />
     </div>
+  );
+}
+
+// One block, three DIFFERENT statements. Collapsing them was the defect:
+// "model dark" is a design decision a reader can accept and move on
+// from, so wearing it over a failure means nobody investigates.
+function ModelStatus({ state }: { state: ModelState }) {
+  if (state === "loading" || state === "approved") return null;
+  const copy = {
+    dark: {
+      head: "model status · epl-2026-v0 — dark",
+      body: "The engine is wired end-to-end (fixtures, identity, market "
+        + "discovery, lock machinery) but the model is unapproved and "
+        + "produces no output. Approval is earned through the same "
+        + "evaluation ladder MLS passed — on real 2026-27 results, which "
+        + "don't exist yet. Until then this hub shows data, never "
+        + "predictions.",
+    },
+    approved_no_runs: {
+      head: "model status · epl-2026-v0 — approved / no runs",
+      body: "epl-2026-v0 is approved for shadow collection, and no "
+        + "complete run exists yet. This is an empty result, not a "
+        + "withheld one: nothing has been produced to show. Odds appear "
+        + "here as soon as the first sweep completes.",
+    },
+    unavailable: {
+      head: "model status · unavailable",
+      body: "The odds board could not be read, so this page cannot say "
+        + "what state the model is in. That is a FAILURE, not a design "
+        + "decision — absence of odds here means nothing until the read "
+        + "succeeds.",
+    },
+  }[state];
+  return (
+    <Reveal>
+      <section data-testid={`model-status-${state}`}
+        className="rounded-2xl border border-line bg-elev px-5 py-4">
+        <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-ink-low">
+          {copy.head}
+        </p>
+        <p className="mt-2 max-w-2xl text-xs leading-relaxed text-ink-low">
+          {copy.body}
+        </p>
+      </section>
+    </Reveal>
   );
 }
 

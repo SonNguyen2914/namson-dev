@@ -33,6 +33,7 @@ function inDays(n: number, utcHour = 12) {
 
 async function serve(page: import("@playwright/test").Page, opts?: {
   scoreboard?: unknown; tables?: unknown[]; odds?: unknown;
+  oddsStatus?: number;
 }) {
   await page.route("**/api/epl/scoreboard", (r) =>
     r.fulfill({ status: 200, contentType: "application/json",
@@ -52,10 +53,17 @@ async function serve(page: import("@playwright/test").Page, opts?: {
     r.fulfill({ status: 200, contentType: "application/json",
                 body: JSON.stringify({ game_series: "KXEPLGAME",
                   series_exists: true, open_events: 0 }) }));
-  await page.route("**/api/epl/odds", (r) =>
-    r.fulfill({ status: 200, contentType: "application/json",
-                body: JSON.stringify(opts?.odds
-                  ?? { odds: [], shadow: true, model_dark: true }) }));
+  await page.route("**/api/epl/odds", (r) => {
+    if (opts?.oddsStatus && opts.oddsStatus >= 400) {
+      return r.fulfill({ status: opts.oddsStatus,
+                         contentType: "application/json",
+                         body: JSON.stringify({ detail: "boom" }) });
+    }
+    return r.fulfill({ status: 200, contentType: "application/json",
+                       body: JSON.stringify(opts?.odds
+                         ?? { odds: [], shadow: true, model_dark: true,
+                              model_state: "dark" }) });
+  });
 }
 
 test.describe("EPL hub", () => {
@@ -100,6 +108,57 @@ test.describe("EPL hub", () => {
       // and the empty market state names the verified series reality
       await expect(
         page.getByText(/lists no 2026-27 events yet/i)).toBeVisible();
+    });
+
+  // --- P0-5: approval, empty data and failure are THREE states --------
+  // The hub initialised `modelDark` to true and never left it on a
+  // failed fetch, so a broken backend rendered as a deliberate design
+  // decision — the one story a reader accepts and stops investigating.
+
+  test("an APPROVED model with no runs says so — never 'dark'",
+    async ({ page }) => {
+      await serve(page, { odds: { odds: [], shadow: true,
+                                  model_dark: false,
+                                  model_state: "approved_no_runs" } });
+      await page.goto("/bet-suggester?league=epl");
+      await expect(
+        page.getByTestId("model-status-approved_no_runs")).toBeVisible();
+      await expect(page.getByText(/approved \/ no runs/i)).toBeVisible();
+      await expect(page.getByText(/epl-2026-v0 — dark/i)).toHaveCount(0);
+    });
+
+  test("a REJECTED odds fetch says unavailable — never 'dark'",
+    async ({ page }) => {
+      await serve(page, { oddsStatus: 503 });
+      await page.goto("/bet-suggester?league=epl");
+      await expect(
+        page.getByTestId("model-status-unavailable")).toBeVisible();
+      await expect(page.getByText(/model status · unavailable/i))
+        .toBeVisible();
+      await expect(page.getByText(/epl-2026-v0 — dark/i)).toHaveCount(0);
+    });
+
+  test("only an explicit unapproved answer paints the dark block",
+    async ({ page }) => {
+      await serve(page);            // model_state: "dark"
+      await page.goto("/bet-suggester?league=epl");
+      await expect(page.getByTestId("model-status-dark")).toBeVisible();
+      await expect(
+        page.getByTestId("model-status-unavailable")).toHaveCount(0);
+      await expect(
+        page.getByTestId("model-status-approved_no_runs")).toHaveCount(0);
+    });
+
+  test("an APPROVED model with runs shows odds and no status block",
+    async ({ page }) => {
+      await serve(page, { odds: { shadow: true, model_dark: false,
+        model_state: "approved",
+        odds: [{ espn_event_id: "401879301", run_type: "scheduled",
+                 outcomes: { home_win: 0.5, draw: 0.25,
+                             away_win: 0.25 } }] } });
+      await page.goto("/bet-suggester?league=epl");
+      await expect(page.getByText(/H 50 · D 25 · A 25/)).toBeVisible();
+      await expect(page.getByText(/model status ·/i)).toHaveCount(0);
     });
 
   test("an upcoming fixture shows WHEN it kicks off, not 'Scheduled'",
