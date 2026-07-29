@@ -9,6 +9,18 @@
 // carries its conditionality sentence, and a dead or degraded scanner
 // reads as exactly that — the API's own heartbeat doc: age far above the
 // poll cadence means the scanner is DEAD, not that the market is quiet.
+//
+// Two more, from the Codex review:
+//   1. MODEL_EDGE is a MODEL DIAGNOSTIC, not a structural finding. The
+//      structural three (SUM_BELOW_ONE / CROSSED_BOOK / POST_CERTAINTY)
+//      are mechanically-true states net of exact fees; a model readout
+//      whose standing result is not significant must never sit in that
+//      list and inherit its authority. It gets its own class, its own
+//      colour, and its qualifier is always attached.
+//   2. The served page is NOT the record. findings_per_type is the API's
+//      global total; it is rendered beside the list, and whenever fewer
+//      rows were served than exist an explicit "showing N of M" line
+//      says so. Completeness is never implied.
 import Head from "next/head";
 import { useEffect, useState } from "react";
 import { Eyebrow } from "../../components/ui";
@@ -116,6 +128,87 @@ const TYPE_ORDER = [
   "WIDE_SPREAD", "THIN_BOOK", "IN_PLAY_OVERREACTION",
 ];
 
+// The rows the API serves are ONE PAGE, not the record. Kept as a
+// constant so the request and the copy that describes it cannot drift.
+const FINDINGS_LIMIT = 200;
+
+/* ---------- finding classes ---------- */
+
+// Three different kinds of claim, and they must never share a visual
+// class. STRUCTURAL is the backend's ALERTABLE set
+// (origin/feat-market-hunter: ALERTABLE) — mechanically-true states net
+// of exact fees. CONTEXT is the backend's CONTEXT_TYPES — observational
+// flags, never wins. MODEL_EDGE is NEITHER: it is a readout of the
+// shadow model, whose standing result is not statistically significant,
+// so it gets its own class and never borrows structural authority by
+// sitting in the same list.
+const STRUCTURAL_TYPES = new Set([
+  "SUM_BELOW_ONE", "CROSSED_BOOK", "POST_CERTAINTY",
+]);
+const CONTEXT_TYPES = new Set([
+  "WIDE_SPREAD", "THIN_BOOK", "IN_PLAY_OVERREACTION",
+]);
+const MODEL_TYPES = new Set(["MODEL_EDGE"]);
+
+type FindingClass = "structural" | "model" | "context" | "unclassified";
+
+const CLASS_ORDER: FindingClass[] =
+  ["structural", "model", "context", "unclassified"];
+
+const CLASS_LABEL: Record<FindingClass, string> = {
+  structural: "structural",
+  model: "model diagnostic",
+  context: "context — not a win",
+  unclassified: "unclassified",
+};
+
+// compact form for tables and count strips
+const CLASS_SHORT: Record<FindingClass, string> = {
+  structural: "structural",
+  model: "model readout",
+  context: "context",
+  unclassified: "unclassified",
+};
+
+function classOfType(t: string): FindingClass {
+  if (MODEL_TYPES.has(t)) return "model";
+  if (STRUCTURAL_TYPES.has(t)) return "structural";
+  if (CONTEXT_TYPES.has(t)) return "context";
+  // a type this panel does not know is never granted structural
+  // standing — fail closed
+  return "unclassified";
+}
+
+// The API's is_context flag may DEMOTE a row but can never promote one,
+// and a model readout is a model readout whatever else is set on it.
+function classOf(f: Finding): FindingClass {
+  const byType = classOfType(f.finding_type);
+  if (byType === "model") return "model";
+  if (f.is_context) return "context";
+  return byType;
+}
+
+/* ---------- served totals ---------- */
+
+type PerType = NonNullable<Report["findings_per_type"]>;
+type Totals = { open: number; expired: number; total: number };
+
+// findings_per_type is the API's GLOBAL count (findings_per_type_scope
+// says so). It is the only denominator we have for "how much is on
+// record" versus the one page of rows we were served.
+function totalsOf(perType: PerType | null | undefined,
+                  keep?: (t: string) => boolean): Totals | null {
+  if (!perType) return null;
+  let open = 0;
+  let expired = 0;
+  for (const [t, v] of Object.entries(perType)) {
+    if (keep && !keep(t)) continue;
+    open += v?.open ?? 0;
+    expired += v?.expired ?? 0;
+  }
+  return { open, expired, total: open + expired };
+}
+
 /* ---------- tiny formatters ---------- */
 
 const usd = (v?: string | null) => (v == null ? "—" : `$${v}`);
@@ -163,7 +256,7 @@ export default function HunterPanel() {
   useEffect(() => {
     let alive = true;
     const load = () =>
-      fetch("/api/hunter/findings?limit=200")
+      fetch(`/api/hunter/findings?limit=${FINDINGS_LIMIT}`)
         .then(async (r) => {
           if (!alive) return;
           if (r.status === 404) { setPhase("not_deployed"); return; }
@@ -198,8 +291,15 @@ export default function HunterPanel() {
     : lc?.age_seconds ?? null;
 
   const findings = [...(report?.findings ?? [])].sort((a, b) => b.id - a.id);
-  const structural = findings.filter((f) => !f.is_context);
-  const context = findings.filter((f) => f.is_context);
+  const grouped: Record<FindingClass, Finding[]> = {
+    structural: [], model: [], context: [], unclassified: [],
+  };
+  for (const f of findings) grouped[classOf(f)].push(f);
+
+  // what the API says is on record, versus the page of rows it served
+  const perType = report?.findings_per_type ?? null;
+  const served = totalsOf(perType);
+  const shown = findings.length;
 
   return (
     <div className="min-h-screen bg-bs font-sans text-ink-mid"
@@ -284,7 +384,7 @@ export default function HunterPanel() {
                   findings · episode history
                 </Eyebrow>
                 <h2 className="text-lg font-medium text-ink-hi">
-                  {findings.length} finding{findings.length === 1 ? "" : "s"} on record
+                  {shown} finding{shown === 1 ? "" : "s"} shown
                   <span className="ml-2 text-sm font-normal text-ink-low">
                     · over {numOrDash(den?.cycles_run)} cycles
                     · {numOrDash(den?.markets_scanned_total)} markets scanned
@@ -292,22 +392,36 @@ export default function HunterPanel() {
                 </h2>
               </div>
 
+              <ServedTotals perType={perType} served={served} shown={shown} />
+
               {findings.length === 0 ? (
-                <p className="rounded-2xl border border-dashed border-line px-4 py-8 text-center font-mono text-[11px] uppercase tracking-[0.15em] text-ink-faint">
-                  no findings on record —{" "}
+                <p className="mt-5 rounded-2xl border border-dashed border-line px-4 py-8 text-center font-mono text-[11px] uppercase tracking-[0.15em] text-ink-faint">
+                  {served != null && served.total > 0
+                    ? <>no findings in this page — {served.total} on record, </>
+                    : <>no findings on record — </>}
                   {numOrDash(den?.cycles_run)} cycles run,{" "}
                   {numOrDash(den?.markets_scanned_total)} markets scanned
                 </p>
               ) : (
-                <div className="space-y-10">
+                <div className="mt-5 space-y-10">
                   <FindingGroup
-                    heading="structural"
+                    cls="structural"
                     sub="mechanically defined, net of exact fees"
-                    list={structural} nowMs={nowMs} />
+                    list={grouped.structural} perType={perType} nowMs={nowMs} />
                   <FindingGroup
-                    heading="context — not a win"
+                    cls="model"
+                    sub="a readout of the shadow model — NOT a structural mispricing and not mechanically true. Every row carries the API's own qualifier verbatim; read the edge, its interval and its n before reading anything into it."
+                    list={grouped.model} perType={perType} nowMs={nowMs} />
+                  <FindingGroup
+                    cls="context"
                     sub="liquidity and repricing context; observational flags, never wins"
-                    list={context} nowMs={nowMs} />
+                    list={grouped.context} perType={perType} nowMs={nowMs} />
+                  {grouped.unclassified.length > 0 && (
+                    <FindingGroup
+                      cls="unclassified"
+                      sub="a finding type this panel does not know — shown with its raw payload, never counted as structural"
+                      list={grouped.unclassified} perType={perType} nowMs={nowMs} />
+                  )}
                 </div>
               )}
             </section>
@@ -557,14 +671,19 @@ function Denominators({ report, lc }: { report: Report; lc: LastCycle | null }) 
           <thead>
             <tr className="font-mono text-[10px] uppercase text-ink-faint">
               <th className="px-3 py-1.5 text-left">type</th>
+              <th className="px-2 py-1.5 text-left">class</th>
               <th className="px-2 py-1.5 text-right">open</th>
               <th className="px-3 py-1.5 text-right">expired</th>
             </tr>
           </thead>
           <tbody>
             {keys.map((k) => (
-              <tr key={k} className="border-t border-line/60">
+              <tr key={k} className="border-t border-line/60"
+                data-finding-class={classOfType(k)}>
                 <td className="px-3 py-1.5 font-mono text-[11px] text-ink-hi">{k}</td>
+                <td className={`px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.1em] ${CLASS_HEAD[classOfType(k)]}`}>
+                  {CLASS_SHORT[classOfType(k)]}
+                </td>
                 <td className="px-2 py-1.5 text-right font-mono text-[11px] tabular-nums text-accent">
                   {perType[k]?.open ?? 0}
                 </td>
@@ -629,25 +748,123 @@ function Denominators({ report, lc }: { report: Report; lc: LastCycle | null }) 
 
 /* ---------- findings ---------- */
 
-function FindingGroup({ heading, sub, list, nowMs }: {
-  heading: string; sub: string; list: Finding[]; nowMs: number;
+// The served totals strip: what the API says is on record, next to the
+// rows it actually served. The panel must never present one page as the
+// whole record (Codex review finding 2).
+function ServedTotals({ perType, served, shown }: {
+  perType: PerType | null; served: Totals | null; shown: number;
 }) {
+  const truncated = served != null && served.total > shown;
+  const inconsistent = served != null && served.total < shown;
   return (
-    <div>
-      <h3 className="mb-1 font-mono text-[12px] uppercase tracking-[0.2em] text-ink-hi">
-        {heading}
+    <div data-testid="served-totals"
+      className="rounded-2xl border border-line px-4 py-3">
+      <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-low">
+        served totals · what is on record
+      </p>
+      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 font-mono text-[11px]">
+        <span className="text-ink-low">
+          rows served{" "}
+          <span className="tabular-nums text-ink-hi">{shown}</span>
+        </span>
+        <span className="text-ink-low">
+          on record{" "}
+          <span className="tabular-nums text-ink-hi">
+            {served != null ? served.total : "unknown"}
+          </span>
+          {served != null && (
+            <span className="ml-1">
+              (open {served.open} · expired {served.expired})
+            </span>
+          )}
+        </span>
+        {perType != null && CLASS_ORDER.map((c) => {
+          const t = totalsOf(perType, (k) => classOfType(k) === c);
+          if (t == null || (t.total === 0 && c === "unclassified")) return null;
+          return (
+            <span key={c} className="text-ink-low">
+              {CLASS_SHORT[c]}{" "}
+              <span className="tabular-nums text-ink-hi">{t.total}</span>
+              <span className="ml-1">
+                (open {t.open} · expired {t.expired})
+              </span>
+            </span>
+          );
+        })}
+      </div>
+
+      {truncated && served != null && (
+        <p className="mt-2.5 rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 font-mono text-[11px] leading-relaxed text-warn">
+          showing {shown} of {served.total} findings on record — this list is
+          the most recent page (limit {FINDINGS_LIMIT}) and is NOT the
+          complete record.
+        </p>
+      )}
+      {inconsistent && served != null && (
+        <p className="mt-2.5 rounded-lg border border-live/40 bg-live/5 px-3 py-2 font-mono text-[11px] leading-relaxed text-live">
+          the served totals ({served.total}) are below the {shown} rows
+          served — the totals disagree with the rows and cannot be read as a
+          denominator.
+        </p>
+      )}
+      {served == null && (
+        <p className="mt-2.5 rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 font-mono text-[11px] leading-relaxed text-warn">
+          the API served no per-type totals — how much is on record is
+          UNKNOWN from here, and this list must not be read as the complete
+          record.
+        </p>
+      )}
+      <p className="mt-2 font-mono text-[10px] leading-relaxed text-ink-faint">
+        totals are the API&apos;s global per-type counts; their scope
+        sentence is quoted under denominators.
+      </p>
+    </div>
+  );
+}
+
+const CLASS_HEAD: Record<FindingClass, string> = {
+  structural: "text-ink-hi", model: "text-skylive",
+  context: "text-ink-hi", unclassified: "text-warn",
+};
+
+const CLASS_WRAP: Record<FindingClass, string> = {
+  structural: "",
+  model: "rounded-2xl border border-skylive/40 bg-skylive/5 p-4",
+  context: "",
+  unclassified: "rounded-2xl border border-warn/40 bg-warn/5 p-4",
+};
+
+function FindingGroup({ cls, sub, list, perType, nowMs }: {
+  cls: FindingClass; sub: string; list: Finding[];
+  perType: PerType | null; nowMs: number;
+}) {
+  const t = totalsOf(perType, (k) => classOfType(k) === cls);
+  return (
+    <div data-finding-class={cls} className={CLASS_WRAP[cls]}>
+      {cls === "model" && (
+        <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-skylive">
+          model readout · not a structural finding
+        </p>
+      )}
+      <h3 className={`mb-1 font-mono text-[12px] uppercase tracking-[0.2em] ${CLASS_HEAD[cls]}`}>
+        {CLASS_LABEL[cls]}
         <span className="ml-2 font-sans text-[11px] normal-case tracking-normal text-ink-faint">
-          · {list.length} finding{list.length === 1 ? "" : "s"}
+          · {list.length} shown
+          {t != null && (
+            <> · {t.total} on record (open {t.open} · expired {t.expired})</>
+          )}
         </span>
       </h3>
       <p className="mb-4 text-xs text-ink-low">{sub}</p>
       {list.length === 0 ? (
         <p className="rounded-xl border border-dashed border-line px-4 py-5 text-center font-mono text-[11px] uppercase tracking-[0.15em] text-ink-faint">
-          none on record
+          {t != null && t.total === 0 ? "none on record" : "none in this page"}
         </p>
       ) : (
         <div className="space-y-3">
-          {list.map((f) => <FindingCard key={f.id} f={f} nowMs={nowMs} />)}
+          {list.map((f) => (
+            <FindingCard key={f.id} f={f} cls={cls} nowMs={nowMs} />
+          ))}
         </div>
       )}
     </div>
@@ -660,12 +877,13 @@ function liquidityUnknown(f: Finding): boolean {
 }
 
 function Badge({ children, tone }: {
-  children: React.ReactNode; tone: "accent" | "warn" | "low" | "live";
+  children: React.ReactNode; tone: "accent" | "warn" | "low" | "live" | "sky";
 }) {
   const cls = tone === "accent"
     ? "border-accent/50 bg-accent/10 text-accent"
     : tone === "warn" ? "border-warn/50 bg-warn/5 text-warn"
     : tone === "live" ? "border-live/50 bg-live/5 text-live"
+    : tone === "sky" ? "border-skylive/50 bg-skylive/10 text-skylive"
     : "border-line text-ink-low";
   return (
     <span className={`rounded-md border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] ${cls}`}>
@@ -674,14 +892,24 @@ function Badge({ children, tone }: {
   );
 }
 
-function FindingCard({ f, nowMs }: { f: Finding; nowMs: number }) {
+const CLASS_BADGE: Record<FindingClass, "accent" | "sky" | "low" | "warn"> = {
+  structural: "accent", model: "sky", context: "low", unclassified: "warn",
+};
+
+function FindingCard({ f, cls, nowMs }: {
+  f: Finding; cls: FindingClass; nowMs: number;
+}) {
   const expired = f.status !== "open";
   return (
     <article data-status={f.status} data-type={f.finding_type}
+      data-finding-class={cls}
       className={`rounded-xl border p-4 transition-opacity ${
         expired ? "border-line/70 opacity-55" : "border-line"}`}>
       <div className="flex flex-wrap items-center gap-2">
-        <Badge tone={f.is_context ? "low" : "accent"}>{f.finding_type}</Badge>
+        <Badge tone={CLASS_BADGE[cls]}>{f.finding_type}</Badge>
+        {cls === "model" && (
+          <Badge tone="sky">model readout — not structural</Badge>
+        )}
         {f.is_context && <Badge tone="low">context — not a win</Badge>}
         {liquidityUnknown(f) && <Badge tone="warn">liquidity_unknown</Badge>}
         <Badge tone={expired ? "low" : "accent"}>
@@ -781,8 +1009,10 @@ function QualifierBlock({ q }: { q?: Qualifier | null }) {
       <Row k="edge_vs_baseline" v={numOrDash(q.edge_vs_baseline)} />
       <Row k="ci" v={`[${numOrDash(q.ci_low)}, ${numOrDash(q.ci_high)}]`} />
       <Row k="n_scored" v={numOrDash(q.n_scored)} />
-      <Row k="significant" v={q.significant ? "true" : "false"}
-        tone={q.significant ? undefined : "text-warn"} />
+      <Row k="significant"
+        v={q.significant == null ? "— (not served)"
+          : q.significant ? "true" : "false"}
+        tone={q.significant === true ? undefined : "text-warn"} />
       <Row k="decision"
         v={`${numOrDash(q.decision_id)} · ${q.decision_content_hash ?? "—"}`} />
       {q.note && (
@@ -791,6 +1021,39 @@ function QualifierBlock({ q }: { q?: Qualifier | null }) {
         </p>
       )}
     </div>
+  );
+}
+
+// The significance sentence is DERIVED from the qualifier rendered
+// immediately above it — never asserted from copy, and the
+// interval-spans-zero clause only appears when those two numbers say so.
+function SignificanceLine({ q }: { q?: Qualifier | null }) {
+  if (!q) return null;   // QualifierBlock already states it is missing
+  const spansZero = q.ci_low != null && q.ci_high != null
+    && q.ci_low <= 0 && q.ci_high >= 0;
+  if (q.significant === true) {
+    return (
+      <p className="mt-2 font-mono text-[10px] leading-relaxed text-ink-low">
+        The served qualifier marks this model result significant. It is
+        still a model readout, not a mechanically-true state.
+      </p>
+    );
+  }
+  if (q.significant === false) {
+    return (
+      <p className="mt-2 font-mono text-[10px] leading-relaxed text-warn">
+        The served qualifier marks this model result NOT statistically
+        significant
+        {spansZero && <> — the interval shown above spans zero</>}. A point
+        estimate, never an established edge.
+      </p>
+    );
+  }
+  return (
+    <p className="mt-2 font-mono text-[10px] leading-relaxed text-warn">
+      The served qualifier carries no significance flag — significance is
+      UNKNOWN here and is not assumed.
+    </p>
   );
 }
 
@@ -957,16 +1220,22 @@ function Arith({ f }: { f: Finding }) {
       return (
         <div>
           <Rule text={l.rule} />
+          <p className="mb-2 font-mono text-[10px] leading-relaxed text-skylive">
+            model diagnostic — a readout of the shadow model against the
+            book, not a mechanically-true structural state. The qualifier
+            below is the API&apos;s own, and it is what this row means.
+          </p>
           <Row k="outcome" v={l.outcome_key ?? "—"} />
           <Row k="model probability" v={numOrDash(l.model_probability)} />
           <Row k="yes_ask" v={usd(l.yes_ask_dollars)} />
           <Row k="fee" v={usd(l.fee_dollars)} />
           <Row k="net readout vs ask" v={usd(l.net_edge_dollars)}
-            tone="text-accent" />
+            tone="text-skylive" />
           <Row k="prediction run" v={numOrDash(l.prediction_run_id)} />
           <Row k="approval decision"
             v={numOrDash(l.model_approval_decision_id)} />
           <div className="mt-2"><QualifierBlock q={f.model_qualifier} /></div>
+          <SignificanceLine q={f.model_qualifier} />
         </div>
       );
     default:

@@ -11,6 +11,10 @@ import { expect, test } from "@playwright/test";
 //   - no imperative order language anywhere on the page
 //   - context findings are labelled "context — not a win"
 //   - MODEL_EDGE renders the API's qualifier verbatim
+//   - MODEL_EDGE is a MODEL DIAGNOSTIC and never appears among the
+//     structural findings, whatever its significance flag says
+//   - the served page is labelled as a page: the API's global totals ride
+//     beside the list and "showing N of M" appears whenever N < M
 //   - IN_PLAY_OVERREACTION carries its conditionality sentence
 
 const PAGE = "/bet-suggester/hunter";
@@ -37,6 +41,33 @@ const QUALIFIER = {
 };
 
 const ISO = (msAgo: number) => new Date(Date.now() - msAgo).toISOString();
+
+const ZERO_PER_TYPE = {
+  SUM_BELOW_ONE: { open: 0, expired: 0 },
+  CROSSED_BOOK: { open: 0, expired: 0 },
+  POST_CERTAINTY: { open: 0, expired: 0 },
+  WIDE_SPREAD: { open: 0, expired: 0 },
+  THIN_BOOK: { open: 0, expired: 0 },
+  IN_PLAY_OVERREACTION: { open: 0, expired: 0 },
+  MODEL_EDGE: { open: 0, expired: 0 },
+};
+
+// A record far larger than one served page: 87 findings on record.
+//   structural 52 + 17 + 2  = 71
+//   model                   =  3
+//   context     5 + 5 + 3   = 13
+const BIG_PER_TYPE = {
+  SUM_BELOW_ONE: { open: 12, expired: 40 },
+  CROSSED_BOOK: { open: 3, expired: 14 },
+  POST_CERTAINTY: { open: 0, expired: 2 },
+  WIDE_SPREAD: { open: 1, expired: 4 },
+  THIN_BOOK: { open: 2, expired: 3 },
+  IN_PLAY_OVERREACTION: { open: 1, expired: 2 },
+  MODEL_EDGE: { open: 1, expired: 2 },
+};
+
+const sumTotals = (p: Record<string, { open: number; expired: number }>) =>
+  Object.values(p).reduce((a, v) => a + v.open + v.expired, 0);
 
 function findings() {
   return [
@@ -198,6 +229,10 @@ function report(over: Record<string, unknown> = {}) {
       roster_note: "between discoveries only recently-active series are " +
         "scanned: a series going active is seen with up to 360 minutes of lag",
     },
+    // NOTE: these totals sum to 5 — exactly the 5 rows findings() serves.
+    // The default report is therefore the M == N control for the
+    // "showing N of M" qualifier: it must render WITHOUT one. Do not
+    // "tidy" these numbers; the control test asserts the premise.
     findings_per_type: {
       SUM_BELOW_ONE: { open: 1, expired: 0 },
       CROSSED_BOOK: { open: 0, expired: 1 },
@@ -359,6 +394,161 @@ test.describe("hunter panel (hermetic recorded payloads)", () => {
     await expect(card.getByText("false").first()).toBeVisible();
   });
 
+  // --- Codex finding 1: MODEL_EDGE is a model diagnostic, not a
+  // structural finding. The structural three are mechanically-true money;
+  // a model readout whose standing result is not significant must never
+  // be listed among them and inherit that standing.
+  test("a nonsignificant MODEL_EDGE renders ONLY under the model-diagnostic class",
+    async ({ page }) => {
+      await serve(page, report());
+      await page.goto(PAGE);
+
+      const structural = page.locator('div[data-finding-class="structural"]');
+      const model = page.locator('div[data-finding-class="model"]');
+      await expect(structural).toHaveCount(1);
+      await expect(model).toHaveCount(1);
+
+      // never among the structural findings
+      await expect(structural.locator('article[data-type="MODEL_EDGE"]'))
+        .toHaveCount(0);
+      const structuralTypes = await structural.locator("article")
+        .evaluateAll((els) => els.map((e) => e.getAttribute("data-type")));
+      expect(structuralTypes.sort())
+        .toEqual(["CROSSED_BOOK", "SUM_BELOW_ONE"]);
+
+      // and present, exactly once, under the diagnostic class
+      await expect(model.locator('article[data-type="MODEL_EDGE"]'))
+        .toHaveCount(1);
+      await expect(page.locator('article[data-type="MODEL_EDGE"]'))
+        .toHaveAttribute("data-finding-class", "model");
+
+      // labelled as a readout, in its own words
+      await expect(model.getByText(/model diagnostic/i).first()).toBeVisible();
+      await expect(model.getByText(/model readout · not a structural finding/i))
+        .toBeVisible();
+      await expect(model.getByText(/NOT a structural mispricing/i))
+        .toBeVisible();
+      await expect(page.getByText("model readout — not structural"))
+        .toBeVisible();
+    });
+
+  test("the diagnostic keeps its qualifier attached, verbatim, with its significance",
+    async ({ page }) => {
+      await serve(page, report());
+      await page.goto(PAGE);
+      const card = page.locator('article[data-type="MODEL_EDGE"]');
+      // the API's qualifier, rendered as served
+      await expect(card.getByText(QUALIFIER_NOTE)).toBeVisible();
+      await expect(card.getByText("edge_vs_baseline")).toBeVisible();
+      await expect(card.getByText("0.0078")).toBeVisible();
+      await expect(card.getByText("[-0.0126, 0.0282]")).toBeVisible();
+      await expect(card.getByText("n_scored")).toBeVisible();
+      await expect(card.getByText("177")).toBeVisible();
+      // and the significance said out loud, derived from those numbers
+      await expect(card.getByText(/NOT statistically significant/))
+        .toBeVisible();
+      await expect(card.getByText(/spans zero/)).toBeVisible();
+      await expect(card.getByText(/never an established edge/)).toBeVisible();
+    });
+
+  test("significance does not promote a MODEL_EDGE into the structural class",
+    async ({ page }) => {
+      const rows = findings().map((f) =>
+        f.finding_type === "MODEL_EDGE"
+          ? { ...f, model_qualifier: { ...QUALIFIER, significant: true } }
+          : f);
+      await serve(page, report({ findings: rows }));
+      await page.goto(PAGE);
+      await expect(page.locator(
+        'div[data-finding-class="structural"] article[data-type="MODEL_EDGE"]'))
+        .toHaveCount(0);
+      await expect(page.locator(
+        'div[data-finding-class="model"] article[data-type="MODEL_EDGE"]'))
+        .toHaveCount(1);
+    });
+
+  test("an unknown non-context type is never promoted to structural either",
+    async ({ page }) => {
+      const rows = [
+        { ...findings()[0], id: 99, finding_type: "SOME_NEW_TYPE",
+          is_context: false },
+        ...findings(),
+      ];
+      await serve(page, report({ findings: rows }));
+      await page.goto(PAGE);
+      await expect(page.locator(
+        'div[data-finding-class="structural"] article[data-type="SOME_NEW_TYPE"]'))
+        .toHaveCount(0);
+      await expect(page.locator(
+        'div[data-finding-class="unclassified"] article[data-type="SOME_NEW_TYPE"]'))
+        .toHaveCount(1);
+    });
+
+  // --- Codex finding 2: the served page is not the record.
+  test("a record larger than the page says 'showing N of M' and never implies completeness",
+    async ({ page }) => {
+      expect(sumTotals(BIG_PER_TYPE)).toBe(87);       // the fixture's premise
+      await serve(page, report({ findings_per_type: BIG_PER_TYPE }));
+      await page.goto(PAGE);
+
+      await expect(page.getByText(/showing 5 of 87 findings on record/i))
+        .toBeVisible();
+      await expect(page.getByText(/is NOT the complete record/i)).toBeVisible();
+
+      // the served totals ride beside the list, by class
+      const strip = page.getByTestId("served-totals");
+      await expect(strip.getByText(/rows served 5/)).toBeVisible();
+      await expect(strip.getByText(/on record 87/)).toBeVisible();
+      await expect(strip.getByText(/structural 71/)).toBeVisible();
+      await expect(strip.getByText(/model readout 3/)).toBeVisible();
+      await expect(strip.getByText(/context 13/)).toBeVisible();
+
+      // and every group carries its own denominator beside its count
+      await expect(page.locator('div[data-finding-class="structural"]')
+        .getByText(/2 shown · 71 on record/)).toBeVisible();
+      await expect(page.locator('div[data-finding-class="model"]')
+        .getByText(/1 shown · 3 on record/)).toBeVisible();
+      await expect(page.locator('div[data-finding-class="context"]')
+        .getByText(/2 shown · 13 on record/)).toBeVisible();
+    });
+
+  test("CONTROL: totals equal to the rows served render NO truncation qualifier",
+    async ({ page }) => {
+      const r = report();
+      // the control's premise: M == N, so nothing is being withheld
+      expect(sumTotals(r.findings_per_type)).toBe(r.findings.length);
+      await serve(page, r);
+      await page.goto(PAGE);
+
+      await expect(page.getByTestId("served-totals")).toBeVisible();
+      await expect(page.getByTestId("served-totals")
+        .getByText(/on record 5/)).toBeVisible();
+      await expect(page.getByText(/showing \d+ of \d+/i)).toHaveCount(0);
+      await expect(page.getByText(/not the complete record/i)).toHaveCount(0);
+    });
+
+  test("an empty PAGE over a nonempty record never reads as an empty record",
+    async ({ page }) => {
+      await serve(page, report({ findings: [],
+                                 findings_per_type: BIG_PER_TYPE }));
+      await page.goto(PAGE);
+      await expect(page.getByText(/no findings in this page — 87 on record/i))
+        .toBeVisible();
+      await expect(page.getByText(/no findings on record/i)).toHaveCount(0);
+      await expect(page.getByText(/showing 0 of 87/i)).toBeVisible();
+    });
+
+  test("no per-type totals served: completeness is UNKNOWN, never implied",
+    async ({ page }) => {
+      await serve(page, report({ findings_per_type: undefined }));
+      await page.goto(PAGE);
+      await expect(page.getByText(/how much is on record is UNKNOWN/i))
+        .toBeVisible();
+      await expect(page.getByText(/must not be read as the complete record/i))
+        .toBeVisible();
+      await expect(page.getByText(/showing \d+ of \d+/i)).toHaveCount(0);
+    });
+
   test("a MODEL_EDGE row missing its qualifier says so — never synthesized",
     async ({ page }) => {
       const rows = findings().map((f) =>
@@ -397,8 +587,10 @@ test.describe("hunter panel (hermetic recorded payloads)", () => {
       expect(body).not.toMatch(/NaN|undefined|Infinity/);
     });
 
+  // The zeroed per-type totals matter: an empty page whose totals said 5
+  // would be a record with rows we did not serve, not an empty record.
   test("empty findings still show their denominators", async ({ page }) => {
-    await serve(page, report({ findings: [] }));
+    await serve(page, report({ findings: [], findings_per_type: ZERO_PER_TYPE }));
     await page.goto(PAGE);
     await expect(page.getByText(/no findings on record/i)).toBeVisible();
     await expect(page.getByText(/412 cycles run/)).toBeVisible();
