@@ -55,6 +55,77 @@ function row(fixture_id: string, home: string, away: string,
            freshness: null, ...over };
 }
 
+// --- market-implied blocks: RECORDED backend output ------------------------
+// Copied verbatim from src.friendlies.market_implied on the same three
+// books, so these payloads are the real shape rather than a guess at it.
+// Asks 0.69 / 0.18 / 0.19 sum to $1.06 — 6c of the exchange's margin.
+const IMPLIED_PRICED = {
+  state: "priced", reason: null, basis: "yes_ask",
+  method: "proportional_normalization",
+  legs: [
+    { ticker: "KXCLUBFGAME-26JUL29LFCWRE-LFC", label: "Liverpool",
+      is_draw: false, ask_dollars: "0.6900", bid_dollars: "0.6800",
+      spread_dollars: "0.0100", implied_probability: "0.650944",
+      fee_dollars: "1.4973", cost_dollars: "70.4973",
+      breakeven_probability: "0.704973" },
+    { ticker: "KXCLUBFGAME-26JUL29LFCWRE-TIE", label: "Tie",
+      is_draw: true, ask_dollars: "0.1800", bid_dollars: "0.1600",
+      spread_dollars: "0.0200", implied_probability: "0.169811",
+      fee_dollars: "1.0332", cost_dollars: "19.0332",
+      breakeven_probability: "0.190332" },
+    { ticker: "KXCLUBFGAME-26JUL29LFCWRE-WRE", label: "Wrexham",
+      is_draw: false, ask_dollars: "0.1900", bid_dollars: "0.1300",
+      spread_dollars: "0.0600", implied_probability: "0.179245",
+      fee_dollars: "1.0773", cost_dollars: "20.0773",
+      breakeven_probability: "0.200773" },
+  ],
+  sum_ask_dollars: "1.0600", sum_bid_dollars: "0.9700",
+  overround_dollars: "0.0600", shortfall_dollars: null,
+  sum_implied_probability: "1.000000",
+  residue_rule: "largest_leg_absorbs_rounding_residue",
+  fee_reference_contracts: 100,
+  fee_policy_version: "kalshi-fee-2026-07-general",
+  freshness: { state: "fresh", age_seconds: 0 },
+  captured_at: "2026-07-29T18:41:03+00:00",
+};
+
+// asks 0.60 / 0.18 / 0.14 = $0.92 — the SUM_BELOW_ONE shape, returned
+// with NO probability set (normalizing it upward would launder a
+// structural anomaly into a comfortable percentage)
+const IMPLIED_BELOW_ONE = {
+  ...IMPLIED_PRICED,
+  state: "sum_below_one", reason: "asks_sum_below_one", method: null,
+  legs: IMPLIED_PRICED.legs.map((l) => ({ ...l,
+    implied_probability: null })),
+  sum_ask_dollars: "0.9200", sum_bid_dollars: "0.8700",
+  overround_dollars: "-0.0800", shortfall_dollars: "0.0800",
+  sum_implied_probability: null, residue_rule: null,
+};
+
+// two legs only — incomplete, and NEVER renormalized into a 3-way
+const IMPLIED_INCOMPLETE = {
+  ...IMPLIED_PRICED,
+  state: "incomplete", reason: "leg_count", method: null,
+  legs: IMPLIED_PRICED.legs.slice(0, 2).map((l) => ({ ...l,
+    implied_probability: null })),
+  sum_ask_dollars: "0.8700", sum_bid_dollars: "0.8400",
+  overround_dollars: null, sum_implied_probability: null,
+  residue_rule: null,
+};
+
+const IMPLIED_STALE = {
+  ...IMPLIED_PRICED,
+  freshness: { state: "stale", age_seconds: 42 },
+};
+
+// Words that would relabel Kalshi's arithmetic as this platform's
+// claim. Banned INSIDE the implied block and on the card around it.
+// (The page-level framing block legitimately says "no model runs here"
+// and "forecast evidence" — that is a denial, and it lives far from
+// these numbers. Hence the scoped assertion.)
+const FORECAST_WORDS =
+  /prediction|predicted|predicts|forecast|model|edge|fair value/i;
+
 type ServeOpts = {
   scoreboard?: unknown;
   markets?: unknown;
@@ -323,6 +394,186 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
     await page.goto("/bet-suggester/friendlies");
     await expect(page.getByText(/backend unreachable/i)).toBeVisible();
   });
+
+  // --- market-implied probabilities ---------------------------------------
+  // Arithmetic on Kalshi's own asks, rendered beside a mapped fixture.
+  // These tests assert the LABELLING as hard as the numbers, because the
+  // only thing separating "the book prices Liverpool at 65.1%" from a
+  // forecast this platform cannot produce is what the page calls it.
+
+  test("market-implied probabilities render, labelled as the market's own",
+    async ({ page }) => {
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("20", NOW(), "Liverpool", "Wrexham")] },
+        markets: { fixtures: [
+          row("20", "Liverpool", "Wrexham", "mapped",
+              { book: BOOK, candidates: [BOOK.event_ticker],
+                implied: IMPLIED_PRICED }),
+        ], listed: null },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      const block = page.getByTestId("market-implied");
+      await expect(block).toBeVisible();
+      const txt = await block.innerText();
+      // called what it is, and attributed to the book + our read time
+      expect(txt).toMatch(/market-implied/i);
+      expect(txt).toMatch(/vig stripped/i);
+      expect(txt).toMatch(/kalshi's own asks/i);
+      expect(txt).toMatch(/read \d/i);
+      expect(txt).toMatch(/this site does the arithmetic, not the pricing/i);
+      // the vig-stripped set, proportional to the asks
+      expect(txt).toMatch(/65\.1%/);
+      expect(txt).toMatch(/17\.0%/);
+      expect(txt).toMatch(/17\.9%/);
+      expect(txt).not.toMatch(/NaN|undefined|Infinity/);
+    });
+
+  test("the vig removed and the spreads render beside the percentages",
+    async ({ page }) => {
+      // a clean percentage with the margin and the spread hidden would
+      // overstate how precise the number is
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("21", NOW(), "Liverpool", "Wrexham")] },
+        markets: { fixtures: [
+          row("21", "Liverpool", "Wrexham", "mapped",
+              { book: BOOK, candidates: [BOOK.event_ticker],
+                implied: IMPLIED_PRICED }),
+        ], listed: null },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      const txt = await page.getByTestId("market-implied").innerText();
+      expect(txt).toMatch(/6¢ of margin removed from 106¢ of asks/i);
+      expect(txt).toMatch(/spreads 1–6¢/);
+      // and the fee-adjusted breakeven, stated as unattainable
+      expect(txt).toMatch(/70¢/);
+      expect(txt).toMatch(/breakeven = ask \+ kalshi's taker fee/i);
+      expect(txt).toMatch(/not prices anyone can get/i);
+      expect(txt).toMatch(/100-contract order/i);
+    });
+
+  test("ACCEPTANCE 6: no forecast vocabulary anywhere near these numbers",
+    async ({ page }) => {
+      // static assertion over the RENDERED output: neither the implied
+      // block nor the card around it may say prediction / forecast /
+      // model / edge / fair value. The page-level framing block still
+      // must (and does) say no model runs here — that is a denial, and
+      // it sits far from the numbers.
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("22", NOW(), "Liverpool", "Wrexham")] },
+        markets: { fixtures: [
+          row("22", "Liverpool", "Wrexham", "mapped",
+              { book: BOOK, candidates: [BOOK.event_ticker],
+                implied: IMPLIED_PRICED }),
+        ], listed: null },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      const block = page.getByTestId("market-implied");
+      await expect(block).toBeVisible();
+      expect(await block.innerText()).not.toMatch(FORECAST_WORDS);
+      const card = page.locator("div.rounded-xl", { hasText: "Liverpool" });
+      expect(await card.innerText()).not.toMatch(FORECAST_WORDS);
+      // no bare directives either (the standing invariant)
+      expect(await card.innerText()).not.toMatch(/\b(TAKE|BUY|SELL)\b/);
+      // ...and the page has NOT quietly dropped the modelless framing
+      const body = await page.locator("body").innerText();
+      expect(body).toMatch(/no model runs here, and none is planned/i);
+      expect(body).toMatch(/the market's own view, not this site's/i);
+    });
+
+  test("the framing block adds whose view these numbers are",
+    async ({ page }) => {
+      await serve(page);
+      await page.goto("/bet-suggester/friendlies");
+      const body = await page.locator("body").innerText();
+      // both claims, together: no model here, AND the numbers are the
+      // market's rather than ours
+      expect(body).toMatch(/no model runs here, and none is planned/i);
+      expect(body).toMatch(/probabilities that book implies/i);
+      expect(body).toMatch(/the market's own view, not this site's/i);
+      expect(body).not.toMatch(/\b(TAKE|BUY|SELL)\b/);
+    });
+
+  test("ACCEPTANCE 5: a stale book's implied numbers are visibly stale",
+    async ({ page }) => {
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("23", NOW(), "Liverpool", "Wrexham")] },
+        markets: { fixtures: [
+          row("23", "Liverpool", "Wrexham", "mapped",
+              { book: BOOK, candidates: [BOOK.event_ticker],
+                freshness: { state: "stale", age_seconds: 42 },
+                implied: IMPLIED_STALE }),
+        ], listed: null },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      const txt = await page.getByTestId("market-implied").innerText();
+      // the staleness is INSIDE the implied block, not only on the book
+      expect(txt).toMatch(/stale book/i);
+      expect(txt).toMatch(/42s old/i);
+      expect(txt).toMatch(/65\.1%/);       // still shown, but marked
+    });
+
+  test("ACCEPTANCE 3: an incomplete book shows NO implied probabilities",
+    async ({ page }) => {
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("24", NOW(), "Liverpool", "Wrexham")] },
+        markets: { fixtures: [
+          row("24", "Liverpool", "Wrexham", "mapped",
+              { book: BOOK, candidates: [BOOK.event_ticker],
+                implied: IMPLIED_INCOMPLETE }),
+        ], listed: null },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      const txt = await page.getByTestId("market-implied").innerText();
+      expect(txt).toMatch(/book incomplete/i);
+      expect(txt).toMatch(/not three legs/i);
+      expect(txt).toMatch(/no implied probabilities computed/i);
+      // NOT a 2-way renormalized into a 3-way: no percentage at all
+      expect(txt).not.toMatch(/%/);
+      expect(txt).not.toMatch(FORECAST_WORDS);
+    });
+
+  test("ACCEPTANCE 2: asks under $1 show the anomaly, nothing normalized",
+    async ({ page }) => {
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("25", NOW(), "Liverpool", "Wrexham")] },
+        markets: { fixtures: [
+          row("25", "Liverpool", "Wrexham", "mapped",
+              { book: BOOK, candidates: [BOOK.event_ticker],
+                implied: IMPLIED_BELOW_ONE }),
+        ], listed: null },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      const txt = await page.getByTestId("market-implied").innerText();
+      expect(txt).toMatch(/asks sum to 92¢/i);
+      expect(txt).toMatch(/under \$1/i);
+      expect(txt).toMatch(/structural anomaly/i);
+      expect(txt).toMatch(/nothing normalized/i);
+      // no probability set exists, so none renders
+      expect(txt).not.toMatch(/%/);
+      expect(txt).not.toMatch(FORECAST_WORDS);
+    });
+
+  test("a non-mapped fixture renders no implied block at all",
+    async ({ page }) => {
+      // the mapping status already says why in words; an empty block
+      // would invite a zero bar that reads as a real number
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("26", NOW(), "Al Nassr", "Mérida")] },
+        markets: { fixtures: [
+          row("26", "Al Nassr", "Mérida", "unmapped", { implied: null }),
+        ], listed: null },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      await expect(page.getByText(/no kalshi book matched/i)).toBeVisible();
+      await expect(page.getByTestId("market-implied")).toHaveCount(0);
+    });
 
   test("the board links to the friendlies page", async ({ page }) => {
     // the board itself talks to the WC26 + MLS APIs; abort them so this
