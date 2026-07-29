@@ -276,8 +276,18 @@ export default function HunterPanel() {
     load();
     const poll = setInterval(load, 60_000);
     const tick = setInterval(() => setNowMs(Date.now()), 1000);
-    setNowMs(Date.now());
-    return () => { alive = false; clearInterval(poll); clearInterval(tick); };
+    // Seed the clock on the next frame rather than synchronously in the
+    // effect body (react-hooks/set-state-in-effect) — the same idiom
+    // ui.tsx already uses. SSR must not depend on the viewer's clock
+    // (AGENTS §5), so nowMs stays 0 until the client has painted once;
+    // the heartbeat falls back to the API's own age_seconds until then.
+    const seed = requestAnimationFrame(() => setNowMs(Date.now()));
+    return () => {
+      alive = false;
+      cancelAnimationFrame(seed);
+      clearInterval(poll);
+      clearInterval(tick);
+    };
   }, []);
 
   const activeSection = useScrollSpy(
