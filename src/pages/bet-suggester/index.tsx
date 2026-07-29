@@ -433,6 +433,10 @@ export default function BetSuggesterDashboard() {
             <NavChip href="/bet-suggester/bots" active={false}>Bots</NavChip>
           </>
         )}
+        {/* Not a league mode: friendlies are a viewer-only surface (no
+            model, ever), so they get a chip off the board rather than a
+            place in the league carousel. */}
+        <NavChip href="/bet-suggester/friendlies" active={false}>Friendlies</NavChip>
       </TopBar>
 
       {fxOn && <LeagueFX key={fxKey} id={league.id} />}

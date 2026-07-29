@@ -6,6 +6,7 @@
 // recommendation, and real-money signals stay disabled server-side.
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { dayKeyOf, dayLabel, fmtDate, groupByDay, localDay } from "../lib/matchday";
 import { Eyebrow, Reveal } from "./ui";
 
 type Side = { name?: string; short?: string; abbrev?: string; logo?: string;
@@ -192,47 +193,9 @@ function Empty({ children }: { children: React.ReactNode }) {
   );
 }
 
-// One date formatter for the whole dashboard, in the VIEWER's timezone.
-// `month: "short"` is used on the fixture cards because a bare 7/29 is
-// ambiguous outside the US and the card has room for three letters.
-// Local calendar-day identity. Deliberately not the ISO date: the wire
-// format is UTC, and a 23:30Z kickoff and a 00:30Z one are the same
-// evening in the Americas.
-const dayKeyOf = (d: Date) =>
-  `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-
-function localDay(iso: string) {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "" : dayKeyOf(d);
-}
-
-function dayLabel(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString(undefined, {
-    weekday: "long", month: "short", day: "numeric",
-  });
-}
-
-function groupByDay(fixtures: Fixture[]) {
-  const groups = new Map<string, Fixture[]>();
-  for (const f of [...fixtures].sort((a, b) => a.date.localeCompare(b.date))) {
-    const list = groups.get(localDay(f.date));
-    if (list) list.push(f);
-    else groups.set(localDay(f.date), [f]);
-  }
-  return [...groups.entries()].map(([key, list]) => ({ key, list }));
-}
-
-function fmtDate(iso?: string, month: "short" | "numeric" = "numeric") {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleString(undefined, {
-    weekday: "short", month, day: "numeric",
-    hour: "numeric", minute: "2-digit",
-  });
-}
+// Date/matchday helpers live in ../lib/matchday — extracted (verbatim)
+// so the friendlies page imports the grouping rules instead of copying
+// them. See that module for the two defects they encode.
 
 function TeamLine({ s, live }: { s: Side; live: boolean }) {
   return (
