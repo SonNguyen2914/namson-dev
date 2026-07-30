@@ -469,7 +469,15 @@ export default function BetSuggesterDashboard() {
             model, ever), so they get a chip off the board rather than a
             place in the league carousel. */}
         <NavChip href="/bet-suggester/friendlies" active={false}>Friendlies</NavChip>
-        <NavChip href="/bet-suggester/ecl" active={false}>Conference</NavChip>
+        {/* Viewer competitions: fixtures + Kalshi + strength read, no
+            model. One shared page at /bet-suggester/comp/[key]. */}
+        {[["ecl", "Conference"], ["uel", "Europa"], ["ucl", "UCL"],
+          ["brasileirao", "Brasileirão"], ["argentina", "Argentina"],
+          ["usl", "USL"]].map(([k, label]) => (
+          <NavChip key={k} href={`/bet-suggester/comp/${k}`} active={false}>
+            {label}
+          </NavChip>
+        ))}
       </TopBar>
 
       {fxOn && <LeagueFX key={fxKey} id={league.id} />}
