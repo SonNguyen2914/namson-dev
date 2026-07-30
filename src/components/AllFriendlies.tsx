@@ -13,6 +13,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { dayLabel, groupByDay } from "../lib/matchday";
 import { Eyebrow } from "./ui";
 
 type Side = { name?: string; crest?: string | null };
@@ -27,6 +28,9 @@ type Strength = {
   away?: { rated?: boolean; reason?: string; reason_words?: string;
            elo?: number; league_level?: string | null;
            country?: string | null };
+};
+type KalshiOnly = {
+  event_ticker: string; title?: string; means?: string;
 };
 type Row = {
   fixture_id: number;
@@ -86,7 +90,11 @@ function StrengthCell({ s }: { s?: Strength }) {
 
 export default function AllFriendlies() {
   const [rows, setRows] = useState<Row[]>([]);
-  const [meta, setMeta] = useState<{ count?: number; registry?: boolean }>({});
+  const [meta, setMeta] = useState<{
+    count?: number; registry?: boolean; finishedHidden?: number;
+    kalshiTradeable?: number | null; kalshiListed?: number | null;
+  }>({});
+  const [kalshiOnly, setKalshiOnly] = useState<KalshiOnly[]>([]);
   const [err, setErr] = useState<string | null>(null);
   // Defaults to TRUE. Chronological order puts the obscure
   // fixtures first (reserve sides, third tiers), so opening on
@@ -103,7 +111,11 @@ export default function AllFriendlies() {
         .then((d) => {
           if (!alive) return;
           setRows(d.fixtures || []);
-          setMeta({ count: d.count, registry: d.kalshi_registry_read });
+          setKalshiOnly(d.kalshi_only || []);
+          setMeta({ count: d.count, registry: d.kalshi_registry_read,
+            finishedHidden: d.finished_hidden,
+            kalshiTradeable: d.kalshi_tradeable_total,
+            kalshiListed: d.kalshi_listed_total });
           setErr(null);
         })
         .catch(() => alive && setErr("fixtures unavailable"));
@@ -117,6 +129,11 @@ export default function AllFriendlies() {
     ? rows.filter((r) => r.strength?.available)
     : rows;
   const ratedCount = rows.filter((r) => r.strength?.available).length;
+  // groupByDay wants {id, date}; the row travels alongside so the render
+  // does not have to look it up again.
+  const groups = groupByDay(shown.map((r) => ({
+    id: String(r.fixture_id), date: r.kickoff_utc || "", row: r,
+  })).filter((x) => x.date));
 
   return (
     <section className="mt-14">
@@ -130,7 +147,11 @@ export default function AllFriendlies() {
 
       <div className="mt-4 flex flex-wrap items-center gap-3 font-mono text-[10px] uppercase tracking-wide">
         <span className="text-ink-faint">
-          {meta.count ?? 0} matches · {ratedCount} with a strength read
+          {meta.count ?? 0} upcoming · {ratedCount} with a strength read
+          {meta.finishedHidden
+            ? ` · ${meta.finishedHidden} finished hidden` : ""}
+          {meta.kalshiTradeable != null
+            ? ` · ${meta.kalshiTradeable} tradeable on kalshi` : ""}
         </span>
         <button onClick={() => setOnlyRated((v) => !v)}
           className={`rounded-md border px-2 py-1 ${onlyRated
@@ -157,40 +178,101 @@ export default function AllFriendlies() {
         </p>
       )}
 
-      <div className="mt-4 divide-y divide-line overflow-hidden rounded-xl border border-line">
-        {shown.map((r) => (
-          <Link key={r.fixture_id}
-            href={`/bet-suggester/friendlies/${r.fixture_id}`}
-            className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-elev">
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm text-ink-hi">
-                {r.home?.name} <span className="text-ink-faint">v</span>{" "}
-                {r.away?.name}
-              </div>
-              <div className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-wide text-ink-faint">
-                {when(r)}
-                {r.league_name ? ` · ${r.league_name}` : ""}
-                {r.venue ? ` · ${r.venue}` : ""}
-                {r.kalshi?.state === "bridged" ? " · KALSHI BOOK" : ""}
-              </div>
-            </div>
-            <div className="shrink-0 text-right">
-              <StrengthCell s={r.strength} />
-            </div>
-          </Link>
-        ))}
-        {!shown.length && !err && (
-          <p className="px-4 py-6 text-center font-mono text-[11px] uppercase tracking-wide text-ink-faint">
-            no friendlies in this window
-          </p>
-        )}
-      </div>
+      {/* Grouped by DAY, using the shared matchday rules rather than a
+          fourth copy of them — a flat 312-row table is unreadable, and the
+          day boundary is the thing a reader actually navigates by. */}
+      {groups.map(({ key, list }) => (
+        <div key={key} className="mt-6">
+          <div className="mb-2 flex items-baseline justify-between">
+            <h3 className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">
+              {dayLabel(list[0].date)}
+            </h3>
+            <span className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+              {list.length} {list.length === 1 ? "match" : "matches"}
+            </span>
+          </div>
+          <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
+            {list.map(({ row: r }) => (
+              <Link key={r.fixture_id}
+                href={`/bet-suggester/friendlies/${r.fixture_id}`}
+                className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-elev">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm text-ink-hi">
+                    {r.home?.name} <span className="text-ink-faint">v</span>{" "}
+                    {r.away?.name}
+                  </div>
+                  <div className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+                    {when(r)}
+                    {r.league_name ? ` · ${r.league_name}` : ""}
+                    {r.venue ? ` · ${r.venue}` : ""}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2 text-right">
+                  {r.kalshi?.state === "bridged" && (
+                    <span className="rounded border border-accent/40 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-accent">
+                      book
+                    </span>
+                  )}
+                  <StrengthCell s={r.strength} />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ))}
+      {!groups.length && !err && (
+        <p className="mt-4 rounded-xl border border-line px-4 py-6 text-center font-mono text-[11px] uppercase tracking-wide text-ink-faint">
+          no upcoming friendlies in this window
+        </p>
+      )}
 
-      <p className="mt-3 font-mono text-[10px] leading-relaxed text-ink-faint">
-        strength read = clubelo.com Elo expectation, an EXPECTED POINTS
-        SHARE with draws counted as half — not a win probability, not a
-        forecast, and not a model output. Unrated clubs say why rather than
-        showing a number.
+      {/* Tradeable markets our fixture feed could not match. Shown rather
+          than dropped: this section claims to cover what the venue is
+          pricing, so an event it prices must not vanish because
+          API-Football lacks the club. */}
+      {!!kalshiOnly.length && (
+        <div className="mt-8">
+          <h3 className="font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
+            tradeable on kalshi · no fixture matched
+          </h3>
+          <div className="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line">
+            {kalshiOnly.map((k) => (
+              <div key={k.event_ticker} className="px-4 py-3">
+                <div className="truncate text-sm text-ink-mid">
+                  {k.title || k.event_ticker}
+                </div>
+                <div className="mt-0.5 font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+                  {k.event_ticker}
+                </div>
+                {k.means && (
+                  <p className="mt-1 font-mono text-[10px] leading-relaxed text-ink-faint">
+                    {k.means}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <p className="mt-4 font-mono text-[10px] leading-relaxed text-ink-faint">
+        strength read = an expected POINTS SHARE (draws counted as half)
+        from clubelo.com or worldclubratings.com, whichever covers both
+        clubs — not a win probability, not a forecast, not a model output.
+        Unrated clubs say why rather than showing a number.
+      </p>
+      {meta.kalshiListed != null && meta.kalshiTradeable != null && (
+        <p className="mt-2 font-mono text-[10px] leading-relaxed text-ink-faint">
+          kalshi carries {meta.kalshiListed} club-friendly events in total,
+          but only {meta.kalshiTradeable} have an open market — the rest are
+          settled past matches. Only the second number is a count of things
+          you could bet on now.
+        </p>
+      )}
+      <p className="mt-2 font-mono text-[10px] leading-relaxed text-ink-faint">
+        finished and cancelled matches are excluded: the fixture sweep is
+        date-scoped, so without that filter the previous day&apos;s results
+        sat at the top of the list.
       </p>
     </section>
   );
