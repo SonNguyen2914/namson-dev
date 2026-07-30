@@ -130,6 +130,7 @@ type ServeOpts = {
   scoreboard?: unknown;
   markets?: unknown;
   schedule?: unknown;
+  xg?: unknown;              // /api/xg/friendlies (league-derived xG form)
   hunter?: boolean;          // does /api/hunter/findings answer 200?
 };
 
@@ -145,6 +146,11 @@ async function serve(page: import("@playwright/test").Page,
     r.fulfill(json(opts.markets ?? { fixtures: [], listed: null })));
   await page.route("**/api/friendlies/schedule**", (r) =>
     r.fulfill(json(opts.schedule ?? { fixtures: [] })));
+  // Always stubbed, default EMPTY. Leaving it un-routed would send every
+  // existing test in this file through the app's real proxy to a live
+  // backend — exactly the live-data rot AGENTS.md warns about.
+  await page.route("**/api/xg/friendlies**", (r) =>
+    r.fulfill(json(opts.xg ?? { fixtures: [] })));
   if (opts.hunter) {
     await page.route("**/api/hunter/findings", (r) =>
       r.fulfill(json({ findings: [] })));
@@ -587,4 +593,203 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
     const chip = page.locator('a[href="/bet-suggester/friendlies"]').first();
     await expect(chip).toBeVisible();
   });
+});
+
+// --- league-derived xG form -----------------------------------------------
+//
+// Son's rule: a club's xG rating comes from the league that club plays in.
+// The thing worth testing is NOT that a number renders — it is that the page
+// cannot be read as comparing two of them, and that an absent rating says WHY
+// instead of showing a blank or a zero.
+//
+// Payloads below are the real backend shape (src.live.xg_ratings
+// .friendly_fixture_ratings), recorded rather than guessed at.
+
+const XG_DORTMUND = {
+  club: "Borussia Dortmund", rated: true, reason: null, reason_words: null,
+  league: { league_id: 78, season: 2025, league_name: "Bundesliga",
+            league_country: "Germany" },
+  rating: { team_name: "Borussia Dortmund", attack: 1.3142, defence: 0.8814,
+            n_fixtures: 34, competition_key: "api-football:78:2025",
+            league_id: 78, season: 2025, source: "api-football",
+            window_start: "2025-08-22T18:30:00+00:00",
+            window_end: "2026-04-04T13:30:00+00:00",
+            comparable_across_competitions: false },
+};
+const XG_CEREZO = {
+  club: "Cerezo Osaka", rated: true, reason: null, reason_words: null,
+  league: { league_id: 98, season: 2026, league_name: "J1 League",
+            league_country: "Japan" },
+  rating: { team_name: "Cerezo Osaka", attack: 1.0821, defence: 1.0435,
+            n_fixtures: 17, competition_key: "api-football:98:2026",
+            league_id: 98, season: 2026, source: "api-football",
+            window_start: "2026-02-06T05:00:00+00:00",
+            window_end: "2026-05-13T10:00:00+00:00",
+            comparable_across_competitions: false },
+};
+// MEASURED absent: the provider carries no xG value for the Qatar Stars
+// League at all (0/6 sampled fixtures), so Al Sadd can never be rated.
+const XG_NO_LEAGUE_DATA = {
+  club: "Al Sadd", rated: false, reason: "league_has_no_xg",
+  reason_words: "no xG data for this club's league",
+  league: { league_id: 305, season: 2025, league_name: "Stars League",
+            league_country: "Qatar" },
+  rating: null,
+};
+const XG_NOT_INDEXED = {
+  club: "Al Nassr", rated: false, reason: "league_not_indexed",
+  reason_words: "no xG data for this club's league", league: null,
+  rating: null,
+};
+const XG_THIN_SAMPLE = {
+  club: "Newport County", rated: false, reason: "insufficient_fixtures",
+  reason_words: "not enough xG fixtures to rate this club",
+  league: { league_id: 42, season: 2025, league_name: "League Two",
+            league_country: "England" },
+  rating: null,
+};
+
+function xgFixture(id: string, home: unknown, away: unknown) {
+  return {
+    espn_event_id: id, date: NOW(), name: "test",
+    home: (home as { club: string }).club,
+    away: (away as { club: string }).club,
+    xg: {
+      home, away, same_competition: false, comparable: false,
+      not_comparable_note:
+        "Ratings from different leagues are fitted on different populations " +
+        "and different scales. They are shown side by side for context only.",
+      forecast: null, forecast_available: false,
+    },
+  };
+}
+
+test.describe("league-derived xG form on friendlies", () => {
+  test("a rated club shows its own league and sample size beside its name",
+    async ({ page }) => {
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("70", NOW(), "Cerezo Osaka", "Borussia Dortmund")] },
+        xg: { fixtures: [xgFixture("70", XG_CEREZO, XG_DORTMUND)] },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      const card = page.locator("div.rounded-xl",
+                                { hasText: "Borussia Dortmund" });
+      const txt = await card.innerText();
+      // the league the rating was FITTED IN, and the n behind it
+      expect(txt).toMatch(/xG form from Bundesliga, n=34/i);
+      expect(txt).toMatch(/xG form from J1 League, n=17/i);
+      // the numbers, labelled for/against so neither reads as a probability
+      expect(txt).toMatch(/1\.31 for \/ 0\.88 against/i);
+      expect(txt).toMatch(/1\.08 for \/ 1\.04 against/i);
+      // no percentage anywhere: a rating is not a probability
+      expect(txt).not.toMatch(/\d%/);
+      expect(txt).not.toMatch(/NaN|undefined|Infinity/);
+    });
+
+  test("ACCEPTANCE: the page says the two ratings are not comparable, and "
+     + "derives no match probability from them", async ({ page }) => {
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("71", NOW(), "Cerezo Osaka", "Borussia Dortmund")] },
+        xg: { fixtures: [xgFixture("71", XG_CEREZO, XG_DORTMUND)] },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      // stated where a reader cannot miss it — in the framing block
+      const body = await page.locator("body").innerText();
+      expect(body).toMatch(/not comparable to each other/i);
+      expect(body).toMatch(/no match probability is derived from them/i);
+      // and restated on the card itself, where the temptation actually is
+      const note = page.getByTestId("xg-not-comparable");
+      await expect(note).toBeVisible();
+      const noteTxt = await note.innerText();
+      expect(noteTxt).toMatch(/not comparable/i);
+      expect(noteTxt).toMatch(/nothing about this fixture is derived/i);
+      // the card must not carry forecast vocabulary: inside a fixture card
+      // those words would relabel two leagues' form as a view of the match
+      const card = page.locator("div.rounded-xl",
+                                { hasText: "Borussia Dortmund" });
+      expect(await card.innerText()).not.toMatch(FORECAST_WORDS);
+      expect(await card.innerText()).not.toMatch(/\b(TAKE|BUY|SELL)\b/);
+    });
+
+  test("the not-comparable note appears ONLY when both clubs are rated",
+    async ({ page }) => {
+      // one rated, one not: there is no pair to compare, so the note would
+      // be noise. The refusal words carry the meaning instead.
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("72", NOW(), "Al Sadd", "Borussia Dortmund")] },
+        xg: { fixtures: [xgFixture("72", XG_NO_LEAGUE_DATA, XG_DORTMUND)] },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      await expect(page.getByTestId("xg-not-comparable")).toHaveCount(0);
+      const card = page.locator("div.rounded-xl", { hasText: "Al Sadd" });
+      expect(await card.innerText()).toMatch(/xG form from Bundesliga/i);
+    });
+
+  test("ACCEPTANCE: a club with no xG for its league says so — never a blank "
+     + "and never a zero", async ({ page }) => {
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("73", NOW(), "Al Sadd", "Al Nassr")] },
+        xg: { fixtures: [xgFixture("73", XG_NO_LEAGUE_DATA, XG_NOT_INDEXED)] },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      const card = page.locator("div.rounded-xl", { hasText: "Al Sadd" });
+      const txt = await card.innerText();
+      expect(txt).toMatch(/no xG data for this club's league/i);
+      // the failure this test exists to catch: a zero rendered as a rating
+      expect(txt).not.toMatch(/0\.00 for/);
+      expect(txt).not.toMatch(/n=0/);
+      expect(txt).not.toMatch(/NaN|undefined|Infinity|null/);
+      // and no comparison note, since there is nothing rated to compare
+      await expect(page.getByTestId("xg-not-comparable")).toHaveCount(0);
+    });
+
+  test("each refusal reason renders its OWN words, because they are "
+     + "different facts", async ({ page }) => {
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("74", NOW(), "Newport County", "Al Nassr")] },
+        xg: { fixtures: [xgFixture("74", XG_THIN_SAMPLE, XG_NOT_INDEXED)] },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      const card = page.locator("div.rounded-xl", { hasText: "Newport County" });
+      const txt = await card.innerText();
+      // 'too few matches' is NOT the same claim as 'this league has no data'
+      expect(txt).toMatch(/not enough xG fixtures to rate this club/i);
+      expect(txt).toMatch(/no xG data for this club's league/i);
+    });
+
+  test("a fixture with no xG entry at all renders no xG row", async ({ page }) => {
+      // CONTROL, not evidence: asserts an ABSENCE, so it also passes against
+      // the previous build. Kept because an empty rating row would assert a
+      // measurement the feed never delivered.
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("75", NOW(), "Liverpool", "Wrexham")] },
+        xg: { fixtures: [] },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      await expect(page.getByTestId("xg-form")).toHaveCount(0);
+      const body = await page.locator("body").innerText();
+      expect(body).not.toMatch(/NaN|undefined|Infinity/);
+    });
+
+  test("a failed xG fetch leaves the page intact and claims nothing",
+    async ({ page }) => {
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("76", NOW(), "Liverpool", "Wrexham")] },
+      });
+      await page.route("**/api/xg/friendlies**", (r) =>
+        r.fulfill({ status: 503, contentType: "application/json",
+                    body: JSON.stringify({ error: "unavailable" }) }));
+      await page.goto("/bet-suggester/friendlies");
+      await expect(page.getByText("Liverpool").first()).toBeVisible();
+      await expect(page.getByTestId("xg-form")).toHaveCount(0);
+      const body = await page.locator("body").innerText();
+      expect(body).not.toMatch(/NaN|undefined|Infinity/);
+    });
 });

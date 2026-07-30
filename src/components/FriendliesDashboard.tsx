@@ -72,12 +72,52 @@ type MappedRow = { fixture_id?: string; home?: string; away?: string;
   implied?: Implied };
 type Listed = { count?: number; truncated?: boolean; complete?: boolean };
 
+// --- league-derived xG form ------------------------------------------------
+// Son's rule: a club's xG rating comes from the league that club plays in.
+// Each rating is fitted ONLY on that league's fixtures and is relative to that
+// league's own average, so it is a statement about a club inside its own
+// competition and nowhere else.
+//
+// The consequence is the whole reason this block is careful: TWO OF THESE
+// NUMBERS CANNOT BE COMPARED. A Bundesliga 1.31 and a J1 1.08 are fitted on
+// different populations against different means; subtracting them produces a
+// figure with no referent. So the UI shows both, labels each with its league
+// and sample size, says plainly that they are not comparable, and derives no
+// match probability from them — the backend refuses that arithmetic in its own
+// types (CrossCompetitionArithmetic), and this surface must not present
+// anything that looks like the result of it.
+//
+// Every unrated club renders NAMED WORDS, never a blank and never a zero.
+// `attack`/`defence` are display-only; nothing here feeds another calculation.
+type XgRating = {
+  team_name?: string; attack: number; defence: number; n_fixtures: number;
+  competition_key?: string; league_id?: number; season?: number;
+  source?: string; window_start?: string | null; window_end?: string | null;
+  comparable_across_competitions?: boolean;
+};
+type XgSide = {
+  club?: string; rated: boolean; reason?: string | null;
+  reason_words?: string | null;
+  league?: { league_id?: number; season?: number; league_name?: string;
+    league_country?: string } | null;
+  rating?: XgRating | null;
+};
+type XgBlock = {
+  home: XgSide; away: XgSide;
+  same_competition?: boolean; comparable?: boolean;
+  not_comparable_note?: string;
+  forecast?: null; forecast_available?: boolean;
+} | null;
+type XgFixture = { espn_event_id?: string; home?: string; away?: string;
+  xg?: XgBlock };
+
 const j = (r: Response) => (r.ok ? r.json() : Promise.reject(r.status));
 
 export default function FriendliesDashboard() {
   const [today, setToday] = useState<Fixture[] | null>(null);
   const [week, setWeek] = useState<Fixture[] | null>(null);
   const [maps, setMaps] = useState<Record<string, MappedRow>>({});
+  const [xg, setXg] = useState<Record<string, XgBlock>>({});
   const [listed, setListed] = useState<Listed | null>(null);
   // 404 means the deployed backend does not serve /api/friendlies yet —
   // this page can be ahead of the API it reads. Say so in words instead
@@ -116,6 +156,18 @@ export default function FriendliesDashboard() {
           }
           setMaps(m);
           setListed(d.listed ?? null);
+        }).catch(() => {});
+      // League-derived xG form. A failure leaves the map empty, and an
+      // absent entry renders nothing at all rather than an empty rating
+      // row — the card must never imply a measurement it does not have.
+      fetch("/api/xg/friendlies?days=1").then(j)
+        .then((d) => {
+          if (!alive) return;
+          const x: Record<string, XgBlock> = {};
+          for (const row of (d.fixtures ?? []) as XgFixture[]) {
+            if (row.espn_event_id) x[row.espn_event_id] = row.xg ?? null;
+          }
+          setXg(x);
         }).catch(() => {});
     };
     load();
@@ -180,6 +232,26 @@ export default function FriendliesDashboard() {
             site&apos;s</strong> — arithmetic on prices Kalshi set, shown
             with the margin removed and the spread left visible.
           </p>
+          {/* League-derived xG form, and the constraint that governs it.
+              This is placed in the framing block — not buried under a card —
+              because a reader who takes two of these numbers as comparable
+              has been misled by the layout, and no per-card footnote fixes
+              that. The backend refuses the arithmetic in its own types; this
+              paragraph is the reader-facing half of the same rule. */}
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-hi">
+            Each club also shows its <strong>xG form from its own
+            league</strong> — expected goals created and conceded relative to
+            that league&apos;s average, fitted only on that league&apos;s
+            fixtures, with the league and the number of matches named beside
+            it.{" "}
+            <strong>The two clubs&apos; numbers are not comparable to each
+            other</strong>: they come from different leagues, fitted on
+            different populations against different averages, so the
+            difference between them would mean nothing.{" "}
+            <strong>No match probability is derived from them</strong>, here
+            or anywhere — a club whose league has no expected-goals data says
+            so in words rather than showing a blank or a zero.
+          </p>
           <p className="mt-3 max-w-2xl text-xs leading-relaxed text-ink-low">
             Prices are the exchange&apos;s own, shown ask / bid —
             observational, not advice.{" "}
@@ -223,7 +295,8 @@ export default function FriendliesDashboard() {
                   )}
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {g.list.map((f) => (
-                      <FixtureCard key={f.id} f={f} m={maps[f.id]} />
+                      <FixtureCard key={f.id} f={f} m={maps[f.id]}
+                        x={xg[f.id]} />
                     ))}
                   </div>
                 </div>
@@ -310,19 +383,75 @@ function Empty({ children }: { children: React.ReactNode }) {
   );
 }
 
-function TeamLine({ s, live }: { s: Side; live: boolean }) {
+function TeamLine({ s, live, xg }: { s: Side; live: boolean; xg?: XgSide }) {
   return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="flex min-w-0 items-center gap-2">
-        {s.logo && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={s.logo} alt="" className="h-5 w-5 shrink-0 object-contain" />
-        )}
-        <span className="truncate text-sm text-ink-hi">{s.name}</span>
-      </span>
-      <span className={`font-mono text-sm tabular-nums ${
-        live ? "text-accent" : "text-ink-hi"}`}>{s.score}</span>
+    <div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex min-w-0 items-center gap-2">
+          {s.logo && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={s.logo} alt="" className="h-5 w-5 shrink-0 object-contain" />
+          )}
+          <span className="truncate text-sm text-ink-hi">{s.name}</span>
+        </span>
+        <span className={`font-mono text-sm tabular-nums ${
+          live ? "text-accent" : "text-ink-hi"}`}>{s.score}</span>
+      </div>
+      <XgForm xg={xg} />
     </div>
+  );
+}
+
+// One club's league-derived xG form, beside its name.
+//
+// A rated club reads e.g. "xG form from Bundesliga, n=34 · 1.31 for / 0.88
+// against". An unrated one reads the REASON, in words, because the reasons are
+// different facts: a league measured to carry no expected-goals data is not the
+// same as a club with too few matches, and neither is a league we have not
+// looked at. A blank or a 0.00 would collapse all three into a number the data
+// does not support.
+//
+// Undefined (no entry at all) renders NOTHING — the ratings feed may simply not
+// have loaded, and an empty row would assert an absence we cannot claim.
+function XgForm({ xg }: { xg?: XgSide }) {
+  if (!xg) return null;
+  if (!xg.rated) {
+    return (
+      <p data-testid="xg-form"
+        className="mt-0.5 font-mono text-[9px] uppercase tracking-wide text-ink-faint">
+        {xg.reason_words || "no xG form available"}
+      </p>
+    );
+  }
+  const r = xg.rating!;
+  const league = xg.league?.league_name || `league ${r.league_id}`;
+  return (
+    <p data-testid="xg-form"
+      className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 font-mono text-[9px] uppercase tracking-wide text-ink-faint">
+      <span>
+        xG form from {league}, n={r.n_fixtures}
+      </span>
+      <span className="tabular-nums text-ink-low">
+        {r.attack.toFixed(2)} for / {r.defence.toFixed(2)} against
+      </span>
+    </p>
+  );
+}
+
+// The card-level restatement of the constraint, rendered only where BOTH clubs
+// actually carry a rating — which is the only situation in which a reader could
+// be tempted to compare them. Wording is deliberately plain and deliberately
+// free of forecast vocabulary: inside a fixture card, those words would relabel
+// two leagues' form as a view about the match.
+function XgNotComparable({ x }: { x?: XgBlock }) {
+  if (!x || !x.home?.rated || !x.away?.rated) return null;
+  return (
+    <p data-testid="xg-not-comparable"
+      className="mt-1.5 rounded-lg border border-dashed border-line px-2 py-1 font-mono text-[9px] leading-relaxed text-ink-faint">
+      the two figures above are <strong>not comparable</strong> — each is
+      relative to its own league&apos;s average, on a different set of
+      matches. nothing about this fixture is derived from them.
+    </p>
   );
 }
 
@@ -524,7 +653,7 @@ function readAt(iso?: string | null) {
   return `, read ${d.toLocaleTimeString()}`;
 }
 
-function FixtureCard({ f, m }: { f: Fixture; m?: MappedRow }) {
+function FixtureCard({ f, m, x }: { f: Fixture; m?: MappedRow; x?: XgBlock }) {
   const live = f.state === "in";
   // A finished match keeps its result detail (FT); anything not yet
   // under way shows WHEN it kicks off (local time — rendered only
@@ -535,9 +664,10 @@ function FixtureCard({ f, m }: { f: Fixture; m?: MappedRow }) {
   return (
     <div className={`rounded-xl border p-3 ${
       live ? "glow glow-accent border-accent/40 bg-elev" : "border-line"}`}>
-      <TeamLine s={f.home} live={live} />
+      <TeamLine s={f.home} live={live} xg={x?.home} />
       <div className="my-1.5 h-px bg-line" />
-      <TeamLine s={f.away} live={live} />
+      <TeamLine s={f.away} live={live} xg={x?.away} />
+      <XgNotComparable x={x} />
       <div className="mt-2 flex justify-between font-mono text-[10px] uppercase tracking-wide text-ink-faint">
         <span className={live ? "text-accent" : undefined}>
           {live ? `LIVE ${f.minute ?? ""}` : when}
