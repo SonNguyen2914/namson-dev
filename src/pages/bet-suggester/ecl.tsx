@@ -73,30 +73,46 @@ function when(f: Fixture) {
   });
 }
 
+
+/** A compact club label for a narrow row: the most distinctive word, so
+ *  "Borussia Dortmund" reads DORTMUND and "FC Augsburg" reads AUGSBURG
+ *  rather than both collapsing to a generic prefix. */
+function shortClub(name?: string) {
+  if (!name) return "";
+  const drop = new Set(["fc", "cf", "afc", "sc", "ac", "as", "ss", "ssc",
+    "club", "cd", "sd", "ca", "fk", "sk", "bk", "if", "ks", "de", "the"]);
+  const words = name.split(/[\s.]+/).filter((w) => w
+    && !drop.has(w.toLowerCase().replace(/[^a-z]/g, "")));
+  const pick = words.sort((a, b) => b.length - a.length)[0] || name;
+  return pick.slice(0, 9).toUpperCase();
+}
+
 /** The strength read, or the NAMED reason there is none — never a blank and
- *  never a 50% stand-in, since an unreadable pairing has to look different
- *  from an evenly-matched one. */
-function Read({ s }: { s?: Strength }) {
+ *  never a 50% stand-in. Each percentage carries its own club, because a
+ *  bare "71% / 29%" on a row does not say which side is which. */
+function Read({ s, home, away }: {
+  s?: Strength; home?: string; away?: string;
+}) {
   const e = s?.expected_points_share;
   if (!e) {
-    const why = s?.home?.rated === false
-      ? s?.home?.reason : s?.away?.reason;
+    const why = s?.home?.rated === false ? s?.home?.reason : s?.away?.reason;
     return (
       <span className="font-mono text-[10px] text-ink-faint"
         title={s?.home?.reason_words || s?.away?.reason_words || ""}>
-        {why === "name_ambiguous" ? "ambiguous club name" : "no read"}
+        {why === "name_ambiguous" ? "ambiguous name" : "no read"}
       </span>
     );
   }
-  const d = s?.rating_difference ?? s?.elo_difference;
+  const hi = e.home >= e.away;
   return (
-    <span className="font-mono text-[11px] text-ink-hi">
-      {(e.home * 100).toFixed(0)}% / {(e.away * 100).toFixed(0)}%
-      {typeof d === "number" && (
-        <span className="pl-1.5 text-ink-faint">
-          Δ{d > 0 ? "+" : ""}{d.toFixed(0)}
-        </span>
-      )}
+    <span className="whitespace-nowrap font-mono text-[10px]">
+      <span className={hi ? "text-accent" : "text-ink-low"}>
+        {shortClub(s?.home?.club || home)} {(e.home * 100).toFixed(0)}%
+      </span>
+      <span className="px-1 text-ink-faint">·</span>
+      <span className={!hi ? "text-accent" : "text-ink-low"}>
+        {(e.away * 100).toFixed(0)}% {shortClub(s?.away?.club || away)}
+      </span>
     </span>
   );
 }
@@ -240,7 +256,7 @@ export default function EclHub() {
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
-                      <Read s={f.strength} />
+                      <Read s={f.strength} home={f.home?.name} away={f.away?.name} />
                     </div>
                   </div>
                 ))}
