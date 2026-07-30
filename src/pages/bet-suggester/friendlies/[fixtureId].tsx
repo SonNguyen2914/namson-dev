@@ -37,16 +37,27 @@ type Strength = {
 };
 type SideRating = {
   club?: string; rated?: boolean; reason?: string; reason_words?: string;
-  elo?: number; country?: string | null; league_level?: string | null;
+  // `rating`, not `elo`: the backend serves one field for both providers
+  // since their scales differ (ClubElo 400 / worldclubratings 600). Reading
+  // `elo` here is why every club panel rendered a blank value next to its
+  // label.
+  rating?: number; source?: string; scale?: string;
+  provider_rank?: number | null; provider_id?: string;
+  country?: string | null; league_level?: string | null;
   match_tier?: string;
 };
+// The real shape, read off the served payload rather than assumed:
+// books.book.markets[] with `label` / `yes_ask` / `yes_bid`. A first pass
+// guessed `markets[].yes_sub_title` / `yes_ask_dollars` and rendered an
+// empty table for every fixture that HAD a book.
 type BookRow = {
-  ticker?: string; yes_sub_title?: string;
-  yes_ask_dollars?: string | null; yes_bid_dollars?: string | null;
+  ticker?: string; label?: string; status?: string;
+  yes_ask?: string | null; yes_bid?: string | null;
 };
 type Books = {
-  status?: string; means?: string;
-  markets?: BookRow[]; families?: Record<string, BookRow[]>;
+  status?: string; means?: string; event_ticker?: string;
+  book?: { event_ticker?: string; title?: string; markets?: BookRow[] };
+  freshness?: { state?: string; age_seconds?: number | null };
 };
 type Detail = {
   fixture?: {
@@ -109,7 +120,7 @@ function TeamRow({ s, goals, live }: {
 function MarketVsStrength({ books, strength }: {
   books?: Books; strength?: Strength;
 }) {
-  const rows = books?.markets || [];
+  const rows = books?.book?.markets || [];
   const e = strength?.expected_points_share;
   return (
     <section className="mt-10">
@@ -120,10 +131,10 @@ function MarketVsStrength({ books, strength }: {
 
       {(!rows.length) && (
         <p className="mt-4 rounded-xl border border-line bg-elev px-4 py-4 font-mono text-[11px] uppercase leading-relaxed tracking-wide text-ink-faint">
-          {books?.status === "unavailable"
-            ? (books.means
-               || "the book could not be read — not “no book exists”")
-            : "no kalshi book matched this fixture"}
+          {books?.means
+            || (books?.status === "no_event_bridged"
+              ? "no tradeable kalshi event bridges to this fixture"
+              : "the book could not be read — not “no book exists”")}
         </p>
       )}
 
@@ -141,17 +152,17 @@ function MarketVsStrength({ books, strength }: {
             </thead>
             <tbody>
               {rows.map((m, i) => {
-                const p = impliedFromAsk(m.yes_ask_dollars);
+                const p = impliedFromAsk(m.yes_ask);
                 return (
                   <tr key={m.ticker ?? i} className="border-b border-line/60">
                     <td className="py-2 text-ink-mid">
-                      {m.yes_sub_title ?? m.ticker}
+                      {m.label ?? m.ticker}
                     </td>
                     <td className="py-2 text-right font-mono text-ink-hi">
-                      {cents(m.yes_ask_dollars)}
+                      {cents(m.yes_ask)}
                     </td>
                     <td className="py-2 text-right font-mono text-ink-low">
-                      {cents(m.yes_bid_dollars)}
+                      {cents(m.yes_bid)}
                     </td>
                     <td className="py-2 text-right font-mono text-ink-mid">
                       {p === null ? "—" : `${(p * 100).toFixed(1)}%`}
@@ -240,27 +251,54 @@ function MarketVsStrength({ books, strength }: {
 }
 
 function ClubProfile({ r, label }: { r?: SideRating; label: string }) {
+  const src = r?.source === "worldclubratings" ? "worldclubratings"
+    : r?.source === "clubelo" ? "clubelo" : null;
   return (
     <div className="rounded-xl border border-line p-3">
-      <div className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">
-        {label}
+      <div className="flex items-baseline justify-between">
+        <span className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+          {label}
+        </span>
+        {src && (
+          <span className="font-mono text-[9px] uppercase tracking-wide text-ink-faint">
+            {src}
+          </span>
+        )}
       </div>
       <div className="mt-1 truncate text-sm text-ink-hi">{r?.club ?? "—"}</div>
       {r?.rated ? (
-        <dl className="mt-2 space-y-1 font-mono text-[10px] text-ink-low">
-          <div className="flex justify-between">
-            <dt>elo</dt><dd className="text-ink-mid">{r.elo?.toFixed(0)}</dd>
+        <>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="font-mono text-2xl text-accent">
+              {r.rating?.toFixed(0) ?? "—"}
+            </span>
+            <span className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+              {r.scale === "fifa_adapted_600" ? "pts · fifa-adapted"
+                : "elo"}
+            </span>
           </div>
-          <div className="flex justify-between">
-            <dt>country</dt><dd>{r.country ?? "—"}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt>league tier</dt><dd>{r.league_level ?? "—"}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt>name match</dt><dd>{r.match_tier ?? "—"}</dd>
-          </div>
-        </dl>
+          <dl className="mt-2 space-y-1 font-mono text-[10px] text-ink-low">
+            {r.provider_rank != null && (
+              <div className="flex justify-between">
+                <dt>world rank</dt><dd className="text-ink-mid">
+                  #{r.provider_rank}</dd>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <dt>country</dt><dd className="text-ink-mid">
+                {r.country ?? "—"}</dd>
+            </div>
+            {r.league_level && (
+              <div className="flex justify-between">
+                <dt>league tier</dt><dd className="text-ink-mid">
+                  {r.league_level}</dd>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <dt>name match</dt><dd>{r.match_tier ?? "—"}</dd>
+            </div>
+          </dl>
+        </>
       ) : (
         <p className="mt-2 font-mono text-[10px] leading-relaxed text-ink-faint">
           {r?.reason_words || "not rated"}
@@ -347,26 +385,34 @@ export default function FriendlyMatchPage() {
 
             <MarketVsStrength books={d?.books} strength={d?.strength} />
 
-            {d?.strength?.estimate_meaning && (
-              <p className="mt-10 text-[11px] leading-relaxed text-ink-faint">
-                {d.strength.estimate_meaning}
-              </p>
-            )}
-            {d?.strength?.home_field_advantage && (
-              <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
-                Home field: {d.strength.home_field_advantage}
-              </p>
-            )}
-            {d?.strength?.attribution && (
-              <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
-                {d.strength.attribution}
-              </p>
-            )}
-            {d?.framing && (
-              <p className="mt-4 text-[11px] leading-relaxed text-ink-faint">
-                {d.framing}
-              </p>
-            )}
+            {/* One compact footer instead of five stacked paragraphs. The
+                previous version put ~250 words of disclaimer under every
+                fixture, which buried the data it was qualifying. Every
+                claim below is still made — just once, and briefly. */}
+            <details className="mt-10 rounded-xl border border-line bg-elev">
+              <summary className="cursor-pointer px-4 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
+                what these numbers are, and are not
+              </summary>
+              <div className="space-y-2 px-4 pb-4 font-mono text-[10px] leading-relaxed text-ink-faint">
+                <p>
+                  The strength read is an EXTERNAL, unevaluated orientation
+                  figure — not a forecast, not a model output, and below
+                  every evidence class an approved model here is judged
+                  against. No home-field term is applied.
+                </p>
+                <p>
+                  It is an expected POINTS share with draws counted as half,
+                  not a win probability, and carries no draw number.
+                </p>
+                <p>
+                  No difference against the market is computed: a three-way
+                  price carrying a spread and a two-way points share are not
+                  the same quantity.
+                </p>
+                {d?.strength?.attribution && <p>{d.strength.attribution}</p>}
+                {d?.strength?.as_of && <p>ratings as of {d.strength.as_of}.</p>}
+              </div>
+            </details>
           </Reveal>
         )}
       </main>
