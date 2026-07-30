@@ -16,6 +16,7 @@ import LiveScoreboard from "../../components/LiveScoreboard";
 import BracketView from "../../components/BracketView";
 import MlsDashboard from "../../components/MlsDashboard";
 import EplDashboard from "../../components/EplDashboard";
+import LaligaDashboard from "../../components/LaligaDashboard";
 import LigamxDashboard from "../../components/LigamxDashboard";
 import { Eyebrow, Flash, Reveal } from "../../components/ui";
 import { NavChip, RouteProgress, SkeletonRows, Toaster, TopBar, useScrollSpy } from "../../components/chrome";
@@ -91,6 +92,10 @@ const LEAGUES = [
     font: ligamxFont,
     tagline: "Eagle green. Two tournaments a year, open Kalshi books tonight — the model stays dark until it earns approval." },
 ];
+
+// Every league id with a real dashboard above. Kept beside the
+// dispatch so the two cannot drift.
+const BUILT_LEAGUES = new Set(["mls", "epl", "ligamx", "laliga"]);
 
 function LeagueComingSoon({ league }: { league: (typeof LEAGUES)[number] }) {
   return (
@@ -464,6 +469,7 @@ export default function BetSuggesterDashboard() {
             model, ever), so they get a chip off the board rather than a
             place in the league carousel. */}
         <NavChip href="/bet-suggester/friendlies" active={false}>Friendlies</NavChip>
+        <NavChip href="/bet-suggester/ecl" active={false}>Conference</NavChip>
       </TopBar>
 
       {fxOn && <LeagueFX key={fxKey} id={league.id} />}
@@ -542,10 +548,14 @@ export default function BetSuggesterDashboard() {
           {!isWC && league.id === "mls" && <MlsDashboard />}
           {!isWC && league.id === "epl" && <EplDashboard />}
           {!isWC && league.id === "ligamx" && <LigamxDashboard />}
-          {/* the coming-soon fallback must exclude EVERY league that now
-              has a real dashboard, or a built hub renders behind it */}
-          {!isWC && league.id !== "mls" && league.id !== "epl"
-            && league.id !== "ligamx" &&
+          {!isWC && league.id === "laliga" && <LaligaDashboard />}
+          {/* The fallback must exclude EVERY league with a real
+              dashboard, or a built hub renders behind a "coming soon"
+              card. La Liga was exactly that: its backend served all
+              five routes while this list still hid it. Derived from
+              BUILT_LEAGUES now, so adding a dashboard cannot leave the
+              fallback stale — the failure mode is silent. */}
+          {!isWC && !BUILT_LEAGUES.has(league.id) &&
             <LeagueComingSoon league={league} />}
           <div className={isWC ? undefined : "hidden"}>
           {error && (
