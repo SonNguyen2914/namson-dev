@@ -84,7 +84,7 @@ const LEAGUES = [
     ambient: "rgba(255,75,68,0.07)", modeMs: 1000,
     logo: "/leagues/laliga.png", glyph: "soft",
     font: laligaFont,
-    tagline: "Crest coral. The world champions’ home league is the obvious next room." },
+    tagline: "Crest coral. Fixtures, books and the table are live — the model stays dark until it earns approval." },
   { id: "ligamx", name: "Liga MX", top: "Liga MX · Bet Suggester",
     eyebrow: "engine adaptation · apertura 2026 · in season",
     accent: "#0fbe66", dim: "rgba(15,190,102,0.35)", faint: "rgba(15,190,102,0.10)",
