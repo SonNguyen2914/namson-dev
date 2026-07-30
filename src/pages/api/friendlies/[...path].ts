@@ -5,11 +5,16 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { proxy } from "../../../lib/suggesterProxy";
 
-const ALLOWED = new Set(["scoreboard", "schedule", "markets"]);
+// "coverage" was MISSING here, so the backend census route was
+// unreachable from the deployed frontend. "fixtures" is the hub's list.
+const ALLOWED = new Set(["scoreboard", "schedule", "markets", "coverage",
+                         "fixtures"]);
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const segs = ((req.query.path as string[]) || []).join("/");
-  const ok = ALLOWED.has(segs) || /^match\/\d{1,12}$/.test(segs);
+  const ok = ALLOWED.has(segs)
+    || /^match\/\d{1,12}$/.test(segs)
+    || /^fixtures\/\d{1,12}$/.test(segs);
   if (req.method !== "GET" || !ok) {
     return res.status(404).json({ error: "unknown friendlies route" });
   }
