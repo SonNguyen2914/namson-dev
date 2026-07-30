@@ -24,6 +24,7 @@ type Strength = {
   estimate_meaning?: string;
   available?: boolean;
   expected_points_share?: { home: number; away: number } | null;
+  rating_difference?: number | null;
   elo_difference?: number | null;
   pair_confidence?: string;
   pair_confidence_words?: string;
@@ -198,17 +199,32 @@ function MarketVsStrength({ books, strength }: {
 
         {e ? (
           <>
-            <div className="mt-3 flex h-2 overflow-hidden rounded-full border border-line">
+            {/* The club NAME sits with its own number. A bare
+                "20.5% … 79.5%" cannot be read: nothing on the bar says
+                which side is which, and the reader has to infer it from
+                row order. */}
+            <div className="mt-3 flex items-baseline justify-between gap-3">
+              <span className="min-w-0 truncate text-sm text-accent">
+                {strength?.home?.club ?? "home"}
+              </span>
+              <span className="min-w-0 truncate text-right text-sm text-ink-mid">
+                {strength?.away?.club ?? "away"}
+              </span>
+            </div>
+            <div className="mt-1.5 flex h-2 overflow-hidden rounded-full border border-line">
               <div style={{ width: `${e.home * 100}%` }}
                 className="bg-accent/70" />
               <div style={{ width: `${e.away * 100}%` }} className="bg-line" />
             </div>
-            <div className="mt-2 flex justify-between font-mono text-[11px]">
+            <div className="mt-2 flex items-baseline justify-between font-mono text-[11px]">
               <span className="text-accent">{(e.home * 100).toFixed(1)}%</span>
-              {typeof strength?.elo_difference === "number" && (
+              {typeof (strength?.rating_difference
+                ?? strength?.elo_difference) === "number" && (
                 <span className="text-ink-faint">
-                  ΔElo {strength.elo_difference > 0 ? "+" : ""}
-                  {strength.elo_difference.toFixed(0)}
+                  Δ{(strength.rating_difference
+                    ?? strength.elo_difference)! > 0 ? "+" : ""}
+                  {(strength.rating_difference
+                    ?? strength.elo_difference)!.toFixed(0)}
                 </span>
               )}
               <span className="text-ink-mid">{(e.away * 100).toFixed(1)}%</span>

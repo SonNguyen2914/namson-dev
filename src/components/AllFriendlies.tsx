@@ -17,17 +17,23 @@ import { dayLabel, groupByDay } from "../lib/matchday";
 import { Eyebrow } from "./ui";
 
 type Side = { name?: string; crest?: string | null };
+// Kept in step with the served payload. This drifted once already: after
+// the backend renamed `elo` to `rating` (one field for two providers whose
+// scales differ), this type still declared `elo` and had no `club` at all.
+type SideRating = {
+  club?: string; rated?: boolean; reason?: string; reason_words?: string;
+  rating?: number; source?: string; scale?: string;
+  provider_rank?: number | null;
+  league_level?: string | null; country?: string | null;
+};
 type Strength = {
   available?: boolean;
   expected_points_share?: { home: number; away: number } | null;
+  rating_difference?: number | null;
   elo_difference?: number | null;
-  pair_confidence?: string;
-  home?: { rated?: boolean; reason?: string; reason_words?: string;
-           elo?: number; league_level?: string | null;
-           country?: string | null };
-  away?: { rated?: boolean; reason?: string; reason_words?: string;
-           elo?: number; league_level?: string | null;
-           country?: string | null };
+  pair_confidence?: string; source?: string;
+  home?: SideRating;
+  away?: SideRating;
 };
 type KalshiOnly = {
   event_ticker: string; title?: string; means?: string;
@@ -61,29 +67,53 @@ function when(r: Row) {
 // The strength read, or the NAMED reason there isn't one. Never a blank,
 // never a dash standing in for a number, and never a 50% default — an
 // unreadable pairing has to look different from an even one.
-function StrengthCell({ s }: { s?: Strength }) {
+
+/** A compact club label for a narrow row: the most distinctive word, so
+ *  "Borussia Dortmund" reads DORTMUND and "FC Augsburg" reads AUGSBURG
+ *  rather than both collapsing to a generic prefix. */
+function shortClub(name?: string) {
+  if (!name) return "";
+  const drop = new Set(["fc", "cf", "afc", "sc", "ac", "as", "ss", "ssc",
+    "club", "cd", "sd", "ca", "fk", "sk", "bk", "if", "ks", "de", "the"]);
+  const words = name.split(/[\s.]+/).filter((w) => w
+    && !drop.has(w.toLowerCase().replace(/[^a-z]/g, "")));
+  const pick = words.sort((a, b) => b.length - a.length)[0] || name;
+  return pick.slice(0, 9).toUpperCase();
+}
+
+// The strength read, or the NAMED reason there isn't one. Never a blank,
+// never a dash standing in for a number, and never a 50% default — an
+// unreadable pairing has to look different from an even one.
+//
+// Each percentage carries its own club. A bare "20% / 80%" is unreadable
+// on a row: nothing says which side is which, and the reader has to infer
+// it from the fixture title above.
+function StrengthCell({ s, home, away }: {
+  s?: Strength; home?: string; away?: string;
+}) {
   if (!s) return <span className="text-ink-faint">—</span>;
   if (!s.available || !s.expected_points_share) {
-    const why = s.home?.rated === false ? s.home?.reason
-      : s.away?.reason;
+    const why = s.home?.rated === false ? s.home?.reason : s.away?.reason;
     return (
       <span className="font-mono text-[10px] text-ink-faint" title={
         s.home?.reason_words || s.away?.reason_words || ""}>
-        {why === "clubelo_name_unmapped" ? "no elo match"
-          : why === "clubelo_request_failed" ? "elo unread"
+        {why === "name_ambiguous" ? "ambiguous name"
+          : why === "provider_request_failed" ? "ratings unread"
             : "no strength read"}
       </span>
     );
   }
   const e = s.expected_points_share;
+  const hi = e.home >= e.away;
   return (
-    <span className="font-mono text-[11px] text-ink-hi">
-      {(e.home * 100).toFixed(0)}% / {(e.away * 100).toFixed(0)}%
-      {typeof s.elo_difference === "number" && (
-        <span className="pl-1.5 text-ink-faint">
-          ΔElo {s.elo_difference > 0 ? "+" : ""}{s.elo_difference.toFixed(0)}
-        </span>
-      )}
+    <span className="whitespace-nowrap font-mono text-[10px]">
+      <span className={hi ? "text-accent" : "text-ink-low"}>
+        {shortClub(s.home?.club || home)} {(e.home * 100).toFixed(0)}%
+      </span>
+      <span className="px-1 text-ink-faint">·</span>
+      <span className={!hi ? "text-accent" : "text-ink-low"}>
+        {(e.away * 100).toFixed(0)}% {shortClub(s.away?.club || away)}
+      </span>
     </span>
   );
 }
@@ -213,7 +243,8 @@ export default function AllFriendlies() {
                       book
                     </span>
                   )}
-                  <StrengthCell s={r.strength} />
+                  <StrengthCell s={r.strength} home={r.home?.name}
+                    away={r.away?.name} />
                 </div>
               </Link>
             ))}
