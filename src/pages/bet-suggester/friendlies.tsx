@@ -1,6 +1,7 @@
 // Club Friendlies — market viewer. Same chrome as the league hubs; the
 // honest framing (no model here, ever) lives in FriendliesDashboard.
 import Head from "next/head";
+import AllFriendlies from "../../components/AllFriendlies";
 import FriendliesDashboard from "../../components/FriendliesDashboard";
 import { RouteProgress, TopBar } from "../../components/chrome";
 import { Eyebrow } from "../../components/ui";
@@ -20,6 +21,7 @@ export default function FriendliesPage() {
         <div className="mt-10">
           <FriendliesDashboard />
         </div>
+        <AllFriendlies />
       </main>
     </div>
   );
