@@ -675,6 +675,12 @@ test.describe("league-derived xG form on friendlies", () => {
       await page.goto("/bet-suggester/friendlies");
       const card = page.locator("div.rounded-xl",
                                 { hasText: "Borussia Dortmund" });
+      // The xG feed is a SEPARATE async fetch, so every assertion about it
+      // must poll. Reading innerText() straight after goto() races the fetch
+      // and passes or fails on machine load — which is how two of these went
+      // red under a busy CPU before this wait existed.
+      await expect(card.getByTestId("xg-form").first())
+        .toContainText(/xG form from/i);
       const txt = await card.innerText();
       // the league the rating was FITTED IN, and the n behind it
       expect(txt).toMatch(/xG form from Bundesliga, n=34/i);
@@ -695,6 +701,9 @@ test.describe("league-derived xG form on friendlies", () => {
         xg: { fixtures: [xgFixture("71", XG_CEREZO, XG_DORTMUND)] },
       });
       await page.goto("/bet-suggester/friendlies");
+      // the card note proves the feed landed; assert it FIRST so the body
+      // read below cannot race the async xG fetch
+      await expect(page.getByTestId("xg-not-comparable")).toBeVisible();
       // stated where a reader cannot miss it — in the framing block
       const body = await page.locator("body").innerText();
       expect(body).toMatch(/not comparable to each other/i);
@@ -723,9 +732,16 @@ test.describe("league-derived xG form on friendlies", () => {
         xg: { fixtures: [xgFixture("72", XG_NO_LEAGUE_DATA, XG_DORTMUND)] },
       });
       await page.goto("/bet-suggester/friendlies");
-      await expect(page.getByTestId("xg-not-comparable")).toHaveCount(0);
       const card = page.locator("div.rounded-xl", { hasText: "Al Sadd" });
-      expect(await card.innerText()).toMatch(/xG form from Bundesliga/i);
+      // Wait for the fetch to LAND before asserting the note is absent —
+      // otherwise the absence is trivially true and proves nothing. Asserted
+      // on the CARD, not on the first xg-form row: the first row is the HOME
+      // side (Al Sadd, unrated), so a .first() assertion about Dortmund's
+      // league would be inspecting the wrong element entirely.
+      await expect(card).toContainText(/xG form from Bundesliga/i);
+      await expect(page.getByTestId("xg-not-comparable")).toHaveCount(0);
+      expect(await card.innerText())
+        .toMatch(/no xG data for this club's league/i);
     });
 
   test("ACCEPTANCE: a club with no xG for its league says so — never a blank "
@@ -737,6 +753,8 @@ test.describe("league-derived xG form on friendlies", () => {
       });
       await page.goto("/bet-suggester/friendlies");
       const card = page.locator("div.rounded-xl", { hasText: "Al Sadd" });
+      await expect(card.getByTestId("xg-form").first())
+        .toContainText(/no xG data for this club's league/i);
       const txt = await card.innerText();
       expect(txt).toMatch(/no xG data for this club's league/i);
       // the failure this test exists to catch: a zero rendered as a rating
@@ -756,6 +774,8 @@ test.describe("league-derived xG form on friendlies", () => {
       });
       await page.goto("/bet-suggester/friendlies");
       const card = page.locator("div.rounded-xl", { hasText: "Newport County" });
+      await expect(card.getByTestId("xg-form").first())
+        .toContainText(/not enough xG fixtures/i);
       const txt = await card.innerText();
       // 'too few matches' is NOT the same claim as 'this league has no data'
       expect(txt).toMatch(/not enough xG fixtures to rate this club/i);
@@ -772,6 +792,9 @@ test.describe("league-derived xG form on friendlies", () => {
         xg: { fixtures: [] },
       });
       await page.goto("/bet-suggester/friendlies");
+      // the fixture itself must have rendered, so the absence below is an
+      // absence of xG rows rather than an absence of the whole page
+      await expect(page.getByText("Liverpool").first()).toBeVisible();
       await expect(page.getByTestId("xg-form")).toHaveCount(0);
       const body = await page.locator("body").innerText();
       expect(body).not.toMatch(/NaN|undefined|Infinity/);
