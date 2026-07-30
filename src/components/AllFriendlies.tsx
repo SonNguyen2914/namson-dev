@@ -88,7 +88,11 @@ export default function AllFriendlies() {
   const [rows, setRows] = useState<Row[]>([]);
   const [meta, setMeta] = useState<{ count?: number; registry?: boolean }>({});
   const [err, setErr] = useState<string | null>(null);
-  const [onlyRated, setOnlyRated] = useState(false);
+  // Defaults to TRUE. Chronological order puts the obscure
+  // fixtures first (reserve sides, third tiers), so opening on
+  // "show all" meant the first screen was a wall of "no strength
+  // read" even though 83 matches had one.
+  const [onlyRated, setOnlyRated] = useState(true);
   const [days, setDays] = useState(2);
 
   useEffect(() => {
@@ -131,7 +135,7 @@ export default function AllFriendlies() {
         <button onClick={() => setOnlyRated((v) => !v)}
           className={`rounded-md border px-2 py-1 ${onlyRated
             ? "border-accent/50 text-accent" : "border-line text-ink-faint"}`}>
-          {onlyRated ? "showing rated only" : "show all"}
+          {onlyRated ? `rated only · ${ratedCount}` : `all ${meta.count ?? 0}`}
         </button>
         {[1, 2, 4, 8].map((d) => (
           <button key={d} onClick={() => setDays(d)}
@@ -167,7 +171,7 @@ export default function AllFriendlies() {
                 {when(r)}
                 {r.league_name ? ` · ${r.league_name}` : ""}
                 {r.venue ? ` · ${r.venue}` : ""}
-                {r.kalshi?.state === "bridged" ? " · kalshi book" : ""}
+                {r.kalshi?.state === "bridged" ? " · KALSHI BOOK" : ""}
               </div>
             </div>
             <div className="shrink-0 text-right">
