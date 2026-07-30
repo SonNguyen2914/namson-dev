@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="424" height="448" viewBox="0 0 424 448">
+  <title>Liga MX placeholder mark (generic — not the league's crest)</title>
+  <!-- Generic circular/wing placeholder, deliberately abstract: this is a
+       stand-in for the missing asset, not a recreation of the real Liga MX
+       crest. Drop the official mark in per public/leagues/README.md
+       whenever one is licensed. -->
+  <circle cx="212" cy="212" r="188" fill="none" stroke="#fff" stroke-width="14"/>
+  <path d="M212,96 L268,180 L316,164 L268,232 L296,308 L212,268 L128,308 L156,232 L108,164 L156,180 Z"
+        fill="#fff"/>
+</svg>

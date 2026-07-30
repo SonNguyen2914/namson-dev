@@ -87,7 +87,7 @@ const LEAGUES = [
     eyebrow: "engine adaptation · apertura 2026 · in season",
     accent: "#0fbe66", dim: "rgba(15,190,102,0.35)", faint: "rgba(15,190,102,0.10)",
     ambient: "rgba(15,190,102,0.07)", modeMs: 900,
-    logo: "/leagues/ligamx.png", glyph: "soft",
+    logo: "/leagues/ligamx.svg", glyph: "soft",
     font: ligamxFont,
     tagline: "Eagle green. Two tournaments a year, open Kalshi books tonight — the model stays dark until it earns approval." },
 ];
