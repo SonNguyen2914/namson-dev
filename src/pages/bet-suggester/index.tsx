@@ -4,7 +4,7 @@
 // zone for the ranking board. One accent, gray hierarchy, mono for data.
 // Scoped to this route so it doesn't fight the rest of the portfolio.
 import Head from "next/head";
-import { Anton, Baloo_2, Exo_2, Poppins } from "next/font/google";
+import { Anton, Archivo, Baloo_2, Exo_2, Poppins } from "next/font/google";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { CSSProperties, useCallback, useEffect, useRef, useState } from "react";
@@ -16,6 +16,7 @@ import LiveScoreboard from "../../components/LiveScoreboard";
 import BracketView from "../../components/BracketView";
 import MlsDashboard from "../../components/MlsDashboard";
 import EplDashboard from "../../components/EplDashboard";
+import LigamxDashboard from "../../components/LigamxDashboard";
 import { Eyebrow, Flash, Reveal } from "../../components/ui";
 import { NavChip, RouteProgress, SkeletonRows, Toaster, TopBar, useScrollSpy } from "../../components/chrome";
 
@@ -46,6 +47,8 @@ const wcFont = Anton({ weight: "400", subsets: ["latin"] });
 const mlsFont = Exo_2({ weight: "800", style: "italic", subsets: ["latin"] });
 const eplFont = Poppins({ weight: "600", subsets: ["latin"] });
 const laligaFont = Baloo_2({ weight: "700", subsets: ["latin"] });
+// Liga MX's wordmark is a heavy geometric sans — Archivo's 800 sits close.
+const ligamxFont = Archivo({ weight: "800", subsets: ["latin"] });
 
 // League "drive modes": each carries the primary color of its competition's
 // logo (tuned where needed so the accent reads on the near-black canvas).
@@ -80,6 +83,13 @@ const LEAGUES = [
     logo: "/leagues/laliga.png", glyph: "soft",
     font: laligaFont,
     tagline: "Crest coral. The world champions’ home league is the obvious next room." },
+  { id: "ligamx", name: "Liga MX", top: "Liga MX · Bet Suggester",
+    eyebrow: "engine adaptation · apertura 2026 · in season",
+    accent: "#0fbe66", dim: "rgba(15,190,102,0.35)", faint: "rgba(15,190,102,0.10)",
+    ambient: "rgba(15,190,102,0.07)", modeMs: 900,
+    logo: "/leagues/ligamx.png", glyph: "soft",
+    font: ligamxFont,
+    tagline: "Eagle green. Two tournaments a year, open Kalshi books tonight — the model stays dark until it earns approval." },
 ];
 
 function LeagueComingSoon({ league }: { league: (typeof LEAGUES)[number] }) {
@@ -119,6 +129,7 @@ function LeagueFX({ id }: { id: string }) {
     el.style.setProperty("--fx-y", `${r.top + r.height / 2}px`);
   }, [id]);
   if (id === "mls") return <div className="fxx fxx-mls"><span className="curtain" /></div>;
+  if (id === "ligamx") return <div className="fxx fxx-ligamx"><span className="curtain" /></div>;
   if (id === "epl") return <div className="fxx fxx-epl"><i /><i /><i /></div>;
   if (id === "laliga") return <div ref={ref} className="fxx fxx-laliga"><i /></div>;
   return (
@@ -192,6 +203,21 @@ function LeagueGlyph({ id }: { id: string }) {
         <path d="M30 34 c-6 8 -8 18 -4 27 c4 10 14 17 24 17 c6 0 11 -2 15 -5 l-6 -8 c5 -2 9 -6 11 -11 l-9 -3 c1 -6 0 -12 -3 -17 z" />
         <path d="M44 48 a2.5 2.5 0 1 0 0.1 0 z" fill="currentColor" stroke="none" />
         <path d="M58 62 l10 3" />
+      </svg>
+    );
+  }
+  if (id === "ligamx") {
+    return (
+      <svg {...common}>
+        {/* the eagle over the ball, reduced to strokes */}
+        <circle cx="50" cy="62" r="24" />
+        <path d="M50 38 c-3 8 -8 14 -14 18 M50 38 c3 8 8 14 14 18" />
+        {/* wing sweeps */}
+        <path d="M18 34 c10 -2 20 -6 26 -14 c2 6 0 12 -4 16 c-7 6 -15 6 -22 -2 z" />
+        <path d="M82 34 c-10 -2 -20 -6 -26 -14 c-2 6 0 12 4 16 c7 6 15 6 22 -2 z" />
+        {/* head */}
+        <path d="M46 16 c2 -4 6 -6 10 -5 c3 1 5 4 5 7 l-7 2 z" />
+        <path d="M50 58 l6 8 -6 8 -6 -8 z" strokeWidth="1.6" />
       </svg>
     );
   }
@@ -515,7 +541,11 @@ export default function BetSuggesterDashboard() {
 
           {!isWC && league.id === "mls" && <MlsDashboard />}
           {!isWC && league.id === "epl" && <EplDashboard />}
-          {!isWC && league.id !== "mls" && league.id !== "epl" &&
+          {!isWC && league.id === "ligamx" && <LigamxDashboard />}
+          {/* the coming-soon fallback must exclude EVERY league that now
+              has a real dashboard, or a built hub renders behind it */}
+          {!isWC && league.id !== "mls" && league.id !== "epl"
+            && league.id !== "ligamx" &&
             <LeagueComingSoon league={league} />}
           <div className={isWC ? undefined : "hidden"}>
           {error && (
