@@ -396,6 +396,8 @@ img.glyph-soft   { opacity: 0.11; filter: grayscale(1) brightness(1.1); }
 
 .mode-reveal-laliga { animation: stageIn 0.5s ease-out both; }
 
+.mode-reveal-ligamx { animation: stageIn 0.35s ease-out both; }
+
 
 /* ---- full-viewport effects riding the reveals ------------------------ */
 .fxx { position: fixed; inset: 0; z-index: 40; pointer-events: none; overflow: hidden; }
@@ -575,6 +577,23 @@ img.glyph-soft   { opacity: 0.11; filter: grayscale(1) brightness(1.1); }
 }
 @keyframes curtainOut { to { transform: skewX(-14deg) translateX(185vw); } }
 
+/* Liga MX rides the same curtain grammar as MLS (the CSS is keyed on
+   --accent, so it sweeps eagle-green), skewed the other way so the two
+   leagues' entrances read as siblings, not clones. */
+.fxx-ligamx .curtain {
+  position: absolute; top: -22%; bottom: -22%; right: -12vw; width: 155vw;
+  background: #050507; will-change: transform;
+  transform: skewX(14deg) translateX(0);
+  animation: curtainOutLeft 0.55s cubic-bezier(0.75, 0, 0.15, 1) both;
+}
+.fxx-ligamx .curtain::before {
+  content: ""; position: absolute; top: 0; bottom: 0; right: -13vw; width: 14vw;
+  background: linear-gradient(270deg, transparent,
+    var(--accent-dim) 35%, var(--accent) 70%,
+    rgba(255, 255, 255, 0.65) 88%, #050507 100%);
+}
+@keyframes curtainOutLeft { to { transform: skewX(14deg) translateX(-185vw); } }
+
 .fxx-epl i {
   position: absolute; left: 50%; top: 20rem; width: 14vmax; height: 14vmax;
   margin: -7vmax 0 0 -7vmax; border-radius: 9999px;
@@ -618,7 +637,8 @@ img.glyph-soft   { opacity: 0.11; filter: grayscale(1) brightness(1.1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mode-reveal-wc26, .mode-reveal-mls, .mode-reveal-epl, .mode-reveal-laliga {
+  .mode-reveal-wc26, .mode-reveal-mls, .mode-reveal-epl, .mode-reveal-laliga,
+  .mode-reveal-ligamx {
     animation: none !important;
     -webkit-mask-image: none !important; mask-image: none !important;
     clip-path: none !important;

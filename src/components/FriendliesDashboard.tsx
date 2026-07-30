@@ -6,6 +6,31 @@
 // scores and raw Kalshi books, states that plainly, and stops. The
 // market hunter owns structural findings across KXCLUBFGAME; this page
 // links there rather than re-detecting anything.
+//
+// MARKET-IMPLIED PROBABILITIES (2026-07-29) do not soften that line.
+// Son asked for predictions on friendlies; the platform cannot produce
+// them, and the reason is structural: team ratings are
+// competition-scoped (the backend's model fits on
+// competition_slug="mls-2026", the only approved model) while friendlies
+// span the global club universe, so zero of these clubs hold a rating
+// anywhere in the system. What the page CAN show is the probability set
+// the exchange's own asks imply once the overround is stripped out —
+// authored by the book, not by this site.
+//
+// The labelling is therefore the feature, not decoration:
+//   - "market-implied · vig stripped", attributed to Kalshi and to the
+//     time WE read it. Never "prediction", "forecast", "model", "edge",
+//     or "fair value" — inside this block those words would relabel
+//     someone else's arithmetic as our claim. Asserted statically over
+//     the rendered output in e2e/friendlies.spec.ts.
+//   - the vig removed and the per-leg spreads render BESIDE the
+//     percentages, so a reader sees the width of the number instead of a
+//     clean figure that hides it.
+//   - the fee-adjusted breakeven renders too, and is the honest part: it
+//     shows the implied percentage is NOT a price anyone can get.
+//   - a stale book's numbers are visibly stale; an incomplete book shows
+//     no probabilities at all, and a below-$1 book shows the anomaly in
+//     words with nothing normalized.
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { dayKeyOf, dayLabel, fmtDate, groupByDay, localDay } from "../lib/matchday";
@@ -19,11 +44,72 @@ type BookRow = { ticker: string; label?: string; yes_ask?: string;
   yes_bid?: string; status?: string };
 type GameBook = { event_ticker: string; title?: string; markets: BookRow[] };
 type Freshness = { state?: string; age_seconds?: number } | null;
+// The market-implied block, exactly as the backend serves it. Every
+// numeric field is a STRING because the backend computes in exact
+// Decimal — parsing to a float here is for display only, and never
+// feeds another calculation.
+type ImpliedLeg = { ticker?: string; label?: string; is_draw?: boolean;
+  ask_dollars?: string | null; bid_dollars?: string | null;
+  spread_dollars?: string | null; implied_probability?: string | null;
+  fee_dollars?: string | null; cost_dollars?: string | null;
+  breakeven_probability?: string | null };
+type Implied = {
+  state: "priced" | "sum_below_one" | "incomplete";
+  reason?: string | null;
+  basis?: string; method?: string | null;
+  legs: ImpliedLeg[];
+  sum_ask_dollars?: string | null; sum_bid_dollars?: string | null;
+  overround_dollars?: string | null; shortfall_dollars?: string | null;
+  sum_implied_probability?: string | null;
+  fee_reference_contracts?: number; fee_policy_version?: string;
+  freshness?: Freshness; captured_at?: string | null;
+  attribution?: string;
+} | null;
 type MappedRow = { fixture_id?: string; home?: string; away?: string;
   status: "mapped" | "unmapped" | "ambiguous" | "no_open_markets"
     | "unresolved_name" | "unavailable" | "registry_incomplete";
-  book: GameBook | null; candidates: string[]; freshness?: Freshness };
+  book: GameBook | null; candidates: string[]; freshness?: Freshness;
+  implied?: Implied };
 type Listed = { count?: number; truncated?: boolean; complete?: boolean };
+
+// --- league-derived xG form ------------------------------------------------
+// Son's rule: a club's xG rating comes from the league that club plays in.
+// Each rating is fitted ONLY on that league's fixtures and is relative to that
+// league's own average, so it is a statement about a club inside its own
+// competition and nowhere else.
+//
+// The consequence is the whole reason this block is careful: TWO OF THESE
+// NUMBERS CANNOT BE COMPARED. A Bundesliga 1.31 and a J1 1.08 are fitted on
+// different populations against different means; subtracting them produces a
+// figure with no referent. So the UI shows both, labels each with its league
+// and sample size, says plainly that they are not comparable, and derives no
+// match probability from them — the backend refuses that arithmetic in its own
+// types (CrossCompetitionArithmetic), and this surface must not present
+// anything that looks like the result of it.
+//
+// Every unrated club renders NAMED WORDS, never a blank and never a zero.
+// `attack`/`defence` are display-only; nothing here feeds another calculation.
+type XgRating = {
+  team_name?: string; attack: number; defence: number; n_fixtures: number;
+  competition_key?: string; league_id?: number; season?: number;
+  source?: string; window_start?: string | null; window_end?: string | null;
+  comparable_across_competitions?: boolean;
+};
+type XgSide = {
+  club?: string; rated: boolean; reason?: string | null;
+  reason_words?: string | null;
+  league?: { league_id?: number; season?: number; league_name?: string;
+    league_country?: string } | null;
+  rating?: XgRating | null;
+};
+type XgBlock = {
+  home: XgSide; away: XgSide;
+  same_competition?: boolean; comparable?: boolean;
+  not_comparable_note?: string;
+  forecast?: null; forecast_available?: boolean;
+} | null;
+type XgFixture = { espn_event_id?: string; home?: string; away?: string;
+  xg?: XgBlock };
 
 const j = (r: Response) => (r.ok ? r.json() : Promise.reject(r.status));
 
@@ -31,6 +117,7 @@ export default function FriendliesDashboard() {
   const [today, setToday] = useState<Fixture[] | null>(null);
   const [week, setWeek] = useState<Fixture[] | null>(null);
   const [maps, setMaps] = useState<Record<string, MappedRow>>({});
+  const [xg, setXg] = useState<Record<string, XgBlock>>({});
   const [listed, setListed] = useState<Listed | null>(null);
   // 404 means the deployed backend does not serve /api/friendlies yet —
   // this page can be ahead of the API it reads. Say so in words instead
@@ -69,6 +156,18 @@ export default function FriendliesDashboard() {
           }
           setMaps(m);
           setListed(d.listed ?? null);
+        }).catch(() => {});
+      // League-derived xG form. A failure leaves the map empty, and an
+      // absent entry renders nothing at all rather than an empty rating
+      // row — the card must never imply a measurement it does not have.
+      fetch("/api/xg/friendlies?days=1").then(j)
+        .then((d) => {
+          if (!alive) return;
+          const x: Record<string, XgBlock> = {};
+          for (const row of (d.fixtures ?? []) as XgFixture[]) {
+            if (row.espn_event_id) x[row.espn_event_id] = row.xg ?? null;
+          }
+          setXg(x);
         }).catch(() => {});
     };
     load();
@@ -120,6 +219,39 @@ export default function FriendliesDashboard() {
             evidence, so no predictions, no shadow odds and no locks
             exist on this surface.
           </p>
+          {/* The addition that keeps the scope line true rather than
+              contradicted: a matched book also gets the probabilities IT
+              implies. Those are the market's view of the match. This site
+              performs the arithmetic and is not the author of the
+              numbers — the distinction the whole surface rests on. */}
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-hi">
+            Where a book matches a fixture, the card also shows the
+            probabilities <strong>that book implies</strong> once the
+            exchange&apos;s margin is stripped out.{" "}
+            <strong>Those are the market&apos;s own view, not this
+            site&apos;s</strong> — arithmetic on prices Kalshi set, shown
+            with the margin removed and the spread left visible.
+          </p>
+          {/* League-derived xG form, and the constraint that governs it.
+              This is placed in the framing block — not buried under a card —
+              because a reader who takes two of these numbers as comparable
+              has been misled by the layout, and no per-card footnote fixes
+              that. The backend refuses the arithmetic in its own types; this
+              paragraph is the reader-facing half of the same rule. */}
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-hi">
+            Each club also shows its <strong>xG form from its own
+            league</strong> — expected goals created and conceded relative to
+            that league&apos;s average, fitted only on that league&apos;s
+            fixtures, with the league and the number of matches named beside
+            it.{" "}
+            <strong>The two clubs&apos; numbers are not comparable to each
+            other</strong>: they come from different leagues, fitted on
+            different populations against different averages, so the
+            difference between them would mean nothing.{" "}
+            <strong>No match probability is derived from them</strong>, here
+            or anywhere — a club whose league has no expected-goals data says
+            so in words rather than showing a blank or a zero.
+          </p>
           <p className="mt-3 max-w-2xl text-xs leading-relaxed text-ink-low">
             Prices are the exchange&apos;s own, shown ask / bid —
             observational, not advice.{" "}
@@ -163,7 +295,8 @@ export default function FriendliesDashboard() {
                   )}
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {g.list.map((f) => (
-                      <FixtureCard key={f.id} f={f} m={maps[f.id]} />
+                      <FixtureCard key={f.id} f={f} m={maps[f.id]}
+                        x={xg[f.id]} />
                     ))}
                   </div>
                 </div>
@@ -250,19 +383,75 @@ function Empty({ children }: { children: React.ReactNode }) {
   );
 }
 
-function TeamLine({ s, live }: { s: Side; live: boolean }) {
+function TeamLine({ s, live, xg }: { s: Side; live: boolean; xg?: XgSide }) {
   return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="flex min-w-0 items-center gap-2">
-        {s.logo && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={s.logo} alt="" className="h-5 w-5 shrink-0 object-contain" />
-        )}
-        <span className="truncate text-sm text-ink-hi">{s.name}</span>
-      </span>
-      <span className={`font-mono text-sm tabular-nums ${
-        live ? "text-accent" : "text-ink-hi"}`}>{s.score}</span>
+    <div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex min-w-0 items-center gap-2">
+          {s.logo && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={s.logo} alt="" className="h-5 w-5 shrink-0 object-contain" />
+          )}
+          <span className="truncate text-sm text-ink-hi">{s.name}</span>
+        </span>
+        <span className={`font-mono text-sm tabular-nums ${
+          live ? "text-accent" : "text-ink-hi"}`}>{s.score}</span>
+      </div>
+      <XgForm xg={xg} />
     </div>
+  );
+}
+
+// One club's league-derived xG form, beside its name.
+//
+// A rated club reads e.g. "xG form from Bundesliga, n=34 · 1.31 for / 0.88
+// against". An unrated one reads the REASON, in words, because the reasons are
+// different facts: a league measured to carry no expected-goals data is not the
+// same as a club with too few matches, and neither is a league we have not
+// looked at. A blank or a 0.00 would collapse all three into a number the data
+// does not support.
+//
+// Undefined (no entry at all) renders NOTHING — the ratings feed may simply not
+// have loaded, and an empty row would assert an absence we cannot claim.
+function XgForm({ xg }: { xg?: XgSide }) {
+  if (!xg) return null;
+  if (!xg.rated) {
+    return (
+      <p data-testid="xg-form"
+        className="mt-0.5 font-mono text-[9px] uppercase tracking-wide text-ink-faint">
+        {xg.reason_words || "no xG form available"}
+      </p>
+    );
+  }
+  const r = xg.rating!;
+  const league = xg.league?.league_name || `league ${r.league_id}`;
+  return (
+    <p data-testid="xg-form"
+      className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 font-mono text-[9px] uppercase tracking-wide text-ink-faint">
+      <span>
+        xG form from {league}, n={r.n_fixtures}
+      </span>
+      <span className="tabular-nums text-ink-low">
+        {r.attack.toFixed(2)} for / {r.defence.toFixed(2)} against
+      </span>
+    </p>
+  );
+}
+
+// The card-level restatement of the constraint, rendered only where BOTH clubs
+// actually carry a rating — which is the only situation in which a reader could
+// be tempted to compare them. Wording is deliberately plain and deliberately
+// free of forecast vocabulary: inside a fixture card, those words would relabel
+// two leagues' form as a view about the match.
+function XgNotComparable({ x }: { x?: XgBlock }) {
+  if (!x || !x.home?.rated || !x.away?.rated) return null;
+  return (
+    <p data-testid="xg-not-comparable"
+      className="mt-1.5 rounded-lg border border-dashed border-line px-2 py-1 font-mono text-[9px] leading-relaxed text-ink-faint">
+      the two figures above are <strong>not comparable</strong> — each is
+      relative to its own league&apos;s average, on a different set of
+      matches. nothing about this fixture is derived from them.
+    </p>
   );
 }
 
@@ -349,11 +538,122 @@ function BookState({ m }: { m?: MappedRow }) {
         )}
         ask / bid · exchange prices, not advice
       </p>
+      <MarketImplied imp={m.implied} />
     </div>
   );
 }
 
-function FixtureCard({ f, m }: { f: Fixture; m?: MappedRow }) {
+// What the book itself implies, with the exchange's margin removed.
+//
+// This is ARITHMETIC ON OBSERVED PRICES and the copy has to keep saying
+// so — inside this block the words "prediction", "forecast", "model",
+// "edge" and "fair value" are banned, because any of them would relabel
+// Kalshi's numbers as ours. The framing block above carries the fuller
+// statement (and is where the phrase "no model runs here" belongs).
+//
+// Each non-priced state renders DIFFERENT words and no percentages:
+//   incomplete     the arithmetic's preconditions were not met (a
+//                  missing leg, an empty ask side, an unproven 3-way).
+//                  A 2-way is never renormalized — that would invent a
+//                  draw price.
+//   sum_below_one  asks summing under $1 are a structural anomaly, not
+//                  a probability set. Nothing is normalized, and the
+//                  finding itself belongs to the market hunter.
+function MarketImplied({ imp }: { imp?: Implied }) {
+  if (!imp) return null;
+  if (imp.state === "incomplete") {
+    return (
+      <p data-testid="market-implied"
+        className="mt-1.5 font-mono text-[9px] uppercase tracking-wide text-ink-faint">
+        book incomplete ({incompleteWords(imp.reason)}) — no implied
+        probabilities computed
+      </p>
+    );
+  }
+  if (imp.state === "sum_below_one") {
+    return (
+      <p data-testid="market-implied"
+        className="mt-1.5 font-mono text-[9px] uppercase tracking-wide text-ink-faint">
+        asks sum to {cents(imp.sum_ask_dollars)} — under $1, a structural
+        anomaly rather than a probability set. nothing normalized.
+      </p>
+    );
+  }
+  const stale = imp.freshness?.state === "stale";
+  const spreads = imp.legs
+    .map((l) => centNumber(l.spread_dollars))
+    .filter((n): n is number => n !== null);
+  // min/max, not first/last: the widest leg is the one that matters and
+  // book order is the provider's, not sorted
+  const lo = spreads.length ? Math.min(...spreads) : null;
+  const hi = spreads.length ? Math.max(...spreads) : null;
+  return (
+    <div data-testid="market-implied"
+      className="mt-1.5 rounded-lg border border-line px-2 py-1.5">
+      <p className="flex items-center justify-between font-mono text-[9px] uppercase tracking-wide text-ink-faint">
+        <span>market-implied · vig stripped</span>
+        <span>{stale ? "" : "implied / breakeven"}</span>
+        {stale && (
+          <span className="rounded bg-elev px-1 py-0.5 text-live">
+            stale book · {imp.freshness?.age_seconds ?? "?"}s old
+          </span>
+        )}
+      </p>
+      {imp.legs.map((leg) => (
+        <div key={leg.ticker}
+          className="flex items-center justify-between font-mono text-[10px]">
+          <span className="truncate text-ink-low">{leg.label}</span>
+          <span className="tabular-nums">
+            <span className="text-ink-hi">{pct(leg.implied_probability)}</span>
+            <span className="text-ink-faint">
+              {" "}/ {cents(leg.breakeven_probability)}
+            </span>
+          </span>
+        </div>
+      ))}
+      {/* the width of the number, beside the number */}
+      <p className="pt-1 font-mono text-[9px] leading-relaxed text-ink-faint">
+        {cents(imp.overround_dollars)} of margin removed from{" "}
+        {cents(imp.sum_ask_dollars)} of asks
+        {lo !== null && hi !== null && (
+          <> · spreads {lo === hi ? `${lo}¢` : `${lo}–${hi}¢`}</>
+        )}
+      </p>
+      <p className="font-mono text-[9px] leading-relaxed text-ink-faint">
+        breakeven = ask + kalshi&apos;s taker fee on a{" "}
+        {imp.fee_reference_contracts ?? 100}-contract order, so the
+        implied percentages are not prices anyone can get.
+      </p>
+      <p className="font-mono text-[9px] leading-relaxed text-ink-faint">
+        kalshi&apos;s own asks{readAt(imp.captured_at)} · this site does
+        the arithmetic, not the pricing — observational, not advice.
+      </p>
+    </div>
+  );
+}
+
+function incompleteWords(reason?: string | null) {
+  switch (reason) {
+    case "leg_count": return "not three legs";
+    case "partition_unproven": return "3-way structure unproven";
+    case "missing_ask": return "a leg has no ask";
+    case "book_unavailable": return "book could not be read";
+    default: return "no book";
+  }
+}
+
+// Local time of OUR read, never the exchange's: Kalshi publishes no
+// quote timestamp (its updated_time is the market-definition clock and
+// has been seen ~30h stale on live markets). Rendered from fetched data
+// only, so it cannot mismatch SSR.
+function readAt(iso?: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return `, read ${d.toLocaleTimeString()}`;
+}
+
+function FixtureCard({ f, m, x }: { f: Fixture; m?: MappedRow; x?: XgBlock }) {
   const live = f.state === "in";
   // A finished match keeps its result detail (FT); anything not yet
   // under way shows WHEN it kicks off (local time — rendered only
@@ -364,9 +664,10 @@ function FixtureCard({ f, m }: { f: Fixture; m?: MappedRow }) {
   return (
     <div className={`rounded-xl border p-3 ${
       live ? "glow glow-accent border-accent/40 bg-elev" : "border-line"}`}>
-      <TeamLine s={f.home} live={live} />
+      <TeamLine s={f.home} live={live} xg={x?.home} />
       <div className="my-1.5 h-px bg-line" />
-      <TeamLine s={f.away} live={live} />
+      <TeamLine s={f.away} live={live} xg={x?.away} />
+      <XgNotComparable x={x} />
       <div className="mt-2 flex justify-between font-mono text-[10px] uppercase tracking-wide text-ink-faint">
         <span className={live ? "text-accent" : undefined}>
           {live ? `LIVE ${f.minute ?? ""}` : when}
@@ -378,7 +679,23 @@ function FixtureCard({ f, m }: { f: Fixture; m?: MappedRow }) {
   );
 }
 
-function cents(v?: string) {
+function cents(v?: string | null) {
   const n = v ? Math.round(parseFloat(v) * 100) : NaN;
   return Number.isFinite(n) ? `${n}¢` : "—";
+}
+
+// Same conversion, as a number, for the spread range. Null (not NaN)
+// when absent, so an unpriced side cannot become a 0¢ spread.
+function centNumber(v?: string | null) {
+  if (v === null || v === undefined) return null;
+  const n = Math.round(parseFloat(v) * 100);
+  return Number.isFinite(n) ? n : null;
+}
+
+// A market-implied probability, display-only. One decimal: the exact
+// set is guaranteed to sum to 1 by the backend, and rounding for display
+// never feeds another calculation.
+function pct(v?: string | null) {
+  const n = v ? parseFloat(v) * 100 : NaN;
+  return Number.isFinite(n) ? `${n.toFixed(1)}%` : "—";
 }

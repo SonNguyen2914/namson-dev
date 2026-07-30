@@ -55,10 +55,82 @@ function row(fixture_id: string, home: string, away: string,
            freshness: null, ...over };
 }
 
+// --- market-implied blocks: RECORDED backend output ------------------------
+// Copied verbatim from src.friendlies.market_implied on the same three
+// books, so these payloads are the real shape rather than a guess at it.
+// Asks 0.69 / 0.18 / 0.19 sum to $1.06 — 6c of the exchange's margin.
+const IMPLIED_PRICED = {
+  state: "priced", reason: null, basis: "yes_ask",
+  method: "proportional_normalization",
+  legs: [
+    { ticker: "KXCLUBFGAME-26JUL29LFCWRE-LFC", label: "Liverpool",
+      is_draw: false, ask_dollars: "0.6900", bid_dollars: "0.6800",
+      spread_dollars: "0.0100", implied_probability: "0.650944",
+      fee_dollars: "1.4973", cost_dollars: "70.4973",
+      breakeven_probability: "0.704973" },
+    { ticker: "KXCLUBFGAME-26JUL29LFCWRE-TIE", label: "Tie",
+      is_draw: true, ask_dollars: "0.1800", bid_dollars: "0.1600",
+      spread_dollars: "0.0200", implied_probability: "0.169811",
+      fee_dollars: "1.0332", cost_dollars: "19.0332",
+      breakeven_probability: "0.190332" },
+    { ticker: "KXCLUBFGAME-26JUL29LFCWRE-WRE", label: "Wrexham",
+      is_draw: false, ask_dollars: "0.1900", bid_dollars: "0.1300",
+      spread_dollars: "0.0600", implied_probability: "0.179245",
+      fee_dollars: "1.0773", cost_dollars: "20.0773",
+      breakeven_probability: "0.200773" },
+  ],
+  sum_ask_dollars: "1.0600", sum_bid_dollars: "0.9700",
+  overround_dollars: "0.0600", shortfall_dollars: null,
+  sum_implied_probability: "1.000000",
+  residue_rule: "largest_leg_absorbs_rounding_residue",
+  fee_reference_contracts: 100,
+  fee_policy_version: "kalshi-fee-2026-07-general",
+  freshness: { state: "fresh", age_seconds: 0 },
+  captured_at: "2026-07-29T18:41:03+00:00",
+};
+
+// asks 0.60 / 0.18 / 0.14 = $0.92 — the SUM_BELOW_ONE shape, returned
+// with NO probability set (normalizing it upward would launder a
+// structural anomaly into a comfortable percentage)
+const IMPLIED_BELOW_ONE = {
+  ...IMPLIED_PRICED,
+  state: "sum_below_one", reason: "asks_sum_below_one", method: null,
+  legs: IMPLIED_PRICED.legs.map((l) => ({ ...l,
+    implied_probability: null })),
+  sum_ask_dollars: "0.9200", sum_bid_dollars: "0.8700",
+  overround_dollars: "-0.0800", shortfall_dollars: "0.0800",
+  sum_implied_probability: null, residue_rule: null,
+};
+
+// two legs only — incomplete, and NEVER renormalized into a 3-way
+const IMPLIED_INCOMPLETE = {
+  ...IMPLIED_PRICED,
+  state: "incomplete", reason: "leg_count", method: null,
+  legs: IMPLIED_PRICED.legs.slice(0, 2).map((l) => ({ ...l,
+    implied_probability: null })),
+  sum_ask_dollars: "0.8700", sum_bid_dollars: "0.8400",
+  overround_dollars: null, sum_implied_probability: null,
+  residue_rule: null,
+};
+
+const IMPLIED_STALE = {
+  ...IMPLIED_PRICED,
+  freshness: { state: "stale", age_seconds: 42 },
+};
+
+// Words that would relabel Kalshi's arithmetic as this platform's
+// claim. Banned INSIDE the implied block and on the card around it.
+// (The page-level framing block legitimately says "no model runs here"
+// and "forecast evidence" — that is a denial, and it lives far from
+// these numbers. Hence the scoped assertion.)
+const FORECAST_WORDS =
+  /prediction|predicted|predicts|forecast|model|edge|fair value/i;
+
 type ServeOpts = {
   scoreboard?: unknown;
   markets?: unknown;
   schedule?: unknown;
+  xg?: unknown;              // /api/xg/friendlies (league-derived xG form)
   hunter?: boolean;          // does /api/hunter/findings answer 200?
 };
 
@@ -74,6 +146,11 @@ async function serve(page: import("@playwright/test").Page,
     r.fulfill(json(opts.markets ?? { fixtures: [], listed: null })));
   await page.route("**/api/friendlies/schedule**", (r) =>
     r.fulfill(json(opts.schedule ?? { fixtures: [] })));
+  // Always stubbed, default EMPTY. Leaving it un-routed would send every
+  // existing test in this file through the app's real proxy to a live
+  // backend — exactly the live-data rot AGENTS.md warns about.
+  await page.route("**/api/xg/friendlies**", (r) =>
+    r.fulfill(json(opts.xg ?? { fixtures: [] })));
   if (opts.hunter) {
     await page.route("**/api/hunter/findings", (r) =>
       r.fulfill(json({ findings: [] })));
@@ -324,6 +401,189 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
     await expect(page.getByText(/backend unreachable/i)).toBeVisible();
   });
 
+  // --- market-implied probabilities ---------------------------------------
+  // Arithmetic on Kalshi's own asks, rendered beside a mapped fixture.
+  // These tests assert the LABELLING as hard as the numbers, because the
+  // only thing separating "the book prices Liverpool at 65.1%" from a
+  // forecast this platform cannot produce is what the page calls it.
+
+  test("market-implied probabilities render, labelled as the market's own",
+    async ({ page }) => {
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("20", NOW(), "Liverpool", "Wrexham")] },
+        markets: { fixtures: [
+          row("20", "Liverpool", "Wrexham", "mapped",
+              { book: BOOK, candidates: [BOOK.event_ticker],
+                implied: IMPLIED_PRICED }),
+        ], listed: null },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      const block = page.getByTestId("market-implied");
+      await expect(block).toBeVisible();
+      const txt = await block.innerText();
+      // called what it is, and attributed to the book + our read time
+      expect(txt).toMatch(/market-implied/i);
+      expect(txt).toMatch(/vig stripped/i);
+      expect(txt).toMatch(/kalshi's own asks/i);
+      expect(txt).toMatch(/read \d/i);
+      expect(txt).toMatch(/this site does the arithmetic, not the pricing/i);
+      // the vig-stripped set, proportional to the asks
+      expect(txt).toMatch(/65\.1%/);
+      expect(txt).toMatch(/17\.0%/);
+      expect(txt).toMatch(/17\.9%/);
+      expect(txt).not.toMatch(/NaN|undefined|Infinity/);
+    });
+
+  test("the vig removed and the spreads render beside the percentages",
+    async ({ page }) => {
+      // a clean percentage with the margin and the spread hidden would
+      // overstate how precise the number is
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("21", NOW(), "Liverpool", "Wrexham")] },
+        markets: { fixtures: [
+          row("21", "Liverpool", "Wrexham", "mapped",
+              { book: BOOK, candidates: [BOOK.event_ticker],
+                implied: IMPLIED_PRICED }),
+        ], listed: null },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      const txt = await page.getByTestId("market-implied").innerText();
+      expect(txt).toMatch(/6¢ of margin removed from 106¢ of asks/i);
+      expect(txt).toMatch(/spreads 1–6¢/);
+      // and the fee-adjusted breakeven, stated as unattainable
+      expect(txt).toMatch(/70¢/);
+      expect(txt).toMatch(/breakeven = ask \+ kalshi's taker fee/i);
+      expect(txt).toMatch(/not prices anyone can get/i);
+      expect(txt).toMatch(/100-contract order/i);
+    });
+
+  test("ACCEPTANCE 6: no forecast vocabulary anywhere near these numbers",
+    async ({ page }) => {
+      // static assertion over the RENDERED output: neither the implied
+      // block nor the card around it may say prediction / forecast /
+      // model / edge / fair value. The page-level framing block still
+      // must (and does) say no model runs here — that is a denial, and
+      // it sits far from the numbers.
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("22", NOW(), "Liverpool", "Wrexham")] },
+        markets: { fixtures: [
+          row("22", "Liverpool", "Wrexham", "mapped",
+              { book: BOOK, candidates: [BOOK.event_ticker],
+                implied: IMPLIED_PRICED }),
+        ], listed: null },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      const block = page.getByTestId("market-implied");
+      await expect(block).toBeVisible();
+      expect(await block.innerText()).not.toMatch(FORECAST_WORDS);
+      const card = page.locator("div.rounded-xl", { hasText: "Liverpool" });
+      expect(await card.innerText()).not.toMatch(FORECAST_WORDS);
+      // no bare directives either (the standing invariant)
+      expect(await card.innerText()).not.toMatch(/\b(TAKE|BUY|SELL)\b/);
+      // ...and the page has NOT quietly dropped the modelless framing
+      const body = await page.locator("body").innerText();
+      expect(body).toMatch(/no model runs here, and none is planned/i);
+      expect(body).toMatch(/the market's own view, not this site's/i);
+    });
+
+  test("the framing block adds whose view these numbers are",
+    async ({ page }) => {
+      await serve(page);
+      await page.goto("/bet-suggester/friendlies");
+      const body = await page.locator("body").innerText();
+      // both claims, together: no model here, AND the numbers are the
+      // market's rather than ours
+      expect(body).toMatch(/no model runs here, and none is planned/i);
+      expect(body).toMatch(/probabilities that book implies/i);
+      expect(body).toMatch(/the market's own view, not this site's/i);
+      expect(body).not.toMatch(/\b(TAKE|BUY|SELL)\b/);
+    });
+
+  test("ACCEPTANCE 5: a stale book's implied numbers are visibly stale",
+    async ({ page }) => {
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("23", NOW(), "Liverpool", "Wrexham")] },
+        markets: { fixtures: [
+          row("23", "Liverpool", "Wrexham", "mapped",
+              { book: BOOK, candidates: [BOOK.event_ticker],
+                freshness: { state: "stale", age_seconds: 42 },
+                implied: IMPLIED_STALE }),
+        ], listed: null },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      const txt = await page.getByTestId("market-implied").innerText();
+      // the staleness is INSIDE the implied block, not only on the book
+      expect(txt).toMatch(/stale book/i);
+      expect(txt).toMatch(/42s old/i);
+      expect(txt).toMatch(/65\.1%/);       // still shown, but marked
+    });
+
+  test("ACCEPTANCE 3: an incomplete book shows NO implied probabilities",
+    async ({ page }) => {
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("24", NOW(), "Liverpool", "Wrexham")] },
+        markets: { fixtures: [
+          row("24", "Liverpool", "Wrexham", "mapped",
+              { book: BOOK, candidates: [BOOK.event_ticker],
+                implied: IMPLIED_INCOMPLETE }),
+        ], listed: null },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      const txt = await page.getByTestId("market-implied").innerText();
+      expect(txt).toMatch(/book incomplete/i);
+      expect(txt).toMatch(/not three legs/i);
+      expect(txt).toMatch(/no implied probabilities computed/i);
+      // NOT a 2-way renormalized into a 3-way: no percentage at all
+      expect(txt).not.toMatch(/%/);
+      expect(txt).not.toMatch(FORECAST_WORDS);
+    });
+
+  test("ACCEPTANCE 2: asks under $1 show the anomaly, nothing normalized",
+    async ({ page }) => {
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("25", NOW(), "Liverpool", "Wrexham")] },
+        markets: { fixtures: [
+          row("25", "Liverpool", "Wrexham", "mapped",
+              { book: BOOK, candidates: [BOOK.event_ticker],
+                implied: IMPLIED_BELOW_ONE }),
+        ], listed: null },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      const txt = await page.getByTestId("market-implied").innerText();
+      expect(txt).toMatch(/asks sum to 92¢/i);
+      expect(txt).toMatch(/under \$1/i);
+      expect(txt).toMatch(/structural anomaly/i);
+      expect(txt).toMatch(/nothing normalized/i);
+      // no probability set exists, so none renders
+      expect(txt).not.toMatch(/%/);
+      expect(txt).not.toMatch(FORECAST_WORDS);
+    });
+
+  test("a non-mapped fixture renders no implied block at all",
+    async ({ page }) => {
+      // CONTROL, not evidence: this asserts an ABSENCE, so it passes
+      // against origin/main too (which renders no implied block at all).
+      // Kept because it is the regression that would matter later — the
+      // mapping status already says why in words, and an empty block
+      // would invite a zero bar that reads as a real number.
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("26", NOW(), "Al Nassr", "Mérida")] },
+        markets: { fixtures: [
+          row("26", "Al Nassr", "Mérida", "unmapped", { implied: null }),
+        ], listed: null },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      await expect(page.getByText(/no kalshi book matched/i)).toBeVisible();
+      await expect(page.getByTestId("market-implied")).toHaveCount(0);
+    });
+
   test("the board links to the friendlies page", async ({ page }) => {
     // the board itself talks to the WC26 + MLS APIs; abort them so this
     // stays hermetic (an aborted fetch takes the board's catch paths —
@@ -333,4 +593,226 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
     const chip = page.locator('a[href="/bet-suggester/friendlies"]').first();
     await expect(chip).toBeVisible();
   });
+});
+
+// --- league-derived xG form -----------------------------------------------
+//
+// Son's rule: a club's xG rating comes from the league that club plays in.
+// The thing worth testing is NOT that a number renders — it is that the page
+// cannot be read as comparing two of them, and that an absent rating says WHY
+// instead of showing a blank or a zero.
+//
+// Payloads below are the real backend shape (src.live.xg_ratings
+// .friendly_fixture_ratings), recorded rather than guessed at.
+
+const XG_DORTMUND = {
+  club: "Borussia Dortmund", rated: true, reason: null, reason_words: null,
+  league: { league_id: 78, season: 2025, league_name: "Bundesliga",
+            league_country: "Germany" },
+  rating: { team_name: "Borussia Dortmund", attack: 1.3142, defence: 0.8814,
+            n_fixtures: 34, competition_key: "api-football:78:2025",
+            league_id: 78, season: 2025, source: "api-football",
+            window_start: "2025-08-22T18:30:00+00:00",
+            window_end: "2026-04-04T13:30:00+00:00",
+            comparable_across_competitions: false },
+};
+const XG_CEREZO = {
+  club: "Cerezo Osaka", rated: true, reason: null, reason_words: null,
+  league: { league_id: 98, season: 2026, league_name: "J1 League",
+            league_country: "Japan" },
+  rating: { team_name: "Cerezo Osaka", attack: 1.0821, defence: 1.0435,
+            n_fixtures: 17, competition_key: "api-football:98:2026",
+            league_id: 98, season: 2026, source: "api-football",
+            window_start: "2026-02-06T05:00:00+00:00",
+            window_end: "2026-05-13T10:00:00+00:00",
+            comparable_across_competitions: false },
+};
+// MEASURED absent: the provider carries no xG value for the Qatar Stars
+// League at all (0/6 sampled fixtures), so Al Sadd can never be rated.
+const XG_NO_LEAGUE_DATA = {
+  club: "Al Sadd", rated: false, reason: "league_has_no_xg",
+  reason_words: "no xG data for this club's league",
+  league: { league_id: 305, season: 2025, league_name: "Stars League",
+            league_country: "Qatar" },
+  rating: null,
+};
+const XG_NOT_INDEXED = {
+  club: "Al Nassr", rated: false, reason: "league_not_indexed",
+  reason_words: "no xG data for this club's league", league: null,
+  rating: null,
+};
+const XG_THIN_SAMPLE = {
+  club: "Newport County", rated: false, reason: "insufficient_fixtures",
+  reason_words: "not enough xG fixtures to rate this club",
+  league: { league_id: 42, season: 2025, league_name: "League Two",
+            league_country: "England" },
+  rating: null,
+};
+
+function xgFixture(id: string, home: unknown, away: unknown) {
+  return {
+    espn_event_id: id, date: NOW(), name: "test",
+    home: (home as { club: string }).club,
+    away: (away as { club: string }).club,
+    xg: {
+      home, away, same_competition: false, comparable: false,
+      not_comparable_note:
+        "Ratings from different leagues are fitted on different populations " +
+        "and different scales. They are shown side by side for context only.",
+      forecast: null, forecast_available: false,
+    },
+  };
+}
+
+test.describe("league-derived xG form on friendlies", () => {
+  test("a rated club shows its own league and sample size beside its name",
+    async ({ page }) => {
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("70", NOW(), "Cerezo Osaka", "Borussia Dortmund")] },
+        xg: { fixtures: [xgFixture("70", XG_CEREZO, XG_DORTMUND)] },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      const card = page.locator("div.rounded-xl",
+                                { hasText: "Borussia Dortmund" });
+      // The xG feed is a SEPARATE async fetch, so every assertion about it
+      // must poll. Reading innerText() straight after goto() races the fetch
+      // and passes or fails on machine load — which is how two of these went
+      // red under a busy CPU before this wait existed.
+      await expect(card.getByTestId("xg-form").first())
+        .toContainText(/xG form from/i);
+      const txt = await card.innerText();
+      // the league the rating was FITTED IN, and the n behind it
+      expect(txt).toMatch(/xG form from Bundesliga, n=34/i);
+      expect(txt).toMatch(/xG form from J1 League, n=17/i);
+      // the numbers, labelled for/against so neither reads as a probability
+      expect(txt).toMatch(/1\.31 for \/ 0\.88 against/i);
+      expect(txt).toMatch(/1\.08 for \/ 1\.04 against/i);
+      // no percentage anywhere: a rating is not a probability
+      expect(txt).not.toMatch(/\d%/);
+      expect(txt).not.toMatch(/NaN|undefined|Infinity/);
+    });
+
+  test("ACCEPTANCE: the page says the two ratings are not comparable, and "
+     + "derives no match probability from them", async ({ page }) => {
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("71", NOW(), "Cerezo Osaka", "Borussia Dortmund")] },
+        xg: { fixtures: [xgFixture("71", XG_CEREZO, XG_DORTMUND)] },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      // the card note proves the feed landed; assert it FIRST so the body
+      // read below cannot race the async xG fetch
+      await expect(page.getByTestId("xg-not-comparable")).toBeVisible();
+      // stated where a reader cannot miss it — in the framing block
+      const body = await page.locator("body").innerText();
+      expect(body).toMatch(/not comparable to each other/i);
+      expect(body).toMatch(/no match probability is derived from them/i);
+      // and restated on the card itself, where the temptation actually is
+      const note = page.getByTestId("xg-not-comparable");
+      await expect(note).toBeVisible();
+      const noteTxt = await note.innerText();
+      expect(noteTxt).toMatch(/not comparable/i);
+      expect(noteTxt).toMatch(/nothing about this fixture is derived/i);
+      // the card must not carry forecast vocabulary: inside a fixture card
+      // those words would relabel two leagues' form as a view of the match
+      const card = page.locator("div.rounded-xl",
+                                { hasText: "Borussia Dortmund" });
+      expect(await card.innerText()).not.toMatch(FORECAST_WORDS);
+      expect(await card.innerText()).not.toMatch(/\b(TAKE|BUY|SELL)\b/);
+    });
+
+  test("the not-comparable note appears ONLY when both clubs are rated",
+    async ({ page }) => {
+      // one rated, one not: there is no pair to compare, so the note would
+      // be noise. The refusal words carry the meaning instead.
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("72", NOW(), "Al Sadd", "Borussia Dortmund")] },
+        xg: { fixtures: [xgFixture("72", XG_NO_LEAGUE_DATA, XG_DORTMUND)] },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      const card = page.locator("div.rounded-xl", { hasText: "Al Sadd" });
+      // Wait for the fetch to LAND before asserting the note is absent —
+      // otherwise the absence is trivially true and proves nothing. Asserted
+      // on the CARD, not on the first xg-form row: the first row is the HOME
+      // side (Al Sadd, unrated), so a .first() assertion about Dortmund's
+      // league would be inspecting the wrong element entirely.
+      await expect(card).toContainText(/xG form from Bundesliga/i);
+      await expect(page.getByTestId("xg-not-comparable")).toHaveCount(0);
+      expect(await card.innerText())
+        .toMatch(/no xG data for this club's league/i);
+    });
+
+  test("ACCEPTANCE: a club with no xG for its league says so — never a blank "
+     + "and never a zero", async ({ page }) => {
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("73", NOW(), "Al Sadd", "Al Nassr")] },
+        xg: { fixtures: [xgFixture("73", XG_NO_LEAGUE_DATA, XG_NOT_INDEXED)] },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      const card = page.locator("div.rounded-xl", { hasText: "Al Sadd" });
+      await expect(card.getByTestId("xg-form").first())
+        .toContainText(/no xG data for this club's league/i);
+      const txt = await card.innerText();
+      expect(txt).toMatch(/no xG data for this club's league/i);
+      // the failure this test exists to catch: a zero rendered as a rating
+      expect(txt).not.toMatch(/0\.00 for/);
+      expect(txt).not.toMatch(/n=0/);
+      expect(txt).not.toMatch(/NaN|undefined|Infinity|null/);
+      // and no comparison note, since there is nothing rated to compare
+      await expect(page.getByTestId("xg-not-comparable")).toHaveCount(0);
+    });
+
+  test("each refusal reason renders its OWN words, because they are "
+     + "different facts", async ({ page }) => {
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("74", NOW(), "Newport County", "Al Nassr")] },
+        xg: { fixtures: [xgFixture("74", XG_THIN_SAMPLE, XG_NOT_INDEXED)] },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      const card = page.locator("div.rounded-xl", { hasText: "Newport County" });
+      await expect(card.getByTestId("xg-form").first())
+        .toContainText(/not enough xG fixtures/i);
+      const txt = await card.innerText();
+      // 'too few matches' is NOT the same claim as 'this league has no data'
+      expect(txt).toMatch(/not enough xG fixtures to rate this club/i);
+      expect(txt).toMatch(/no xG data for this club's league/i);
+    });
+
+  test("a fixture with no xG entry at all renders no xG row", async ({ page }) => {
+      // CONTROL, not evidence: asserts an ABSENCE, so it also passes against
+      // the previous build. Kept because an empty rating row would assert a
+      // measurement the feed never delivered.
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("75", NOW(), "Liverpool", "Wrexham")] },
+        xg: { fixtures: [] },
+      });
+      await page.goto("/bet-suggester/friendlies");
+      // the fixture itself must have rendered, so the absence below is an
+      // absence of xG rows rather than an absence of the whole page
+      await expect(page.getByText("Liverpool").first()).toBeVisible();
+      await expect(page.getByTestId("xg-form")).toHaveCount(0);
+      const body = await page.locator("body").innerText();
+      expect(body).not.toMatch(/NaN|undefined|Infinity/);
+    });
+
+  test("a failed xG fetch leaves the page intact and claims nothing",
+    async ({ page }) => {
+      await serve(page, {
+        scoreboard: { fixtures: [
+          fixture("76", NOW(), "Liverpool", "Wrexham")] },
+      });
+      await page.route("**/api/xg/friendlies**", (r) =>
+        r.fulfill({ status: 503, contentType: "application/json",
+                    body: JSON.stringify({ error: "unavailable" }) }));
+      await page.goto("/bet-suggester/friendlies");
+      await expect(page.getByText("Liverpool").first()).toBeVisible();
+      await expect(page.getByTestId("xg-form")).toHaveCount(0);
+      const body = await page.locator("body").innerText();
+      expect(body).not.toMatch(/NaN|undefined|Infinity/);
+    });
 });
