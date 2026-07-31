@@ -18,7 +18,8 @@ type Pick = {
   has_pick?: boolean; side?: string; confidence?: string;
   agreement?: string; reasoning?: string; not_advice?: string;
   reason?: string; means?: string; our_side?: string;
-  market_side?: string;
+  market_side?: string; draw_probability?: number | null;
+  draw_note?: string;
   disagreement?: number; what_would_change_this?: string;
 };
 type Leg = { club?: string; label?: string; p?: number | null };
@@ -128,27 +129,45 @@ export default function MarketVsRead({ d }: { d?: MarketVsReadData | null }) {
         market beside the read · home side, expected points share
       </h3>
 
-      {/* Every leg the exchange prices, each named. */}
-      {d.market_three_way && (
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          {([["home", d.market_three_way.home],
-             ["tie", d.market_three_way.tie],
-             ["away", d.market_three_way.away]] as const).map(([k, leg]) => (
-            <div key={k}
-              className="rounded-xl border border-line px-3 py-2 text-center">
-              <div className="truncate font-mono text-[9px] uppercase tracking-wide text-ink-faint">
-                {leg?.club || k}
-              </div>
-              <div className="mt-1 font-mono text-lg text-ink-hi">
-                {pct(leg?.p ?? undefined)}
-              </div>
+      {/* Every leg the exchange prices, as ONE bar — same visual language
+          as the strength read's bar directly above it, so the difference
+          between two segments and three is the thing that stands out. The
+          draw gets its own segment rather than being split across the two
+          sides, because on this exchange a draw is its own contract. */}
+      {d.market_three_way && (() => {
+        const tw = d.market_three_way!;
+        const seg = [
+          { ...tw.home, cls: "bg-accent/70" },
+          { ...tw.tie, cls: "bg-ink-faint/50" },
+          { ...tw.away, cls: "bg-sky-400/60" },
+        ];
+        return (
+          <div className="mt-4">
+            <div className="flex items-baseline justify-between font-mono text-[10px] uppercase tracking-wide">
+              <span className="truncate text-accent">{tw.home?.club}</span>
+              <span className="px-2 text-ink-faint">draw</span>
+              <span className="truncate text-sky-400">{tw.away?.club}</span>
             </div>
-          ))}
-        </div>
-      )}
+            <div className="mt-1.5 flex h-2 overflow-hidden rounded-full border border-line">
+              {seg.map((x, i) => (
+                <div key={i} className={x.cls}
+                  style={{ width: `${(x.p ?? 0) * 100}%` }} />
+              ))}
+            </div>
+            <div className="mt-1 flex items-baseline justify-between font-mono text-[11px]">
+              <span className="text-accent">{pct(tw.home?.p ?? undefined)}</span>
+              <span className="text-ink-faint">
+                {pct(tw.tie?.p ?? undefined)}
+              </span>
+              <span className="text-sky-400">{pct(tw.away?.p ?? undefined)}</span>
+            </div>
+          </div>
+        );
+      })()}
       <p className="mt-2 font-mono text-[10px] leading-relaxed text-ink-faint">
-        the exchange&apos;s three legs, vig removed — win, draw, win. Our
-        read has no third number: {d.read_is_two_way?.why}
+        three segments, vig removed — win, draw, win. The read&apos;s bar
+        above has only two, and that is not an omission:{" "}
+        {d.read_is_two_way?.why}
       </p>
 
       <div className="mt-4 space-y-1.5">
@@ -193,6 +212,11 @@ export default function MarketVsRead({ d }: { d?: MarketVsReadData | null }) {
         <p className="mt-2 text-sm leading-relaxed text-ink-mid">
           {p?.reasoning}
         </p>
+        {p?.has_pick && p.draw_note && (
+          <p className="mt-2 rounded-lg border border-line px-3 py-2 font-mono text-[10px] leading-relaxed text-ink-low">
+            {p.draw_note}
+          </p>
+        )}
         {p?.has_pick && (
           <p className="mt-2 font-mono text-[10px] leading-relaxed text-ink-faint">
             confidence {p.confidence} · {p.agreement} — {p.not_advice}
