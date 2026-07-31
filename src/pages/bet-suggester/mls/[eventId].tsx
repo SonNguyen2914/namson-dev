@@ -1,3 +1,4 @@
+import { TZ } from "../../../lib/matchday";
 // MLS match hub — Son's Jul 23 layout: the compact match-info card
 // (the original hero box), xG duel, "how they play" (data-driven from
 // the fitted ratings — no hand-sourced blurbs), ESPN scouting, then
@@ -75,7 +76,8 @@ function fmtTime(iso?: string | number | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString("en-US", {
+    timeZone: TZ,
     month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
@@ -1014,8 +1016,8 @@ function fmtShortDate(iso?: string) {
   if (!iso) return "";
   const d = new Date(iso);
   return Number.isFinite(d.getTime())
-    ? d.toLocaleDateString(undefined,
-        { month: "short", day: "numeric", year: "numeric" })
+    ? d.toLocaleDateString("en-US", {
+    timeZone: TZ, month: "short", day: "numeric", year: "numeric" })
     : iso;
 }
 

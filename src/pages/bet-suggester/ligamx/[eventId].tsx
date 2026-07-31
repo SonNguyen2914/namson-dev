@@ -1,3 +1,4 @@
+import { TZ } from "../../../lib/matchday";
 // Liga MX match hub — mirrors the MLS hub skeleton (shared chrome +
 // the every-market EDGE table are the core): compact match-info card,
 // xG duel (model-simulated xG — NO provider xG exists for Liga MX),
@@ -76,7 +77,8 @@ function fmtTime(iso?: string | number | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString("en-US", {
+    timeZone: TZ,
     month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
@@ -1032,8 +1034,8 @@ function fmtShortDate(iso?: string) {
   if (!iso) return "";
   const d = new Date(iso);
   return Number.isFinite(d.getTime())
-    ? d.toLocaleDateString(undefined,
-        { month: "short", day: "numeric", year: "numeric" })
+    ? d.toLocaleDateString("en-US", {
+    timeZone: TZ, month: "short", day: "numeric", year: "numeric" })
     : iso;
 }
 

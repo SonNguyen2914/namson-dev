@@ -1,3 +1,4 @@
+import { TZ } from "../../../lib/matchday";
 // EPL match hub — mirrors the MLS match-page skeleton (shared chrome,
 // match-info card, scouting, market-vs-model bars, the every-market
 // EDGE table, scenario engine, live stats). One structural truth is
@@ -74,7 +75,8 @@ function fmtTime(iso?: string | number | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString("en-US", {
+    timeZone: TZ,
     month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
@@ -830,8 +832,8 @@ function fmtShortDate(iso?: string) {
   if (!iso) return "";
   const d = new Date(iso);
   return Number.isFinite(d.getTime())
-    ? d.toLocaleDateString(undefined,
-        { month: "short", day: "numeric", year: "numeric" })
+    ? d.toLocaleDateString("en-US", {
+    timeZone: TZ, month: "short", day: "numeric", year: "numeric" })
     : iso;
 }
 

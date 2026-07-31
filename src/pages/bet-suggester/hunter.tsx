@@ -1,3 +1,4 @@
+import { TZ } from "../../lib/matchday";
 // Market Hunter panel — the read surface for the always-on OBSERVATIONAL
 // scanner over Kalshi's soccer per-match books (backend branch
 // feat-market-hunter, GET /api/hunter/findings). The panel presents
@@ -219,7 +220,8 @@ function fmtT(iso?: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString("en-US", {
+    timeZone: TZ,
     month: "short", day: "numeric",
     hour: "2-digit", minute: "2-digit", second: "2-digit",
   });

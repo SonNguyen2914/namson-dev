@@ -33,7 +33,7 @@
 //     words with nothing normalized.
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { dayKeyOf, dayLabel, fmtDate, groupByDay, localDay } from "../lib/matchday";
+import { TZ, dayKeyOf, dayLabel, fmtDate, groupByDay, localDay } from "../lib/matchday";
 import { Eyebrow, Reveal } from "./ui";
 
 type Side = { name?: string; short?: string; abbrev?: string; logo?: string;
@@ -650,7 +650,7 @@ function readAt(iso?: string | null) {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return `, read ${d.toLocaleTimeString()}`;
+  return `, read ${d.toLocaleTimeString("en-US", { timeZone: TZ })}`;
 }
 
 function FixtureCard({ f, m, x }: { f: Fixture; m?: MappedRow; x?: XgBlock }) {

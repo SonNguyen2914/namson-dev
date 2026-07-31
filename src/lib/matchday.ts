@@ -13,9 +13,26 @@
 //    kickoff are one evening in the Americas; splitting them renders an
 //    artefact of the wire format.
 
-// Local calendar-day identity. Deliberately not the ISO date (see above).
-export const dayKeyOf = (d: Date) =>
-  `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+// EVERY time on this site renders in Los Angeles time, whoever is looking
+// and wherever the machine rendering it happens to be.
+//
+// It used to render in the VIEWER's timezone, which is not the same thing
+// even when the viewer is in LA: server-side rendering runs in the
+// container's timezone (UTC on Railway), so the first paint and the
+// rehydrated paint could disagree about which day a fixture belongs to.
+// One fixed zone makes the board deterministic — the same page for
+// everyone, and the same page twice.
+export const TZ = "America/Los_Angeles";
+
+// Calendar-day identity IN LA. Deliberately not the ISO date (see above):
+// a 23:30Z and a 00:30Z kickoff are one evening here, and splitting them
+// renders an artefact of the wire format. en-CA gives YYYY-MM-DD, which
+// sorts lexicographically — the old key was `${y}-${m}-${d}` with an
+// unpadded month, where "2026-9-1" sorts before "2026-10-1".
+const _dayKey = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
+});
+export const dayKeyOf = (d: Date) => _dayKey.format(d);
 
 export function localDay(iso: string) {
   const d = new Date(iso);
@@ -25,8 +42,8 @@ export function localDay(iso: string) {
 export function dayLabel(iso: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString(undefined, {
-    weekday: "long", month: "short", day: "numeric",
+  return d.toLocaleDateString("en-US", {
+    timeZone: TZ, weekday: "long", month: "short", day: "numeric",
   });
 }
 
@@ -42,15 +59,25 @@ export function groupByDay<T extends { id: string; date: string }>(
   return [...groups.entries()].map(([key, list]) => ({ key, list }));
 }
 
-// One date formatter for every dashboard, in the VIEWER's timezone.
+// One date formatter for every dashboard, in LA time.
 // `month: "short"` on fixture cards: a bare 7/29 is ambiguous outside
 // the US and the card has room for three letters.
 export function fmtDate(iso?: string, month: "short" | "numeric" = "numeric") {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleString(undefined, {
-    weekday: "short", month, day: "numeric",
+  return d.toLocaleString("en-US", {
+    timeZone: TZ, weekday: "short", month, day: "numeric",
     hour: "numeric", minute: "2-digit",
+  });
+}
+
+
+/** Clock time in LA, for a fixture row. */
+export function fmtTime(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString("en-US", {
+    timeZone: TZ, hour: "numeric", minute: "2-digit",
   });
 }

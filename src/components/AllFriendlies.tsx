@@ -15,7 +15,7 @@ import { useEffect, useState } from "react";
 
 import MarketVsRead, { MarketVsReadInline, type MarketVsReadData }
   from "./MarketVsRead";
-import { dayLabel, groupByDay } from "../lib/matchday";
+import { TZ, dayLabel, groupByDay } from "../lib/matchday";
 import { Eyebrow } from "./ui";
 
 type Side = { name?: string; crest?: string | null };
@@ -62,7 +62,8 @@ function when(r: Row) {
   if (!r.kickoff_utc) return "";
   const d = new Date(r.kickoff_utc);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString("en-US", {
+    timeZone: TZ,
     weekday: "short", hour: "numeric", minute: "2-digit",
   });
 }

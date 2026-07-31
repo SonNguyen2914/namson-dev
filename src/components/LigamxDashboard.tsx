@@ -1,3 +1,4 @@
+import { TZ } from "../lib/matchday";
 // Liga MX dashboard — split-season league surface (Jul 29, 2026).
 // Live ESPN fixtures/scores/standings for mex.1, Kalshi's real
 // KXLIGAMXGAME 3-way books (both sides shown — ask to buy, bid to
@@ -240,7 +241,8 @@ function localDay(iso: string) {
 function dayLabel(iso: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString(undefined, {
+  return d.toLocaleDateString("en-US", {
+    timeZone: TZ,
     weekday: "long", month: "short", day: "numeric",
   });
 }
@@ -259,7 +261,8 @@ function fmtDate(iso?: string, month: "short" | "numeric" = "numeric") {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString("en-US", {
+    timeZone: TZ,
     weekday: "short", month, day: "numeric",
     hour: "numeric", minute: "2-digit",
   });

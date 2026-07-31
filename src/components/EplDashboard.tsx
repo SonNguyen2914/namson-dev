@@ -1,3 +1,4 @@
+import { TZ } from "../lib/matchday";
 // EPL dashboard — the Premier League hub (Jul 28, 2026), mirroring the
 // MLS skeleton: live ESPN eng.1 fixtures/scores, Kalshi books where
 // they exist, the single league table, and shadow odds — which are
@@ -305,7 +306,8 @@ function localDay(iso: string) {
 function dayLabel(iso: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString(undefined, {
+  return d.toLocaleDateString("en-US", {
+    timeZone: TZ,
     weekday: "long", month: "short", day: "numeric",
   });
 }
@@ -324,7 +326,8 @@ function fmtDate(iso?: string, month: "short" | "numeric" = "numeric") {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString("en-US", {
+    timeZone: TZ,
     weekday: "short", month, day: "numeric",
     hour: "numeric", minute: "2-digit",
   });
