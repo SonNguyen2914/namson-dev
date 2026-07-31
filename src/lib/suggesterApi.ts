@@ -1,3 +1,4 @@
+import { TZ } from "../lib/matchday";
 // Thin client for the Python backend, called through the Next.js proxy
 // routes in pages/api/bet-suggester/ (keeps the backend URL server-side).
 
@@ -666,10 +667,12 @@ export function countdown(seconds: number): string {
 export function kickoffLocal(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
-  const date = d.toLocaleDateString(undefined, {
+  const date = d.toLocaleDateString("en-US", {
+    timeZone: TZ,
     weekday: "short", month: "short", day: "numeric",
   });
-  const time = d.toLocaleTimeString(undefined, {
+  const time = d.toLocaleTimeString("en-US", {
+    timeZone: TZ,
     hour: "numeric", minute: "2-digit",
   });
   return `${date} · ${time}`;

@@ -1,3 +1,4 @@
+import { TZ } from "../../../lib/matchday";
 // Match detail — namson.dev/bet-suggester/market/BRA_SRB
 // Apple-Sports treatment: the matchup is the hero, outcome probabilities as
 // thin horizontal stat bars, everything else glanceable and subordinate.
@@ -716,7 +717,7 @@ export default function MatchDetail() {
                       {timeline.map((p, i) => (
                         <tr key={i} className={`border-t border-line ${p.is_final ? "bg-live/5" : ""}`}>
                           <td className="px-4 py-2.5 font-mono text-xs tabular-nums text-ink-low">
-                            {new Date(p.timestamp).toLocaleTimeString()}
+                            {new Date(p.timestamp).toLocaleTimeString("en-US", { timeZone: TZ })}
                           </td>
                           <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink-hi">{pct(p.model_probability)}</td>
                           <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink-low">

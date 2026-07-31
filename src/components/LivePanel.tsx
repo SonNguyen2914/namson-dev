@@ -1,3 +1,4 @@
+import { TZ } from "../lib/matchday";
 // Live in-play panel (Layer 3 + Piece 5 honest presentation).
 //
 // The user enters the CURRENT match state — phase (1st/2nd half, extra time,
@@ -325,7 +326,7 @@ export default function LivePanel({ matchId, liveLevers }: {
         <div className="mt-7">
           {savedAt && (
             <p className="mb-3 text-right font-mono text-[10px] tracking-wide text-ink-faint">
-              saved locally · {new Date(savedAt).toLocaleTimeString()}
+              saved locally · {new Date(savedAt).toLocaleTimeString("en-US", { timeZone: TZ })}
             </p>
           )}
           {/* the entered state, score-as-hero */}

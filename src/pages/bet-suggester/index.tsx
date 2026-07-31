@@ -1,3 +1,4 @@
+import { TZ } from "../../lib/matchday";
 // Dashboard — namson.dev/bet-suggester
 // Showcase at the top (live scoreboard + next-match hero, Apple-grade type
 // and glow), then a deliberate transition into a denser Linear-style tool
@@ -527,7 +528,7 @@ export default function BetSuggesterDashboard() {
                 <p className="mx-auto mt-6 max-w-md text-sm leading-relaxed text-ink-low">
                   {isWC ? (
                     <>Monte Carlo match simulation vs. live market prices.
-                    {updatedAt && ` Updated ${updatedAt.toLocaleTimeString()}.`}
+                    {updatedAt && ` Updated ${updatedAt.toLocaleTimeString("en-US", { timeZone: TZ })}.`}
                     {" "}For research — not financial advice.</>
                   ) : league.tagline}
                 </p>
@@ -643,7 +644,7 @@ export default function BetSuggesterDashboard() {
           </div>
           <p className="mb-4 font-mono text-[11px] tracking-wide text-ink-faint">
             Auto-updates every 60s
-            {updatedAt && ` · Last updated ${updatedAt.toLocaleTimeString()}`}
+            {updatedAt && ` · Last updated ${updatedAt.toLocaleTimeString("en-US", { timeZone: TZ })}`}
             {` · next auto-refresh in ${secsToRefresh}s`}
           </p>
           {refreshMsg && (
@@ -839,7 +840,7 @@ export default function BetSuggesterDashboard() {
                       </span>
                     </span>
                     <span className="font-mono text-[11px] text-ink-faint">
-                      {new Date(a.fired_at).toLocaleTimeString()}
+                      {new Date(a.fired_at).toLocaleTimeString("en-US", { timeZone: TZ })}
                     </span>
                   </div>
                 </div>

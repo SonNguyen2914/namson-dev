@@ -20,7 +20,7 @@ import { RouteProgress, TopBar } from "../../../components/chrome";
 import { Eyebrow, Reveal } from "../../../components/ui";
 import MarketVsRead, { MarketVsReadInline, type MarketVsReadData }
   from "../../../components/MarketVsRead";
-import { dayLabel, groupByDay } from "../../../lib/matchday";
+import { TZ, dayLabel, groupByDay } from "../../../lib/matchday";
 
 type SideRating = {
   club?: string; rated?: boolean; reason?: string; reason_words?: string;
@@ -76,7 +76,8 @@ function when(f: Fixture) {
   }
   if (!f.kickoff_utc) return "";
   const d = new Date(f.kickoff_utc);
-  return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString(undefined, {
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString("en-US", {
+    timeZone: TZ,
     hour: "numeric", minute: "2-digit",
   });
 }
