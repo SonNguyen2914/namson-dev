@@ -18,6 +18,8 @@ import { useEffect, useState } from "react";
 
 import { RouteProgress, TopBar } from "../../../components/chrome";
 import { Eyebrow, Reveal } from "../../../components/ui";
+import MarketVsRead, { MarketVsReadInline, type MarketVsReadData }
+  from "../../../components/MarketVsRead";
 import { dayLabel, groupByDay } from "../../../lib/matchday";
 
 type SideRating = {
@@ -40,6 +42,8 @@ type Fixture = {
   away: { name?: string; crest?: string | null };
   goals?: { home: number | null; away: number | null };
   strength?: Strength;
+  market_vs_read?: MarketVsReadData | null;
+  kalshi_event?: string | null;
 };
 type Payload = {
   display?: string; accent?: string; count?: number;
@@ -223,8 +227,8 @@ export default function CompViewer() {
               </div>
               <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
                 {list.map(({ f }) => (
-                  <div key={f.fixture_id}
-                    className="flex items-center justify-between gap-3 px-4 py-3">
+                  <details key={f.fixture_id} className="group">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm text-ink-hi">
                         {f.home?.name}{" "}
@@ -239,11 +243,16 @@ export default function CompViewer() {
                         {f.venue ? ` · ${f.venue}` : ""}
                       </div>
                     </div>
-                    <div className="shrink-0 text-right">
+                    <div className="flex shrink-0 items-center text-right">
                       <Read s={f.strength} home={f.home?.name}
                         away={f.away?.name} />
+                      <MarketVsReadInline d={f.market_vs_read} />
                     </div>
+                  </summary>
+                  <div className="px-4 pb-4">
+                    <MarketVsRead d={f.market_vs_read} />
                   </div>
+                  </details>
                 ))}
               </div>
             </div>
