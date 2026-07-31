@@ -158,10 +158,20 @@ export default function AllFriendlies() {
     return () => { alive = false; clearInterval(t); };
   }, [days]);
 
+  // "rated only" used to drop fixtures that HAVE a tradeable Kalshi book
+  // but no strength read — Sporting CP v Nottingham Forest vanished from
+  // the board while being one of the most liquid friendlies listed. A
+  // priced book is the thing most worth seeing; the filter is there to
+  // hide fixtures with NOTHING attached, not to hide the market.
+  const hasBook = (r: Row) => r.kalshi?.state === "bridged";
   const shown = onlyRated
-    ? rows.filter((r) => r.strength?.available)
+    ? rows.filter((r) => r.strength?.available || hasBook(r))
     : rows;
   const ratedCount = rows.filter((r) => r.strength?.available).length;
+  // surfaced so a bridged-but-unrated fixture is visibly a GAP in our
+  // ratings coverage rather than an absence of the match
+  const bookNoRead = rows.filter(
+    (r) => hasBook(r) && !r.strength?.available).length;
   // groupByDay wants {id, date}; the row travels alongside so the render
   // does not have to look it up again.
   const groups = groupByDay(shown.map((r) => ({
@@ -185,11 +195,15 @@ export default function AllFriendlies() {
             ? ` · ${meta.finishedHidden} finished hidden` : ""}
           {meta.kalshiTradeable != null
             ? ` · ${meta.kalshiTradeable} tradeable on kalshi` : ""}
+          {bookNoRead
+            ? ` · ${bookNoRead} priced but unrated` : ""}
         </span>
         <button onClick={() => setOnlyRated((v) => !v)}
           className={`rounded-md border px-2 py-1 ${onlyRated
             ? "border-accent/50 text-accent" : "border-line text-ink-faint"}`}>
-          {onlyRated ? `rated only · ${ratedCount}` : `all ${meta.count ?? 0}`}
+          {onlyRated
+            ? `rated or priced · ${shown.length}`
+            : `all ${meta.count ?? 0}`}
         </button>
         {[1, 2, 4, 8].map((d) => (
           <button key={d} onClick={() => setDays(d)}
