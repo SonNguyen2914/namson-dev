@@ -26,6 +26,8 @@ type Leg = { club?: string; label?: string; p?: number | null };
 export type MarketVsReadData = {
   market_three_way?: { home?: Leg; tie?: Leg; away?: Leg };
   market_share_by_side?: { home?: number; away?: number; means?: string };
+  read_three_way?: { home?: number; tie?: number; away?: number;
+                     clipped?: boolean; basis?: string };
   read_is_two_way?: { has_draw?: boolean; why?: string;
                       comparable_on?: string };
   available?: boolean;
@@ -96,6 +98,7 @@ export function MarketVsReadInline({ d }: { d?: MarketVsReadData | null }) {
   if (!d?.available) return null;
   const tw = d.market_three_way;
   const ms = d.market_share_by_side;
+  const r3 = d.read_three_way;
   if (!tw) return null;
 
   // Aligned by team, one column each, draw in the middle. The two rows
@@ -115,6 +118,12 @@ export function MarketVsReadInline({ d }: { d?: MarketVsReadData | null }) {
       <span className="text-right text-sky-400">{shortClub(tw.away?.club)}</span>
       <span />
       <GridRow label="win" home={tw.home?.p} tie={tw.tie?.p} away={tw.away?.p} />
+      {/* our own win/draw/loss, where a draw rate has been MEASURED for
+          this kind of fixture — the row that makes the top line
+          comparable leg by leg rather than only on the share */}
+      {r3 && (
+        <GridRow label="our win" home={r3.home} tie={r3.tie} away={r3.away} />
+      )}
       <GridRow label="share" home={ms?.home} away={ms?.away} />
       <GridRow label="read" home={d.our_points_share}
         away={d.our_points_share == null ? null : 1 - d.our_points_share}
@@ -189,9 +198,10 @@ export default function MarketVsRead({ d }: { d?: MarketVsReadData | null }) {
         );
       })()}
       <p className="mt-2 font-mono text-[10px] leading-relaxed text-ink-faint">
-        three segments, vig removed — win, draw, win. The read&apos;s bar
-        above has only two, and that is not an omission:{" "}
-        {d.read_is_two_way?.why}
+        three segments, vig removed — win, draw, win.{" "}
+        {d.read_three_way
+          ? `Our own three-way sits beside it: ${d.read_three_way.basis}.`
+          : d.read_is_two_way?.why}
       </p>
 
       <div className="mt-4 space-y-1.5">
