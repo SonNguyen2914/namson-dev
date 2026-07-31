@@ -13,6 +13,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { MarketVsReadInline, type MarketVsReadData }
+  from "./MarketVsRead";
 import { dayLabel, groupByDay } from "../lib/matchday";
 import { Eyebrow } from "./ui";
 
@@ -49,6 +51,7 @@ type Row = {
   away: Side;
   goals?: { home: number | null; away: number | null };
   kalshi?: { state?: string; event_ticker?: string; means?: string };
+  market_vs_read?: MarketVsReadData | null;
   strength?: Strength;
 };
 
@@ -245,6 +248,7 @@ export default function AllFriendlies() {
                   )}
                   <StrengthCell s={r.strength} home={r.home?.name}
                     away={r.away?.name} />
+                  <MarketVsReadInline d={r.market_vs_read} />
                 </div>
               </Link>
             ))}

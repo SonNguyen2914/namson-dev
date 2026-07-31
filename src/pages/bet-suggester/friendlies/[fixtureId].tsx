@@ -16,6 +16,8 @@ import { useEffect, useState } from "react";
 
 import { RouteProgress, TopBar } from "../../../components/chrome";
 import { Eyebrow, Reveal } from "../../../components/ui";
+import MarketVsRead, { type MarketVsReadData }
+  from "../../../components/MarketVsRead";
 import { unitFeeDollars } from "../../../lib/fee";
 
 type Side = { name?: string; crest?: string | null };
@@ -77,6 +79,7 @@ type Detail = {
   };
   strength?: Strength;
   books?: Books;
+  market_vs_read?: MarketVsReadData | null;
   framing?: string | null;
 };
 
@@ -447,6 +450,8 @@ export default function FriendlyMatchPage() {
 
             <MarketVsStrength books={d?.books} strength={d?.strength} />
 
+            <MarketVsRead d={d?.market_vs_read} />
+
             {/* One compact footer instead of five stacked paragraphs. The
                 previous version put ~250 words of disclaimer under every
                 fixture, which buried the data it was qualifying. Every
@@ -467,9 +472,18 @@ export default function FriendlyMatchPage() {
                   not a win probability, and carries no draw number.
                 </p>
                 <p>
-                  No difference against the market is computed: a three-way
-                  price carrying a spread and a two-way points share are not
-                  the same quantity.
+                  The market table above still shows no difference column:
+                  a raw three-way price and a points share are not the same
+                  quantity. The block beneath it computes one only after
+                  converting the book onto the SAME scale — P(win) plus half
+                  P(draw), vig removed — which is what makes subtraction
+                  mean anything.
+                </p>
+                <p>
+                  That difference is a DISAGREEMENT between two sources, not
+                  a verified mispricing. Our read beats a coin flip only
+                  narrowly, and the market&apos;s own accuracy on friendlies
+                  is unmeasured here.
                 </p>
                 {d?.strength?.attribution && <p>{d.strength.attribution}</p>}
                 {d?.strength?.as_of && <p>ratings as of {d.strength.as_of}.</p>}
