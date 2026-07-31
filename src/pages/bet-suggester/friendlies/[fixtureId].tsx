@@ -19,7 +19,13 @@ import { Eyebrow, Reveal } from "../../../components/ui";
 import { unitFeeDollars } from "../../../lib/fee";
 
 type Side = { name?: string; crest?: string | null };
+type Calibrated = {
+  expected_points_share?: { home: number; away: number };
+  shrink_k?: number; source?: string; measured_at?: string;
+  basis?: string; corrects?: string; scope?: string;
+};
 type Strength = {
+  calibrated?: Calibrated;
   estimate_class?: string;
   estimate_meaning?: string;
   available?: boolean;
@@ -243,6 +249,46 @@ function MarketVsStrength({ books, strength }: {
           </p>
         )}
 
+        {/* BOTH numbers. The bar above is the PROVIDER's published
+            expectation and stays citable as such; this is OURS, measured
+            here, and shown beside it rather than quietly replacing it —
+            a locally fitted number wearing a provider's name would be a
+            different claim than the one the label makes. */}
+        {strength?.calibrated?.expected_points_share && e && (
+          <div className="mt-4 rounded-lg border border-line/70 p-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+                calibrated on our own measurement
+              </span>
+              <span className="font-mono text-[9px] uppercase tracking-wide text-ink-faint">
+                shrink {strength.calibrated.shrink_k} · {strength.calibrated.measured_at}
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline justify-between font-mono text-[11px]">
+              <span className="text-accent">
+                {(strength.calibrated.expected_points_share.home * 100)
+                  .toFixed(1)}%
+              </span>
+              <span className="text-ink-faint">
+                was {(e.home * 100).toFixed(1)}% / {(e.away * 100).toFixed(1)}%
+              </span>
+              <span className="text-ink-mid">
+                {(strength.calibrated.expected_points_share.away * 100)
+                  .toFixed(1)}%
+              </span>
+            </div>
+            {strength.calibrated.basis && (
+              <p className="mt-2 font-mono text-[10px] leading-relaxed text-ink-faint">
+                {strength.calibrated.basis}
+              </p>
+            )}
+            {strength.calibrated.corrects && (
+              <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-ink-faint">
+                {strength.calibrated.corrects}
+              </p>
+            )}
+          </div>
+        )}
         {strength?.semantics && (
           <p className="mt-4 text-[11px] leading-relaxed text-ink-low">
             {strength.semantics}
