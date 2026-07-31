@@ -21,7 +21,11 @@ type Pick = {
   market_side?: string;
   disagreement?: number; what_would_change_this?: string;
 };
+type Leg = { club?: string; label?: string; p?: number | null };
 export type MarketVsReadData = {
+  market_three_way?: { home?: Leg; tie?: Leg; away?: Leg };
+  read_is_two_way?: { has_draw?: boolean; why?: string;
+                      comparable_on?: string };
   available?: boolean;
   our_points_share?: number; our_basis?: string;
   market_points_share?: number; market_vig?: number;
@@ -41,17 +45,49 @@ function tone(d?: string) {
   return "text-ink-faint";
 }
 
-/** The compact form for a fixture row: market over read, one line each. */
+/** The most DISTINCTIVE word of a club name, so the three legs fit on one
+ *  row without collapsing onto a shared prefix. */
+function shortClub(name?: string) {
+  if (!name) return "";
+  const drop = new Set(["fc", "cf", "afc", "sc", "ac", "as", "ss", "ssc",
+    "club", "cd", "sd", "ca", "fk", "sk", "bk", "if", "ks", "de", "the"]);
+  const words = name.split(/[\s.]+/).filter((w) => w
+    && !drop.has(w.toLowerCase().replace(/[^a-z]/g, "")));
+  return (words.sort((a, b) => b.length - a.length)[0] || name)
+    .slice(0, 8).toUpperCase();
+}
+
+/** The compact form for a fixture row.
+ *
+ *  Kalshi gets all THREE legs, each with its side named — that is real
+ *  data the exchange publishes. Our read gets two, because two is all it
+ *  has: both ratings providers publish an expected points share with the
+ *  draw already folded in at half weight, and neither publishes a usable
+ *  1X2 split. The two lines are therefore NOT the same quantity, and the
+ *  only number compared across them is the points share on the last line.
+ */
 export function MarketVsReadInline({ d }: { d?: MarketVsReadData | null }) {
   if (!d?.available) return null;
+  const tw = d.market_three_way;
   return (
     <span className="ml-2 inline-flex flex-col items-end leading-tight"
       title={d.note}>
-      <span className="font-mono text-[10px] text-ink-low">
-        kalshi {pct(d.market_points_share)}
-      </span>
-      <span className={`font-mono text-[10px] ${tone(d.direction)}`}>
-        read {pct(d.our_points_share)}
+      {tw && (
+        <span className="whitespace-nowrap font-mono text-[10px] text-ink-low">
+          <span className="pr-1 text-ink-faint">kalshi</span>
+          {shortClub(tw.home?.club)} {pct(tw.home?.p ?? undefined)}
+          <span className="px-1 text-ink-faint">·</span>
+          TIE {pct(tw.tie?.p ?? undefined)}
+          <span className="px-1 text-ink-faint">·</span>
+          {shortClub(tw.away?.club)} {pct(tw.away?.p ?? undefined)}
+        </span>
+      )}
+      <span className={`whitespace-nowrap font-mono text-[10px] ${
+        tone(d.direction)}`}>
+        <span className="pr-1 text-ink-faint">share</span>
+        k{pct(d.market_points_share)}
+        <span className="px-1 text-ink-faint">·</span>
+        r{pct(d.our_points_share)}
         {d.disagreement != null && (
           <span className="pl-1">
             {d.disagreement > 0 ? "+" : ""}{(d.disagreement * 100).toFixed(0)}
@@ -91,6 +127,29 @@ export default function MarketVsRead({ d }: { d?: MarketVsReadData | null }) {
       <h3 className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
         market beside the read · home side, expected points share
       </h3>
+
+      {/* Every leg the exchange prices, each named. */}
+      {d.market_three_way && (
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          {([["home", d.market_three_way.home],
+             ["tie", d.market_three_way.tie],
+             ["away", d.market_three_way.away]] as const).map(([k, leg]) => (
+            <div key={k}
+              className="rounded-xl border border-line px-3 py-2 text-center">
+              <div className="truncate font-mono text-[9px] uppercase tracking-wide text-ink-faint">
+                {leg?.club || k}
+              </div>
+              <div className="mt-1 font-mono text-lg text-ink-hi">
+                {pct(leg?.p ?? undefined)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="mt-2 font-mono text-[10px] leading-relaxed text-ink-faint">
+        the exchange&apos;s three legs, vig removed — win, draw, win. Our
+        read has no third number: {d.read_is_two_way?.why}
+      </p>
 
       <div className="mt-4 space-y-1.5">
         <div className="flex items-baseline justify-between">
