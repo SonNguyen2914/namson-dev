@@ -13,7 +13,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { MarketVsReadInline, type MarketVsReadData }
+import MarketVsRead, { MarketVsReadInline, type MarketVsReadData }
   from "./MarketVsRead";
 import { dayLabel, groupByDay } from "../lib/matchday";
 import { Eyebrow } from "./ui";
@@ -239,10 +239,13 @@ export default function AllFriendlies() {
             </span>
           </div>
           <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
+            {/* Collapsible, matching the viewer competitions. The row was
+                a whole-row <Link>, so the market detail was only reachable
+                by leaving the board — which is a poor trade when scanning
+                a slate. It now expands in place AND still links out. */}
             {list.map(({ row: r }) => (
-              <Link key={r.fixture_id}
-                href={`/bet-suggester/friendlies/${r.fixture_id}`}
-                className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-elev">
+              <details key={r.fixture_id} className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-elev">
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm text-ink-hi">
                     {r.home?.name} <span className="text-ink-faint">v</span>{" "}
@@ -269,7 +272,15 @@ export default function AllFriendlies() {
                   )}
                   <MarketVsReadInline d={r.market_vs_read} />
                 </div>
-              </Link>
+              </summary>
+              <div className="px-4 pb-4">
+                <MarketVsRead d={r.market_vs_read} />
+                <Link href={`/bet-suggester/friendlies/${r.fixture_id}`}
+                  className="mt-3 inline-block font-mono text-[10px] uppercase tracking-wide text-accent hover:underline">
+                  full match page →
+                </Link>
+              </div>
+              </details>
             ))}
           </div>
         </div>
