@@ -244,8 +244,10 @@ export default function CompViewer() {
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center text-right">
-                      <Read s={f.strength} home={f.home?.name}
-                        away={f.away?.name} />
+                      {!f.market_vs_read?.available && (
+                        <Read s={f.strength} home={f.home?.name}
+                          away={f.away?.name} />
+                      )}
                       <MarketVsReadInline d={f.market_vs_read} />
                     </div>
                   </summary>

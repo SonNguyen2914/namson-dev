@@ -25,6 +25,7 @@ type Pick = {
 type Leg = { club?: string; label?: string; p?: number | null };
 export type MarketVsReadData = {
   market_three_way?: { home?: Leg; tie?: Leg; away?: Leg };
+  market_share_by_side?: { home?: number; away?: number; means?: string };
   read_is_two_way?: { has_draw?: boolean; why?: string;
                       comparable_on?: string };
   available?: boolean;
@@ -67,34 +68,57 @@ function shortClub(name?: string) {
  *  1X2 split. The two lines are therefore NOT the same quantity, and the
  *  only number compared across them is the points share on the last line.
  */
+const CELL = "text-right tabular-nums";
+
+/** One row of the aligned grid. Declared at module scope: defined inside
+ *  the render it would be a new component type on every paint, resetting
+ *  its state each time. */
+function GridRow({ label, home, tie, away, cls = "text-ink-low", delta }: {
+  label: string; home?: number | null; tie?: number | null;
+  away?: number | null; cls?: string; delta?: number | null;
+}) {
+  return (
+    <>
+      <span className="pr-1.5 text-left text-ink-faint">{label}</span>
+      <span className={`${CELL} ${cls}`}>{pct(home ?? undefined)}</span>
+      <span className={`${CELL} ${tie == null ? "text-ink-faint" : cls}`}>
+        {tie == null ? "\u00b7" : pct(tie)}
+      </span>
+      <span className={`${CELL} ${cls}`}>{pct(away ?? undefined)}</span>
+      <span className={`${CELL} pl-1 ${cls}`}>
+        {delta == null ? "" : `${delta > 0 ? "+" : ""}${(delta * 100).toFixed(0)}`}
+      </span>
+    </>
+  );
+}
+
 export function MarketVsReadInline({ d }: { d?: MarketVsReadData | null }) {
   if (!d?.available) return null;
   const tw = d.market_three_way;
+  const ms = d.market_share_by_side;
+  if (!tw) return null;
+
+  // Aligned by team, one column each, draw in the middle. The two rows
+  // that may be SUBTRACTED are adjacent and both labelled "share"; the
+  // win legs sit above them and are a different quantity.
+  //
+  // The rows are deliberately not interchangeable. Kalshi's 57% is
+  // Elche's chance of winning; our 61% is a points share with the draw
+  // already counted as half. Stacking those two directly would invite
+  // reading a -4 that does not exist — the real difference is 69 vs 61.
   return (
-    <span className="ml-2 inline-flex flex-col items-end leading-tight"
+    <span className="ml-2 grid shrink-0 grid-cols-[auto_3.1rem_3.1rem_3.1rem_1.7rem] font-mono text-[10px] leading-[1.35]"
       title={d.note}>
-      {tw && (
-        <span className="whitespace-nowrap font-mono text-[10px] text-ink-low">
-          <span className="pr-1 text-ink-faint">kalshi</span>
-          {shortClub(tw.home?.club)} {pct(tw.home?.p ?? undefined)}
-          <span className="px-1 text-ink-faint">·</span>
-          TIE {pct(tw.tie?.p ?? undefined)}
-          <span className="px-1 text-ink-faint">·</span>
-          {shortClub(tw.away?.club)} {pct(tw.away?.p ?? undefined)}
-        </span>
-      )}
-      <span className={`whitespace-nowrap font-mono text-[10px] ${
-        tone(d.direction)}`}>
-        <span className="pr-1 text-ink-faint">share</span>
-        k{pct(d.market_points_share)}
-        <span className="px-1 text-ink-faint">·</span>
-        r{pct(d.our_points_share)}
-        {d.disagreement != null && (
-          <span className="pl-1">
-            {d.disagreement > 0 ? "+" : ""}{(d.disagreement * 100).toFixed(0)}
-          </span>
-        )}
-      </span>
+      <span />
+      <span className="text-right text-accent">{shortClub(tw.home?.club)}</span>
+      <span className="text-right text-ink-faint">TIE</span>
+      <span className="text-right text-sky-400">{shortClub(tw.away?.club)}</span>
+      <span />
+      <GridRow label="win" home={tw.home?.p} tie={tw.tie?.p} away={tw.away?.p} />
+      <GridRow label="share" home={ms?.home} away={ms?.away} />
+      <GridRow label="read" home={d.our_points_share}
+        away={d.our_points_share == null ? null : 1 - d.our_points_share}
+        cls={tone(d.direction)} delta={d.disagreement} />
     </span>
   );
 }

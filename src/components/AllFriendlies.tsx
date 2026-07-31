@@ -246,8 +246,13 @@ export default function AllFriendlies() {
                       book
                     </span>
                   )}
-                  <StrengthCell s={r.strength} home={r.home?.name}
-                    away={r.away?.name} />
+                  {/* The grid carries its own read row. Showing the
+                      standalone cell too put the RAW read (70%) beside the
+                      CALIBRATED one (61%), both labelled as ours. */}
+                  {!r.market_vs_read?.available && (
+                    <StrengthCell s={r.strength} home={r.home?.name}
+                      away={r.away?.name} />
+                  )}
                   <MarketVsReadInline d={r.market_vs_read} />
                 </div>
               </Link>
