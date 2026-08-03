@@ -44,6 +44,18 @@ type Fixture = {
   strength?: Strength;
   market_vs_read?: MarketVsReadData | null;
   kalshi_event?: string | null;
+  meaning?: {
+    round?: string | null;
+    tie?: { leg?: number; first_leg?: string; means?: string };
+    stakes?: { means?: string; format?: string;
+               home?: { played?: number; w?: number; d_shootout?: number;
+                        l?: number; points?: number | null;
+                        points_range?: number[] | null };
+               away?: { played?: number; w?: number; d_shootout?: number;
+                        l?: number; points?: number | null;
+                        points_range?: number[] | null } };
+  } | null;
+  news?: { absences?: unknown[]; status?: string } | null;
 };
 type Payload = {
   display?: string; accent?: string; count?: number;
@@ -253,6 +265,56 @@ export default function CompViewer() {
                     </div>
                   </summary>
                   <div className="px-4 pb-4">
+                    {/* what the match MEANS — derived context, never a
+                        model input. Rendered ABOVE the numbers because
+                        "second leg, trailing 3-1" changes how every
+                        number below should be read. */}
+                    {(f.meaning?.tie?.means || f.meaning?.stakes) && (
+                      <div className="mt-3 rounded-xl border border-line bg-elev px-4 py-3">
+                        {f.meaning?.tie?.means && (
+                          <p className="text-sm leading-relaxed text-ink-mid">
+                            {f.meaning.tie.means}
+                          </p>
+                        )}
+                        {f.meaning?.stakes?.home && (() => {
+                          const rec = (r?: { played?: number; w?: number;
+                            d_shootout?: number; l?: number;
+                            points?: number | null;
+                            points_range?: number[] | null }) => r
+                            ? `${r.w}W ${r.d_shootout}D ${r.l}L · ` +
+                              (r.points != null ? `${r.points} pts`
+                                : r.points_range
+                                  ? `${r.points_range[0]}–${r.points_range[1]} pts`
+                                  : "0 pts")
+                            : "no matches yet";
+                          return (
+                            <p className="font-mono text-[11px] leading-relaxed text-ink-low">
+                              group phase · {shortClub(f.home?.name)}{" "}
+                              {rec(f.meaning?.stakes?.home)}
+                              <span className="px-1.5 text-ink-faint">·</span>
+                              {shortClub(f.away?.name)}{" "}
+                              {rec(f.meaning?.stakes?.away)}
+                            </p>
+                          );
+                        })()}
+                        {f.meaning?.stakes?.means && !f.meaning?.stakes?.home && (
+                          <p className="font-mono text-[11px] text-ink-low">
+                            {f.meaning.stakes.means}
+                          </p>
+                        )}
+                        {f.meaning?.stakes?.format && (
+                          <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-ink-faint">
+                            {f.meaning.stakes.format}
+                          </p>
+                        )}
+                        {f.news && (f.news.absences?.length ?? 0) > 0 && (
+                          <p className="mt-1.5 font-mono text-[10px] uppercase tracking-wide text-accent">
+                            {f.news.absences?.length} reported absence(s) —
+                            see match news
+                          </p>
+                        )}
+                      </div>
+                    )}
                     <MarketVsRead d={f.market_vs_read} s={f.strength} />
                   </div>
                   </details>
