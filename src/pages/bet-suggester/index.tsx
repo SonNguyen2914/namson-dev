@@ -472,7 +472,8 @@ export default function BetSuggesterDashboard() {
         <NavChip href="/bet-suggester/friendlies" active={false}>Friendlies</NavChip>
         {/* Viewer competitions: fixtures + Kalshi + strength read, no
             model. One shared page at /bet-suggester/comp/[key]. */}
-        {[["ecl", "Conference"], ["uel", "Europa"], ["ucl", "UCL"],
+        {[["leagues-cup", "Leagues Cup"],
+          ["ecl", "Conference"], ["uel", "Europa"], ["ucl", "UCL"],
           ["brasileirao", "Brasileirão"], ["argentina", "Argentina"],
           ["usl", "USL"]].map(([k, label]) => (
           <NavChip key={k} href={`/bet-suggester/comp/${k}`} active={false}>
