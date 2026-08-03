@@ -117,15 +117,15 @@ export function MarketVsReadInline({ d }: { d?: MarketVsReadData | null }) {
       <span className="text-right text-ink-faint">TIE</span>
       <span className="text-right text-sky-400">{shortClub(tw.away?.club)}</span>
       <span />
-      <GridRow label="win" home={tw.home?.p} tie={tw.tie?.p} away={tw.away?.p} />
+      <GridRow label="kalshi win" home={tw.home?.p} tie={tw.tie?.p} away={tw.away?.p} />
       {/* our own win/draw/loss, where a draw rate has been MEASURED for
           this kind of fixture — the row that makes the top line
           comparable leg by leg rather than only on the share */}
       {r3 && (
         <GridRow label="our win" home={r3.home} tie={r3.tie} away={r3.away} />
       )}
-      <GridRow label="share" home={ms?.home} away={ms?.away} />
-      <GridRow label="read" home={d.our_points_share}
+      <GridRow label="kalshi share" home={ms?.home} away={ms?.away} />
+      <GridRow label="our share" home={d.our_points_share}
         away={d.our_points_share == null ? null : 1 - d.our_points_share}
         cls={tone(d.direction)} delta={d.disagreement} />
     </span>
@@ -133,7 +133,12 @@ export function MarketVsReadInline({ d }: { d?: MarketVsReadData | null }) {
 }
 
 /** The full block for a detail page: both numbers, then the pick. */
-export default function MarketVsRead({ d }: { d?: MarketVsReadData | null }) {
+type EloSide = { club?: string; rating?: number; source?: string };
+
+export default function MarketVsRead({ d, s }: {
+  d?: MarketVsReadData | null;
+  s?: { home?: EloSide; away?: EloSide; source?: string } | null;
+}) {
   if (!d) return null;
   const p = d.pick;
 
@@ -207,7 +212,7 @@ export default function MarketVsRead({ d }: { d?: MarketVsReadData | null }) {
       <div className="mt-4 space-y-1.5">
         <div className="flex items-baseline justify-between">
           <span className="font-mono text-[11px] uppercase tracking-wide text-ink-faint">
-            kalshi
+            kalshi · market share
           </span>
           <span className="font-mono text-2xl text-ink-hi">
             {pct(d.market_points_share)}
@@ -215,7 +220,7 @@ export default function MarketVsRead({ d }: { d?: MarketVsReadData | null }) {
         </div>
         <div className="flex items-baseline justify-between">
           <span className="font-mono text-[11px] uppercase tracking-wide text-ink-faint">
-            our read{d.our_basis === "calibrated" ? " · calibrated" : ""}
+            our model{d.our_basis === "calibrated" ? " · calibrated" : ""}
           </span>
           <span className={`font-mono text-2xl ${tone(d.direction)}`}>
             {pct(d.our_points_share)}
@@ -232,6 +237,49 @@ export default function MarketVsRead({ d }: { d?: MarketVsReadData | null }) {
           </span>
         </div>
       </div>
+
+      {/* OUR bar, in the same visual language as Kalshi's above, so the
+          two sources compare segment against segment. Ours has two
+          segments unless a measured draw exists — that difference is
+          honest, not an omission. */}
+      {d.our_points_share != null && (() => {
+        const r3 = d.read_three_way;
+        const seg = r3
+          ? [{ p: r3.home, cls: "bg-accent/70" },
+             { p: r3.tie, cls: "bg-ink-faint/50" },
+             { p: r3.away, cls: "bg-sky-400/60" }]
+          : [{ p: d.our_points_share, cls: "bg-accent/70" },
+             { p: 1 - d.our_points_share, cls: "bg-sky-400/60" }];
+        return (
+          <div className="mt-4">
+            <div className="flex items-baseline justify-between font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+              <span>our model{r3 ? " · win / draw / win" : " · points share"}</span>
+            </div>
+            <div className="mt-1.5 flex h-2 overflow-hidden rounded-full border border-line">
+              {seg.map((x, i) => (
+                <div key={i} className={x.cls}
+                  style={{ width: `${(x.p ?? 0) * 100}%` }} />
+              ))}
+            </div>
+            <div className="mt-1 flex items-baseline justify-between font-mono text-[11px]">
+              <span className="text-accent">{pct(seg[0].p ?? undefined)}</span>
+              {r3 && <span className="text-ink-faint">{pct(r3.tie ?? undefined)}</span>}
+              <span className="text-sky-400">{pct((r3 ? r3.away : seg[1].p) ?? undefined)}</span>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* the raw ratings behind our number, with their source named */}
+      {(s?.home?.rating != null || s?.away?.rating != null) && (
+        <p className="mt-3 font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+          elo · {s?.home?.club || "home"}{" "}
+          <span className="text-ink-low">{s?.home?.rating?.toFixed(0) ?? "—"}</span>
+          {" · "}{s?.away?.club || "away"}{" "}
+          <span className="text-ink-low">{s?.away?.rating?.toFixed(0) ?? "—"}</span>
+          {" "}({(s?.home as EloSide & {source?: string})?.source || s?.source || "ratings"})
+        </p>
+      )}
 
       {/* The caveat sits WITH the number, not in a collapsed panel. A
           coloured gap with the explanation hidden reads as a tip. */}

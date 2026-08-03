@@ -253,7 +253,7 @@ export default function CompViewer() {
                     </div>
                   </summary>
                   <div className="px-4 pb-4">
-                    <MarketVsRead d={f.market_vs_read} />
+                    <MarketVsRead d={f.market_vs_read} s={f.strength} />
                   </div>
                   </details>
                 ))}
