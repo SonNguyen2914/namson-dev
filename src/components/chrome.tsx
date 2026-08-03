@@ -17,6 +17,23 @@ export function TopBar({ back, title, children }: {
       <div className="mx-auto flex h-12 max-w-5xl items-center gap-4 px-5">
         {back && (
           <Link href={back.href} aria-label={back.label}
+            onClick={(e) => {
+              // "back" means where the user WAS. A hardcoded href resets
+              // the board to its default league tab (WC26), losing their
+              // place — reported after every Leagues Cup visit. Real
+              // history wins when it exists; the href stays as the
+              // fallback for direct/bookmarked loads.
+              // same-origin referrer required: history.length counts
+              // about:blank/new-tab entries, so on a DIRECT load back()
+              // would exit the site — e2e decision-safety.spec caught
+              // exactly that. Direct loads follow the href fallback.
+              if (typeof window !== "undefined"
+                  && window.history.length > 1
+                  && document.referrer.startsWith(window.location.origin)) {
+                e.preventDefault();
+                window.history.back();
+              }
+            }}
             className="shrink-0 font-mono text-[11px] uppercase tracking-[0.16em] text-ink-low transition-colors hover:text-accent">
             {/* arrow always; the label only where there's room (sm+),
                 so the nav chip rail gets the full width on phones */}

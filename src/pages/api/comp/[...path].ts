@@ -7,7 +7,10 @@ import { proxy } from "../../../lib/suggesterProxy";
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const segs = ((req.query.path as string[]) || []).join("/");
   // "" is the listing; otherwise {key}/{fixtures|markets|status}
-  const ok = segs === "" || /^[a-z]{2,16}\/(fixtures|markets|status)$/.test(segs);
+  // hyphen allowed: "leagues-cup" is a real key. The first pattern was
+  // written against the six keys that existed at the time and silently
+  // 404'd the seventh — the LAFC-alias class of rot, applied to a regex.
+  const ok = segs === "" || /^[a-z][a-z-]{1,20}\/(fixtures|markets|status)$/.test(segs);
   if (req.method !== "GET" || !ok) {
     return res.status(404).json({ error: "unknown comp route" });
   }
