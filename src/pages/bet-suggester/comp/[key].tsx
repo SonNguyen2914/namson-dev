@@ -59,6 +59,10 @@ type Fixture = {
                         points_range?: number[] | null } };
   } | null;
   news?: { absences?: unknown[]; status?: string } | null;
+  weather?: { available?: boolean; place?: string;
+              temperature_c?: number;
+              precipitation_probability_pct?: number;
+              wind_speed_kmh?: number } | null;
 };
 type Payload = {
   display?: string; accent?: string; count?: number;
@@ -315,6 +319,16 @@ export default function CompViewer() {
                         {f.meaning?.stakes?.format && (
                           <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-ink-faint">
                             {f.meaning.stakes.format}
+                          </p>
+                        )}
+                        {f.weather?.available && (
+                          <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-ink-faint">
+                            kickoff weather · {f.weather.temperature_c}°C
+                            {f.weather.precipitation_probability_pct != null &&
+                              ` · rain ${f.weather.precipitation_probability_pct}%`}
+                            {f.weather.wind_speed_kmh != null &&
+                              ` · wind ${f.weather.wind_speed_kmh} km/h`}
+                            {f.weather.place && ` · ${f.weather.place}`}
                           </p>
                         )}
                         {f.news && (f.news.absences?.length ?? 0) > 0 && (

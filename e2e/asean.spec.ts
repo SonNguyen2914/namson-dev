@@ -63,6 +63,9 @@ const PAYLOAD = {
                 rating: 873 },
       },
       kalshi_event: "KXASEANGAME-26AUG07VIECAM",
+      weather: { available: true, place: "Hanoi, Vietnam",
+                 temperature_c: 27.4, precipitation_probability_pct: 39,
+                 wind_speed_kmh: 4.0 },
       meaning: {
         round: "Group Stage - 5",
         stakes: {
@@ -255,6 +258,17 @@ test("group tables render with qualification markers", async ({ page }) => {
   await expect(page.getByText("Group A").first()).toBeVisible();
   const vnRow = page.getByRole("row").filter({ hasText: "Vietnam" });
   await expect(vnRow.first()).toBeVisible();
+});
+
+test("kickoff weather renders with its resolved place visible", async ({
+  page,
+}) => {
+  await open(page);
+  // the place is part of the line — a mis-geocode must be SEEN
+  await expect(
+    page.getByText(/kickoff weather · 27.4°C · rain 39% · wind 4 km\/h · Hanoi, Vietnam/)
+      .first(),
+  ).toBeAttached();
 });
 
 test("the group-phase record renders standard draws, not undefined", async ({
