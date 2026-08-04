@@ -6,11 +6,17 @@ import { proxy } from "../../../lib/suggesterProxy";
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const segs = ((req.query.path as string[]) || []).join("/");
-  // "" is the listing; otherwise {key}/{fixtures|markets|status}
+  // "" is the listing; otherwise {key}/{fixtures|markets|status|tournament}
   // hyphen allowed: "leagues-cup" is a real key. The first pattern was
   // written against the six keys that existed at the time and silently
   // 404'd the seventh — the LAFC-alias class of rot, applied to a regex.
-  const ok = segs === "" || /^[a-z][a-z-]{1,20}\/(fixtures|markets|status)$/.test(segs);
+  // Then the RESOURCE list caught the same disease: "tournament" shipped
+  // backend-first and this allowlist silently 404'd it on prod while the
+  // hermetic specs stayed green (their route mocks intercept in the
+  // browser, so no test exercised this file). e2e/asean.spec.ts now has
+  // an unmocked proxy test pinning exactly this.
+  const ok = segs === "" ||
+    /^[a-z][a-z-]{1,20}\/(fixtures|markets|status|tournament)$/.test(segs);
   if (req.method !== "GET" || !ok) {
     return res.status(404).json({ error: "unknown comp route" });
   }

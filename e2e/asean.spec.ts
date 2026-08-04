@@ -272,6 +272,23 @@ test("a withheld forecast renders its reason, never a stale board", async ({
   await expect(page.getByText(/Group A/)).toHaveCount(0);
 });
 
+test("the comp proxy forwards tournament — unmocked on purpose", async ({
+  request,
+}) => {
+  // Every other test mocks fetch routes in the browser, so the Next API
+  // proxy at src/pages/api/comp/[...path].ts is never exercised — which
+  // is exactly how "tournament" shipped backend-first and 404'd on prod
+  // behind nine green specs. This hits the real dev server. Whatever the
+  // backend answers (payload, error, unreachable), the one response that
+  // proves the ALLOWLIST rejected it is the proxy's own 404 body.
+  for (const resource of ["fixtures", "markets", "tournament", "status"]) {
+    const r = await request.get(`/api/comp/asean/${resource}`);
+    const body = await r.text();
+    expect(body, `${resource} rejected by the proxy allowlist`)
+      .not.toContain("unknown comp route");
+  }
+});
+
 test("no tournament backend leaves the page intact", async ({ page }) => {
   await page.route("**/api/comp/asean/fixtures**", (r) =>
     r.fulfill(json(PAYLOAD)));
