@@ -102,11 +102,58 @@ const MARKETS = {
   events: [],
 };
 
+const TOURNAMENT = {
+  available: true,
+  format: "two groups, single round-robin; top two per group advance",
+  forecast_kind:
+    "EXTERNAL-RATING FORECAST — a Monte-Carlo simulation on " +
+    "eloratings.net's published national Elo. No model of ours runs on " +
+    "this competition and no number here is a model probability, an " +
+    "edge, or a recommendation.",
+  assumptions: {
+    draw: "p_draw(E) = 0.163 * (1 - |2E-1|); the anchor is MEASURED",
+    two_leg_ties: "P(advance) = single-match Elo expectation",
+  },
+  groups: [
+    { name: "Group A", table: [
+      { team: "Thailand", played: 3, w: 2, d: 0, l: 1, gf: 9, ga: 2,
+        gd: 7, points: 6 },
+      { team: "Malaysia", played: 3, w: 2, d: 0, l: 1, gf: 5, ga: 2,
+        gd: 3, points: 6 },
+      { team: "Laos", played: 3, w: 0, d: 0, l: 3, gf: 1, ga: 13,
+        gd: -12, points: 0 },
+    ] },
+    { name: "Group B", table: [
+      { team: "Vietnam", played: 3, w: 2, d: 1, l: 0, gf: 11, ga: 1,
+        gd: 10, points: 7 },
+      { team: "Singapore", played: 3, w: 2, d: 1, l: 0, gf: 5, ga: 2,
+        gd: 3, points: 7 },
+      { team: "Timor-Leste", played: 3, w: 0, d: 0, l: 3, gf: 0, ga: 15,
+        gd: -15, points: 0 },
+    ] },
+  ],
+  remaining_group_matches: 6,
+  knockout_fixtures_published: 0,
+  n_sims: 20000,
+  tiebreak_proxy_share: 0.2572,
+  champion: null,
+  champion_forecast: [
+    { team: "Vietnam", p_champion: 0.3608, p_final: 0.6551,
+      p_semis: 1.0 },
+    { team: "Thailand", p_champion: 0.3572, p_final: 0.6442,
+      p_semis: 0.9842 },
+    { team: "Laos", p_champion: 0.0, p_final: 0.0, p_semis: 0.0 },
+  ],
+  champion_forecast_leader: { team: "Vietnam", p: 0.3608 },
+};
+
 async function open(page: import("@playwright/test").Page) {
   await page.route("**/api/comp/asean/fixtures**", (r) =>
     r.fulfill(json(PAYLOAD)));
   await page.route("**/api/comp/asean/markets**", (r) =>
     r.fulfill(json(MARKETS)));
+  await page.route("**/api/comp/asean/tournament", (r) =>
+    r.fulfill(json(TOURNAMENT)));
   await page.goto("/bet-suggester/comp/asean");
 }
 
@@ -140,4 +187,52 @@ test("no bare trade verbs on a surface with no model", async ({ page }) => {
   await open(page);
   const body = (await page.textContent("body")) || "";
   expect(body).not.toMatch(/\b(TAKE|BUY NOW|SELL NOW)\b/);
+});
+
+test("the tournament surface crowns nobody and names its kind", async ({
+  page,
+}) => {
+  await open(page);
+  // forecast leader shown, explicitly NOT crowned
+  await expect(page.getByText(/36% in the forecast/).first()).toBeVisible();
+  await expect(page.getByText(/not crowned/).first()).toBeVisible();
+  // the kind disclaimer is on the page, not buried in a tooltip
+  await expect(
+    page.getByText(/external-rating forecast, not a model/i).first(),
+  ).toBeVisible();
+});
+
+test("group tables render with qualification markers", async ({ page }) => {
+  await open(page);
+  await expect(page.getByText("Group A").first()).toBeVisible();
+  const vnRow = page.getByRole("row").filter({ hasText: "Vietnam" });
+  await expect(vnRow.first()).toBeVisible();
+});
+
+test("a withheld forecast renders its reason, never a stale board", async ({
+  page,
+}) => {
+  await page.route("**/api/comp/asean/fixtures**", (r) =>
+    r.fulfill(json(PAYLOAD)));
+  await page.route("**/api/comp/asean/markets**", (r) =>
+    r.fulfill(json(MARKETS)));
+  await page.route("**/api/comp/asean/tournament", (r) =>
+    r.fulfill(json({ available: false,
+                     reason: "unrated teams: Atlantis: name_unmapped" })));
+  await page.goto("/bet-suggester/comp/asean");
+  await expect(page.getByText(/forecast withheld/).first()).toBeVisible();
+  await expect(page.getByText(/Group A/)).toHaveCount(0);
+});
+
+test("no tournament backend leaves the page intact", async ({ page }) => {
+  await page.route("**/api/comp/asean/fixtures**", (r) =>
+    r.fulfill(json(PAYLOAD)));
+  await page.route("**/api/comp/asean/markets**", (r) =>
+    r.fulfill(json(MARKETS)));
+  await page.route("**/api/comp/asean/tournament", (r) =>
+    r.fulfill({ status: 404, contentType: "application/json",
+                body: JSON.stringify({ detail: "no tournament surface" }) }));
+  await page.goto("/bet-suggester/comp/asean");
+  await expect(page.getByText("ASEAN Championship").first()).toBeVisible();
+  await expect(page.getByText(/Road to the title/)).toHaveCount(0);
 });

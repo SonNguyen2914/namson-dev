@@ -20,6 +20,7 @@ import { RouteProgress, TopBar } from "../../../components/chrome";
 import { Eyebrow, Reveal } from "../../../components/ui";
 import MarketVsRead, { MarketVsReadInline, type MarketVsReadData }
   from "../../../components/MarketVsRead";
+import TournamentView from "../../../components/TournamentView";
 import { TZ, dayLabel, groupByDay } from "../../../lib/matchday";
 
 type SideRating = {
@@ -199,6 +200,11 @@ export default function CompViewer() {
             {d?.model?.instead}
           </p>
         </section>
+
+        {/* WC26-style tournament surface — groups, bracket, champion
+            forecast. Mounts unconditionally; the backend's 404 is the
+            feature switch, so no per-competition frontend code. */}
+        {key && <TournamentView compKey={key} />}
 
         <div className="mt-8 flex flex-wrap items-center gap-3 font-mono text-[10px] uppercase tracking-wide">
           <span className="text-ink-faint">
