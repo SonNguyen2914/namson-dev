@@ -257,6 +257,21 @@ test("group tables render with qualification markers", async ({ page }) => {
   await expect(vnRow.first()).toBeVisible();
 });
 
+test("the group-phase record renders standard draws, not undefined", async ({
+  page,
+}) => {
+  // ASEAN serves `d` where Leagues Cup serves `d_shootout`; the renderer
+  // must read both. This shipped as "3W undefinedD 0L" on prod because
+  // the mock carried the right key but nothing asserted the line.
+  await open(page);
+  // the record lives inside a collapsed match card — attached, not
+  // visible, is the honest assertion; the undefined check reads the
+  // whole DOM either way
+  await expect(page.getByText(/3W 0D 0L · 9 pts/).first()).toBeAttached();
+  const body = (await page.textContent("body")) || "";
+  expect(body).not.toContain("undefined");
+});
+
 test("a withheld forecast renders its reason, never a stale board", async ({
   page,
 }) => {

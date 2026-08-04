@@ -49,10 +49,12 @@ type Fixture = {
     round?: string | null;
     tie?: { leg?: number; first_leg?: string; means?: string };
     stakes?: { means?: string; format?: string;
-               home?: { played?: number; w?: number; d_shootout?: number;
+               home?: { played?: number; w?: number; d?: number;
+                        d_shootout?: number;
                         l?: number; points?: number | null;
                         points_range?: number[] | null };
-               away?: { played?: number; w?: number; d_shootout?: number;
+               away?: { played?: number; w?: number; d?: number;
+                        d_shootout?: number;
                         l?: number; points?: number | null;
                         points_range?: number[] | null } };
   } | null;
@@ -284,10 +286,12 @@ export default function CompViewer() {
                         )}
                         {f.meaning?.stakes?.home && (() => {
                           const rec = (r?: { played?: number; w?: number;
-                            d_shootout?: number; l?: number;
+                            d?: number; d_shootout?: number; l?: number;
                             points?: number | null;
                             points_range?: number[] | null }) => r
-                            ? `${r.w}W ${r.d_shootout}D ${r.l}L · ` +
+                            // d: standard draws (ASEAN); d_shootout:
+                            // Leagues Cup's shootout-decided draws
+                            ? `${r.w}W ${r.d ?? r.d_shootout ?? 0}D ${r.l}L · ` +
                               (r.points != null ? `${r.points} pts`
                                 : r.points_range
                                   ? `${r.points_range[0]}–${r.points_range[1]} pts`
