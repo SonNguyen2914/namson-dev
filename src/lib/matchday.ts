@@ -13,16 +13,22 @@
 //    kickoff are one evening in the Americas; splitting them renders an
 //    artefact of the wire format.
 
-// EVERY time on this site renders in Los Angeles time, whoever is looking
+// EVERY time on this site renders in ONE fixed zone, whoever is looking
 // and wherever the machine rendering it happens to be.
 //
 // It used to render in the VIEWER's timezone, which is not the same thing
-// even when the viewer is in LA: server-side rendering runs in the
+// even when the viewer is local: server-side rendering runs in the
 // container's timezone (UTC on Railway), so the first paint and the
 // rehydrated paint could disagree about which day a fixture belongs to.
 // One fixed zone makes the board deterministic — the same page for
 // everyone, and the same page twice.
-export const TZ = "America/Los_Angeles";
+//
+// WHICH fixed zone is a separate decision from THAT it is fixed. It was
+// America/Los_Angeles from the US-market era; the operator lives in
+// Vietnam, and an 8pm Hanoi kickoff rendering as "6:00 AM" reads as a
+// bug every time (2026-08-04 audit). Every determinism property above
+// survives any fixed choice.
+export const TZ = "Asia/Ho_Chi_Minh";
 
 // Calendar-day identity IN LA. Deliberately not the ISO date (see above):
 // a 23:30Z and a 00:30Z kickoff are one evening here, and splitting them
