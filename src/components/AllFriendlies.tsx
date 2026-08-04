@@ -52,6 +52,7 @@ type Row = {
   goals?: { home: number | null; away: number | null };
   kalshi?: { state?: string; event_ticker?: string; means?: string };
   market_vs_read?: MarketVsReadData | null;
+  meaning?: { stakes?: { means?: string } } | null;
   strength?: Strength;
 };
 
@@ -275,6 +276,15 @@ export default function AllFriendlies() {
                 </div>
               </summary>
               <div className="px-4 pb-4">
+                {/* what the match MEANS — for a friendly, that it means
+                    nothing competitively, which is exactly why the read
+                    is shrunk. In the payload since the meaning layer
+                    shipped; never rendered until now. */}
+                {r.meaning?.stakes?.means && (
+                  <p className="mt-3 rounded-xl border border-line bg-elev px-4 py-3 font-mono text-[11px] leading-relaxed text-ink-low">
+                    {r.meaning.stakes.means}
+                  </p>
+                )}
                 <MarketVsRead d={r.market_vs_read} s={r.strength} />
                 <Link href={`/bet-suggester/friendlies/${r.fixture_id}`}
                   className="mt-3 inline-block font-mono text-[10px] uppercase tracking-wide text-accent hover:underline">
