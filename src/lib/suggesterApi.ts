@@ -690,6 +690,10 @@ const FLAGS: Record<string, string> = {
   "Australia": "🇦🇺", "Cape Verde": "🇨🇻", "Ivory Coast": "🇨🇮",
   "Algeria": "🇩🇿", "Austria": "🇦🇹", "Scotland": "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Haiti": "🇭🇹",
   "DR Congo": "🇨🇩", "Canada": "🇨🇦",
+  // ASEAN Championship field
+  "Vietnam": "🇻🇳", "Thailand": "🇹🇭", "Indonesia": "🇮🇩", "Malaysia": "🇲🇾",
+  "Singapore": "🇸🇬", "Philippines": "🇵🇭", "Myanmar": "🇲🇲",
+  "Cambodia": "🇰🇭", "Laos": "🇱🇦", "Brunei": "🇧🇳", "Timor-Leste": "🇹🇱",
 };
 
 export const flag = (team: string): string => FLAGS[team] ?? "⚽";

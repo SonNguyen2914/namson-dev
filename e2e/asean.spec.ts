@@ -145,6 +145,34 @@ const TOURNAMENT = {
     { team: "Laos", p_champion: 0.0, p_final: 0.0, p_semis: 0.0 },
   ],
   champion_forecast_leader: { team: "Vietnam", p: 0.3608 },
+  bracket: {
+    projected: true,
+    basis: "slots filled by simulating the remaining group matches from " +
+      "current standings — the pairings are NOT drawn until the groups " +
+      "finish",
+    semifinals: [
+      { name: "SF1",
+        home_slot: { label: "Group A winner",
+          dist: [{ team: "Thailand", p: 0.62 },
+                 { team: "Malaysia", p: 0.38 }] },
+        away_slot: { label: "Group B runner-up",
+          dist: [{ team: "Singapore", p: 0.55 },
+                 { team: "Indonesia", p: 0.41 }] },
+        winner_dist: [{ team: "Thailand", p: 0.52 }] },
+      { name: "SF2",
+        home_slot: { label: "Group B winner",
+          dist: [{ team: "Vietnam", p: 0.71 }] },
+        away_slot: { label: "Group A runner-up",
+          dist: [{ team: "Malaysia", p: 0.5 }] },
+        winner_dist: [{ team: "Vietnam", p: 0.63 }] },
+    ],
+    final: {
+      home_slot: { label: "SF1 winner",
+        dist: [{ team: "Thailand", p: 0.52 }] },
+      away_slot: { label: "SF2 winner",
+        dist: [{ team: "Vietnam", p: 0.63 }] },
+    },
+  },
 };
 
 async function open(page: import("@playwright/test").Page) {
@@ -193,13 +221,33 @@ test("the tournament surface crowns nobody and names its kind", async ({
   page,
 }) => {
   await open(page);
-  // forecast leader shown, explicitly NOT crowned
-  await expect(page.getByText(/36% in the forecast/).first()).toBeVisible();
+  // the champion spot carries the % inside it, explicitly NOT crowned
+  const box = page.locator("section", { hasText: "Road to the title" })
+    .getByText("36%", { exact: true });
+  await expect(box.first()).toBeVisible();
   await expect(page.getByText(/not crowned/).first()).toBeVisible();
   // the kind disclaimer is on the page, not buried in a tooltip
   await expect(
     page.getByText(/external-rating forecast, not a model/i).first(),
   ).toBeVisible();
+});
+
+test("bracket cards ghost their slots as forecast, never model", async ({
+  page,
+}) => {
+  await open(page);
+  // slot labels render with their most likely occupant and its %
+  await expect(page.getByText("Group A winner").first()).toBeVisible();
+  await expect(page.getByText(/Thailand 62%/).first()).toBeVisible();
+  // the projected disclaimer sits under the cards
+  await expect(
+    page.getByText(/pairings are not drawn until the groups finish/i)
+      .first(),
+  ).toBeVisible();
+  // the ghost line says forecast — the word "model:" may not appear
+  const body = (await page.textContent("body")) || "";
+  expect(body).toMatch(/forecast:/);
+  expect(body).not.toMatch(/model:/);
 });
 
 test("group tables render with qualification markers", async ({ page }) => {

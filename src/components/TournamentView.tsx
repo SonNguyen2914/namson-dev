@@ -1,16 +1,18 @@
-// Tournament surface for viewer competitions that have one — groups,
-// bracket skeleton, and a champion FORECAST. Mirrors BracketView's
-// flipped-pyramid language (champion crowns the top, the road unfolds
-// beneath) with one structural difference it must never lose: BracketView
-// shows a MODEL's win probabilities and edges; this shows a Monte-Carlo
-// forecast on an EXTERNAL published rating (eloratings.net). No edge
-// column exists here because no edge exists here.
+// Tournament surface for viewer competitions that have one — built on the
+// WC26 page's bracket language: the champion spot crowns the top with its
+// percentage inside, then the flipped pyramid unfolds beneath (final,
+// semis, groups). One structural difference it must never lose: the WC26
+// bracket shows a MODEL's win probabilities and edges; this shows a
+// Monte-Carlo forecast on an EXTERNAL published rating (eloratings.net).
+// Every ghost line under an unresolved slot says "forecast:", never
+// "model:", and no edge column exists because no edge exists here.
 //
 // Renders null for competitions whose backend serves no tournament —
 // the 404 is the feature switch, so this component mounts unconditionally
 // on the shared /comp/[key] page without per-competition frontend code.
 import { useEffect, useState } from "react";
 
+import { flag } from "../lib/suggesterApi";
 import { Eyebrow, Reveal } from "./ui";
 
 type TableRow = {
@@ -19,6 +21,25 @@ type TableRow = {
 };
 type ForecastRow = {
   team: string; p_champion: number; p_final: number; p_semis: number;
+};
+type SlotDist = { team: string; p: number };
+type Slot = { label: string; dist: SlotDist[] };
+type ProjectedTie = {
+  name: string; home_slot: Slot; away_slot: Slot; winner_dist?: SlotDist[];
+};
+type RealTie = {
+  teams: { team: string; p_advance: number | null }[];
+  legs: { kickoff_utc?: string; status?: string; home?: string;
+          away?: string; goals?: { home: number | null;
+                                   away: number | null } }[];
+  aggregate?: string | null;
+  legs_settled?: number;
+};
+type Bracket = {
+  projected: boolean; basis?: string;
+  semifinals?: (ProjectedTie | RealTie)[];
+  final?: { home_slot: Slot; away_slot: Slot };
+  final_ties?: RealTie[];
 };
 type Tournament = {
   available?: boolean; reason?: string;
@@ -31,10 +52,10 @@ type Tournament = {
   champion?: string | null;
   champion_forecast?: ForecastRow[];
   champion_forecast_leader?: { team: string; p: number } | null;
+  bracket?: Bracket;
 };
 
-const pct = (p: number) =>
-  `${(p * 100).toFixed(p >= 0.1 ? 0 : 1)}%`;
+const pct = (p: number) => `${(p * 100).toFixed(p >= 0.1 ? 0 : 1)}%`;
 
 export default function TournamentView({ compKey }: { compKey: string }) {
   const [t, setT] = useState<Tournament | null>(null);
@@ -64,7 +85,7 @@ export default function TournamentView({ compKey }: { compKey: string }) {
   }
   const fc = t.champion_forecast || [];
   const lead = t.champion_forecast_leader;
-  const semisKnown = (t.knockout_fixtures_published || 0) > 0;
+  const b = t.bracket;
 
   return (
     <Reveal>
@@ -81,7 +102,7 @@ export default function TournamentView({ compKey }: { compKey: string }) {
         </p>
 
         <div className="mx-auto max-w-4xl">
-          {/* champion box — dashed until the real final crowns someone */}
+          {/* ============ the champion spot, % inside ============ */}
           <div className="mx-auto max-w-xs">
             <p className="mb-1.5 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-accent">
               Champion
@@ -92,17 +113,22 @@ export default function TournamentView({ compKey }: { compKey: string }) {
                 : "border-dashed border-line"
             }`}>
               {t.champion ? (
-                <p className="text-lg font-semibold text-ink-hi">{t.champion}</p>
+                <p className="text-lg font-semibold text-ink-hi">
+                  {flag(t.champion)} {t.champion}
+                </p>
               ) : lead ? (
                 <>
-                  <p className="text-lg font-semibold text-ink-hi">
-                    {lead.team}
-                  </p>
-                  <p className="mt-1 font-mono text-[11px] text-accent">
-                    {pct(lead.p)} in the forecast
+                  <p className="flex items-baseline justify-center gap-2">
+                    <span className="text-lg font-semibold text-ink-hi">
+                      {flag(lead.team)} {lead.team}
+                    </span>
+                    <span className="font-mono text-2xl font-semibold tabular-nums text-accent">
+                      {pct(lead.p)}
+                    </span>
                   </p>
                   <p className="mt-1 font-mono text-[9px] uppercase tracking-wide text-ink-faint">
-                    not crowned — {t.n_sims?.toLocaleString()} simulations
+                    forecast · not crowned ·{" "}
+                    {t.n_sims?.toLocaleString()} sims
                   </p>
                 </>
               ) : (
@@ -111,20 +137,40 @@ export default function TournamentView({ compKey }: { compKey: string }) {
             </div>
           </div>
 
-          <PyramidGap />
+          <BranchLines />
           <RoundLabel>Final · two legs</RoundLabel>
           <div className="mx-auto max-w-md">
-            <TieCard label={semisKnown ? "TBD" : "Winner SF1 v Winner SF2"} />
+            {b?.projected && b.final ? (
+              <ProjectedCard
+                home={b.final.home_slot} away={b.final.away_slot} emphasis />
+            ) : b?.final_ties?.length ? (
+              b.final_ties.map((tie, i) => (
+                <RealTieCard key={i} tie={tie} emphasis />
+              ))
+            ) : (
+              <PlaceholderCard label="TBD" />
+            )}
           </div>
 
-          <PyramidGap />
+          <BranchLines />
           <RoundLabel>Semi-finals · two legs</RoundLabel>
           <div className="mx-auto grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-2">
-            <TieCard label="Winner A v Runner-up B" />
-            <TieCard label="Winner B v Runner-up A" />
+            {b?.projected
+              ? (b.semifinals as ProjectedTie[] | undefined)?.map((sf) => (
+                  <ProjectedCard key={sf.name} home={sf.home_slot}
+                    away={sf.away_slot} winner={sf.winner_dist?.[0]} />
+                ))
+              : (b?.semifinals as RealTie[] | undefined)?.map((tie, i) => (
+                  <RealTieCard key={i} tie={tie} />
+                ))}
           </div>
+          {b?.projected && (
+            <p className="mt-2 text-center font-mono text-[9px] uppercase tracking-wide text-ink-faint">
+              projected — pairings are not drawn until the groups finish
+            </p>
+          )}
 
-          <PyramidGap />
+          <BranchLines />
           <RoundLabel>Groups</RoundLabel>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {(t.groups || []).map((g) => (
@@ -151,7 +197,7 @@ export default function TournamentView({ compKey }: { compKey: string }) {
                           {i < 2 && (
                             <span className="mr-1 text-accent">▸</span>
                           )}
-                          {r.team}
+                          {flag(r.team)} {r.team}
                         </td>
                         <td className="py-0.5 pr-2 text-right">{r.played}</td>
                         <td className="py-0.5 pr-2 text-right">
@@ -181,8 +227,8 @@ export default function TournamentView({ compKey }: { compKey: string }) {
               {fc.map((r) => (
                 <div key={r.team}
                   className="flex items-center gap-3 font-mono text-[11px]">
-                  <span className="w-24 shrink-0 truncate text-ink-mid">
-                    {r.team}
+                  <span className="w-28 shrink-0 truncate text-ink-mid">
+                    {flag(r.team)} {r.team}
                   </span>
                   <div className="h-2 flex-1 overflow-hidden rounded bg-line/40">
                     <div className="h-full rounded bg-accent/70"
@@ -215,6 +261,11 @@ export default function TournamentView({ compKey }: { compKey: string }) {
                       {pct(t.tiebreak_proxy_share)} of simulations
                     </li>
                   )}
+                  {b?.basis && (
+                    <li>
+                      <span className="text-ink-low">bracket:</span> {b.basis}
+                    </li>
+                  )}
                 </ul>
               </details>
             )}
@@ -233,14 +284,128 @@ function RoundLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function PyramidGap() {
-  return <div className="mx-auto my-4 h-5 w-px bg-line" aria-hidden />;
+// Subtle centered connector between rounds — same drop the WC26 bracket
+// uses, so the two pages read as one family.
+function BranchLines() {
+  return (
+    <div className="flex justify-center py-2" aria-hidden>
+      <div className="h-5 w-px bg-line" />
+    </div>
+  );
 }
 
-function TieCard({ label }: { label: string }) {
+function PlaceholderCard({ label }: { label: string }) {
   return (
     <div className="rounded-xl border border-dashed border-line p-3 text-center font-mono text-[11px] text-ink-faint">
       {label}
+    </div>
+  );
+}
+
+// An unresolved slot, WC26-style: the slot label carries a ghosted
+// forecast of its most likely occupant — labelled "forecast:", never
+// "model:" — and the occupant's probability sits where the WC26 card
+// puts its win probability.
+function SlotLine({ slot, leader }: { slot: Slot; leader: boolean }) {
+  const top = slot.dist?.[0];
+  return (
+    <div className="flex items-center gap-2">
+      <span className="shrink-0 text-base opacity-60">
+        {top ? flag(top.team) : "•"}
+      </span>
+      <span className="min-w-0 flex-1 text-sm text-ink-low">
+        <span className="block truncate">{slot.label}</span>
+        {top && (
+          <span className="block truncate font-mono text-[9px] uppercase tracking-[0.12em] text-ink-faint">
+            forecast:{" "}
+            <span className="text-accent/80">
+              {top.team} {pct(top.p)}
+            </span>
+          </span>
+        )}
+      </span>
+      {top && (
+        <span className={`shrink-0 font-mono text-xs tabular-nums ${
+          leader ? "text-accent" : "text-ink-low"}`}>
+          {pct(top.p)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function ProjectedCard({ home, away, winner, emphasis = false }: {
+  home: Slot; away: Slot; winner?: SlotDist; emphasis?: boolean;
+}) {
+  const hp = home.dist?.[0]?.p ?? 0;
+  const ap = away.dist?.[0]?.p ?? 0;
+  return (
+    <div className={`rounded-xl border border-dashed border-line p-3 ${
+      emphasis ? "bg-elev" : ""}`}>
+      <SlotLine slot={home} leader={hp >= ap} />
+      <div className="my-1.5 h-px bg-line" />
+      <SlotLine slot={away} leader={ap > hp} />
+      {winner && (
+        <p className="mt-2 text-center font-mono text-[10px] tracking-wide text-ink-faint">
+          tie forecast:{" "}
+          <span className="text-accent/80">
+            {winner.team} {pct(winner.p)}
+          </span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+// A published two-legged tie: real teams, real legs, aggregate as it
+// lands. p_advance is the Elo expectation; no winner is claimed from an
+// aggregate — regulations decide those, not this card.
+function RealTieCard({ tie, emphasis = false }: {
+  tie: RealTie; emphasis?: boolean;
+}) {
+  const [t1, t2] = tie.teams;
+  const lead1 = (t1.p_advance ?? 0) >= (t2.p_advance ?? 0);
+  return (
+    <div className={`rounded-xl border border-line p-3 ${
+      emphasis ? "border-accent/30 bg-elev" : ""}`}>
+      {[t1, t2].map((s, i) => (
+        <div key={s.team}>
+          {i === 1 && <div className="my-1.5 h-px bg-line" />}
+          <div className="flex items-center gap-2">
+            <span className="shrink-0 text-base">{flag(s.team)}</span>
+            <span className={`min-w-0 flex-1 truncate text-sm ${
+              (i === 0 ? lead1 : !lead1) ? "text-ink-hi" : "text-ink-mid"}`}>
+              {s.team}
+            </span>
+            {s.p_advance != null && (
+              <span className={`shrink-0 font-mono text-xs tabular-nums ${
+                (i === 0 ? lead1 : !lead1) ? "text-accent" : "text-ink-low"}`}>
+                {pct(s.p_advance)}
+              </span>
+            )}
+          </div>
+        </div>
+      ))}
+      <div className="mt-2 space-y-0.5 text-center font-mono text-[10px] tracking-wide text-ink-faint">
+        {tie.aggregate && (
+          <p>
+            aggregate <span className="text-ink-hi">{tie.aggregate}</span>
+            {" "}after {tie.legs_settled} leg{tie.legs_settled === 1 ? "" : "s"}
+          </p>
+        )}
+        {tie.legs?.map((l, i) => (
+          <p key={i}>
+            leg {i + 1} · {l.home} v {l.away} ·{" "}
+            {l.status && l.status !== "NS" && l.goals?.home != null
+              ? `${l.goals.home}-${l.goals.away} (${l.status})`
+              : l.kickoff_utc
+                ? new Date(l.kickoff_utc).toLocaleString("en-US", {
+                    month: "short", day: "numeric", hour: "numeric",
+                    minute: "2-digit" })
+                : "TBD"}
+          </p>
+        ))}
+      </div>
     </div>
   );
 }
