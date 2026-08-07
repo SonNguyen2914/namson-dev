@@ -23,12 +23,16 @@
 // One fixed zone makes the board deterministic — the same page for
 // everyone, and the same page twice.
 //
-// WHICH fixed zone is a separate decision from THAT it is fixed. It was
-// America/Los_Angeles from the US-market era; the operator lives in
-// Vietnam, and an 8pm Hanoi kickoff rendering as "6:00 AM" reads as a
-// bug every time (2026-08-04 audit). Every determinism property above
-// survives any fixed choice.
-export const TZ = "Asia/Ho_Chi_Minh";
+// WHICH fixed zone is a separate decision from THAT it is fixed, and it
+// is the OPERATOR'S, not an inference. On 2026-08-06 this was changed to
+// Asia/Ho_Chi_Minh because an agent inferred the operator's location from
+// the competitions being worked on. They are in California. Every kickoff
+// on the site rendered ~15 hours off for a day, and a whole matchday of
+// fixtures appeared under the wrong day heading.
+//
+// The rule that follows: this constant is set from what the operator has
+// SAID, and from nothing else. If it is ever unclear, ask.
+export const TZ = "America/Los_Angeles";
 
 // Calendar-day identity IN LA. Deliberately not the ISO date (see above):
 // a 23:30Z and a 00:30Z kickoff are one evening here, and splitting them
