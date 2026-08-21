@@ -26,7 +26,9 @@ import { Eyebrow, Reveal } from "./ui";
 
 type Refusable<T> = T | { refused?: string; unavailable?: string };
 
-type Headline = { value: number | string; reason?: string; meaning?: string };
+type Headline = { value: number | string; reason?: string;
+  meaning?: string; warning?: string; disagreement_tvd?: number;
+  ledger_row?: number | string };
 
 type Identity = { home?: string; away?: string; kickoff_utc?: string;
   venue?: string; venue_class?: string; status?: string;
@@ -190,12 +192,31 @@ function HeadlineBlock({ h }: { h?: Headline }) {
       </div>
     );
   }
+  // A WARNED number is never painted as an opportunity. The rail exists
+  // because a large model-market disagreement measured WORSE, not
+  // better (ledger row 8) — so the accent colour, which the eye reads
+  // as "take this", is withheld and the warning outranks the meaning.
+  const warned = typeof h.warning === "string" && h.warning.length > 0;
   return (
     <div>
       <p className={`font-mono text-4xl tabular-nums tracking-tight ${
-        h.value >= 0 ? "text-accent" : "text-ink-hi"}`}>
+        warned ? "text-warn" : h.value >= 0 ? "text-accent" : "text-ink-hi"}`}>
         {signed4(h.value)}
       </p>
+      {warned && (
+        <p
+          data-testid="headline-warning"
+          className="mt-2 max-w-xl rounded-lg border border-warn/40 px-3 py-2 font-mono text-[11px] leading-relaxed text-warn"
+        >
+          {h.warning}
+          {h.disagreement_tvd != null && (
+            <span className="ml-1 text-ink-low">
+              (model−market {h.disagreement_tvd.toFixed(3)}
+              {h.ledger_row != null && `, ledger row ${h.ledger_row}`})
+            </span>
+          )}
+        </p>
+      )}
       {h.meaning && (
         <p className="mt-2 max-w-xl font-mono text-[11px] leading-relaxed text-ink-low">
           {h.meaning}
