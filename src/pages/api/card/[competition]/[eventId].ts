@@ -54,8 +54,33 @@ export default async function handler(
     }
     const cr = await fetch(
       `${BACKEND}/api/${competition}/card/${resolved.fixture_id}`);
-    const data = await cr.json();
-    return res.status(cr.status).json(data);
+    // Pass the backend's BYTES through untouched: content_hash is
+    // sha256 over the backend's own serialization, and re-encoding here
+    // (float formatting, accent escapes) made the hash unverifiable
+    // from the dashboard (5-match audit, 2026-08-20). Parse a copy only
+    // to guard identity.
+    const raw = await cr.text();
+    if (cr.ok) {
+      // The same audit caught ONE transient wrong-fixture serve (event
+      // 761726 briefly answered with fixture 144's card). Whatever the
+      // resolver race was, the card names its own espn_event_id — so
+      // refuse loudly rather than hand the user another match's card.
+      try {
+        const espn = JSON.parse(raw)?.card?.layers?.identity
+          ?.espn_event_id;
+        if (espn && String(espn) !== eventId) {
+          return res.status(502).json({
+            error: `resolver mismatch: asked for event ${eventId} but `
+              + `the card identifies as event ${espn} — refusing to `
+              + "serve the wrong match's card; retry",
+          });
+        }
+      } catch { /* unparseable guard input never blocks the passthrough */ }
+    }
+    res.status(cr.status);
+    res.setHeader("content-type",
+      cr.headers.get("content-type") || "application/json");
+    return res.send(raw);
   } catch (err) {
     return res.status(502).json({
       error: "Backend unreachable", detail: String(err) });
