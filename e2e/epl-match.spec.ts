@@ -91,6 +91,9 @@ test.describe("EPL scenario fee policy", () => {
       // contracts — 100 x $0.10 plus the $0.63 whole-order fee — and the
       // linear float agrees at this price. It pins that the wiring is
       // live and produces the canonical numbers end to end.
+      await page.route("**/api/card/**", (route) =>   // hermetic: the card fetch stays recorded too
+        route.fulfill({ status: 404, contentType: "application/json",
+                        body: JSON.stringify({ error: "no live-plane fixture in this recorded world" }) }));
       await page.route(`**/api/epl/match/${EVENT}`, (r) =>
         r.fulfill({ status: 200, contentType: "application/json",
                     body: JSON.stringify(MATCH_PAYLOAD) }));
@@ -110,6 +113,9 @@ test.describe("EPL scenario fee policy", () => {
 
   test("the scenario states which fees are NOT modelled",
     async ({ page }) => {
+      await page.route("**/api/card/**", (route) =>   // hermetic: the card fetch stays recorded too
+        route.fulfill({ status: 404, contentType: "application/json",
+                        body: JSON.stringify({ error: "no live-plane fixture in this recorded world" }) }));
       await page.route(`**/api/epl/match/${EVENT}`, (r) =>
         r.fulfill({ status: 200, contentType: "application/json",
                     body: JSON.stringify(MATCH_PAYLOAD) }));

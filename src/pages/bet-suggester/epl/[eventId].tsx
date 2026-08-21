@@ -16,6 +16,7 @@ import { FEE_NOT_MODELED, maxContractsForStake, orderCostDollars,
   unitFeeDollars } from "../../../lib/fee";
 import { Eyebrow, Reveal } from "../../../components/ui";
 import { Collapse, NavChip, TopBar, useScrollSpy } from "../../../components/chrome";
+import SuggestionCard from "../../../components/SuggestionCard";
 
 type Side = { name?: string; abbrev?: string; logo?: string; score?: string;
   color?: string; alt_color?: string };
@@ -132,7 +133,7 @@ export default function EplMatchPage() {
   const run = model?.primary ?? model?.latest;
   const secsToKick = m?.date && now > 0
     ? Math.floor((new Date(m.date).getTime() - now) / 1000) : null;
-  const activeSection = useScrollSpy(["prediction", "strategy", "markets", "stats"]);
+  const activeSection = useScrollSpy(["card", "prediction", "strategy", "markets", "stats"]);
 
   return (
     <div style={EPL_VARS} className="min-h-screen bg-bs font-sans text-ink-mid">
@@ -152,6 +153,7 @@ export default function EplMatchPage() {
             </span>
           </NavChip>
         )}
+        <NavChip href="#card" active={activeSection === "card"}>Card</NavChip>
         <NavChip href="#markets" active={activeSection === "markets"}>Markets</NavChip>
         <NavChip href="#prediction" active={activeSection === "prediction"}>Prediction</NavChip>
         <NavChip href="#strategy" active={activeSection === "strategy"}>Strategy</NavChip>
@@ -210,6 +212,13 @@ export default function EplMatchPage() {
 
             {/* in play, the live read jumps the queue — see bottom */}
             {live && <LiveBlock m={m} promoted />}
+
+            {/* ===== the suggestion card — every layer present or
+                refusing by name (card-v1) ===== */}
+            {eventId && (
+              <SuggestionCard key={eventId} competition="epl-2026"
+                eventId={eventId} />
+            )}
 
             {/* ===== how they play — fitted ratings; absent while dark ===== */}
             <HowTheyPlay m={m} run={run} />

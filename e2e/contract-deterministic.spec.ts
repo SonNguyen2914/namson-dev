@@ -32,6 +32,11 @@ async function serve(page: import("@playwright/test").Page, body: unknown) {
   await page.route(`**/api/mls/match/${EVENT}`, (route) =>
     route.fulfill({ status: 200, contentType: "application/json",
                     body: JSON.stringify(body) }));
+  // the match hub now mounts the suggestion card; stub its fetch so
+  // this spec stays hermetic (no backend involved)
+  await page.route("**/api/card/**", (route) =>
+    route.fulfill({ status: 404, contentType: "application/json",
+                    body: JSON.stringify({ error: "no live-plane fixture in this recorded world" }) }));
 }
 
 test.describe("deterministic contract tests (recorded payloads)", () => {
