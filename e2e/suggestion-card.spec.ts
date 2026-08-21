@@ -21,6 +21,12 @@ import { expect, test } from "@playwright/test";
 //     verbatim with no numbers behind it, and a payload WITHOUT
 //     live_now — every pre and post card — renders no live block at
 //     all.
+//  6. the LIVE STATE readout under that bar: possession, shots, on
+//     target, corners, cards, threat and the exploratory tilt label
+//     render what the tape carries — and a stat the tape does NOT
+//     carry renders "—", never 0. A real 0 still prints as 0; the two
+//     are different facts and this suite pins the difference. A
+//     live_now with no state renders the block exactly as before.
 
 const EVENT = "999999";
 
@@ -277,6 +283,45 @@ const LIVE_NOW_REFUSED = {
   score: "0-0", refused: LIVE_REFUSAL,
 };
 
+// --- the state sub-block (live_now.state) ----------------------------
+//
+// FULL: every field the backend can attach. Note red.home is null while
+// red.away is 1 — one side observed, the other not, on the same row.
+const LIVE_STATE = {
+  possession: { home: 61.4, away: 38.6 },
+  shots: { home: 14, away: 6 },
+  on_target: { home: 5, away: 1 },
+  corners: { home: 9, away: 2 },
+  cards: { yellow: { home: 1, away: 3 }, red: { home: null, away: 1 } },
+  threat: 0.72,
+  tilt_label: "SIEGE",
+  tilt_note: "one side is camped in the other's half — an EXPLORATORY "
+    + "split of the live state, not a measured pattern: nothing is "
+    + "backtested behind it and no number prices off it",
+};
+
+// GAPS: the case the readout exists for. possession is present but
+// unknown on both sides; shots knows the home count (which is ZERO —
+// a reading, not an absence) and not the away one; on_target is null
+// outright; corners knows both, one of them a real 0; threat carries
+// the collector's refusal instead of an index; no cards key at all.
+const THREAT_REFUSAL = "no shot-location feed on this row — the threat "
+  + "index is not computed from counts, and this card will not stand "
+  + "one up from the ones it has";
+
+const LIVE_STATE_GAPS = {
+  possession: { home: null, away: null },
+  shots: { home: 0, away: null },
+  on_target: null,
+  corners: { home: 3, away: 0 },
+  threat: { refused: THREAT_REFUSAL },
+  tilt_label: null,
+};
+
+function withState(live: Record<string, unknown>, state: unknown) {
+  return { ...live, state };
+}
+
 function withHeadline(headline: unknown) {
   const c = JSON.parse(JSON.stringify(CARD_PAYLOAD));
   c.card.headline = headline;
@@ -458,6 +503,149 @@ test.describe("suggestion card (recorded payloads)", () => {
       await expect(page.getByText(/frozen T-10 lock/i)).toHaveCount(0);
       await expect(page.getByText(/updated \d\d:\d\d:\d\dZ/))
         .toHaveCount(0);
+    });
+
+  test("live_now.state renders the tape's own counts — possession as a "
+    + "share, shots / on target / corners / cards as pairs, and the "
+    + "tilt label with its note", async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page, withLiveNow(withState(LIVE_NOW, LIVE_STATE)));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const live = page.getByTestId("live-now");
+      const st = page.getByTestId("live-state");
+      await expect(st).toBeVisible();
+      // observation, said in words — this is not model output
+      await expect(st).toContainText(/observed on the tape, not modelled/);
+
+      // possession: the two shares, and a bar drawn from the SAME pair
+      const poss = page.getByTestId("live-stat-possession");
+      await expect(poss.locator("span.text-accent")).toHaveText("61.4%");
+      await expect(poss.locator("span.text-sky-400")).toHaveText("38.6%");
+      const posWidths = await page.getByTestId("possession-bar")
+        .locator("div").evaluateAll((els) => els.map(
+          (e) => Math.round(parseFloat((e as HTMLElement).style.width)
+                            * 10) / 10));
+      expect(posWidths).toEqual([61.4, 38.6]);
+
+      // the count pairs, home in the accent and away in the sky — the
+      // same two colours the probability bar gives the same two teams
+      for (const [id, h, a] of [
+        ["shots", "14", "6"], ["on-target", "5", "1"],
+        ["corners", "9", "2"], ["yellow", "1", "3"],
+      ] as const) {
+        const row = page.getByTestId(`live-stat-${id}`);
+        await expect(row.locator("span.text-accent")).toHaveText(h);
+        await expect(row.locator("span.text-sky-400")).toHaveText(a);
+      }
+      // one side observed, the other not, on the SAME row
+      const red = page.getByTestId("live-stat-red");
+      await expect(red.locator("span.text-accent")).toHaveText("\u2014");
+      await expect(red.locator("span.text-sky-400")).toHaveText("1");
+
+      await expect(page.getByTestId("live-stat-threat"))
+        .toContainText("0.72");
+
+      // the tilt chip, and its note ON SCREEN as well as in the title —
+      // an unvalidated split whose caveat is hidden reads as settled
+      const chip = page.getByTestId("tilt-chip");
+      await expect(chip).toHaveText("SIEGE");
+      expect(await chip.getAttribute("title"))
+        .toBe(LIVE_STATE.tilt_note);
+      await expect(page.getByTestId("live-tilt"))
+        .toContainText("EXPLORATORY split of the live state, not a "
+          + "measured pattern");
+      await expect(page.getByTestId("live-tilt"))
+        .toContainText(/tilt · exploratory/);
+
+      // and the block above it is untouched: minute, score, the triple
+      await expect(live).toContainText("63'");
+      await expect(live).toContainText("64.1%");
+      await expect(page.getByTestId("live-prob-bar").locator("div"))
+        .toHaveCount(3);
+    });
+
+  test("a stat the tape does not carry renders \u2014, never 0 — and a "
+    + "real 0 still renders 0", async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page,
+        withLiveNow(withState(LIVE_NOW, LIVE_STATE_GAPS)));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await expect(page.getByTestId("live-state")).toBeVisible();
+
+      // possession unknown on both sides: dashes, no invented 50/50,
+      // and NO BAR — a share cannot be drawn from numbers that are
+      // not there
+      const poss = page.getByTestId("live-stat-possession");
+      await expect(poss.locator("span.text-accent")).toHaveText("\u2014");
+      await expect(poss.locator("span.text-sky-400")).toHaveText("\u2014");
+      await expect(poss).not.toContainText("0");
+      await expect(page.getByTestId("possession-bar")).toHaveCount(0);
+
+      // the distinction the block exists for, on two rows: shots knows
+      // a real ZERO at home and knows NOTHING away...
+      const shots = page.getByTestId("live-stat-shots");
+      await expect(shots.locator("span.text-accent")).toHaveText("0");
+      await expect(shots.locator("span.text-sky-400")).toHaveText("\u2014");
+      // ...corners knows both, and its 0 is a reading that stays a 0
+      const corners = page.getByTestId("live-stat-corners");
+      await expect(corners.locator("span.text-accent")).toHaveText("3");
+      await expect(corners.locator("span.text-sky-400")).toHaveText("0");
+
+      // a null pair still says so rather than vanishing
+      const ont = page.getByTestId("live-stat-on-target");
+      await expect(ont.locator("span.text-accent")).toHaveText("\u2014");
+      await expect(ont.locator("span.text-sky-400")).toHaveText("\u2014");
+
+      // threat: the collector's refusal in its own words, no index
+      await expect(page.getByTestId("live-stat-threat"))
+        .toContainText(THREAT_REFUSAL);
+
+      // absent keys render nothing at all — no phantom rows of zeroes
+      await expect(page.getByTestId("live-stat-yellow")).toHaveCount(0);
+      await expect(page.getByTestId("live-stat-red")).toHaveCount(0);
+      await expect(page.getByTestId("live-tilt")).toHaveCount(0);
+    });
+
+  test("a live_now with NO state renders the block exactly as before — "
+    + "no readout, no empty rows", async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page, withLiveNow(LIVE_NOW));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const live = page.getByTestId("live-now");
+      await expect(live).toBeVisible();
+      // the block that shipped before the readout existed, intact
+      await expect(live).toContainText("63'");
+      await expect(live).toContainText("1-0");
+      await expect(live).toContainText("64.1%");
+      await expect(live).toContainText("24.1%");
+      await expect(live).toContainText("11.8%");
+      await expect(live).toContainText(/frozen T-10 lock/);
+      await expect(page.getByTestId("live-prob-bar").locator("div"))
+        .toHaveCount(3);
+      // ...and nothing of the state readout in the DOM
+      await expect(page.getByTestId("live-state")).toHaveCount(0);
+      await expect(page.getByTestId("possession-bar")).toHaveCount(0);
+      await expect(page.getByText(/observed on the tape/))
+        .toHaveCount(0);
+    });
+
+  test("a REFUSED triple still shows the state the collector saw — the "
+    + "refusal is about the number, not about the tape",
+    async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page,
+        withLiveNow(withState(LIVE_NOW_REFUSED, LIVE_STATE)));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const live = page.getByTestId("live-now");
+      await expect(live).toContainText(LIVE_REFUSAL);
+      // no probability bar and no triple behind the refusal
+      await expect(page.getByTestId("live-prob-bar")).toHaveCount(0);
+      await expect(live).not.toContainText(/frozen T-10 lock/);
+      // but the observed counts are still observations
+      await expect(page.getByTestId("live-stat-shots"))
+        .toContainText("14");
+      await expect(page.getByTestId("live-state"))
+        .toContainText(/observed on the tape, not modelled/);
     });
 
   test("while live_now is present the card re-fetches itself and "
