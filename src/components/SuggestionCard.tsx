@@ -19,6 +19,14 @@
 // minute, the score and the three probabilities on screen track the
 // tape. Pre and post the key is absent and this file renders exactly
 // what it rendered before the block existed.
+//
+// Beneath that bar sits live_now.state: the counts the collector SAW
+// (possession, shots, on target, corners, cards, a threat index, an
+// exploratory tilt label). Observation, not model output, and labelled
+// so on screen. Every field of it is optional — a stat that is not on
+// the payload renders "—", never 0, and no bar is drawn from a number
+// that is missing. A live_now with no state renders exactly what it
+// rendered before this readout existed.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Eyebrow, Reveal } from "./ui";
 
@@ -105,9 +113,30 @@ type HazardPeak = { bin?: string; p?: number; n?: number;
 // here, and never a zero bar standing in for a missing forecast.
 type LiveTriple = { home?: number; draw?: number; away?: number };
 
+// The OBSERVED state off the same tape row as the triple: what the
+// collector saw, never what the engine believes. Every field is optional
+// and every side may be null, so the readout renders what is there and
+// says "—" for what is not — a missing count is NEVER drawn as 0. The
+// two are different facts: "0 corners" is a measurement, "no corner
+// count on this row" is an absence, and giving them one face is the
+// same error as a zero bar standing in for a missing forecast.
+type LivePair = { home?: number | null; away?: number | null };
+
+type LiveState = {
+  possession?: LivePair | null; shots?: LivePair | null;
+  on_target?: LivePair | null; corners?: LivePair | null;
+  cards?: { yellow?: LivePair | null; red?: LivePair | null } | null;
+  // a single index, or the collector's refusal in its own words
+  threat?: number | { refused?: string; unavailable?: string } | null;
+  // an EXPLORATORY split of the state, not a measured pattern — it
+  // renders with its note, never as a settled finding
+  tilt_label?: "SIEGE" | "STERILE_POSSESSION" | "CONTEST" | null;
+  tilt_note?: string };
+
 type LiveNow = { minute?: string | null; captured_at?: string | null;
   score?: string | null; p?: LiveTriple;
   lambdas?: { home?: number; away?: number } | null; basis?: string;
+  state?: LiveState | null;
   refused?: string; unavailable?: string };
 
 type InplayLayer = {
@@ -734,6 +763,175 @@ const LIVE_MEANING =
   + " before kickoff and advances it to the state on the tape. The card"
   + " quotes the number that tick wrote — it never re-solves one here.";
 
+/* ---------- live state: the counts the collector SAW ---------- */
+
+// The readout under the bar is observation, not model output, and it is
+// labelled as such on screen. Its one rule: an absent number renders
+// "—". Nothing here fills a gap with 0, and no bar is drawn from a
+// number that is not on the payload.
+const isNum = (v: unknown): v is number =>
+  typeof v === "number" && Number.isFinite(v);
+
+const hasKey = (o: object, k: string) =>
+  Object.prototype.hasOwnProperty.call(o, k);
+
+// a count prints as it arrived — 0 included, because 0 is a reading
+const liveCount = (v?: number) => (v == null ? "—" : String(v));
+
+// an index of unknown scale prints at its own precision rather than
+// being dressed in a unit this card cannot vouch for
+const liveIndex = (v?: number) =>
+  v == null ? "—" : Number.isInteger(v) ? String(v) : v.toFixed(2);
+
+const STAT_ROWS = [
+  { key: "shots" as const, label: "shots", id: "shots" },
+  { key: "on_target" as const, label: "on target", id: "on-target" },
+  { key: "corners" as const, label: "corners", id: "corners" },
+];
+
+// home in the accent, away in the sky — the same two colours the
+// probability bar directly above gives the same two teams
+function StatPair({ label, pair, fmt = liveCount, swatch, id }: {
+  label: string; pair?: LivePair | null; fmt?: (v?: number) => string;
+  swatch?: string; id: string;
+}) {
+  const hv = pair?.home;
+  const av = pair?.away;
+  const h = isNum(hv) ? hv : undefined;
+  const a = isNum(av) ? av : undefined;
+  return (
+    <div data-testid={`live-stat-${id}`}
+      className="flex items-baseline justify-between gap-3">
+      <span className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+        {swatch && (
+          <span className={`mr-1.5 inline-block h-2.5 w-1.5 rounded-[2px] align-middle ${swatch}`} />
+        )}
+        {label}
+      </span>
+      <span className="font-mono text-[11px] tabular-nums">
+        <span className="text-accent">{fmt(h)}</span>
+        <span className="mx-1.5 text-ink-faint">–</span>
+        <span className="text-sky-400">{fmt(a)}</span>
+      </span>
+    </div>
+  );
+}
+
+function LiveStateBlock({ st }: { st: LiveState }) {
+  const cards = st.cards;
+  const pos = st.possession;
+  const ph = pos?.home;
+  const pa = pos?.away;
+  // The two shares are DERIVED from the same pair printed beside them,
+  // so the bar and the numbers can never tell different stories
+  // (AGENTS.md §3) — and it makes the block indifferent to whether the
+  // tape counts possession 0-100 or 0-1. Half a split is not a split:
+  // with one side missing there is no share to draw, and completing it
+  // from 100 minus the other would be inventing the missing half.
+  const total = isNum(ph) && isNum(pa) ? ph + pa : null;
+  const share = total != null && total > 0 && isNum(ph) && isNum(pa)
+    ? { home: (ph / total) * 100, away: (pa / total) * 100 }
+    : null;
+  const threat = st.threat;
+  const threatRefusal = threat != null && typeof threat === "object"
+    ? refusalOf(threat) : null;
+
+  const rows = [
+    hasKey(st, "possession"), ...STAT_ROWS.map((r) => hasKey(st, r.key)),
+    cards != null, hasKey(st, "threat"),
+    st.tilt_label != null, st.tilt_note != null,
+  ];
+  // nothing on the sub-block = nothing rendered; the live block stays
+  // exactly what it was before this readout existed
+  if (!rows.some(Boolean)) return null;
+
+  return (
+    <div data-testid="live-state"
+      className="mt-3 space-y-1.5 border-t border-line pt-3">
+      <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+        match state · observed on the tape, not modelled
+      </p>
+
+      {hasKey(st, "possession") && (
+        <div>
+          {/* with both sides present the printed pair IS the bar's two
+              shares. One side alone cannot form a share, so it prints
+              as it arrived, read as the percentage possession always
+              is — and the missing half stays a dash rather than being
+              completed. */}
+          <StatPair id="possession" label="possession"
+            pair={share ?? pos}
+            fmt={(v) => (v == null ? "—" : `${v.toFixed(1)}%`)} />
+          {share && (
+            <div data-testid="possession-bar"
+              className="mt-1 flex h-1.5 overflow-hidden rounded-full border border-line">
+              <div className="bg-accent/70"
+                style={{ width: `${share.home}%` }} />
+              <div className="bg-sky-400/60"
+                style={{ width: `${share.away}%` }} />
+            </div>
+          )}
+        </div>
+      )}
+
+      {STAT_ROWS.map((r) => hasKey(st, r.key) && (
+        <StatPair key={r.key} id={r.id} label={r.label} pair={st[r.key]} />
+      ))}
+
+      {cards && hasKey(cards, "yellow") && (
+        <StatPair id="yellow" label="yellow" pair={cards.yellow}
+          swatch="bg-warn" />
+      )}
+      {cards && hasKey(cards, "red") && (
+        <StatPair id="red" label="red" pair={cards.red}
+          swatch="bg-live" />
+      )}
+
+      {hasKey(st, "threat") && (threatRefusal ? (
+        <div data-testid="live-stat-threat">
+          <span className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+            threat
+          </span>
+          <div className="mt-1"><RefusalNote text={threatRefusal} /></div>
+        </div>
+      ) : (
+        <div data-testid="live-stat-threat"
+          className="flex items-baseline justify-between gap-3">
+          <span className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+            threat
+          </span>
+          <span className="font-mono text-[11px] tabular-nums text-ink-hi">
+            {liveIndex(isNum(threat) ? threat : undefined)}
+          </span>
+        </div>
+      ))}
+
+      {(st.tilt_label != null || st.tilt_note != null) && (
+        <div data-testid="live-tilt" className="pt-0.5">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+              tilt · exploratory
+            </span>
+            {st.tilt_label && (
+              <span data-testid="tilt-chip" title={st.tilt_note}
+                className="rounded-md border border-line px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-mid">
+                {st.tilt_label}
+              </span>
+            )}
+          </div>
+          {/* the note sits WITH the label, not only in a tooltip: a
+              chip whose caveat is hidden reads as a settled split, and
+              this one is not measured */}
+          <p className="mt-1 font-mono text-[9px] leading-relaxed text-ink-faint">
+            {st.tilt_note ?? "no note travelled with this label on the "
+              + "payload — nothing is measured behind it here"}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LiveNowBlock({ l, updatedAt, stale }: {
   l: LiveNow; updatedAt: string | null; stale: boolean;
 }) {
@@ -769,7 +967,8 @@ function LiveNowBlock({ l, updatedAt, stale }: {
               <span key={s.key} className={s.ink}>{s.key}</span>
             ))}
           </div>
-          <div className="mt-1.5 flex h-2 overflow-hidden rounded-full border border-line">
+          <div data-testid="live-prob-bar"
+            className="mt-1.5 flex h-2 overflow-hidden rounded-full border border-line">
             {LIVE_SIDES.map((s) => (
               <div key={s.key} className={s.bar}
                 style={{ width: `${(p?.[s.key] ?? 0) * 100}%` }} />
@@ -791,6 +990,13 @@ function LiveNowBlock({ l, updatedAt, stale }: {
           {LIVE_MEANING}
         </p>
       )}
+
+      {/* the observed state, beneath the bar. It renders under a
+          REFUSED triple too: the tape's counts are things the collector
+          saw, and they do not stop existing because the engine declined
+          to write a belief. Absent from the payload — and so from the
+          DOM — exactly as before. */}
+      {l.state && <LiveStateBlock st={l.state} />}
       <p className="mt-1 font-mono text-[9px] leading-relaxed text-ink-faint">
         captured {l.captured_at ?? "— (the tape row carried no capture time)"}
         {l.lambdas?.home != null && l.lambdas?.away != null
