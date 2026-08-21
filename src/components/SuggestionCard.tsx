@@ -20,6 +20,27 @@
 // tape. Pre and post the key is absent and this file renders exactly
 // what it rendered before the block existed.
 //
+// Beneath the match-state readout sits THE LADDER, in two halves.
+//
+// EXPOSURE (layers.inplay_plan.exposure) is public and renders for any
+// in-play fixture: how exposed the lead ON THE PITCH is over grids-v1's
+// next measured window, with its Wilson band and its n, and the "a lead
+// never gets safer per minute, and there is no safe window" line
+// verbatim beside it — on the refusals too. It is a property of the
+// match, so a reader holding nothing still sees it.
+//
+// POSITION (the response's `positions` sibling, never inside `card`) is
+// operator-only: what the holding is worth exiting into the bid, what
+// it is worth held to settlement at the current read, and which way the
+// two differ. Size and position value are staking, so the public card
+// never carries them and this file renders nothing when the key is
+// absent. Every figure is the backend's, net of the exact per-order
+// fee, displayed unchanged — nothing here computes money.
+//
+// Neither half instructs. MORE and LESS are statements about two dollar
+// figures and get no accent colour; the no-bid, thin-bid, stale-quote
+// and red-card refusals render their own words.
+//
 // Beneath that bar sits live_now.state: the counts the collector SAW
 // (possession, shots, on target, corners, cards, a threat index, an
 // exploratory tilt label). Observation, not model output, and labelled
@@ -128,10 +149,28 @@ type LiveState = {
   cards?: { yellow?: LivePair | null; red?: LivePair | null } | null;
   // a single index, or the collector's refusal in its own words
   threat?: number | { refused?: string; unavailable?: string } | null;
-  // an EXPLORATORY split of the state, not a measured pattern — it
-  // renders with its note, never as a settled finding
-  tilt_label?: "SIEGE" | "STERILE_POSSESSION" | "CONTEST" | null;
+  // An EXPLORATORY split of the state, not a measured pattern — it
+  // renders with its note, never as a settled finding.
+  //
+  // ALWAYS AN OBJECT from the backend (card.py `_tilt`): `{label, note}`
+  // or `{refused}` — never a bare string, and there is no `tilt_note`
+  // sibling. This file typed it as a string until 2026-08-21 and
+  // rendered it straight into JSX, so React threw #31 ("objects are not
+  // valid as a React child") and the WHOLE CARD blanked to a
+  // client-side exception on EVERY in-play fixture — `_tilt` has no
+  // string-returning branch at all. The canned e2e payloads had been
+  // hand-written in the string shape, so a green suite proved nothing
+  // about the shape the backend actually sends. That is the lesson, not
+  // the typo: a recorded payload has to be recorded.
+  //
+  // The bare string stays accepted below only so an older recorded
+  // payload still renders. Nothing emits it.
+  tilt_label?: TiltLabel | "SIEGE" | "STERILE_POSSESSION" | "CONTEST"
+    | null;
   tilt_note?: string };
+
+type TiltLabel = { label?: "SIEGE" | "STERILE_POSSESSION" | "CONTEST";
+  note?: string; refused?: string; unavailable?: string };
 
 type LiveNow = { minute?: string | null; captured_at?: string | null;
   score?: string | null; p?: LiveTriple;
@@ -139,12 +178,108 @@ type LiveNow = { minute?: string | null; captured_at?: string | null;
   state?: LiveState | null;
   refused?: string; unavailable?: string };
 
+// THE DANGER READ, for anyone. Present on the PUBLIC card whenever the
+// fixture is in play, because it is a property of the MATCH and not of
+// a holding: a one-goal lead at 71' carries the hazard grids-v1
+// measured whether or not the reader owns a contract on it. `next_15.p`
+// is P(the lead is equalized inside the measured window) and `survives`
+// is its complement with the band reflected. Neither renders as a
+// verdict — the honesty line rides beside both and says why.
+type ExposureCell = { p?: number; n?: number; wilson_low?: number;
+  wilson_high?: number; source_cell?: string; definition?: string;
+  refused?: string; fallback?: Cell | null; fallback_note?: string };
+
+type Survives = { p?: number; wilson_low?: number; wilson_high?: number;
+  units?: string; meaning?: string; refused?: string };
+
+type CellWindow = { bin?: string; start_minute?: number;
+  end_minute?: number; read_at_minute?: number;
+  offset_from_cell_start?: number; note?: string };
+
+type Exposure = {
+  applies?: boolean; subject?: string; minute?: number; score?: string;
+  lead_held_by?: string;
+  next_15?: ExposureCell; survives?: Survives; cell_window?: CellWindow;
+  to_full_time?: Cell & { cell_band?: string; opener_side?: string;
+    band_basis?: string };
+  band_note?: string; variant?: string; variant_basis?: string;
+  honesty?: string; not_a_plan?: string;
+  refused?: string; unavailable?: string };
+
 type InplayLayer = {
   live_now?: LiveNow;
+  exposure?: Refusable<Exposure>;
   danger_windows?: { equalizer_hazard_peak?: Refusable<HazardPeak>;
     late_opener?: Refusable<Cell> };
   red_card_rule?: string; cash_out_ladder?: string;
   refused?: string; unavailable?: string };
+
+/* ---- the operator's own position (backend src/live/position.py) ----
+ *
+ * These keys ride BESIDE `card`, never inside it, and only on the
+ * operator route: size and position value are staking, and the public
+ * card takes no credential. This file renders them when a payload
+ * carries them and renders nothing at all when it does not. It never
+ * synthesizes a position and it never computes one of these numbers
+ * itself — every figure below was made server-side, net of the exact
+ * per-order fee, and is displayed as it arrived.
+ */
+type ExitArith = { contracts?: string; bid?: string;
+  gross_dollars?: string; fee_dollars?: string; net_dollars?: string;
+  cents?: number; fee_cents?: number;
+  fee_cents_per_contract?: number; fee_helper?: string };
+
+type HoldVsExit = { difference_cents?: number;
+  difference_cents_per_contract?: number;
+  direction?: "MORE" | "LESS" | "LEVEL"; says?: string;
+  certainty_vs_mean?: string; not_a_recommendation?: string;
+  refused?: string };
+
+type JournalEntry = { bet_id?: number; market_ticker?: string;
+  outcome_key?: string; stated_price_dollars?: string;
+  stated_size?: string; price_basis?: string; recorded_at?: string;
+  size_basis?: string; size_disagreement?: string;
+  executions?: { rows?: number; filled_contracts?: string;
+    contracts_sold_early?: string; open_contracts?: string;
+    not_filled?: number; closed_early?: number; note?: string } };
+
+type HeldPosition = {
+  journal_entry?: JournalEntry;
+  position?: { outcome_key?: string; side?: string; size?: string;
+    entry_price?: number | null; entry_cost_dollars?: string | null;
+    entry_note?: string };
+  fair_now?: { p?: number | null; basis?: string; refused?: string;
+    source?: string };
+  value_now_cents?: number | null;
+  value_at_settlement_cents?: number | null;
+  hold_vs_exit?: HoldVsExit;
+  // each of these is a FINDING when present, never a missing number
+  no_bid?: { finding?: string; ask?: number | null;
+    common_case?: string } | null;
+  thin_bid?: { finding?: string; top_of_book_size?: string | null;
+    position_size?: string; executable_now?: ExitArith;
+    clip_fee_warning?: string; common_case?: string } | null;
+  stale_quote?: { finding?: string; age_seconds?: number | null;
+    ceiling_seconds?: number } | null;
+  exposure?: Refusable<Exposure>;
+  red_card_void?: { void?: boolean; witness?: string[] | null;
+    tape_note?: string | null; rule?: string; survives?: string | null };
+  arithmetic?: { exit?: ExitArith | null;
+    settlement?: { cents?: number; fee_note?: string } | null;
+    maker_exit?: string };
+  policy?: Record<string, string>;
+  refused?: string; unavailable?: string };
+
+type PositionsBlock = { held?: HeldPosition[]; definition?: string;
+  competition_scope?: string | null; book_basis?: string;
+  tape_row?: string; refused?: string; unavailable?: string };
+
+// How old the arithmetic is, on the SERVER's clock at assembly. It
+// rides outside `card` because content_hash covers `card`, and a clock
+// inside the hashed payload would make every re-render a new claim.
+type LiveTick = { captured_at?: string | null;
+  age_seconds?: number | null; interval_seconds?: number;
+  basis?: string; note?: string };
 
 type Artifact = { artifact?: string; version?: string; built?: string };
 
@@ -161,7 +296,8 @@ type Card = { card_version?: string; competition?: string;
     inplay_plan?: InplayLayer; evidence?: EvidenceLayer } };
 
 type CardResponse = { generated_at?: string; content_hash?: string;
-  emission?: string; prediction_run_id?: string | null; card?: Card };
+  emission?: string; prediction_run_id?: string | null; card?: Card;
+  live_tick?: LiveTick; positions?: PositionsBlock };
 
 /* ---------- small helpers ---------- */
 
@@ -171,6 +307,11 @@ const band = (lo?: number, hi?: number) =>
   lo == null || hi == null ? "" : `${lo.toFixed(1)}–${hi.toFixed(1)}`;
 const cents = (v?: number) =>
   v == null || !Number.isFinite(v) ? "—" : `${Math.round(v * 100)}¢`;
+// the position payload speaks in CENTS already — never re-scale it, and
+// never fill a null with a zero: a value that could not be computed is
+// a refusal with its own words somewhere on the block.
+const usd = (c?: number | null) =>
+  c == null || !Number.isFinite(c) ? "—" : `$${(c / 100).toFixed(2)}`;
 
 // A block with nothing to say says so in words. Returns the block's own
 // refusal text when it carries one, else null (= render the content).
@@ -835,6 +976,15 @@ function LiveStateBlock({ st }: { st: LiveState }) {
   const threat = st.threat;
   const threatRefusal = threat != null && typeof threat === "object"
     ? refusalOf(threat) : null;
+  // the tilt arrives as `{label, note}` or `{refused}`; the label and
+  // the note are pulled OUT of it, and neither the object nor a bare
+  // string ever reaches JSX as a child
+  const tilt = st.tilt_label;
+  const tiltObj = tilt != null && typeof tilt === "object" ? tilt : null;
+  const tiltRefusal = tiltObj ? refusalOf(tiltObj) : null;
+  const tiltLabel = tiltObj
+    ? tiltObj.label : (typeof tilt === "string" ? tilt : undefined);
+  const tiltNote = tiltObj?.note ?? st.tilt_note;
 
   const rows = [
     hasKey(st, "possession"), ...STAT_ROWS.map((r) => hasKey(st, r.key)),
@@ -912,28 +1062,356 @@ function LiveStateBlock({ st }: { st: LiveState }) {
             <span className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">
               tilt · exploratory
             </span>
-            {st.tilt_label && (
-              <span data-testid="tilt-chip" title={st.tilt_note}
+            {/* the LABEL only — never the object that carries it. A raw
+                object here is React #31 and a blank card. */}
+            {tiltLabel && (
+              <span data-testid="tilt-chip" title={tiltNote}
                 className="rounded-md border border-line px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-mid">
-                {st.tilt_label}
+                {tiltLabel}
               </span>
             )}
           </div>
-          {/* the note sits WITH the label, not only in a tooltip: a
-              chip whose caveat is hidden reads as a settled split, and
-              this one is not measured */}
-          <p className="mt-1 font-mono text-[9px] leading-relaxed text-ink-faint">
-            {st.tilt_note ?? "no note travelled with this label on the "
-              + "payload — nothing is measured behind it here"}
-          </p>
+          {/* a refused tilt renders the collector's own sentence, in the
+              same note every other refused block uses — no chip, and no
+              invented label standing in for one that was declined */}
+          {tiltRefusal ? <div className="mt-1">
+            <RefusalNote text={tiltRefusal} />
+          </div> : (
+            /* the note sits WITH the label, not only in a tooltip: a
+               chip whose caveat is hidden reads as a settled split, and
+               this one is not measured */
+            <p className="mt-1 font-mono text-[9px] leading-relaxed text-ink-faint">
+              {tiltNote ?? "no note travelled with this label on the "
+                + "payload — nothing is measured behind it here"}
+            </p>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function LiveNowBlock({ l, updatedAt, stale }: {
+/* ---------- how old the arithmetic is ---------- */
+
+// Son asked for "every set minute". Nothing here picks a cadence: the
+// collector's period is the backend's (config.LIVE_STATE_INTERVAL_
+// SECONDS) and arrives on the payload, and this line says how far past
+// it the state on screen already is.
+//
+// The age advances on ELAPSED CLIENT TIME added to the SERVER's age at
+// fetch — never on the viewer's wall clock against a server timestamp,
+// which a skewed laptop clock would turn into a confident lie.
+function TickAge({ tick, fetchedAt }: {
+  tick?: LiveTick; fetchedAt: number | null;
+}) {
+  // MOUNTED PER FETCH (the caller keys this component by `fetchedAt`),
+  // so the anchor is set once at mount and the effect only subscribes
+  // to the tick — no setState in an effect body, and no stale anchor.
+  const [now, setNow] = useState<number | null>(fetchedAt);
+  useEffect(() => {
+    if (fetchedAt == null) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [fetchedAt]);
+  if (!tick) return null;
+  if (tick.age_seconds == null || fetchedAt == null || now == null) {
+    // UNKNOWN is not fresh, and it says so in the backend's words
+    return (
+      <span data-testid="tick-age" className="text-warn">
+        {tick.note ?? "state age unknown"}
+      </span>
+    );
+  }
+  const age = tick.age_seconds + Math.max(0, (now - fetchedAt) / 1000);
+  const late = tick.interval_seconds != null && age > tick.interval_seconds;
+  return (
+    <span data-testid="tick-age" title={tick.basis}
+      className={late ? "text-warn" : undefined}>
+      state captured {Math.round(age)}s ago
+      {tick.interval_seconds != null
+        && ` · collector interval ${tick.interval_seconds}s`}
+      {late && " · a tick has not landed"}
+    </span>
+  );
+}
+
+/* ---------- the danger read (grids-v1, measured) ---------- */
+
+function CellFigure({ label, p, lo, hi, n, testid }: {
+  label: string; p?: number; lo?: number; hi?: number; n?: number;
+  testid: string;
+}) {
+  return (
+    <div data-testid={testid} className="flex items-baseline justify-between gap-3">
+      <span className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+        {label}
+      </span>
+      <span className="font-mono text-[11px] tabular-nums">
+        <span className="text-ink-hi">{pct1(p)}</span>
+        {/* the band NEVER travels separately from the number */}
+        <span className="ml-1.5 text-ink-faint">
+          [{band(lo, hi) || "band unavailable"}]
+        </span>
+        {n != null && <span className="ml-1.5 text-ink-low">n={n}</span>}
+      </span>
+    </div>
+  );
+}
+
+function ExposureBlock({ e }: { e?: Refusable<Exposure> }) {
+  // THE BLOCK NEVER VANISHES. A refused exposure renders its words in
+  // the panel the numbers would have occupied, and the honesty line
+  // renders WITH it — that sentence is not a garnish on the success
+  // case. A dismissal voids the cells and changes nothing about the
+  // fact that a lead never gets safer per minute.
+  const r = refusalOf(e);
+  const x = (e ?? {}) as Exposure;
+  const cellRefusal = !r && x.next_15 ? refusalOf(x.next_15) : null;
+  const ft = r ? null : x.to_full_time;
+  const ftRefusal = ft ? refusalOf(ft) : null;
+  return (
+    <div data-testid="exposure" className="space-y-2">
+      <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+        exposure · measured, not modelled
+        {x.score && (
+          <span className="ml-2 normal-case tracking-normal text-ink-low">
+            {x.lead_held_by} lead {x.score} at {x.minute}&apos;
+          </span>
+        )}
+      </p>
+
+      {r ? <RefusalNote text={r} />
+        : cellRefusal ? <RefusalNote text={cellRefusal} /> : (
+        <>
+          <CellFigure testid="exposure-equalized"
+            label="equalized in window"
+            p={x.next_15?.p} lo={x.next_15?.wilson_low}
+            hi={x.next_15?.wilson_high} n={x.next_15?.n} />
+          <CellFigure testid="exposure-survives" label="lead survives it"
+            p={x.survives?.p} lo={x.survives?.wilson_low}
+            hi={x.survives?.wilson_high} />
+        </>
+      )}
+      {!r && x.next_15?.fallback_note && (
+        <RefusalNote text={x.next_15.fallback_note} />
+      )}
+
+      {!r && x.cell_window?.note && (
+        <p className="font-mono text-[9px] leading-relaxed text-ink-faint">
+          {x.cell_window.note}
+        </p>
+      )}
+
+      {ft && (ftRefusal ? <RefusalNote text={ftRefusal} /> : (
+        <div data-testid="exposure-full-time"
+          className="border-t border-line/60 pt-2">
+          <p className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+            to full time
+            {ft.cell_band && (
+              <span className="ml-2 normal-case text-ink-low">
+                band {ft.cell_band} · {ft.opener_side}
+              </span>
+            )}
+          </p>
+          <CellFigure testid="exposure-eventually" label="equalized eventually"
+            p={ft.equalized?.p} lo={ft.equalized?.wilson_low}
+            hi={ft.equalized?.wilson_high} n={ft.equalized?.n} />
+          <CellFigure testid="exposure-overturned" label="overturned at ft"
+            p={ft.overturned?.p} lo={ft.overturned?.wilson_low}
+            hi={ft.overturned?.wilson_high} n={ft.overturned?.n} />
+        </div>
+      ))}
+
+      {!r && x.band_note && (
+        <p className="font-mono text-[9px] leading-relaxed text-ink-faint">
+          {x.band_note}
+        </p>
+      )}
+      {/* THE LINE THAT MAY NEVER BE DROPPED. A lead never gets safer per
+          minute and there is no safe window — it renders verbatim, on
+          the successes and on the refusals alike, and it is styled as a
+          warning rather than as a footnote. */}
+      {x.honesty && (
+        <p data-testid="no-safe-window"
+          className="rounded-lg border border-warn/40 px-3 py-2 font-mono text-[10px] leading-relaxed text-warn">
+          {x.honesty}
+        </p>
+      )}
+      {x.not_a_plan && (
+        <p className="font-mono text-[9px] leading-relaxed text-ink-faint">
+          {x.not_a_plan}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ---------- the position, when the payload carries one ---------- */
+
+// One held position. Nothing here decides anything: the two figures are
+// stated, the backend's own sentence about the difference is rendered
+// verbatim, and every refusal (no bid, thin bid, stale quote, voided
+// grids) renders in the collector's words rather than as a blank.
+function HeldPositionBlock({ h }: { h: HeldPosition }) {
+  const r = refusalOf(h);
+  if (r) return <RefusalNote text={r} />;
+  const je = h.journal_entry;
+  const hve = h.hold_vs_exit;
+  const hveRefusal = hve ? refusalOf(hve) : null;
+  const dir = hve?.direction;
+  return (
+    <div data-testid="held-position"
+      className="rounded-xl border border-line bg-elev/40 p-3">
+      <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+        position
+        <span className="ml-2 normal-case tracking-normal text-ink-hi">
+          {h.position?.size ?? "—"} ×{" "}
+          {OUTCOME_LABEL[h.position?.outcome_key ?? ""]
+            ?? h.position?.outcome_key ?? "—"}
+        </span>
+        {je?.market_ticker && (
+          <span className="ml-2 normal-case tracking-normal text-ink-faint">
+            {je.market_ticker}
+          </span>
+        )}
+        {je?.bet_id != null && (
+          <span className="ml-2 normal-case tracking-normal text-ink-faint">
+            journal #{je.bet_id}
+          </span>
+        )}
+      </p>
+
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <div data-testid="value-now"
+          className="rounded-lg border border-line px-3 py-2">
+          <p className="font-mono text-[9px] uppercase tracking-wide text-ink-faint">
+            value now (exit into the bid)
+          </p>
+          <p className="font-mono text-xl tabular-nums text-ink-hi">
+            {usd(h.value_now_cents)}
+          </p>
+          <p className="font-mono text-[9px] text-ink-faint">
+            net of the exact per-order fee
+          </p>
+        </div>
+        <div data-testid="value-settlement"
+          className="rounded-lg border border-line px-3 py-2">
+          <p className="font-mono text-[9px] uppercase tracking-wide text-ink-faint">
+            value at settlement (at the read)
+          </p>
+          <p className="font-mono text-xl tabular-nums text-ink-hi">
+            {usd(h.value_at_settlement_cents)}
+          </p>
+          <p className="font-mono text-[9px] text-ink-faint">
+            expected value, not a payout
+          </p>
+        </div>
+      </div>
+
+      {/* the comparison, in the backend's own words. MORE and LESS are
+          statements about two dollar figures — no colour is spent on
+          making either read as an instruction. */}
+      {hveRefusal ? (
+        <div className="mt-2"><RefusalNote text={hveRefusal} /></div>
+      ) : hve?.says && (
+        <p data-testid="hold-vs-exit"
+          className="mt-2 rounded-lg border border-line px-3 py-2 font-mono text-[11px] leading-relaxed text-ink-hi">
+          <span className="mr-1.5 text-[10px] uppercase tracking-[0.14em] text-ink-faint">
+            {dir ?? ""}
+          </span>
+          {hve.says}
+        </p>
+      )}
+      {hve?.certainty_vs_mean && (
+        <p className="mt-1 font-mono text-[9px] leading-relaxed text-ink-faint">
+          {hve.certainty_vs_mean}
+        </p>
+      )}
+      {hve?.not_a_recommendation && (
+        <p className="mt-1 font-mono text-[9px] leading-relaxed text-ink-faint">
+          {hve.not_a_recommendation}
+        </p>
+      )}
+
+      {/* THE COMMON CASE IS THAT THE EXIT IS NOT THERE. Each of these is
+          a finding with its own sentence; none is a missing number. */}
+      {h.no_bid?.finding && (
+        <div data-testid="no-bid" className="mt-2">
+          <RefusalNote text={h.no_bid.finding} />
+        </div>
+      )}
+      {h.thin_bid?.finding && (
+        <div data-testid="thin-bid" className="mt-2 space-y-1">
+          <RefusalNote text={h.thin_bid.finding} />
+          {h.thin_bid.clip_fee_warning && (
+            <p className="font-mono text-[9px] leading-relaxed text-ink-faint">
+              {h.thin_bid.clip_fee_warning}
+            </p>
+          )}
+        </div>
+      )}
+      {h.stale_quote?.finding && (
+        <div data-testid="stale-quote" className="mt-2">
+          <RefusalNote text={h.stale_quote.finding} />
+        </div>
+      )}
+      {h.red_card_void?.void && h.red_card_void.rule && (
+        <p data-testid="red-card-void"
+          className="mt-2 rounded-lg border border-warn/40 px-3 py-2 font-mono text-[10px] leading-relaxed text-warn">
+          {h.red_card_void.rule}
+          {h.red_card_void.survives && ` ${h.red_card_void.survives}`}
+        </p>
+      )}
+
+      {/* the entry price is on the record and is NOT an input — the
+          sentence saying so renders with it, not instead of it */}
+      {h.position?.entry_note && (
+        <p className="mt-2 font-mono text-[9px] leading-relaxed text-ink-faint">
+          entry {h.position.entry_price ?? "—"} · {h.position.entry_note}
+        </p>
+      )}
+      {je?.size_disagreement && (
+        <div className="mt-2"><RefusalNote text={je.size_disagreement} /></div>
+      )}
+      {h.policy?.not_a_signal && (
+        <p data-testid="not-a-signal"
+          className="mt-2 font-mono text-[9px] leading-relaxed text-ink-faint">
+          {h.policy.not_a_signal}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function PositionsPanel({ p }: { p?: PositionsBlock }) {
+  // absent from the payload = absent from the DOM. The public card
+  // never carries this key, and nothing is invented in its place.
+  if (!p) return null;
+  const r = refusalOf(p);
+  const held = p.held ?? [];
+  return (
+    <div data-testid="positions" className="space-y-2">
+      <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+        your position · operator view
+      </p>
+      {r && <RefusalNote text={r} />}
+      {held.map((h, i) => (
+        <HeldPositionBlock key={h.journal_entry?.bet_id ?? i} h={h} />
+      ))}
+      {p.definition && (
+        <p className="font-mono text-[9px] leading-relaxed text-ink-faint">
+          {p.definition}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function LiveNowBlock({ l, updatedAt, stale, tick, fetchedAt, exposure,
+                       positions }: {
   l: LiveNow; updatedAt: string | null; stale: boolean;
+  tick?: LiveTick; fetchedAt: number | null;
+  exposure?: Refusable<Exposure>; positions?: PositionsBlock;
 }) {
   // a refusal is the collector's own sentence, rendered verbatim in the
   // same note every other refused block on this card uses
@@ -956,6 +1434,13 @@ function LiveNowBlock({ l, updatedAt, stale }: {
         <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-faint">
           {updatedAt ? `updated ${updatedAt}` : "updating…"}
           {stale ? " · stale — last refresh failed, retrying" : ""}
+          {/* how old the STATE is, which is not the same fact as how
+              long ago we last fetched it: a fetch can succeed and hand
+              back a tick the collector took four minutes ago. */}
+          {tick && <span className="ml-2 normal-case tracking-normal">
+            · <TickAge key={fetchedAt ?? "unfetched"} tick={tick}
+                fetchedAt={fetchedAt} />
+          </span>}
           <span className="ml-2 tracking-[0.14em]">· shadow · not advice</span>
         </p>
       </div>
@@ -997,7 +1482,24 @@ function LiveNowBlock({ l, updatedAt, stale }: {
           to write a belief. Absent from the payload — and so from the
           DOM — exactly as before. */}
       {l.state && <LiveStateBlock st={l.state} />}
-      <p className="mt-1 font-mono text-[9px] leading-relaxed text-ink-faint">
+
+      {/* THE LADDER, beneath the match-state readout. Exposure first —
+          it is a property of the match and renders for any in-play
+          fixture, holder or not — then the position, which is present
+          only on an operator payload. Absent keys render nothing at
+          all; a refusal renders its words. */}
+      {exposure != null && (
+        <div className="mt-3 border-t border-line pt-3">
+          <ExposureBlock e={exposure} />
+        </div>
+      )}
+      {positions != null && (
+        <div className="mt-3 border-t border-line pt-3">
+          <PositionsPanel p={positions} />
+        </div>
+      )}
+
+      <p className="mt-3 font-mono text-[9px] leading-relaxed text-ink-faint">
         captured {l.captured_at ?? "— (the tape row carried no capture time)"}
         {l.lambdas?.home != null && l.lambdas?.away != null
           ? ` · λ ${l.lambdas.home.toFixed(4)} / ${l.lambdas.away.toFixed(4)}`
@@ -1014,8 +1516,9 @@ function LiveNowBlock({ l, updatedAt, stale }: {
 
 /* ---------- in-play plan ---------- */
 
-function InplayBlock({ p, updatedAt, stale }: {
+function InplayBlock({ p, updatedAt, stale, tick, fetchedAt, positions }: {
   p?: InplayLayer; updatedAt: string | null; stale: boolean;
+  tick?: LiveTick; fetchedAt: number | null; positions?: PositionsBlock;
 }) {
   const r = refusalOf(p);
   if (r) return <RefusalNote text={r} />;
@@ -1028,7 +1531,9 @@ function InplayBlock({ p, updatedAt, stale }: {
       {/* first and dominant while the fixture is in play; absent from
           the payload — and so from the DOM — pre and post */}
       {p?.live_now && (
-        <LiveNowBlock l={p.live_now} updatedAt={updatedAt} stale={stale} />
+        <LiveNowBlock l={p.live_now} updatedAt={updatedAt} stale={stale}
+          tick={tick} fetchedAt={fetchedAt} exposure={p.exposure}
+          positions={positions} />
       )}
       {peak && (peakRefusal ? <RefusalNote text={peakRefusal} /> : (
         <div className="rounded-xl border border-line p-3">
@@ -1118,6 +1623,9 @@ export default function SuggestionCard({ competition, eventId }: {
   // so — blanking a live card would read as "the match stopped"
   const [stale, setStale] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  // the client-elapsed anchor the tick age advances from — never the
+  // viewer's wall clock against a server timestamp
+  const [fetchedAt, setFetchedAt] = useState<number | null>(null);
   const alive = useRef(true);
   const held = useRef<CardResponse | null>(null);
 
@@ -1128,7 +1636,7 @@ export default function SuggestionCard({ competition, eventId }: {
         if (!alive.current) return;
         held.current = d;
         setResp(d); setErr(null); setStale(false);
-        setUpdatedAt(stampUtc());
+        setUpdatedAt(stampUtc()); setFetchedAt(Date.now());
       })
       .catch((e) => {
         if (!alive.current) return;
@@ -1241,7 +1749,8 @@ export default function SuggestionCard({ competition, eventId }: {
 
             <CardSection eyebrow="in-play plan">
               <InplayBlock p={layers?.inplay_plan} updatedAt={updatedAt}
-                stale={stale} />
+                stale={stale} tick={resp.live_tick}
+                fetchedAt={fetchedAt} positions={resp.positions} />
             </CardSection>
 
             <CardSection eyebrow="evidence">
