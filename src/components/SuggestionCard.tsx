@@ -12,7 +12,14 @@
 // "unproven vs constant baseline" label verbatim; the style axes carry
 // their measured-non-predictive label verbatim — that label is a
 // measured finding, not decoration.
-import { useEffect, useState } from "react";
+//
+// The in-play section leads with LIVE NOW: while (and only while) the
+// fixture is in play the backend attaches layers.inplay_plan.live_now,
+// and the card broadcasts it — re-fetching itself on an interval so the
+// minute, the score and the three probabilities on screen track the
+// tape. Pre and post the key is absent and this file renders exactly
+// what it rendered before the block existed.
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Eyebrow, Reveal } from "./ui";
 
 /* ---------- payload types (mirrors backend src/live/card.py) ---------- */
@@ -90,7 +97,19 @@ type StyleLayer = { label?: string; axes?: string[]; home?: StyleSide;
 type HazardPeak = { bin?: string; p?: number; n?: number;
   wilson_low?: number; wilson_high?: number; meaning?: string };
 
+// Present ONLY while the fixture is in play (backend _live_now): the
+// live triple read off the newest state-tape row, or that row's own
+// refusal in its own words. Absent pre and post — never synthesized
+// here, and never a zero bar standing in for a missing forecast.
+type LiveTriple = { home?: number; draw?: number; away?: number };
+
+type LiveNow = { minute?: string | null; captured_at?: string | null;
+  score?: string | null; p?: LiveTriple;
+  lambdas?: { home?: number; away?: number } | null; basis?: string;
+  refused?: string; unavailable?: string };
+
 type InplayLayer = {
+  live_now?: LiveNow;
   danger_windows?: { equalizer_hazard_peak?: Refusable<HazardPeak>;
     late_opener?: Refusable<Cell> };
   red_card_rule?: string; cash_out_ladder?: string;
@@ -670,9 +689,107 @@ function StyleBlock({ s }: { s?: StyleLayer }) {
   );
 }
 
+/* ---------- live now: the in-play broadcast ---------- */
+
+// The three outcomes wear the card's existing home/draw/away language —
+// accent home, faint draw, sky away, one hairline bar with the exact
+// percentages beneath it (the same segments MarketVsRead draws for a
+// three-way price). No new palette; the only addition is the live red,
+// which this system already reserves for in-play.
+const LIVE_SIDES = [
+  { key: "home" as const, bar: "bg-accent/70", ink: "text-accent",
+    num: "text-accent" },
+  // the draw's segment stays quiet, but its number is read at a glance
+  // like the other two — this readout is the point of the block
+  { key: "draw" as const, bar: "bg-ink-faint/50", ink: "text-ink-faint",
+    num: "text-ink-mid" },
+  { key: "away" as const, bar: "bg-sky-400/60", ink: "text-sky-400",
+    num: "text-sky-400" },
+];
+
+const LIVE_MEANING =
+  "computed from the frozen T-10 lock and the current minute and score:"
+  + " the collector's engine anchors on the belief the T-10 lock froze"
+  + " before kickoff and advances it to the state on the tape. The card"
+  + " quotes the number that tick wrote — it never re-solves one here.";
+
+function LiveNowBlock({ l, updatedAt, stale }: {
+  l: LiveNow; updatedAt: string | null; stale: boolean;
+}) {
+  // a refusal is the collector's own sentence, rendered verbatim in the
+  // same note every other refused block on this card uses
+  const r = refusalOf(l);
+  const p = l.p;
+  return (
+    <div data-testid="live-now"
+      className="rounded-xl border border-live/40 bg-live/5 p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-live">
+          <span className="pulse-dot mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-live align-middle" />
+          live now
+          <span className="ml-2 text-base tracking-normal text-ink-hi">
+            {l.minute ?? "minute unavailable"}
+          </span>
+          <span className="ml-2 text-base tabular-nums tracking-normal text-ink-hi">
+            {l.score ?? "score unavailable"}
+          </span>
+        </p>
+        <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-faint">
+          {updatedAt ? `updated ${updatedAt}` : "updating…"}
+          {stale ? " · stale — last refresh failed, retrying" : ""}
+          <span className="ml-2 tracking-[0.14em]">· shadow · not advice</span>
+        </p>
+      </div>
+
+      {r ? <div className="mt-2.5"><RefusalNote text={r} /></div> : (
+        <div className="mt-3">
+          <div className="flex items-baseline justify-between font-mono text-[10px] uppercase tracking-wide">
+            {LIVE_SIDES.map((s) => (
+              <span key={s.key} className={s.ink}>{s.key}</span>
+            ))}
+          </div>
+          <div className="mt-1.5 flex h-2 overflow-hidden rounded-full border border-line">
+            {LIVE_SIDES.map((s) => (
+              <div key={s.key} className={s.bar}
+                style={{ width: `${(p?.[s.key] ?? 0) * 100}%` }} />
+            ))}
+          </div>
+          <div className="mt-1.5 flex items-baseline justify-between font-mono text-lg tabular-nums">
+            {LIVE_SIDES.map((s) => (
+              <span key={s.key} className={s.num}>
+                {p?.[s.key] != null ? pct1(p[s.key]! * 100) : "—"}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* where the number came from — said only when there IS one */}
+      {!r && (
+        <p className="mt-3 font-mono text-[9px] leading-relaxed text-ink-faint">
+          {LIVE_MEANING}
+        </p>
+      )}
+      <p className="mt-1 font-mono text-[9px] leading-relaxed text-ink-faint">
+        captured {l.captured_at ?? "— (the tape row carried no capture time)"}
+        {l.lambdas?.home != null && l.lambdas?.away != null
+          ? ` · λ ${l.lambdas.home.toFixed(4)} / ${l.lambdas.away.toFixed(4)}`
+          : ""}
+      </p>
+      {l.basis && (
+        <p className="mt-1 break-words font-mono text-[9px] leading-relaxed text-ink-faint">
+          {l.basis}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /* ---------- in-play plan ---------- */
 
-function InplayBlock({ p }: { p?: InplayLayer }) {
+function InplayBlock({ p, updatedAt, stale }: {
+  p?: InplayLayer; updatedAt: string | null; stale: boolean;
+}) {
   const r = refusalOf(p);
   if (r) return <RefusalNote text={r} />;
   const peak = p?.danger_windows?.equalizer_hazard_peak;
@@ -681,6 +798,11 @@ function InplayBlock({ p }: { p?: InplayLayer }) {
   const lateRefusal = late ? refusalOf(late) : null;
   return (
     <div className="space-y-3">
+      {/* first and dominant while the fixture is in play; absent from
+          the payload — and so from the DOM — pre and post */}
+      {p?.live_now && (
+        <LiveNowBlock l={p.live_now} updatedAt={updatedAt} stale={stale} />
+      )}
       {peak && (peakRefusal ? <RefusalNote text={peakRefusal} /> : (
         <div className="rounded-xl border border-line p-3">
           <p className="mb-1 font-mono text-[10px] uppercase tracking-wide text-ink-low">
@@ -751,6 +873,13 @@ function EvidenceLine({ e, resp }: { e?: EvidenceLayer; resp: CardResponse }) {
 
 /* ---------- the card ---------- */
 
+// The collector ticks every 120s, so a 60s re-fetch never sits on a
+// stale tick for a whole cycle. Polling runs ONLY while live_now is on
+// the payload, and only while the tab is visible.
+const LIVE_REFRESH_MS = 60_000;
+
+const stampUtc = () => `${new Date().toISOString().slice(11, 19)}Z`;
+
 export default function SuggestionCard({ competition, eventId }: {
   competition: "mls-2026" | "epl-2026" | "la-liga-2026";
   eventId: string;
@@ -758,19 +887,65 @@ export default function SuggestionCard({ competition, eventId }: {
   const [resp, setResp] = useState<CardResponse | null>(null);
   // null = in flight; a number = HTTP status; 0 = network failure
   const [err, setErr] = useState<number | null>(null);
+  // a refresh that fails keeps the last good numbers on screen and says
+  // so — blanking a live card would read as "the match stopped"
+  const [stale, setStale] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const alive = useRef(true);
+  const held = useRef<CardResponse | null>(null);
+
+  const load = useCallback(() =>
+    fetch(`/api/card/${competition}/${eventId}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((d: CardResponse) => {
+        if (!alive.current) return;
+        held.current = d;
+        setResp(d); setErr(null); setStale(false);
+        setUpdatedAt(stampUtc());
+      })
+      .catch((e) => {
+        if (!alive.current) return;
+        // only a FIRST fetch with nothing to hold becomes the error
+        // panel; a failed refresh marks the held card stale instead
+        if (held.current) setStale(true);
+        else setErr(typeof e === "number" ? e : 0);
+      }), [competition, eventId]);
 
   // No synchronous reset here: the mount sites key this component by
   // eventId, so a different fixture remounts it with fresh state.
   useEffect(() => {
-    let alive = true;
-    fetch(`/api/card/${competition}/${eventId}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then((d) => { if (alive) setResp(d); })
-      .catch((e) => alive && setErr(typeof e === "number" ? e : 0));
-    return () => { alive = false; };
-  }, [competition, eventId]);
+    alive.current = true;
+    load();
+    return () => { alive.current = false; };
+  }, [load]);
 
   const card = resp?.card;
+  // the broadcast switch: present only while the fixture is in play
+  const broadcasting = card?.layers?.inplay_plan?.live_now != null;
+
+  useEffect(() => {
+    if (!broadcasting) return;            // pre/post: no timer at all
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const stop = () => {
+      if (timer !== null) { clearInterval(timer); timer = null; }
+    };
+    const start = () => {
+      if (timer === null) timer = setInterval(() => { load(); },
+                                              LIVE_REFRESH_MS);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") { load(); start(); }
+      else stop();                        // hidden tab polls nothing
+    };
+    if (document.visibilityState === "visible") start();
+    document.addEventListener("visibilitychange", onVisibility);
+    // unmount, or live_now disappearing at full time, clears the timer
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [broadcasting, load]);
+
   const layers = card?.layers;
   const id = layers?.identity;
   const idRefusal = refusalOf(id);
@@ -838,7 +1013,8 @@ export default function SuggestionCard({ competition, eventId }: {
             </CardSection>
 
             <CardSection eyebrow="in-play plan">
-              <InplayBlock p={layers?.inplay_plan} />
+              <InplayBlock p={layers?.inplay_plan} updatedAt={updatedAt}
+                stale={stale} />
             </CardSection>
 
             <CardSection eyebrow="evidence">
