@@ -277,6 +277,12 @@ const LIVE_NOW_REFUSED = {
   score: "0-0", refused: LIVE_REFUSAL,
 };
 
+function withHeadline(headline: unknown) {
+  const c = JSON.parse(JSON.stringify(CARD_PAYLOAD));
+  c.card.headline = headline;
+  return c;
+}
+
 function withLiveNow(live: unknown) {
   const c = JSON.parse(JSON.stringify(CARD_PAYLOAD));
   c.card.layers.inplay_plan.live_now = live;
@@ -490,5 +496,49 @@ test.describe("suggestion card (recorded payloads)", () => {
       await expect(live).toContainText("78'");
       await expect(live).toContainText("51.1%");
       await expect(page.getByText(/card unavailable/i)).toHaveCount(0);
+    });
+});
+
+test.describe("the disagreement rail is visible, not just present", () => {
+  // The rail exists because a LARGE model-market disagreement measured
+  // WORSE (ledger row 8). A warned number painted in the accent colour
+  // would read as "take this" — which is the exact inversion the rail
+  // is there to prevent, so these tests guard the COLOUR as well as
+  // the words.
+  test("a warned headline shows its warning and drops the accent",
+    async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page, withHeadline({
+        value: 0.0933,
+        warning: "WARNING — a disagreement this large measured WORSE, not better: the read sat above the market on 17 of 18 real-money legs and lost the Brier head-to-head (ledger row 8). Not an invitation.",
+        disagreement_tvd: 0.1766,
+        ledger_row: 8,
+        meaning: "fee-inclusive edge on away_win — non-lead outcome",
+      }));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const w = page.getByTestId("headline-warning");
+      await expect(w).toBeVisible();
+      await expect(w).toContainText("measured WORSE");
+      await expect(w).toContainText("ledger row 8");
+      await expect(w).toContainText("0.177");
+      // the number is still shown — hiding it would hide information
+      await expect(page.getByText("+0.0933")).toBeVisible();
+      // ...but never in the accent colour
+      const cls = await page.getByText("+0.0933").getAttribute("class");
+      expect(cls).toContain("text-warn");
+      expect(cls).not.toContain("text-accent");
+    });
+
+  test("an unwarned positive headline keeps the accent and shows no "
+    + "warning block", async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page, withHeadline({
+        value: 0.0412,
+        meaning: "fee-inclusive edge on home_win",
+      }));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await expect(page.getByTestId("headline-warning")).toHaveCount(0);
+      const cls = await page.getByText("+0.0412").getAttribute("class");
+      expect(cls).toContain("text-accent");
     });
 });
