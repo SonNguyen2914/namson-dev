@@ -122,6 +122,9 @@ test.describe("La Liga match page", () => {
 
   test("dark model is stated on the hero and in the model bar",
     async ({ page }) => {
+      await page.route("**/api/card/**", (route) =>   // hermetic: the card fetch stays recorded too
+        route.fulfill({ status: 404, contentType: "application/json",
+                        body: JSON.stringify({ error: "no live-plane fixture in this recorded world" }) }));
       await page.route("**/api/laliga/match/401882926", (r) =>
         r.fulfill({ status: 200, contentType: "application/json",
                     body: JSON.stringify(MATCH) }));
