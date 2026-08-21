@@ -287,6 +287,17 @@ const LIVE_NOW_REFUSED = {
 //
 // FULL: every field the backend can attach. Note red.home is null while
 // red.away is 1 — one side observed, the other not, on the same row.
+//
+// `tilt_label` is an OBJECT — `{label, note}` — because card.py `_tilt`
+// has no branch that returns a string. This block used to carry
+// `tilt_label: "SIEGE"` with a `tilt_note` sibling, a shape the backend
+// never sends, and the suite was green while every real in-play card
+// crashed the page (React #31). Corrected 2026-08-21 to the bytes the
+// backend actually emits.
+const TILT_NOTE = "one side is camped in the other's half — an "
+  + "EXPLORATORY split of the live state, not a measured pattern: "
+  + "nothing is backtested behind it and no number prices off it";
+
 const LIVE_STATE = {
   possession: { home: 61.4, away: 38.6 },
   shots: { home: 14, away: 6 },
@@ -294,11 +305,12 @@ const LIVE_STATE = {
   corners: { home: 9, away: 2 },
   cards: { yellow: { home: 1, away: 3 }, red: { home: null, away: 1 } },
   threat: 0.72,
-  tilt_label: "SIEGE",
-  tilt_note: "one side is camped in the other's half — an EXPLORATORY "
-    + "split of the live state, not a measured pattern: nothing is "
-    + "backtested behind it and no number prices off it",
+  tilt_label: { label: "SIEGE", note: TILT_NOTE },
 };
+
+// The tilt REFUSED, which is what a thin tape produces — and what the
+// backend sent on every card whose row lacked shots/on-target/corners.
+const TILT_REFUSAL = "no threat tilt, so no tilt label — see threat";
 
 // GAPS: the case the readout exists for. possession is present but
 // unknown on both sides; shots knows the home count (which is ZERO —
@@ -331,6 +343,210 @@ function withHeadline(headline: unknown) {
 function withLiveNow(live: unknown) {
   const c = JSON.parse(JSON.stringify(CARD_PAYLOAD));
   c.card.layers.inplay_plan.live_now = live;
+  return c;
+}
+
+// --- the ladder: exposure, the tick age, the position ----------------
+//
+// Every payload below is the backend's own bytes, taken from
+// GET /api/admin/mls-2026/card/1 against a seeded 1-0 lead at 71'
+// (trimmed; every load-bearing sentence intact).
+//
+// EXPOSURE rides on the PUBLIC card — it is a property of the MATCH,
+// not of a holding, so a reader with no position still sees it.
+// POSITIONS rides BESIDE `card` and only on the operator route, because
+// size and position value are staking and the public card takes no
+// credential. That split is what these tests pin.
+
+const HONESTY = "A LEAD NEVER GETS SAFER PER MINUTE, AND THERE IS NO "
+  + "SAFE WINDOW. grids-v1's equalizer hazard rises from its first "
+  + "quotable bin to its 75-90 peak, which is also its maximum — no "
+  + "minute of this grid reads as a lead being out of danger, and no "
+  + "window in it is risk-free. The artifact's own checks block "
+  + "(equalizer_hazard_never_falls) records the ONE interior fall, into "
+  + "60-75, and publishes it rather than shipping the claim silently. "
+  + "The figure beside this sentence is P(the lead survives the window) "
+  + "with its Wilson band and its n — a measured frequency with an "
+  + "interval on it, never a reassurance.";
+
+const NOT_A_PLAN = "A MEASURED FREQUENCY, NOT A PLAN. grids-v1 counted "
+  + "how often a one-goal lead standing at the start of this minute bin "
+  + "had been equalized by the end of it, across the states corpus. It "
+  + "describes what happened in those matches; it prescribes nothing, "
+  + "prices nothing, and names no moment to do anything.";
+
+const FT_REFUSAL = "comeback_by_strength conditions on an opener at or "
+  + "before 30' and this state cannot establish one: the score is 1-0 "
+  + "at 71'. The cell is not quoted rather than quoted against a "
+  + "conditioning state that may not hold.";
+
+const EXPOSURE = {
+  applies: true, subject: "match", minute: 71, score: "1-0",
+  lead_held_by: "home",
+  next_15: {
+    grid: "equalizer_hazard", variant: "clean_11v11",
+    source_cell: "equalizer_hazard/60-75",
+    n: 4992, p: 17.7, wilson_low: 16.7, wilson_high: 18.8,
+    definition: "P(equalize within the next 15' | one-goal lead at the "
+      + "bin's START minute); window (m, m+15] in recorded minutes",
+  },
+  survives: {
+    p: 82.3, wilson_low: 81.2, wilson_high: 83.3, units: "percent",
+    meaning: "P(the lead is still a lead at the end of this measured "
+      + "15-minute window) — the complement of the equalizer cell "
+      + "beside it, band reflected",
+  },
+  cell_window: {
+    bin: "60-75", start_minute: 60, end_minute: 75, read_at_minute: 71,
+    offset_from_cell_start: 11,
+    note: "grids-v1 measures the lead AT THE BIN'S START minute (60') "
+      + "over the window (60, 75] in recorded minutes. This read is "
+      + "taken at 71', so the cell is the nearest measured conditioning "
+      + "state and not a per-minute hazard; the 11-minute offset is "
+      + "stated rather than interpolated away.",
+  },
+  to_full_time: { refused: FT_REFUSAL },
+  band_note: "the 15-minute cell above is BAND-FREE: grids-v1's "
+    + "equalizer_hazard pools every one-goal lead regardless of the "
+    + "sides' strength, so no gap band enters it and none is invented "
+    + "for it.",
+  variant: "clean_11v11",
+  honesty: HONESTY, not_a_plan: NOT_A_PLAN,
+};
+
+const RED_CARD_EXPOSURE_REFUSAL = "a dismissal has been seen — every "
+  + "grid-derived number on this match refuses. A red card VOIDS every "
+  + "grid-derived number from first sighting: the priors were measured "
+  + "on eleven-a-side play (clean_11v11) and no ten-man adjustment has "
+  + "been measured (grids-v1 red_card_rule, src/live/patterns.py).";
+
+const EXPOSURE_RED_CARD = {
+  applies: false, subject: "match",
+  refused: RED_CARD_EXPOSURE_REFUSAL,
+  honesty: HONESTY, not_a_plan: NOT_A_PLAN,
+};
+
+const LIVE_TICK = {
+  captured_at: "2026-08-21T19:53:02.114820+00:00",
+  age_seconds: 47.0, interval_seconds: 120,
+  basis: "HOW OLD THE ARITHMETIC IS. Every live number on this card "
+    + "was computed by the collector at the tick that wrote the state "
+    + "row.",
+};
+
+const LATE_TICK_NOTE = "this state is 402s old against a 120s collector "
+  + "interval — at least one tick has not landed, and every live number "
+  + "on this card is that old";
+
+const LIVE_TICK_LATE = { ...LIVE_TICK, age_seconds: 402.0,
+                         note: LATE_TICK_NOTE };
+
+const NOT_A_SIGNAL = "NO VALIDATED EDGE. This module prices a position "
+  + "that is already on: it is fair value against a price, not a "
+  + "signal, and no in-play entry edge has been measured on this "
+  + "platform. Nothing in this payload is a recommendation and nothing "
+  + "in it is an instruction.";
+
+const ENTRY_IS_SUNK = "The entry price is carried for the record and is "
+  + "NOT an input to the comparison. Settlement pays $1.00 a contract "
+  + "and the exit pays the bid, whatever was paid to get on.";
+
+const HELD_DEFINITION = "HELD means: a journal entry on this fixture "
+  + "that resolved to `taken`, names one of the three GAME legs, is the "
+  + "head of its correction chain, carries no settlement, and has not "
+  + "been closed early.";
+
+const HOLD_VS_EXIT_SAYS = "the live bid pays 5.5c per contract LESS "
+  + "than holding is worth at the current read (220.9c across the "
+  + "40-contract position)";
+
+function heldPosition(over: Record<string, unknown> = {}) {
+  return {
+    journal_entry: {
+      bet_id: 1, market_ticker: "KXMLSGAME-x-H",
+      outcome_key: "home_win", stated_price_dollars: "0.62",
+      stated_size: "40", price_basis: "observed_quote",
+      executions: { rows: 0, note: "no execution row on this entry" },
+    },
+    position: {
+      outcome_key: "home_win", side: "home", size: "40",
+      entry_price: 0.62, entry_cost_dollars: "24.80",
+      entry_note: ENTRY_IS_SUNK,
+    },
+    fair_now: { p: 0.72, source: "live_stat_snapshot#1.p_home" },
+    value_now_cents: 2659.07,
+    value_at_settlement_cents: 2880.0,
+    hold_vs_exit: {
+      difference_cents: -220.93,
+      difference_cents_per_contract: -5.5232,
+      direction: "LESS", says: HOLD_VS_EXIT_SAYS,
+      certainty_vs_mean: "This compares a CERTAIN amount against a "
+        + "MEAN. The exit figure is what the book pays now; the "
+        + "settlement figure is an expected value at the current read.",
+      not_a_recommendation: "Which way the arithmetic points is not "
+        + "what to do. This states the difference between two figures; "
+        + "the operator decides what to do about it.",
+    },
+    no_bid: null, thin_bid: null, stale_quote: null,
+    exposure: EXPOSURE,
+    red_card_void: { void: false, witness: null },
+    policy: { not_a_signal: NOT_A_SIGNAL },
+    ...over,
+  };
+}
+
+const NO_BID_FINDING = "NO BID. The book is one-sided: an ask of $0.71 "
+  + "and nothing resting on the buy side. This position CANNOT BE "
+  + "EXITED at any price at this tick — that is the finding, not a "
+  + "missing number, and the ask is never substituted for it "
+  + "(src/execution.py sell_proceeds).";
+
+const NO_BID_POSITION = heldPosition({
+  value_now_cents: null,
+  no_bid: { finding: NO_BID_FINDING, ask: 0.71,
+    common_case: "A thin or absent bid is THE COMMON CASE in play." },
+  hold_vs_exit: { refused: "there is no executable bid, so there is "
+    + "nothing to compare holding against. See no_bid." },
+});
+
+const RED_CARD_RULE_TEXT = "A red card VOIDS every grid-derived number "
+  + "from first sighting: the priors were measured on eleven-a-side "
+  + "play (clean_11v11) and no ten-man adjustment has been measured.";
+
+const RED_CARD_POSITION = heldPosition({
+  exposure: EXPOSURE_RED_CARD,
+  red_card_void: {
+    void: true,
+    witness: ["the collector's persisted refusal on this row "
+      + "(inplay_basis names a dismissal)"],
+    rule: RED_CARD_RULE_TEXT,
+    survives: "the price arithmetic (bid, fee, exit value) is "
+      + "unaffected and is still computed; every grid-derived number "
+      + "refuses",
+  },
+});
+
+function positionsBlock(held: unknown[], over: Record<string, unknown> = {}) {
+  return { held, definition: HELD_DEFINITION,
+           competition_scope: "mls-2026", ...over };
+}
+
+/** A live card: live_now + the PUBLIC exposure block + the tick age,
+ *  plus the operator-only `positions` sibling when one is supplied.
+ *  `exposure: null` drops the block entirely, which is what a card for
+ *  a fixture that is not in play looks like. */
+function withLadder(opts: {
+  live?: unknown; exposure?: unknown; tick?: unknown;
+  positions?: unknown;
+} = {}) {
+  const c = JSON.parse(JSON.stringify(CARD_PAYLOAD));
+  c.card.layers.inplay_plan.live_now =
+    opts.live ?? withState(LIVE_NOW, LIVE_STATE);
+  if (opts.exposure !== null) {
+    c.card.layers.inplay_plan.exposure = opts.exposure ?? EXPOSURE;
+  }
+  c.live_tick = opts.tick ?? LIVE_TICK;
+  if (opts.positions !== undefined) c.positions = opts.positions;
   return c;
 }
 
@@ -549,8 +765,7 @@ test.describe("suggestion card (recorded payloads)", () => {
       // an unvalidated split whose caveat is hidden reads as settled
       const chip = page.getByTestId("tilt-chip");
       await expect(chip).toHaveText("SIEGE");
-      expect(await chip.getAttribute("title"))
-        .toBe(LIVE_STATE.tilt_note);
+      expect(await chip.getAttribute("title")).toBe(TILT_NOTE);
       await expect(page.getByTestId("live-tilt"))
         .toContainText("EXPLORATORY split of the live state, not a "
           + "measured pattern");
@@ -684,6 +899,312 @@ test.describe("suggestion card (recorded payloads)", () => {
       await expect(live).toContainText("78'");
       await expect(live).toContainText("51.1%");
       await expect(page.getByText(/card unavailable/i)).toHaveCount(0);
+    });
+});
+
+test.describe("the ladder: exposure, tick age, and the position", () => {
+  // Son's product: for a match he holds a position in, a constantly
+  // updating read of what the position is worth now, whether the live
+  // bid beats holding to settlement, and how exposed the lead is.
+  //
+  // The four honesty constraints are asserted ON SCREEN here, not only
+  // in the payload: no window reads as safe, no string instructs, the
+  // fee arithmetic is the backend's exact figure rendered unchanged,
+  // and the entry-side is labelled as no validated edge.
+
+  test("a REFUSED tilt renders its words and the card survives — the "
+    + "label is an object, not a string", async ({ page }) => {
+      // REGRESSION, found by rendering the backend's real bytes rather
+      // than a hand-written stand-in. card.py `_tilt` returns
+      // `{label, note}` or `{refused}` and has NO string branch, so the
+      // string-typed renderer threw React #31 and the whole card became
+      // a client-side exception — on every in-play fixture, while this
+      // suite stayed green against a shape nothing emits.
+      const errors: string[] = [];
+      page.on("pageerror", (e) => errors.push(String(e)));
+      await serveMatch(page);
+      await serveCard(page, withLadder({
+        live: withState(LIVE_NOW, {
+          ...LIVE_STATE_GAPS,
+          tilt_label: { refused: TILT_REFUSAL } }) }));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      // the card is ON SCREEN — this is the assertion that would have
+      // caught it
+      await expect(page.getByTestId("live-now")).toBeVisible();
+      await expect(page.getByTestId("exposure")).toBeVisible();
+      expect(errors).toEqual([]);
+      // the refusal renders in the collector's own words, and no chip
+      // is invented to stand in for a label that was declined
+      await expect(page.getByTestId("live-tilt"))
+        .toContainText(TILT_REFUSAL);
+      await expect(page.getByTestId("tilt-chip")).toHaveCount(0);
+    });
+
+  test("a tilt that HAS a label renders the label and its note, and "
+    + "throws nothing", async ({ page }) => {
+      const errors: string[] = [];
+      page.on("pageerror", (e) => errors.push(String(e)));
+      await serveMatch(page);
+      await serveCard(page, withLadder());
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await expect(page.getByTestId("tilt-chip")).toHaveText("SIEGE");
+      await expect(page.getByTestId("live-tilt")).toContainText(TILT_NOTE);
+      expect(errors).toEqual([]);
+    });
+
+  test("the exposure read renders for a fixture with NO position — it "
+    + "is a property of the match", async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page, withLadder());   // no `positions` key at all
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const exp = page.getByTestId("exposure");
+      await expect(exp).toBeVisible();
+      // the state the cell conditions on
+      await expect(exp).toContainText("home lead 1-0 at 71'");
+      // P(equalized) WITH its band and its denominator
+      await expect(page.getByTestId("exposure-equalized"))
+        .toContainText("17.7%");
+      await expect(page.getByTestId("exposure-equalized"))
+        .toContainText("[16.7–18.8]");
+      await expect(page.getByTestId("exposure-equalized"))
+        .toContainText("n=4992");
+      // and P(survives) as the reflected complement, also banded
+      await expect(page.getByTestId("exposure-survives"))
+        .toContainText("82.3%");
+      await expect(page.getByTestId("exposure-survives"))
+        .toContainText("[81.2–83.3]");
+      // the operator-only block is absent from the DOM entirely
+      await expect(page.getByTestId("positions")).toHaveCount(0);
+      await expect(page.getByTestId("held-position")).toHaveCount(0);
+    });
+
+  test("the NO SAFE WINDOW line renders verbatim beside the numbers",
+    async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page, withLadder());
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      // verbatim, not paraphrased — this sentence is the constraint
+      await expect(page.getByTestId("no-safe-window"))
+        .toContainText(HONESTY);
+      // and it is styled as a warning, never as a footnote the eye skips
+      await expect(page.getByTestId("no-safe-window"))
+        .toHaveClass(/text-warn/);
+      // the measured-frequency label rides with it
+      await expect(page.getByTestId("exposure")).toContainText(NOT_A_PLAN);
+    });
+
+  test("nothing on a live card tells the reader a lead is safe",
+    async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page, withLadder({
+        positions: positionsBlock([heldPosition()]) }));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      // not vacuous: the position IS on screen before the scan runs
+      await expect(page.getByTestId("held-position")).toBeVisible();
+      const text = (await page.locator("#card").innerText()).toLowerCase();
+      for (const claim of ["safe now", "risk-free window", "in the clear",
+                           "out of the woods", "the lead is safe",
+                           "danger has passed"]) {
+        expect(text, claim).not.toContain(claim);
+      }
+      for (const order of ["cash out now", "sell now", "buy now",
+                           "you should", "we recommend", "we advise",
+                           "act now", "take profit"]) {
+        expect(text, order).not.toContain(order);
+      }
+    });
+
+  test("the refused to-full-time cell renders its words, never a blank",
+    async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page, withLadder());
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await expect(page.getByTestId("exposure")).toContainText(FT_REFUSAL);
+      // the band-free fact is stated rather than a band being invented
+      await expect(page.getByTestId("exposure"))
+        .toContainText(/BAND-FREE/);
+    });
+
+  test("a position renders value now, value at settlement, and the "
+    + "comparison in the backend's own words", async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page, withLadder({
+        positions: positionsBlock([heldPosition()]) }));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const held = page.getByTestId("held-position");
+      await expect(held).toBeVisible();
+      // the position itself, named
+      await expect(held).toContainText("40 × home");
+      await expect(held).toContainText("journal #1");
+      // 2659.07c and 2880.0c, rendered as dollars and NOT re-scaled
+      await expect(page.getByTestId("value-now")).toContainText("$26.59");
+      await expect(page.getByTestId("value-settlement"))
+        .toContainText("$28.80");
+      // the one comparison, verbatim, with its direction
+      await expect(page.getByTestId("hold-vs-exit"))
+        .toContainText(HOLD_VS_EXIT_SAYS);
+      await expect(page.getByTestId("hold-vs-exit")).toContainText("LESS");
+      // and the sentence that says the direction is not an instruction
+      await expect(held).toContainText(/the operator decides what to do/);
+      // constraint 4: in-play entry is not a validated edge
+      await expect(page.getByTestId("not-a-signal"))
+        .toContainText("NO VALIDATED EDGE");
+      // the entry price is on the record AND labelled as not an input
+      await expect(held).toContainText(ENTRY_IS_SUNK);
+    });
+
+  test("the exit figure is never painted as an opportunity — MORE and "
+    + "LESS get no accent colour", async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page, withLadder({
+        positions: positionsBlock([heldPosition({
+          hold_vs_exit: { direction: "MORE",
+            says: "the live bid pays 7.2c per contract MORE than "
+              + "holding is worth at the current read",
+            not_a_recommendation: "Which way the arithmetic points is "
+              + "not what to do." } })]) }));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const line = page.getByTestId("hold-vs-exit");
+      await expect(line).toContainText("MORE");
+      // decision safety: the colour the eye reads as "take this" is
+      // withheld from a number that orders no action
+      await expect(line).not.toHaveClass(/text-accent/);
+    });
+
+  test("NO BID renders the finding verbatim and shows no exit value",
+    async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page, withLadder({
+        positions: positionsBlock([NO_BID_POSITION]) }));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await expect(page.getByTestId("no-bid")).toContainText(NO_BID_FINDING);
+      // a null value is a DASH, never a zero — 0¢ would read as "this
+      // position is worthless", which is a different claim entirely
+      await expect(page.getByTestId("value-now")).toContainText("—");
+      await expect(page.getByTestId("value-now")).not.toContainText("$0.00");
+      // the ask is never substituted for the missing bid
+      await expect(page.getByTestId("value-now")).not.toContainText("$0.71");
+      // the comparison refuses in its own words rather than vanishing
+      await expect(page.getByTestId("held-position"))
+        .toContainText(/no executable bid/);
+      await expect(page.getByTestId("hold-vs-exit")).toHaveCount(0);
+      // holding is still priced — that half is not affected
+      await expect(page.getByTestId("value-settlement"))
+        .toContainText("$28.80");
+    });
+
+  test("a THIN BID prices the clip and names the per-order round-up",
+    async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page, withLadder({
+        positions: positionsBlock([heldPosition({
+          thin_bid: {
+            finding: "THIN BID: 3 contract(s) resting at the top of the "
+              + "book against a position of 40. what is executable AT "
+              + "THIS TICK is 3 contract(s) for 199.4c net.",
+            top_of_book_size: "3", position_size: "40",
+            clip_fee_warning: "the fee is charged per ORDER and rounded "
+              + "UP to the centicent, so an exit dripped out in clips "
+              + "pays that round-up once per clip",
+          } })]) }));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const thin = page.getByTestId("thin-bid");
+      await expect(thin).toContainText("THIN BID: 3 contract(s)");
+      await expect(thin).toContainText(/once per clip/);
+    });
+
+  test("a RED CARD voids the grid numbers on screen and leaves the "
+    + "price arithmetic standing", async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page, withLadder({
+        exposure: EXPOSURE_RED_CARD,
+        positions: positionsBlock([RED_CARD_POSITION]) }));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      // the public block refuses in the backend's words...
+      await expect(page.getByTestId("exposure"))
+        .toContainText(RED_CARD_EXPOSURE_REFUSAL);
+      // ...and NO grid figure is left on screen to be misread
+      await expect(page.getByTestId("exposure-equalized")).toHaveCount(0);
+      await expect(page.getByTestId("exposure-survives")).toHaveCount(0);
+      // the honesty line survives the refusal — it is not a garnish on
+      // the success case
+      await expect(page.getByTestId("no-safe-window"))
+        .toContainText(HONESTY);
+      // the rule is on the position too, with the half that survives
+      await expect(page.getByTestId("red-card-void"))
+        .toContainText(RED_CARD_RULE_TEXT);
+      await expect(page.getByTestId("red-card-void"))
+        .toContainText(/the price arithmetic .* is unaffected/);
+      // and the price arithmetic really is still there
+      await expect(page.getByTestId("value-now")).toContainText("$26.59");
+    });
+
+  test("nothing held renders the backend's named refusal, not an empty "
+    + "panel", async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page, withLadder({
+        positions: positionsBlock([], {
+          refused: "no journal entry on fixture 1 is still on. "
+            + HELD_DEFINITION }) }));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await expect(page.getByTestId("positions"))
+        .toContainText("no journal entry on fixture 1 is still on");
+      await expect(page.getByTestId("positions"))
+        .toContainText("HELD means");
+      await expect(page.getByTestId("held-position")).toHaveCount(0);
+    });
+
+  test("the tick age says how old the STATE is and advances on its own",
+    async ({ page }) => {
+      await page.clock.install();
+      await serveMatch(page);
+      await serveCard(page, withLadder());
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const age = page.getByTestId("tick-age");
+      await expect(age).toContainText("state captured 47s ago");
+      // the collector's own interval, quoted — this file picks no cadence
+      await expect(age).toContainText("collector interval 120s");
+      // ten seconds later it says so, without a re-fetch
+      await page.clock.fastForward("00:10");
+      await expect(age).toContainText(/state captured 5[67]s ago/);
+    });
+
+  test("a state older than the collector interval says a tick was "
+    + "missed", async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page, withLadder({ tick: LIVE_TICK_LATE }));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const age = page.getByTestId("tick-age");
+      await expect(age).toContainText("state captured 402s ago");
+      await expect(age).toContainText("a tick has not landed");
+      await expect(age).toHaveClass(/text-warn/);
+    });
+
+  test("a card with no live_tick renders no age claim at all",
+    async ({ page }) => {
+      await serveMatch(page);
+      const c = withLadder();
+      delete c.live_tick;
+      await serveCard(page, c);
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await expect(page.getByTestId("tick-age")).toHaveCount(0);
+      await expect(page.getByText(/state captured/)).toHaveCount(0);
+    });
+
+  test("a pre or post card carries neither block and renders neither",
+    async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page);      // the recorded settled-fixture card
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await expect(page.getByTestId("exposure")).toHaveCount(0);
+      await expect(page.getByTestId("positions")).toHaveCount(0);
+      await expect(page.getByTestId("tick-age")).toHaveCount(0);
+      // and the in-play section is otherwise exactly as it was
+      await expect(
+        page.getByText(/a red card VOIDS every grid number/i).first())
+        .toBeVisible();
+      await expect(page.getByText(/cash-out ladder: NOT YET SHIPPED/))
+        .toBeVisible();
     });
 });
 
