@@ -12,7 +12,15 @@ import { expect, test } from "@playwright/test";
 //  3. style notes carry the measured non-predictive label, and the λ
 //     number carries its display-only label, both verbatim;
 //  4. a card fetch failure names its HTTP status — never a blank panel,
-//     never invented content.
+//     never invented content;
+//  5. the LIVE BROADCAST: while the payload carries
+//     layers.inplay_plan.live_now the card shows the minute, the score
+//     and all three probabilities, re-fetches itself on the interval,
+//     and holds the last good numbers (marked stale) when a refresh
+//     fails. A live_now refusal renders the collector's own sentence
+//     verbatim with no numbers behind it, and a payload WITHOUT
+//     live_now — every pre and post card — renders no live block at
+//     all.
 
 const EVENT = "999999";
 
@@ -234,6 +242,47 @@ const CARD_PAYLOAD = {
   },
 };
 
+// --- the live block (backend src/live/card.py _live_now) -------------
+//
+// Present ONLY while the fixture is in play. Both shapes below are the
+// backend's own: the live triple, and a refusal carrying the
+// collector's sentence (here live_watch.NO_LOCK, verbatim).
+const LIVE_NOW = {
+  minute: "63'",
+  captured_at: "2026-08-21T19:53:02.114820+00:00",
+  score: "1-0",
+  p: { home: 0.6412, draw: 0.2411, away: 0.1177 },
+  lambdas: { home: 1.4321, away: 1.0212 },
+  basis: "inplay-wire-v1 | anchor: canonical T-10 lock ce8944f6 "
+    + "de-vigged 3-way | calibration exact | state minute 63 score 1-0",
+};
+
+const LIVE_NOW_LATER = {
+  minute: "78'",
+  captured_at: "2026-08-21T20:08:04.551190+00:00",
+  score: "2-1",
+  p: { home: 0.5109, draw: 0.2203, away: 0.2688 },
+  lambdas: { home: 1.4321, away: 1.0212 },
+  basis: "inplay-wire-v1 | anchor: canonical T-10 lock ce8944f6 "
+    + "de-vigged 3-way | calibration exact | state minute 78 score 2-1",
+};
+
+const LIVE_REFUSAL = "no canonical T-10 lock with a complete frozen "
+  + "3-way book — the engine anchors on the belief the lock froze at "
+  + "T-10 and will not invent a kickoff belief after kickoff, so NO "
+  + "NUMBER is written";
+
+const LIVE_NOW_REFUSED = {
+  minute: "45'", captured_at: "2026-08-21T19:35:11.902341+00:00",
+  score: "0-0", refused: LIVE_REFUSAL,
+};
+
+function withLiveNow(live: unknown) {
+  const c = JSON.parse(JSON.stringify(CARD_PAYLOAD));
+  c.card.layers.inplay_plan.live_now = live;
+  return c;
+}
+
 type Pg = import("@playwright/test").Page;
 
 async function serveMatch(page: Pg) {
@@ -339,5 +388,107 @@ test.describe("suggestion card (recorded payloads)", () => {
       // no invented card content behind the failure
       await expect(page.getByText("REFUSED")).toHaveCount(0);
       await expect(page.getByText(/fee floor/)).toHaveCount(0);
+    });
+
+  test("a card WITH live_now broadcasts the minute, the score and all "
+    + "three probabilities, first in the in-play section",
+    async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page, withLiveNow(LIVE_NOW));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const live = page.getByTestId("live-now");
+      await expect(live).toBeVisible();
+      // the state on the tape
+      await expect(live).toContainText("63'");
+      await expect(live).toContainText("1-0");
+      // all three outcomes, exact, beneath their own bar segment
+      await expect(live).toContainText("64.1%");
+      await expect(live).toContainText("24.1%");
+      await expect(live).toContainText("11.8%");
+      // three segments, one per outcome, sized by the probabilities
+      const widths = await live.locator("div.rounded-full > div")
+        .evaluateAll((els) => els.map(
+          (e) => Math.round(parseFloat((e as HTMLElement).style.width)
+                            * 100) / 100));
+      expect(widths).toEqual([64.12, 24.11, 11.77]);
+      // where the number comes from, and when it was captured
+      await expect(live).toContainText(/frozen T-10 lock/);
+      await expect(live).toContainText("2026-08-21T19:53:02.114820+00:00");
+      await expect(live).toContainText(/updated \d\d:\d\d:\d\dZ/);
+      // decision safety travels with the live numbers
+      await expect(live).toContainText(/shadow · not advice/);
+      // FIRST in the in-play section — the readout, not a footnote
+      expect(await live.evaluate(
+        (el) => el.parentElement?.firstElementChild === el)).toBe(true);
+    });
+
+  test("a live_now refusal renders the collector's words verbatim, with "
+    + "no numbers behind it", async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page, withLiveNow(LIVE_NOW_REFUSED));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const live = page.getByTestId("live-now");
+      await expect(live).toBeVisible();
+      await expect(live).toContainText(LIVE_REFUSAL);
+      // the state it refused at is still shown
+      await expect(live).toContainText("45'");
+      await expect(live).toContainText("0-0");
+      // never a zero bar reading as a real forecast (AGENTS.md §2)
+      await expect(live.locator("div.rounded-full > div")).toHaveCount(0);
+      expect(await live.innerText()).not.toContain("%");
+    });
+
+  test("a card WITHOUT live_now renders no live block at all — pre and "
+    + "post cards are untouched", async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page);          // the recorded settled-fixture card
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      // the in-play section is there, exactly as it always rendered
+      await expect(
+        page.getByText(/a red card VOIDS every grid number/i).first())
+        .toBeVisible();
+      await expect(page.getByTestId("live-now")).toHaveCount(0);
+      await expect(page.getByText(/live now/i)).toHaveCount(0);
+      await expect(page.getByText(/frozen T-10 lock/i)).toHaveCount(0);
+      await expect(page.getByText(/updated \d\d:\d\d:\d\dZ/))
+        .toHaveCount(0);
+    });
+
+  test("while live_now is present the card re-fetches itself and "
+    + "updates in place; a failed refresh holds the last good numbers "
+    + "and marks them stale", async ({ page }) => {
+      await page.clock.install();
+      await serveMatch(page);
+      let hit = 0;
+      await page.route(`**/api/card/mls-2026/${EVENT}`, (r) => {
+        hit += 1;
+        if (hit >= 3) {
+          return r.fulfill({ status: 503,
+            contentType: "application/json",
+            body: JSON.stringify({ error: "card unavailable" }) });
+        }
+        return r.fulfill({ status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(withLiveNow(
+            hit === 1 ? LIVE_NOW : LIVE_NOW_LATER)) });
+      });
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const live = page.getByTestId("live-now");
+      await expect(live).toContainText("63'");
+      await expect(live).toContainText("64.1%");
+
+      // one 60s tick later the card has re-fetched and moved on
+      await page.clock.fastForward("01:05");
+      await expect(live).toContainText("78'");
+      await expect(live).toContainText("2-1");
+      await expect(live).toContainText("51.1%");
+
+      // the next refresh fails: the numbers stay, marked stale — a live
+      // card that blanked would read as "the match stopped"
+      await page.clock.fastForward("01:05");
+      await expect(live).toContainText(/stale/);
+      await expect(live).toContainText("78'");
+      await expect(live).toContainText("51.1%");
+      await expect(page.getByText(/card unavailable/i)).toHaveCount(0);
     });
 });
