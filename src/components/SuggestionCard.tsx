@@ -42,12 +42,12 @@
 // and red-card refusals render their own words.
 //
 // Beneath that bar sits live_now.state: the counts the collector SAW
-// (possession, shots, on target, corners, cards, a threat index, an
-// exploratory tilt label). Observation, not model output, and labelled
-// so on screen. Every field of it is optional — a stat that is not on
-// the payload renders "—", never 0, and no bar is drawn from a number
-// that is missing. A live_now with no state renders exactly what it
-// rendered before this readout existed.
+// (possession, shots, on target, corners, cards, the favourite's share
+// of the threat, an exploratory tilt label). Observation, not model
+// output, and labelled so on screen. Every field of it is optional — a
+// stat that is not on the payload renders "—", never 0, and no bar is
+// drawn from a number that is missing. A live_now with no state renders
+// exactly what it rendered before this readout existed.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Eyebrow, Reveal } from "./ui";
 
@@ -147,8 +147,25 @@ type LiveState = {
   possession?: LivePair | null; shots?: LivePair | null;
   on_target?: LivePair | null; corners?: LivePair | null;
   cards?: { yellow?: LivePair | null; red?: LivePair | null } | null;
-  // a single index, or the collector's refusal in its own words
-  threat?: number | { refused?: string; unavailable?: string } | null;
+  // ALWAYS AN OBJECT from the backend (card.py `_live_state`):
+  // `{tilt, fav, basis}` or `{refused}` — never a bare index. This file
+  // typed it as a NUMBER until 2026-08-24 and asked `isNum` before
+  // printing it, so the object never matched and every computed tilt
+  // rendered "—": an em-dash sitting beside a confident SIEGE chip,
+  // which reads as a broken card rather than as the number it is.
+  //
+  // Nothing accepts a bare number here, because nothing ever sent one —
+  // `threat` has carried the object since the block shipped (backend
+  // cfeb25a). That is what separates it from the `tilt_label` string
+  // below, which stays accepted because older payloads really do have
+  // it.
+  //
+  // Same disease as that string, caught the same way one incident
+  // later: the canned e2e payload had been hand-written as `0.72`, so
+  // the suite went green on a shape the backend does not emit and
+  // proved only that the frontend agreed with itself. A recorded
+  // payload has to be recorded.
+  threat?: Threat | null;
   // An EXPLORATORY split of the state, not a measured pattern — it
   // renders with its note, never as a settled finding.
   //
@@ -167,10 +184,24 @@ type LiveState = {
   // payload still renders. Nothing emits it.
   tilt_label?: TiltLabel | "SIEGE" | "STERILE_POSSESSION" | "CONTEST"
     | null;
-  tilt_note?: string };
+  tilt_note?: string;
+  // WHY these counts can be read as one minute of one match (backend
+  // LIVE_STATE_BASIS), including the rule the dashes above depend on:
+  // a null is the provider's silence, and missing is never zero. It is
+  // rendered from the payload rather than restated in copy here, so
+  // the two can never drift into saying different things.
+  basis?: string };
 
 type TiltLabel = { label?: "SIEGE" | "STERILE_POSSESSION" | "CONTEST";
   note?: string; refused?: string; unavailable?: string };
+
+// The favourite's SHARE of shots + on-target + corners on this row, so
+// the number belongs to a SIDE and `fav` is printed beside it — a bare
+// 0.76 says nothing about whose 0.76 it is. `basis` is the pattern
+// library's own definition, carried on the payload and rendered, never
+// retyped here (backend THREAT_DEFINITION).
+type Threat = { tilt?: number; fav?: "home" | "away"; basis?: string;
+  refused?: string; unavailable?: string };
 
 type LiveNow = { minute?: string | null; captured_at?: string | null;
   score?: string | null; p?: LiveTriple;
@@ -973,9 +1004,12 @@ function LiveStateBlock({ st }: { st: LiveState }) {
   const share = total != null && total > 0 && isNum(ph) && isNum(pa)
     ? { home: (ph / total) * 100, away: (pa / total) * 100 }
     : null;
+  // the threat arrives as `{tilt, fav, basis}` or `{refused}`; the
+  // number, the side it is a share OF, and the definition are pulled
+  // OUT of it, and the object itself never reaches JSX as a child
   const threat = st.threat;
-  const threatRefusal = threat != null && typeof threat === "object"
-    ? refusalOf(threat) : null;
+  const threatRefusal = threat ? refusalOf(threat) : null;
+  const threatTilt = threat && isNum(threat.tilt) ? threat.tilt : undefined;
   // the tilt arrives as `{label, note}` or `{refused}`; the label and
   // the note are pulled OUT of it, and neither the object nor a bare
   // string ever reaches JSX as a child
@@ -998,7 +1032,12 @@ function LiveStateBlock({ st }: { st: LiveState }) {
   return (
     <div data-testid="live-state"
       className="mt-3 space-y-1.5 border-t border-line pt-3">
-      <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+      {/* the backend's own sentence about what these counts are and
+          what a null among them means, reachable on the header rather
+          than dropped — the payload carries it and the dashes below
+          are only honest if it is readable somewhere */}
+      <p title={st.basis}
+        className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
         match state · observed on the tape, not modelled
       </p>
 
@@ -1045,13 +1084,24 @@ function LiveStateBlock({ st }: { st: LiveState }) {
           <div className="mt-1"><RefusalNote text={threatRefusal} /></div>
         </div>
       ) : (
-        <div data-testid="live-stat-threat"
+        <div data-testid="live-stat-threat" title={threat?.basis}
           className="flex items-baseline justify-between gap-3">
           <span className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">
             threat
           </span>
           <span className="font-mono text-[11px] tabular-nums text-ink-hi">
-            {liveIndex(isNum(threat) ? threat : undefined)}
+            {liveIndex(threatTilt)}
+            {/* the tilt is a SHARE, so it belongs to a side. The side
+                is printed WITH the number rather than left to the
+                tooltip: an unattributed 0.76 beside a SIEGE chip is
+                the same ambiguity as a result letter that does not
+                come off the numbers next to it (AGENTS.md §3). */}
+            {threatTilt != null && threat?.fav && (
+              <span data-testid="threat-fav"
+                className="ml-1.5 text-[9px] uppercase tracking-wide text-ink-faint">
+                {threat.fav}
+              </span>
+            )}
           </span>
         </div>
       ))}
