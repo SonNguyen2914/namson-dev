@@ -471,11 +471,14 @@ export default function BetSuggesterDashboard() {
             place in the league carousel. */}
         <NavChip href="/bet-suggester/friendlies" active={false}>Friendlies</NavChip>
         {/* Viewer competitions: fixtures + Kalshi + strength read, no
-            model. One shared page at /bet-suggester/comp/[key]. */}
+            model. One shared page at /bet-suggester/comp/[key].
+            RETIRED 2026-08-24 by operator decision, and dropped from
+            this rail: Conference (ecl), Europa (uel), Brasileirão,
+            Argentina, USL. The backend stopped collecting them the same
+            day; nothing recorded was deleted, and a journal entry
+            against one is still readable at /api/comp/{key}/journal. */}
         {[["leagues-cup", "Leagues Cup"], ["asean", "ASEAN"],
-          ["ecl", "Conference"], ["uel", "Europa"], ["ucl", "UCL"],
-          ["brasileirao", "Brasileirão"], ["argentina", "Argentina"],
-          ["usl", "USL"]].map(([k, label]) => (
+          ["ucl", "UCL"]].map(([k, label]) => (
           <NavChip key={k} href={`/bet-suggester/comp/${k}`} active={false}>
             {label}
           </NavChip>
