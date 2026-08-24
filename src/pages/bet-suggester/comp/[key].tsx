@@ -1,8 +1,14 @@
-// One page for every viewer competition — Conference League, Europa League,
-// Champions League, Brasileirão, Liga Profesional Argentina, USL
-// Championship.
+// One page for every viewer competition — Champions League, Leagues Cup,
+// ASEAN Championship.
 //
-// Deliberately ONE page rather than six. The three league match pages in
+// Five more were served here until 2026-08-24, when the operator retired
+// Conference League, Europa League, Brasileirão, Liga Profesional
+// Argentina and USL Championship. This page needed no per-competition
+// edit for that: the registry is the backend's, and a retired key now
+// answers 404 with the reason, which the not-served state below renders
+// instead of retrying an outage that will never end.
+//
+// Deliberately ONE page rather than eight. The three league match pages in
 // this repo are the cautionary tale: copied per league, they drifted apart
 // on fee arithmetic and only one of them is correct. Everything that varies
 // between these competitions — display name, accent, Kalshi series, and the
@@ -145,23 +151,57 @@ export default function CompViewer() {
   const [days, setDays] = useState(14);
   const [onlyRated, setOnlyRated] = useState(false);
   const [err, setErr] = useState(false);
+  // A key the backend does not serve is PERMANENT, not a blip. Kept
+  // apart from `err` because the two need opposite behaviour: a
+  // transient failure should keep retrying, and a retired competition
+  // polled every 60s forever is an outage that never resolves.
+  const [gone, setGone] = useState<string | null>(null);
 
   useEffect(() => {
     if (!key) return;
     let alive = true;
+    // Flips false on a 404 and never back: the backend does not serve
+    // this key, so every later poll would ask the same dead question.
+    // The handle lives in an object so the 404 branch can cancel the
+    // poll without depending on when the timer was assigned.
+    let served = true;
+    const poll: { id?: ReturnType<typeof setInterval> } = {};
     const load = () => {
+      if (!served) return;
       fetch(`/api/comp/${key}/fixtures?days=${days}`)
-        .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+        .then(async (r) => {
+          if (r.ok) return r.json();
+          // 404 means this key is not served — a retirement or a typo,
+          // either way permanent. The backend sends the reason in
+          // `detail`; show it and STOP polling. Anything else is a
+          // failure worth retrying.
+          if (r.status === 404) {
+            const body = await r.json().catch(() => null);
+            const why = body && typeof body.detail === "string"
+              ? body.detail : null;
+            throw { permanent: true as const, why };
+          }
+          throw { permanent: false as const, why: null };
+        })
         .then((j) => { if (alive) { setD(j); setErr(false); } })
-        .catch(() => alive && setErr(true));
+        .catch((e) => {
+          if (!alive) return;
+          if (e && e.permanent) {
+            served = false;
+            setGone(e.why || "this competition is not served here");
+            if (poll.id) clearInterval(poll.id);
+          } else {
+            setErr(true);
+          }
+        });
       fetch(`/api/comp/${key}/markets`)
         .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
         .then((j) => alive && setMk(j))
         .catch(() => {});
     };
     load();
-    const t = setInterval(load, 60000);
-    return () => { alive = false; clearInterval(t); };
+    poll.id = setInterval(load, 60000);
+    return () => { alive = false; if (poll.id) clearInterval(poll.id); };
   }, [key, days]);
 
   const all = d?.fixtures || [];
@@ -172,6 +212,33 @@ export default function CompViewer() {
     .filter((x) => x.date));
   const byDesign = d?.model?.state === "no_model_by_design";
   const vars = { "--accent": d?.accent || "#7dd3fc" } as React.CSSProperties;
+
+  // A key the backend does not serve gets its own page rather than the
+  // board with every panel empty. The old behaviour rendered "Loading",
+  // a blank no-model card and a zero count, then re-fetched forever —
+  // a permanent state wearing a transient one's clothes, which is the
+  // empty-state rule this repo already applies to a missing prediction.
+  if (gone) {
+    return (
+      <div style={vars} className="min-h-screen bg-bs font-sans text-ink-mid">
+        <Head><title>Not served · market viewer · namson.dev</title></Head>
+        <RouteProgress />
+        <TopBar back={{ href: "/bet-suggester", label: "board" }}
+          title="market viewer" />
+        <main className="mx-auto max-w-5xl px-5 pb-24 pt-10">
+          <Eyebrow>not served here</Eyebrow>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-ink-hi">
+            {String(key || "This competition")}
+          </h1>
+          <section className="mt-8 rounded-2xl border border-line bg-elev p-5">
+            <p className="max-w-3xl text-sm leading-relaxed text-ink-low">
+              {gone}
+            </p>
+          </section>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div style={vars} className="min-h-screen bg-bs font-sans text-ink-mid">
