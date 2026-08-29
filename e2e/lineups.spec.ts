@@ -55,8 +55,14 @@ test.describe("MLS match page — team news", () => {
     for (const side of ["home", "away"] as const) {
       const s = body.lineups[side];
       if (!s) continue;
-      // the invariant: no XI released => no absence claims
-      if (!s.released) expect(s.key_absences.length).toBe(0);
+      // the invariant: no XI released => no absence CLAIMS.
+      // null (backend could not compute) and [] (computed, nobody
+      // missing) both satisfy it, and they are NOT the same thing — the
+      // assertion says so rather than collapsing them with `?? []`.
+      if (!s.released) {
+        expect(s.key_absences === null
+               || s.key_absences.length === 0).toBe(true);
+      }
     }
 
     await page.goto(`/bet-suggester/mls/${EVENT}`);

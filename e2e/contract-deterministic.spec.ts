@@ -59,6 +59,41 @@ test.describe("deterministic contract tests (recorded payloads)", () => {
     await expect(page.getByText(/not starting/i)).toHaveCount(0);
   });
 
+  test("key_absences null renders the REASON, never silence", async ({ page }) => {
+    // The backend distinguishes [] (computed, nobody missing) from null
+    // (could not compute). Hiding the null case would move the exact
+    // ambiguity the backend fix removed into the UI: a reader would see
+    // the same nothing for "nobody is out" and "we did not look".
+    //
+    // The live case this pins: Liga MX and EPL fixtures, where the
+    // Sportec player feed does not cover the competition. Before the
+    // backend fix those returned Atlanta United's players for Atlante,
+    // or a bare [] that read as "nobody is missing".
+    await serve(page, payload({
+      lineups: {
+        strength_available: true,
+        home: { formation: "4-3-3", confirmed: true, released: true,
+                goalkeeper: "Keeper One", bench: [],
+                starters: Array.from({ length: 11 }, (_, i) => ({
+                  name: `Player ${i}`, position: i === 0 ? "G" : "M",
+                  jersey: String(i + 1), xg90: null, apps: null,
+                  is_goalkeeper: i === 0 })),
+                key_absences: null,
+                key_absences_reason:
+                  "no player-strength feed for liga-mx-2026 — absences "
+                  + "are computed only for mls-2026" },
+        away: null,
+      },
+    }));
+    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    // the reason is shown...
+    await expect(page.getByText(/no player-strength feed for liga-mx-2026/i)
+      .first()).toBeVisible();
+    // ...and it is explicitly NOT read as "nobody is missing"
+    await expect(page.getByText(/not a statement that nobody is missing/i)
+      .first()).toBeVisible();
+  });
+
   test("team news is labelled CURRENT, never as the frozen T-10 input",
     async ({ page }) => {
       await serve(page, payload({

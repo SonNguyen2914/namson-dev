@@ -44,7 +44,14 @@ type Absence = { name?: string; xg90?: number; apps?: number;
   status?: "bench" | "out" };
 type SideLineup = { formation?: string; confirmed?: boolean;
   released?: boolean; starters: XiPlayer[]; bench: XiPlayer[];
-  goalkeeper?: string | null; key_absences: Absence[] };
+  goalkeeper?: string | null;
+  // null (never []) when the backend could NOT compute absences — the
+  // competition has no player-strength feed, or a club did not resolve.
+  // [] means it computed them and nobody is missing. Conflating the two
+  // is the bug the backend fix exists to prevent; do not "simplify" this
+  // to Absence[] with a ?? [] default.
+  key_absences: Absence[] | null;
+  key_absences_reason?: string | null };
 type Lineups = { home: SideLineup | null; away: SideLineup | null;
   strength_available?: boolean };
 type BookRow = { ticker: string; label?: string; yes_ask?: string;
@@ -964,7 +971,20 @@ function SideXi({ side, team }: { side: SideLineup | null; team?: string }) {
         </>
       )}
 
-      {side && side.key_absences.length > 0 && (
+      {side && side.key_absences === null && (
+        <div className="mt-3 border-t border-line pt-3">
+          <p className="mb-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+            not starting
+          </p>
+          <p className="font-mono text-[10px] leading-relaxed text-ink-low">
+            not available — {side.key_absences_reason
+              || "the backend did not compute absences for this fixture"}.
+            This is NOT a statement that nobody is missing.
+          </p>
+        </div>
+      )}
+
+      {side && side.key_absences !== null && side.key_absences.length > 0 && (
         <div className="mt-3 border-t border-line pt-3">
           <p className="mb-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
             not starting
