@@ -90,7 +90,7 @@ type ExecutionLayer = { clip_contracts?: number; clip_basis?: string;
   scope?: string; book_basis?: string; fill_risk?: string;
   not_an_edge?: string; break_even_basis?: string;
   effective_rate_basis?: string; rounding_granularity?: string;
-  fee_helpers?: string;
+  maker_rounding_reimbursement?: string; fee_helpers?: string;
   routes?: { cross?: string; rest?: string };
   outcomes?: Record<string, ExecOutcome> };
 
@@ -688,7 +688,15 @@ function ExecutionBlock({ x }: { x?: Refusable<ExecutionLayer> }) {
           {ex.not_an_edge}
         </p>
       )}
+      {/* maker_rounding_reimbursement goes IMMEDIATELY after the
+          rounding note it qualifies. The backend charges the round-up
+          and the venue may refund part of it monthly, above a $10
+          threshold a small clip can miss every month — a worst-case
+          multiple rendered without that clause reads as a settled cost
+          rather than a charge. Same rule as the fill-risk line: the
+          qualifier does not get to drift away from its number. */}
       {[ex.scope, ex.clip_basis, ex.rounding_granularity,
+        ex.maker_rounding_reimbursement,
         ex.effective_rate_basis, ex.break_even_basis, ex.book_basis,
         ex.fee_helpers].map((t) => t && (
         <p key={t.slice(0, 40)}

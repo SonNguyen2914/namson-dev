@@ -61,13 +61,14 @@ const MATCH_PAYLOAD = {
 const EXECUTION = {
   "clip_contracts": 100,
   "clip_basis": "EVERY FIGURE BELOW IS FOR THIS CLIP AND NO OTHER. Kalshi rounds the fee UP once per ORDER, so cost per contract is a function of order size and a saving quoted without a size is not a number. The clip is config.EXECUTION_VIEW_CLIP_CONTRACTS, defaulting to the paper policy's own target_contracts so a cost read here and a cost read off the paper ledger are the same clip. It is a reference size for arithmetic — not a suggested stake, and nothing on this card sizes anything.",
-  "scope": "WHAT ENTERING COSTS, not whether to enter. Two routes into the same position priced side by side at a stated clip: crossing the spread as a taker, and resting at the bid as a maker at a quarter of the fee. Nothing here places an order, sizes one, or recommends one — this repo has no order path — and the arithmetic is emitted with the two conditions that qualify it attached, never on its own.",
+  "scope": "WHAT ENTERING COSTS, not whether to enter. Two routes into the same position priced side by side at a stated clip: crossing the spread as a taker, and resting at the bid as a maker at a QUARTER OF THE RATE — of the RATE, and never of the fee. The rate multiplies p·(1−p) and the two routes are quoted at two different prices, so a maker resting nearer the middle of the book can pay MORE in fee than a taker crossing nearer $1: it happens on seven books of the legal cent grid this project trades, and where it does the figures below report it as a NEGATIVE fee difference rather than hiding it. Every fee here is computed per leg from the price actually quoted; none is inferred from the ratio between the two rates. Nothing here places an order, sizes one, or recommends one — this repo has no order path — and the arithmetic is emitted with the two conditions that qualify it attached, never on its own.",
   "book_basis": "BOTH SIDES OFF ONE QUOTE ROW. The execution figures read the ask AND the bid from the SAME newest MarketQuote per leg (the `_quote_book` projection of the same approved regular_time mapping the ask column above is derived from), preferring the provider's exact dollar string over the derived integer cents (V9 eval F7, position.py's reader reused). One capture, one clock, two sides — a spread assembled from two different captures is not a spread, and a saving computed from one would be an artefact of the gap between them. Sub-penny prices therefore make these figures differ in the third decimal from the whole-cent asks above; that is the cent column rounding, not two books.",
   "fill_risk": "A RESTING ORDER IS NOT A CHEAPER POSITION UNTIL IT FILLS. The difference here is between two prices you might pay, and it becomes real only if the bid you joined gets hit. If it is not hit you hold nothing — not a cheaper position, no position — and the move you were pricing can happen without you, which costs nothing in fees and can cost the entire trade. A resting bid also fills preferentially when someone is willing to sell it to you, so the fills you get are not a random sample of the fills you wanted. None of that is measured here: this feed carries no fill data, so the probability of filling is not in any number on this block and cannot be read off it.",
   "not_an_edge": "PAYING LESS TO ENTER IS NOT INFORMATION ABOUT THE OUTCOME. This block compares the cost of two routes into the SAME position. It moves no probability, it makes no outcome more likely, and a cheaper entry does not make a losing position win. It claims no ledger row: the rest-versus-cross figure this surface exists for is filed in research_archive/TEST-LEDGER.md as an ADJACENT MEASUREMENT, listed there beside the fee constant precisely so nobody mistakes it for one of the edge tests — thirteen of which are dead.",
   "break_even_basis": "The break-even is this route's ALL-IN cost per contract — the model probability at which entering by it is EV-zero. It is CLIP-SPECIFIC because the fee rounds up once per order, so it moves with the size above it. The market block's own `break_even_fee_inclusive` is the size-free per-contract taker number from src/execution.py and will differ in the last digits; the two are not in conflict and neither is the other rounded.",
-  "effective_rate_basis": "`effective_rate` is what this clip ACTUALLY pays: the rounded per-order fee divided by C·p·(1−p). `rounding_multiple` is that over the headline rate, and it is 1 exactly when the raw fee already lands on a centicent. It rises as the clip shrinks because the round-up is charged once per ORDER — which is the regime a small bankroll trades in by construction. Quoted as a computed number rather than a remembered one so it can never disagree with the fee beside it.",
-  "rounding_granularity": "ROUNDING GRANULARITY IS AN OPEN QUESTION, and it is worth up to 2.3x on a small clip. Both fees here round UP once per order to the CENTICENT ($0.0001), which is this repo's implemented policy (paper.FEE_POLICY, V9.1 eval F3). The archived venue capture (research_archive/rn1/venue_fee_params.json) states the form as ceil to the next CENT, which is 100x coarser and is where the 'small clips pay up to 2.3x the headline rate' figure comes from: at p=0.50 one maker contract costs 0.4375c raw, 0.44c rounded to the centicent, 1.00c rounded to the cent. The effective rate quoted beside every figure here is computed under the CENTICENT, so if the venue rounds to the cent these costs are understated on small clips and correct at size. Unresolved on purpose — settling it by choosing the convenient reading is the error, and the fix is a fill receipt at a small clip, not an argument.",
+  "effective_rate_basis": "`effective_rate` is what this clip is CHARGED at the point of trade: the rounded per-order fee divided by C·p·(1−p). It is deliberately NOT called what the clip actually pays. The venue capture this repo cites carries a term this repo does not model — the round-up excess is refunded in the first week of the following month IF that month's cumulative excess exceeds $10 — so a clip small enough to show a large multiple here is also the clip least likely to reach the threshold, and may be charged this rate and refunded none of it. The clause and its condition ride in this block as `maker_rounding_reimbursement`. `rounding_multiple` is the charged rate over the headline rate, and it is 1 exactly when the raw fee already lands on a centicent. It rises as the clip shrinks because the round-up is charged once per ORDER — which is the regime a small bankroll trades in by construction. Quoted as a computed number rather than a remembered one so it can never disagree with the fee beside it.",
+  "rounding_granularity": "ROUNDING GRANULARITY IS AN OPEN QUESTION, and its bound runs the OPPOSITE WAY from the figure this repo used to quote. Both fees here round UP once per order to the CENTICENT ($0.0001), this repo's implemented policy (paper.FEE_POLICY, V9.1 eval F3), while the archived venue capture (research_archive/rn1/venue_fee_params.json) states the form as ceil to the next CENT, 100x coarser. MEASURED over the whole cent price grid at one contract: cent rounding costs a MINIMUM of 2.2857x the raw headline fee, and that minimum is AT p=0.50 — p(1-p) peaks there, so it is the cheapest place the round-up can bite, not the dearest — rising steeply toward both extremes to 57.72x at p=0.01 and p=0.99. Against the centicent this repo actually charges, the same sweep runs 2.27x to 50.00x. The text this replaces said 'up to 2.3x on a small clip', which is a MINIMUM stated as a maximum and understates the question by about 22x, and which had no provenance for the purpose: the only 2.33x in research_archive is the KALSHI-taker vs POLYMARKET-taker fee ratio (7/3, at every price), an inter-venue comparison of fee LEVELS unrelated to any round-up. No archived source states a round-up penalty, so none is quoted from memory here and the figures above are recomputed by test. Partly — not wholly — defused by MAKER_ROUNDING_REIMBURSEMENT, which is what the venue says it refunds and on what condition. The effective rate quoted beside every figure here is computed under the CENTICENT, so if the venue rounds to the cent these charges are understated on small clips and correct at size. Unresolved on purpose — settling it by choosing the convenient reading is the error, and the fix is a fill receipt at a small clip, not an argument.",
+  "maker_rounding_reimbursement": "THE VENUE SAYS IT GIVES SOME OF THE ROUND-UP BACK, ON A CONDITION A SMALL CLIP MAY NEVER MEET. The archived capture (research_archive/rn1/venue_fee_params.json, field `maker_rounding_reimbursement`) reads, verbatim: 'excess paid via round-up refunded first week of following month IF cumulative excess > $10'. So the excess is charged per order at the point of trade and returned only LATER, MONTHLY, and only once a calendar month's accumulated excess clears TEN DOLLARS. An operator trading small clips is the case that fails the condition: the round-up bites hardest on the smallest orders and those are the orders least likely to accumulate $10 of excess in a month, so the same operator can pay the excess every month and be refunded none of it. NOTHING IN THIS REPO MODELS IT — no figure on any surface is net of a refund, there is no accumulator (FEE_POLICY's `not_modeled` says so), and this constant adds none. It is stated because every rounding figure beside it is a CHARGE and not necessarily a final cost, and because a clause sitting unread in a source this project cites is the failure this project keeps cataloguing.",
   "fee_helpers": "src.live.paper.order_fee_dollars (taker) and maker_fee_dollars (maker): Decimal, ceil to the centicent, computed ONCE on the whole order. src/execution.py's fee() is an unrounded float per-contract TAKER helper used by the gates; it is deliberately not used for any money figure here.",
   "routes": {
     "cross": "CROSS — a TAKER order that lifts the ask and fills now, at 0.07·p·(1−p) per contract rounded up once on the order.",
@@ -1529,10 +1530,14 @@ test.describe("entry cost: what crossing costs and what resting costs",
         // computed them — this file does no money arithmetic
         await expect(home).toContainText("$46.7325");
         await expect(home).toContainText("$43.4290");
-        // the fee each route pays, a quarter apart
+        // the fee each route pays. NOT "a quarter apart": the RATES
+        // are a quarter apart at the SAME price, and these two legs
+        // are quoted at 45c and 43c, so the fees are whatever the two
+        // prices make them — 4.038x here, and on some books the maker
+        // fee is the LARGER of the two.
         await expect(home).toContainText("$1.7325");
         await expect(home).toContainText("$0.4290");
-        // THE EFFECTIVE RATE EACH ROUTE ACTUALLY PAYS AT THIS CLIP.
+        // THE EFFECTIVE RATE EACH ROUTE IS CHARGED AT THIS CLIP.
         // Crossing lands exactly on the headline 0.07; the maker fee
         // at 43c does not land on a centicent, so the round-up makes
         // this clip pay 0.017503 — 1.0002x the headline — and the
@@ -1588,6 +1593,42 @@ test.describe("entry cost: what crossing costs and what resting costs",
       await expect(ne).toContainText("moves no probability");
       await expect(ne).toContainText("claims no ledger row");
     });
+
+    test("the corrected fee claims render, and the refund clause "
+      + "renders beside the rounding figure it qualifies",
+      async ({ page }) => {
+        await serveMatch(page);
+        await serveCard(page);
+        await page.goto(`/bet-suggester/mls/${EVENT}`);
+        const block = page.getByTestId("execution");
+
+        // THE SCOPE STRING. It used to say "a quarter of the fee",
+        // which is false wherever b(1-b) > 4a(1-a) — the maker resting
+        // at the bid then pays MORE fee than the taker crossing.
+        await expect(block).not.toContainText("quarter of the fee");
+        await expect(block).toContainText("QUARTER OF THE RATE");
+        await expect(block).toContainText("can pay MORE in fee");
+
+        // THE ROUNDING BOUND, in the direction it actually runs: 2.3x
+        // was derived at p=0.50, where p(1-p) peaks and the round-up
+        // therefore bites LEAST. It is the floor, not the ceiling.
+        await expect(block).toContainText("MINIMUM of 2.2857x");
+        await expect(block).toContainText("57.72x at p=0.01 and p=0.99");
+        await expect(block).toContainText("MINIMUM stated as a maximum");
+
+        // THE CLAUSE THAT WAS IN THE CITED CAPTURE AND IN NO CODE. It
+        // renders, and it renders with its condition — the operator
+        // reading a worst-case multiple has to see that the excess is
+        // a CHARGE which may be refunded above a threshold small clips
+        // can miss every month.
+        await expect(block).toContainText(
+          "excess paid via round-up refunded first week of following "
+          + "month IF cumulative excess > $10");
+        await expect(block).toContainText(
+          "is CHARGED at the point of trade");
+        await expect(block).not.toContainText(
+          "is what this clip ACTUALLY pays");
+      });
 
     test("nothing in the block reads as an instruction", async ({ page }) => {
       await serveMatch(page);
