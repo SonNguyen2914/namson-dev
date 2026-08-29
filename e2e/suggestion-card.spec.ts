@@ -43,6 +43,143 @@ const MATCH_PAYLOAD = {
   generated_at: new Date().toISOString(),
 };
 
+// --- the ENTRY COST block (backend src/live/card.py _execution) ------
+//
+// What entering costs by each of the two routes: crossing the spread as
+// a taker, or resting at the bid as a maker at a QUARTER of the fee.
+// Recorded verbatim from the backend — every string here is the one
+// src/live/execution_view.py emits, not a paraphrase, because these are
+// the sentences the render is asserted to carry.
+//
+// Three legs on purpose, one per render path this file has to cover:
+//   home  fully priced — both routes and the difference;
+//   draw  a ONE-SIDED book. No bid, so the resting route and the
+//         comparison refuse while crossing stays priced;
+//   away  a spread too wide for the bid to be the same trade, which
+//         refuses the comparison rather than reporting a "saving" that
+//         is almost entirely spread.
+const EXECUTION = {
+  "clip_contracts": 100,
+  "clip_basis": "EVERY FIGURE BELOW IS FOR THIS CLIP AND NO OTHER. Kalshi rounds the fee UP once per ORDER, so cost per contract is a function of order size and a saving quoted without a size is not a number. The clip is config.EXECUTION_VIEW_CLIP_CONTRACTS, defaulting to the paper policy's own target_contracts so a cost read here and a cost read off the paper ledger are the same clip. It is a reference size for arithmetic — not a suggested stake, and nothing on this card sizes anything.",
+  "scope": "WHAT ENTERING COSTS, not whether to enter. Two routes into the same position priced side by side at a stated clip: crossing the spread as a taker, and resting at the bid as a maker at a QUARTER OF THE RATE — of the RATE, and never of the fee. The rate multiplies p·(1−p) and the two routes are quoted at two different prices, so a maker resting nearer the middle of the book can pay MORE in fee than a taker crossing nearer $1: it happens on seven books of the legal cent grid this project trades, and where it does the figures below report it as a NEGATIVE fee difference rather than hiding it. Every fee here is computed per leg from the price actually quoted; none is inferred from the ratio between the two rates. Nothing here places an order, sizes one, or recommends one — this repo has no order path — and the arithmetic is emitted with the two conditions that qualify it attached, never on its own.",
+  "book_basis": "BOTH SIDES OFF ONE QUOTE ROW. The execution figures read the ask AND the bid from the SAME newest MarketQuote per leg (the `_quote_book` projection of the same approved regular_time mapping the ask column above is derived from), preferring the provider's exact dollar string over the derived integer cents (V9 eval F7, position.py's reader reused). One capture, one clock, two sides — a spread assembled from two different captures is not a spread, and a saving computed from one would be an artefact of the gap between them. Sub-penny prices therefore make these figures differ in the third decimal from the whole-cent asks above; that is the cent column rounding, not two books.",
+  "fill_risk": "A RESTING ORDER IS NOT A CHEAPER POSITION UNTIL IT FILLS. The difference here is between two prices you might pay, and it becomes real only if the bid you joined gets hit. If it is not hit you hold nothing — not a cheaper position, no position — and the move you were pricing can happen without you, which costs nothing in fees and can cost the entire trade. A resting bid also fills preferentially when someone is willing to sell it to you, so the fills you get are not a random sample of the fills you wanted. None of that is measured here: this feed carries no fill data, so the probability of filling is not in any number on this block and cannot be read off it.",
+  "not_an_edge": "PAYING LESS TO ENTER IS NOT INFORMATION ABOUT THE OUTCOME. This block compares the cost of two routes into the SAME position. It moves no probability, it makes no outcome more likely, and a cheaper entry does not make a losing position win. It claims no ledger row: the rest-versus-cross figure this surface exists for is filed in research_archive/TEST-LEDGER.md as an ADJACENT MEASUREMENT, listed there beside the fee constant precisely so nobody mistakes it for one of the edge tests — thirteen of which are dead.",
+  "break_even_basis": "The break-even is this route's ALL-IN cost per contract — the model probability at which entering by it is EV-zero. It is CLIP-SPECIFIC because the fee rounds up once per order, so it moves with the size above it. The market block's own `break_even_fee_inclusive` is the size-free per-contract taker number from src/execution.py and will differ in the last digits; the two are not in conflict and neither is the other rounded.",
+  "effective_rate_basis": "`effective_rate` is what this clip is CHARGED at the point of trade: the rounded per-order fee divided by C·p·(1−p). It is deliberately NOT called what the clip actually pays. The venue capture this repo cites carries a term this repo does not model — the round-up excess is refunded in the first week of the following month IF that month's cumulative excess exceeds $10 — so a clip small enough to show a large multiple here is also the clip least likely to reach the threshold, and may be charged this rate and refunded none of it. The clause and its condition ride in this block as `maker_rounding_reimbursement`. `rounding_multiple` is the charged rate over the headline rate, and it is 1 exactly when the raw fee already lands on a centicent. It rises as the clip shrinks because the round-up is charged once per ORDER — which is the regime a small bankroll trades in by construction. Quoted as a computed number rather than a remembered one so it can never disagree with the fee beside it.",
+  "rounding_granularity": "ROUNDING GRANULARITY IS AN OPEN QUESTION, and its bound runs the OPPOSITE WAY from the figure this repo used to quote. Both fees here round UP once per order to the CENTICENT ($0.0001), this repo's implemented policy (paper.FEE_POLICY, V9.1 eval F3), while the archived venue capture (research_archive/rn1/venue_fee_params.json) states the form as ceil to the next CENT, 100x coarser. MEASURED over the whole cent price grid at one contract: cent rounding costs a MINIMUM of 2.2857x the raw headline fee, and that minimum is AT p=0.50 — p(1-p) peaks there, so it is the cheapest place the round-up can bite, not the dearest — rising steeply toward both extremes to 57.72x at p=0.01 and p=0.99. Against the centicent this repo actually charges, the same sweep runs 2.27x to 50.00x. The text this replaces said 'up to 2.3x on a small clip', which is a MINIMUM stated as a maximum and understates the question by about 22x, and which had no provenance for the purpose: the only 2.33x in research_archive is the KALSHI-taker vs POLYMARKET-taker fee ratio (7/3, at every price), an inter-venue comparison of fee LEVELS unrelated to any round-up. No archived source states a round-up penalty, so none is quoted from memory here and the figures above are recomputed by test. Partly — not wholly — defused by MAKER_ROUNDING_REIMBURSEMENT, which is what the venue says it refunds and on what condition. The effective rate quoted beside every figure here is computed under the CENTICENT, so if the venue rounds to the cent these charges are understated on small clips and correct at size. Unresolved on purpose — settling it by choosing the convenient reading is the error, and the fix is a fill receipt at a small clip, not an argument.",
+  "maker_rounding_reimbursement": "THE VENUE SAYS IT GIVES SOME OF THE ROUND-UP BACK, ON A CONDITION A SMALL CLIP MAY NEVER MEET. The archived capture (research_archive/rn1/venue_fee_params.json, field `maker_rounding_reimbursement`) reads, verbatim: 'excess paid via round-up refunded first week of following month IF cumulative excess > $10'. So the excess is charged per order at the point of trade and returned only LATER, MONTHLY, and only once a calendar month's accumulated excess clears TEN DOLLARS. An operator trading small clips is the case that fails the condition: the round-up bites hardest on the smallest orders and those are the orders least likely to accumulate $10 of excess in a month, so the same operator can pay the excess every month and be refunded none of it. NOTHING IN THIS REPO MODELS IT — no figure on any surface is net of a refund, there is no accumulator (FEE_POLICY's `not_modeled` says so), and this constant adds none. It is stated because every rounding figure beside it is a CHARGE and not necessarily a final cost, and because a clause sitting unread in a source this project cites is the failure this project keeps cataloguing. ITS OWN EVIDENCE CLASS: the capture's `_caveat` says the formula text comes from the Feb 5 2026 PDF and that the CURRENT (July 2026) edition could not be downloaded — kalshi.com serves a bot challenge to every automated fetch and to web.archive.org. The rates were corroborated against the live fee page; this prose clause was not, so it is REPORTED as of Feb 2026 and may have changed. That cuts both ways and is stated rather than resolved.",
+  "fee_helpers": "src.live.paper.order_fee_dollars (taker) and maker_fee_dollars (maker): Decimal, ceil to the centicent, computed ONCE on the whole order. src/execution.py's fee() is an unrounded float per-contract TAKER helper used by the gates; it is deliberately not used for any money figure here.",
+  "routes": {
+    "cross": "CROSS — a TAKER order that lifts the ask and fills now, at 0.07·p·(1−p) per contract rounded up once on the order.",
+    "rest": "REST — a MAKER order that joins the best bid and waits, at 0.0175·p·(1−p) per contract, a quarter of the taker rate, rounded up once on the order. This prices JOINING the bid. Improving on it costs more per contract and is a different figure, not quoted here."
+  },
+  "outcomes": {
+    "home": {
+      "clip_contracts": "100",
+      "book": {
+        "ask": "0.45",
+        "bid": "0.43",
+        "spread_cents": "2.00"
+      },
+      "cross": {
+        "price": "0.45",
+        "contracts": "100",
+        "gross_dollars": "45.0000",
+        "fee_dollars": "1.7325",
+        "all_in_dollars": "46.7325",
+        "all_in_cents": 4673,
+        "fee_cents": 173,
+        "fee_cents_per_contract": "1.7325",
+        "break_even": "0.467325",
+        "headline_rate": "0.07",
+        "effective_rate": "0.070000",
+        "rounding_multiple": "1.0000"
+      },
+      "rest": {
+        "price": "0.43",
+        "contracts": "100",
+        "gross_dollars": "43.0000",
+        "fee_dollars": "0.4290",
+        "all_in_dollars": "43.4290",
+        "all_in_cents": 4343,
+        "fee_cents": 43,
+        "fee_cents_per_contract": "0.4290",
+        "break_even": "0.434290",
+        "headline_rate": "0.0175",
+        "effective_rate": "0.017503",
+        "rounding_multiple": "1.0002"
+      },
+      "difference": {
+        "direction": "CROSSING COSTS MORE",
+        "dollars": "3.3035",
+        "cents": 330,
+        "per_contract_dollars": "0.033035",
+        "per_contract_cents": "3.3035",
+        "of_which_fee_dollars": "1.3035",
+        "of_which_spread_dollars": "2.0000",
+        "says": "At 100 contracts, crossing at $0.45 costs $46.7325 all-in and resting at $0.43 costs $43.4290 all-in, a difference of $3.3035 ($1.3035 of it fee, $2.0000 of it spread) — IF the resting order fills, which is the whole condition and is not a number on this block."
+      }
+    },
+    "draw": {
+      "clip_contracts": "100",
+      "book": {
+        "ask": "0.30",
+        "bid": null,
+        "spread_cents": null
+      },
+      "cross": {
+        "price": "0.30",
+        "contracts": "100",
+        "gross_dollars": "30.0000",
+        "fee_dollars": "1.4700",
+        "all_in_dollars": "31.4700",
+        "all_in_cents": 3147,
+        "fee_cents": 147,
+        "fee_cents_per_contract": "1.4700",
+        "break_even": "0.314700",
+        "headline_rate": "0.07",
+        "effective_rate": "0.070000",
+        "rounding_multiple": "1.0000"
+      },
+      "rest": {
+        "refused": "NO BID. The book is one-sided: an ask of $0.30 and nothing resting on the buy side to join. There is no resting price to quote, so what resting would cost is unknown rather than cheap, and the ask is never substituted for it. Crossing is priced above; the comparison is not."
+      },
+      "difference": {
+        "refused": "NO BID. The book is one-sided: an ask of $0.30 and nothing resting on the buy side to join. There is no resting price to quote, so what resting would cost is unknown rather than cheap, and the ask is never substituted for it. Crossing is priced above; the comparison is not."
+      }
+    },
+    "away": {
+      "clip_contracts": "100",
+      "book": {
+        "ask": "0.60",
+        "bid": "0.40",
+        "spread_cents": "20.00"
+      },
+      "cross": {
+        "price": "0.60",
+        "contracts": "100",
+        "gross_dollars": "60.0000",
+        "fee_dollars": "1.6800",
+        "all_in_dollars": "61.6800",
+        "all_in_cents": 6168,
+        "fee_cents": 168,
+        "fee_cents_per_contract": "1.6800",
+        "break_even": "0.616800",
+        "headline_rate": "0.07",
+        "effective_rate": "0.070000",
+        "rounding_multiple": "1.0000"
+      },
+      "rest": {
+        "refused": "SPREAD 20.00c IS WIDER THAN 8c, so resting at the bid is not the same trade as crossing at the ask. The two prices are far enough apart that a fill at $0.40 happens because the market moved to you, not because you saved a fee — the difference would be mostly spread and would read as a saving. 8c is EXEC_POLICY's max_spread_c, the widest book the paper policy treats as one price; measured median spreads on these series are 1-2c. Named rather than quoted."
+      },
+      "difference": {
+        "refused": "SPREAD 20.00c IS WIDER THAN 8c, so resting at the bid is not the same trade as crossing at the ask. The two prices are far enough apart that a fill at $0.40 happens because the market moved to you, not because you saved a fee — the difference would be mostly spread and would read as a saving. 8c is EXEC_POLICY's max_spread_c, the widest book the paper policy treats as one price; measured median spreads on these series are 1-2c. Named rather than quoted."
+      }
+    }
+  }
+};
+
 // Derived from the real GET /api/mls-2026/card/87 (trimmed, structure
 // and every load-bearing sentence intact).
 const CARD_PAYLOAD = {
@@ -74,10 +211,13 @@ const CARD_PAYLOAD = {
         asks: { away: 1.0, home: 1.0, draw: 1.0 },
         devig: { away: 0.3333, home: 0.3333, draw: 0.3333 },
         break_even_fee_inclusive: { away: 1.0, home: 1.0, draw: 1.0 },
-        fee_basis: "taker 0.07·p·(1−p) per contract (src/execution); "
-          + "maker is 0.0175·p·(1−p) and ROUNDS UP PER ORDER — small "
-          + "clips pay up to 2.3x headline (fee-schedule memory); "
-          + "resting economics are not quoted here",
+        fee_basis: "taker 0.07·p·(1−p) per contract (src/execution) "
+          + "for the break-evens above; the maker rate is a QUARTER of "
+          + "it, 0.0175·p·(1−p), and both round UP PER ORDER "
+          + "(paper.MAKER_FEE_RATE, archived capture). What each route "
+          + "costs at a stated clip is priced in `execution` below, "
+          + "with the effective rate each actually pays",
+        execution: EXECUTION,
       },
       pick: {
         model_outcomes: { home_win: 0.4712, draw: 0.2558,
@@ -1347,3 +1487,238 @@ test.describe("the disagreement rail is visible, not just present", () => {
       expect(cls).toContain("text-accent");
     });
 });
+
+/* ---------- the ENTRY COST block ---------- */
+
+// The card has always quoted a fee-inclusive break-even and never said
+// what entering COSTS, or that there are two prices for it — on series
+// where a maker pays a QUARTER of a taker's fee. What is pinned here:
+//
+//  1. both costs render per outcome, with the difference and the
+//     effective rate each route actually pays;
+//  2. the FILL-RISK sentence renders verbatim and is styled as the
+//     warning it is — a resting order that does not fill is no
+//     position, so a saving read without it is the wrong number;
+//  3. the NOT-AN-EDGE sentence renders verbatim — paying less to enter
+//     moves no probability and claims no ledger row;
+//  4. nothing reads as an instruction. The direction is a comparison
+//     between two dollar figures and gets no accent colour, exactly as
+//     the position ladder's MORE and LESS do not;
+//  5. every refusal renders its own words — a one-sided book, a spread
+//     too wide to be one trade, and a settled book that can no longer
+//     be entered at all;
+//  6. a card payload with NO execution key renders exactly what it
+//     rendered before the block existed.
+
+function withExecution(execution: unknown) {
+  const c = JSON.parse(JSON.stringify(CARD_PAYLOAD));
+  c.card.layers.market.execution = execution;
+  return c;
+}
+
+test.describe("entry cost: what crossing costs and what resting costs",
+  () => {
+    test("both routes render per outcome with the difference and the "
+      + "effective rate", async ({ page }) => {
+        await serveMatch(page);
+        await serveCard(page);
+        await page.goto(`/bet-suggester/mls/${EVENT}`);
+
+        const home = page.getByTestId("exec-home");
+        await expect(home).toBeVisible();
+        // crossing at 45c and resting at 43c, all-in, as the backend
+        // computed them — this file does no money arithmetic
+        await expect(home).toContainText("$46.7325");
+        await expect(home).toContainText("$43.4290");
+        // the fee each route pays. NOT "a quarter apart": the RATES
+        // are a quarter apart at the SAME price, and these two legs
+        // are quoted at 45c and 43c, so the fees are whatever the two
+        // prices make them — 4.038x here, and on some books the maker
+        // fee is the LARGER of the two.
+        await expect(home).toContainText("$1.7325");
+        await expect(home).toContainText("$0.4290");
+        // THE EFFECTIVE RATE EACH ROUTE IS CHARGED AT THIS CLIP.
+        // Crossing lands exactly on the headline 0.07; the maker fee
+        // at 43c does not land on a centicent, so the round-up makes
+        // this clip pay 0.017503 — 1.0002x the headline — and the
+        // multiple renders beside it rather than being left implicit.
+        // That number is the whole reason the block quotes a computed
+        // rate instead of restating the constant.
+        await expect(home).toContainText("0.070000");
+        await expect(home).toContainText("0.017503");
+        await expect(home).toContainText("1.0002× headline");
+        // and the break-even each implies
+        await expect(home).toContainText("0.467325");
+        await expect(home).toContainText("0.434290");
+
+        // the difference, split into its fee half and its spread half
+        const diff = page.getByTestId("exec-diff-home");
+        await expect(diff).toContainText("CROSSING COSTS MORE");
+        await expect(diff).toContainText("$3.3035");
+        await expect(diff).toContainText("$1.3035 fee");
+        await expect(diff).toContainText("$2.0000 spread");
+        await expect(diff).toContainText("3.3035¢/contract");
+
+        // the clip is on screen: a saving quoted without a size is not
+        // a number, and this one is quoted at 100 contracts
+        await expect(page.getByText(/at 100 contracts/i).first())
+          .toBeVisible();
+      });
+
+    test("the fill-risk sentence renders verbatim and reads as a "
+      + "warning, not a footnote", async ({ page }) => {
+        await serveMatch(page);
+        await serveCard(page);
+        await page.goto(`/bet-suggester/mls/${EVENT}`);
+        const fr = page.getByTestId("fill-risk");
+        await expect(fr).toBeVisible();
+        await expect(fr).toContainText(
+          "A RESTING ORDER IS NOT A CHEAPER POSITION UNTIL IT FILLS");
+        await expect(fr).toContainText("you hold nothing");
+        await expect(fr).toContainText("no fill data");
+        // styled as the warning it is, like the no-safe-window line
+        expect(await fr.getAttribute("class")).toContain("text-warn");
+        // and the saving carries the condition inside its own sentence
+        await expect(page.getByTestId("exec-diff-home"))
+          .toContainText("IF the resting order fills");
+      });
+
+    test("the not-an-edge sentence renders verbatim", async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page);
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const ne = page.getByTestId("not-an-edge");
+      await expect(ne).toContainText(
+        "PAYING LESS TO ENTER IS NOT INFORMATION ABOUT THE OUTCOME");
+      await expect(ne).toContainText("moves no probability");
+      await expect(ne).toContainText("claims no ledger row");
+    });
+
+    test("the corrected fee claims render, and the refund clause "
+      + "renders beside the rounding figure it qualifies",
+      async ({ page }) => {
+        await serveMatch(page);
+        await serveCard(page);
+        await page.goto(`/bet-suggester/mls/${EVENT}`);
+        const block = page.getByTestId("execution");
+
+        // THE SCOPE STRING. It used to say "a quarter of the fee",
+        // which is false wherever b(1-b) > 4a(1-a) — the maker resting
+        // at the bid then pays MORE fee than the taker crossing.
+        await expect(block).not.toContainText("quarter of the fee");
+        await expect(block).toContainText("QUARTER OF THE RATE");
+        await expect(block).toContainText("can pay MORE in fee");
+
+        // THE ROUNDING BOUND, in the direction it actually runs: 2.3x
+        // was derived at p=0.50, where p(1-p) peaks and the round-up
+        // therefore bites LEAST. It is the floor, not the ceiling.
+        await expect(block).toContainText("MINIMUM of 2.2857x");
+        await expect(block).toContainText("57.72x at p=0.01 and p=0.99");
+        await expect(block).toContainText("MINIMUM stated as a maximum");
+
+        // THE CLAUSE THAT WAS IN THE CITED CAPTURE AND IN NO CODE. It
+        // renders, and it renders with its condition — the operator
+        // reading a worst-case multiple has to see that the excess is
+        // a CHARGE which may be refunded above a threshold small clips
+        // can miss every month.
+        await expect(block).toContainText(
+          "excess paid via round-up refunded first week of following "
+          + "month IF cumulative excess > $10");
+        await expect(block).toContainText(
+          "is CHARGED at the point of trade");
+        await expect(block).not.toContainText(
+          "is what this clip ACTUALLY pays");
+      });
+
+    test("nothing in the block reads as an instruction", async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page);
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      // the comparison gets no accent colour — MORE and LESS are
+      // statements about two dollar figures, never a recommendation
+      const cls = await page.getByTestId("exec-diff-home")
+        .getAttribute("class");
+      expect(cls).not.toContain("text-accent");
+      // decision safety still holds over the new block
+      await expect(page.getByText(/^TAKE$/)).toHaveCount(0);
+      await expect(page.getByText(/shadow · not advice/i).first())
+        .toBeVisible();
+      const block = await page.getByTestId("execution").innerText();
+      for (const word of ["you should", "we recommend", "rest this order",
+                          "cross now", "best route"]) {
+        expect(block.toLowerCase()).not.toContain(word);
+      }
+    });
+
+    test("a one-sided book refuses the resting route in its own words "
+      + "and still prices crossing", async ({ page }) => {
+        await serveMatch(page);
+        await serveCard(page);
+        await page.goto(`/bet-suggester/mls/${EVENT}`);
+        // asserted on the REST CELL ITSELF, not on the row: the same
+        // sentence also reaches the difference note, so a row-level
+        // assertion stays green while this cell renders a dash
+        const rest = page.getByTestId("exec-draw-rest");
+        await expect(rest).toContainText("NO BID");
+        await expect(rest).toContainText("The book is one-sided");
+        await expect(rest).toContainText("never substituted for it");
+        const draw = page.getByTestId("exec-draw");
+        // crossing IS knowable on that leg and is not withheld
+        await expect(draw).toContainText("$31.4700");
+        // no comparison is drawn against a price that is not there
+        await expect(page.getByTestId("exec-diff-draw")).toHaveCount(0);
+        // ...and the one reason is stated ONCE. The backend gives the
+        // leg and the comparison the same sentence; printing it twice
+        // in a row buries what it is trying to say.
+        expect((await draw.innerText()).split("NO BID").length - 1)
+          .toBe(1);
+      });
+
+    test("a spread too wide to be one trade refuses the comparison "
+      + "rather than reporting a saving", async ({ page }) => {
+        await serveMatch(page);
+        await serveCard(page);
+        await page.goto(`/bet-suggester/mls/${EVENT}`);
+        const awayRest = page.getByTestId("exec-away-rest");
+        await expect(awayRest).toContainText(
+          "SPREAD 20.00c IS WIDER THAN 8c");
+        await expect(awayRest).toContainText("not the same trade");
+        const away = page.getByTestId("exec-away");
+        await expect(away).toContainText("would read as a saving");
+        await expect(page.getByTestId("exec-diff-away")).toHaveCount(0);
+      });
+
+    test("a settled book refuses the whole block in words",
+      async ({ page }) => {
+        await serveMatch(page);
+        await serveCard(page, withExecution({
+          refused: "NO EXECUTION COST IS QUOTED FOR A SETTLED BOOK. "
+            + "Post-settlement the asks are pinned at payout, so there "
+            + "is no trade to enter and no spread to cross or rest "
+            + "inside — a cost quoted here would be the price of a "
+            + "trade that cannot be made, which is worse than no "
+            + "number at all.",
+        }));
+        await page.goto(`/bet-suggester/mls/${EVENT}`);
+        await expect(page.getByTestId("execution-refused"))
+          .toContainText("NO EXECUTION COST IS QUOTED FOR A SETTLED BOOK");
+        await expect(page.getByTestId("execution-refused"))
+          .toContainText("cannot be made");
+        // no cost figure survives the refusal
+        await expect(page.getByTestId("exec-home")).toHaveCount(0);
+        await expect(page.getByTestId("fill-risk")).toHaveCount(0);
+      });
+
+    test("a payload without the block renders exactly what it rendered "
+      + "before the block existed", async ({ page }) => {
+        await serveMatch(page);
+        await serveCard(page, withExecution(undefined));
+        await page.goto(`/bet-suggester/mls/${EVENT}`);
+        await expect(page.getByTestId("execution")).toHaveCount(0);
+        await expect(page.getByTestId("execution-refused")).toHaveCount(0);
+        await expect(page.getByTestId("fill-risk")).toHaveCount(0);
+        // the market block itself is untouched
+        await expect(page.getByText(/latest stored GAME-family ask book/)
+          .first()).toBeVisible();
+      });
+  });

@@ -63,9 +63,41 @@ type Identity = { home?: string; away?: string; kickoff_utc?: string;
   venue?: string; venue_class?: string; status?: string;
   espn_event_id?: string };
 
+// Every money figure below is an exact decimal STRING from the backend
+// (src/live/execution_view.py). Nothing here parses one to do
+// arithmetic on it — the backend owns the Decimal, this file owns the
+// layout, and a float round-trip through JS is how a displayed cost
+// stops matching the cost that was computed.
+type ExecLeg = { price?: string; contracts?: string;
+  gross_dollars?: string; fee_dollars?: string; all_in_dollars?: string;
+  all_in_cents?: number; fee_cents?: number;
+  fee_cents_per_contract?: string; break_even?: string;
+  headline_rate?: string; effective_rate?: string;
+  rounding_multiple?: string; refused?: string };
+
+type ExecDiff = { direction?: string; dollars?: string; cents?: number;
+  per_contract_dollars?: string; per_contract_cents?: string;
+  of_which_fee_dollars?: string; of_which_spread_dollars?: string;
+  says?: string; refused?: string };
+
+type ExecOutcome = { clip_contracts?: string;
+  book?: { ask?: string | null; bid?: string | null;
+    spread_cents?: string | null };
+  cross?: ExecLeg; rest?: ExecLeg; difference?: ExecDiff;
+  refused?: string };
+
+type ExecutionLayer = { clip_contracts?: number; clip_basis?: string;
+  scope?: string; book_basis?: string; fill_risk?: string;
+  not_an_edge?: string; break_even_basis?: string;
+  effective_rate_basis?: string; rounding_granularity?: string;
+  maker_rounding_reimbursement?: string; fee_helpers?: string;
+  routes?: { cross?: string; rest?: string };
+  outcomes?: Record<string, ExecOutcome> };
+
 type MarketLayer = { source?: string; asks?: Record<string, number>;
   devig?: Record<string, number>;
-  break_even_fee_inclusive?: Record<string, number>; fee_basis?: string };
+  break_even_fee_inclusive?: Record<string, number>; fee_basis?: string;
+  execution?: Refusable<ExecutionLayer> };
 
 type Gate = { ask?: number; all_in_cost?: number;
   edge_fee_inclusive?: number; fee_floor?: number; verdict?: string;
@@ -467,9 +499,211 @@ function MarketBlock({ m }: { m?: Refusable<MarketLayer> }) {
           {mk.fee_basis}
         </p>
       )}
+      <ExecutionBlock x={mk.execution} />
       {mk.source && (
         <p className="mt-1 font-mono text-[9px] text-ink-faint">{mk.source}</p>
       )}
+    </div>
+  );
+}
+
+/* ---------- what entering costs, by each of the two routes ---------- */
+
+// WHY THIS IS ON THE CARD. The market block has always quoted a
+// fee-inclusive break-even and never said what entering costs — on
+// series where a maker pays a QUARTER of a taker's fee and where the
+// one execution quantity this project measured and did NOT kill is
+// that resting beat crossing by $12-18/leg. Two costs per outcome, the
+// difference, and the effective rate each route actually pays.
+//
+// IT IS NOT AN EDGE AND IT IS NOT ADVICE, and both sentences saying so
+// come from the backend and render verbatim. The fill-risk line is
+// styled as a warning and sits ABOVE the numbers, because a saving
+// read without it is the wrong number: a resting order that does not
+// fill is no position, not a cheaper one. Nothing here is coloured to
+// read as a recommendation — CROSSING COSTS MORE is a comparison
+// between two dollar figures, exactly as the position ladder's MORE
+// and LESS are, and gets no accent.
+//
+// Every figure is the backend's exact decimal string, rendered
+// unchanged. This file computes no money.
+
+function money(s?: string) {
+  return s == null ? "—" : `$${s}`;
+}
+
+// A route's cost, or its refusal in the backend's own words. The
+// refusal is TESTABLE ON ITS OWN (`exec-<side>-<route>`) because the
+// same sentence also reaches the difference note below, and a test
+// that could not tell them apart passed while this cell rendered a
+// dash — which is precisely the blank-instead-of-a-reason failure the
+// whole card exists to prevent.
+function ExecLegCell({ leg, label, side, note }: {
+  leg?: ExecLeg; label: string; side: string; note?: string;
+}) {
+  if (!leg || leg.refused) {
+    return (
+      <div data-testid={`exec-${side}-${label}`}
+        className="rounded-lg border border-dashed border-line px-2.5 py-2">
+        <p className="font-mono text-[9px] uppercase tracking-wide text-ink-faint">
+          {label}
+        </p>
+        <p className="mt-1 font-mono text-[10px] leading-relaxed text-ink-low">
+          {leg?.refused ?? "not priced"}
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div data-testid={`exec-${side}-${label}`}
+      className="rounded-lg border border-line px-2.5 py-2" title={note}>
+      <p className="font-mono text-[9px] uppercase tracking-wide text-ink-faint">
+        {label}
+        {leg.price != null && (
+          <span className="ml-1.5 normal-case tracking-normal">
+            @ ${leg.price}
+          </span>
+        )}
+      </p>
+      <p className="font-mono text-base tabular-nums text-ink-hi">
+        {money(leg.all_in_dollars)}
+      </p>
+      <p className="font-mono text-[9px] tabular-nums text-ink-faint">
+        fee {money(leg.fee_dollars)} · rate {leg.effective_rate ?? "—"}
+        {leg.rounding_multiple != null
+          && leg.rounding_multiple !== "1.0000" && (
+          <span className="text-warn"> ({leg.rounding_multiple}× headline)</span>
+        )}
+      </p>
+      <p className="font-mono text-[9px] tabular-nums text-ink-faint">
+        break-even {leg.break_even ?? "—"}
+      </p>
+    </div>
+  );
+}
+
+function ExecutionOutcomeRow({ side, o, routes }: {
+  side: string; o?: ExecOutcome;
+  routes?: { cross?: string; rest?: string };
+}) {
+  const r = refusalOf(o);
+  return (
+    <div data-testid={`exec-${side}`} className="space-y-1.5">
+      <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+        {side}
+        {o?.book?.spread_cents != null && (
+          <span className="ml-2 normal-case tracking-normal">
+            spread {o.book.spread_cents}¢
+          </span>
+        )}
+      </p>
+      {r ? <RefusalNote text={r} /> : (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <ExecLegCell leg={o?.cross} label="cross" side={side}
+              note={routes?.cross} />
+            <ExecLegCell leg={o?.rest} label="rest" side={side}
+              note={routes?.rest} />
+          </div>
+          {/* the comparison. Two dollar figures — no accent colour is
+              spent on making either read as an instruction.
+
+              A refusal that already rendered in one of the two cells
+              above is NOT repeated here: the backend sets the leg's
+              reason and the comparison's to the same sentence (there
+              is one reason — no bid, or a spread too wide), and
+              printing sixty words twice in a row buries the thing it
+              is trying to say. A comparison refused for its OWN
+              reason still renders in full. */}
+          {o?.difference?.refused ? (
+            o.difference.refused !== o?.rest?.refused
+              && o.difference.refused !== o?.cross?.refused
+              ? <RefusalNote text={o.difference.refused} /> : null
+          ) : o?.difference?.says && (
+            <p data-testid={`exec-diff-${side}`}
+              className="rounded-lg border border-line px-2.5 py-2 font-mono text-[10px] leading-relaxed text-ink-hi">
+              <span className="mr-1.5 text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+                {o.difference.direction ?? ""}
+              </span>
+              {money(o.difference.dollars)}
+              <span className="ml-1.5 text-ink-mid">
+                ({o.difference.per_contract_cents}¢/contract ·{" "}
+                {money(o.difference.of_which_fee_dollars)} fee,{" "}
+                {money(o.difference.of_which_spread_dollars)} spread)
+              </span>
+              <span className="mt-1 block text-ink-mid">
+                {o.difference.says}
+              </span>
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ExecutionBlock({ x }: { x?: Refusable<ExecutionLayer> }) {
+  if (x == null) return null;          // a card that predates the block
+  const r = refusalOf(x);
+  if (r) {
+    return (
+      <div data-testid="execution-refused" className="mt-3">
+        <Eyebrow className="mb-1.5">entry cost</Eyebrow>
+        <RefusalNote text={r} />
+      </div>
+    );
+  }
+  const ex = x as ExecutionLayer;
+  return (
+    <div data-testid="execution" className="mt-3 space-y-2">
+      <Eyebrow className="mb-1.5">
+        entry cost
+        {ex.clip_contracts != null && (
+          <span className="ml-2 normal-case tracking-normal text-ink-mid">
+            at {ex.clip_contracts} contracts
+          </span>
+        )}
+      </Eyebrow>
+
+      {/* THE LINE THAT MAY NEVER BE DROPPED, and it goes ABOVE the
+          numbers rather than under them: a saving read without it is
+          the wrong number. Styled as a warning, like the ladder's
+          no-safe-window line, because it is the same kind of sentence. */}
+      {ex.fill_risk && (
+        <p data-testid="fill-risk"
+          className="rounded-lg border border-warn/40 px-3 py-2 font-mono text-[10px] leading-relaxed text-warn">
+          {ex.fill_risk}
+        </p>
+      )}
+
+      {SIDES.map((k) => (
+        <ExecutionOutcomeRow key={k} side={k} o={ex.outcomes?.[k]}
+          routes={ex.routes} />
+      ))}
+
+      {/* not an edge, and the clip it was all computed at */}
+      {ex.not_an_edge && (
+        <p data-testid="not-an-edge"
+          className="font-mono text-[9px] leading-relaxed text-ink-low">
+          {ex.not_an_edge}
+        </p>
+      )}
+      {/* maker_rounding_reimbursement goes IMMEDIATELY after the
+          rounding note it qualifies. The backend charges the round-up
+          and the venue may refund part of it monthly, above a $10
+          threshold a small clip can miss every month — a worst-case
+          multiple rendered without that clause reads as a settled cost
+          rather than a charge. Same rule as the fill-risk line: the
+          qualifier does not get to drift away from its number. */}
+      {[ex.scope, ex.clip_basis, ex.rounding_granularity,
+        ex.maker_rounding_reimbursement,
+        ex.effective_rate_basis, ex.break_even_basis, ex.book_basis,
+        ex.fee_helpers].map((t) => t && (
+        <p key={t.slice(0, 40)}
+          className="font-mono text-[9px] leading-relaxed text-ink-faint">
+          {t}
+        </p>
+      ))}
     </div>
   );
 }
