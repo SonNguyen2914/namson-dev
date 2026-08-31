@@ -100,6 +100,11 @@ export const LEAGUE_LABEL: Record<string, string> = {
 
 export const leagueLabel = (slug: string) => LEAGUE_LABEL[slug] ?? slug;
 
+/** The board's fixed column order. A slug the payload serves that is not
+ *  in this list still gets a column, appended after these four — a new
+ *  league arriving in the registry must not disappear from the board. */
+export const PICKER_LEAGUE_ORDER = ["mls", "epl", "laliga", "ligamx"];
+
 /** Below this many games played, Stage 1 takes ALL FOUR inputs from last
  *  season instead — this season's table is still noise. Mirrors
  *  src/picker/tables.decide_source; shown to the reader, never used to

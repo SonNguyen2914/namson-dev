@@ -87,8 +87,13 @@ test("a window switch shows skeletons and hides the previous board's header line
       await new Promise((res) => setTimeout(res, 1200));
       await r.fulfill(json(BOARD));
     });
-    await page.getByRole("button", { name: "7d" }).click();
-    await expect(page.getByRole("status")).toBeVisible();   // SkeletonRows
+    // 3d, NOT 7d: since the four-column board (2026-08-31) the page's
+    // default window IS 7 - clicking the already-active chip is a no-op
+    // and would never re-enter loading.
+    await page.getByRole("button", { name: "3d" }).click();
+    // four columns, four skeleton stacks - one per league since 2026-08-31
+    await expect(page.getByRole("status")).toHaveCount(4);
+    await expect(page.getByRole("status").first()).toBeVisible();
     await expect(page.getByTestId("picker-row")).toHaveCount(0);
     // the OLD board's "built …" line must not stand beside skeletons —
     // the error state promises nothing stale is ever shown, and the
