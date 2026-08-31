@@ -143,7 +143,7 @@ export default function EplMatchPage() {
           : `${m.home.abbrev} vs ${m.away.abbrev} · EPL`) : "EPL match"}
       </title></Head>
 
-      <TopBar back={{ href: "/bet-suggester?league=epl", label: "epl board" }}
+      <TopBar back={{ href: "/bet-suggester/leagues?league=epl", label: "epl board" }}
         title={m ? `${m.home.abbrev} vs ${m.away.abbrev}` : "EPL"}>
         {live && (
           <NavChip href="#stats">

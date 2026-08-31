@@ -401,7 +401,8 @@ export default function FriendlyMatchPage() {
 
   return (
     <div style={VARS} className="min-h-screen bg-bs font-sans text-ink-mid">
-      <Head><title>{title} · club friendly · namson.dev</title></Head>
+      {/* one expression — next/head drops multi-child <title> at SSR */}
+      <Head><title>{`${title} · club friendly · namson.dev`}</title></Head>
       <RouteProgress />
       <TopBar back={{ href: "/bet-suggester/friendlies", label: "friendlies" }}
         title="Club friendly" />

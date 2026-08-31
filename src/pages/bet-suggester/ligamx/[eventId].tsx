@@ -155,7 +155,7 @@ export default function LigamxMatchPage() {
           : `${m.home.abbrev} vs ${m.away.abbrev} · Liga MX`) : "Liga MX match"}
       </title></Head>
 
-      <TopBar back={{ href: "/bet-suggester?league=ligamx", label: "liga mx board" }}
+      <TopBar back={{ href: "/bet-suggester/leagues?league=ligamx", label: "liga mx board" }}
         title={m ? `${m.home.abbrev} vs ${m.away.abbrev}` : "Liga MX"}>
         {live && (
           <NavChip href="#stats">

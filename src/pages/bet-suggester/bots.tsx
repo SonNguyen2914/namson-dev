@@ -154,9 +154,9 @@ export default function BotArena() {
 
   return (
     <div className="min-h-screen bg-bs font-sans text-ink-mid">
-      <Head><title>Bot Arena · WC26 Bet Suggester</title></Head>
+      <Head><title>Bot Arena · WC26 Bet Suggester · namson.dev</title></Head>
       <RouteProgress />
-      <TopBar back={{ href: "/bet-suggester", label: "dashboard" }}
+      <TopBar back={{ href: "/bet-suggester/wc26", label: "wc26" }}
         title="WC26 · Bot Arena" />
       <main className="mx-auto max-w-5xl px-5 pb-24 pt-10">
         <Eyebrow>strategy laboratory</Eyebrow>

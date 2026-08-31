@@ -87,6 +87,15 @@ body {
   overflow-x: clip;
 }
 
+/* The whole app is the near-black bet-suggester. Give the ROOT element
+   the same ground: once html has its own background it (not body's
+   propagated --background, which is WHITE under a light
+   prefers-color-scheme) paints the canvas, so overscroll rubber-banding
+   can no longer flash white around a dark page. */
+html {
+  background: var(--bs-bg);
+}
+
 /* quality floor: visible keyboard focus everywhere */
 :focus-visible {
   outline: 2px solid var(--accent);
@@ -227,6 +236,17 @@ body {
   -webkit-backdrop-filter: blur(14px) saturate(1.2);
   backdrop-filter: blur(14px) saturate(1.2);
   border-bottom: 1px solid var(--line);
+}
+
+/* menus that hang off the top bar: the same elevated surface and the
+   same blur recipe, but OPAQUE. The bar can be translucent because it is
+   a thin strip a page scrolls under; a menu sits on top of body copy,
+   and a first draft at 92% put the board's own rows straight through the
+   competition names. Legibility wins over the effect. */
+.menu-glass {
+  background: var(--bs-elev2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
 }
 
 /* anchored sections land below the sticky bar */

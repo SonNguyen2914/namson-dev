@@ -160,7 +160,7 @@ export default function LaLigaMatchPage() {
           : `${m.home.abbrev} vs ${m.away.abbrev} · La Liga`) : "La Liga match"}
       </title></Head>
 
-      <TopBar back={{ href: "/bet-suggester?league=laliga", label: "la liga board" }}
+      <TopBar back={{ href: "/bet-suggester/leagues?league=laliga", label: "la liga board" }}
         title={m ? `${m.home.abbrev} vs ${m.away.abbrev}` : "La Liga"}>
         {live && (
           <NavChip href="#stats">

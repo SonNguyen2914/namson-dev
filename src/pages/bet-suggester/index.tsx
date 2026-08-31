@@ -1,865 +1,633 @@
-import { TZ } from "../../lib/matchday";
-// Dashboard — namson.dev/bet-suggester
-// Showcase at the top (live scoreboard + next-match hero, Apple-grade type
-// and glow), then a deliberate transition into a denser Linear-style tool
-// zone for the ranking board. One accent, gray hierarchy, mono for data.
-// Scoped to this route so it doesn't fight the rest of the portfolio.
+// The picker board — namson.dev/bet-suggester
+//
+// The landing surface: every upcoming fixture across the four in-season
+// leagues, ranked by the size of the measured table gap between the two
+// clubs. Reads GET /api/picker/board, which serves src/picker.
+//
+// WHAT THIS PAGE IS ALLOWED TO SAY. It is a place to look, not a thing to
+// do. No model runs on these fixtures, no probability of ours exists for
+// them, and no number here is an edge — so nothing on this page may read
+// as a recommendation, carry a confidence score, or imply a price is
+// wrong. The picker RANKS, NEVER CUTS: there is no qualifying bar in the
+// backend and this page adds none. The operator is the threshold.
+//
+// THREE THINGS THIS PAGE EXISTS TO KEEP VISIBLE, because each is a real
+// finding that a plain sorted list would bury:
+//
+//  1. A row can rank first on the table gap and be HOLLOW underneath.
+//     Tonight Barcelona leads at GD/g 1.63 with defence T1 v T1 — a
+//     +0 gap. The three tier gaps therefore render as three separate
+//     signed chips with a plain-English read beside them, not as one
+//     shape word and three numbers to squint at.
+//  2. "prior szn" is not a footnote. Under 8 games played, ALL FOUR
+//     Stage 1 inputs come from last season, and tonight that is three
+//     leagues out of four. It gets a banner and a per-row badge.
+//  3. Refused fixtures are LISTED with their reason. A promoted club has
+//     no row in last season's top-flight table; borrowing its
+//     second-division numbers was measured dead (ledger row 20), so the
+//     picker refuses BY NAME rather than imputing. A fixture that
+//     vanishes silently is the defect the whole surface is built against.
 import Head from "next/head";
-import { Anton, Archivo, Baloo_2, Exo_2, Poppins } from "next/font/google";
-import Link from "next/link";
 import { useRouter } from "next/router";
-import { CSSProperties, useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+import { fmtDate, TZ } from "../../lib/matchday";
 import {
-  api, countdown, flag, pct, signedPct, kickoffLocal,
-  RipenessAlert, SuggestionRow, UpcomingMatch, WatchlistEntry,
-} from "../../lib/suggesterApi";
-import LiveScoreboard from "../../components/LiveScoreboard";
-import BracketView from "../../components/BracketView";
-import MlsDashboard from "../../components/MlsDashboard";
-import EplDashboard from "../../components/EplDashboard";
-import LaligaDashboard from "../../components/LaligaDashboard";
-import LigamxDashboard from "../../components/LigamxDashboard";
-import { Eyebrow, Flash, Reveal } from "../../components/ui";
-import { NavChip, RouteProgress, SkeletonRows, Toaster, TopBar, useScrollSpy } from "../../components/chrome";
+  Board, BoardRefusal, BoardRow, TierPair,
+  CURRENT_SEASON_GP_FLOOR, THIN_ASK_SIZE, WIDE_SPREAD_C,
+  fetchBoard, leagueLabel,
+} from "../../lib/pickerApi";
+import { Eyebrow } from "../../components/ui";
+import { ArchiveMenu } from "../../components/ArchiveMenu";
+import {
+  Collapse, NavChip, RouteProgress, SkeletonRows, TopBar,
+} from "../../components/chrome";
 
-const POLL_MS = 60 * 1000; // watchlist scores move every 30s poll; refresh often
+const WINDOWS = [1, 2, 3, 7, 14];   // the endpoint accepts 1..14
+const DEFAULT_DAYS = 2;             // the endpoint's own default
 
-// Shared column template so the sortable header bar and every match group's
-// rows line up: Market (flex) | Likelihood | Edge | Multiplier | Alert.
-const BOARD_COLS =
-  "grid grid-cols-[minmax(0,1fr)_5.5rem_5rem_5rem_4.5rem] items-center gap-x-3";
+// A signed integer gap. ZERO RENDERS AS "+0", deliberately: a bare "0"
+// beside "+3" and "−1" reads as an absence of data rather than as a
+// measured level, and level is the finding that matters most here.
+const sign = (n: number) => (n < 0 ? `−${Math.abs(n)}` : `+${n}`);
+// Same rule as `sign`: ZERO RENDERS SIGNED. This is the number the board
+// is ORDERED by, and a bare "0.00" beside "+1.63" reads as missing data
+// on the one row that exists to prove the picker never cuts.
+const dec = (n: number, places = 2) =>
+  (n < 0 ? "−" : "+") + Math.abs(n).toFixed(places);
+const pair = (p: TierPair) => `T${p[0]} v T${p[1]}`;
 
-type SortKey = "likelihood" | "edge" | "multiplier";
+/** The board's own ET date key, YYYYMMDD, made readable. Left as the raw
+ *  key if it is ever any other shape — inventing a date from a string we
+ *  do not recognise is worse than showing the string. */
+const etDate = (d: string) =>
+  /^\d{8}$/.test(d) ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}` : d;
 
-// The schedule's `group` field is a group letter ("A"–"L") through the group
-// stage but a round code from the knockouts on — label each accordingly
-// ("group 3P" read like a fourth group stage).
-function stageLabel(group: string): string {
-  const rounds: Record<string, string> = {
-    R16: "round of 16", QF: "quarter-final", SF: "semi-final",
-    "3P": "third place", F: "final",
-  };
-  return rounds[group] ?? `group ${group}`;
+/** The word for a signed tier gap, from the favourite's side. A gap of
+ *  zero is LEVEL, not "small" — the distinction is the whole point of
+ *  the hollow read. */
+const gapWord = (v: number) => (v > 0 ? "ahead" : v === 0 ? "level" : "behind");
+
+/** One sentence a human can read without the legend. */
+function shapeRead(r: BoardRow): string {
+  const g = r.tier_gaps, t = r.tiers;
+  if (r.shape === "CLEAN") {
+    return "Clean — the favourite is a better tier overall, in attack and in defence.";
+  }
+  const flat: string[] = [];
+  if (g.atk <= 0) flat.push(`${gapWord(g.atk)} in attack (${pair(t.atk)})`);
+  if (g.def <= 0) flat.push(`${gapWord(g.def)} in defence (${pair(t.def)})`);
+  if (g.ovr <= 0) flat.push(`${gapWord(g.ovr)} overall (${pair(t.ovr)})`);
+  const strong: string[] = [];
+  if (g.atk > 0) strong.push(`attack ${sign(g.atk)}`);
+  if (g.def > 0) strong.push(`defence ${sign(g.def)}`);
+  if (g.ovr > 0) strong.push(`overall ${sign(g.ovr)}`);
+  if (r.shape === "HOLLOW") {
+    return `Hollow — high on the table gap, but ${flat.join(" and ")}.`;
+  }
+  return `Split — the tier gap is ${strong.join(" and ")}; ${flat.join(" and ")}.`;
 }
 
-// Wordmark-adjacent faces: Anton for the WC26 emblem's condensed weight,
-// Exo 2 heavy italic for MLS's slanted crest letters, Poppins for the
-// Premier League's rounded geometric, Baloo 2 for LaLiga's rounded quirk.
-const wcFont = Anton({ weight: "400", subsets: ["latin"] });
-const mlsFont = Exo_2({ weight: "800", style: "italic", subsets: ["latin"] });
-const eplFont = Poppins({ weight: "600", subsets: ["latin"] });
-const laligaFont = Baloo_2({ weight: "700", subsets: ["latin"] });
-// Liga MX's wordmark is a heavy geometric sans — Archivo's 800 sits close.
-const ligamxFont = Archivo({ weight: "800", subsets: ["latin"] });
-
-// League "drive modes": each carries the primary color of its competition's
-// logo (tuned where needed so the accent reads on the near-black canvas).
-const LEAGUES = [
-  { id: "wc26", name: "World Cup 26", top: "WC26 · Bet Suggester",
-    eyebrow: "live model · kalshi markets",
-    accent: "#f5c542", dim: "rgba(245,197,66,0.35)", faint: "rgba(245,197,66,0.10)",
-    ambient: "rgba(245,197,66,0.07)", modeMs: 3200,
-    logo: "/leagues/wc26-official.png", glyph: "rich",
-    font: wcFont,
-    tracking: "0.025em",
-    tagline: "" },
-  { id: "mls", name: "MLS", top: "MLS · Bet Suggester",
-    eyebrow: "engine adaptation · in season",
-    accent: "#d50032", dim: "rgba(213,0,50,0.35)", faint: "rgba(213,0,50,0.10)",
-    ambient: "rgba(213,0,50,0.07)", modeMs: 600,
-    logo: "/leagues/mls.svg", glyph: "soft",
-    font: mlsFont,
-    tracking: "0.05em",
-    tagline: "Crest red. The same engine, rewired for MLS — fixtures, books and twelve fresh bot ledgers." },
-  { id: "epl", name: "Premier League", top: "EPL · Bet Suggester",
-    eyebrow: "engine adaptation · season 26/27",
-    accent: "#b18cff", dim: "rgba(177,140,255,0.35)", faint: "rgba(177,140,255,0.10)",
-    ambient: "rgba(177,140,255,0.07)", modeMs: 1450,
-    logo: "/leagues/epl.png", glyph: "invert",
-    font: eplFont,
-    tagline: "Lion purple, lifted for the dark. Thirty-eight matches of honest calibration sample." },
-  { id: "laliga", name: "La Liga", top: "La Liga · Bet Suggester",
-    eyebrow: "engine adaptation · season 26/27",
-    accent: "#ff4b44", dim: "rgba(255,75,68,0.35)", faint: "rgba(255,75,68,0.10)",
-    ambient: "rgba(255,75,68,0.07)", modeMs: 1000,
-    logo: "/leagues/laliga.png", glyph: "soft",
-    font: laligaFont,
-    tagline: "Crest coral. Fixtures, books and the table are live — the model stays dark until it earns approval." },
-  { id: "ligamx", name: "Liga MX", top: "Liga MX · Bet Suggester",
-    eyebrow: "engine adaptation · apertura 2026 · in season",
-    accent: "#0fbe66", dim: "rgba(15,190,102,0.35)", faint: "rgba(15,190,102,0.10)",
-    ambient: "rgba(15,190,102,0.07)", modeMs: 900,
-    logo: "/leagues/ligamx.svg", glyph: "soft",
-    font: ligamxFont,
-    tagline: "Eagle green. Two tournaments a year, open Kalshi books tonight — the model stays dark until it earns approval." },
-];
-
-// Every league id with a real dashboard above. Kept beside the
-// dispatch so the two cannot drift.
-const BUILT_LEAGUES = new Set(["mls", "epl", "ligamx", "laliga"]);
-
-function LeagueComingSoon({ league }: { league: (typeof LEAGUES)[number] }) {
+/** A signed tier gap, drawn so a zero cannot be mistaken for a small
+ *  positive. Positive is the accent; LEVEL is amber and dashed; behind
+ *  is the negative ink. */
+function GapChip({ label, gap, tiers }: {
+  label: string; gap: number; tiers: TierPair;
+}) {
+  const tone =
+    gap > 0 ? "border-accent/40 bg-accent/5 text-accent"
+    : gap === 0 ? "border-dashed border-warn/50 bg-warn/5 text-warn"
+    : "border-neg/40 bg-neg/5 text-neg";
   return (
-    <Reveal>
-      <section className="glow glow-accent mx-auto max-w-2xl rounded-3xl border border-line bg-elev px-6 py-14 text-center">
-        <Eyebrow tone="accent">mode · scaffolded</Eyebrow>
-        <p className="mt-5 text-lg text-ink-hi">
-          The engine that priced World Cup 26 is being adapted for {league.name}.
-        </p>
-        <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-ink-low">
-          Fixtures pipeline · Kalshi market mapping · per-match xG sourcing
-          · twelve fresh bot ledgers.
-        </p>
-        <p className="mt-10 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-faint">
-          arriving pre-season
-        </p>
-      </section>
-    </Reveal>
+    <span data-testid="gap-chip" data-dim={label} data-gap={gap}
+      className={`inline-flex min-w-[6.5rem] flex-col rounded-md border px-2 py-1 ${tone}`}>
+      <span className="font-mono text-[9px] uppercase tracking-[0.18em] opacity-70">
+        {label}
+      </span>
+      <span className="mt-0.5 font-mono text-[11px] tabular-nums">
+        {pair(tiers)} <span className="font-semibold">{sign(gap)}</span>
+      </span>
+      <span className="font-mono text-[9px] uppercase tracking-[0.14em] opacity-70">
+        {gapWord(gap)}
+      </span>
+    </span>
   );
 }
 
-// Bespoke entrance effect per league (rendered only during a mode change).
-// Full-viewport transition effects. Each rides its league's reveal:
-// WC26 spotlight beams sweep with the wipe edge; the MLS slash band is
-// the wipe edge; EPL glass droplets refract the page as they expand;
-// the La Liga arm rotates at the boundary of the radial reveal.
-function LeagueFX({ id }: { id: string }) {
-  // anchor rotation/origin effects on the league logo's real position
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    const g = document.querySelector(".league-glyph");
-    if (!el || !g) return;
-    const r = g.getBoundingClientRect();
-    el.style.setProperty("--fx-x", `${r.left + r.width / 2}px`);
-    el.style.setProperty("--fx-y", `${r.top + r.height / 2}px`);
-  }, [id]);
-  if (id === "mls") return <div className="fxx fxx-mls"><span className="curtain" /></div>;
-  if (id === "ligamx") return <div className="fxx fxx-ligamx"><span className="curtain" /></div>;
-  if (id === "epl") return <div className="fxx fxx-epl"><i /><i /><i /></div>;
-  if (id === "laliga") return <div ref={ref} className="fxx fxx-laliga"><i /></div>;
+function ShapeChip({ shape }: { shape: BoardRow["shape"] }) {
+  const tone =
+    shape === "CLEAN" ? "border-accent/50 bg-accent/10 text-accent"
+    : shape === "HOLLOW" ? "border-neg/50 bg-neg/10 text-neg"
+    : "border-warn/50 bg-warn/10 text-warn";
   return (
-    <div ref={ref} className="fxx fxx-wc26">
-      <i className="bloom" /><i className="burst" />
-      {Array.from({ length: 24 }, (_, i) => <span key={i} className="c" />)}
-      {Array.from({ length: 6 }, (_, i) => <b key={`r${i}`} className="r" />)}
-      {Array.from({ length: 6 }, (_, i) => <u key={`f${i}`} className="f" />)}
-      {Array.from({ length: 3 }, (_, i) => (
-        <svg key={`e${i}`} className="crest" viewBox="0 0 24 30" aria-hidden>
-          <path d="M4 7 h16 v11 c0 6 -5 9 -8 10 c-3 -1 -8 -4 -8 -10 z" fill="#c60b1e" />
-          <path d="M12 7 h8 v11 c0 6 -5 9 -8 10 z" fill="#ffc400" />
-          <path d="M4 7 h16 v11 c0 6 -5 9 -8 10 c-3 -1 -8 -4 -8 -10 z"
-            fill="none" stroke="#f5c542" strokeWidth="1.4" />
-          <path d="M6 6 l2 -3.4 2 2.2 2 -3.4 2 3.4 2 -2.2 2 3.4 z" fill="#f5c542" />
-        </svg>
+    <span className={`rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] ${tone}`}>
+      {shape}
+    </span>
+  );
+}
+
+/** The favourite's Kalshi quote — annotation only. A row with no event,
+ *  or an event with no live quote, STAYS on the board and says which of
+ *  the two it is: "no kalshi event" and "listed · no quote" are different
+ *  facts, and collapsing them into one blank hides a mapping failure. */
+function KalshiCell({ row }: { row: BoardRow }) {
+  const k = row.kalshi;
+  if (!k) {
+    return (
+      <span className="font-mono text-[11px] text-ink-faint"
+        title="no Kalshi event matched this fixture's date and both club names">
+        no kalshi event
+      </span>
+    );
+  }
+  if (k.ask_c == null) {
+    return (
+      <span className="font-mono text-[11px] text-ink-faint">
+        listed · no quote ·{" "}
+        <span className="text-ink-faint/70">{k.event_ticker}</span>
+      </span>
+    );
+  }
+  return (
+    <span className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] tabular-nums text-ink-mid">
+      <span className="text-ink-hi">ask {k.ask_c}¢</span>
+      <span>spread {k.spread_c == null ? "—" : `${k.spread_c}¢`}</span>
+      <span>size {k.ask_size == null ? "—" : k.ask_size}</span>
+      {k.flags.map((f) => (
+        <span key={f}
+          title={f === "WIDE"
+            ? `spread wider than ${WIDE_SPREAD_C}c`
+            : f === "THIN" ? `ask size under ${THIN_ASK_SIZE}` : undefined}
+          className="rounded border border-warn/50 bg-warn/5 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] text-warn">
+          {f}
+        </span>
       ))}
-      <em className="chant">¡CAMPEONES!</em>
-      <em className="chant">¡VIVA ESPAÑA!</em>
-      <em className="chant">OÉ OÉ OÉ</em>
-      <em className="chant">¡A POR ELLOS!</em>
-    </div>
+    </span>
   );
 }
 
-// Watermark behind the league title. Prefers a real logo file dropped at
-// public/leagues/{id}.svg (or .png via rename); until one exists, falls
-// back to a built-in one-color recreation of the mark.
-// Inner holds the img-failed state; the wrapper re-keys it per league so
-// the state resets on league change WITHOUT a setState-in-effect.
-function LeagueMark({ league }: { league: (typeof LEAGUES)[number] }) {
-  return <LeagueMarkInner key={league.id} league={league} />;
-}
-
-function LeagueMarkInner({ league }: { league: (typeof LEAGUES)[number] }) {
-  const [failed, setFailed] = useState(false);
-  if (!failed) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={league.logo} alt="" aria-hidden
-        onError={() => setFailed(true)}
-        className={`league-glyph object-contain glyph-${league.glyph}`} />
-    );
-  }
-  return <LeagueGlyph id={league.id} />;
-}
-
-// Built-in one-color recreations (single-stroke, watermark duty).
-function LeagueGlyph({ id }: { id: string }) {
-  const common = { className: "league-glyph", viewBox: "0 0 100 100",
-    fill: "none", stroke: "currentColor", strokeWidth: 2.2,
-    strokeLinecap: "round" as const, strokeLinejoin: "round" as const,
-    "aria-hidden": true };
-  if (id === "mls") {
-    return (
-      <svg {...common}>
-        {/* the crest: shield, diagonal slash, three stars in the field */}
-        <path d="M22 12 h56 v42 c0 18 -14 28 -28 34 c-14 -6 -28 -16 -28 -34 z" />
-        <path d="M64 12 L36 86" strokeWidth="4.5" />
-        <path d="M31 24 l1.8 3.7 4 .6 -2.9 2.8 .7 4 -3.6 -1.9 -3.6 1.9 .7 -4 -2.9 -2.8 4 -.6 z" strokeWidth="1.6" />
-        <path d="M40 38 l1.8 3.7 4 .6 -2.9 2.8 .7 4 -3.6 -1.9 -3.6 1.9 .7 -4 -2.9 -2.8 4 -.6 z" strokeWidth="1.6" />
-        <path d="M33 54 l1.8 3.7 4 .6 -2.9 2.8 .7 4 -3.6 -1.9 -3.6 1.9 .7 -4 -2.9 -2.8 4 -.6 z" strokeWidth="1.6" />
-      </svg>
-    );
-  }
-  if (id === "epl") {
-    return (
-      <svg {...common}>
-        {/* the crowned lion, reduced to its geometry */}
-        <path d="M30 30 v-12 l8 7 12 -11 12 11 8 -7 v12 z" />
-        <path d="M30 34 c-6 8 -8 18 -4 27 c4 10 14 17 24 17 c6 0 11 -2 15 -5 l-6 -8 c5 -2 9 -6 11 -11 l-9 -3 c1 -6 0 -12 -3 -17 z" />
-        <path d="M44 48 a2.5 2.5 0 1 0 0.1 0 z" fill="currentColor" stroke="none" />
-        <path d="M58 62 l10 3" />
-      </svg>
-    );
-  }
-  if (id === "ligamx") {
-    return (
-      <svg {...common}>
-        {/* the eagle over the ball, reduced to strokes */}
-        <circle cx="50" cy="62" r="24" />
-        <path d="M50 38 c-3 8 -8 14 -14 18 M50 38 c3 8 8 14 14 18" />
-        {/* wing sweeps */}
-        <path d="M18 34 c10 -2 20 -6 26 -14 c2 6 0 12 -4 16 c-7 6 -15 6 -22 -2 z" />
-        <path d="M82 34 c-10 -2 -20 -6 -26 -14 c-2 6 0 12 4 16 c7 6 15 6 22 -2 z" />
-        {/* head */}
-        <path d="M46 16 c2 -4 6 -6 10 -5 c3 1 5 4 5 7 l-7 2 z" />
-        <path d="M50 58 l6 8 -6 8 -6 -8 z" strokeWidth="1.6" />
-      </svg>
-    );
-  }
-  if (id === "laliga") {
-    return (
-      <svg {...common}>
-        {/* the segmented pelota */}
-        <circle cx="50" cy="50" r="36" />
-        <path d="M50 14 c-14 10 -20 24 -16 40 c3 12 12 20 16 32" />
-        <path d="M50 14 c14 10 20 24 16 40 c-3 12 -12 20 -16 32" />
-        <path d="M16 42 c12 -6 30 -8 46 -4 c8 2 16 6 22 10" />
-        <path d="M18 64 c14 2 32 0 46 -8 c6 -3 12 -8 16 -13" />
-      </svg>
-    );
-  }
+function RowCard({ row, rank }: { row: BoardRow; rank: number }) {
+  const favHome = row.fav_side === "home";
   return (
-    <svg {...common}>
-      {/* the trophy, and the year it was lifted */}
-      <path d="M34 12 h32 v12 a16 16 0 0 1 -32 0 z" />
-      <path d="M34 16 h-9 a9 11 0 0 0 9 13" />
-      <path d="M66 16 h9 a9 11 0 0 1 -9 13" />
-      <path d="M50 40 v10 M42 56 h16 M38 63 h24" />
-      <text x="50" y="88" textAnchor="middle" fontSize="26" fontWeight="700"
-        fill="currentColor" stroke="none" fontFamily="inherit">26</text>
-    </svg>
+    <article
+      data-testid="picker-row"
+      data-shape={row.shape}
+      data-league={row.league}
+      className="rounded-xl border border-line bg-elev/40 p-4 transition-colors hover:border-line-strong sm:p-5"
+    >
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="font-mono text-[11px] tabular-nums text-ink-faint">
+          {String(rank).padStart(2, "0")}
+        </span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-low">
+          {leagueLabel(row.league)}
+        </span>
+        {row.src === "prior" && (
+          <span
+            title="rated on last season's final table — this season has too few games played"
+            className="rounded border border-warn/40 bg-warn/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
+            prior szn
+          </span>
+        )}
+        <span className="ml-auto font-mono text-[11px] tabular-nums text-ink-faint">
+          {fmtDate(row.kickoff, "short")}
+        </span>
+      </div>
+
+      {/* The fixture line is the way IN. A board of hand-picked matches
+          you cannot open is a list of names — every dashboard already
+          links this same id space (MlsDashboard.tsx:143). Wraps only the
+          matchup, so the Stage-1/2 numbers below stay plain text. */}
+      <Link
+        href={`/bet-suggester/${row.league}/${row.event_id}`}
+        aria-label={`open ${row.favourite} versus ${row.opponent}`}
+        className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-md outline-none transition-colors hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bs">
+        <span className="text-lg font-medium text-ink-hi">{row.favourite}</span>
+        <span className="rounded border border-line px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-low"
+          title={favHome ? "the favourite is at home" : "the favourite is away"}>
+          {favHome ? "H" : "A"}
+        </span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
+          fav · rank {row.ranks.fav}
+        </span>
+        <span className="px-1 text-ink-faint">vs</span>
+        <span className="text-base text-ink-mid">{row.opponent}</span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
+          rank {row.ranks.opp}
+        </span>
+        <span aria-hidden className="text-ink-faint transition-transform">→</span>
+      </Link>
+
+      {/* Stage 1 — the ranking inputs, favourite-signed */}
+      <div className="mt-3 flex flex-wrap items-baseline gap-x-5 gap-y-1 font-mono text-[11px] tabular-nums">
+        <span className="text-ink-low">
+          GD/g gap{" "}
+          <span className="text-base font-semibold text-ink-hi">
+            {dec(row.gdg_gap)}
+          </span>
+        </span>
+        <span className="text-ink-low">
+          ppg gap <span className="text-ink-hi">{dec(row.ppg_gap)}</span>
+        </span>
+        <span className="text-ink-low">
+          rank gap <span className="text-ink-hi">{sign(row.rank_gap)}</span>
+        </span>
+        <span className="text-ink-faint">
+          gp {row.gp_current.home ?? "—"}/{row.gp_current.away ?? "—"}
+        </span>
+      </div>
+
+      {/* Stage 2 — the three tier gaps, each drawn on its own */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <GapChip label="overall" gap={row.tier_gaps.ovr} tiers={row.tiers.ovr} />
+        <GapChip label="attack" gap={row.tier_gaps.atk} tiers={row.tiers.atk} />
+        <GapChip label="defence" gap={row.tier_gaps.def} tiers={row.tiers.def} />
+        <ShapeChip shape={row.shape} />
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-ink-low">
+        {shapeRead(row)}
+      </p>
+
+      <div className="mt-3 border-t border-line pt-3">
+        <KalshiCell row={row} />
+      </div>
+    </article>
   );
 }
 
-export default function BetSuggesterDashboard() {
-  const [suggestions, setSuggestions] = useState<SuggestionRow[]>([]);
-  const [tierUsed, setTierUsed] = useState<number | null>(null);
-  const [matches, setMatches] = useState<UpcomingMatch[]>([]);
-  const [watchlist, setWatchlist] = useState<WatchlistEntry[]>([]);
-  const [ripeAlerts, setRipeAlerts] = useState<RipenessAlert[]>([]);
-  const [alertThreshold, setAlertThreshold] = useState(75);
-  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
-  const [secsToRefresh, setSecsToRefresh] = useState(POLL_MS / 1000);
-  const [nowMs, setNowMs] = useState(() => Date.now());
-  const [refreshingAll, setRefreshingAll] = useState(false);
-  const [refreshMsg, setRefreshMsg] = useState("");
+function RefusalRow({ r }: { r: BoardRefusal }) {
+  return (
+    <li data-testid="picker-refusal"
+      className="rounded-lg border border-line bg-elev/30 px-3 py-2.5">
+      <p className="text-sm text-ink-hi">
+        {r.home} <span className="text-ink-faint">vs</span> {r.away}
+        <span className="ml-2 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-low">
+          {leagueLabel(r.league)}
+        </span>
+      </p>
+      <p className="mt-1 font-mono text-[11px] text-warn">
+        {r.club} — {r.reason}
+      </p>
+    </li>
+  );
+}
+
+export default function PickerBoard() {
+  const router = useRouter();
+  const [days, setDays] = useState(DEFAULT_DAYS);
+  const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  // Ranking-board sort (columns) + which match groups are collapsed.
-  const [sortKey, setSortKey] = useState<SortKey>("likelihood");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  // League drive-mode switcher: out-wipe, accent snap under the light
-  // sweep, in-slide from the direction of travel.
-  const [leagueIdx, setLeagueIdx] = useState(0);
-  const [swapClass, setSwapClass] = useState("");
-  const [fxOn, setFxOn] = useState(false);
-  const [fxKey, setFxKey] = useState(0);
-  const switching = useRef(false);
-  const touchStart = useRef<{ x: number; y: number } | null>(null);
-  const league = LEAGUES[leagueIdx];
-  const isWC = league.id === "wc26";
-  // curtain-up: play the landing league's transition once on page load.
-  // ?league=<id> deep-links a mode (the match hubs' "back to board" links
-  // return to THEIR league, not the WC26 default) — wait for the router
-  // so the query param is actually readable on this auto-static route.
-  const router = useRouter();
-  const didIntro = useRef(false);
-  useEffect(() => {
-    if (!router.isReady || didIntro.current) return;
-    didIntro.current = true;
-    switching.current = true;
-    const wanted = typeof router.query.league === "string"
-      ? router.query.league : "wc26";
-    const idx = Math.max(0, LEAGUES.findIndex((l) => l.id === wanted));
-    const l = LEAGUES[idx];
-    setLeagueIdx(idx);
-    setSwapClass(`mode-reveal-${l.id}`);
-    setFxOn(true);
-    setFxKey((k) => k + 1);
-    const t = setTimeout(() => {
-      setSwapClass("");
-      setFxOn(false);
-      switching.current = false;
-    }, l.modeMs);
-    return () => clearTimeout(t);
-  }, [router.isReady, router.query.league]);
+  const [nonce, setNonce] = useState(0);
 
-  const goLeague = (target: number, _dirName: "next" | "prev") => {
-    if (switching.current || target === leagueIdx) return;
-    switching.current = true;
-    const to = LEAGUES[target];
-    // keep the mode in the URL (shallow — no data reload) so refresh,
-    // share, and the match hubs' back links all land in this league
+  // Deep-link guard. /bet-suggester?league=<id> was the carousel's own
+  // URL until 2026-08-30 and is all over the match hubs' back links and
+  // anyone's bookmarks. next.config.ts redirects the HARD loads; a config
+  // redirect never sees a client-side <Link> transition, so the same
+  // mapping lives here too. wc26 goes to the archive page, not to the
+  // first league in a list it is no longer part of.
+  //
+  // PRESENCE, not truthiness: "?league=" (an empty value) is still a
+  // legacy deep link and goes to the carousel's own default rather than
+  // silently keeping a dead param on the board. And bookmarks arrive in
+  // any case — "?league=WC26" means wc26, not "clamp to MLS".
+  const rawLeague = router.query.league;
+  const deepLink = typeof rawLeague === "string"
+    ? rawLeague.toLowerCase() : null;
+  useEffect(() => {
+    if (!router.isReady || deepLink === null) return;
     router.replace(
-      { query: to.id === "wc26" ? {} : { league: to.id } },
-      undefined, { shallow: true });
-    // the new league mounts immediately; its reveal animation and the
-    // matching full-screen effect uncover it together
-    setLeagueIdx(target);
-    setSwapClass(`mode-reveal-${to.id}`);
-    setFxOn(true);
-    setFxKey((k) => k + 1);
-    setTimeout(() => {
-      setSwapClass("");
-      setFxOn(false);
-      switching.current = false;
-    }, to.modeMs);
-  };
-  const switchLeague = (delta: number) =>
-    goLeague((leagueIdx + delta + LEAGUES.length) % LEAGUES.length,
-             delta > 0 ? "next" : "prev");
+      deepLink === "wc26" ? "/bet-suggester/wc26"
+      : deepLink === "" ? "/bet-suggester/leagues"
+      : `/bet-suggester/leagues?league=${encodeURIComponent(deepLink)}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, deepLink]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (signal: AbortSignal) => {
+    setLoading(true);
     try {
-      const [s, m, wl, al] = await Promise.all([
-        api.suggestions(), api.upcoming(72), api.watchlist(), api.alerts(),
-      ]);
-      setSuggestions(s.suggestions);
-      setTierUsed(s.tier_used);
-      setMatches(m.matches);
-      setWatchlist(wl.watchlist);
-      setAlertThreshold(wl.alert_threshold);
-      setRipeAlerts(al.alerts);
-      setUpdatedAt(new Date());
-      setSecsToRefresh(POLL_MS / 1000);
+      const b = await fetchBoard(days, signal);
+      if (signal.aborted) return;
+      setBoard(b);
       setError("");
-    } catch {
-      setError("Backend unreachable. Is the Python service running?");
+    } catch (e) {
+      if (signal.aborted) return;
+      setBoard(null);
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
-  }, []);
+  }, [days]);
 
   useEffect(() => {
-    // Scheduled (not called sync in the effect body) so the setState calls
-    // inside load() happen in async callbacks — keeps react-hooks happy and
-    // avoids cascading sync renders.
-    const t = setTimeout(load, 0);
-    const id = setInterval(load, POLL_MS);
-    return () => { clearTimeout(t); clearInterval(id); };
-  }, [load]);
+    if (deepLink !== null) return;        // redirecting; do not fetch
+    const ac = new AbortController();
+    // async, not called sync in the effect body, so every setState inside
+    // load() lands in a callback rather than cascading a render
+    const t = setTimeout(() => { void load(ac.signal); }, 0);
+    return () => { clearTimeout(t); ac.abort(); };
+  }, [load, nonce, deepLink]);
 
-  // 1s tick for the "next auto-refresh in Ns" countdown; also keeps the
-  // "in play" kickoff comparison fresh without impure reads during render.
-  useEffect(() => {
-    const t = setInterval(() => {
-      setSecsToRefresh((s) => Math.max(0, s - 1));
-      setNowMs(Date.now());
-    }, 1000);
-    return () => clearInterval(t);
-  }, []);
+  // The board's own order is |GD/g gap| descending. Re-applied here so
+  // the page states the rule it renders by rather than inheriting it
+  // silently — and so a reordered payload cannot quietly reorder the
+  // board. It is a SORT, never a filter: every row served is drawn.
+  const rows = [...(board?.rows ?? [])]
+    .sort((a, b) => Math.abs(b.gdg_gap) - Math.abs(a.gdg_gap));
+  const refusals = board?.refusals ?? [];
+  const leagues = Object.entries(board?.leagues ?? {});
+  const priorLeagues = leagues.filter(([, m]) => m.src === "prior");
+  const failedLeagues = leagues.filter(([, m]) => m.error);
+  const kalshiFailed = leagues.filter(([, m]) => m.kalshi_error);
 
-  async function handleRefreshAll() {
-    setRefreshingAll(true);
-    setRefreshMsg("Refreshing all matches with fresh simulations + live Kalshi prices… this can take up to 90 seconds.");
-    try {
-      const r = await api.refreshAll();
-      const total = r.refreshed.length + r.failed.length;
-      setRefreshMsg(
-        r.failed.length === 0
-          ? `✓ Refreshed ${r.refreshed.length}/${total} matches just now`
-          : `✓ Refreshed ${r.refreshed.length}/${total} — ${r.failed.join(", ")} didn't update, showing last known data`
-      );
-      await load();
-    } catch {
-      setRefreshMsg("✗ Refresh failed — backend unreachable. Showing last known data.");
-    } finally {
-      setRefreshingAll(false);
-    }
+  if (deepLink !== null) {
+    return (
+      <div className="min-h-screen bg-bs font-sans text-ink-mid">
+        <Head><title>Picker board · namson.dev</title></Head>
+        <RouteProgress />
+        <main className="mx-auto max-w-5xl px-5 pt-24">
+          <Eyebrow>opening the league carousel…</Eyebrow>
+        </main>
+      </div>
+    );
   }
-
-  const watchedIds = new Set(watchlist.map((w) => w.market_id));
-
-  // In-play: on the board (kickoff+4h tracking window) but past kickoff,
-  // so absent from the pre-kickoff-only "upcoming" list. Derived from
-  // suggestions since the upcoming endpoint intentionally drops them.
-  // nowMs (state, ticked above) powers the "in play" tag on board rows.
-
-  async function toggleWatch(s: SuggestionRow) {
-    try {
-      if (watchedIds.has(s.market_id)) await api.unwatch(s.market_id);
-      else await api.watch(s.match_id, s.market_id, s.market_title);
-      const wl = await api.watchlist();
-      setWatchlist(wl.watchlist);
-    } catch { /* non-fatal; next poll resyncs */ }
-  }
-
-  const next = matches[0];
-
-  // Group best-bets by match, ordered by kickoff (schedule). Columns sort
-  // within every group by the shared sort state; groups collapse independently.
-  const groupsMap = new Map<string, {
-    match_id: string; home: string; away: string;
-    kickoff: string; is_final: boolean; rows: SuggestionRow[];
-  }>();
-  for (const s of suggestions) {
-    let g = groupsMap.get(s.match_id);
-    if (!g) {
-      g = { match_id: s.match_id, home: s.home, away: s.away,
-            kickoff: s.kickoff, is_final: s.is_final, rows: [] };
-      groupsMap.set(s.match_id, g);
-    }
-    g.rows.push(s);
-  }
-  const groups = [...groupsMap.values()].sort(
-    (a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime()
-  );
-  const sortVal = (s: SuggestionRow) =>
-    sortKey === "likelihood" ? s.model_probability
-    : sortKey === "edge" ? s.edge : s.kalshi_odds;
-  const sortRows = (rows: SuggestionRow[]) => {
-    const dir = sortDir === "asc" ? 1 : -1;
-    return [...rows].sort((a, b) => (sortVal(a) - sortVal(b)) * dir);
-  };
-  const onSort = (k: SortKey) => {
-    if (k === sortKey) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else { setSortKey(k); setSortDir("desc"); }
-  };
-  const arrow = (k: SortKey) =>
-    sortKey === k ? (sortDir === "asc" ? " ↑" : " ↓") : "";
-  const toggleCollapse = (id: string) =>
-    setCollapsed((prev) => {
-      const n = new Set(prev);
-      if (n.has(id)) n.delete(id); else n.add(id);
-      return n;
-    });
-
-  // active chip follows the section in view
-  const activeSection = useScrollSpy(["bracket", "board"], [loading]);
 
   return (
-    <div className="min-h-screen bg-bs font-sans text-ink-mid"
-      style={{ "--accent": league.accent, "--accent-dim": league.dim,
-               "--accent-faint": league.faint,
-               "--accent-ambient": league.ambient } as CSSProperties}>
-      <Head><title>{league.name} Bet Suggester · namson.dev</title></Head>
-
+    <div className="min-h-screen bg-bs font-sans text-ink-mid">
+      <Head><title>Picker board · namson.dev</title></Head>
       <RouteProgress />
-      <Toaster />
-      <TopBar title={league.top}>
-        {isWC && (
-          <>
-            <NavChip href="#bracket" active={activeSection === "bracket"}>Bracket</NavChip>
-            <NavChip href="#board" active={activeSection === "board"}>Best bets</NavChip>
-            <NavChip href="/bet-suggester/bots" active={false}>Bots</NavChip>
-          </>
-        )}
-        {/* Not a league mode: friendlies are a viewer-only surface (no
-            model, ever), so they get a chip off the board rather than a
-            place in the league carousel. */}
+      <TopBar left={<ArchiveMenu />} title="picker board">
+        <NavChip href="/bet-suggester/leagues" active={false}>Leagues</NavChip>
         <NavChip href="/bet-suggester/friendlies" active={false}>Friendlies</NavChip>
-        {/* Viewer competitions: fixtures + Kalshi + strength read, no
-            model. One shared page at /bet-suggester/comp/[key].
-            RETIRED 2026-08-24 by operator decision, and dropped from
-            this rail: Conference (ecl), Europa (uel), Brasileirão,
-            Argentina, USL. The backend stopped collecting them the same
-            day; nothing recorded was deleted, and a journal entry
-            against one is still readable at /api/comp/{key}/journal. */}
-        {[["leagues-cup", "Leagues Cup"], ["asean", "ASEAN"],
-          ["ucl", "UCL"]].map(([k, label]) => (
+        {/* Live viewer competitions. ASEAN is not here: it finished, and
+            it sits in the Archive dropdown at the top-left with WC26. */}
+        {[["leagues-cup", "Leagues Cup"], ["ucl", "UCL"]].map(([k, label]) => (
           <NavChip key={k} href={`/bet-suggester/comp/${k}`} active={false}>
             {label}
           </NavChip>
         ))}
       </TopBar>
 
-      {fxOn && <LeagueFX key={fxKey} id={league.id} />}
-      {/* ============ MODE STAGE: the whole page is the cluster ============ */}
-      <div className={`mode-stage ${swapClass}`}
-        onTouchStart={(e) => {
-          touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-        }}
-        onTouchEnd={(e) => {
-          const t = touchStart.current;
-          touchStart.current = null;
-          if (!t) return;
-          const dx = e.changedTouches[0].clientX - t.x;
-          const dy = e.changedTouches[0].clientY - t.y;
-          // horizontal-dominant swipes only — vertical scroll stays free
-          if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-            switchLeague(dx < 0 ? 1 : -1);
-          }
-        }}>
-      {/* ===================== SHOWCASE ZONE ===================== */}
-      <div className="hero-ambient">
-        <div className="mx-auto max-w-5xl px-5 pt-20 sm:pt-24">
-          {/* Title lockup */}
-          <header className="relative mb-16 select-none text-center sm:mb-20">
-            <button aria-label="previous league" onClick={() => switchLeague(-1)}
-              className="group absolute left-0 top-1/2 z-10 -translate-y-1/2 p-3 text-ink-low transition-all duration-300 hover:text-accent hover:drop-shadow-[0_0_10px_var(--accent-dim)] sm:left-2">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-                className="transition-transform duration-300 group-hover:-translate-x-0.5">
-                <polyline points="15 18 9 12 15 6" /></svg>
+      <main className="mx-auto max-w-5xl px-5 pb-24 pt-12 sm:pt-16">
+        <Eyebrow tone="accent">picker · stage 1 + stage 2</Eyebrow>
+        {/* "Hand-picked" read as a curated subset — the one phrase on the
+            page that drifted from its own rule (RANKS, NEVER CUTS). */}
+        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-ink-hi sm:text-5xl">
+          Every fixture, ranked
+        </h1>
+        {/* The one honest line of framing. Not "bet these". */}
+        <p className="mt-4 max-w-2xl text-sm leading-relaxed text-ink-low">
+          Every upcoming fixture in the four in-season leagues, ranked by how
+          far apart the two clubs sit in their own league&apos;s table. No model
+          runs on this page, no number below is a probability or an edge of
+          ours, and nothing here is a recommendation — the ranking says where
+          to look, and you are the one who picks.
+        </p>
+
+        {/* ------------------------- controls ------------------------- */}
+        <div className="mt-8 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-wide">
+          <span className="mr-1 text-ink-faint">window</span>
+          {WINDOWS.map((n) => (
+            <button key={n} onClick={() => setDays(n)}
+              aria-pressed={days === n}
+              className={`rounded-md border px-2 py-1 transition-colors ${
+                days === n
+                  ? "border-accent/50 bg-accent/10 text-accent"
+                  : "border-line text-ink-faint hover:border-line-strong hover:text-ink-mid"}`}>
+              {n}d
             </button>
-            <button aria-label="next league" onClick={() => switchLeague(1)}
-              className="group absolute right-0 top-1/2 z-10 -translate-y-1/2 p-3 text-ink-low transition-all duration-300 hover:text-accent hover:drop-shadow-[0_0_10px_var(--accent-dim)] sm:right-2">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-                className="transition-transform duration-300 group-hover:translate-x-0.5">
-                <polyline points="9 18 15 12 9 6" /></svg>
-            </button>
-            <div className="relative">
-              <div className="relative">
-                <LeagueMark league={league} />
-                <Eyebrow tone="accent" className="mb-5">{`bet suggester · ${league.eyebrow}`}</Eyebrow>
-                <h1 className="text-5xl font-semibold leading-[1.02] tracking-tighter sm:text-7xl lg:text-8xl">
-                  <span className={`league-title block text-accent ${league.font.className}`}
-                    style={"tracking" in league ? { letterSpacing: (league as { tracking?: string }).tracking } : undefined}>{league.name}</span>
-                </h1>
-                <p className="mx-auto mt-6 max-w-md text-sm leading-relaxed text-ink-low">
-                  {isWC ? (
-                    <>Monte Carlo match simulation vs. live market prices.
-                    {updatedAt && ` Updated ${updatedAt.toLocaleTimeString("en-US", { timeZone: TZ })}.`}
-                    {" "}For research — not financial advice.</>
-                  ) : league.tagline}
-                </p>
-                {isWC && (
-                  <p className="mt-5 flex justify-center">
-                    <span className="champ-badge font-mono text-xs uppercase">
-                      <span className="flag" aria-hidden />
-                      ★ ★ campeones · españa
-                      <span className="flag" aria-hidden />
-                    </span>
-                  </p>
-                )}
-              </div>
-            </div>
-            <div className="mt-7 flex items-center justify-center gap-2">
-              {LEAGUES.map((l, i) => (
-                <button key={l.id} aria-label={`switch to ${l.name}`}
-                  onClick={() => goLeague(i, i > leagueIdx ? "next" : "prev")}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${
-                    i === leagueIdx ? "w-9 bg-accent shadow-[0_0_12px_var(--accent-dim)]"
-                    : "w-2.5 bg-[color:var(--line-strong)] hover:bg-ink-faint"}`} />
+          ))}
+          <button onClick={() => setNonce((n) => n + 1)}
+            className="ml-2 rounded-md border border-line px-2 py-1 text-ink-faint transition-colors hover:border-line-strong hover:text-ink-mid">
+            ↻ refresh
+          </button>
+          {/* !loading too: a previous board's "built …" line standing
+              beside skeletons is exactly the stale-dressed-as-current
+              state the error branch below promises never to show. */}
+          {board && !loading && (
+            <span className="ml-auto text-ink-faint">
+              built {new Date(board.generated_at).toLocaleString("en-US", {
+                timeZone: TZ, month: "short", day: "numeric",
+                hour: "numeric", minute: "2-digit", second: "2-digit",
+              })}
+              {" · slate "}{etDate(board.date)} ET · {rows.length} fixture{rows.length === 1 ? "" : "s"}
+            </span>
+          )}
+        </div>
+        <p className="mt-2 font-mono text-[10px] tracking-wide text-ink-faint">
+          kickoffs render in {TZ} — one fixed zone for everyone, so the page is
+          the same page twice. Cached 90s server-side; “built” is when the
+          board was assembled, not when you asked for it.
+        </p>
+
+        {/* --------------- the season-basis banner, not a footnote --------------- */}
+        {priorLeagues.length > 0 && (
+          <section data-testid="prior-banner"
+            className="mt-6 rounded-xl border border-warn/30 bg-warn/5 p-4">
+            <Eyebrow tone="warn">
+              {priorLeagues.length} of {leagues.length} leagues · rated on last season
+            </Eyebrow>
+            <p className="mt-2 text-sm leading-relaxed text-ink-mid">
+              {priorLeagues
+                .map(([slug, m]) => `${leagueLabel(slug)} ${m.min_current_gp ?? "?"} GP`)
+                .join(" · ")}
+              {/* explicit {" "}: JSX ate the leading space of the text node
+                  after this expression and shipped "Under 8games played" */}
+              . Under {CURRENT_SEASON_GP_FLOOR}{" "}
+              games played this season&apos;s table
+              is noise, so all four ranking inputs — and the tiers below — come
+              from last season&apos;s final table for those leagues. The rows say
+              which.
+            </p>
+          </section>
+        )}
+
+        {/* -------------------- named upstream failures -------------------- */}
+        {failedLeagues.length > 0 && (
+          <section data-testid="league-errors"
+            className="mt-4 rounded-xl border border-live/30 bg-live/5 p-4">
+            <Eyebrow tone="live">leagues that could not be rated</Eyebrow>
+            <ul className="mt-2 space-y-1">
+              {failedLeagues.map(([slug, m]) => (
+                <li key={slug} className="font-mono text-[11px] text-live">
+                  {leagueLabel(slug)} — {m.error}
+                </li>
               ))}
-            </div>
-          </header>
+            </ul>
+            <p className="mt-2 text-xs text-ink-low">
+              These leagues contribute no fixtures below. The rest of the board
+              is unaffected — the page is short, not wrong.
+            </p>
+          </section>
+        )}
+        {kalshiFailed.length > 0 && (
+          <p className="mt-3 font-mono text-[11px] text-ink-low">
+            kalshi unavailable for {kalshiFailed.map(([s]) => leagueLabel(s)).join(", ")} —
+            prices are annotation here, so those fixtures are still ranked and listed.
+          </p>
+        )}
 
-          {!isWC && league.id === "mls" && <MlsDashboard />}
-          {!isWC && league.id === "epl" && <EplDashboard />}
-          {!isWC && league.id === "ligamx" && <LigamxDashboard />}
-          {!isWC && league.id === "laliga" && <LaligaDashboard />}
-          {/* The fallback must exclude EVERY league with a real
-              dashboard, or a built hub renders behind a "coming soon"
-              card. La Liga was exactly that: its backend served all
-              five routes while this list still hid it. Derived from
-              BUILT_LEAGUES now, so adding a dashboard cannot leave the
-              fallback stale — the failure mode is silent. */}
-          {!isWC && !BUILT_LEAGUES.has(league.id) &&
-            <LeagueComingSoon league={league} />}
-          <div className={isWC ? undefined : "hidden"}>
-          {error && (
-            <div className="mb-10 rounded-xl border border-live/30 bg-live/5 p-4 text-center text-sm text-live">
-              {error}
-            </div>
-          )}
-
-          {/* Live scoreboard — real feed-backed score cards, at the top */}
-          <LiveScoreboard />
-
-          {/* Next match hero — under the live board */}
-          {next && (
-            <Reveal>
-              <Link href={`/bet-suggester/market/${next.match_id}`} className="block">
-                <section className="glow glow-accent cursor-pointer rounded-3xl border border-line bg-elev px-6 py-12 text-center transition-colors duration-300 hover:border-accent/40 sm:py-14">
-                  <Eyebrow tone="accent">
-                    next match · {stageLabel(next.group)}
-                  </Eyebrow>
-                  <h2 className="mt-5 text-3xl font-semibold tracking-tight text-ink-hi sm:text-5xl">
-                    <span className="mr-3">{flag(next.home)}</span>
-                    {next.home}
-                    <span className="mx-3 text-xl font-normal text-ink-faint sm:mx-4 sm:text-2xl">vs</span>
-                    {next.away}
-                    <span className="ml-3">{flag(next.away)}</span>
-                  </h2>
-                  <p className="mt-3 text-xs text-ink-low">{next.venue}</p>
-                  <p className="mt-1 font-mono text-[11px] tracking-wide text-ink-faint">
-                    {kickoffLocal(next.kickoff)} · local time
-                  </p>
-                  <p className="mt-8 text-6xl font-semibold tracking-tight tabular-nums text-accent sm:text-7xl">
-                    {countdown(next.seconds_to_kickoff)}
-                  </p>
-                  <p className="mt-4 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-low">
-                    {next.is_final ? "🔒 final decision locked" : "to kickoff · final lock at T-10min"}
-                  </p>
-                </section>
-              </Link>
-            </Reveal>
-          )}
+        {/* ---------------------------- the board ---------------------------- */}
+        <section className="mt-8">
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2 border-t border-line pt-6">
+            <h2 className="text-lg font-medium text-ink-hi">
+              Ranked by table gap
+            </h2>
+            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
+              |GD/g gap| descending · no cut-off
+            </p>
           </div>
-        </div>
-      </div>
 
-      {/* ===================== TOOL ZONE (Linear-style) ===================== */}
-      <div className={`mx-auto max-w-5xl px-5 pb-16 pt-20 sm:pt-24${isWC ? "" : " hidden"}`}>
-
-        {/* Knockout bracket — reversed pyramid, model win probabilities */}
-        <div id="bracket" className="mb-20 border-t border-line pt-10">
-          <BracketView />
-        </div>
-
-        {/* Ranking board — likelihood-first, all matches pooled */}
-        <Reveal>
-        <section id="board" className="mb-20 border-t border-line pt-10">
-          <div className="mb-1 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <Eyebrow className="mb-2">ranking board · by match</Eyebrow>
-              <h3 className="text-lg font-medium text-ink-hi">
-                Best bets — grouped by match, in kickoff order
-              </h3>
-              <p className="mt-1 text-xs text-ink-low">
-                Click a column to sort · click a match to collapse
+          {loading ? (
+            <SkeletonRows rows={4} height="h-32" />
+          ) : error ? (
+            <div data-testid="board-error"
+              className="rounded-xl border border-live/30 bg-live/5 p-5">
+              <Eyebrow tone="live">the board could not be built</Eyebrow>
+              <p className="mt-2 font-mono text-[12px] text-live">{error}</p>
+              <p className="mt-3 text-sm text-ink-low">
+                Nothing is being shown from an earlier request — a stale board
+                dressed as a current one is worse than none.
+              </p>
+              <button onClick={() => setNonce((n) => n + 1)}
+                className="mt-4 rounded-md border border-line px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low transition-colors hover:border-line-strong hover:text-ink-hi">
+                try again
+              </button>
+            </div>
+          ) : rows.length === 0 ? (
+            <div data-testid="board-empty"
+              className="rounded-xl border border-line p-6">
+              <p className="text-sm text-ink-mid">
+                No fixtures in the next {days} day{days === 1 ? "" : "s"} across
+                {" "}{leagues.length ? leagues.map(([s]) => leagueLabel(s)).join(", ") : "the four leagues"}.
+              </p>
+              <p className="mt-2 text-xs text-ink-low">
+                {refusals.length > 0
+                  ? `${refusals.length} fixture${refusals.length === 1 ? " was" : "s were"} refused — they are listed below with the reason.`
+                  : "Widen the window above to look further ahead."}
               </p>
             </div>
-            <button
-              onClick={handleRefreshAll}
-              disabled={refreshingAll}
-              className={`rounded-lg border px-3.5 py-2 font-mono text-[11px] uppercase tracking-[0.14em] transition-colors ${
-                refreshingAll
-                  ? "cursor-not-allowed border-line text-ink-faint"
-                  : "border-accent/40 text-accent hover:border-accent hover:bg-accent/5"
-              }`}
-            >
-              {refreshingAll ? "⟳ Refreshing…" : "↻ Refresh all"}
-            </button>
-          </div>
-          <p className="mb-4 font-mono text-[11px] tracking-wide text-ink-faint">
-            Auto-updates every 60s
-            {updatedAt && ` · Last updated ${updatedAt.toLocaleTimeString("en-US", { timeZone: TZ })}`}
-            {` · next auto-refresh in ${secsToRefresh}s`}
-          </p>
-          {refreshMsg && (
-            <p className={`mb-4 text-xs ${
-              refreshMsg.startsWith("✗") ? "text-live" : "text-accent"
-            }`}>
-              {refreshMsg}
-            </p>
-          )}
-          {tierUsed === 40 && suggestions.length > 0 && (
-            <p className="mb-4 rounded-lg border border-warn/25 bg-warn/5 px-3 py-2 text-xs text-warn">
-              Expanded to 40%+ likely — nothing cleared 49%+ right now.
-            </p>
-          )}
-          {loading ? (
-            <SkeletonRows rows={7} />
-          ) : groups.length === 0 ? (
-            <p className="rounded-xl border border-line p-6 text-sm text-ink-low">
-              No statistically likely value across any match right now — the
-              markets are efficiently priced.
-            </p>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-line">
-              <div className="min-w-[600px]">
-                {/* sortable column header bar (aligns with every group's rows) */}
-                <div className={`${BOARD_COLS} border-b border-line bg-elev px-4 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-low`}>
-                  <span>Market</span>
-                  <button onClick={() => onSort("likelihood")} className="text-right transition-colors hover:text-ink-hi">
-                    Likelihood{arrow("likelihood")}
-                  </button>
-                  <button onClick={() => onSort("edge")}
-                    title="Model probability minus the market's implied probability — positive means the model sees value"
-                    className="text-right transition-colors hover:text-ink-hi">
-                    Edge{arrow("edge")}
-                  </button>
-                  <button onClick={() => onSort("multiplier")}
-                    title="Payout multiple at the buyable ask price (not the midpoint)"
-                    className="text-right transition-colors hover:text-ink-hi">
-                    Mult{arrow("multiplier")}
-                  </button>
-                  <span className="text-right">Alert</span>
-                </div>
-
-                {groups.map((g) => {
-                  const isCollapsed = collapsed.has(g.match_id);
-                  const inPlay = new Date(g.kickoff).getTime() <= nowMs;
-                  return (
-                    <div key={g.match_id}>
-                      {/* collapsible match header */}
-                      <button
-                        onClick={() => toggleCollapse(g.match_id)}
-                        className="flex w-full items-center gap-2.5 border-b border-line bg-elev/40 px-4 py-2.5 text-left transition-colors hover:bg-elev"
-                      >
-                        <span className={`text-ink-faint transition-transform ${isCollapsed ? "" : "rotate-90"}`}>▸</span>
-                        <span className="truncate text-sm text-ink-hi">
-                          {flag(g.home)} {g.home} <span className="text-ink-faint">vs</span> {g.away} {flag(g.away)}
-                        </span>
-                        {inPlay && (
-                          <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-live">
-                            <span className="pulse-dot mr-1 inline-block h-1 w-1 rounded-full bg-live align-middle" />
-                            in play
-                          </span>
-                        )}
-                        {g.is_final && (
-                          <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-live">🔒 final</span>
-                        )}
-                        <span className="ml-auto shrink-0 whitespace-nowrap pl-3 font-mono text-[11px] tracking-wide text-ink-faint">
-                          {!inPlay && (
-                            <span className="mr-2 text-accent">
-                              in {countdown(Math.max(0, Math.floor((new Date(g.kickoff).getTime() - nowMs) / 1000)))}
-                            </span>
-                          )}
-                          {kickoffLocal(g.kickoff)} · {g.rows.length} bet{g.rows.length === 1 ? "" : "s"}
-                        </span>
-                      </button>
-
-                      {/* rows (sorted by the active column) */}
-                      {!isCollapsed && sortRows(g.rows).map((s) => (
-                        <div
-                          key={s.market_id}
-                          className={`${BOARD_COLS} border-b border-line px-4 py-3 text-sm transition-colors hover:bg-elev`}
-                        >
-                          <div className="min-w-0 pr-2">
-                            <Link
-                              href={`/bet-suggester/market/${s.match_id}`}
-                              className="font-medium text-ink-hi transition-colors hover:text-accent"
-                            >
-                              {s.market_title}
-                            </Link>
-                          </div>
-                          <div className="text-right font-mono tabular-nums text-ink-hi">
-                            <Flash value={pct(s.model_probability)} />
-                          </div>
-                          <div className={`text-right font-mono tabular-nums ${
-                            s.edge >= 0 ? "text-accent" : "text-neg"
-                          }`}>
-                            {signedPct(s.edge)}
-                          </div>
-                          <div className="text-right font-mono tabular-nums text-ink-mid">
-                            {s.kalshi_odds.toFixed(2)}x
-                          </div>
-                          <div className="text-right">
-                            <button
-                              onClick={() => toggleWatch(s)}
-                              className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors ${
-                                watchedIds.has(s.market_id)
-                                  ? "border-warn/50 text-warn hover:border-warn"
-                                  : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"
-                              }`}
-                            >
-                              {watchedIds.has(s.market_id) ? "Watching" : "Watch"}
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
+            <div className="space-y-3">
+              {rows.map((r, i) => (
+                <RowCard key={`${r.league}-${r.event_id}`} row={r} rank={i + 1} />
+              ))}
             </div>
           )}
         </section>
-        </Reveal>
 
-        {/* Watched bets — ripeness scores */}
-        {watchlist.length > 0 && (
-          <Reveal>
-          <section className="mb-20">
-            <Eyebrow className="mb-2">bet timing</Eyebrow>
-            <h3 className="mb-4 text-lg font-medium text-ink-hi">
-              Watched bets <span className="text-sm font-normal text-ink-low">· alert fires at {alertThreshold.toFixed(0)}/100</span>
-            </h3>
-            <div className="space-y-3">
-              {watchlist.map((w) => {
-                const t = w.timing;
-                const ripe = t.score >= alertThreshold;
-                return (
-                  <Link key={w.market_id} href={`/bet-suggester/market/${w.match_id}`} className="block">
-                    <div className={`cursor-pointer rounded-xl border p-4 transition-colors ${
-                      ripe ? "border-warn/50 bg-warn/5"
-                           : "border-line hover:border-line-strong"
-                    }`}>
-                      <div className="flex items-baseline justify-between gap-4">
-                        <p className="text-sm text-ink-hi">
-                          {ripe && <span className="mr-2">⏰</span>}
-                          {w.market_title}
-                          <span className="ml-2 font-mono text-[11px] text-ink-faint">
-                            {t.readings} readings · {t.status}
-                          </span>
-                        </p>
-                        <p className={`font-mono text-lg tabular-nums ${
-                          ripe ? "text-warn" : "text-ink-mid"
-                        }`}>
-                          {t.score.toFixed(0)}<span className="text-xs text-ink-faint">/100</span>
-                        </p>
-                      </div>
-                      <div className="mt-3 h-1 overflow-hidden rounded-full bg-elev2">
-                        <div
-                          className={`h-full rounded-full ${ripe ? "bg-warn" : "bg-accent/60"}`}
-                          style={{ width: `${Math.min(t.score, 100)}%` }}
-                        />
-                      </div>
-                      {t.reasons[0] && (
-                        <p className="mt-2.5 text-xs text-ink-low">{t.reasons[0]}
-                          {t.reasons[1] && ` · ${t.reasons[1]}`}</p>
-                      )}
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
+        {/* --------------------------- refusals --------------------------- */}
+        {refusals.length > 0 && (
+          <section data-testid="refusals" className="mt-12 border-t border-line pt-6">
+            <Eyebrow tone="warn">
+              refused · {refusals.length} fixture{refusals.length === 1 ? "" : "s"}
+            </Eyebrow>
+            <h2 className="mt-2 text-lg font-medium text-ink-hi">
+              Fixtures the picker would not rate
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-low">
+              A club with no row in the table being used — a promoted side, most
+              often — cannot be ranked against one that has a row. Its
+              second-division numbers were measured as no help at all, so the
+              picker refuses it by name instead of imputing a number, and the
+              fixture is listed here rather than quietly dropped.
+            </p>
+            <ul className="mt-4 space-y-2">
+              {refusals.map((r, i) => (
+                <RefusalRow key={`${r.league}-${r.club}-${i}`} r={r} />
+              ))}
+            </ul>
           </section>
-          </Reveal>
         )}
 
-        {/* Recent ripeness alerts */}
-        {ripeAlerts.length > 0 && (
-          <Reveal>
-          <section className="mb-20">
-            <Eyebrow className="mb-2">alerts</Eyebrow>
-            <h3 className="mb-4 text-lg font-medium text-ink-hi">
-              Recent bet-window alerts
-            </h3>
-            <div className="space-y-2">
-              {ripeAlerts.slice(0, 6).map((a, i) => (
-                <div key={i} className="rounded-xl border border-line px-4 py-3 text-sm">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="text-warn">
-                      ⏰ {a.market_title}
-                      <span className="ml-2 font-mono tabular-nums">@ {a.decimal_odds?.toFixed(2)}</span>
-                      <span className="ml-2 font-mono text-xs tabular-nums text-ink-mid">
-                        edge {signedPct(a.edge)} · score {a.score.toFixed(0)}
+        {/* ------------------------ per-league basis ------------------------ */}
+        {leagues.length > 0 && (
+          <section className="mt-12 border-t border-line pt-6">
+            <Eyebrow>what each league was rated on</Eyebrow>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {leagues.map(([slug, m]) => (
+                <div key={slug}
+                  className="flex flex-wrap items-baseline gap-x-2 rounded-lg border border-line px-3 py-2 font-mono text-[11px]">
+                  <span className="text-ink-hi">{leagueLabel(slug)}</span>
+                  {m.error ? (
+                    <span className="text-live">{m.error}</span>
+                  ) : (
+                    <>
+                      <span className={m.src === "prior" ? "text-warn" : "text-accent"}>
+                        {m.src === "prior" ? "prior szn" : "this season"}
                       </span>
-                    </span>
-                    <span className="font-mono text-[11px] text-ink-faint">
-                      {new Date(a.fired_at).toLocaleTimeString("en-US", { timeZone: TZ })}
-                    </span>
-                  </div>
+                      <span className="text-ink-faint">
+                        min {m.min_current_gp ?? "—"} GP · {m.clubs} clubs
+                      </span>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
           </section>
-          </Reveal>
         )}
 
-        <footer className="mt-24 border-t border-line pt-6 font-mono text-[11px] leading-relaxed text-ink-faint">
-          Educational project. Simulated probabilities, not betting advice.
-          Predictions refresh hourly; final decisions lock 10 minutes before kickoff.
+        {/* ------------------------- how to read it -------------------------
+            Deliberately NOT wrapped in <Reveal>: it is a reference block at
+            the bottom of a long page, and a fade-in that has not fired yet
+            renders it at opacity 0 — indistinguishable from broken for the
+            one reader who came looking for a definition. */}
+          <Collapse eyebrow="legend" title="How to read a row"
+            defaultOpen={false} className="mt-12 border-t border-line pt-6">
+            <dl className="space-y-4 text-sm leading-relaxed text-ink-low">
+              <div>
+                <dt className="text-ink-hi">GD/g gap · ppg gap · rank gap</dt>
+                <dd className="mt-1">
+                  Stage 1, all three signed from the favourite&apos;s side. The
+                  favourite is whichever club has the better whole-league derived
+                  rank; conferences and groups are deliberately ignored. The board
+                  is ordered by the absolute GD/g gap and by nothing else.
+                </dd>
+              </div>
+              <div>
+                <dt className="text-ink-hi">T1 … T5</dt>
+                <dd className="mt-1">
+                  Within-league quintiles — T1 is the best fifth of that league,
+                  T5 the worst — on three separate measures: points per game
+                  (overall), goals for per game (attack), goals against per game
+                  (defence). A pair reads favourite v opponent.
+                </dd>
+              </div>
+              <div>
+                <dt className="text-ink-hi">CLEAN · SPLIT · HOLLOW</dt>
+                <dd className="mt-1">
+                  CLEAN = the favourite is a better tier on all three. HOLLOW =
+                  level or behind in BOTH attack and defence, however big the
+                  table gap looks. SPLIT = everything else. The label annotates;
+                  it never removes a row.
+                </dd>
+              </div>
+              <div>
+                <dt className="text-ink-hi">prior szn</dt>
+                <dd className="mt-1">
+                  That league&apos;s lowest current games-played is under{" "}
+                  {CURRENT_SEASON_GP_FLOOR}, so every input and every tier comes
+                  from last season&apos;s final table instead of a handful of
+                  matches.
+                </dd>
+              </div>
+              <div>
+                <dt className="text-ink-hi">kalshi ask · spread · size</dt>
+                <dd className="mt-1">
+                  The favourite&apos;s side of the book, as annotation.
+                  WIDE = spread over {WIDE_SPREAD_C}¢; THIN = ask size under{" "}
+                  {THIN_ASK_SIZE}. A missing quote never removes a fixture — the
+                  price decorates the board, it does not gate it.
+                </dd>
+              </div>
+            </dl>
+          </Collapse>
+
+        <footer className="mt-16 border-t border-line pt-6 font-mono text-[11px] leading-relaxed text-ink-faint">
+          Research surface. The picker ranks and annotates; it sets no
+          threshold, and neither does this page. Not betting advice.
         </footer>
-      </div>
-      </div>
+      </main>
     </div>
   );
 }

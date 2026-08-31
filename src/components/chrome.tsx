@@ -7,14 +7,20 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { ReactNode, useEffect, useState } from "react";
 
-export function TopBar({ back, title, children }: {
+export function TopBar({ back, left, title, children }: {
   back?: { href: string; label: string };
+  // Far-left slot, ahead of the back link. The archive dropdown lives
+  // here on the surfaces that have no "back" (the board is the root of
+  // the app), so the top-left corner is either wayfinding OUT or
+  // wayfinding DOWN — never both fighting over the same 40px.
+  left?: ReactNode;
   title: ReactNode;
   children?: ReactNode;               // right side: nav chips / status
 }) {
   return (
     <header className="topbar">
       <div className="mx-auto flex h-12 max-w-5xl items-center gap-4 px-5">
+        {left}
         {back && (
           <Link href={back.href} aria-label={back.label}
             onClick={(e) => {
@@ -72,9 +78,14 @@ export function NavChip({ href, onClick, active, children }: {
     (active
       ? "border-accent/50 bg-accent/10 text-accent"
       : "border-line text-ink-low hover:border-line-strong hover:text-ink-hi");
+  // Link, not <a>: a plain anchor made every chip hop a full document
+  // load — the one navigation in the app that skipped the client router
+  // (and RouteProgress). The legacy ?league= mapping that hard loads
+  // used to pick up from next.config.ts lives client-side too (the
+  // board's own deep-link guard), so nothing depends on the reload.
   return onClick
     ? <button onClick={onClick} className={cls}>{children}</button>
-    : <a href={href} className={cls}>{children}</a>;
+    : <Link href={href ?? "#"} className={cls}>{children}</Link>;
 }
 
 // Which of the given section ids is currently in view — drives the active
@@ -191,14 +202,17 @@ export function Collapse({ id, eyebrow, title, defaultOpen = true, className = "
         className="group flex w-full items-baseline gap-3 border-b border-line pb-2.5 text-left">
         <span aria-hidden
           className={`text-ink-faint transition-transform ${open ? "rotate-90" : ""}`}>▸</span>
+        {/* The eyebrow and the "show" hint are visual decoration; left in
+            the accessible name they concatenate into garbage
+            ("legendHow to read a row show"). The name is the title. */}
         <span className="min-w-0">
           {eyebrow && (
-            <span className="mr-3 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">{eyebrow}</span>
+            <span aria-hidden className="mr-3 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">{eyebrow}</span>
           )}
           <span className="text-base font-medium text-ink-hi transition-colors group-hover:text-accent">{title}</span>
         </span>
         {!open && (
-          <span className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">show</span>
+          <span aria-hidden className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">show</span>
         )}
       </button>
       {open && <div className="pt-5">{children}</div>}

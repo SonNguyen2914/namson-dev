@@ -18,7 +18,17 @@ import { expect, test } from "@playwright/test";
 // `_comp_404` refusal, so this passes with no backend at all.
 
 const RETIRED = ["ecl", "uel", "brasileirao", "argentina", "usl"];
-const KEPT = ["ucl", "leagues-cup", "asean"];
+// The two that are LIVE keep a chip on the board's rail: Leagues Cup is
+// at its semi-finals, UCL's league phase has not kicked off.
+const KEPT_CHIPS = ["ucl", "leagues-cup"];
+// ASEAN is kept too, but it FINISHED (0 upcoming, 28 played), so on
+// 2026-08-30 it moved into the Archive dropdown at the top-left, with
+// WC26. "Still reachable" is unchanged as a claim — it is reached
+// through the control that says what it is, instead of sitting in a rail
+// of live competitions. Retired and finished are different things and
+// this spec must not blur them: a retired competition is offered
+// nowhere, a finished one is filed.
+const KEPT_IN_ARCHIVE = ["asean"];
 
 const GONE_DETAIL =
   "UEFA Europa League was retired on 2026-08-24 by operator decision — " +
@@ -35,12 +45,27 @@ test("the board offers none of the five, and still offers the three",
         `${k} must not be linked from the board`,
       ).toHaveCount(0);
     }
-    for (const k of KEPT) {
+    for (const k of KEPT_CHIPS) {
       await expect(
         page.locator(`a[href="/bet-suggester/comp/${k}"]`).first(),
-        `${k} must still be reachable`,
+        `${k} must still be reachable from the rail`,
       ).toBeVisible();
     }
+    // the finished one is behind the archive control, and the control
+    // must actually produce it — "it is in a menu somewhere" is not a
+    // reachability claim
+    await page.getByRole("button", { name: /archive/i }).click();
+    for (const k of KEPT_IN_ARCHIVE) {
+      await expect(
+        page.locator(`a[href="/bet-suggester/comp/${k}"]`).first(),
+        `${k} must still be reachable from the archive dropdown`,
+      ).toBeVisible();
+    }
+    // and it is NOT also sitting in the live rail
+    await expect(
+      page.getByRole("navigation")
+        .locator(`a[href="/bet-suggester/comp/asean"]`),
+    ).toHaveCount(0);
   });
 
 test("a bookmarked retired competition says it was retired, and stops asking",

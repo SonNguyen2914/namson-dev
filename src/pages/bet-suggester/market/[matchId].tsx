@@ -277,14 +277,16 @@ export default function MatchDetail() {
 
   return (
     <div className="min-h-screen bg-bs font-sans text-ink-mid">
-      <Head><title>{matchId ?? "Match"} · Bet Suggester</title></Head>
+      {/* One expression — next/head drops a multi-child <title> at SSR.
+          And the MATCHUP, not the raw id: home/away are right here. */}
+      <Head><title>{`${home} vs ${away} · WC26 Bet Suggester · namson.dev`}</title></Head>
 
       <RouteProgress />
       <Toaster />
-      <TopBar back={{ href: "/bet-suggester", label: "board" }}
+      <TopBar back={{ href: "/bet-suggester/wc26", label: "wc26" }}
         title={`${home} vs ${away}`}>
         {liveNow && (
-          <NavChip href="/bet-suggester">
+          <NavChip href="/bet-suggester/wc26">
             <span className="pulse-dot mr-1 inline-block h-1 w-1 rounded-full bg-live align-middle" />
             <span className="text-live">
               {liveNow.home.slice(0, 3)} {liveNow.home_goals}–{liveNow.away_goals} {liveNow.away.slice(0, 3)}

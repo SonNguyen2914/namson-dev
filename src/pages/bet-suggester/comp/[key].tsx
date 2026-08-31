@@ -22,6 +22,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
+import { ARCHIVE, ArchiveMenu } from "../../../components/ArchiveMenu";
 import { RouteProgress, TopBar } from "../../../components/chrome";
 import { Eyebrow, Reveal } from "../../../components/ui";
 import MarketVsRead, { MarketVsReadInline, type MarketVsReadData }
@@ -146,6 +147,11 @@ function Read({ s, home, away }: {
 export default function CompViewer() {
   const router = useRouter();
   const key = typeof router.query.key === "string" ? router.query.key : null;
+  // A finished competition served by this page (ASEAN) lives in the
+  // Archive dropdown — so the dropdown must be HERE too, marking it
+  // current, or the archive is a door that locks behind you.
+  const archiveKey =
+    key != null && ARCHIVE.some((a) => a.key === key) ? key : undefined;
   const [d, setD] = useState<Payload | null>(null);
   const [mk, setMk] = useState<Markets | null>(null);
   const [days, setDays] = useState(14);
@@ -223,7 +229,8 @@ export default function CompViewer() {
       <div style={vars} className="min-h-screen bg-bs font-sans text-ink-mid">
         <Head><title>Not served · market viewer · namson.dev</title></Head>
         <RouteProgress />
-        <TopBar back={{ href: "/bet-suggester", label: "board" }}
+        <TopBar left={<ArchiveMenu current={archiveKey} />}
+          back={{ href: "/bet-suggester", label: "board" }}
           title="market viewer" />
         <main className="mx-auto max-w-5xl px-5 pb-24 pt-10">
           <Eyebrow>not served here</Eyebrow>
@@ -243,10 +250,13 @@ export default function CompViewer() {
   return (
     <div style={vars} className="min-h-screen bg-bs font-sans text-ink-mid">
       <Head>
-        <title>{d?.display || "Competition"} · market viewer · namson.dev</title>
+        {/* ONE expression: next/head only renders a single-child <title>
+            at SSR, so the old juxtaposed children shipped no title tag */}
+        <title>{`${d?.display || "Competition"} · market viewer · namson.dev`}</title>
       </Head>
       <RouteProgress />
-      <TopBar back={{ href: "/bet-suggester", label: "board" }}
+      <TopBar left={<ArchiveMenu current={archiveKey} />}
+        back={{ href: "/bet-suggester", label: "board" }}
         title={`${d?.display || "Competition"} · market viewer`} />
       <main className="mx-auto max-w-5xl px-5 pb-24 pt-10">
         <Eyebrow>{(d?.display || "competition").toLowerCase()} · viewer</Eyebrow>

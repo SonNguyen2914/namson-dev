@@ -7,6 +7,11 @@ import { defineConfig, devices } from "@playwright/test";
 const BACKEND = process.env.SUGGESTER_BACKEND_URL
   || "https://wc26-bet-suggester-production.up.railway.app";
 
+// Overridable so a second checkout/agent can run the suite WITHOUT
+// inheriting whatever server (and backend stub) already holds 3123 —
+// reuseExistingServer would silently adopt it, stale build and all.
+const PORT = Number(process.env.SUGGESTER_E2E_PORT || 3123);
+
 export default defineConfig({
   testDir: "./e2e",
   timeout: 45_000,
@@ -14,15 +19,15 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: "line",
   use: {
-    baseURL: "http://localhost:3123",
+    baseURL: `http://localhost:${PORT}`,
     trace: "on-first-retry",
   },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
   ],
   webServer: {
-    command: "npm run start -- --port 3123",
-    url: "http://localhost:3123",
+    command: `npm run start -- --port ${PORT}`,
+    url: `http://localhost:${PORT}`,
     timeout: 120_000,
     reuseExistingServer: !process.env.CI,
     env: { SUGGESTER_BACKEND_URL: BACKEND },
