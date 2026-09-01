@@ -36,22 +36,92 @@ import {
   ReviewLeagueMeta, ReviewRefusal, ReviewRow,
 } from "../lib/pickerReview";
 import {
-  ColumnSort, DEFAULT_SORT, SORT_MODES, isDefaultSort, loadColumnSort,
-  modeById, nullNoteFor, saveColumnSort, sortRows,
+  ColumnSort, DEFAULT_SORT, SORT_MODES, SortModeId, isDefaultSort,
+  loadColumnSort, modeById, nullNoteFor, saveColumnSort, sortRows,
 } from "../lib/pickerSort";
 import {
-  GapNote, KalshiCell, RegTimeNote, SeasonWeight, TierGaps, dec, sign,
+  GapNote, KalshiCell, RegTimeNote, SeasonWeight, TierGaps, WITHHELD,
+  dec, sign,
 } from "./PickerRead";
 import { ReviewTail } from "./ReviewCard";
 import { Eyebrow } from "./ui";
 
+// ---------------------------------------------------------------------
+// The Floodlit identity (2026-09-01). Each league column carries its own
+// hue — WAYFINDING ONLY: rails, the favourite's pip, the dumbbell span.
+// Data ink stays on the gray ladder; gold stays the brand and rank 01.
+// ---------------------------------------------------------------------
+const LEAGUE_HUE: Record<string, string> = {
+  mls: "var(--lg-mls)", epl: "var(--lg-epl)", laliga: "var(--lg-laliga)",
+  ligamx: "var(--lg-ligamx)",
+};
+export const hueOf = (slug: string) => LEAGUE_HUE[slug] ?? "var(--lg-cup)";
+
+/** The card's ANCHOR: the active sort metric, displayed signed the way
+ *  the reader thinks about it — so a column scans as a ranked ladder of
+ *  one number. Sorting by kickoff keeps GD/g (a time is not a
+ *  magnitude); a missing quote says "no quote", a withheld gap says the
+ *  board's own word for it. */
+function anchorFor(row: BoardRow, modeId: SortModeId): { v: string; k: string } {
+  const id = modeId === "kickoff" ? "gdg" : modeId;
+  switch (id) {
+    case "gdg": return { v: dec(row.gdg_gap), k: "GD/g gap" };
+    case "ppg": return { v: dec(row.ppg_gap), k: "ppg gap" };
+    case "rank": return { v: sign(row.rank_gap), k: "rank gap" };
+    case "tier_ovr": return { v: sign(row.tier_gaps.ovr), k: "tier · ovr" };
+    case "tier_atk": return { v: sign(row.tier_gaps.atk), k: "tier · atk" };
+    case "tier_def": return { v: sign(row.tier_gaps.def), k: "tier · def" };
+    case "ask": return row.kalshi?.ask_c == null
+      ? { v: WITHHELD, k: "no quote" }
+      : { v: `${row.kalshi.ask_c}¢`, k: "ask" };
+    case "spread": return row.kalshi?.spread_c == null
+      ? { v: WITHHELD, k: "no quote" }
+      : { v: `${row.kalshi.spread_c}¢`, k: "spread" };
+    case "depth": return row.kalshi?.ask_size == null
+      ? { v: WITHHELD, k: "no quote" }
+      : { v: row.kalshi.ask_size >= 1000
+            ? `${(row.kalshi.ask_size / 1000).toFixed(1)}k`
+            : String(row.kalshi.ask_size), k: "depth" };
+  }
+}
+
+/** THE RANK DUMBBELL — both clubs on the real 1..N axis of the league
+ *  they are rated in: ● favourite (league hue), ○ opponent. Position
+ *  says how good the favourite is, the lit span says how far apart the
+ *  pair sits — the picker's premise in one 9px instrument. A
+ *  cross-league tie has no shared axis, so it gets no instrument, which
+ *  is the same honesty as its withheld gaps. */
+function RankDumbbell({ row, clubCount }: { row: BoardRow; clubCount: number }) {
+  if (row.cross_league) return null;
+  const n = Math.max(clubCount, row.ranks.fav, row.ranks.opp, 2);
+  const pos = (k: number) => 2 + (96 * (k - 1)) / (n - 1);
+  const a = pos(row.ranks.fav), b = pos(row.ranks.opp);
+  const lo = Math.min(a, b), w = Math.abs(b - a);
+  return (
+    <span data-testid="rank-dumbbell" aria-hidden
+      title={`league ranks on the 1–${n} axis: favourite #${row.ranks.fav}, opponent #${row.ranks.opp}`}
+      className="relative mt-2 block h-[9px]">
+      <span className="absolute left-0 right-0 top-[4px] h-px bg-line" />
+      <span className="absolute top-[4px] h-px opacity-60 [background:var(--lg)]"
+        style={{ left: `${lo}%`, width: `${w}%` }} />
+      <span className="absolute top-[0.5px] h-2 w-2 -translate-x-1/2 rounded-full [background:var(--lg)]"
+        style={{ left: `${a}%` }} />
+      <span className="absolute top-[1px] h-[7px] w-[7px] -translate-x-1/2 rounded-full border border-ink-low bg-bs"
+        style={{ left: `${b}%` }} />
+    </span>
+  );
+}
+
 /** One match card. `rank` is the row's position under the column's
  *  CURRENT sort — the badge follows the reader's chosen order, it does
  *  not fossilise the default one. */
-function RowCard({ row, rank }: { row: BoardRow; rank: number }) {
+function RowCard({ row, rank, modeId, clubCount }: {
+  row: BoardRow; rank: number; modeId: SortModeId; clubCount: number;
+}) {
   const favHome = row.fav_side === "home";
   const w = row.weights;
   const cross = row.cross_league === true;
+  const anchor = anchorFor(row, modeId);
   return (
     <article
       data-testid="picker-row"
@@ -60,11 +130,15 @@ function RowCard({ row, rank }: { row: BoardRow; rank: number }) {
       data-column={row.column ?? row.league}
       data-event={row.event_id}
       data-cross-league={cross ? "true" : "false"}
-      className="rounded-xl border border-line bg-elev/40 p-4 transition-colors hover:border-line-strong"
+      className={`rounded-xl border p-4 transition-colors bg-gradient-to-b from-elev2/60 to-elev/40 ${
+        rank === 1
+          ? "border-accent/35 hover:border-accent/60"
+          : "border-line hover:border-line-strong"}`}
     >
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span data-testid="row-rank"
-          className="font-mono text-[11px] tabular-nums text-ink-faint">
+          className={`font-mono text-[11px] tabular-nums ${
+            rank === 1 ? "text-accent" : "text-ink-faint"}`}>
           {String(rank).padStart(2, "0")}
         </span>
         {/* THE WEIGHT, NOT A BADGE. The board blends both seasons per
@@ -111,40 +185,73 @@ function RowCard({ row, rank }: { row: BoardRow; rank: number }) {
           cannot open is a list of names — every dashboard already links
           this same id space. Wraps only the matchup, so the Stage-1/2
           numbers below stay plain text. */}
+      {/* THE MATCHUP + THE ANCHOR. Two team lines with the ● / ○ pips
+          that also mark the dumbbell's ends — the mapping teaches
+          itself — and the active sort metric as a 20px right-anchored
+          number, so the column scans as a ranked ladder without reading
+          a word. The whole block stays the link in. */}
       <Link
         href={`/bet-suggester/${row.league}/${row.event_id}`}
         aria-label={`open ${row.favourite} versus ${row.opponent}`}
-        className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-md outline-none transition-colors hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bs">
-        <span className="text-lg font-medium text-ink-hi">{row.favourite}</span>
-        <span className="rounded border border-line px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-low"
-          title={favHome ? "the favourite is at home" : "the favourite is away"}>
-          {favHome ? "H" : "A"}
-        </span>
-        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
-          fav · rank {row.ranks.fav}
-        </span>
-        <span className="px-1 text-ink-faint">vs</span>
-        <span className="text-base text-ink-mid">{row.opponent}</span>
-        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
-          rank {row.ranks.opp}
-        </span>
-        <span aria-hidden className="text-ink-faint transition-transform">→</span>
-      </Link>
-
-      {/* Stage 1 — the ranking inputs, favourite-signed */}
-      <div className="mt-3 flex flex-wrap items-baseline gap-x-5 gap-y-1 font-mono text-[11px] tabular-nums">
-        <span className="text-ink-low">
-          GD/g gap{" "}
-          <span className="text-base font-semibold text-ink-hi">
-            {dec(row.gdg_gap)}
+        className="mt-2.5 flex items-start gap-3 rounded-md outline-none transition-colors hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bs">
+        <span className="min-w-0 flex-1">
+          <span className="flex min-w-0 items-center gap-2">
+            <span aria-hidden
+              className="h-2 w-2 flex-none rounded-full [background:var(--lg)]" />
+            <span
+              className="truncate text-[15.5px] font-semibold text-ink-hi [font-family:var(--font-archivo)] [font-stretch:95%]"
+              title={`${row.favourite} v ${row.opponent}`}>
+              {row.favourite}
+            </span>
+            <span className="flex-none rounded border border-line px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-low"
+              title={favHome ? "the favourite is at home" : "the favourite is away"}>
+              {favHome ? "H" : "A"}
+            </span>
+          </span>
+          <span className="mt-0.5 flex min-w-0 items-center gap-2">
+            <span aria-hidden
+              className="h-[7px] w-[7px] flex-none rounded-full border border-ink-low bg-bs" />
+            <span className="truncate text-[12.5px] text-ink-low [font-family:var(--font-archivo)] [font-stretch:96%]">
+              <span className="text-ink-faint">vs </span>{row.opponent}
+            </span>
           </span>
         </span>
-        <span className="text-ink-low">
-          ppg gap <span className="text-ink-hi">{dec(row.ppg_gap)}</span>
+        <span className="flex-none text-right">
+          <span data-testid="row-anchor"
+            className={`block font-mono text-[20px] font-semibold leading-none tabular-nums ${
+              anchor.v === WITHHELD ? "font-normal text-ink-faint" : "text-ink-hi"}`}>
+            {anchor.v}
+          </span>
+          <span className="mt-1 block font-mono text-[8.5px] uppercase tracking-[0.12em] text-ink-low">
+            {anchor.k}
+          </span>
         </span>
-        <span className="text-ink-low">
-          rank gap <span className="text-ink-hi">{sign(row.rank_gap)}</span>
+      </Link>
+
+      <RankDumbbell row={row} clubCount={clubCount} />
+
+      {/* Stage 1 — the ranking inputs, favourite-signed. The metric the
+          anchor already shows is not repeated down here; the ranks pair
+          names what the dumbbell draws. */}
+      <div className="mt-2.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-[10.5px] tabular-nums">
+        <span className="text-ink-faint">
+          #{row.ranks.fav} v #{row.ranks.opp}
         </span>
+        {modeId !== "gdg" && modeId !== "kickoff" && (
+          <span className="text-ink-low">
+            GD/g <span className="text-ink-mid">{dec(row.gdg_gap)}</span>
+          </span>
+        )}
+        {modeId !== "ppg" && (
+          <span className="text-ink-low">
+            ppg <span className="text-ink-mid">{dec(row.ppg_gap)}</span>
+          </span>
+        )}
+        {modeId !== "rank" && (
+          <span className="text-ink-low">
+            rank <span className="text-ink-mid">{sign(row.rank_gap)}</span>
+          </span>
+        )}
         <span className="text-ink-faint">
           gp {row.gp_current.home ?? "—"}/{row.gp_current.away ?? "—"}
         </span>
@@ -231,10 +338,14 @@ export function LeagueColumn({
     <section data-testid="league-col" data-league={slug}
       id={`picker-col-${slug}`}
       aria-label={`${leagueLabel(slug)} column`}
+      style={{ ["--lg" as string]: hueOf(slug) }}
       className="min-w-0 scroll-mt-16">
       <header className="border-b border-line pb-3">
+        {/* the league's own light — a 2px rail, wayfinding only */}
+        <div aria-hidden
+          className="mb-2 h-[2px] rounded-full opacity-80 [background:var(--lg)]" />
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <h3 className="text-base font-medium text-ink-hi">
+          <h3 className="text-base font-bold uppercase tracking-[0.03em] text-ink-hi [font-family:var(--font-archivo)] [font-stretch:106%]">
             {leagueLabel(slug)}
           </h3>
           {meta?.src === "prior" && (
@@ -331,7 +442,8 @@ export function LeagueColumn({
       {sorted.length > 0 ? (
         <div className="mt-3 space-y-3">
           {sorted.map((r, i) => (
-            <RowCard key={`${r.league}-${r.event_id}`} row={r} rank={i + 1} />
+            <RowCard key={`${r.league}-${r.event_id}`} row={r} rank={i + 1}
+              modeId={mode.id} clubCount={meta?.clubs ?? 0} />
           ))}
         </div>
       ) : meta?.error ? null : (

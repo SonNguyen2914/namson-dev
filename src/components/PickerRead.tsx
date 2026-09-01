@@ -84,8 +84,12 @@ export function shapeRead(r: ReadLike): string {
 export function GapChip({ label, gap, tiers }: {
   label: string; gap: number; tiers: TierPair;
 }) {
+  // ONE TRAFFIC LIGHT, PLATFORM-WIDE (operator call, 2026-09-01):
+  // green = ahead, amber = level, red = behind. Gold stopped meaning
+  // "good" the day it became the brand; a verdict and a brand sharing a
+  // hue made both weaker.
   const tone =
-    gap > 0 ? "border-accent/40 bg-accent/5 text-accent"
+    gap > 0 ? "border-up/40 bg-up/5 text-up"
     : gap === 0 ? "border-dashed border-warn/50 bg-warn/5 text-warn"
     : "border-neg/40 bg-neg/5 text-neg";
   return (
@@ -162,8 +166,10 @@ export function RegTimeNote({ note }: { note: string }) {
 }
 
 export function ShapeChip({ shape }: { shape: Shape }) {
+  // the same traffic light as the gap chips: a CLEAN shape is three
+  // greens by definition, so its chip is green; HOLLOW is the red read
   const tone =
-    shape === "CLEAN" ? "border-accent/50 bg-accent/10 text-accent"
+    shape === "CLEAN" ? "border-up/50 bg-up/10 text-up"
     : shape === "HOLLOW" ? "border-neg/50 bg-neg/10 text-neg"
     : "border-warn/50 bg-warn/10 text-warn";
   return (

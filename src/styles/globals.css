@@ -32,7 +32,27 @@
   --accent-dim: rgba(245, 197, 66, 0.35);
   --accent-faint: rgba(245, 197, 66, 0.10);
 
+  /* league identity — WAYFINDING ONLY (2026-09-01 board redesign).
+     One hue per league column: rails, favourite pips, dumbbell spans,
+     hover tints. Never data ink: numbers stay on the gray ladder and
+     gold stays the brand, rank 01 and the controls. One saturation
+     band so the four read as a broadcast set, not a warning palette. */
+  --lg-mls: #53c8f5;
+  --lg-epl: #a78bfa;
+  --lg-laliga: #ff7a70;
+  --lg-ligamx: #5fe0a0;
+  --lg-cup: #f5c542;       /* cross-league competitions stay brand-gold */
+
+  /* the board's display voice (bundled via @fontsource-variable) */
+  --font-archivo: "Archivo Variable", var(--font-geist-sans), ui-sans-serif,
+    system-ui, sans-serif;
+
   /* semantic data-ink */
+  --up: #34d399;           /* ahead / favours the favourite (2026-09-01:
+                              gold is BRAND, not a verdict — the traffic
+                              light is up/warn/neg, and fill-density on
+                              the tier cells carries the same fact for
+                              anyone the hues fail) */
   --live: #ff453a;         /* Apple system red — in-play only */
   --live-faint: rgba(255, 69, 58, 0.10);
   --warn: #fbbf24;         /* watch / ripeness / tier notes */
@@ -65,6 +85,12 @@
   --color-ink-faint: var(--ink-faint);
   --color-accent: var(--accent);
   --color-live: var(--live);
+  --color-up: var(--up);
+  --color-lg-mls: var(--lg-mls);
+  --color-lg-epl: var(--lg-epl);
+  --color-lg-laliga: var(--lg-laliga);
+  --color-lg-ligamx: var(--lg-ligamx);
+  --color-lg-cup: var(--lg-cup);
   --color-warn: var(--warn);
   --color-skylive: var(--skylive);
   --color-neg: var(--neg);

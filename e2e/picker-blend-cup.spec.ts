@@ -260,9 +260,14 @@ test("a cross-league cup fixture withholds its gaps, says why, and keeps its tie
     await expect(cross).toHaveAttribute("data-cross-league", "true");
     // the three Stage-1 numbers read n/a — NOT "0.00", which is a
     // measured level and a completely different finding
-    await expect(cross).toContainText(/GD\/g gap\s*n\/a/);
-    await expect(cross).toContainText(/ppg gap\s*n\/a/);
-    await expect(cross).toContainText(/rank gap\s*n\/a/);
+    // 2026-09-01 card: the active sort metric renders as the right-hand
+    // ANCHOR (value over label), the rest on the data line — the
+    // withheld gaps must read n/a in BOTH places, which is the same
+    // assertion this test always made, against the new layout.
+    await expect(cross.getByTestId("row-anchor")).toHaveText("n/a");
+    await expect(cross).toContainText(/GD\/g gap/);
+    await expect(cross).toContainText(/ppg\s*n\/a/);
+    await expect(cross).toContainText(/rank\s*n\/a/);
     await expect(cross).not.toContainText("+0.00");
     // …and the card says why, in the backend's own words
     await expect(cross.getByTestId("gap-note"))

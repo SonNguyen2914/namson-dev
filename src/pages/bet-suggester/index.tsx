@@ -255,25 +255,42 @@ export default function PickerBoard() {
       {/* max-w-[96rem], not the app's usual 5xl: four columns of match
           cards need the width, and each column stays a readable ~22rem.
           The intro copy below keeps its own measure (max-w-2xl). */}
-      <main className="mx-auto max-w-[96rem] px-5 pb-24 pt-12 sm:pt-16">
-        <Eyebrow tone="accent">picker · stage 1 + stage 2</Eyebrow>
-        {/* "Hand-picked" read as a curated subset — the page's copy states
-            its own rule (ranks, never cuts) in the H1 itself. */}
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-ink-hi sm:text-5xl">
-          Every fixture, ranked
-        </h1>
-        {/* The one honest line of framing. Not "bet these". */}
-        <p className="mt-4 max-w-2xl text-sm leading-relaxed text-ink-low">
-          Every upcoming fixture in the four in-season leagues and the
-          Leagues Cup, ranked by how far apart the two clubs sit in their own
-          league&apos;s table. No model
-          runs on this page, no number below is a probability or an edge of
-          ours, and nothing here is a recommendation — the ranking says where
-          to look, and you are the one who picks.
-        </p>
+      <main className="mx-auto max-w-[96rem] px-5 pb-24 pt-10 sm:pt-12">
+        {/* THE HERO IS A COMMAND BAR (2026-09-01). The old masthead spent
+            ~40% of the first viewport on a title the operator has read a
+            hundred times; the wordmark now sits at reading size in the
+            board's display voice, with a floodlight wash behind it and
+            the four league lights beside it. The H1 keeps its accessible
+            name and the mission line keeps its words — both are pinned
+            surfaces — they just stop costing a scroll. */}
+        <div className="relative">
+          <div aria-hidden
+            className="pointer-events-none absolute -inset-x-10 -top-16 h-44 bg-[radial-gradient(ellipse_45%_90%_at_18%_0%,rgba(220,235,255,0.05),transparent_72%)]" />
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <Eyebrow tone="accent">picker · stage 1 + stage 2</Eyebrow>
+            <span aria-hidden className="flex items-center gap-1.5">
+              {(["mls", "epl", "laliga", "ligamx"] as const).map((s2) => (
+                <i key={s2} className="h-1.5 w-1.5 rounded-full"
+                  style={{ background: `var(--lg-${s2})` }} />
+              ))}
+            </span>
+          </div>
+          <h1 className="mt-2 text-2xl font-bold uppercase tracking-[0.02em] text-ink-hi [font-family:var(--font-archivo)] [font-stretch:115%] sm:text-3xl">
+            Every fixture, ranked
+          </h1>
+          {/* The one honest line of framing. Not "bet these". */}
+          <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-ink-low">
+            Every upcoming fixture in the four in-season leagues and the
+            Leagues Cup, ranked by how far apart the two clubs sit in their own
+            league&apos;s table. No model
+            runs on this page, no number below is a probability or an edge of
+            ours, and nothing here is a recommendation — the ranking says where
+            to look, and you are the one who picks.
+          </p>
+        </div>
 
         {/* ------------------------- controls ------------------------- */}
-        <div className="mt-8 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-wide">
+        <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4 font-mono text-[10px] uppercase tracking-wide">
           <span className="mr-1 text-ink-faint">window</span>
           {WINDOWS.map((n) => (
             <button key={n} onClick={() => setDays(n)}

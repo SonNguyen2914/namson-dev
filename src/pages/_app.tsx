@@ -1,4 +1,8 @@
 import "@/styles/globals.css";
+// Archivo Variable (width axis included) from fontsource — bundled files,
+// same no-build-time-fetch rule as the geist package below. It is the
+// board's display voice: wordmark, column names, team names.
+import "@fontsource-variable/archivo/wdth.css";
 import type { AppProps } from "next/app";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
