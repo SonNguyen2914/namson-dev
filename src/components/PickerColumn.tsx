@@ -28,7 +28,7 @@
 // column does, rather than a hand-copied one free to drift from it.
 import Link from "next/link";
 import { useState } from "react";
-import { TZ, fmtDate } from "../lib/matchday";
+import { dayLabel, fmtDate, localDay } from "../lib/matchday";
 import {
   BoardRefusal, BoardRow, LeagueMeta, leagueLabel,
 } from "../lib/pickerApi";
@@ -110,17 +110,6 @@ function RankDumbbell({ row, clubCount }: { row: BoardRow; clubCount: number }) 
         style={{ left: `${b}%` }} />
     </span>
   );
-}
-
-/** The fixture's DAY in the board's one fixed zone — the grouping key
- *  and the divider label for kickoff-sorted columns. */
-function dayOf(iso: string): { key: string; label: string } {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return { key: "?", label: "date unknown" };
-  const key = d.toLocaleDateString("en-CA", { timeZone: TZ });
-  const label = d.toLocaleDateString("en-US", {
-    timeZone: TZ, weekday: "long", month: "short", day: "numeric" });
-  return { key, label };
 }
 
 /** One match card. `rank` is the row's position under the column's
@@ -308,7 +297,7 @@ function RefusalRow({ r }: { r: BoardRefusal }) {
 }
 
 export function LeagueColumn({
-  slug, meta, rows, refusals, days, review,
+  slug, meta, rows, refusals, days, dayKeys, review,
 }: {
   slug: string;
   /** absent when the payload never mentioned this league at all */
@@ -316,6 +305,10 @@ export function LeagueColumn({
   rows: BoardRow[];
   refusals: BoardRefusal[];
   days: number;
+  /** the BOARD's ordered matchday keys (union across every column).
+   *  The page computes them once so all four columns share the same
+   *  band tracks — the whole point of day-major alignment. */
+  dayKeys: string[];
   /** the finished tail's slice of this league. A SEPARATE payload on a
    *  separate fetch: the board is a 90s sweep of what is coming, the
    *  review is a long-cached read of matches that cannot change again.
@@ -337,8 +330,18 @@ export function LeagueColumn({
   // missing or throwing localStorage and answers the default.
   const [sort, setSort] = useState<ColumnSort>(() => loadColumnSort(slug));
   const mode = modeById(sort.mode) ?? modeById(DEFAULT_SORT.mode)!;
-  const sorted = sortRows(rows, sort);
+  // DAY-MAJOR (operator, 2026-09-01): the matchday is the board's primary
+  // structure and the chosen sort ranks WITHIN each day. Rank badges
+  // restart per day, so 01 always means "this day's best under your
+  // sort" — the number the operator actually picks with at night.
+  const byDay = dayKeys.map((k) => ({
+    key: k,
+    rows: sortRows(rows.filter((r) => localDay(r.kickoff) === k), sort),
+  }));
   const nullNote = nullNoteFor(mode, rows);
+  // the subgrid track plan, shared with the page: row 1 header, then
+  // per day a label track + a content track, then refusals, then tail
+  const trackCount = 2 * dayKeys.length + 3;
 
   const apply = (next: ColumnSort) => {
     setSort(next);
@@ -349,9 +352,10 @@ export function LeagueColumn({
     <section data-testid="league-col" data-league={slug}
       id={`picker-col-${slug}`}
       aria-label={`${leagueLabel(slug)} column`}
-      style={{ ["--lg" as string]: hueOf(slug) }}
-      className="min-w-0 scroll-mt-16">
-      <header className="border-b border-line pb-3">
+      style={{ ["--lg" as string]: hueOf(slug),
+        ["--tracks" as string]: String(trackCount) }}
+      className="min-w-0 scroll-mt-16 xl:grid xl:content-start xl:[grid-template-rows:subgrid] xl:[grid-row:1/span_var(--tracks)]">
+      <header className="self-start border-b border-line pb-3 xl:[grid-row:1]">
         {/* the league's own light — a 2px rail, wayfinding only */}
         <div aria-hidden
           className="mb-2 h-[2px] rounded-full opacity-80 [background:var(--lg)]" />
@@ -450,37 +454,37 @@ export function LeagueColumn({
         )}
       </header>
 
-      {sorted.length > 0 ? (
-        <div className="mt-3 space-y-3">
-          {/* DAY DIVIDERS, kickoff sort only (operator ask, 2026-09-01).
-              Under kickoff the column is a schedule and the dividers are
-              true; under any ranking sort it is a ladder, and slicing a
-              ladder by date would misstate the order the page claims. */}
-          {sorted.map((r, i) => {
-            const divider = mode.id === "kickoff"
-              && (i === 0
-                || dayOf(r.kickoff).key !== dayOf(sorted[i - 1].kickoff).key);
-            return (
-              <div key={`${r.league}-${r.event_id}`} className="space-y-3">
-                {divider && (
-                  <div data-testid="day-divider"
-                    className="flex items-center gap-2 pt-1 first:pt-0">
-                    <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-low">
-                      {dayOf(r.kickoff).label}
-                    </span>
-                    <span aria-hidden className="h-px flex-1 bg-line" />
-                  </div>
-                )}
-                <RowCard row={r} rank={i + 1}
-                  modeId={mode.id} clubCount={meta?.clubs ?? 0} />
-              </div>
-            );
-          })}
-        </div>
-      ) : meta?.error ? null : (
+      {/* ── MATCHDAY BANDS. Each day owns a shared subgrid track, so a
+          date's fixtures sit at the same height in every column — the
+          alignment the operator asked for. The band's date is drawn
+          once, full-width, by the page (xl); below xl each column keeps
+          its own compact divider so a stacked layout still says the
+          date. A day this league does not play leaves its track to the
+          columns that do. */}
+      {byDay.map(({ key, rows: dayRows }, di) =>
+        dayRows.length === 0 ? null : (
+          <div key={key}
+            style={{ ["--r" as string]: String(3 + 2 * di) }}
+            className="mt-3 space-y-3 xl:mt-0 xl:self-start xl:pb-4 xl:[grid-row:var(--r)]">
+            <div data-testid="day-divider"
+              className="flex items-center gap-2 xl:hidden">
+              <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-low">
+                {dayLabel(dayRows[0].kickoff)}
+              </span>
+              <span aria-hidden className="h-px flex-1 bg-line" />
+            </div>
+            {dayRows.map((r, i) => (
+              <RowCard key={`${r.league}-${r.event_id}`} row={r} rank={i + 1}
+                modeId={mode.id} clubCount={meta?.clubs ?? 0} />
+            ))}
+          </div>
+        ))}
+      {rows.length === 0 && !meta?.error && (
         // an empty column SAYS SO — a failed league (above) is a different
         // fact and must not be dressed as a quiet weekend
-        <div data-testid="col-empty" className="mt-3 rounded-xl border border-line p-4">
+        <div data-testid="col-empty"
+          style={{ ["--r" as string]: "3" }}
+          className="mt-3 self-start rounded-xl border border-line p-4 xl:mt-0 xl:[grid-row:var(--r)]">
           <p className="text-sm text-ink-mid">
             No {leagueLabel(slug)} fixtures in the next {days} day{days === 1 ? "" : "s"}.
           </p>
@@ -489,7 +493,8 @@ export function LeagueColumn({
 
       {refusals.length > 0 && (
         <div data-testid="refusals"
-          className="mt-4 rounded-xl border border-warn/25 bg-warn/5 p-3">
+          style={{ ["--r" as string]: String(2 + 2 * dayKeys.length) }}
+          className="mt-4 self-start rounded-xl border border-warn/25 bg-warn/5 p-3 xl:mt-4 xl:[grid-row:var(--r)]">
           <Eyebrow tone="warn">
             refused · {refusals.length} fixture{refusals.length === 1 ? "" : "s"}
           </Eyebrow>
@@ -512,10 +517,14 @@ export function LeagueColumn({
           Last in the column, after the upcoming fixtures AND after the
           refusals that belong to them, so this league's forward story is
           complete before the backward one starts. */}
-      <ReviewTail slug={slug} back={review.back}
-        rows={review.rows} refusals={review.refusals} meta={review.meta}
-        loading={review.loading} error={review.error}
-        storeNote={review.storeNote} />
+      <div className="xl:self-start xl:[grid-row:var(--r)]"
+        style={{ ["--r" as string]: String(3 + 2 * dayKeys.length) }}
+        data-slot="tail-track">
+        <ReviewTail slug={slug} back={review.back}
+          rows={review.rows} refusals={review.refusals} meta={review.meta}
+          loading={review.loading} error={review.error}
+          storeNote={review.storeNote} />
+      </div>
     </section>
   );
 }

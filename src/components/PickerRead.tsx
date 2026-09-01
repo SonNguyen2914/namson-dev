@@ -199,11 +199,17 @@ export function TierGaps({ read }: { read: ReadLike }) {
         </span>
         <ShapeChip shape={read.shape} />
         <span
-          className="font-mono text-[10px] tabular-nums text-ink-low"
-          title="tier pairs, favourite v opponent: overall · attack · defence">
-          {read.tiers.ovr[0]}v{read.tiers.ovr[1]} ·{" "}
-          {read.tiers.atk[0]}v{read.tiers.atk[1]} ·{" "}
-          {read.tiers.def[0]}v{read.tiers.def[1]}
+          className="inline-flex items-end gap-2.5 font-mono text-[10px] tabular-nums text-ink-low"
+          title="tier pairs, favourite v opponent">
+          {([["ovr", read.tiers.ovr], ["atk", read.tiers.atk],
+             ["def", read.tiers.def]] as const).map(([lbl, pr]) => (
+            <span key={lbl} className="inline-flex flex-col items-center gap-[2px] leading-none">
+              <span className="text-[7.5px] uppercase tracking-[0.12em] text-ink-faint">
+                {lbl}
+              </span>
+              <span>{pr[0]}v{pr[1]}</span>
+            </span>
+          ))}
         </span>
         <button data-testid="tier-read" aria-expanded={open}
           aria-label="how to read this shape"

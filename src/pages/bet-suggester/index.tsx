@@ -55,7 +55,7 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
-import { TZ } from "../../lib/matchday";
+import { TZ, dayLabel, localDay } from "../../lib/matchday";
 import {
   Board, PICKER_LEAGUE_ORDER, SEASON_BLEND_K, THIN_ASK_SIZE,
   WIDE_SPREAD_C, fetchBoard, leagueLabel,
@@ -208,6 +208,18 @@ export default function PickerBoard() {
   // rather than in a column of its own (backend 2026-09-01). `?? league`
   // keeps an older payload rendering exactly as it did.
   const colOf = (r: { column?: string; league: string }) => r.column ?? r.league;
+
+  // MATCHDAY BANDS (operator, 2026-09-01): the board is day-major. One
+  // ordered union of day keys, computed here so every column lays its
+  // groups on the SAME subgrid tracks — that is what aligns a date's
+  // fixtures across all four leagues.
+  const dayKeys = [...new Set(rows.map((r) => localDay(r.kickoff)))]
+    .filter(Boolean).sort();
+  const dayLabelFor = new Map<string, string>();
+  for (const r of rows) {
+    const k = localDay(r.kickoff);
+    if (k && !dayLabelFor.has(k)) dayLabelFor.set(k, dayLabel(r.kickoff));
+  }
 
   const columnSlugs = [
     ...PICKER_LEAGUE_ORDER,
@@ -384,7 +396,7 @@ export default function PickerBoard() {
               Ranked by table gap
             </h2>
             <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
-              per column · |GD/g gap| descending by default · no cut-off
+              matchday bands · |GD/g gap| descending within each day · no cut-off
             </p>
           </div>
 
@@ -425,9 +437,17 @@ export default function PickerBoard() {
               {/* Every column's content flows at its natural height — no
                   inner scrollers: a row below a fold that only scrolls
                   inside a box is a row most readers never see. */}
-              <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2 xl:grid-cols-4">
+              {/* The columns are subgrids over shared row tracks: row 1
+                  headers, then per matchday a label track + a content
+                  track, then refusals, then the finished tails. At xl
+                  the date is drawn ONCE per band, full-width, by the
+                  label items below (placed by explicit grid-row, so DOM
+                  order keeps mobile sane); under xl each column carries
+                  its own compact divider instead. */}
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4 xl:gap-y-2">
                 {columnSlugs.map((slug) => (
                   <LeagueColumn key={slug} slug={slug} days={days}
+                    dayKeys={dayKeys}
                     meta={leaguesMap[slug]}
                     rows={rows.filter((r) => colOf(r) === slug)}
                     refusals={refusals.filter((r) => colOf(r) === slug)}
@@ -438,6 +458,16 @@ export default function PickerBoard() {
                       back, loading: reviewLoading, error: reviewError,
                       storeNote,
                     }} />
+                ))}
+                {dayKeys.map((k, i) => (
+                  <div key={k} data-testid="day-band" aria-hidden
+                    style={{ gridRow: 2 + 2 * i, gridColumn: "1 / -1" }}
+                    className="hidden items-center gap-3 pt-5 xl:flex">
+                    <span className="whitespace-nowrap font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-mid">
+                      {dayLabelFor.get(k) ?? k}
+                    </span>
+                    <span className="h-px flex-1 bg-line-strong" />
+                  </div>
                 ))}
               </div>
             </>
@@ -457,9 +487,10 @@ export default function PickerBoard() {
               <dd className="mt-1">
                 Stage 1, all three signed from the favourite&apos;s side. The
                 favourite is whichever club has the better whole-league derived
-                rank; conferences and groups are deliberately ignored. Each
-                column opens ordered by the absolute GD/g gap and by nothing
-                else.
+                rank; conferences and groups are deliberately ignored. The
+                board is grouped by MATCHDAY first — one date&apos;s fixtures
+                align across all four leagues — and each column opens ordered
+                by the absolute GD/g gap within each day, by nothing else.
               </dd>
             </div>
             <div>

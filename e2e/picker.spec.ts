@@ -32,7 +32,13 @@ const json = (body: unknown, status = 200) => ({
 });
 
 function inHours(h: number) {
-  return new Date(Date.now() + h * 3600_000).toISOString();
+  // DETERMINISTIC and SAME-PT-DAY (2026-09-01): the board went
+  // day-major, so relative-to-now kickoffs that straddle PT midnight
+  // made every order assertion flaky. Base = midnight PT on a fixed
+  // future date; h maps to 25-minute steps so every historical h value
+  // (2..50) stays inside one matchday while chronology is preserved.
+  const base = Date.UTC(2026, 11, 10, 8, 0, 0);
+  return new Date(base + h * 25 * 60_000).toISOString();
 }
 
 const LEAGUES = {

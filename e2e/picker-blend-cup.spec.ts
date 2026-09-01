@@ -37,8 +37,13 @@ const json = (body: unknown, status = 200) => ({
   body: JSON.stringify(body),
 });
 
-const inHours = (h: number) =>
-  new Date(Date.now() + h * 3600_000).toISOString();
+const inHours = (h: number) => {
+  // deterministic + day-major aware: 25-minute steps from midnight PT on
+  // a fixed date, so h<=32 is one matchday and h=80 lands on the next —
+  // exactly what the band tests need, run at any wall-clock time
+  const base = Date.UTC(2026, 11, 15, 8, 0, 0);
+  return new Date(base + h * 25 * 60_000).toISOString();
+};
 
 const weights = (home: number, away: number,
                  basis: [string, string] = ["blend", "blend"]) => ({
@@ -542,8 +547,8 @@ test("a league fixture gets no competition badge", async ({ page }) => {
 // be sliced by a key it is not ordered by.
 // ---------------------------------------------------------------------
 
-test("kickoff sort splits the column by day; ranking sorts never do", async ({ page }) => {
-  // a hermetic two-day column: same row twice, 72 hours apart
+test("the board is day-major: bands under every sort, ranks restart per day", async ({ page }) => {
+  // a hermetic two-day column: a second fixture on the NEXT matchday
   const dayTwo = {
     ...EARLY, event_id: "mx-day2", competition_id: "mx-day2",
     home: "Tigres UANL", away: "Necaxa", favourite: "Tigres UANL",
@@ -552,14 +557,29 @@ test("kickoff sort splits the column by day; ranking sorts never do", async ({ p
   await open(page, { ...BOARD, rows: [EARLY, dayTwo] });
   const ligamx = col(page, "ligamx");
   await expect(ligamx.locator('[data-testid="picker-row"]')).toHaveCount(2);
-  // default |GD/g| ladder: no dividers anywhere
-  await expect(ligamx.locator('[data-testid="day-divider"]')).toHaveCount(0);
-  await ligamx.getByTestId("col-sort").selectOption("kickoff");
-  // two days, two headers, and the first one leads the column
+  // day-major is the PRIMARY structure: the bands are there under the
+  // default |GD/g| sort, not just under kickoff
   const dividers = ligamx.locator('[data-testid="day-divider"]');
   await expect(dividers).toHaveCount(2);
-  await expect(dividers.first()).toBeVisible();
-  // back to a ranking sort: the ladder is whole again
-  await ligamx.getByTestId("col-sort").selectOption("gdg");
-  await expect(ligamx.locator('[data-testid="day-divider"]')).toHaveCount(0);
+  // ...and the rank badge restarts per day: each day's best is 01
+  const ranks = ligamx.getByTestId("row-rank");
+  await expect(ranks.nth(0)).toHaveText("01");
+  await expect(ranks.nth(1)).toHaveText("01");
+  // the chosen sort still ranks WITHIN each day — switching it must
+  // never move a fixture across its matchday
+  await ligamx.getByTestId("col-sort").selectOption("ask");
+  await expect(ligamx.locator('[data-testid="day-divider"]')).toHaveCount(2);
+  const events = ligamx.getByTestId("picker-row");
+  await expect(events.nth(0)).toHaveAttribute("data-event", EARLY.event_id);
+  await expect(events.nth(1)).toHaveAttribute("data-event", "mx-day2");
+});
+
+test("at desktop width a date is one full-width band across every league", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await open(page);
+  // the page draws each matchday's label ONCE, spanning the board; the
+  // per-column dividers yield to it at this width
+  const bands = page.getByTestId("day-band");
+  await expect(bands.first()).toBeVisible();
+  expect(await bands.count()).toBeGreaterThanOrEqual(1);
 });
