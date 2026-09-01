@@ -471,3 +471,57 @@ test("the five columns stack on a phone with no horizontal overflow",
       document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
   });
+
+// ---------------------------------------------------------------------
+// The fold: a cup fixture whose two clubs share a league is drawn in
+// THAT league's column, and the cup column stops being drawn at all.
+// (2026-09-01. The Leagues Cup reached its semi-finals as an all-Liga MX
+// tournament, so a whole column stood empty-but-for-two beside four full
+// ones while Liga MX's own table described both fixtures completely.)
+// ---------------------------------------------------------------------
+
+const FOLDED_BOARD = {
+  ...BOARD,
+  // the four leagues only — the backend drops a cup column no row claims
+  leagues: Object.fromEntries(
+    Object.entries(LEAGUES).filter(([k]) => k !== "leaguescup")),
+  rows: [
+    { ...TOLUCA, column: "ligamx" },
+    { ...AMERICA, column: "ligamx" },
+  ],
+  folded: {
+    leaguescup: { kind: "cup", rated_on: ["mls", "ligamx"],
+                  folded_into: ["ligamx"], fixtures: 2 },
+  },
+};
+
+test("a same-league cup tie is drawn in that league's column, and the cup column is gone", async ({ page }) => {
+  await open(page, FOLDED_BOARD);
+  await expect(col(page, "leaguescup")).toHaveCount(0);
+  const ligamx = col(page, "ligamx");
+  await expect(ligamx).toBeVisible();
+  await expect(ligamx.locator('[data-testid="picker-row"]')).toHaveCount(2);
+  await expect(ligamx.getByText("Toluca", { exact: false }).first())
+    .toBeVisible();
+});
+
+test("a folded row still says which competition it is", async ({ page }) => {
+  // the whole reason the fold is safe: these legs settle on 90 minutes
+  // plus stoppage, so a card that read as a plain Liga MX fixture would
+  // carry a wrong assumption straight into the price.
+  await open(page, FOLDED_BOARD);
+  const row = col(page, "ligamx").locator('[data-testid="picker-row"]').first();
+  await expect(row.locator('[data-testid="competition-badge"]'))
+    .toHaveText(/leagues cup/i);
+  await expect(row).toHaveAttribute("data-league", "leaguescup");
+  await expect(row).toHaveAttribute("data-column", "ligamx");
+});
+
+test("a league fixture gets no competition badge", async ({ page }) => {
+  // the badge must mark the exception, not decorate every card
+  await open(page);
+  const anyLeagueRow = col(page, "ligamx")
+    .locator('[data-testid="picker-row"]').first();
+  await expect(anyLeagueRow.locator('[data-testid="competition-badge"]'))
+    .toHaveCount(0);
+});
