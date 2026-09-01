@@ -244,7 +244,7 @@ test("every cup row served is drawn, and Wednesday's two semis carry the full ca
     await expect(toluca).toContainText("+1.39");     // GD/g gap
     await expect(toluca).toContainText("+0.69");     // ppg gap
     await expect(toluca).toContainText("+10");       // rank gap
-    await expect(toluca.getByTestId("gap-chip")).toHaveCount(3);
+    await expect(toluca.getByTestId("tier-cell")).toHaveCount(3);
     await expect(toluca.getByTestId("gap-note")).toHaveCount(0);
     await expect(toluca.getByTestId("rated-in")).toHaveCount(0);
     await expect(toluca).toContainText("ask 54¢");
@@ -277,8 +277,13 @@ test("a cross-league cup fixture withholds its gaps, says why, and keeps its tie
       .toHaveText("MLS v Liga MX");
     // the tiers survive — they are within-league quintiles, which is
     // exactly the property that makes the comparison possible
-    await expect(cross.getByTestId("gap-chip")).toHaveCount(3);
+    await expect(cross.getByTestId("tier-cell")).toHaveCount(3);
+    // the overall cell is a glyph now — the exact pair lives in the
+    // popover, same words as ever
     await expect(cross.locator('[data-dim="overall"]'))
+      .toHaveAttribute("data-gap", "-1");
+    await cross.getByTestId("tier-read").click();
+    await expect(cross.getByTestId("shape-read"))
       .toContainText("T2 v T1 −1");
   });
 

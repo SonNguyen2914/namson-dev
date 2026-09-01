@@ -316,21 +316,27 @@ test("the column leader's LEVEL defence is visible without reading a number",
     // it leads its column on the table gap
     await expect(top).toContainText("+1.63");
     await expect(top.getByTestId("row-rank")).toHaveText("01");
-    // …and the three tier gaps are drawn SEPARATELY, each with its own
-    // signed value and its own word, so the defence one cannot pass for
-    // a small positive at a glance
-    const chips = top.getByTestId("gap-chip");
-    await expect(chips).toHaveCount(3);
-    const attack = chips.and(top.locator('[data-dim="attack"]'));
-    const defence = chips.and(top.locator('[data-dim="defence"]'));
-    await expect(attack).toContainText("T1 v T4 +3");
-    await expect(attack).toContainText("ahead");
-    await expect(defence).toContainText("T1 v T1 +0");
-    await expect(defence).toContainText("level");
-    await expect(defence).toHaveAttribute("data-gap", "0");
-    // the plain-English read says where the gap actually is
-    await expect(top.getByText(/the tier gap is attack \+3/i)).toBeVisible();
-    await expect(top.getByText(/level in defence \(T1 v T1\)/i)).toBeVisible();
+    // …and the three tier dimensions are drawn SEPARATELY as cells —
+    // fill AND colour both encode the sign (2026-09-01 convergence), so
+    // the level defence (amber half-cell) cannot pass for a small
+    // positive with or without the hues
+    const cells = top.getByTestId("tier-cell");
+    await expect(cells).toHaveCount(3);
+    await expect(cells.and(top.locator('[data-dim="defence"]')))
+      .toHaveAttribute("data-gap", "0");
+    await expect(cells.and(top.locator('[data-dim="attack"]')))
+      .toHaveAttribute("data-gap", "3");
+    // the exact pairs stay on the card…
+    await expect(top).toContainText("T1v T4".replace(" ", "") === "T1vT4"
+      ? "1v4" : "1v4");
+    // …and the plain-English read is one deliberate click away, still
+    // in shapeRead()'s own words, with the per-dimension detail
+    await top.getByTestId("tier-read").click();
+    const read = top.getByTestId("shape-read");
+    await expect(read.getByText(/the tier gap is attack \+3/i)).toBeVisible();
+    await expect(read.getByText(/level in defence \(T1 v T1\)/i)).toBeVisible();
+    await expect(read).toContainText("T1 v T4 +3");
+    await expect(read).toContainText("level");
   });
 
 test("a hollow row is marked differently from a clean one", async ({ page }) => {
@@ -340,14 +346,23 @@ test("a hollow row is marked differently from a clean one", async ({ page }) => 
   const clean = page.getByTestId("picker-row").filter({ hasText: "Arsenal" });
   await expect(hollow).toHaveAttribute("data-shape", "HOLLOW");
   await expect(clean).toHaveAttribute("data-shape", "CLEAN");
-  // the shape is on screen as a word, and the hollow row says WHY in
-  // words — a shape chip alone is a code, not a read
+  // the shape is on screen as a word, and the WHY is one click away in
+  // shapeRead()'s own words — the cells beside the word already draw
+  // where the gap is, dimension by dimension
   await expect(hollow.getByText("HOLLOW", { exact: true })).toBeVisible();
   await expect(clean.getByText("CLEAN", { exact: true })).toBeVisible();
-  await expect(hollow.getByText(/high on the table gap, but/i)).toBeVisible();
-  await expect(hollow.getByText(/behind in defence/i)).toBeVisible();
-  await expect(clean.getByText(/better tier overall, in attack and in defence/i))
+  await hollow.getByTestId("tier-read").click();
+  await expect(
+    hollow.getByTestId("shape-read").getByText(/high on the table gap, but/i))
     .toBeVisible();
+  await expect(
+    hollow.getByTestId("shape-read").getByText(/behind in defence/i))
+    .toBeVisible();
+  await hollow.getByTestId("tier-read").click();   // closes again
+  await expect(hollow.getByTestId("shape-read")).toHaveCount(0);
+  await clean.getByTestId("tier-read").click();
+  await expect(clean.getByTestId("shape-read")
+    .getByText(/better tier overall, in attack and in defence/i)).toBeVisible();
 });
 
 test("prior-season rating is a banner, not a footnote", async ({ page }) => {

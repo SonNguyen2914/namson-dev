@@ -18,6 +18,7 @@
 //  - A MISSING PRICE IS A FACT WITH A NAME. "no kalshi event" and
 //    "listed · no quote" are different failures and never collapse into
 //    one blank.
+import { useState } from "react";
 import {
   BlendWeights, KalshiQuote, Shape, TierPair, THIN_ASK_SIZE, WIDE_SPREAD_C,
   pctThisSeason, weightIsCurrent,
@@ -78,33 +79,21 @@ export function shapeRead(r: ReadLike): string {
   return `Split — the tier gap is ${strong.join(" and ")}; ${flat.join(" and ")}.`;
 }
 
-/** A signed tier gap, drawn so a zero cannot be mistaken for a small
- *  positive. Positive is the accent; LEVEL is amber and dashed; behind
- *  is the negative ink. */
-export function GapChip({ label, gap, tiers }: {
-  label: string; gap: number; tiers: TierPair;
-}) {
-  // ONE TRAFFIC LIGHT, PLATFORM-WIDE (operator call, 2026-09-01):
-  // green = ahead, amber = level, red = behind. Gold stopped meaning
-  // "good" the day it became the brand; a verdict and a brand sharing a
-  // hue made both weaker.
-  const tone =
-    gap > 0 ? "border-up/40 bg-up/5 text-up"
-    : gap === 0 ? "border-dashed border-warn/50 bg-warn/5 text-warn"
-    : "border-neg/40 bg-neg/5 text-neg";
+/** One tier dimension as a CELL (2026-09-01 convergence to the
+ *  approved mockup): fill and colour say the same thing twice — green
+ *  filled = ahead, amber half = level, red empty = behind — so a level
+ *  defence cannot pass for a small positive at a glance, with or
+ *  without the hues. data-dim/data-gap stay machine-readable. */
+export function TierCell({ label, gap }: { label: string; gap: number }) {
+  const cls =
+    gap > 0 ? "bg-up border-up"
+    : gap === 0
+      ? "border-warn [background:linear-gradient(90deg,var(--warn)_50%,transparent_50%)]"
+      : "border-neg bg-transparent";
   return (
-    <span data-testid="gap-chip" data-dim={label} data-gap={gap}
-      className={`inline-flex min-w-[6.5rem] flex-col rounded-md border px-2 py-1 ${tone}`}>
-      <span className="font-mono text-[9px] uppercase tracking-[0.18em] opacity-70">
-        {label}
-      </span>
-      <span className="mt-0.5 font-mono text-[11px] tabular-nums">
-        {pair(tiers)} <span className="font-semibold">{sign(gap)}</span>
-      </span>
-      <span className="font-mono text-[9px] uppercase tracking-[0.14em] opacity-70">
-        {gapWord(gap)}
-      </span>
-    </span>
+    <i data-testid="tier-cell" data-dim={label} data-gap={gap}
+      title={`${label}: ${gapWord(gap)}`}
+      className={`inline-block h-[8px] w-[8px] rounded-[2px] border ${cls}`} />
   );
 }
 
@@ -157,11 +146,18 @@ export function GapNote({ note }: { note: string }) {
  *  The Leagues Cup legs are regulation time only, so a price beside a
  *  knockout fixture is not the price of going through. */
 export function RegTimeNote({ note }: { note: string }) {
+  // Collapsed to its headline (2026-09-01): 340 characters repeated on
+  // every cup card had become wallpaper. The summary line keeps the
+  // load-bearing fact — REGULATION TIME ONLY — permanently visible; the
+  // backend's full wording is one click away, not gone.
   return (
-    <p data-testid="reg-time-note"
-      className="mt-2 rounded-md border border-skylive/30 bg-skylive/5 px-2.5 py-2 text-[11px] leading-relaxed text-skylive">
-      {note}
-    </p>
+    <details data-testid="reg-time-note"
+      className="mt-2 rounded-md border border-skylive/30 bg-skylive/5 px-2.5 py-1.5 text-[11px] leading-relaxed text-skylive">
+      <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.1em] marker:text-skylive/60">
+        regulation time only — the price is 90 minutes, not the tie
+      </summary>
+      <p className="mt-1.5">{note}</p>
+    </details>
   );
 }
 
@@ -179,20 +175,70 @@ export function ShapeChip({ shape }: { shape: Shape }) {
   );
 }
 
-/** The three tier gaps and the shape, with the sentence beside them. */
+/** The Stage-2 read, compact (2026-09-01): three cells + the shape
+ *  word + the exact tier pairs on one line, with the plain-English
+ *  sentence and the per-dimension detail one click away. Everything the
+ *  old three-chip block said is still said — the sentence in the
+ *  popover is the same shapeRead(), word for word — it just stops
+ *  costing 70px on every card. Shared by the board card and the
+ *  finished tail, so both surfaces converge together. */
 export function TierGaps({ read }: { read: ReadLike }) {
+  const [open, setOpen] = useState(false);
+  const dims = [
+    ["overall", read.tier_gaps.ovr, read.tiers.ovr],
+    ["attack", read.tier_gaps.atk, read.tiers.atk],
+    ["defence", read.tier_gaps.def, read.tiers.def],
+  ] as const;
   return (
-    <>
-      <div className="flex flex-wrap items-center gap-2">
-        <GapChip label="overall" gap={read.tier_gaps.ovr} tiers={read.tiers.ovr} />
-        <GapChip label="attack" gap={read.tier_gaps.atk} tiers={read.tiers.atk} />
-        <GapChip label="defence" gap={read.tier_gaps.def} tiers={read.tiers.def} />
+    <div className="relative">
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+        <span className="inline-flex items-center gap-[3px]">
+          {dims.map(([label, gap]) => (
+            <TierCell key={label} label={label} gap={gap} />
+          ))}
+        </span>
         <ShapeChip shape={read.shape} />
+        <span
+          className="font-mono text-[10px] tabular-nums text-ink-low"
+          title="tier pairs, favourite v opponent: overall · attack · defence">
+          {read.tiers.ovr[0]}v{read.tiers.ovr[1]} ·{" "}
+          {read.tiers.atk[0]}v{read.tiers.atk[1]} ·{" "}
+          {read.tiers.def[0]}v{read.tiers.def[1]}
+        </span>
+        <button data-testid="tier-read" aria-expanded={open}
+          aria-label="how to read this shape"
+          onClick={(e) => {
+            e.preventDefault(); e.stopPropagation(); setOpen((o) => !o);
+          }}
+          className={`ml-auto inline-flex h-[15px] w-[15px] items-center justify-center rounded-full border font-mono text-[9px] transition-colors ${
+            open ? "border-accent/60 text-accent"
+              : "border-line-strong text-ink-low hover:border-accent/40 hover:text-accent"}`}>
+          i
+        </button>
       </div>
-      <p className="mt-2 text-xs leading-relaxed text-ink-low">
-        {shapeRead(read)}
-      </p>
-    </>
+      {open && (
+        <div data-testid="shape-read"
+          className="absolute right-0 top-6 z-10 w-64 rounded-lg border border-line-strong bg-elev2 p-3 text-[11px] leading-relaxed text-ink-mid shadow-xl">
+          <p>{shapeRead(read)}</p>
+          <div className="mt-2 space-y-0.5 border-t border-line pt-2 font-mono text-[10px]">
+            {dims.map(([label, gap, tiers]) => (
+              <p key={label} className="flex justify-between gap-3">
+                <span className="uppercase tracking-[0.1em] text-ink-low">
+                  {label}
+                </span>
+                <span className={
+                  gap > 0 ? "text-up" : gap === 0 ? "text-warn" : "text-neg"}>
+                  {pair(tiers)} {sign(gap)} · {gapWord(gap)}
+                </span>
+              </p>
+            ))}
+          </div>
+          <p className="mt-2 border-t border-line pt-2 text-[10px] text-ink-low">
+            Tiers are within-league quintiles; annotation, never a veto.
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
 
