@@ -114,6 +114,27 @@ function RankDumbbell({ row, clubCount }: { row: BoardRow; clubCount: number }) 
   );
 }
 
+/** Last-≤5 results as five tiny cells — the same traffic light as the
+ *  rest of the board (W green, L red) with draws NEUTRAL, matching the
+ *  match hubs' form chips: a draw is not a warning. Oldest→newest, so
+ *  the rightmost cell is the latest result; the title spells it out. */
+function FormStrip({ form, name }: { form?: string | null; name: string }) {
+  if (!form) return null;
+  return (
+    <span data-testid="form-strip" aria-hidden
+      title={`${name} — last ${form.length}, oldest→newest: ${form}`}
+      className="ml-1.5 inline-flex flex-none items-center gap-[2px]">
+      {form.split("").map((c, i) => (
+        <i key={i} data-r={c}
+          className={`h-[6px] w-[6px] rounded-[1.5px] ${
+            c === "W" ? "bg-up/80"
+            : c === "L" ? "bg-neg/70"
+            : "bg-line-strong"}`} />
+      ))}
+    </span>
+  );
+}
+
 /** One match card. `rank` is the row's position under the column's
  *  CURRENT sort — the badge follows the reader's chosen order, it does
  *  not fossilise the default one. */
@@ -209,6 +230,7 @@ function RowCard({ row, rank, modeId, clubCount }: {
               title={favHome ? "the favourite is at home" : "the favourite is away"}>
               {favHome ? "H" : "A"}
             </span>
+            <FormStrip form={row.form?.fav} name={row.favourite} />
           </span>
           <span className="mt-0.5 flex min-w-0 items-center gap-2">
             <span aria-hidden
@@ -216,6 +238,7 @@ function RowCard({ row, rank, modeId, clubCount }: {
             <span className="truncate text-[12.5px] text-ink-low [font-family:var(--font-archivo)] [font-stretch:96%]">
               <span className="text-ink-faint">vs </span>{row.opponent}
             </span>
+            <FormStrip form={row.form?.opp} name={row.opponent} />
           </span>
         </span>
         <span className="flex-none text-right">

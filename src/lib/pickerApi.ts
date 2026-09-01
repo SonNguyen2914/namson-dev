@@ -73,6 +73,12 @@ export interface BoardRow {
    *  withheld exactly because neither table can host it. Optional so an
    *  older payload still renders. */
   column?: string;
+  /** Last-≤5 results per side — "WDLWW", oldest→newest, each club's own
+   *  perspective, derived server-side from a past scoreboard sweep.
+   *  null/absent when the sweep knows nothing of the club (early
+   *  season, new competition) — a blank is a fact, not an empty
+   *  string, and an older payload simply has no strips. */
+  form?: { fav?: string | null; opp?: string | null } | null;
   home: string;
   away: string;
   favourite: string;

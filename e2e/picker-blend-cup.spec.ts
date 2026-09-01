@@ -685,3 +685,32 @@ test("a league's empty matchday says rest day and names its next fixture", async
   await expect(col(page, "epl").getByTestId("col-empty")).toBeVisible();
   await expect(col(page, "epl").getByTestId("rest-day")).toHaveCount(0);
 });
+
+// -------------------------------------------------- form strips --------
+
+test("form strips draw last results per side; absent form draws nothing", async ({ page }) => {
+  const withForm = {
+    ...EARLY,
+    form: { fav: "WDLWW", opp: "LLLLL" },
+  };
+  const without = {
+    ...EARLY, event_id: "mx-noform", competition_id: "mx-noform",
+    home: "Atlas", away: "Juárez", favourite: "Atlas", opponent: "Juárez",
+    kickoff: inHours(10), form: null,
+  };
+  await open(page, { ...BOARD, rows: [withForm, without] });
+  const ligamx = col(page, "ligamx");
+  await expect(ligamx.getByTestId("picker-row")).toHaveCount(2);
+  const first = ligamx.getByTestId("picker-row")
+    .filter({ hasText: EARLY.favourite });
+  const strips = first.getByTestId("form-strip");
+  await expect(strips).toHaveCount(2);         // one per side
+  // five cells each, colour-coded by result: the favourite's newest
+  // (rightmost) is a W, the opponent's whole run is losses
+  await expect(strips.nth(0).locator("i")).toHaveCount(5);
+  await expect(strips.nth(0).locator('i[data-r="W"]')).toHaveCount(3);
+  await expect(strips.nth(1).locator('i[data-r="L"]')).toHaveCount(5);
+  // an older payload (or an unknown club) simply has no strips
+  await expect(ligamx.getByTestId("picker-row")
+    .filter({ hasText: "Atlas" }).getByTestId("form-strip")).toHaveCount(0);
+});
