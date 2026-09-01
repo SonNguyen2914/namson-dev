@@ -501,7 +501,7 @@ test("every sort mode reorders its column, and none of them filters",
   async ({ page }) => {
     await open(page, SORT_BOARD);
     const mls = col(page, "mls");
-    const select = mls.getByTestId("col-sort");
+    const select = page.getByTestId("col-sort");
     for (const [modeId, want] of Object.entries(EXPECTED)) {
       await select.selectOption(modeId);
       await expect.poll(() => orderOf(mls), {
@@ -525,49 +525,51 @@ test("the direction toggle flips the measured rows; no-quote rows sort last both
   async ({ page }) => {
     await open(page, SORT_BOARD);
     const mls = col(page, "mls");
-    await mls.getByTestId("col-sort").selectOption("ask");
+    await page.getByTestId("col-sort").selectOption("ask");
     // the null policy is ON SCREEN while a book key is active
-    await expect(mls.getByTestId("col-null-note"))
+    await expect(page.getByTestId("col-null-note"))
       .toHaveText("no quote sorts last");
-    await expect(mls.getByTestId("col-dir")).toHaveAttribute("data-dir", "asc");
+    await expect(page.getByTestId("col-dir")).toHaveAttribute("data-dir", "asc");
     await expect.poll(() => orderOf(mls))
       .toEqual(["m-alpha", "m-bravo", "m-charlie", "m-delta"]);
-    await mls.getByTestId("col-dir").click();
-    await expect(mls.getByTestId("col-dir")).toHaveAttribute("data-dir", "desc");
+    await page.getByTestId("col-dir").click();
+    await expect(page.getByTestId("col-dir")).toHaveAttribute("data-dir", "desc");
     // the priced rows reverse; the quoteless row is NOT "smallest" or
     // "largest" — it stays last under both directions
     await expect.poll(() => orderOf(mls))
       .toEqual(["m-charlie", "m-bravo", "m-alpha", "m-delta"]);
   });
 
-test("each column sorts independently of the others", async ({ page }) => {
+test("the board sort moves every column together", async ({ page }) => {
+  // sorting lives on the matchday since the C ship (2026-09-01): the
+  // command-bar default applies to all four columns at once, and
+  // per-DAY divergence is the band override's job (picker-blend-cup).
   await open(page, SORT_BOARD);
   const mls = col(page, "mls");
   const laliga = col(page, "laliga");
-  await mls.getByTestId("col-sort").selectOption("kickoff");
+  await page.getByTestId("col-sort").selectOption("kickoff");
   await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.kickoff);
-  // La Liga did not move: same control default, same default order
-  await expect(laliga.getByTestId("col-sort")).toHaveValue("gdg");
+  // La Liga follows the same board sort: chronological too
   await expect.poll(() => orderOf(laliga))
-    .toEqual(["401882903", "401882901"]);
+    .toEqual(["401882901", "401882903"]);
 });
 
-test("a column's sort survives a reload, and reset returns (and forgets) the default",
+test("the board's sort survives a reload, and reset returns (and forgets) the default",
   async ({ page }) => {
     await open(page, SORT_BOARD);
     const mls = col(page, "mls");
-    await mls.getByTestId("col-sort").selectOption("kickoff");
+    await page.getByTestId("col-sort").selectOption("kickoff");
     await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.kickoff);
     await page.reload();
-    await expect(mls.getByTestId("col-sort")).toHaveValue("kickoff");
+    await expect(page.getByTestId("col-sort")).toHaveValue("kickoff");
     await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.kickoff);
     // reset: default order, default control, and the stored choice gone
-    await mls.getByTestId("col-reset").click();
-    await expect(mls.getByTestId("col-sort")).toHaveValue("gdg");
+    await page.getByTestId("col-reset").click();
+    await expect(page.getByTestId("col-sort")).toHaveValue("gdg");
     await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.gdg);
     await page.reload();
-    await expect(mls.getByTestId("col-sort")).toHaveValue("gdg");
-    await expect(mls.getByTestId("col-reset")).toHaveCount(0);
+    await expect(page.getByTestId("col-sort")).toHaveValue("gdg");
+    await expect(page.getByTestId("col-reset")).toHaveCount(0);
   });
 
 test("a browser with no usable storage still renders, and still sorts",
@@ -582,7 +584,7 @@ test("a browser with no usable storage still renders, and still sorts",
     await open(page, SORT_BOARD);
     const mls = col(page, "mls");
     await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.gdg);
-    await mls.getByTestId("col-sort").selectOption("ppg");
+    await page.getByTestId("col-sort").selectOption("ppg");
     await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.ppg);
   });
 
@@ -1561,7 +1563,7 @@ test("the finished tail sorts independently of the column above it",
     const colMls = col(page, "mls");
     const tailMls = tail(page, "mls");
     // move the UPCOMING column: the tail below it does not budge
-    await colMls.getByTestId("col-sort").selectOption("ask");
+    await page.getByTestId("col-sort").selectOption("ask");
     await expect.poll(() => orderOf(colMls)).toEqual(EXPECTED.ask);
     await expect(tailMls.getByTestId("review-sort")).toHaveValue("kickoff");
     await expect.poll(() => tailOrder(tailMls))
@@ -1569,7 +1571,7 @@ test("the finished tail sorts independently of the column above it",
     // move the TAIL: the column above it does not budge either
     await tailMls.getByTestId("review-sort").selectOption("gdg");
     await expect.poll(() => tailOrder(tailMls)).toEqual(REVIEW_EXPECTED.gdg);
-    await expect(colMls.getByTestId("col-sort")).toHaveValue("ask");
+    await expect(page.getByTestId("col-sort")).toHaveValue("ask");
     await expect.poll(() => orderOf(colMls)).toEqual(EXPECTED.ask);
     // and another league's tail kept its own default
     await expect(tail(page, "epl").getByTestId("review-sort"))

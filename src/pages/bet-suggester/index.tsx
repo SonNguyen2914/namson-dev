@@ -63,6 +63,10 @@ import {
 import {
   DEFAULT_BACK, REVIEW_WINDOWS, Review, fetchReview,
 } from "../../lib/pickerReview";
+import {
+  ColumnSort, DEFAULT_SORT, SORT_MODES, isDefaultSort, loadBoardSort,
+  modeById, nullNoteFor, saveBoardSort,
+} from "../../lib/pickerSort";
 import { Eyebrow } from "../../components/ui";
 import { ArchiveMenu } from "../../components/ArchiveMenu";
 import { LeagueColumn } from "../../components/PickerColumn";
@@ -94,6 +98,20 @@ export default function PickerBoard() {
   // window. A dead review must not blank the board, and a slow one must
   // not hold the board's first paint.
   const [back, setBack] = useState(DEFAULT_BACK);
+  // SORT LIVES ON THE MATCHDAY (2026-09-01, draft C shipped): one board
+  // default, remembered on this device, plus per-day overrides that are
+  // session-only — a remembered "Saturday" override would silently
+  // apply to a different Saturday next week. Changing the default
+  // clears every override, so the board never mixes stale intentions.
+  const [boardSort, setBoardSort] = useState<ColumnSort>(() => loadBoardSort());
+  const [daySorts, setDaySorts] = useState<Record<string, ColumnSort>>({});
+  const applyBoardSort = (next: ColumnSort) => {
+    setBoardSort(next);
+    saveBoardSort(next);
+    setDaySorts({});
+  };
+  const applyDaySort = (day: string, next: ColumnSort) =>
+    setDaySorts((prev) => ({ ...prev, [day]: next }));
   const [review, setReview] = useState<Review | null>(null);
   const [reviewError, setReviewError] = useState("");
   const [reviewLoading, setReviewLoading] = useState(true);
@@ -215,11 +233,14 @@ export default function PickerBoard() {
   // fixtures across all four leagues.
   const dayKeys = [...new Set(rows.map((r) => localDay(r.kickoff)))]
     .filter(Boolean).sort();
-  const dayLabelFor = new Map<string, string>();
+  const dayLabelFor: Record<string, string> = {};
   for (const r of rows) {
     const k = localDay(r.kickoff);
-    if (k && !dayLabelFor.has(k)) dayLabelFor.set(k, dayLabel(r.kickoff));
+    if (k && !dayLabelFor[k]) dayLabelFor[k] = dayLabel(r.kickoff);
   }
+  const sortFor = (k: string): ColumnSort => daySorts[k] ?? boardSort;
+  const boardMode = modeById(boardSort.mode) ?? modeById(DEFAULT_SORT.mode)!;
+  const boardNullNote = nullNoteFor(boardMode, rows);
 
   const columnSlugs = [
     ...PICKER_LEAGUE_ORDER,
@@ -303,7 +324,39 @@ export default function PickerBoard() {
 
         {/* ------------------------- controls ------------------------- */}
         <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4 font-mono text-[10px] uppercase tracking-wide">
-          <span className="mr-1 text-ink-faint">window</span>
+          <label htmlFor="board-sort" className="mr-1 text-ink-faint">sort</label>
+          <select id="board-sort" data-testid="col-sort"
+            value={boardSort.mode}
+            onChange={(e) => {
+              const m = modeById(e.target.value) ?? modeById(DEFAULT_SORT.mode)!;
+              applyBoardSort({ mode: m.id, dir: m.defaultDir });
+            }}
+            className="rounded-md border border-line bg-bs px-1.5 py-1 uppercase text-ink-mid outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-accent">
+            {SORT_MODES.map((m) => (
+              <option key={m.id} value={m.id}>{m.label}</option>
+            ))}
+          </select>
+          <button data-testid="col-dir" data-dir={boardSort.dir}
+            onClick={() => applyBoardSort({ ...boardSort,
+              dir: boardSort.dir === "asc" ? "desc" : "asc" })}
+            aria-label={`sort direction ${boardSort.dir === "asc" ? "ascending" : "descending"} — press to flip`}
+            className="rounded-md border border-line px-2 py-1 text-ink-low transition-colors hover:border-line-strong hover:text-ink-hi">
+            {boardSort.dir === "asc" ? "↑ asc" : "↓ desc"}
+          </button>
+          {!isDefaultSort(boardSort) && (
+            <button data-testid="col-reset"
+              onClick={() => applyBoardSort(DEFAULT_SORT)}
+              title="back to the board's default order — |GD/g gap| descending"
+              className="rounded-md border border-line px-2 py-1 text-ink-faint transition-colors hover:border-line-strong hover:text-ink-mid">
+              reset
+            </button>
+          )}
+          {boardNullNote && (
+            <span data-testid="col-null-note" className="text-ink-faint normal-case tracking-normal">
+              {boardNullNote}
+            </span>
+          )}
+          <span className="ml-3 mr-1 text-ink-faint">window</span>
           {WINDOWS.map((n) => (
             <button key={n} onClick={() => setDays(n)}
               aria-pressed={days === n}
@@ -447,7 +500,8 @@ export default function PickerBoard() {
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4 xl:gap-y-2">
                 {columnSlugs.map((slug) => (
                   <LeagueColumn key={slug} slug={slug} days={days}
-                    dayKeys={dayKeys}
+                    dayKeys={dayKeys} sortFor={sortFor}
+                    dayLabels={dayLabelFor}
                     meta={leaguesMap[slug]}
                     rows={rows.filter((r) => colOf(r) === slug)}
                     refusals={refusals.filter((r) => colOf(r) === slug)}
@@ -459,16 +513,53 @@ export default function PickerBoard() {
                       storeNote,
                     }} />
                 ))}
-                {dayKeys.map((k, i) => (
-                  <div key={k} data-testid="day-band" aria-hidden
-                    style={{ gridRow: 2 + 2 * i, gridColumn: "1 / -1" }}
-                    className="hidden items-center gap-3 pt-5 xl:flex">
-                    <span className="whitespace-nowrap font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-mid">
-                      {dayLabelFor.get(k) ?? k}
-                    </span>
-                    <span className="h-px flex-1 bg-line-strong" />
-                  </div>
+                {dayKeys.map((k, i) => i % 2 === 0 ? null : (
+                  <div key={`tint-${k}`} aria-hidden
+                    style={{ gridRow: `${2 + 2 * i} / span 2`,
+                      gridColumn: "1 / -1" }}
+                    className="pointer-events-none hidden rounded-xl bg-[rgba(210,225,255,0.015)] xl:block" />
                 ))}
+                {dayKeys.map((k, i) => {
+                  const ds = sortFor(k);
+                  const overridden = Boolean(daySorts[k]);
+                  return (
+                    <div key={k} data-testid="day-band" data-day={k}
+                      style={{ gridRow: 2 + 2 * i, gridColumn: "1 / -1" }}
+                      className="hidden items-center gap-3 pt-5 xl:flex">
+                      <span className="whitespace-nowrap font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-mid">
+                        {dayLabelFor[k] ?? k}
+                      </span>
+                      <span className="h-px flex-1 bg-line-strong" />
+                      {/* THIS DAY's sort — an override on the board
+                          default, session-only. The label says which it
+                          is, so an overridden band cannot read as the
+                          default order. */}
+                      <span className="font-mono text-[8.5px] uppercase tracking-[0.14em] text-ink-faint">
+                        {overridden ? "this day" : "sort"}
+                      </span>
+                      <select data-testid="band-sort" data-day={k}
+                        value={ds.mode}
+                        onChange={(e) => {
+                          const m = modeById(e.target.value)
+                            ?? modeById(DEFAULT_SORT.mode)!;
+                          applyDaySort(k, { mode: m.id, dir: m.defaultDir });
+                        }}
+                        className="rounded-md border border-line bg-bs px-1.5 py-0.5 font-mono text-[9.5px] uppercase text-ink-mid outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-accent">
+                        {SORT_MODES.map((m) => (
+                          <option key={m.id} value={m.id}>{m.label}</option>
+                        ))}
+                      </select>
+                      <button data-testid="band-dir" data-day={k}
+                        data-dir={ds.dir}
+                        onClick={() => applyDaySort(k, { ...ds,
+                          dir: ds.dir === "asc" ? "desc" : "asc" })}
+                        aria-label={`sort direction for ${dayLabelFor[k] ?? k}: ${ds.dir === "asc" ? "ascending" : "descending"} — press to flip`}
+                        className="rounded-md border border-line px-1.5 py-0.5 font-mono text-[9.5px] text-ink-low transition-colors hover:border-line-strong hover:text-ink-hi">
+                        {ds.dir === "asc" ? "↑" : "↓"}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </>
           )}
@@ -615,16 +706,22 @@ export default function PickerBoard() {
               </dd>
             </div>
             <div>
-              <dt className="text-ink-hi">sorting a column</dt>
+              <dt className="text-ink-hi">sorting the board · sorting a day</dt>
               <dd className="mt-1">
-                Each column sorts on its own: kickoff, the three Stage-1 gaps
-                (by size), the three tier gaps (signed — level and behind sort
-                below ahead), or the book&apos;s ask, spread and depth, each
-                with a direction flip. Sorting is presentation — it reorders
-                the rows a column was served and never hides one. Under the
-                three book keys a row with no quote sorts after every priced
-                row, in both directions, and the column says so. The choice is
-                remembered per league on this device.
+                One sort for the whole board — kickoff, the three Stage-1
+                gaps (by size), the three tier gaps (signed — level and
+                behind sort below ahead), the shape (CLEAN before SPLIT
+                before HOLLOW), or the book&apos;s ask, spread and depth —
+                each with a direction flip, ranking WITHIN each matchday.
+                Any single day can override it from its own band header;
+                overrides last for this visit only, because a remembered
+                &ldquo;Saturday&rdquo; would silently apply to a different
+                Saturday next week, and changing the board default clears
+                them. Sorting is presentation — it reorders the rows a band
+                was served and never hides one; under the three book keys a
+                row with no quote sorts after every priced row, in both
+                directions, and the board says so. The default is remembered
+                on this device.
               </dd>
             </div>
           </dl>

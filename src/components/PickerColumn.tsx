@@ -36,8 +36,7 @@ import {
   ReviewLeagueMeta, ReviewRefusal, ReviewRow,
 } from "../lib/pickerReview";
 import {
-  ColumnSort, DEFAULT_SORT, SORT_MODES, SortModeId, isDefaultSort,
-  loadColumnSort, modeById, nullNoteFor, saveColumnSort, sortRows,
+  ColumnSort, DEFAULT_SORT, SortModeId, modeById, sortRows,
 } from "../lib/pickerSort";
 import {
   GapNote, KalshiCell, RegTimeNote, SeasonWeight, TierGaps, WITHHELD,
@@ -63,7 +62,10 @@ export const hueOf = (slug: string) => LEAGUE_HUE[slug] ?? "var(--lg-cup)";
  *  magnitude); a missing quote says "no quote", a withheld gap says the
  *  board's own word for it. */
 function anchorFor(row: BoardRow, modeId: SortModeId): { v: string; k: string } {
-  const id = modeId === "kickoff" ? "gdg" : modeId;
+  // a time is not a magnitude, and neither is a shape — the shape is
+  // already on the card as its coloured chip, so both keys keep GD/g as
+  // the anchor number
+  const id = modeId === "kickoff" || modeId === "shape" ? "gdg" : modeId;
   switch (id) {
     case "gdg": return { v: dec(row.gdg_gap), k: "GD/g gap" };
     case "ppg": return { v: dec(row.ppg_gap), k: "ppg gap" };
@@ -297,7 +299,7 @@ function RefusalRow({ r }: { r: BoardRefusal }) {
 }
 
 export function LeagueColumn({
-  slug, meta, rows, refusals, days, dayKeys, review,
+  slug, meta, rows, refusals, days, dayKeys, sortFor, dayLabels, review,
 }: {
   slug: string;
   /** absent when the payload never mentioned this league at all */
@@ -309,6 +311,12 @@ export function LeagueColumn({
    *  The page computes them once so all four columns share the same
    *  band tracks — the whole point of day-major alignment. */
   dayKeys: string[];
+  /** each matchday's resolved sort — the board default or that day's
+   *  override. Sorting lives on the PAGE since the C ship (2026-09-01);
+   *  this column just applies what it is handed, per band. */
+  sortFor: (dayKey: string) => ColumnSort;
+  /** matchday labels, for the rest-day ghosts' "next" line */
+  dayLabels: Record<string, string>;
   /** the finished tail's slice of this league. A SEPARATE payload on a
    *  separate fetch: the board is a 90s sweep of what is coming, the
    *  review is a long-cached read of matches that cannot change again.
@@ -324,29 +332,22 @@ export function LeagueColumn({
     storeNote: string | null;
   };
 }) {
-  // Lazy init is safe here: columns only mount client-side (the board
-  // renders after its fetch resolves), so the stored choice is read once
-  // on the client and never during SSR. loadColumnSort itself absorbs a
-  // missing or throwing localStorage and answers the default.
-  const [sort, setSort] = useState<ColumnSort>(() => loadColumnSort(slug));
-  const mode = modeById(sort.mode) ?? modeById(DEFAULT_SORT.mode)!;
-  // DAY-MAJOR (operator, 2026-09-01): the matchday is the board's primary
-  // structure and the chosen sort ranks WITHIN each day. Rank badges
-  // restart per day, so 01 always means "this day's best under your
-  // sort" — the number the operator actually picks with at night.
-  const byDay = dayKeys.map((k) => ({
-    key: k,
-    rows: sortRows(rows.filter((r) => localDay(r.kickoff) === k), sort),
-  }));
-  const nullNote = nullNoteFor(mode, rows);
+  // DAY-MAJOR (operator, 2026-09-01): the matchday is the board's
+  // primary structure and each band's sort — the board default or that
+  // day's override — ranks WITHIN the day. Rank badges restart per day,
+  // so 01 always means "this day's best under its sort".
+  const byDay = dayKeys.map((k) => {
+    const sort = sortFor(k);
+    return {
+      key: k,
+      sort,
+      modeId: (modeById(sort.mode) ?? modeById(DEFAULT_SORT.mode)!).id,
+      rows: sortRows(rows.filter((r) => localDay(r.kickoff) === k), sort),
+    };
+  });
   // the subgrid track plan, shared with the page: row 1 header, then
   // per day a label track + a content track, then refusals, then tail
   const trackCount = 2 * dayKeys.length + 3;
-
-  const apply = (next: ColumnSort) => {
-    setSort(next);
-    saveColumnSort(slug, next);
-  };
 
   return (
     <section data-testid="league-col" data-league={slug}
@@ -411,47 +412,10 @@ export function LeagueColumn({
           </p>
         )}
 
-        {/* The sort control — this column's alone. The choice is kept per
-            league in localStorage as a convenience; a browser without
-            storage still sorts, it just forgets on reload. */}
-        <div className="mt-3 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide">
-          <label htmlFor={`col-sort-${slug}`} className="text-ink-faint">
-            sort
-          </label>
-          <select id={`col-sort-${slug}`} data-testid="col-sort"
-            value={sort.mode}
-            onChange={(e) => {
-              const m = modeById(e.target.value) ?? modeById(DEFAULT_SORT.mode)!;
-              // a fresh mode opens in ITS default direction — carrying the
-              // previous mode's flip across keys reads as random order
-              apply({ mode: m.id, dir: m.defaultDir });
-            }}
-            className="min-w-0 flex-1 rounded-md border border-line bg-bs px-1.5 py-1 uppercase text-ink-mid outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-accent">
-            {SORT_MODES.map((m) => (
-              <option key={m.id} value={m.id}>{m.label}</option>
-            ))}
-          </select>
-          <button data-testid="col-dir" data-dir={sort.dir}
-            onClick={() => apply({ ...sort, dir: sort.dir === "asc" ? "desc" : "asc" })}
-            aria-label={`sort direction ${sort.dir === "asc" ? "ascending" : "descending"} — press to flip`}
-            className="shrink-0 rounded-md border border-line px-2 py-1 text-ink-low transition-colors hover:border-line-strong hover:text-ink-hi">
-            {sort.dir === "asc" ? "↑ asc" : "↓ desc"}
-          </button>
-          {!isDefaultSort(sort) && (
-            <button data-testid="col-reset"
-              onClick={() => apply(DEFAULT_SORT)}
-              title="back to the board's default order — |GD/g gap| descending"
-              className="shrink-0 rounded-md border border-line px-2 py-1 text-ink-faint transition-colors hover:border-line-strong hover:text-ink-mid">
-              reset
-            </button>
-          )}
-        </div>
-        {nullNote && (
-          <p data-testid="col-null-note"
-            className="mt-1.5 font-mono text-[10px] tracking-wide text-ink-faint">
-            {nullNote}
-          </p>
-        )}
+        {/* Sorting moved to the PAGE with the C ship (2026-09-01): one
+            board default in the command bar, a per-day override on each
+            matchday band. This column applies what it is handed. */}
+
       </header>
 
       {/* ── MATCHDAY BANDS. Each day owns a shared subgrid track, so a
@@ -461,8 +425,32 @@ export function LeagueColumn({
           its own compact divider so a stacked layout still says the
           date. A day this league does not play leaves its track to the
           columns that do. */}
-      {byDay.map(({ key, rows: dayRows }, di) =>
-        dayRows.length === 0 ? null : (
+      {byDay.map(({ key, rows: dayRows, modeId }, di) => {
+        if (dayRows.length === 0) {
+          // A REST DAY IS SAID, NOT LEFT BLANK (draft C, shipped): the
+          // empty track gets a quiet cell naming the league's next
+          // fixture, so a hole reads as schedule, not absence of data.
+          // Only when the league plays elsewhere in the window — a fully
+          // empty column keeps its own louder empty-state below — and
+          // only at xl, where the aligned matrix exists.
+          if (rows.length === 0) return null;
+          const next = byDay.slice(di + 1).find((d) => d.rows.length > 0);
+          return (
+            <div key={key} data-testid="rest-day" data-day={key}
+              style={{ ["--r" as string]: String(3 + 2 * di) }}
+              className="hidden min-h-[52px] flex-col justify-center gap-0.5 rounded-[10px] border border-dashed border-line px-3 py-2.5 xl:flex xl:self-start xl:[grid-row:var(--r)]">
+              <span className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-ink-faint">
+                {leagueLabel(slug)} — rest day
+              </span>
+              <span className="font-mono text-[9.5px] text-ink-low">
+                {next
+                  ? `next · ${(dayLabels[next.key] ?? next.key).toLowerCase()}`
+                  : "no more fixtures in window"}
+              </span>
+            </div>
+          );
+        }
+        return (
           <div key={key}
             style={{ ["--r" as string]: String(3 + 2 * di) }}
             className="mt-3 space-y-3 xl:mt-0 xl:self-start xl:pb-4 xl:[grid-row:var(--r)]">
@@ -475,10 +463,11 @@ export function LeagueColumn({
             </div>
             {dayRows.map((r, i) => (
               <RowCard key={`${r.league}-${r.event_id}`} row={r} rank={i + 1}
-                modeId={mode.id} clubCount={meta?.clubs ?? 0} />
+                modeId={modeId} clubCount={meta?.clubs ?? 0} />
             ))}
           </div>
-        ))}
+        );
+      })}
       {rows.length === 0 && !meta?.error && (
         // an empty column SAYS SO — a failed league (above) is a different
         // fact and must not be dressed as a quiet weekend

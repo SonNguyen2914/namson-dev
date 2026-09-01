@@ -381,19 +381,19 @@ test("the withheld gap sorts last under every Stage-1 key, in both directions",
     await expect.poll(() => orderOf(cup))
       .toEqual(["lc-toluca", "lc-america", "lc-cross"]);
     for (const mode of ["gdg", "ppg", "rank"]) {
-      await cup.getByTestId("col-sort").selectOption(mode);
+      await page.getByTestId("col-sort").selectOption(mode);
       // the policy is ON SCREEN while such a key is active
-      await expect(cup.getByTestId("col-null-note"))
+      await expect(page.getByTestId("col-null-note"))
         .toHaveText("no measured gap (cross-league) sorts last");
       await expect.poll(() => orderOf(cup))
         .toEqual(["lc-toluca", "lc-america", "lc-cross"]);
-      await cup.getByTestId("col-dir").click();
+      await page.getByTestId("col-dir").click();
       // the measured rows reverse; the withheld one does NOT become the
       // smallest — this is the ascending case where `Math.abs(null)`
       // would have put it first
       await expect.poll(() => orderOf(cup))
         .toEqual(["lc-america", "lc-toluca", "lc-cross"]);
-      await cup.getByTestId("col-dir").click();
+      await page.getByTestId("col-dir").click();
     }
   });
 
@@ -406,12 +406,17 @@ test("the cross-league note is not printed over a column that has no such row",
     // not on one that is deliberately absent — a mutation that printed
     // this note over every column slipped through exactly that hole.
     await expect(mls.getByTestId("picker-row")).toHaveCount(1);
-    await expect(mls.getByTestId("col-sort")).toHaveValue("gdg");
-    await expect(col(page, "leaguescup").getByTestId("col-null-note"))
-      .toBeVisible();
-    // same key, same page, nothing withheld: an explanation of something
-    // that is not there is noise
-    await expect(mls.getByTestId("col-null-note")).toHaveCount(0);
+    await expect(page.getByTestId("col-sort")).toHaveValue("gdg");
+    // the note is the BOARD's since sorting moved to the matchday
+    // (2026-09-01): it renders ONCE beside the board control — because a
+    // withheld-gap row exists somewhere on the board — and never inside
+    // a league column
+    await expect(page.getByTestId("col-null-note")).toBeVisible();
+    await expect(page.getByTestId("col-null-note")).toHaveCount(1);
+    for (const slug of ["mls", "epl", "laliga", "ligamx", "leaguescup"]) {
+      await expect(col(page, slug).getByTestId("col-null-note"))
+        .toHaveCount(0);
+    }
   });
 
 test("under a tie on another key, a MEASURED zero gap still leads a withheld one",
@@ -439,7 +444,7 @@ test("under a tie on another key, a MEASURED zero gap still leads a withheld one
       rows: [withheld, level],
     });
     const cup = col(page, "leaguescup");
-    await cup.getByTestId("col-sort").selectOption("kickoff");
+    await page.getByTestId("col-sort").selectOption("kickoff");
     await expect.poll(() => orderOf(cup)).toEqual(["lc-level", "lc-cross"]);
   });
 
@@ -447,15 +452,15 @@ test("no sort mode drops a cup row — ranks, never cuts", async ({ page }) => {
   await open(page);
   const cup = col(page, "leaguescup");
   await expect(cup.getByTestId("picker-row")).toHaveCount(3);
-  const modes = await cup.getByTestId("col-sort").locator("option")
+  const modes = await page.getByTestId("col-sort").locator("option")
     .evaluateAll((els) => els.map((e) => (e as HTMLOptionElement).value));
-  expect(modes.length).toBe(10);
+  expect(modes.length).toBe(11);   // +shape, 2026-09-01
   for (const m of modes) {
-    await cup.getByTestId("col-sort").selectOption(m);
+    await page.getByTestId("col-sort").selectOption(m);
     await expect(cup.getByTestId("picker-row")).toHaveCount(3);
-    await cup.getByTestId("col-dir").click();
+    await page.getByTestId("col-dir").click();
     await expect(cup.getByTestId("picker-row")).toHaveCount(3);
-    await cup.getByTestId("col-dir").click();
+    await page.getByTestId("col-dir").click();
   }
   await expect(page.getByTestId("picker-row")).toHaveCount(6);
 });
@@ -567,7 +572,7 @@ test("the board is day-major: bands under every sort, ranks restart per day", as
   await expect(ranks.nth(1)).toHaveText("01");
   // the chosen sort still ranks WITHIN each day — switching it must
   // never move a fixture across its matchday
-  await ligamx.getByTestId("col-sort").selectOption("ask");
+  await page.getByTestId("col-sort").selectOption("ask");
   await expect(ligamx.locator('[data-testid="day-divider"]')).toHaveCount(2);
   const events = ligamx.getByTestId("picker-row");
   await expect(events.nth(0)).toHaveAttribute("data-event", EARLY.event_id);
@@ -582,4 +587,101 @@ test("at desktop width a date is one full-width band across every league", async
   const bands = page.getByTestId("day-band");
   await expect(bands.first()).toBeVisible();
   expect(await bands.count()).toBeGreaterThanOrEqual(1);
+});
+
+// ------------------------------------------------- the shape sort mode
+
+test("shape sorts CLEAN before SPLIT before HOLLOW, and drops nothing", async ({ page }) => {
+  await open(page);
+  // the cup column: three rows, mixed shapes — and toHaveCount FIRST,
+  // because a bare count() races the board's initial paint
+  const cup = col(page, "leaguescup");
+  const rows = cup.getByTestId("picker-row");
+  await expect(rows).toHaveCount(3);
+  await page.getByTestId("col-sort").selectOption("shape");
+  await expect(rows).toHaveCount(3);
+  // descending: every CLEAN precedes every SPLIT precedes every HOLLOW
+  const shapes = await rows.evaluateAll((els) =>
+    els.map((e) => e.getAttribute("data-shape")));
+  const rankOf = (s: string | null) =>
+    s === "CLEAN" ? 2 : s === "SPLIT" ? 1 : 0;
+  for (let i = 1; i < shapes.length; i++) {
+    expect(rankOf(shapes[i - 1])).toBeGreaterThanOrEqual(rankOf(shapes[i]));
+  }
+  // ...and the flip inverts the buckets without losing a row
+  await page.getByTestId("col-dir").click();
+  await expect(rows).toHaveCount(3);
+  const flipped = await rows.evaluateAll((els) =>
+    els.map((e) => e.getAttribute("data-shape")));
+  for (let i = 1; i < flipped.length; i++) {
+    expect(rankOf(flipped[i - 1])).toBeLessThanOrEqual(rankOf(flipped[i]));
+  }
+});
+
+// -------------------------------------------- per-day sort overrides ---
+
+test("a band override re-sorts ONE day; the board default clears it", async ({ page }) => {
+  const dayTwo = {
+    ...EARLY, event_id: "mx-day2", competition_id: "mx-day2",
+    home: "Tigres UANL", away: "Necaxa", favourite: "Tigres UANL",
+    opponent: "Necaxa", kickoff: inHours(80),
+  };
+  const dayTwoB = {
+    ...EARLY, event_id: "mx-day2b", competition_id: "mx-day2b",
+    home: "Pumas UNAM", away: "Querétaro", favourite: "Pumas UNAM",
+    opponent: "Querétaro", gdg_gap: 0.2, kickoff: inHours(82),
+    kalshi: {
+      event_ticker: "KXLIGAMX-DAY2B", ticker: "T-day2b",
+      ask_c: 30, bid_c: 29, spread_c: 1, ask_size: 500, bid_size: 400,
+      flags: [],
+    },
+  };
+  await open(page, { ...BOARD, rows: [EARLY, dayTwo, dayTwoB] });
+  const ligamx = col(page, "ligamx");
+  const rows = ligamx.getByTestId("picker-row");
+  await expect(rows).toHaveCount(3);
+  // two matchdays -> two band headers, each with its own sort + dir
+  const bands = page.getByTestId("day-band");
+  await expect(bands).toHaveCount(2);
+  await expect(page.getByTestId("band-sort")).toHaveCount(2);
+  await expect(page.getByTestId("band-dir")).toHaveCount(2);
+  // override day 2 only: kickoff asc there, GD/g everywhere else
+  await page.getByTestId("band-sort").nth(1).selectOption("kickoff");
+  await expect(rows.nth(0)).toHaveAttribute("data-event", EARLY.event_id);
+  await expect(rows.nth(1)).toHaveAttribute("data-event", "mx-day2");
+  await expect(rows.nth(2)).toHaveAttribute("data-event", "mx-day2b");
+  // flip that day's direction — day 2 reverses, day 1 untouched
+  await page.getByTestId("band-dir").nth(1).click();
+  await expect(rows.nth(0)).toHaveAttribute("data-event", EARLY.event_id);
+  await expect(rows.nth(1)).toHaveAttribute("data-event", "mx-day2b");
+  await expect(rows.nth(2)).toHaveAttribute("data-event", "mx-day2");
+  // changing the BOARD default clears every override — the board never
+  // mixes a stale one-night intention into a fresh read
+  await page.getByTestId("col-sort").selectOption("gdg");
+  await expect(page.getByTestId("band-sort").nth(1)).toHaveValue("gdg");
+  await expect(rows.nth(1)).toHaveAttribute("data-event", "mx-day2");
+});
+
+// ------------------------------------------------ rest-day ghost cells ---
+
+test("a league's empty matchday says rest day and names its next fixture", async ({ page }) => {
+  const dayTwo = {
+    ...EARLY, event_id: "mx-day2", competition_id: "mx-day2",
+    home: "Tigres UANL", away: "Necaxa", favourite: "Tigres UANL",
+    opponent: "Necaxa", kickoff: inHours(80),
+  };
+  // day 1: ligamx + mls; day 2: ligamx only -> the MLS column's day-2
+  // track carries a ghost, not a hole
+  await open(page, { ...BOARD, rows: [EARLY, LATE, dayTwo] });
+  const mls = col(page, "mls");
+  const ghost = mls.getByTestId("rest-day");
+  await expect(ghost).toHaveCount(1);
+  await expect(ghost).toContainText(/rest day/i);
+  await expect(ghost).toContainText(/no more fixtures in window/i);
+  // ligamx plays both days: no ghost anywhere in its column
+  await expect(col(page, "ligamx").getByTestId("rest-day")).toHaveCount(0);
+  // a league with NOTHING in the window keeps its louder empty state
+  // instead of a row of ghosts
+  await expect(col(page, "epl").getByTestId("col-empty")).toBeVisible();
+  await expect(col(page, "epl").getByTestId("rest-day")).toHaveCount(0);
 });

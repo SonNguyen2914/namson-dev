@@ -32,7 +32,7 @@ export type SortDir = "asc" | "desc";
 
 export type SortModeId =
   | "gdg" | "kickoff" | "ppg" | "rank"
-  | "tier_ovr" | "tier_atk" | "tier_def"
+  | "tier_ovr" | "tier_atk" | "tier_def" | "shape"
   | "ask" | "spread" | "depth";
 
 export interface SortMode {
@@ -88,6 +88,15 @@ export const SORT_MODES: SortMode[] = [
     value: (r) => r.tier_gaps.atk },
   { id: "tier_def", label: "defence tier gap", defaultDir: "desc",
     value: (r) => r.tier_gaps.def },
+  // The SHAPE as an ordering (operator ask, 2026-09-01): CLEAN is a gap
+  // the tiers back on all three dimensions, HOLLOW is a gap they do not
+  // back at all — so descending reads best-backed first, and one flip
+  // surfaces the traps. Ties fall to the board's own |GD/g| tiebreak,
+  // which is exactly the order wanted inside a bucket. Shape exists on
+  // every row (tiers survive even a cross-league tie), so this key has
+  // no null case and no note.
+  { id: "shape", label: "shape", defaultDir: "desc",
+    value: (r) => ({ CLEAN: 2, SPLIT: 1, HOLLOW: 0 })[r.shape] ?? null },
   { id: "ask", label: "ask price", defaultDir: "asc",
     value: (r) => r.kalshi?.ask_c ?? null,
     nullNote: "no quote sorts last" },
@@ -175,6 +184,38 @@ export function nullNoteFor(mode: SortMode, rows: BoardRow[]): string | null {
 // the default renders when nothing usable is there.
 
 const storageKey = (league: string) => `picker.colsort.${league}`;
+
+/** The BOARD's default sort (2026-09-01 day-major C): one choice for
+ *  every matchday band, remembered on this device. Per-day overrides
+ *  are deliberately session-only — a matchday is a one-night decision
+ *  and a remembered override for "Saturday" would silently apply to a
+ *  DIFFERENT Saturday next week. */
+const BOARD_SORT_KEY = "picker:sort:board";
+
+export function loadBoardSort(): ColumnSort {
+  try {
+    const raw = window.localStorage.getItem(BOARD_SORT_KEY);
+    if (!raw) return DEFAULT_SORT;
+    const parsed = JSON.parse(raw) as { mode?: unknown; dir?: unknown };
+    const mode = typeof parsed.mode === "string" ? modeById(parsed.mode) : undefined;
+    if (!mode) return DEFAULT_SORT;
+    const dir = parsed.dir === "asc" || parsed.dir === "desc"
+      ? parsed.dir : mode.defaultDir;
+    return { mode: mode.id, dir };
+  } catch {
+    return DEFAULT_SORT;
+  }
+}
+
+export function saveBoardSort(s: ColumnSort): void {
+  try {
+    if (isDefaultSort(s)) {
+      window.localStorage.removeItem(BOARD_SORT_KEY);
+    } else {
+      window.localStorage.setItem(BOARD_SORT_KEY, JSON.stringify(s));
+    }
+  } catch { /* convenience only — sorting still works for this visit */ }
+}
 
 export function loadColumnSort(league: string): ColumnSort {
   try {
