@@ -530,3 +530,31 @@ test("a league fixture gets no competition badge", async ({ page }) => {
   await expect(anyLeagueRow.locator('[data-testid="competition-badge"]'))
     .toHaveCount(0);
 });
+
+// ---------------------------------------------------------------------
+// Day dividers (2026-09-01): a kickoff-sorted column is a schedule and
+// gets date headers; a ranking-sorted column is a ladder and must not
+// be sliced by a key it is not ordered by.
+// ---------------------------------------------------------------------
+
+test("kickoff sort splits the column by day; ranking sorts never do", async ({ page }) => {
+  // a hermetic two-day column: same row twice, 72 hours apart
+  const dayTwo = {
+    ...EARLY, event_id: "mx-day2", competition_id: "mx-day2",
+    home: "Tigres UANL", away: "Necaxa", favourite: "Tigres UANL",
+    opponent: "Necaxa", kickoff: inHours(80),
+  };
+  await open(page, { ...BOARD, rows: [EARLY, dayTwo] });
+  const ligamx = col(page, "ligamx");
+  await expect(ligamx.locator('[data-testid="picker-row"]')).toHaveCount(2);
+  // default |GD/g| ladder: no dividers anywhere
+  await expect(ligamx.locator('[data-testid="day-divider"]')).toHaveCount(0);
+  await ligamx.getByTestId("col-sort").selectOption("kickoff");
+  // two days, two headers, and the first one leads the column
+  const dividers = ligamx.locator('[data-testid="day-divider"]');
+  await expect(dividers).toHaveCount(2);
+  await expect(dividers.first()).toBeVisible();
+  // back to a ranking sort: the ladder is whole again
+  await ligamx.getByTestId("col-sort").selectOption("gdg");
+  await expect(ligamx.locator('[data-testid="day-divider"]')).toHaveCount(0);
+});

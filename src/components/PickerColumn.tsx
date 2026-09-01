@@ -28,7 +28,7 @@
 // column does, rather than a hand-copied one free to drift from it.
 import Link from "next/link";
 import { useState } from "react";
-import { fmtDate } from "../lib/matchday";
+import { TZ, fmtDate } from "../lib/matchday";
 import {
   BoardRefusal, BoardRow, LeagueMeta, leagueLabel,
 } from "../lib/pickerApi";
@@ -110,6 +110,17 @@ function RankDumbbell({ row, clubCount }: { row: BoardRow; clubCount: number }) 
         style={{ left: `${b}%` }} />
     </span>
   );
+}
+
+/** The fixture's DAY in the board's one fixed zone — the grouping key
+ *  and the divider label for kickoff-sorted columns. */
+function dayOf(iso: string): { key: string; label: string } {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { key: "?", label: "date unknown" };
+  const key = d.toLocaleDateString("en-CA", { timeZone: TZ });
+  const label = d.toLocaleDateString("en-US", {
+    timeZone: TZ, weekday: "long", month: "short", day: "numeric" });
+  return { key, label };
 }
 
 /** One match card. `rank` is the row's position under the column's
@@ -441,10 +452,30 @@ export function LeagueColumn({
 
       {sorted.length > 0 ? (
         <div className="mt-3 space-y-3">
-          {sorted.map((r, i) => (
-            <RowCard key={`${r.league}-${r.event_id}`} row={r} rank={i + 1}
-              modeId={mode.id} clubCount={meta?.clubs ?? 0} />
-          ))}
+          {/* DAY DIVIDERS, kickoff sort only (operator ask, 2026-09-01).
+              Under kickoff the column is a schedule and the dividers are
+              true; under any ranking sort it is a ladder, and slicing a
+              ladder by date would misstate the order the page claims. */}
+          {sorted.map((r, i) => {
+            const divider = mode.id === "kickoff"
+              && (i === 0
+                || dayOf(r.kickoff).key !== dayOf(sorted[i - 1].kickoff).key);
+            return (
+              <div key={`${r.league}-${r.event_id}`} className="space-y-3">
+                {divider && (
+                  <div data-testid="day-divider"
+                    className="flex items-center gap-2 pt-1 first:pt-0">
+                    <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-low">
+                      {dayOf(r.kickoff).label}
+                    </span>
+                    <span aria-hidden className="h-px flex-1 bg-line" />
+                  </div>
+                )}
+                <RowCard row={r} rank={i + 1}
+                  modeId={mode.id} clubCount={meta?.clubs ?? 0} />
+              </div>
+            );
+          })}
         </div>
       ) : meta?.error ? null : (
         // an empty column SAYS SO — a failed league (above) is a different
