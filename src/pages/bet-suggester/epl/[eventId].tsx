@@ -160,7 +160,7 @@ export default function EplMatchPage() {
         <NavChip href="#stats" active={activeSection === "stats"}>Live</NavChip>
       </TopBar>
 
-      <div className="mx-auto max-w-2xl px-4 py-10">
+      <div className="mx-auto max-w-6xl px-4 py-8 lg:px-6">
         {err && !m && (
           <p className="mt-10 rounded-2xl border border-dashed border-line px-4 py-8 text-center font-mono text-[11px] uppercase tracking-[0.15em] text-ink-faint">
             match feed unavailable — retrying every 30s
@@ -210,6 +210,8 @@ export default function EplMatchPage() {
               </section>
             </Reveal>
 
+            <div className="mt-2 grid items-start gap-x-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,21rem)]">
+            <div className="min-w-0">
             {/* in play, the live read jumps the queue — see bottom */}
             {live && <LiveBlock m={m} promoted />}
 
@@ -221,6 +223,8 @@ export default function EplMatchPage() {
             )}
 
             {/* ===== how they play — fitted ratings; absent while dark ===== */}
+            </div>{/* /main column */}
+            <aside className="min-w-0 lg:pt-4">
             <HowTheyPlay m={m} run={run} />
 
             {/* ===== team news: announced XI (no strength column — no
@@ -230,15 +234,15 @@ export default function EplMatchPage() {
             {/* ===== ESPN scouting: form + H2H ===== */}
             <ScoutingSection m={m} />
 
+            </aside>{/* /rail */}
+            </div>{/* /grid — the decision flow continues full-main below */}
             {/* ===== market vs model — aligned three-way bars ===== */}
             <section id="markets" className="mt-10">
               <Reveal>
                 <div className="rounded-2xl border border-line bg-elev p-5">
                   <div className="mb-1 flex items-center justify-between">
                     <Eyebrow tone="accent">market · kalshi three-way</Eyebrow>
-                    <span className="rounded-full border border-line px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.15em] text-ink-faint">
-                      shadow · not advice
-                    </span>
+
                   </div>
                   <MarketBar m={m} book={book} run={run} />
                   <div className="mt-5 border-t border-line pt-4">
@@ -312,7 +316,7 @@ function TeamBlock({ s, right }: { s: Side; right?: boolean }) {
         <img src={s.logo} alt="" className="h-10 w-10 shrink-0 object-contain" />
       )}
       <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-ink-hi sm:text-base">
+        <p className="truncate text-sm font-semibold text-ink-hi [font-family:var(--font-archivo)] [font-stretch:97%] sm:text-base">
           {s.name}
         </p>
         <p className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">
@@ -430,7 +434,7 @@ function ratingLine(label: string, v?: number, invert = false) {
   return (
     <div key={label} className="flex items-baseline justify-between font-mono text-[11px]">
       <span className="uppercase tracking-[0.12em] text-ink-faint">{label}</span>
-      <span className={`tabular-nums ${good ? "text-accent" : "text-ink-mid"}`}>
+      <span className={`tabular-nums ${good ? "text-up" : "text-ink-mid"}`}>
         {v.toFixed(2)}× league {delta >= 0 ? `(+${delta.toFixed(0)}%)` : `(${delta.toFixed(0)}%)`}
       </span>
     </div>
@@ -452,7 +456,7 @@ function HowTheyPlay({ m, run }: { m: Match; run?: ModelRun }) {
     <Reveal>
       <Collapse eyebrow="scouting" title="How they play"
         defaultOpen={false} className="mt-8 mb-0">
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3">
           {cards.map((c) => (
             <div key={c.s.abbrev} className="rounded-2xl border border-line p-4">
               <div className="mb-3 flex items-center justify-between">
@@ -578,7 +582,7 @@ function MarketsTable({ m, run, book, families }: {
                         </span>
                         <span className={`text-right font-mono tabular-nums ${
                           edge == null ? "text-ink-faint"
-                            : edge >= 0 ? "text-accent" : "text-neg"}`}>
+                            : edge >= 0 ? "text-up" : "text-neg"}`}>
                           {edge != null ? signedPct(edge) : "—"}
                         </span>
                         <span className="text-right font-mono tabular-nums text-ink-mid">
@@ -674,7 +678,7 @@ function ScenarioSection({ book }: { book: Book | null }) {
               return (
                 <p key={w.ticker} className="font-mono text-xs tabular-nums text-ink-mid">
                   {w.label}:{" "}
-                  <span className={net >= 0 ? "text-accent" : "text-neg"}>
+                  <span className={net >= 0 ? "text-up" : "text-neg"}>
                     {net >= 0 ? "+" : ""}${net.toFixed(2)}
                   </span>
                 </p>
@@ -822,7 +826,7 @@ function LineupSection({ lu, m, run }: {
             now{run ? ", not the lineup frozen at T-10" : ""}
           </p>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4">
           <SideXi side={lu.home} team={m.home?.name} />
           <SideXi side={lu.away} team={m.away?.name} />
         </div>
@@ -853,7 +857,7 @@ function FormChips({ form }: { form?: string }) {
       {form.split("").map((c, i) => (
         <span key={i}
           className={`inline-flex h-5 w-5 items-center justify-center rounded font-mono text-[10px] ${
-            c === "W" ? "bg-accent/20 text-accent"
+            c === "W" ? "bg-up/20 text-up"
               : c === "L" ? "bg-neg/20 text-neg" : "bg-elev2 text-ink-low"}`}>
           {c}
         </span>
@@ -871,7 +875,7 @@ function ScoutingSection({ m }: { m: Match }) {
     <Reveal>
       <Collapse eyebrow="scouting" title="ESPN form + H2H"
         defaultOpen={false} className="mt-8 mb-0">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4">
           {sc.last_five.map((t) => (
             <div key={t.team} className="rounded-2xl border border-line p-4">
               <div className="mb-1 flex items-center justify-between">
@@ -885,7 +889,7 @@ function ScoutingSection({ m }: { m: Match }) {
                 {t.games.map((g, i) => (
                   <div key={i} className="flex items-center gap-2 font-mono text-[11px]">
                     <span className={`w-4 text-center ${
-                      g.result === "W" ? "text-accent"
+                      g.result === "W" ? "text-up"
                         : g.result === "L" ? "text-neg" : "text-ink-low"}`}>
                       {g.result}
                     </span>
@@ -921,7 +925,7 @@ function ScoutingSection({ m }: { m: Match }) {
                   return (
                     <div key={i} className="flex items-center gap-2 font-mono text-[11px]">
                       <span className={`w-4 text-center ${
-                        g.result === "W" ? "text-accent"
+                        g.result === "W" ? "text-up"
                           : g.result === "L" ? "text-neg" : "text-ink-low"}`}>
                         {g.result}
                       </span>
