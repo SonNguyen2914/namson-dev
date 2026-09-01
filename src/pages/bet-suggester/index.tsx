@@ -201,18 +201,26 @@ export default function PickerBoard() {
   // Column order is FIXED — MLS · EPL · La Liga · Liga MX — then any slug
   // the payload serves that this page does not know, appended rather than
   // dropped: a new league arriving in the registry must not disappear.
+  // WHICH COLUMN a row is drawn in, as opposed to which competition it
+  // IS. They differ only for a cup fixture whose two clubs share a
+  // league: that league's table describes it completely, so it belongs
+  // in that league's column with the competition named on the card
+  // rather than in a column of its own (backend 2026-09-01). `?? league`
+  // keeps an older payload rendering exactly as it did.
+  const colOf = (r: { column?: string; league: string }) => r.column ?? r.league;
+
   const columnSlugs = [
     ...PICKER_LEAGUE_ORDER,
     ...[...new Set([
       ...Object.keys(leaguesMap),
-      ...rows.map((r) => r.league),
-      ...refusals.map((r) => r.league),
+      ...rows.map(colOf),
+      ...refusals.map(colOf),
       // the review payload too: a league that has finished matches but no
       // upcoming ones must not lose its column, or the operator loses the
       // matches he came back to look at
       ...Object.keys(reviewLeagues),
-      ...finished.map((r) => r.league),
-      ...finishedRefusals.map((r) => r.league),
+      ...finished.map(colOf),
+      ...finishedRefusals.map(colOf),
     ])].filter((s) => !PICKER_LEAGUE_ORDER.includes(s)),
   ];
 
@@ -404,11 +412,11 @@ export default function PickerBoard() {
                 {columnSlugs.map((slug) => (
                   <LeagueColumn key={slug} slug={slug} days={days}
                     meta={leaguesMap[slug]}
-                    rows={rows.filter((r) => r.league === slug)}
-                    refusals={refusals.filter((r) => r.league === slug)}
+                    rows={rows.filter((r) => colOf(r) === slug)}
+                    refusals={refusals.filter((r) => colOf(r) === slug)}
                     review={{
-                      rows: finished.filter((r) => r.league === slug),
-                      refusals: finishedRefusals.filter((r) => r.league === slug),
+                      rows: finished.filter((r) => colOf(r) === slug),
+                      refusals: finishedRefusals.filter((r) => colOf(r) === slug),
                       meta: reviewLeagues[slug],
                       back, loading: reviewLoading, error: reviewError,
                       storeNote,

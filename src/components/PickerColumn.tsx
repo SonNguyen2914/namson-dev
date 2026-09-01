@@ -57,6 +57,7 @@ function RowCard({ row, rank }: { row: BoardRow; rank: number }) {
       data-testid="picker-row"
       data-shape={row.shape}
       data-league={row.league}
+      data-column={row.column ?? row.league}
       data-event={row.event_id}
       data-cross-league={cross ? "true" : "false"}
       className="rounded-xl border border-line bg-elev/40 p-4 transition-colors hover:border-line-strong"
@@ -76,6 +77,19 @@ function RowCard({ row, rank }: { row: BoardRow; rank: number }) {
             title="rated on last season's final table — this season has too few games played"
             className="rounded border border-warn/40 bg-warn/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
             prior szn
+          </span>
+        )}
+        {/* THE COMPETITION, when it is not the column. A Leagues Cup tie
+            between two Liga MX clubs is drawn in the Liga MX column
+            because that table describes it completely — but it is still
+            a cup tie, and a card that let the reader assume "Liga MX
+            fixture" would be quietly wrong about what the price settles
+            on. This badge is the whole reason the fold is safe. */}
+        {row.column && row.column !== row.league && (
+          <span data-testid="competition-badge"
+            title={`${leagueLabel(row.league)} fixture, shown in the ${leagueLabel(row.column)} column because both clubs are rated on that table`}
+            className="rounded border border-accent/40 bg-accent/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-accent">
+            {leagueLabel(row.league)}
           </span>
         )}
         {/* WHICH TABLE EACH CLUB WAS RATED ON. Only worth saying when

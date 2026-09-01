@@ -63,8 +63,16 @@ export interface KalshiQuote {
 
 export interface BoardRow {
   refused: false;
-  /** a league slug, or a cup slug — both are columns */
+  /** WHICH COMPETITION this fixture is: a league slug or a cup slug. */
   league: string;
+  /** WHICH COLUMN it renders in. Equal to `league` for a league fixture;
+   *  for a cup fixture whose two clubs share a league it is THAT league,
+   *  because that league's table describes the fixture completely and it
+   *  belongs beside its own table rather than in a column of its own.
+   *  A cross-league cup fixture keeps the cup slug — its gaps are
+   *  withheld exactly because neither table can host it. Optional so an
+   *  older payload still renders. */
+  column?: string;
   home: string;
   away: string;
   favourite: string;
@@ -109,6 +117,8 @@ export interface BoardRow {
 export interface BoardRefusal {
   refused: true;
   league: string;
+  /** see BoardRow.column */
+  column?: string;
   home: string;
   away: string;
   club: string;
