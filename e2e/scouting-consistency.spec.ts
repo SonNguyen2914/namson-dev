@@ -48,3 +48,27 @@ test("form + H2H rows: result letter agrees with the scoreline shown",
     }
     expect(checked, "no scoreline rows found to verify").toBeGreaterThan(0);
   });
+
+test("the hero form strips mirror the scouting form, cell for cell",
+  async ({ page }) => {
+    const resp = await page.request.get(`/api/mls/match/${EVENT}`);
+    const body = await resp.json();
+    const sc = body.match?.scouting;
+    test.skip(!sc?.last_five?.length, "no scouting from this backend");
+
+    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    const strips = page.getByTestId("hero-form");
+    // one strip per side that HAS a form string — same source as the
+    // scouting chips, so the two surfaces can never disagree
+    const withForm = (sc.last_five as Array<{ form?: string }>)
+      .filter((t) => (t.form ?? "").replace(/[ ?]/g, "").length > 0);
+    await expect(strips).toHaveCount(withForm.length);
+    for (let i = 0; i < withForm.length; i++) {
+      const letters = withForm[i].form!.replace(/[ ?]/g, "");
+      const cells = strips.nth(i).locator("i");
+      await expect(cells).toHaveCount(letters.length);
+      for (let j = 0; j < letters.length; j++) {
+        await expect(cells.nth(j)).toHaveAttribute("data-r", letters[j]);
+      }
+    }
+  });

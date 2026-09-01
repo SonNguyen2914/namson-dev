@@ -691,7 +691,10 @@ test("a league's empty matchday says rest day and names its next fixture", async
 test("form strips draw last results per side; absent form draws nothing", async ({ page }) => {
   const withForm = {
     ...EARLY,
-    form: { fav: "WDLWW", opp: "LLLLL" },
+    // opp deliberately SHORT: two games played — the strip must still
+    // occupy five aligned slots, padding from the LEFT so the newest
+    // result stays rightmost
+    form: { fav: "WDLWW", opp: "WL" },
   };
   const without = {
     ...EARLY, event_id: "mx-noform", competition_id: "mx-noform",
@@ -709,7 +712,14 @@ test("form strips draw last results per side; absent form draws nothing", async 
   // (rightmost) is a W, the opponent's whole run is losses
   await expect(strips.nth(0).locator("i")).toHaveCount(5);
   await expect(strips.nth(0).locator('i[data-r="W"]')).toHaveCount(3);
-  await expect(strips.nth(1).locator('i[data-r="L"]')).toHaveCount(5);
+  // the short strip still fills five slots — three empty placeholders on
+  // the LEFT, results on the right, newest last
+  await expect(strips.nth(1).locator("i")).toHaveCount(5);
+  await expect(strips.nth(1).locator('i[data-r=""]')).toHaveCount(3);
+  await expect(strips.nth(1).locator("i").nth(3))
+    .toHaveAttribute("data-r", "W");
+  await expect(strips.nth(1).locator("i").nth(4))
+    .toHaveAttribute("data-r", "L");
   // an older payload (or an unknown club) simply has no strips
   await expect(ligamx.getByTestId("picker-row")
     .filter({ hasText: "Atlas" }).getByTestId("form-strip")).toHaveCount(0);

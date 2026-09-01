@@ -558,6 +558,10 @@ test("the board's sort survives a reload, and reset returns (and forgets) the de
   async ({ page }) => {
     await open(page, SORT_BOARD);
     const mls = col(page, "mls");
+    // settle on the default order FIRST: the board renders client-side
+    // after its fetch, and selecting into a still-mounting tree is the
+    // race this test once lost
+    await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.gdg);
     await page.getByTestId("col-sort").selectOption("kickoff");
     await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.kickoff);
     await page.reload();

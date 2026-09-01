@@ -255,12 +255,12 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                   </span>
                 </div>
                 <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-                  <TeamBlock s={m.home} />
+                  <TeamBlock s={m.home} form={formOf(m, m.home.abbrev)} />
                   <div className={`text-center font-mono text-3xl tabular-nums ${
                     live ? "text-accent" : "text-ink-hi"}`}>
                     {(live || post) ? `${m.home.score}–${m.away.score}` : "–"}
                   </div>
-                  <TeamBlock s={m.away} right />
+                  <TeamBlock s={m.away} right form={formOf(m, m.away.abbrev)} />
                 </div>
                 <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3">
                   <span className="rounded-md border border-line px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
@@ -421,7 +421,43 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
 
 /* ---------- hero building blocks ---------- */
 
-function TeamBlock({ s, right }: { s: Side; right?: boolean }) {
+/** Last-≤5 results as five tiny cells, the picker board's own strip
+ *  (2026-09-01): W green, L red, draws NEUTRAL gray, oldest→newest so
+ *  the rightmost cell is the latest. The letters are the backend's,
+ *  derived from the score digits beside them — never the provider's
+ *  verdict — and the same string feeds the bigger chips in the
+ *  scouting section, so the two can never disagree. */
+function FormStrip({ form, name }: { form?: string | null; name?: string }) {
+  if (!form) return null;
+  const letters = form.split("");
+  return (
+    <span data-testid="hero-form" aria-hidden
+      title={`${name ?? ""} — last ${form.length}, oldest→newest: ${form} (rightmost is latest)`}
+      className="inline-flex flex-none items-center gap-[2px]">
+      {letters.map((c, i) => (
+        <i key={i} data-r={c}
+          className={`h-[7px] w-[7px] rounded-[1.5px] ${
+            c === "W" ? "bg-up/85"
+            : c === "L" ? "bg-neg/75"
+            : "bg-line-strong"}${
+            i === letters.length - 1
+              ? " ring-1 ring-ink-hi/70 ring-offset-1 ring-offset-bs" : ""}`} />
+      ))}
+    </span>
+  );
+}
+
+/** The scouting block's form string for one side, by abbreviation —
+ *  compacted for the strip ("W L D W W" → "WLDWW"). */
+function formOf(m: Match, abbrev?: string): string | undefined {
+  if (!abbrev) return undefined;
+  return m.scouting?.last_five
+    .find((t) => t.abbrev === abbrev)?.form?.replace(/[ ?]/g, "");
+}
+
+function TeamBlock({ s, right, form }: {
+  s: Side; right?: boolean; form?: string;
+}) {
   return (
     <div className={`flex min-w-0 items-center gap-3 ${
       right ? "flex-row-reverse text-right" : ""}`}>
@@ -433,8 +469,10 @@ function TeamBlock({ s, right }: { s: Side; right?: boolean }) {
         <p className="truncate text-sm font-semibold text-ink-hi [font-family:var(--font-archivo)] [font-stretch:97%] sm:text-base">
           {s.name}
         </p>
-        <p className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">
-          {s.abbrev}
+        <p className={`flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-ink-faint ${
+          right ? "justify-end" : ""}`}>
+          <span>{s.abbrev}</span>
+          <FormStrip form={form} name={s.name} />
         </p>
       </div>
     </div>

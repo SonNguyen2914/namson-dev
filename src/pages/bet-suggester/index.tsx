@@ -498,10 +498,10 @@ export default function PickerBoard() {
                   order keeps mobile sane); under xl each column carries
                   its own compact divider instead. */}
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4 xl:gap-y-2">
-                {columnSlugs.map((slug) => (
+                {columnSlugs.map((slug, ci) => (
                   <LeagueColumn key={slug} slug={slug} days={days}
                     dayKeys={dayKeys} sortFor={sortFor}
-                    dayLabels={dayLabelFor}
+                    dayLabels={dayLabelFor} colIndex={ci + 1}
                     meta={leaguesMap[slug]}
                     rows={rows.filter((r) => colOf(r) === slug)}
                     refusals={refusals.filter((r) => colOf(r) === slug)}

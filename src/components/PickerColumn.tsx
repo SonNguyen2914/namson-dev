@@ -118,19 +118,36 @@ function RankDumbbell({ row, clubCount }: { row: BoardRow; clubCount: number }) 
  *  rest of the board (W green, L red) with draws NEUTRAL, matching the
  *  match hubs' form chips: a draw is not a warning. Oldest→newest, so
  *  the rightmost cell is the latest result; the title spells it out. */
-function FormStrip({ form, name }: { form?: string | null; name: string }) {
+const FORM_SLOTS = 5;
+function FormStrip({ form, name, className = "" }: {
+  form?: string | null; name: string; className?: string;
+}) {
   if (!form) return null;
+  // FIXED WIDTH, right-aligned (2026-09-01): five slots always, empty
+  // ones drawn as faint placeholders, real results filling from the
+  // RIGHT so the newest result is the rightmost cell and every strip on
+  // the board lines up to the same column edge no matter how many games
+  // a club has played. The latest cell is ringed so "which is now" reads
+  // without counting.
+  const letters = form.slice(-FORM_SLOTS).split("");
+  const pad = FORM_SLOTS - letters.length;
+  const slots = [...Array(pad).fill(null), ...letters];
   return (
     <span data-testid="form-strip" aria-hidden
-      title={`${name} — last ${form.length}, oldest→newest: ${form}`}
-      className="ml-1.5 inline-flex flex-none items-center gap-[2px]">
-      {form.split("").map((c, i) => (
-        <i key={i} data-r={c}
-          className={`h-[6px] w-[6px] rounded-[1.5px] ${
-            c === "W" ? "bg-up/80"
-            : c === "L" ? "bg-neg/70"
-            : "bg-line-strong"}`} />
-      ))}
+      title={`${name} — last ${form.length}, oldest→newest: ${form} (rightmost is latest)`}
+      className={`inline-flex flex-none items-center gap-[2px] ${className}`}>
+      {slots.map((c, i) => {
+        const latest = i === FORM_SLOTS - 1 && c != null;
+        return (
+          <i key={i} data-r={c ?? ""}
+            className={`h-[7px] w-[7px] rounded-[1.5px] ${
+              c == null ? "border border-line"
+              : c === "W" ? "bg-up/85"
+              : c === "L" ? "bg-neg/75"
+              : "bg-line-strong"}${
+              latest ? " ring-1 ring-ink-hi/70 ring-offset-1 ring-offset-bs" : ""}`} />
+        );
+      })}
     </span>
   );
 }
@@ -230,7 +247,8 @@ function RowCard({ row, rank, modeId, clubCount }: {
               title={favHome ? "the favourite is at home" : "the favourite is away"}>
               {favHome ? "H" : "A"}
             </span>
-            <FormStrip form={row.form?.fav} name={row.favourite} />
+            <FormStrip form={row.form?.fav} name={row.favourite}
+              className="ml-auto pl-2" />
           </span>
           <span className="mt-0.5 flex min-w-0 items-center gap-2">
             <span aria-hidden
@@ -238,7 +256,8 @@ function RowCard({ row, rank, modeId, clubCount }: {
             <span className="truncate text-[12.5px] text-ink-low [font-family:var(--font-archivo)] [font-stretch:96%]">
               <span className="text-ink-faint">vs </span>{row.opponent}
             </span>
-            <FormStrip form={row.form?.opp} name={row.opponent} />
+            <FormStrip form={row.form?.opp} name={row.opponent}
+              className="ml-auto pl-2" />
           </span>
         </span>
         <span className="flex-none text-right">
@@ -322,7 +341,8 @@ function RefusalRow({ r }: { r: BoardRefusal }) {
 }
 
 export function LeagueColumn({
-  slug, meta, rows, refusals, days, dayKeys, sortFor, dayLabels, review,
+  slug, meta, rows, refusals, days, dayKeys, sortFor, dayLabels, colIndex,
+  review,
 }: {
   slug: string;
   /** absent when the payload never mentioned this league at all */
@@ -340,6 +360,15 @@ export function LeagueColumn({
   sortFor: (dayKey: string) => ColumnSort;
   /** matchday labels, for the rest-day ghosts' "next" line */
   dayLabels: Record<string, string>;
+  /** the column's EXPLICIT grid column at xl (1-based). Auto placement
+   *  cannot be trusted here: the full-width band labels occupy rows
+   *  2,4,6… across every explicit column, so an auto-placed section
+   *  spanning rows 1..N fits nowhere and the grid silently creates
+   *  IMPLICIT columns — four phantom 0px tracks that swallowed the band
+   *  tints and unevenly sized the real ones (the glued-headers bug,
+   *  2026-09-01). Explicitly placed items may overlap; that is the
+   *  contract the whole band layout stands on. */
+  colIndex: number;
   /** the finished tail's slice of this league. A SEPARATE payload on a
    *  separate fetch: the board is a 90s sweep of what is coming, the
    *  review is a long-cached read of matches that cannot change again.
@@ -377,8 +406,9 @@ export function LeagueColumn({
       id={`picker-col-${slug}`}
       aria-label={`${leagueLabel(slug)} column`}
       style={{ ["--lg" as string]: hueOf(slug),
-        ["--tracks" as string]: String(trackCount) }}
-      className="min-w-0 scroll-mt-16 xl:grid xl:content-start xl:[grid-template-rows:subgrid] xl:[grid-row:1/span_var(--tracks)]">
+        ["--tracks" as string]: String(trackCount),
+        ["--col" as string]: String(colIndex) }}
+      className="min-w-0 scroll-mt-16 xl:grid xl:content-start xl:[grid-template-rows:subgrid] xl:[grid-template-columns:minmax(0,1fr)] xl:[grid-row:1/span_var(--tracks)] xl:[grid-column:var(--col)]">
       <header className="self-start border-b border-line pb-3 xl:[grid-row:1]">
         {/* the league's own light — a 2px rail, wayfinding only */}
         <div aria-hidden
