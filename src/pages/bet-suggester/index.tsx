@@ -30,6 +30,18 @@
 //     active key (no quote, under a price key) sorts last, stated on
 //     screen. The per-column logic lives in lib/pickerSort.ts; the card
 //     itself in components/PickerColumn.tsx.
+//  5. A FINISHED MATCH IS STILL REACHABLE. The board used to lose a
+//     fixture at kickoff — "once a match finished I have no way to access
+//     it to see where could I do better." Each column now carries a
+//     FINISHED TAIL under its upcoming rows, on a second, independent
+//     request to GET /api/picker/review. Two things that page owes the
+//     reader and that this file is responsible for: the BACK WINDOW
+//     control (default 7 days, matching the forward window, so a league
+//     column tells one continuous story), and the STORE NOTE — when no
+//     snapshot store is configured, nothing is being frozen anywhere and
+//     every read in every tail is a reconstruction. That is a property of
+//     the deployment, not a coincidence, and it belongs at the top of the
+//     page rather than being inferred card by card.
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
@@ -38,6 +50,9 @@ import {
   Board, CURRENT_SEASON_GP_FLOOR, PICKER_LEAGUE_ORDER, THIN_ASK_SIZE,
   WIDE_SPREAD_C, fetchBoard, leagueLabel,
 } from "../../lib/pickerApi";
+import {
+  DEFAULT_BACK, REVIEW_WINDOWS, Review, fetchReview,
+} from "../../lib/pickerReview";
 import { Eyebrow } from "../../components/ui";
 import { ArchiveMenu } from "../../components/ArchiveMenu";
 import { LeagueColumn } from "../../components/PickerColumn";
@@ -65,6 +80,13 @@ export default function PickerBoard() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [nonce, setNonce] = useState(0);
+  // The finished tail rides on its OWN state, its own request and its own
+  // window. A dead review must not blank the board, and a slow one must
+  // not hold the board's first paint.
+  const [back, setBack] = useState(DEFAULT_BACK);
+  const [review, setReview] = useState<Review | null>(null);
+  const [reviewError, setReviewError] = useState("");
+  const [reviewLoading, setReviewLoading] = useState(true);
 
   // Deep-link guard. /bet-suggester?league=<id> was the carousel's own
   // URL until 2026-08-30 and is all over the match hubs' back links and
@@ -114,11 +136,53 @@ export default function PickerBoard() {
     return () => { clearTimeout(t); ac.abort(); };
   }, [load, nonce, deepLink]);
 
+  const loadReview = useCallback(async (signal: AbortSignal) => {
+    setReviewLoading(true);
+    try {
+      const r = await fetchReview(back, signal);
+      if (signal.aborted) return;
+      setReview(r);
+      setReviewError("");
+    } catch (e) {
+      if (signal.aborted) return;
+      // Same contract as the board: on failure the previous payload is
+      // DROPPED. A finished tail from an older window standing under a
+      // fresh board is stale dressed as current.
+      setReview(null);
+      setReviewError(e instanceof Error ? e.message : String(e));
+    } finally {
+      if (!signal.aborted) setReviewLoading(false);
+    }
+  }, [back]);
+
+  useEffect(() => {
+    if (deepLink !== null) return;
+    const ac = new AbortController();
+    const t = setTimeout(() => { void loadReview(ac.signal); }, 0);
+    return () => { clearTimeout(t); ac.abort(); };
+  }, [loadReview, nonce, deepLink]);
+
   const rows = board?.rows ?? [];
   const refusals = board?.refusals ?? [];
   const leaguesMap = board?.leagues ?? {};
   const leagues = Object.entries(leaguesMap);
   const priorLeagues = leagues.filter(([, m]) => m.src === "prior");
+
+  const finished = review?.finished ?? [];
+  const finishedRefusals = review?.refusals ?? [];
+  const reviewLeagues = review?.leagues ?? {};
+  // "Nothing was captured" and "capture was never possible here" are
+  // different facts, and only the payload can tell them apart. When the
+  // store reports it cannot write, EVERY read in every tail below is a
+  // reconstruction by construction — say it once, at the top, rather than
+  // leaving the reader to notice the pattern.
+  const storeNote = review && review.store && review.store.writable === false
+    ? `No pre-kickoff read is being frozen on this deployment (snapshot `
+      + `store: ${review.store.backend}), so every read below is a `
+      + `RECONSTRUCTION rebuilt from the season archive. That is a `
+      + `property of the setup, not a coincidence, and it will stay true `
+      + `until a store is configured.`
+    : null;
 
   // Column order is FIXED — MLS · EPL · La Liga · Liga MX — then any slug
   // the payload serves that this page does not know, appended rather than
@@ -129,6 +193,12 @@ export default function PickerBoard() {
       ...Object.keys(leaguesMap),
       ...rows.map((r) => r.league),
       ...refusals.map((r) => r.league),
+      // the review payload too: a league that has finished matches but no
+      // upcoming ones must not lose its column, or the operator loses the
+      // matches he came back to look at
+      ...Object.keys(reviewLeagues),
+      ...finished.map((r) => r.league),
+      ...finishedRefusals.map((r) => r.league),
     ])].filter((s) => !PICKER_LEAGUE_ORDER.includes(s)),
   ];
 
@@ -187,6 +257,33 @@ export default function PickerBoard() {
               aria-pressed={days === n}
               className={`rounded-md border px-2 py-1 transition-colors ${
                 days === n
+                  ? "border-accent/50 bg-accent/10 text-accent"
+                  : "border-line text-ink-faint hover:border-line-strong hover:text-ink-mid"}`}>
+              {n}d
+            </button>
+          ))}
+          {/* The FINISHED tail's own window, its own control. It opens at
+              the same 7 days as the board's forward window on purpose —
+              a column should tell one continuous story — but the two are
+              separate questions ("what is coming" / "what did I miss")
+              and a reader lengthening one must not silently lengthen the
+              other. 30 is the endpoint's own cap; it refuses beyond that
+              rather than clamping, so this list may never grow past it.
+
+              Each chip carries an EXPLICIT accessible name rather than
+              relying on the visible "3d". Two reasons, both real: "3d"
+              alone is a poor button name for anyone who cannot see the
+              row it sits in, and the forward window's chips carry the
+              same visible text — a name that says WHICH window keeps the
+              two addressable apart, by assistive tech and by tests. */}
+          <span className="ml-4 mr-1 text-ink-faint">finished</span>
+          {REVIEW_WINDOWS.map((n) => (
+            <button key={n} data-testid="review-window" data-back={n}
+              onClick={() => setBack(n)}
+              aria-pressed={back === n}
+              aria-label={`finished window, last ${n} day${n === 1 ? "" : "s"}`}
+              className={`rounded-md border px-2 py-1 transition-colors ${
+                back === n
                   ? "border-accent/50 bg-accent/10 text-accent"
                   : "border-line text-ink-faint hover:border-line-strong hover:text-ink-mid"}`}>
               {n}d
@@ -290,7 +387,14 @@ export default function PickerBoard() {
                   <LeagueColumn key={slug} slug={slug} days={days}
                     meta={leaguesMap[slug]}
                     rows={rows.filter((r) => r.league === slug)}
-                    refusals={refusals.filter((r) => r.league === slug)} />
+                    refusals={refusals.filter((r) => r.league === slug)}
+                    review={{
+                      rows: finished.filter((r) => r.league === slug),
+                      refusals: finishedRefusals.filter((r) => r.league === slug),
+                      meta: reviewLeagues[slug],
+                      back, loading: reviewLoading, error: reviewError,
+                      storeNote,
+                    }} />
                 ))}
               </div>
             </>
@@ -349,6 +453,60 @@ export default function PickerBoard() {
                 WIDE = spread over {WIDE_SPREAD_C}¢; THIN = ask size under{" "}
                 {THIN_ASK_SIZE}. A missing quote never removes a fixture — the
                 price decorates the board, it does not gate it.
+              </dd>
+            </div>
+            <div>
+              <dt className="text-ink-hi">captured · reconstructed</dt>
+              <dd className="mt-1">
+                Under each column&apos;s divider are the matches that already
+                finished. CAPTURED means the board row was frozen before
+                kickoff — what the picker actually said. RECONSTRUCTED means
+                nothing was stored, so the picker&apos;s own code was re-run
+                over the season archive rewound to that kickoff. The second
+                is weaker evidence and is drawn as such: a dashed rail, a
+                different ink, the words &ldquo;NOT a capture&rdquo;, and a
+                provenance block naming the archive file and the instant it
+                was rewound to. Rebuilding a read from today&apos;s table and
+                calling it the pre-kickoff one would grade the picker against
+                results it did not have.
+              </dd>
+            </div>
+            <div>
+              <dt className="text-ink-hi">shot share · 20&apos; · before the opener · FT</dt>
+              <dd className="mt-1">
+                The favourite&apos;s share of the shots at three checkpoints,
+                with the raw counts beside it — the event count is part of
+                the answer. A win from 44% of the shots and a win from 91% of
+                them are the same word on the scoreboard and opposite
+                pictures here, which is the whole reason the bars are drawn.
+                TILT_FAV / CONTESTED / TILT_OPP label the threat tilt against
+                the live card&apos;s own band; that band is exploratory and
+                says so.
+              </dd>
+            </div>
+            <div>
+              <dt className="text-ink-hi">the two verdicts</dt>
+              <dd className="mt-1">
+                &ldquo;Favourite won&rdquo; answers the scoreboard.
+                &ldquo;In-play read at 20&apos;&rdquo; answers the tape. They
+                are derived separately and shown separately because they
+                disagree, and the disagreement is the thing worth looking at.
+                Either can read &ldquo;not known&rdquo;, which is not a
+                &ldquo;no&rdquo;. No tally of either is kept: a handful of
+                matches cannot tell a read apart from luck.
+              </dd>
+            </div>
+            <div>
+              <dt className="text-ink-hi">sorting the finished tail</dt>
+              <dd className="mt-1">
+                The tail sorts on its own keys — kickoff (most recent first,
+                its default), the Stage-1 gaps, the overall tier gap, either
+                verdict, the shot share at full time or at 20&apos;, and
+                captured-before-reconstructed — with the same direction flip
+                and the same rule: a row with no value under the active key
+                sorts after every row that has one, in both directions, and
+                the tail names which absence it is. It is independent of the
+                column above it, and remembered separately.
               </dd>
             </div>
             <div>

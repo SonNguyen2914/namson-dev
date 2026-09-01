@@ -225,9 +225,22 @@ async function serveBoard(page: import("@playwright/test").Page,
     r.fulfill(json(body, status)));
 }
 
+// The finished tail is a SECOND request (GET /api/picker/review), so every
+// test that opens the board serves it too — an unmocked tail would put a
+// live network call inside otherwise hermetic tests and make the page's
+// slowest element the weather. Its recorded shapes are at the bottom of
+// this file, beside the tests that read them.
+async function serveReview(page: import("@playwright/test").Page,
+                           body: unknown = REVIEW, status = 200) {
+  await page.route("**/api/picker/review**", (r) =>
+    r.fulfill(json(body, status)));
+}
+
 async function open(page: import("@playwright/test").Page,
-                    body: unknown = BOARD, status = 200) {
+                    body: unknown = BOARD, status = 200,
+                    reviewBody: unknown = REVIEW, reviewStatus = 200) {
   await serveBoard(page, body, status);
+  await serveReview(page, reviewBody, reviewStatus);
   await page.goto("/bet-suggester");
 }
 
@@ -402,6 +415,11 @@ test("a league's kalshi failure is named in its column, costing quotes, not rows
 
 test("nothing on the board reads as advice", async ({ page }) => {
   await open(page);
+  // the finished tail is part of the page and part of this promise, so
+  // wait for its cards before snapshotting the body — a snapshot taken
+  // mid-fetch would clear the tail's copy without ever reading it
+  await expect(page.getByTestId("picker-row").first()).toBeVisible();
+  await expect(page.getByTestId("review-row").first()).toBeVisible();
   const body = (await page.textContent("body")) || "";
   expect(body).not.toMatch(/\b(TAKE|BUY NOW|SELL NOW|BET THIS|BET NOW)\b/);
   expect(body).not.toMatch(/confidence/i);
@@ -688,4 +706,1027 @@ test("the picker proxy forwards board — unmocked on purpose",
     // and a route that is not on the list is refused, by this file
     const bad = await request.get("/api/picker/decision");
     expect(await bad.text()).toContain("unknown picker route");
+  });
+// ============================== the finished tail ==========================
+//
+// Recorded shapes of GET /api/picker/review. The three narrative fixtures
+// below are the REAL 2026-08-29/30 slate as the endpoint serves it — the
+// ids, clubs, scores, tier gaps, checkpoints and verdicts are all taken
+// from a live call, not invented — because the whole point of the tail is
+// that a win from 44% of the shots and a win from 91% of them must not
+// read the same, and only the real numbers prove the card does that.
+//
+// What these tests defend, in order of how much damage the failure does:
+//
+//   1. A RECONSTRUCTION MUST NEVER LOOK LIKE A CAPTURE. A capture is what
+//      the picker actually said; a reconstruction was rebuilt afterwards
+//      from an archive rewound to the kickoff. The second is weaker
+//      evidence and has to LOOK weaker — asserted three ways here
+//      (structure, word, and computed border), because a distinction
+//      carried by colour alone is no distinction for a reader who cannot
+//      see it or a test that cannot measure it.
+//   2. TWO VERDICTS, NEVER ONE TICK. The scoreboard and the tape are
+//      separate answers and either can be "not known", which is not a no.
+//   3. NO TALLY. Nothing on this surface counts hits.
+//   4. The tail's sorts REORDER and NEVER FILTER, on their own keys,
+//      independently of the column above them.
+
+function hoursAgo(h: number) {
+  return new Date(Date.now() - h * 3600_000).toISOString();
+}
+
+/** A checkpoint, in the payload's own shape. Counts are favourite-blind
+ *  (they are per SIDE); the shares are favourite-relative. */
+function cp(over: Record<string, unknown>) {
+  return {
+    checkpoint: "20'", cutoff_minute: 20,
+    home: { shots: 0, on_target: 0, corners: 0, crosses: 0, take_ons: 0, saves: 0 },
+    away: { shots: 0, on_target: 0, corners: 0, crosses: 0, take_ons: 0, saves: 0 },
+    score: { home: 0, away: 0 },
+    included_plays: 300, fav_side: "home",
+    shot_share: 0.5, tilt: 0.5, tilt_label: "CONTESTED",
+    tilt_band: 0.65,
+    tilt_note: "EXPLORATORY — NOT VALIDATED: band chosen by eye on "
+      + "n=35/14/26, never preregistered; the label describes this row, "
+      + "it forecasts nothing.",
+    on_target: { fav: 0, opp: 0, lead: 0 },
+    ...over,
+  };
+}
+
+const CONFIRM_NOTE =
+  "EXPLORATORY — NOT VALIDATED, NOT PREREGISTERED, NO LEDGER ROW. The "
+  + "confirm rule is: the favourite leads the card's threat tilt (band "
+  + "patterns.TILT_THREAT) AND leads the on-target count.";
+
+/** THE TEACHING CASE, HALF ONE. Vancouver won 3-0 away — and the opener
+ *  was a 40th-minute penalty taken from 44% of the shots and NOTHING on
+ *  target either way. Reconstructed: nothing was frozen for it. */
+const VANCOUVER = {
+  league: "mls", espn: "usa.1",
+  event_id: "761762", competition_id: "761762",
+  kickoff: hoursAgo(30),
+  home: "Sporting Kansas City", away: "Vancouver Whitecaps",
+  status_detail: "FT",
+  result: { home: 0, away: 3, winner: "away", source: "espn_scoreboard" },
+  pre_kickoff: {
+    origin: "reconstructed", origin_label: "RECONSTRUCTED",
+    origin_note: "NOT a capture: rebuilt from the season archive rewound "
+      + "to this kickoff, because no pre-kickoff board read was stored",
+    captured_at: null, captured_seconds_before_kickoff: null,
+    board_date: null,
+    reconstructed_from: {
+      season_file: "research_archive/apif_pro_topup_2026-08-30/"
+        + "inplay_states_2026/states-mls-2026.json",
+      season_file_sha256: "6d48a22cb784b575a03d915d517bb91e78c26fcc78",
+      season_file_last_fixture: "2026-08-30T02:30:00+00:00",
+      season_year: "2026", prior_file: null,
+      results_in_table: 319, src: "current", min_current_gp: 20,
+      rewound_to: "2026-08-30T00:30:00+00:00",
+      archive_fixture_id: 1490429,
+      archive_result: { home: 0, away: 3 },
+      considered: [],
+    },
+    unavailable_reason: null,
+    state: {
+      refused: false, league: "mls",
+      home: "Sporting Kansas City", away: "Vancouver Whitecaps",
+      favourite: "Vancouver Whitecaps", opponent: "Sporting Kansas City",
+      fav_side: "away", resolution: {},
+      ppg_gap: 1.2857142857142856, gdg_gap: 2.8261904761904764, rank_gap: 28,
+      gp_current: { home: 21, away: 20, min: 20 },
+      src: "current", ranks: { fav: 2, opp: 30 },
+      tiers: { ovr: [1, 5], atk: [1, 5], def: [1, 5] },
+      tier_gaps: { ovr: 4, atk: 4, def: 4 }, shape: "CLEAN",
+      event_id: null, kickoff: "2026-08-30T00:30:00+00:00",
+    },
+  },
+  shot_state: {
+    at_20: cp({
+      checkpoint: "20'", cutoff_minute: 20, fav_side: "away",
+      home: { shots: 2, on_target: 0, corners: 0, crosses: 1, take_ons: 4, saves: 1 },
+      away: { shots: 3, on_target: 0, corners: 1, crosses: 5, take_ons: 2, saves: 1 },
+      included_plays: 336,
+      shot_share: 0.6, tilt: 0.6666666666666666, tilt_label: "TILT_FAV",
+      on_target: { fav: 0, opp: 0, lead: 0 },
+    }),
+    before_first_goal: cp({
+      checkpoint: "before 40'", cutoff_minute: 39, fav_side: "away",
+      home: { shots: 5, on_target: 0, corners: 0, crosses: 5, take_ons: 5, saves: 1 },
+      away: { shots: 4, on_target: 0, corners: 1, crosses: 7, take_ons: 2, saves: 2 },
+      included_plays: 566,
+      shot_share: 0.4444444444444444, tilt: 0.5, tilt_label: "CONTESTED",
+      on_target: { fav: 0, opp: 0, lead: 0 },
+    }),
+    full_time: cp({
+      checkpoint: "FT", cutoff_minute: null, fav_side: "away",
+      home: { shots: 8, on_target: 0, corners: 2, crosses: 14, take_ons: 21, saves: 4 },
+      away: { shots: 16, on_target: 6, corners: 4, crosses: 12, take_ons: 8, saves: 5 },
+      score: { home: 0, away: 3 }, included_plays: 1332,
+      shot_share: 0.6666666666666666, tilt: 0.7222222222222222,
+      tilt_label: "TILT_FAV",
+      on_target: { fav: 6, opp: 0, lead: 6 },
+    }),
+    first_goal_minute: 40, error: null,
+  },
+  fit: {
+    favourite_won: true, favourite_won_reason: "winner=away fav_side=away",
+    confirmed_at_20: false,
+    confirm_reason: "tilt_label=TILT_FAV on_target 0-0",
+    confirm_rule: "tilt_fav_and_on_target_lead",
+    confirm_note: CONFIRM_NOTE, checkpoint_minute: 20,
+  },
+};
+
+/** THE TEACHING CASE, HALF TWO. Nashville won 4-0 with 91% of the shots
+ *  and a 3-1 on-target lead before the 43rd-minute opener. Same word on
+ *  the scoreboard as Vancouver; the opposite picture underneath. */
+const NASHVILLE = {
+  league: "mls", espn: "usa.1",
+  event_id: "761764", competition_id: "761764",
+  kickoff: hoursAgo(30),
+  home: "Nashville SC", away: "FC Cincinnati",
+  status_detail: "FT",
+  result: { home: 4, away: 0, winner: "home", source: "espn_scoreboard" },
+  pre_kickoff: {
+    origin: "reconstructed", origin_label: "RECONSTRUCTED",
+    origin_note: "NOT a capture",
+    captured_at: null, captured_seconds_before_kickoff: null,
+    board_date: null,
+    reconstructed_from: {
+      season_file: "research_archive/apif_pro_topup_2026-08-30/"
+        + "inplay_states_2026/states-mls-2026.json",
+      season_file_sha256: "6d48a22cb784b575a03d915d517bb91e78c26fcc78",
+      season_file_last_fixture: "2026-08-30T02:30:00+00:00",
+      season_year: "2026", prior_file: null,
+      results_in_table: 319, src: "current", min_current_gp: 20,
+      rewound_to: "2026-08-30T00:30:00+00:00",
+      archive_fixture_id: 1490428,
+      archive_result: { home: 4, away: 0 },
+      considered: [],
+    },
+    unavailable_reason: null,
+    state: {
+      refused: false, league: "mls",
+      home: "Nashville SC", away: "FC Cincinnati",
+      favourite: "Nashville SC", opponent: "FC Cincinnati",
+      fav_side: "home", resolution: {},
+      ppg_gap: 0.8333333333333335, gdg_gap: 1.138095238095238, rank_gap: 11,
+      gp_current: { home: 21, away: 20, min: 20 },
+      src: "current", ranks: { fav: 1, opp: 12 },
+      tiers: { ovr: [1, 2], atk: [1, 1], def: [1, 5] },
+      tier_gaps: { ovr: 1, atk: 0, def: 4 }, shape: "SPLIT",
+      event_id: null, kickoff: "2026-08-30T00:30:00+00:00",
+    },
+  },
+  shot_state: {
+    at_20: cp({
+      checkpoint: "20'", cutoff_minute: 20, fav_side: "home",
+      home: { shots: 6, on_target: 2, corners: 1, crosses: 4, take_ons: 6, saves: 1 },
+      away: { shots: 1, on_target: 1, corners: 1, crosses: 1, take_ons: 3, saves: 4 },
+      included_plays: 323,
+      shot_share: 0.8571428571428571, tilt: 0.75, tilt_label: "TILT_FAV",
+      on_target: { fav: 2, opp: 1, lead: 1 },
+    }),
+    before_first_goal: cp({
+      checkpoint: "before 43'", cutoff_minute: 42, fav_side: "home",
+      home: { shots: 10, on_target: 3, corners: 3, crosses: 11, take_ons: 15, saves: 1 },
+      away: { shots: 1, on_target: 1, corners: 1, crosses: 4, take_ons: 5, saves: 8 },
+      included_plays: 616,
+      shot_share: 0.9090909090909091, tilt: 0.8421052631578947,
+      tilt_label: "TILT_FAV",
+      on_target: { fav: 3, opp: 1, lead: 2 },
+    }),
+    full_time: cp({
+      checkpoint: "FT", cutoff_minute: null, fav_side: "home",
+      home: { shots: 19, on_target: 7, corners: 6, crosses: 16, take_ons: 25, saves: 10 },
+      away: { shots: 15, on_target: 6, corners: 4, crosses: 15, take_ons: 12, saves: 11 },
+      score: { home: 4, away: 0 }, included_plays: 1312,
+      shot_share: 0.5588235294117647, tilt: 0.5614035087719298,
+      tilt_label: "CONTESTED",
+      on_target: { fav: 7, opp: 6, lead: 1 },
+    }),
+    first_goal_minute: 43, error: null,
+  },
+  fit: {
+    favourite_won: true, favourite_won_reason: "winner=home fav_side=home",
+    confirmed_at_20: true,
+    confirm_reason: "tilt_label=TILT_FAV on_target 2-1",
+    confirm_rule: "tilt_fav_and_on_target_lead",
+    confirm_note: CONFIRM_NOTE, checkpoint_minute: 20,
+  },
+};
+
+/** A CAPTURED read — the strong case, and the only one that can carry a
+ *  price, because a reconstruction has no book. The favourite LOST, which
+ *  matters: a captured card must not be the card that always says yes. */
+const CAPTURED = {
+  league: "mls", espn: "usa.1",
+  event_id: "761770", competition_id: "761770",
+  kickoff: hoursAgo(6),
+  home: "Austin FC", away: "Portland Timbers",
+  status_detail: "FT",
+  result: { home: 2, away: 1, winner: "home", source: "espn_scoreboard" },
+  pre_kickoff: {
+    origin: "captured", origin_label: "CAPTURED",
+    origin_note: "frozen from the live board before kickoff — this is what "
+      + "the picker actually said",
+    captured_at: hoursAgo(14),
+    captured_seconds_before_kickoff: 29040,     // 8h 4m
+    board_date: "20260830",
+    reconstructed_from: null, unavailable_reason: null,
+    state: {
+      refused: false, league: "mls",
+      home: "Austin FC", away: "Portland Timbers",
+      favourite: "Portland Timbers", opponent: "Austin FC",
+      fav_side: "away", resolution: {},
+      ppg_gap: 0.6, gdg_gap: 0.9, rank_gap: 9,
+      gp_current: { home: 22, away: 21, min: 21 },
+      src: "current", ranks: { fav: 4, opp: 13 },
+      tiers: { ovr: [2, 3], atk: [2, 4], def: [1, 3] },
+      tier_gaps: { ovr: 1, atk: 2, def: 2 }, shape: "CLEAN",
+      event_id: "761770", kickoff: hoursAgo(6),
+      kalshi: {
+        event_ticker: "KXMLSGAME-SAMPLE-ATXPOR",
+        ticker: "KXMLSGAME-SAMPLE-ATXPOR-POR",
+        ask_c: 58, bid_c: 54, spread_c: 4,
+        ask_size: 210, bid_size: 180, flags: ["WIDE"],
+      },
+    },
+  },
+  shot_state: {
+    at_20: cp({
+      checkpoint: "20'", cutoff_minute: 20, fav_side: "away",
+      home: { shots: 4, on_target: 2, corners: 2, crosses: 3, take_ons: 5, saves: 0 },
+      away: { shots: 2, on_target: 0, corners: 0, crosses: 2, take_ons: 1, saves: 2 },
+      included_plays: 280,
+      shot_share: 0.3333333333333333, tilt: 0.25, tilt_label: "TILT_OPP",
+      on_target: { fav: 0, opp: 2, lead: -2 },
+    }),
+    before_first_goal: cp({
+      checkpoint: "before 12'", cutoff_minute: 11, fav_side: "away",
+      home: { shots: 3, on_target: 2, corners: 1, crosses: 2, take_ons: 3, saves: 0 },
+      away: { shots: 1, on_target: 0, corners: 0, crosses: 1, take_ons: 0, saves: 1 },
+      included_plays: 150,
+      shot_share: 0.25, tilt: 0.16666666666666666, tilt_label: "TILT_OPP",
+      on_target: { fav: 0, opp: 2, lead: -2 },
+    }),
+    full_time: cp({
+      checkpoint: "FT", cutoff_minute: null, fav_side: "away",
+      home: { shots: 14, on_target: 6, corners: 5, crosses: 12, take_ons: 18, saves: 3 },
+      away: { shots: 11, on_target: 3, corners: 3, crosses: 9, take_ons: 10, saves: 5 },
+      score: { home: 2, away: 1 }, included_plays: 1200,
+      shot_share: 0.44, tilt: 0.42, tilt_label: "CONTESTED",
+      on_target: { fav: 3, opp: 6, lead: -3 },
+    }),
+    first_goal_minute: 12, error: null,
+  },
+  fit: {
+    favourite_won: false, favourite_won_reason: "winner=home fav_side=away",
+    confirmed_at_20: false,
+    confirm_reason: "tilt_label=TILT_OPP on_target 0-2",
+    confirm_rule: "tilt_fav_and_on_target_lead",
+    confirm_note: CONFIRM_NOTE, checkpoint_minute: 20,
+  },
+};
+
+/** NO READ AT ALL — nothing frozen, and the archive stops before the
+ *  match. A third state, not an empty version of the other two: the score
+ *  and the tape are still here, both verdicts read "not known", and the
+ *  files that were looked at are named so the staleness is fixable. */
+const NO_READ = {
+  league: "laliga", espn: "esp.1",
+  event_id: "401882903", competition_id: "401882903",
+  kickoff: hoursAgo(20),
+  home: "Barcelona", away: "Rayo Vallecano",
+  status_detail: "FT",
+  result: { home: 5, away: 2, winner: "home", source: "espn_scoreboard" },
+  pre_kickoff: {
+    origin: "reconstructed", origin_label: "NOT AVAILABLE",
+    origin_note: "no stored read, and the archive cannot rebuild one",
+    captured_at: null, captured_seconds_before_kickoff: null,
+    board_date: null,
+    reconstructed_from: {
+      season_file: null,
+      considered: [
+        { path: "research_archive/apif_pro_topup_2026-08-30/"
+            + "inplay_states_2026/states-la-liga-2026.json",
+          last_fixture: "2026-08-30T15:00:00+00:00" },
+      ],
+    },
+    unavailable_reason: "fixture_not_in_archive",
+    state: null,
+  },
+  shot_state: {
+    at_20: cp({
+      checkpoint: "20'", cutoff_minute: 20, fav_side: null,
+      home: { shots: 5, on_target: 3, corners: 2, crosses: 4, take_ons: 7, saves: 1 },
+      away: { shots: 1, on_target: 0, corners: 0, crosses: 1, take_ons: 2, saves: 3 },
+      included_plays: 310,
+      shot_share: null, tilt: null, tilt_label: null, on_target: null,
+    }),
+    before_first_goal: cp({
+      checkpoint: "before 9'", cutoff_minute: 8, fav_side: null,
+      home: { shots: 2, on_target: 1, corners: 1, crosses: 2, take_ons: 3, saves: 0 },
+      away: { shots: 0, on_target: 0, corners: 0, crosses: 0, take_ons: 1, saves: 1 },
+      included_plays: 120,
+      shot_share: null, tilt: null, tilt_label: null, on_target: null,
+    }),
+    full_time: cp({
+      checkpoint: "FT", cutoff_minute: null, fav_side: null,
+      home: { shots: 22, on_target: 11, corners: 7, crosses: 18, take_ons: 24, saves: 4 },
+      away: { shots: 9, on_target: 4, corners: 2, crosses: 11, take_ons: 9, saves: 9 },
+      score: { home: 5, away: 2 }, included_plays: 1400,
+      shot_share: null, tilt: null, tilt_label: null, on_target: null,
+    }),
+    first_goal_minute: 9, error: null,
+  },
+  fit: {
+    favourite_won: null, favourite_won_reason: "no_pre_kickoff_favourite",
+    confirmed_at_20: null, confirm_reason: "no_pre_kickoff_favourite",
+    confirm_rule: "tilt_fav_and_on_target_lead",
+    confirm_note: CONFIRM_NOTE, checkpoint_minute: 20,
+  },
+};
+
+/** A DEAD PLAYS FEED. The match still appears, with its score and its
+ *  pre-kickoff read; only the tape is missing, and it is named. */
+const NO_TAPE = {
+  ...NASHVILLE,
+  league: "epl", espn: "eng.1",
+  event_id: "401879295", competition_id: "401879295",
+  kickoff: hoursAgo(50),
+  home: "Chelsea", away: "Brighton & Hove Albion",
+  result: { home: 4, away: 3, winner: "home", source: "espn_scoreboard" },
+  pre_kickoff: {
+    ...NASHVILLE.pre_kickoff,
+    state: {
+      ...NASHVILLE.pre_kickoff.state,
+      league: "epl", home: "Chelsea", away: "Brighton & Hove Albion",
+      favourite: "Chelsea", opponent: "Brighton & Hove Albion",
+    },
+  },
+  shot_state: {
+    at_20: null, before_first_goal: null, full_time: null,
+    first_goal_minute: null,
+    error: "HTTPError: plays feed 502",
+  },
+  fit: {
+    favourite_won: true, favourite_won_reason: "winner=home fav_side=home",
+    confirmed_at_20: null, confirm_reason: "no_shot_state",
+    confirm_rule: "tilt_fav_and_on_target_lead",
+    confirm_note: CONFIRM_NOTE, checkpoint_minute: 20,
+  },
+};
+
+/** A `post` fixture that never actually completed. Listed, never read as
+ *  a nil-nil — that would invent a match nobody played. */
+const NOT_PLAYED = {
+  league: "ligamx", espn: "mex.1",
+  event_id: "401876999", competition_id: "401876999",
+  kickoff: hoursAgo(40),
+  home: "Puebla", away: "Necaxa",
+  status_detail: "Postponed",
+  reason: "not_completed",
+};
+
+const REVIEW_LEAGUES = {
+  mls: { finished: 3, captured: 1, reconstructed: 2, unavailable: 0, error: null },
+  epl: { finished: 1, captured: 0, reconstructed: 1, unavailable: 0, error: null },
+  laliga: { finished: 1, captured: 0, reconstructed: 0, unavailable: 1, error: null },
+  ligamx: { finished: 0, captured: 0, reconstructed: 0, unavailable: 0, error: null },
+};
+
+const REVIEW = {
+  generated_at: new Date().toISOString(),
+  date: "20260831", back: 7,
+  window: { from: "20260824", to: "20260831" },
+  store: { backend: "postgres", writable: true },
+  leagues: REVIEW_LEAGUES,
+  // deliberately NOT in kickoff order — the tail must sort itself
+  finished: [NASHVILLE, CAPTURED, NO_TAPE, VANCOUVER, NO_READ],
+  refusals: [NOT_PLAYED],
+};
+
+// ---- a synthetic MLS tail where EVERY sort key separates the rows ------
+// Five finished fixtures whose ten sortable values produce TEN DISTINCT
+// orders, so a mode that silently falls back to another key cannot stay
+// green. ECHO is the null row: no pre-kickoff read, no tape, no verdict —
+// it has a value under none of the ten keys and must sort last under all
+// of them, in both directions.
+function finishedRow(over: Record<string, unknown>) {
+  return {
+    league: "mls", espn: "usa.1",
+    status_detail: "FT",
+    result: { home: 1, away: 0, winner: "home", source: "espn_scoreboard" },
+    ...over,
+  };
+}
+
+/** A pre-kickoff read, either origin, with the four sortable numbers. */
+function sortRead(origin: "captured" | "reconstructed",
+                  o: { gdg: number; ppg: number; rank: number; ovr: number }) {
+  const state = {
+    refused: false, league: "mls", home: "H", away: "A",
+    favourite: "H", opponent: "A", fav_side: "home", resolution: {},
+    ppg_gap: o.ppg, gdg_gap: o.gdg, rank_gap: o.rank,
+    gp_current: { home: 20, away: 20, min: 20 },
+    src: "current", ranks: { fav: 1, opp: 10 },
+    tiers: { ovr: [1, 3], atk: [1, 3], def: [1, 3] },
+    tier_gaps: { ovr: o.ovr, atk: 1, def: 1 }, shape: "CLEAN",
+    event_id: null, kickoff: null,
+    ...(origin === "captured" ? { kalshi: null } : {}),
+  };
+  return origin === "captured"
+    ? { origin, origin_label: "CAPTURED", origin_note: "frozen",
+        captured_at: hoursAgo(40), captured_seconds_before_kickoff: 3600,
+        board_date: "20260830", reconstructed_from: null,
+        unavailable_reason: null, state }
+    : { origin, origin_label: "RECONSTRUCTED", origin_note: "NOT a capture",
+        captured_at: null, captured_seconds_before_kickoff: null,
+        board_date: null,
+        reconstructed_from: {
+          season_file: "research_archive/x/states-mls-2026.json",
+          rewound_to: "2026-08-30T00:30:00+00:00", results_in_table: 300,
+          src: "current", min_current_gp: 20, prior_file: null,
+          considered: [],
+        },
+        unavailable_reason: null, state };
+}
+
+function sortShots(ft: number | null, at20: number | null) {
+  if (ft == null || at20 == null) {
+    return { at_20: null, before_first_goal: null, full_time: null,
+             first_goal_minute: null, error: null };
+  }
+  return {
+    at_20: cp({ checkpoint: "20'", cutoff_minute: 20, shot_share: at20,
+                tilt: at20, tilt_label: at20 >= 0.65 ? "TILT_FAV" : "CONTESTED",
+                on_target: { fav: 1, opp: 0, lead: 1 } }),
+    before_first_goal: cp({ checkpoint: "before 30'", cutoff_minute: 29,
+                            shot_share: at20, tilt: at20,
+                            tilt_label: "CONTESTED",
+                            on_target: { fav: 1, opp: 0, lead: 1 } }),
+    full_time: cp({ checkpoint: "FT", cutoff_minute: null, shot_share: ft,
+                    tilt: ft, tilt_label: "CONTESTED",
+                    on_target: { fav: 2, opp: 1, lead: 1 } }),
+    first_goal_minute: 30, error: null,
+  };
+}
+
+function sortFit(won: boolean | null, conf: boolean | null) {
+  return {
+    favourite_won: won,
+    favourite_won_reason: won == null ? "no_pre_kickoff_favourite" : "winner=home",
+    confirmed_at_20: conf,
+    confirm_reason: conf == null ? "no_shot_state" : "tilt_label=TILT_FAV",
+    confirm_rule: "tilt_fav_and_on_target_lead",
+    confirm_note: CONFIRM_NOTE, checkpoint_minute: 20,
+  };
+}
+
+const S_ALFA = finishedRow({
+  event_id: "f-alfa", competition_id: "f-alfa", kickoff: hoursAgo(6),
+  home: "Alfa SC", away: "Alfa Opp",
+  pre_kickoff: sortRead("captured", { gdg: 0.50, ppg: 1.29, rank: 3, ovr: 2 }),
+  shot_state: sortShots(0.667, 0.600), fit: sortFit(false, true),
+});
+const S_BRAVO = finishedRow({
+  event_id: "f-bravo", competition_id: "f-bravo", kickoff: hoursAgo(30),
+  home: "Bravo SC", away: "Bravo Opp",
+  pre_kickoff: sortRead("reconstructed", { gdg: 2.83, ppg: 0.20, rank: 11, ovr: 4 }),
+  shot_state: sortShots(0.559, 0.857), fit: sortFit(true, false),
+});
+const S_CHARLIE = finishedRow({
+  event_id: "f-charlie", competition_id: "f-charlie", kickoff: hoursAgo(54),
+  home: "Charlie SC", away: "Charlie Opp",
+  pre_kickoff: sortRead("reconstructed", { gdg: 1.14, ppg: 0.83, rank: 28, ovr: 1 }),
+  shot_state: sortShots(0.400, 0.300), fit: sortFit(true, true),
+});
+const S_DELTA = finishedRow({
+  event_id: "f-delta", competition_id: "f-delta", kickoff: hoursAgo(78),
+  home: "Delta SC", away: "Delta Opp",
+  pre_kickoff: sortRead("captured", { gdg: 1.90, ppg: 0.55, rank: 7, ovr: 3 }),
+  shot_state: sortShots(0.720, 0.450), fit: sortFit(false, false),
+});
+// The null row: no read, no tape, no verdict. Under every key it has
+// nothing, and "nothing" is neither small nor large.
+const S_ECHO = finishedRow({
+  event_id: "f-echo", competition_id: "f-echo", kickoff: hoursAgo(102),
+  home: "Echo SC", away: "Echo Opp",
+  pre_kickoff: {
+    origin: "reconstructed", origin_label: "NOT AVAILABLE",
+    origin_note: "no stored read, and the archive cannot rebuild one",
+    captured_at: null, captured_seconds_before_kickoff: null,
+    board_date: null,
+    reconstructed_from: { season_file: null, considered: [] },
+    unavailable_reason: "fixture_not_in_archive", state: null,
+  },
+  shot_state: sortShots(null, null), fit: sortFit(null, null),
+});
+
+const REVIEW_SORT = {
+  ...REVIEW,
+  leagues: {
+    ...REVIEW_LEAGUES,
+    mls: { finished: 5, captured: 2, reconstructed: 2, unavailable: 1,
+           error: null },
+    epl: { finished: 0, captured: 0, reconstructed: 0, unavailable: 0,
+           error: null },
+    laliga: { finished: 0, captured: 0, reconstructed: 0, unavailable: 0,
+              error: null },
+  },
+  // deliberately shuffled — the tail must apply its own default
+  finished: [S_CHARLIE, S_ALFA, S_ECHO, S_DELTA, S_BRAVO],
+  refusals: [],
+};
+
+// The order each mode must produce in the MLS tail (by data-event).
+// Ten modes, ten distinct orders, worked out from the values above.
+const REVIEW_EXPECTED: Record<string, string[]> = {
+  kickoff:   ["f-alfa", "f-bravo", "f-charlie", "f-delta", "f-echo"],
+  gdg:       ["f-bravo", "f-delta", "f-charlie", "f-alfa", "f-echo"],
+  ppg:       ["f-alfa", "f-charlie", "f-delta", "f-bravo", "f-echo"],
+  rank:      ["f-charlie", "f-bravo", "f-delta", "f-alfa", "f-echo"],
+  tier_ovr:  ["f-bravo", "f-delta", "f-alfa", "f-charlie", "f-echo"],
+  fav_won:   ["f-bravo", "f-charlie", "f-alfa", "f-delta", "f-echo"],
+  confirmed: ["f-alfa", "f-charlie", "f-bravo", "f-delta", "f-echo"],
+  share_ft:  ["f-delta", "f-alfa", "f-bravo", "f-charlie", "f-echo"],
+  share_20:  ["f-bravo", "f-alfa", "f-delta", "f-charlie", "f-echo"],
+  origin:    ["f-alfa", "f-delta", "f-bravo", "f-charlie", "f-echo"],
+};
+
+const tail = (page: import("@playwright/test").Page, slug: string) =>
+  page.locator(`[data-testid="review-tail"][data-league="${slug}"]`);
+
+const tailOrder = (t: ReturnType<typeof tail>) =>
+  t.getByTestId("review-row")
+    .evaluateAll((els) => els.map((e) => e.getAttribute("data-event")));
+
+const card = (page: import("@playwright/test").Page, event: string) =>
+  page.locator(`[data-testid="review-row"][data-event="${event}"]`);
+
+// ------------------------------------------------ the tail exists at all
+
+test("every league column carries a finished tail, below its upcoming fixtures",
+  async ({ page }) => {
+    await open(page);
+    await expect(page.getByTestId("review-tail")).toHaveCount(4);
+    // it is a TAIL: inside the column, after the last upcoming card.
+    // Rendering the review as a sibling section, or above the fixtures,
+    // would break the one thing the placement is for — a league's story
+    // read top to bottom in the place the operator already looks.
+    const positions = await col(page, "mls").evaluate((colEl) => {
+      const nodes = [...colEl.querySelectorAll(
+        '[data-testid="picker-row"],[data-testid="review-tail"]')];
+      return nodes.map((n) => n.getAttribute("data-testid"));
+    });
+    expect(positions[positions.length - 1]).toBe("review-tail");
+    // three MLS matches finished, and the tail counts them and says over
+    // what window
+    const mls = tail(page, "mls");
+    await expect(mls.getByTestId("review-row")).toHaveCount(3);
+    await expect(mls.getByTestId("review-count"))
+      .toHaveText("3 matches · last 7d");
+    // and it opens most-recent-first, from a payload served out of order
+    await expect.poll(() => tailOrder(mls))
+      .toEqual(["761770", "761764", "761762"]);
+  });
+
+test("the tail's provenance line counts evidence, against its own n",
+  async ({ page }) => {
+    await open(page);
+    // 1 captured + 2 reconstructed + 0 unavailable, out of the 3 printed
+    // beside them. These are counts of what KIND of read exists — not of
+    // outcomes, which are never tallied anywhere on this page.
+    await expect(tail(page, "mls").getByTestId("review-provenance"))
+      .toHaveText("of 3: 1 captured · 2 reconstructed · 0 with no read");
+  });
+
+// ------------------------------------- captured is not reconstructed
+
+test("a captured read and a reconstructed read are not drawn the same",
+  async ({ page }) => {
+    await open(page);
+    const captured = card(page, "761770");
+    const rebuilt = card(page, "761762");
+    await expect(captured).toHaveAttribute("data-origin", "captured");
+    await expect(rebuilt).toHaveAttribute("data-origin", "reconstructed");
+
+    // 1 — DIFFERENT WORDS
+    await expect(captured.getByTestId("origin-chip")).toHaveText("captured");
+    await expect(rebuilt.getByTestId("origin-chip")).toHaveText("reconstructed");
+    await expect(rebuilt.getByTestId("recon-warning"))
+      .toContainText("NOT a capture");
+
+    // 2 — DIFFERENT STRUCTURE. The capture carries a clock the rebuild
+    // cannot have; the rebuild carries a provenance block the capture has
+    // no use for. A reader who cannot see colour still gets the fact.
+    await expect(captured.getByTestId("capture-clock")).toBeVisible();
+    await expect(captured.getByTestId("capture-clock"))
+      .toContainText("8h 4m before kickoff");
+    await expect(captured.getByTestId("capture-clock"))
+      .toContainText("board 20260830");
+    await expect(captured.getByTestId("recon-provenance")).toHaveCount(0);
+    await expect(captured.getByTestId("recon-warning")).toHaveCount(0);
+    await expect(rebuilt.getByTestId("capture-clock")).toHaveCount(0);
+    await expect(rebuilt.getByTestId("recon-provenance")).toBeVisible();
+
+    // 3 — DIFFERENT INK, measured rather than assumed
+    const rail = (c: ReturnType<typeof card>) =>
+      c.getByTestId("pre-kickoff").evaluate((el) => {
+        const s = getComputedStyle(el);
+        return { color: s.borderLeftColor, style: s.borderLeftStyle };
+      });
+    const a = await rail(captured);
+    const b = await rail(rebuilt);
+    expect(a.color, "a capture and a rebuild must not share a rail colour")
+      .not.toBe(b.color);
+    expect(a.style).toBe("solid");
+    expect(b.style, "the weaker evidence is the dashed one").toBe("dashed");
+
+    // and the provenance actually discloses something auditable
+    await rebuilt.getByRole("button", { name: "provenance" }).click();
+    await expect(rebuilt.getByTestId("recon-provenance"))
+      .toContainText("states-mls-2026.json");
+    await expect(rebuilt.getByTestId("recon-provenance"))
+      .toContainText("2026-08-30T00:30:00+00:00");
+    await expect(rebuilt.getByTestId("recon-provenance"))
+      .toContainText("319");
+  });
+
+test("only a captured read can carry a price, and a rebuild says why it has none",
+  async ({ page }) => {
+    await open(page);
+    // the capture froze the whole board row, book and all
+    await expect(card(page, "761770").getByText("ask 58¢")).toBeVisible();
+    await expect(card(page, "761770").getByText("spread 4¢")).toBeVisible();
+    // the rebuild has NO BOOK — a property of rebuilding, named rather
+    // than left as an empty cell that reads like a missing quote
+    await expect(card(page, "761762").getByTestId("no-price"))
+      .toContainText("a rebuilt read has no book snapshot");
+  });
+
+test("no read at all is a third state, not an empty version of the other two",
+  async ({ page }) => {
+    await open(page);
+    const none = card(page, "401882903");
+    await expect(none).toHaveAttribute("data-origin", "unavailable");
+    await expect(none.getByTestId("origin-chip"))
+      .toHaveText("no pre-kickoff read");
+    await expect(none).toContainText("fixture_not_in_archive");
+    // the archive files that were looked at are named — "the archive
+    // stops before this match" is fixable, and invisible otherwise
+    await expect(none.getByTestId("recon-considered"))
+      .toContainText("states-la-liga-2026.json");
+    // the match is still here, with its score and its tape
+    await expect(none.getByTestId("review-score")).toContainText("5–2");
+    await expect(none.getByTestId("checkpoint")).toHaveCount(3);
+    // and BOTH verdicts read "not known" — never "no"
+    await expect(none.getByTestId("fit-result"))
+      .toHaveAttribute("data-value", "unknown");
+    await expect(none.getByTestId("fit-read"))
+      .toHaveAttribute("data-value", "unknown");
+    await expect(none.getByTestId("fit-result")).toContainText("not known");
+  });
+
+// ------------------------------------- the two wins must read differently
+
+test("a win on a penalty from a low share reads nothing like a win from dominance",
+  async ({ page }) => {
+    await open(page);
+    const vancouver = card(page, "761762");
+    const nashville = card(page, "761764");
+
+    // the scoreboard says the SAME thing about both
+    await expect(vancouver).toHaveAttribute("data-fav-won", "yes");
+    await expect(nashville).toHaveAttribute("data-fav-won", "yes");
+    await expect(vancouver.getByTestId("review-score")).toContainText("0–3");
+    await expect(nashville.getByTestId("review-score")).toContainText("4–0");
+
+    // the tape says the OPPOSITE. Vancouver's opener was a 40th-minute
+    // penalty from 44% of the shots and nothing on target either way;
+    // Nashville's came off 91% and a 3-1 on-target lead.
+    const vanBefore = vancouver.locator('[data-cp="before_first_goal"]');
+    const nasBefore = nashville.locator('[data-cp="before_first_goal"]');
+    await expect(vanBefore).toHaveAttribute("data-share", "0.4444");
+    await expect(nasBefore).toHaveAttribute("data-share", "0.9091");
+    await expect(vanBefore.getByTestId("cp-share")).toHaveText("44%");
+    await expect(nasBefore.getByTestId("cp-share")).toHaveText("91%");
+    await expect(vanBefore.getByTestId("cp-tilt"))
+      .toHaveAttribute("data-tilt", "CONTESTED");
+    await expect(nasBefore.getByTestId("cp-tilt"))
+      .toHaveAttribute("data-tilt", "TILT_FAV");
+    // the raw counts ride along — a bare share hides that 0-0 on target
+    // and 3-1 on target are different matches
+    await expect(vanBefore).toContainText("on target 0–0");
+    await expect(nasBefore).toContainText("on target 3–1");
+
+    // the bars are drawn at those widths, so the difference is visible
+    // before a single number is read
+    const width = (c: ReturnType<typeof card>) =>
+      c.locator('[data-cp="before_first_goal"] [data-testid="share-bar"] > div')
+        .evaluate((el) => (el as HTMLElement).style.width);
+    expect(await width(vancouver)).toBe("44%");
+    expect(await width(nashville)).toBe("91%");
+
+    // and the sentence says it in words, derived from those numbers
+    await expect(vancouver.getByTestId("tape-sentence"))
+      .toContainText("Before the 40' opener");
+    await expect(vancouver.getByTestId("tape-sentence"))
+      .toContainText("the tape was level");
+    await expect(nashville.getByTestId("tape-sentence"))
+      .toContainText("the tape was already tilted their way");
+
+    // which is exactly where the two verdicts part company
+    await expect(vancouver.getByTestId("fit-read"))
+      .toHaveAttribute("data-value", "no");
+    await expect(nashville.getByTestId("fit-read"))
+      .toHaveAttribute("data-value", "yes");
+  });
+
+test("every finished card shows both verdicts, never one merged tick",
+  async ({ page }) => {
+    await open(page);
+    const cards = page.getByTestId("review-row");
+    await expect(cards).toHaveCount(5);
+    // both components, on every single card, with their own labels
+    await expect(page.getByTestId("fit-result")).toHaveCount(5);
+    await expect(page.getByTestId("fit-read")).toHaveCount(5);
+    const van = card(page, "761762");
+    await expect(van.getByTestId("fit-result")).toContainText("favourite won");
+    await expect(van.getByTestId("fit-result")).toContainText("yes");
+    await expect(van.getByTestId("fit-read")).toContainText("in-play read at 20'");
+    await expect(van.getByTestId("fit-read")).toContainText("did not confirm");
+    // the reason for each is on the card, not buried in a tooltip
+    await expect(van.getByTestId("fit-read"))
+      .toContainText("tilt_label=TILT_FAV on_target 0-0");
+    // and the rule is labelled exploratory wherever it is used
+    await expect(van.getByTestId("confirm-note"))
+      .toContainText("NOT PREREGISTERED");
+    // a captured card whose favourite LOST shows the disagreement the
+    // other way round: no on the scoreboard, no on the tape
+    await expect(card(page, "761770").getByTestId("fit-result"))
+      .toHaveAttribute("data-value", "no");
+  });
+
+test("a dead plays feed costs the tape, not the match", async ({ page }) => {
+  await open(page);
+  const c = card(page, "401879295");
+  await expect(c.getByTestId("shot-error"))
+    .toContainText("plays feed 502");
+  // the score and the pre-kickoff read are untouched
+  await expect(c.getByTestId("review-score")).toContainText("4–3");
+  await expect(c.getByTestId("pre-kickoff")).toBeVisible();
+  // the scoreboard verdict stands; the tape verdict is NOT KNOWN, not "no"
+  await expect(c.getByTestId("fit-result")).toHaveAttribute("data-value", "yes");
+  await expect(c.getByTestId("fit-read")).toHaveAttribute("data-value", "unknown");
+});
+
+// -------------------------------------------------- the tail's own sorts
+
+test("every finished sort mode reorders its tail, and none of them filters",
+  async ({ page }) => {
+    await open(page, BOARD, 200, REVIEW_SORT);
+    const mls = tail(page, "mls");
+    await expect(mls.getByTestId("review-row")).toHaveCount(5);
+    const select = mls.getByTestId("review-sort");
+    // the tail opens on ITS OWN default — most recent kickoff first
+    await expect(select).toHaveValue("kickoff");
+    await expect(mls.getByTestId("review-dir"))
+      .toHaveAttribute("data-dir", "desc");
+    for (const [modeId, want] of Object.entries(REVIEW_EXPECTED)) {
+      await select.selectOption(modeId);
+      await expect.poll(() => tailOrder(mls), {
+        message: `finished mode ${modeId} must order the tail ${want.join(" → ")}`,
+      }).toEqual(want);
+      // SORT IS PRESENTATION: the same 5 rows, under every single mode
+      await expect(mls.getByTestId("review-row")).toHaveCount(5);
+      await expect(page.getByTestId("review-row")).toHaveCount(5);
+      // the rank badge follows the CURRENT order
+      await expect(mls.getByTestId("review-row").first()
+        .getByTestId("review-rank")).toHaveText("01");
+    }
+  });
+
+test("the finished direction toggle flips the measured rows; a row with nothing to measure sorts last both ways",
+  async ({ page }) => {
+    await open(page, BOARD, 200, REVIEW_SORT);
+    const mls = tail(page, "mls");
+    await mls.getByTestId("review-sort").selectOption("share_ft");
+    await expect(mls.getByTestId("review-null-note"))
+      .toHaveText("no shot state sorts last");
+    await expect.poll(() => tailOrder(mls)).toEqual(REVIEW_EXPECTED.share_ft);
+    await mls.getByTestId("review-dir").click();
+    await expect(mls.getByTestId("review-dir"))
+      .toHaveAttribute("data-dir", "asc");
+    // the measured rows reverse; ECHO has no shot state and is neither the
+    // smallest nor the largest — it stays last
+    await expect.poll(() => tailOrder(mls))
+      .toEqual(["f-charlie", "f-bravo", "f-alfa", "f-delta", "f-echo"]);
+    // the same rule under a VERDICT key, where "not known" is the absence
+    await mls.getByTestId("review-sort").selectOption("fav_won");
+    await expect(mls.getByTestId("review-null-note"))
+      .toContainText("a missing verdict is not");
+    await expect.poll(() => tailOrder(mls)).toEqual(REVIEW_EXPECTED.fav_won);
+    await mls.getByTestId("review-dir").click();
+    await expect.poll(() => tailOrder(mls))
+      .toEqual(["f-alfa", "f-delta", "f-bravo", "f-charlie", "f-echo"]);
+  });
+
+test("the finished tail sorts independently of the column above it",
+  async ({ page }) => {
+    await open(page, SORT_BOARD, 200, REVIEW_SORT);
+    const colMls = col(page, "mls");
+    const tailMls = tail(page, "mls");
+    // move the UPCOMING column: the tail below it does not budge
+    await colMls.getByTestId("col-sort").selectOption("ask");
+    await expect.poll(() => orderOf(colMls)).toEqual(EXPECTED.ask);
+    await expect(tailMls.getByTestId("review-sort")).toHaveValue("kickoff");
+    await expect.poll(() => tailOrder(tailMls))
+      .toEqual(REVIEW_EXPECTED.kickoff);
+    // move the TAIL: the column above it does not budge either
+    await tailMls.getByTestId("review-sort").selectOption("gdg");
+    await expect.poll(() => tailOrder(tailMls)).toEqual(REVIEW_EXPECTED.gdg);
+    await expect(colMls.getByTestId("col-sort")).toHaveValue("ask");
+    await expect.poll(() => orderOf(colMls)).toEqual(EXPECTED.ask);
+    // and another league's tail kept its own default
+    await expect(tail(page, "epl").getByTestId("review-sort"))
+      .toHaveCount(0);          // no rows there, so no control
+  });
+
+test("a finished tail's sort survives a reload, and reset returns (and forgets) the default",
+  async ({ page }) => {
+    await open(page, BOARD, 200, REVIEW_SORT);
+    const mls = tail(page, "mls");
+    await mls.getByTestId("review-sort").selectOption("rank");
+    await expect.poll(() => tailOrder(mls)).toEqual(REVIEW_EXPECTED.rank);
+    await page.reload();
+    await expect(mls.getByTestId("review-sort")).toHaveValue("rank");
+    await expect.poll(() => tailOrder(mls)).toEqual(REVIEW_EXPECTED.rank);
+    await mls.getByTestId("review-reset").click();
+    await expect(mls.getByTestId("review-sort")).toHaveValue("kickoff");
+    await expect.poll(() => tailOrder(mls)).toEqual(REVIEW_EXPECTED.kickoff);
+    await page.reload();
+    await expect(mls.getByTestId("review-sort")).toHaveValue("kickoff");
+    await expect(mls.getByTestId("review-reset")).toHaveCount(0);
+  });
+
+// ------------------------------------------------------ empty and broken
+
+test("an empty finished tail says so, and a fixture that was never played stays listed",
+  async ({ page }) => {
+    await open(page);
+    // Liga MX finished nothing in the window — and SAYS so, rather than
+    // rendering an unexplained gap under the divider
+    const mx = tail(page, "ligamx");
+    await expect(mx.getByTestId("review-empty"))
+      .toContainText("No Liga MX fixtures finished in the last 7 days");
+    await expect(mx.getByTestId("review-row")).toHaveCount(0);
+    // the postponed fixture is LISTED, not counted as a nil-nil
+    await expect(mx.getByTestId("review-refusal")).toHaveCount(1);
+    await expect(mx.getByTestId("review-refusals"))
+      .toContainText("Postponed");
+    await expect(mx.getByTestId("review-refusals"))
+      .toContainText("invent a match nobody played");
+  });
+
+test("an empty tail in every column when nothing at all finished",
+  async ({ page }) => {
+    await open(page, BOARD, 200, {
+      ...REVIEW,
+      leagues: Object.fromEntries(Object.keys(REVIEW_LEAGUES).map((k) => [
+        k, { finished: 0, captured: 0, reconstructed: 0, unavailable: 0,
+             error: null }])),
+      finished: [], refusals: [],
+    });
+    await expect(page.getByTestId("review-empty")).toHaveCount(4);
+    await expect(page.getByTestId("review-row")).toHaveCount(0);
+    // an empty tail still carries the reason there is no score on it
+    await expect(page.getByTestId("no-tally-note").first())
+      .toContainText("No tally is kept here");
+  });
+
+test("a failed review names itself under every column and shows no stale tail",
+  async ({ page }) => {
+    await open(page, BOARD, 200, { detail: "picker review unavailable" }, 503);
+    await expect(page.getByTestId("review-error")).toHaveCount(4);
+    await expect(page.getByTestId("review-error").first())
+      .toContainText("picker review unavailable");
+    await expect(page.getByTestId("review-row")).toHaveCount(0);
+    // the BOARD above is untouched — a dead review costs the tail, not
+    // the page the operator came to
+    await expect(page.getByTestId("picker-row")).toHaveCount(4);
+  });
+
+test("one league's finished fixtures failing costs one tail, not the board",
+  async ({ page }) => {
+    await open(page, BOARD, 200, {
+      ...REVIEW,
+      leagues: {
+        ...REVIEW_LEAGUES,
+        mls: { finished: 0, captured: 0, reconstructed: 0, unavailable: 0,
+               error: "ConnectionError: scoreboard fetch failed" },
+      },
+      finished: [NO_TAPE, NO_READ], refusals: [],
+    });
+    const mls = tail(page, "mls");
+    await expect(mls.getByTestId("review-league-error"))
+      .toContainText("scoreboard fetch failed");
+    // a FAILED league is not dressed as a quiet week
+    await expect(mls.getByTestId("review-empty")).toHaveCount(0);
+    // the other tails rendered
+    await expect(page.getByTestId("review-row")).toHaveCount(2);
+  });
+
+test("a deployment that freezes nothing says so, rather than letting every card look coincidentally rebuilt",
+  async ({ page }) => {
+    await open(page, BOARD, 200, {
+      ...REVIEW,
+      store: { backend: "null", writable: false,
+               note: "no snapshot store is configured" },
+    });
+    const note = page.getByTestId("review-store-note").first();
+    await expect(note).toBeVisible();
+    await expect(note).toContainText("No pre-kickoff read is being frozen");
+    await expect(note).toContainText("RECONSTRUCTION");
+    // a writable store shows no such note
+    await open(page);
+    await expect(page.getByTestId("review-store-note")).toHaveCount(0);
+  });
+
+// -------------------------------------------------- window, links, honesty
+
+test("the finished window has its own control, separate from the board's",
+  async ({ page }) => {
+    const asked: string[] = [];
+    await page.route("**/api/picker/review**", (r) => {
+      asked.push(new URL(r.request().url()).searchParams.get("back") || "");
+      return r.fulfill(json(REVIEW));
+    });
+    await serveBoard(page);
+    await page.goto("/bet-suggester");
+    await expect(page.getByTestId("review-row").first()).toBeVisible();
+    expect(asked, "the tail opens at 7 days, matching the forward window")
+      .toEqual(["7"]);
+    // lengthening the finished window must not touch the forward one
+    await page.getByRole("button", { name: /finished window, last 14 days/i })
+      .click();
+    await expect.poll(() => asked).toEqual(["7", "14"]);
+    await expect(page.getByRole("button", { name: "7d" }))
+      .toHaveAttribute("aria-pressed", "true");
+    await expect(tail(page, "mls").getByTestId("review-count"))
+      .toContainText("last 14d");
+  });
+
+test("a finished card is the way back into its match page", async ({ page }) => {
+  await open(page);
+  await page.getByRole("link",
+    { name: /review Sporting Kansas City versus Vancouver Whitecaps/i }).click();
+  await expect(page).toHaveURL(/\/bet-suggester\/mls\/761762/);
+});
+
+test("the finished tail keeps no score of its own", async ({ page }) => {
+  await open(page);
+  // wait for the tails to be ON the page before reading it — a body
+  // snapshot taken mid-fetch would pass this test by rendering nothing
+  await expect(page.getByTestId("review-row").first()).toBeVisible();
+  await expect(page.getByTestId("no-tally-note")).toHaveCount(4);
+  const body = (await page.textContent("body")) || "";
+  // no scoreboard framing of any kind: the surface may say what happened
+  // and whether the two verdicts agreed, and may not imply a hit rate
+  expect(body).not.toMatch(/win rate|hit rate|strike rate|success rate/i);
+  expect(body).not.toMatch(/you were right|we were right|got it right/i);
+  expect(body).not.toMatch(/\b(streak|accuracy|scorecard)\b/i);
+  expect(body).not.toMatch(/\b\d+\s*\/\s*\d+\s+(right|correct|hits?)\b/i);
+  // and the absence is EXPLAINED, so nobody later "fixes" it
+  expect(body).toMatch(/No tally is kept here, and none will be/);
+  expect(body).toMatch(/cannot tell a real read apart from luck/);
+});
+
+test("the finished tail on a phone: no horizontal overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await open(page, SORT_BOARD, 200, REVIEW_SORT);
+  await expect(page.getByTestId("review-row")).toHaveCount(5);
+  // open the widest thing on a card — the provenance block, with its
+  // absolute archive paths — before measuring
+  await card(page, "f-bravo").getByRole("button", { name: "provenance" }).click();
+  await expect(card(page, "f-bravo").getByTestId("recon-provenance"))
+    .toContainText("states-mls-2026.json");
+  const overflow = await page.evaluate(() =>
+    document.documentElement.scrollWidth
+    - document.documentElement.clientWidth);
+  expect(overflow, "the page body must never scroll horizontally")
+    .toBeLessThanOrEqual(0);
+});
+
+test("the picker proxy forwards review too — unmocked on purpose",
+  async ({ request }) => {
+    // Same reasoning as the board's proxy test: every other test in this
+    // file mocks in the BROWSER, so src/pages/api/picker/[...path].ts is
+    // never exercised by them, and a route missing from the allowlist
+    // would 404 on prod behind a green suite.
+    const r = await request.get("/api/picker/review?back=7");
+    expect(await r.text(), "review rejected by the proxy allowlist")
+      .not.toContain("unknown picker route");
   });

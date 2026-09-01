@@ -1,8 +1,10 @@
 // Catch-all proxy for the picker board (read-only GETs).
 //
-// One route today: /api/picker/board. It serves src/picker's ranked
-// cross-league slate — no model, no edge, no probability, no money — so
-// there is deliberately no odds/decision route here to add later.
+// Two routes: /api/picker/board (src/picker's ranked cross-league slate)
+// and /api/picker/review (the finished matches under each column, with
+// the pre-kickoff read that was frozen or rebuilt for each). Neither
+// carries a model, an edge, a probability or any money — so there is
+// deliberately no odds/decision route here to add later.
 //
 // The ALLOWED set is spelled out rather than pattern-matched. The comp
 // proxy learned this the expensive way twice: a regex written against
@@ -14,7 +16,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { proxy } from "../../../lib/suggesterProxy";
 
-const ALLOWED = new Set(["board"]);
+const ALLOWED = new Set(["board", "review"]);
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const segs = ((req.query.path as string[]) || []).join("/");

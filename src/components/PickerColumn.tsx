@@ -1,4 +1,5 @@
-// One league's column on the picker board, and the match card it stacks.
+// One league's column on the picker board: the upcoming fixtures, and
+// below them the FINISHED TAIL.
 //
 // The card and its chips moved here verbatim from
 // pages/bet-suggester/index.tsx when the board went four-up (2026-08-31);
@@ -12,133 +13,35 @@
 //    fixture that vanishes silently is the defect this surface is built
 //    against.
 //  - No tip / edge / probability language anywhere.
+//
+// THE TAIL (2026-08-31). The board used to lose a fixture at kickoff:
+// "once a match finished I have no way to access it to see where could I
+// do better." The finished matches of the last few days now stack BELOW
+// this column's upcoming ones, under a divider, because the league column
+// is where the operator already looks and it keeps a league's story
+// continuous. The tail sorts on its own keys and remembers its own choice
+// — picking "ask price" above must not reorder the matches below.
+// Its card lives in components/ReviewCard.tsx.
+//
+// The read primitives (gap chips, shape sentence, the Kalshi cell) moved
+// to components/PickerRead.tsx so the tail renders THE SAME READ this
+// column does, rather than a hand-copied one free to drift from it.
 import Link from "next/link";
 import { useState } from "react";
 import { fmtDate } from "../lib/matchday";
 import {
-  BoardRefusal, BoardRow, LeagueMeta, TierPair,
-  THIN_ASK_SIZE, WIDE_SPREAD_C, leagueLabel,
+  BoardRefusal, BoardRow, LeagueMeta, leagueLabel,
 } from "../lib/pickerApi";
+import {
+  ReviewLeagueMeta, ReviewRefusal, ReviewRow,
+} from "../lib/pickerReview";
 import {
   ColumnSort, DEFAULT_SORT, SORT_MODES, isDefaultSort, loadColumnSort,
   modeById, saveColumnSort, sortRows,
 } from "../lib/pickerSort";
+import { KalshiCell, TierGaps, dec, sign } from "./PickerRead";
+import { ReviewTail } from "./ReviewCard";
 import { Eyebrow } from "./ui";
-
-// A signed integer gap. ZERO RENDERS AS "+0", deliberately: a bare "0"
-// beside "+3" and "−1" reads as an absence of data rather than as a
-// measured level, and level is the finding that matters most here.
-const sign = (n: number) => (n < 0 ? `−${Math.abs(n)}` : `+${n}`);
-// Same rule as `sign`: ZERO RENDERS SIGNED. This is the number the board
-// is ORDERED by, and a bare "0.00" beside "+1.63" reads as missing data
-// on the one row that exists to prove the picker never cuts.
-const dec = (n: number, places = 2) =>
-  (n < 0 ? "−" : "+") + Math.abs(n).toFixed(places);
-const pair = (p: TierPair) => `T${p[0]} v T${p[1]}`;
-
-/** The word for a signed tier gap, from the favourite's side. A gap of
- *  zero is LEVEL, not "small" — the distinction is the whole point of
- *  the hollow read. */
-const gapWord = (v: number) => (v > 0 ? "ahead" : v === 0 ? "level" : "behind");
-
-/** One sentence a human can read without the legend. */
-function shapeRead(r: BoardRow): string {
-  const g = r.tier_gaps, t = r.tiers;
-  if (r.shape === "CLEAN") {
-    return "Clean — the favourite is a better tier overall, in attack and in defence.";
-  }
-  const flat: string[] = [];
-  if (g.atk <= 0) flat.push(`${gapWord(g.atk)} in attack (${pair(t.atk)})`);
-  if (g.def <= 0) flat.push(`${gapWord(g.def)} in defence (${pair(t.def)})`);
-  if (g.ovr <= 0) flat.push(`${gapWord(g.ovr)} overall (${pair(t.ovr)})`);
-  const strong: string[] = [];
-  if (g.atk > 0) strong.push(`attack ${sign(g.atk)}`);
-  if (g.def > 0) strong.push(`defence ${sign(g.def)}`);
-  if (g.ovr > 0) strong.push(`overall ${sign(g.ovr)}`);
-  if (r.shape === "HOLLOW") {
-    return `Hollow — high on the table gap, but ${flat.join(" and ")}.`;
-  }
-  return `Split — the tier gap is ${strong.join(" and ")}; ${flat.join(" and ")}.`;
-}
-
-/** A signed tier gap, drawn so a zero cannot be mistaken for a small
- *  positive. Positive is the accent; LEVEL is amber and dashed; behind
- *  is the negative ink. */
-function GapChip({ label, gap, tiers }: {
-  label: string; gap: number; tiers: TierPair;
-}) {
-  const tone =
-    gap > 0 ? "border-accent/40 bg-accent/5 text-accent"
-    : gap === 0 ? "border-dashed border-warn/50 bg-warn/5 text-warn"
-    : "border-neg/40 bg-neg/5 text-neg";
-  return (
-    <span data-testid="gap-chip" data-dim={label} data-gap={gap}
-      className={`inline-flex min-w-[6.5rem] flex-col rounded-md border px-2 py-1 ${tone}`}>
-      <span className="font-mono text-[9px] uppercase tracking-[0.18em] opacity-70">
-        {label}
-      </span>
-      <span className="mt-0.5 font-mono text-[11px] tabular-nums">
-        {pair(tiers)} <span className="font-semibold">{sign(gap)}</span>
-      </span>
-      <span className="font-mono text-[9px] uppercase tracking-[0.14em] opacity-70">
-        {gapWord(gap)}
-      </span>
-    </span>
-  );
-}
-
-function ShapeChip({ shape }: { shape: BoardRow["shape"] }) {
-  const tone =
-    shape === "CLEAN" ? "border-accent/50 bg-accent/10 text-accent"
-    : shape === "HOLLOW" ? "border-neg/50 bg-neg/10 text-neg"
-    : "border-warn/50 bg-warn/10 text-warn";
-  return (
-    <span className={`rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] ${tone}`}>
-      {shape}
-    </span>
-  );
-}
-
-/** The favourite's Kalshi quote — annotation only. A row with no event,
- *  or an event with no live quote, STAYS on the board and says which of
- *  the two it is: "no kalshi event" and "listed · no quote" are different
- *  facts, and collapsing them into one blank hides a mapping failure. */
-function KalshiCell({ row }: { row: BoardRow }) {
-  const k = row.kalshi;
-  if (!k) {
-    return (
-      <span className="font-mono text-[11px] text-ink-faint"
-        title="no Kalshi event matched this fixture's date and both club names">
-        no kalshi event
-      </span>
-    );
-  }
-  if (k.ask_c == null) {
-    return (
-      <span className="font-mono text-[11px] text-ink-faint">
-        listed · no quote ·{" "}
-        <span className="text-ink-faint/70">{k.event_ticker}</span>
-      </span>
-    );
-  }
-  return (
-    <span className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] tabular-nums text-ink-mid">
-      <span className="text-ink-hi">ask {k.ask_c}¢</span>
-      <span>bid {k.bid_c == null ? "—" : `${k.bid_c}¢`}</span>
-      <span>spread {k.spread_c == null ? "—" : `${k.spread_c}¢`}</span>
-      <span>size {k.ask_size == null ? "—" : k.ask_size}</span>
-      {k.flags.map((f) => (
-        <span key={f}
-          title={f === "WIDE"
-            ? `spread wider than ${WIDE_SPREAD_C}c`
-            : f === "THIN" ? `ask size under ${THIN_ASK_SIZE}` : undefined}
-          className="rounded border border-warn/50 bg-warn/5 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] text-warn">
-          {f}
-        </span>
-      ))}
-    </span>
-  );
-}
 
 /** One match card. `rank` is the row's position under the column's
  *  CURRENT sort — the badge follows the reader's chosen order, it does
@@ -213,19 +116,15 @@ function RowCard({ row, rank }: { row: BoardRow; rank: number }) {
         </span>
       </div>
 
-      {/* Stage 2 — the three tier gaps, each drawn on its own */}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <GapChip label="overall" gap={row.tier_gaps.ovr} tiers={row.tiers.ovr} />
-        <GapChip label="attack" gap={row.tier_gaps.atk} tiers={row.tiers.atk} />
-        <GapChip label="defence" gap={row.tier_gaps.def} tiers={row.tiers.def} />
-        <ShapeChip shape={row.shape} />
+      {/* Stage 2 — the three tier gaps, each drawn on its own. Shared
+          with the finished tail (components/PickerRead.tsx), so a read
+          below the divider is THE SAME READ as one above it. */}
+      <div className="mt-3">
+        <TierGaps read={row} />
       </div>
-      <p className="mt-2 text-xs leading-relaxed text-ink-low">
-        {shapeRead(row)}
-      </p>
 
       <div className="mt-3 border-t border-line pt-3">
-        <KalshiCell row={row} />
+        <KalshiCell quote={row.kalshi} />
       </div>
     </article>
   );
@@ -245,13 +144,29 @@ function RefusalRow({ r }: { r: BoardRefusal }) {
   );
 }
 
-export function LeagueColumn({ slug, meta, rows, refusals, days }: {
+export function LeagueColumn({
+  slug, meta, rows, refusals, days, review,
+}: {
   slug: string;
   /** absent when the payload never mentioned this league at all */
   meta?: LeagueMeta;
   rows: BoardRow[];
   refusals: BoardRefusal[];
   days: number;
+  /** the finished tail's slice of this league. A SEPARATE payload on a
+   *  separate fetch: the board is a 90s sweep of what is coming, the
+   *  review is a long-cached read of matches that cannot change again.
+   *  They render in one column, which is a rendering decision and does
+   *  not make them one request. */
+  review: {
+    rows: ReviewRow[];
+    refusals: ReviewRefusal[];
+    meta?: ReviewLeagueMeta;
+    back: number;
+    loading: boolean;
+    error: string;
+    storeNote: string | null;
+  };
 }) {
   // Lazy init is safe here: columns only mount client-side (the board
   // renders after its fetch resolves), so the stored choice is read once
@@ -395,6 +310,15 @@ export function LeagueColumn({ slug, meta, rows, refusals, days }: {
           </p>
         </div>
       )}
+
+      {/* ── the finished tail ──────────────────────────────────────────
+          Last in the column, after the upcoming fixtures AND after the
+          refusals that belong to them, so this league's forward story is
+          complete before the backward one starts. */}
+      <ReviewTail slug={slug} back={review.back}
+        rows={review.rows} refusals={review.refusals} meta={review.meta}
+        loading={review.loading} error={review.error}
+        storeNote={review.storeNote} />
     </section>
   );
 }

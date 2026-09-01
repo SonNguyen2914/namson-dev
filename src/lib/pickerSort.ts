@@ -85,15 +85,29 @@ export const isDefaultSort = (s: ColumnSort): boolean =>
 const defaultOrder = (a: BoardRow, b: BoardRow) =>
   Math.abs(b.gdg_gap) - Math.abs(a.gdg_gap);
 
-/** Reorder — NEVER filter — one column's rows. Output length always
- *  equals input length; there is deliberately no code path that could
- *  make them differ. */
-export function sortRows(rows: BoardRow[], sort: ColumnSort): BoardRow[] {
-  const mode = modeById(sort.mode) ?? modeById(DEFAULT_SORT.mode)!;
-  const dirMul = sort.dir === "asc" ? 1 : -1;
+/** THE ordering primitive — reorder, NEVER filter. Output length always
+ *  equals input length; there is deliberately no code path that could make
+ *  them differ, no predicate parameter, and nowhere to add one.
+ *
+ *  It is generic and exported because the FINISHED TAIL below each column
+ *  sorts on its own keys (lib/pickerReviewSort.ts) and must not own a
+ *  second copy of the null policy. Two copies of "missing sorts last, in
+ *  both directions" drift, and the one that drifts is the one nobody is
+ *  looking at.
+ *
+ *  `baseOrder` is applied BEFORE the key, so equal values fall back to a
+ *  stable, meaningful order rather than to whatever the server happened to
+ *  send. */
+export function orderBy<T>(
+  rows: T[],
+  value: (r: T) => number | null,
+  dir: SortDir,
+  baseOrder: (a: T, b: T) => number,
+): T[] {
+  const dirMul = dir === "asc" ? 1 : -1;
   return [...rows]
-    .sort(defaultOrder)
-    .map((r, i) => ({ r, i, v: mode.value(r) }))
+    .sort(baseOrder)
+    .map((r, i) => ({ r, i, v: value(r) }))
     .sort((a, b) => {
       if (a.v == null || b.v == null) {
         if (a.v == null && b.v == null) return a.i - b.i; // both missing: default order
@@ -102,6 +116,12 @@ export function sortRows(rows: BoardRow[], sort: ColumnSort): BoardRow[] {
       return a.v !== b.v ? dirMul * (a.v - b.v) : a.i - b.i;
     })
     .map((x) => x.r);
+}
+
+/** Reorder — NEVER filter — one column's upcoming rows. */
+export function sortRows(rows: BoardRow[], sort: ColumnSort): BoardRow[] {
+  const mode = modeById(sort.mode) ?? modeById(DEFAULT_SORT.mode)!;
+  return orderBy(rows, mode.value, sort.dir, defaultOrder);
 }
 
 // ---- persistence: a per-viewer convenience, never a requirement ----------
