@@ -37,9 +37,11 @@ import {
 } from "../lib/pickerReview";
 import {
   ColumnSort, DEFAULT_SORT, SORT_MODES, isDefaultSort, loadColumnSort,
-  modeById, saveColumnSort, sortRows,
+  modeById, nullNoteFor, saveColumnSort, sortRows,
 } from "../lib/pickerSort";
-import { KalshiCell, TierGaps, dec, sign } from "./PickerRead";
+import {
+  GapNote, KalshiCell, RegTimeNote, SeasonWeight, TierGaps, dec, sign,
+} from "./PickerRead";
 import { ReviewTail } from "./ReviewCard";
 import { Eyebrow } from "./ui";
 
@@ -48,12 +50,15 @@ import { Eyebrow } from "./ui";
  *  not fossilise the default one. */
 function RowCard({ row, rank }: { row: BoardRow; rank: number }) {
   const favHome = row.fav_side === "home";
+  const w = row.weights;
+  const cross = row.cross_league === true;
   return (
     <article
       data-testid="picker-row"
       data-shape={row.shape}
       data-league={row.league}
       data-event={row.event_id}
+      data-cross-league={cross ? "true" : "false"}
       className="rounded-xl border border-line bg-elev/40 p-4 transition-colors hover:border-line-strong"
     >
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -61,11 +66,26 @@ function RowCard({ row, rank }: { row: BoardRow; rank: number }) {
           className="font-mono text-[11px] tabular-nums text-ink-faint">
           {String(rank).padStart(2, "0")}
         </span>
-        {row.src === "prior" && (
+        {/* THE WEIGHT, NOT A BADGE. The board blends both seasons per
+            club, so "which season" is a percentage. The old binary badge
+            is the FALLBACK for a row that carries no weight — a read
+            reconstructed through the legacy switch — and never a second
+            claim standing beside the number. */}
+        {w ? <SeasonWeight w={w} /> : row.src === "prior" && (
           <span
             title="rated on last season's final table — this season has too few games played"
             className="rounded border border-warn/40 bg-warn/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
             prior szn
+          </span>
+        )}
+        {/* WHICH TABLE EACH CLUB WAS RATED ON. Only worth saying when
+            they differ — on a league column both sides are the column
+            itself, and repeating it would be noise. */}
+        {cross && row.rated_in && (
+          <span data-testid="rated-in"
+            title="each club is rated on its own domestic league's table — this cup has none of its own"
+            className="rounded border border-warn/40 bg-warn/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
+            {leagueLabel(row.rated_in.home)} v {leagueLabel(row.rated_in.away)}
           </span>
         )}
         <span className="ml-auto font-mono text-[11px] tabular-nums text-ink-faint">
@@ -123,8 +143,19 @@ function RowCard({ row, rank }: { row: BoardRow; rank: number }) {
         <TierGaps read={row} />
       </div>
 
+      {/* A WITHHELD GAP SAYS WHY, on the card, in the backend's own
+          words. The tiers above it are the part that survives a
+          cross-league comparison, so the explanation belongs between
+          them and the price. */}
+      {row.gap_note && <GapNote note={row.gap_note} />}
+
       <div className="mt-3 border-t border-line pt-3">
         <KalshiCell quote={row.kalshi} />
+        {/* WHAT THAT PRICE ACTUALLY SETTLES ON. Directly under the
+            quote, because it is a fact about the quote: a Leagues Cup
+            leg pays on 90 minutes, so "54¢" is not the price of going
+            through. */}
+        {row.reg_time_note && <RegTimeNote note={row.reg_time_note} />}
       </div>
     </article>
   );
@@ -175,6 +206,7 @@ export function LeagueColumn({
   const [sort, setSort] = useState<ColumnSort>(() => loadColumnSort(slug));
   const mode = modeById(sort.mode) ?? modeById(DEFAULT_SORT.mode)!;
   const sorted = sortRows(rows, sort);
+  const nullNote = nullNoteFor(mode, rows);
 
   const apply = (next: ColumnSort) => {
     setSort(next);
@@ -203,6 +235,14 @@ export function LeagueColumn({
               title="rated on this season's table — every club has enough games played"
               className="rounded border border-accent/40 bg-accent/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-accent">
               this szn · min {meta.min_current_gp ?? "—"} GP
+            </span>
+          )}
+          {meta?.kind === "cup" && (
+            <span data-testid="col-cup"
+              title="a knockout tournament with no table of its own — every club is rated on its domestic league's table instead"
+              className="rounded border border-line-strong px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-low">
+              cup · rated on{" "}
+              {(meta.rated_on ?? []).map(leagueLabel).join(" + ")}
             </span>
           )}
           <span data-testid="col-count"
@@ -266,10 +306,10 @@ export function LeagueColumn({
             </button>
           )}
         </div>
-        {mode.nullNote && (
+        {nullNote && (
           <p data-testid="col-null-note"
             className="mt-1.5 font-mono text-[10px] tracking-wide text-ink-faint">
-            {mode.nullNote}
+            {nullNote}
           </p>
         )}
       </header>

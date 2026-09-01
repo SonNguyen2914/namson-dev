@@ -53,7 +53,9 @@ import {
   REVIEW_DEFAULT_SORT, REVIEW_SORT_MODES, ReviewSort, isDefaultReviewSort,
   loadReviewSort, reviewModeById, saveReviewSort, sortReviewRows,
 } from "../lib/pickerReviewSort";
-import { KalshiCell, TierGaps, dec, sign } from "./PickerRead";
+import {
+  KalshiCell, SeasonWeight, TierGaps, dec, sign,
+} from "./PickerRead";
 import { Eyebrow } from "./ui";
 
 // ---------------------------------------------------------------- bits
@@ -534,7 +536,12 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
               <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
                 rank {read.ranks.opp}
               </span>
-              {read.src === "prior" && (
+              {/* the SAME chip the board draws, so a read below the
+                  divider is the read above it — with the pre-blend
+                  badge kept as the fallback for a reconstruction, which
+                  carries no weight by design */}
+              {read.weights ? <SeasonWeight w={read.weights} />
+                : read.src === "prior" && (
                 <span
                   title="rated on last season's final table — this season had too few games played at kickoff"
                   className="rounded border border-warn/40 bg-warn/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">

@@ -18,16 +18,28 @@
 //  - A MISSING PRICE IS A FACT WITH A NAME. "no kalshi event" and
 //    "listed · no quote" are different failures and never collapse into
 //    one blank.
-import { KalshiQuote, Shape, TierPair, THIN_ASK_SIZE, WIDE_SPREAD_C } from "../lib/pickerApi";
+import {
+  BlendWeights, KalshiQuote, Shape, TierPair, THIN_ASK_SIZE, WIDE_SPREAD_C,
+  pctThisSeason, weightIsCurrent,
+} from "../lib/pickerApi";
+
+/** The word for a gap that was never measured. It is NOT "0", NOT "—"
+ *  and NOT blank: a cross-league cup fixture has no ppg/GD-g/rank gap
+ *  because the two clubs' rates were never on one scale, and a dash
+ *  beside "+1.63" reads as a rendering failure rather than as a
+ *  deliberate refusal. */
+export const WITHHELD = "n/a";
 
 /** A signed integer gap. ZERO RENDERS AS "+0", deliberately. */
-export const sign = (n: number) => (n < 0 ? `−${Math.abs(n)}` : `+${n}`);
+export const sign = (n: number | null | undefined) =>
+  (n == null ? WITHHELD : n < 0 ? `−${Math.abs(n)}` : `+${n}`);
 
 /** Same rule as `sign`: ZERO RENDERS SIGNED. This is the number the board
  *  is ORDERED by, and a bare "0.00" beside "+1.63" reads as missing data
  *  on the one row that exists to prove the picker never cuts. */
-export const dec = (n: number, places = 2) =>
-  (n < 0 ? "−" : "+") + Math.abs(n).toFixed(places);
+export const dec = (n: number | null | undefined, places = 2) =>
+  (n == null ? WITHHELD
+   : (n < 0 ? "−" : "+") + Math.abs(n).toFixed(places));
 
 export const pair = (p: TierPair) => `T${p[0]} v T${p[1]}`;
 
@@ -89,6 +101,63 @@ export function GapChip({ label, gap, tiers }: {
         {gapWord(gap)}
       </span>
     </span>
+  );
+}
+
+/** HOW MUCH OF THIS RATING IS THIS SEASON — the number that replaced a
+ *  binary badge.
+ *
+ *  The board blends both seasons per club by games played, so "prior
+ *  szn" was never a fact about a row, only about which side of a
+ *  threshold it fell. This chip says the weight: "38% this season".
+ *  Amber below half (last season still carries the rating), accent at
+ *  or above it. A side rated with NO prior row at all is called out,
+ *  because 100% is not the top of the same scale — it is a different
+ *  basis. */
+export function SeasonWeight({ w }: { w: BlendWeights }) {
+  const current = weightIsCurrent(w.min);
+  const soloSide = w.basis.home === "current_only"
+    || w.basis.away === "current_only";
+  const title =
+    `home ${pctThisSeason(w.home)} · away ${pctThisSeason(w.away)}`
+    + ` — each club weighted by its own games played, w = GP/(GP+${w.k})`
+    + (w.constant != null
+        ? ` · FROZEN-WEIGHT CONTROL w=${w.constant}` : "")
+    + (soloSide
+        ? " · a side with no prior-season row is rated on this season"
+          + " alone and reported at 100%" : "");
+  return (
+    <span data-testid="season-weight" data-w={w.min ?? ""} title={title}
+      className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] ${
+        current
+          ? "border-accent/40 bg-accent/5 text-accent"
+          : "border-warn/40 bg-warn/5 text-warn"}`}>
+      {pctThisSeason(w.min)} this szn
+    </span>
+  );
+}
+
+/** WHY A NUMBER IS NOT THERE, in the backend's own words. Rendered
+ *  wherever a gap is withheld — the refusal is part of the read, not an
+ *  omission from it. */
+export function GapNote({ note }: { note: string }) {
+  return (
+    <p data-testid="gap-note"
+      className="mt-2 rounded-md border border-dashed border-warn/40 bg-warn/5 px-2.5 py-2 text-[11px] leading-relaxed text-warn">
+      {note}
+    </p>
+  );
+}
+
+/** WHAT THE MARKET ACTUALLY SETTLES ON, when that is not the match.
+ *  The Leagues Cup legs are regulation time only, so a price beside a
+ *  knockout fixture is not the price of going through. */
+export function RegTimeNote({ note }: { note: string }) {
+  return (
+    <p data-testid="reg-time-note"
+      className="mt-2 rounded-md border border-skylive/30 bg-skylive/5 px-2.5 py-2 text-[11px] leading-relaxed text-skylive">
+      {note}
+    </p>
   );
 }
 

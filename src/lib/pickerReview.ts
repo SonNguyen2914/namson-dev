@@ -25,7 +25,9 @@
 // is kept anywhere in this module or the components that read it. A hit
 // count over a handful of matches reads as evidence it is not.
 
-import { KalshiQuote, Shape, Src, TierPair } from "./pickerApi";
+import {
+  BlendWeights, KalshiQuote, Shape, Src, TierPair,
+} from "./pickerApi";
 
 /** The two ways a pre-kickoff read can exist. A third state — neither —
  *  is carried as `state: null` with `unavailable_reason` naming why. */
@@ -49,6 +51,12 @@ export interface PreKickoffRow {
   gdg_gap: number;
   rank_gap: number;
   gp_current: { home: number | null; away: number | null; min: number | null };
+  /** present on a read frozen after the season blend shipped
+   *  (2026-08-31); absent on a RECONSTRUCTION, which is rebuilt through
+   *  the legacy hard switch on purpose — re-rating a finished match
+   *  under a design the picker did not have at kickoff is the one thing
+   *  the reconstruction path exists to prevent. */
+  weights?: BlendWeights | null;
   src: Src;
   ranks: { fav: number; opp: number };
   tiers: { ovr: TierPair; atk: TierPair; def: TierPair };

@@ -1,9 +1,17 @@
 // The picker board — namson.dev/bet-suggester
 //
 // The landing surface: every upcoming fixture across the four in-season
-// leagues, one COLUMN per league (MLS · EPL · La Liga · Liga MX), each
+// leagues, one COLUMN per league (MLS · EPL · La Liga · Liga MX), plus a
+// column for any tournament the payload carries (the Leagues Cup), each
 // column independently sortable. Reads GET /api/picker/board, which
 // serves src/picker.
+//
+// A CUP COLUMN IS NOT A LEAGUE COLUMN. The Leagues Cup has no table of
+// its own, so its clubs are rated on their domestic leagues and a fixture
+// between the two leagues shows TIERS ONLY, with the Stage-1 gaps
+// withheld and the reason on the card. Columns are payload-driven: the
+// four leagues are always drawn, and any other slug the board serves is
+// appended rather than dropped.
 //
 // WHAT THIS PAGE IS ALLOWED TO SAY. It is a place to look, not a thing to
 // do. No model runs on these fixtures, no probability of ours exists for
@@ -19,9 +27,11 @@
 //     The three tier gaps therefore render as three separate signed
 //     chips with a plain-English read beside them, not as one shape
 //     word and three numbers to squint at.
-//  2. "prior szn" is not a footnote. Under 8 games played, ALL FOUR
-//     Stage 1 inputs come from last season. It gets a banner, a badge in
-//     every column header, and a per-row badge.
+//  2. WHICH SEASON IS A NUMBER, not a footnote and no longer a binary.
+//     Each club is a weighted average of this season and last, by its own
+//     games played (w = GP/(GP+10)), so every row carries its own share
+//     — "38% this szn" — and the early leagues get a banner saying last
+//     season still carries them.
 //  3. Refused fixtures are LISTED with their reason, at the foot of the
 //     column they belong to. A fixture that vanishes silently is the
 //     defect the whole surface is built against.
@@ -47,7 +57,7 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 import { TZ } from "../../lib/matchday";
 import {
-  Board, CURRENT_SEASON_GP_FLOOR, PICKER_LEAGUE_ORDER, THIN_ASK_SIZE,
+  Board, PICKER_LEAGUE_ORDER, SEASON_BLEND_K, THIN_ASK_SIZE,
   WIDE_SPREAD_C, fetchBoard, leagueLabel,
 } from "../../lib/pickerApi";
 import {
@@ -165,7 +175,11 @@ export default function PickerBoard() {
   const rows = board?.rows ?? [];
   const refusals = board?.refusals ?? [];
   const leaguesMap = board?.leagues ?? {};
-  const leagues = Object.entries(leaguesMap);
+  // Cup columns are excluded from the season-basis count on purpose: a
+  // knockout has no season table of its own to be rated on, and folding
+  // it into "N of M leagues" would make that sentence untrue.
+  const leagues = Object.entries(leaguesMap).filter(
+    ([, m]) => m.kind !== "cup");
   const priorLeagues = leagues.filter(([, m]) => m.src === "prior");
 
   const finished = review?.finished ?? [];
@@ -242,8 +256,9 @@ export default function PickerBoard() {
         </h1>
         {/* The one honest line of framing. Not "bet these". */}
         <p className="mt-4 max-w-2xl text-sm leading-relaxed text-ink-low">
-          Every upcoming fixture in the four in-season leagues, ranked by how
-          far apart the two clubs sit in their own league&apos;s table. No model
+          Every upcoming fixture in the four in-season leagues and the
+          Leagues Cup, ranked by how far apart the two clubs sit in their own
+          league&apos;s table. No model
           runs on this page, no number below is a probability or an edge of
           ours, and nothing here is a recommendation — the ranking says where
           to look, and you are the one who picks.
@@ -325,11 +340,14 @@ export default function PickerBoard() {
                 .join(" · ")}
               {/* explicit {" "}: JSX ate the leading space of the text node
                   after this expression and shipped "Under 8games played" */}
-              . Under {CURRENT_SEASON_GP_FLOOR}{" "}
-              games played this season&apos;s table
-              is noise, so all four ranking inputs — and the tiers below — come
-              from last season&apos;s final table for those leagues. The columns
-              and the rows say which.
+              . These leagues are still early, so LAST SEASON carries most
+              of the rating.{" "}
+              Nothing switches at a threshold any more: each club is a
+              weighted average of both seasons, by that club&apos;s own games
+              played — w = GP / (GP + {SEASON_BLEND_K}), so {SEASON_BLEND_K}{" "}
+              games is the point where the two weigh the same. Every row
+              prints its own share on the chip beside the rank, and rank
+              and tiers are re-derived from the blended rates.
             </p>
           </section>
         )}
@@ -438,12 +456,43 @@ export default function PickerBoard() {
               </dd>
             </div>
             <div>
-              <dt className="text-ink-hi">prior szn</dt>
+              <dt className="text-ink-hi">38% this szn</dt>
               <dd className="mt-1">
-                That league&apos;s lowest current games-played is under{" "}
-                {CURRENT_SEASON_GP_FLOOR}, so every input and every tier comes
-                from last season&apos;s final table instead of a handful of
-                matches.
+                How much of that fixture&apos;s rating comes from THIS season.
+                Each club is a weighted average of this season and last, by
+                its own games played: w = GP / (GP + {SEASON_BLEND_K}). The
+                chip shows the fixture&apos;s lower side, because a match is
+                only as current-season as its less-played club; hover for
+                both. Amber below half — last season still carries the read.
+                A club with no last-season row at all is refused until it has
+                played {SEASON_BLEND_K} games, then rated on this season
+                alone at 100%. Rank and tiers are re-derived from the blended
+                rates; tiers are never themselves averaged, because the mean
+                of two league positions is not a position.
+              </dd>
+            </div>
+            <div>
+              <dt className="text-ink-hi">n/a · cross-league</dt>
+              <dd className="mt-1">
+                The Leagues Cup has no table of its own, so each club is
+                rated on its own domestic league&apos;s. When the two clubs
+                come from DIFFERENT leagues, the ppg, GD/g and rank gaps are
+                withheld — 2.0 ppg in MLS is not 2.0 ppg in Liga MX, and
+                subtracting them would invent a gap nobody measured. The
+                tiers stay, because a within-league quintile means the same
+                thing in both. Such a row is never sorted ahead of one with a
+                real gap, and it is never removed.
+              </dd>
+            </div>
+            <div>
+              <dt className="text-ink-hi">regulation time</dt>
+              <dd className="mt-1">
+                The Leagues Cup market settles on 90 minutes plus stoppage,
+                not on the tie: a level match resolves the TIE leg rather
+                than going to penalties. So a price there is the price of
+                leading at full time, not of going through — the four league
+                markets settle their matches outright, and the two must not
+                be read alike.
               </dd>
             </div>
             <div>

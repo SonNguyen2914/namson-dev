@@ -13,6 +13,15 @@
 // one, so it must never interleave. The column says so on screen
 // ("no quote sorts last") while such a key is active.
 //
+// SINCE 2026-08-31 THE STAGE-1 GAPS CAN BE NULL TOO. A cross-league
+// Leagues Cup fixture (MLS v Liga MX) has no ppg, GD/g or rank gap: the
+// two clubs' rates were never measured on one scale, so the difference
+// does not exist. `Math.abs(null)` is 0 in JavaScript, which would have
+// parked such a row beside a dead-level fixture and, on an ASCENDING
+// sort, put a gap nobody measured at the top of the board. So these
+// keys answer null, the same null the book keys answer, and they carry
+// the same on-screen note.
+//
 // TIES fall back to the column's default order (|GD/g gap| descending —
 // the board's own rule), then to served order, so every sort is
 // deterministic and a re-render cannot shuffle equal rows.
@@ -36,24 +45,43 @@ export interface SortMode {
   value: (r: BoardRow) => number | null;
   /** shown beside the control while this key is active */
   nullNote?: string;
+  /** show `nullNote` only when the column actually holds such a row.
+   *
+   *  "no quote" is a standing possibility in EVERY column, so the book
+   *  keys state their policy whether or not it bites today. A withheld
+   *  Stage-1 gap only exists in a cup column with a cross-league
+   *  fixture in it, and printing that sentence over the Premier League
+   *  would be an explanation of something that is not there. */
+  nullNoteOnlyWhenPresent?: boolean;
 }
 
 // The Stage-1 gaps sort by MAGNITUDE (the board's default is |GD/g gap|
 // descending, and ppg/rank follow the same reading: how far apart, not
 // which way). The tier gaps sort SIGNED — their sign is the finding
 // (level and behind are the hollow read) and must order below ahead.
+/** |x| for a gap that may not exist. NOT `Math.abs(x ?? 0)`: a withheld
+ *  gap is not a zero one, and the difference is the whole reason a
+ *  cross-league row must sort last rather than in the middle. */
+const magnitude = (v: number | null | undefined) =>
+  v == null ? null : Math.abs(v);
+
+const GAP_NULL_NOTE = "no measured gap (cross-league) sorts last";
+
 export const SORT_MODES: SortMode[] = [
   { id: "gdg", label: "GD/g gap", defaultDir: "desc",
-    value: (r) => Math.abs(r.gdg_gap) },
+    value: (r) => magnitude(r.gdg_gap), nullNote: GAP_NULL_NOTE,
+    nullNoteOnlyWhenPresent: true },
   { id: "kickoff", label: "kickoff", defaultDir: "asc",
     value: (r) => {
       const t = Date.parse(r.kickoff);
       return Number.isNaN(t) ? null : t;
     } },
   { id: "ppg", label: "ppg gap", defaultDir: "desc",
-    value: (r) => Math.abs(r.ppg_gap) },
+    value: (r) => magnitude(r.ppg_gap), nullNote: GAP_NULL_NOTE,
+    nullNoteOnlyWhenPresent: true },
   { id: "rank", label: "rank gap", defaultDir: "desc",
-    value: (r) => Math.abs(r.rank_gap) },
+    value: (r) => magnitude(r.rank_gap), nullNote: GAP_NULL_NOTE,
+    nullNoteOnlyWhenPresent: true },
   { id: "tier_ovr", label: "overall tier gap", defaultDir: "desc",
     value: (r) => r.tier_gaps.ovr },
   { id: "tier_atk", label: "attack tier gap", defaultDir: "desc",
@@ -82,8 +110,17 @@ export const modeById = (id: string): SortMode | undefined =>
 export const isDefaultSort = (s: ColumnSort): boolean =>
   s.mode === DEFAULT_SORT.mode && s.dir === DEFAULT_SORT.dir;
 
-const defaultOrder = (a: BoardRow, b: BoardRow) =>
-  Math.abs(b.gdg_gap) - Math.abs(a.gdg_gap);
+/** The board's own tiebreak order, null-safe: a row with no measured
+ *  GD/g gap falls to the back of it rather than to the front, which is
+ *  what `NaN` from an arithmetic comparison would have done. */
+const defaultOrder = (a: BoardRow, b: BoardRow) => {
+  const va = magnitude(a.gdg_gap), vb = magnitude(b.gdg_gap);
+  if (va == null || vb == null) {
+    if (va == null && vb == null) return 0;
+    return va == null ? 1 : -1;
+  }
+  return vb - va;
+};
 
 /** THE ordering primitive — reorder, NEVER filter. Output length always
  *  equals input length; there is deliberately no code path that could make
@@ -122,6 +159,14 @@ export function orderBy<T>(
 export function sortRows(rows: BoardRow[], sort: ColumnSort): BoardRow[] {
   const mode = modeById(sort.mode) ?? modeById(DEFAULT_SORT.mode)!;
   return orderBy(rows, mode.value, sort.dir, defaultOrder);
+}
+
+/** The note to print under this column's sort control, or null. */
+export function nullNoteFor(mode: SortMode, rows: BoardRow[]): string | null {
+  if (!mode.nullNote) return null;
+  if (mode.nullNoteOnlyWhenPresent
+      && !rows.some((r) => mode.value(r) == null)) return null;
+  return mode.nullNote;
 }
 
 // ---- persistence: a per-viewer convenience, never a requirement ----------

@@ -13,6 +13,38 @@
 
 export type Src = "current" | "prior";
 
+/** How much of a club's rating came from THIS season.
+ *
+ *  The board no longer switches between two seasons at a threshold — it
+ *  BLENDS them per club by that club's own games played,
+ *  w_current = GP/(GP+k) with k = 10 (backend ledger row 25). So "which
+ *  season" stopped being a yes/no, and `src` survives only as the
+ *  rounding of this number that older readers understand.
+ *
+ *  THE WEIGHT IS THE TRUTH: a row that reports 0.375 can say "38% this
+ *  season", which a badge cannot. `null` means no blend ran at all
+ *  (a read reconstructed through the legacy switch) — which is a
+ *  different fact from a weight of zero, and must not render alike. */
+export interface BlendWeights {
+  home: number | null;
+  away: number | null;
+  /** the fixture's own weight: a match is only as current-season as its
+   *  less-played club */
+  min: number | null;
+  k: number;
+  /** set only under the frozen-weight research control */
+  constant: number | null;
+  basis: {
+    home: BlendBasis | null;
+    away: BlendBasis | null;
+  };
+}
+
+/** "blend" — both seasons; "current_only" — no prior row at all, and
+ *  enough games played to be rated without one (weight reported as 1);
+ *  "prior_only" — no games played yet, so there is nothing to weight. */
+export type BlendBasis = "blend" | "current_only" | "prior_only";
+
 /** [favourite's tier, opponent's tier]; 1 = best fifth of the league. */
 export type TierPair = [number, number];
 
@@ -31,6 +63,7 @@ export interface KalshiQuote {
 
 export interface BoardRow {
   refused: false;
+  /** a league slug, or a cup slug — both are columns */
   league: string;
   home: string;
   away: string;
@@ -38,10 +71,26 @@ export interface BoardRow {
   opponent: string;
   fav_side: "home" | "away";
   resolution: Record<string, string>;
-  ppg_gap: number;
-  gdg_gap: number;
-  rank_gap: number;
+  /** NULL on a cross-league cup fixture: the two clubs were rated in
+   *  different competitions and their rates were never on one scale, so
+   *  the difference was never measured. `gap_note` says so in words.
+   *  Missing is NOT zero — see lib/pickerSort.ts. */
+  ppg_gap: number | null;
+  gdg_gap: number | null;
+  rank_gap: number | null;
   gp_current: { home: number | null; away: number | null; min: number | null };
+  /** the per-club season weights; null on a row built before the blend
+   *  (or by the legacy switch) */
+  weights?: BlendWeights | null;
+  /** true when the two clubs were rated in different leagues */
+  cross_league?: boolean;
+  /** which league's table each club was rated on */
+  rated_in?: { home: string; away: string };
+  /** why the Stage-1 gaps are withheld, in the backend's own words */
+  gap_note?: string | null;
+  /** what the market actually settles on, when that is not the match —
+   *  the Leagues Cup legs are regulation time only */
+  reg_time_note?: string | null;
   src: Src;
   ranks: { fav: number; opp: number };
   tiers: { ovr: TierPair; atk: TierPair; def: TierPair };
@@ -72,6 +121,17 @@ export interface LeagueMeta {
   src: Src | null;
   min_current_gp: number | null;
   clubs: number;
+  /** "league" — has a table of its own; "cup" — a tournament that has
+   *  none, whose clubs are rated on their domestic leagues' tables */
+  kind?: "league" | "cup";
+  /** for a cup: the league slugs its clubs were rated on */
+  rated_on?: string[];
+  /** for a cup whose market does not settle the match outright */
+  reg_time_note?: string | null;
+  /** the blend's shrinkage constant, as the backend ran it */
+  blend_k?: number | null;
+  /** set only under the frozen-weight research control */
+  blend_constant_w?: number | null;
   /** the league's own upstream failure — it contributes no rows, and the
    *  rest of the board still renders */
   error?: string;
@@ -96,6 +156,7 @@ export const LEAGUE_LABEL: Record<string, string> = {
   laliga: "La Liga",
   mls: "MLS",
   ligamx: "Liga MX",
+  leaguescup: "Leagues Cup",
 };
 
 export const leagueLabel = (slug: string) => LEAGUE_LABEL[slug] ?? slug;
@@ -105,11 +166,23 @@ export const leagueLabel = (slug: string) => LEAGUE_LABEL[slug] ?? slug;
  *  league arriving in the registry must not disappear from the board. */
 export const PICKER_LEAGUE_ORDER = ["mls", "epl", "laliga", "ligamx"];
 
-/** Below this many games played, Stage 1 takes ALL FOUR inputs from last
- *  season instead — this season's table is still noise. Mirrors
- *  src/picker/tables.decide_source; shown to the reader, never used to
- *  decide anything here. */
-export const CURRENT_SEASON_GP_FLOOR = 8;
+/** The blend's shrinkage constant: w_current = GP/(GP+k). At GP = k a
+ *  club is rated half on each season, so k is also the games-played
+ *  count at which this season becomes the majority partner. Mirrors
+ *  src/picker/tables.SEASON_BLEND_K; shown to the reader, never used to
+ *  decide anything here — every row carries the weight the backend
+ *  actually used, including under a research override. */
+export const SEASON_BLEND_K = 10;
+
+/** A weight as the sentence the board should say. "38% this season" is
+ *  a thing a reader can act on; a badge reading "prior szn" is not. */
+export const pctThisSeason = (w: number | null | undefined) =>
+  w == null ? "—" : `${Math.round(w * 100)}%`;
+
+/** The board's own reading of a weight: at or above half, this season is
+ *  the majority partner. Mirrors src/picker/tables.weight_src. */
+export const weightIsCurrent = (w: number | null | undefined) =>
+  w != null && w >= 0.5;
 
 /** Kalshi annotation flags, in the backend's own thresholds. */
 export const WIDE_SPREAD_C = 3;    // spread > 3c
