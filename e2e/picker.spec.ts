@@ -294,7 +294,7 @@ test("four league columns, fixed order, each header carrying its facts",
     await expect(page.getByTestId("league-jump")).toBeHidden();
   });
 
-test("every row served is drawn in its league's column, opening in |GD/g gap| order, including a 0.00 gap",
+test("every row served is drawn in its league's column, opening in KICKOFF order, including a 0.00 gap",
   async ({ page }) => {
     await open(page);
     // four served, four drawn — the page adds no bar of its own
@@ -303,25 +303,31 @@ test("every row served is drawn in its league's column, opening in |GD/g gap| or
     // is deliberately shuffled
     const rows = col(page, "laliga").getByTestId("picker-row");
     await expect(rows).toHaveCount(2);
-    await expect(rows.nth(0)).toContainText("Barcelona");
-    await expect(rows.nth(1)).toContainText("Getafe");
+    // the default is KICKOFF ascending (2026-09-02): the board is
+    // day-major, so inside a day the honest order is the order the
+    // football happens in. Getafe kicks off before Barcelona.
+    await expect(rows.nth(0)).toContainText("Getafe");
+    await expect(rows.nth(1)).toContainText("Barcelona");
     // rank badges are the COLUMN's own positions
     await expect(rows.nth(0).getByTestId("row-rank")).toHaveText("01");
     await expect(rows.nth(1).getByTestId("row-rank")).toHaveText("02");
     // the zero-gap fixture is ON the board, showing its zero — SIGNED:
     // a bare "0.00" would keep this green through a regression of the
-    // one row that proves the picker never cuts
-    await expect(rows.nth(1)).toContainText("+0.00");
+    // one row that proves the picker never cuts. It is Getafe, which
+    // kickoff order now puts first.
+    await expect(rows.nth(0)).toContainText("+0.00");
   });
 
-test("the column leader's LEVEL defence is visible without reading a number",
+test("a LEVEL defence is visible without reading a number",
   async ({ page }) => {
     await open(page);
     const top = page.getByTestId("picker-row")
       .filter({ hasText: "Barcelona" });
-    // it leads its column on the table gap
+    // it still leads its column on the TABLE gap — but the board opens
+    // in kickoff order now, so leading that gap is no longer the same
+    // thing as being the first card
     await expect(top).toContainText("+1.63");
-    await expect(top.getByTestId("row-rank")).toHaveText("01");
+    await expect(top.getByTestId("row-rank")).toHaveText("02");
     // …and the three tier dimensions are drawn SEPARATELY as cells —
     // fill AND colour both encode the sign (2026-09-01 convergence), so
     // the level defence (amber half-cell) cannot pass for a small
@@ -561,18 +567,18 @@ test("the board's sort survives a reload, and reset returns (and forgets) the de
     // settle on the default order FIRST: the board renders client-side
     // after its fetch, and selecting into a still-mounting tree is the
     // race this test once lost
+    await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.kickoff);
+    await page.getByTestId("col-sort").selectOption("gdg");
     await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.gdg);
-    await page.getByTestId("col-sort").selectOption("kickoff");
+    await page.reload();
+    await expect(page.getByTestId("col-sort")).toHaveValue("gdg");
+    await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.gdg);
+    // reset: default order, default control, and the stored choice gone
+    await page.getByTestId("col-reset").click();
+    await expect(page.getByTestId("col-sort")).toHaveValue("kickoff");
     await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.kickoff);
     await page.reload();
     await expect(page.getByTestId("col-sort")).toHaveValue("kickoff");
-    await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.kickoff);
-    // reset: default order, default control, and the stored choice gone
-    await page.getByTestId("col-reset").click();
-    await expect(page.getByTestId("col-sort")).toHaveValue("gdg");
-    await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.gdg);
-    await page.reload();
-    await expect(page.getByTestId("col-sort")).toHaveValue("gdg");
     await expect(page.getByTestId("col-reset")).toHaveCount(0);
   });
 
@@ -587,7 +593,7 @@ test("a browser with no usable storage still renders, and still sorts",
     });
     await open(page, SORT_BOARD);
     const mls = col(page, "mls");
-    await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.gdg);
+    await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.kickoff);
     await page.getByTestId("col-sort").selectOption("ppg");
     await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.ppg);
   });

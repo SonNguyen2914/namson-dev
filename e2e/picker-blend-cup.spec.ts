@@ -377,9 +377,12 @@ test("the withheld gap sorts last under every Stage-1 key, in both directions",
   async ({ page }) => {
     await open(page);
     const cup = col(page, "leaguescup");
-    // the default order: |GD/g gap| descending, the null row last
+    // the default order is KICKOFF ascending now (2026-09-02): cross at
+    // +28h, toluca +30h, america +32h. The withheld gap is not what
+    // orders this first assertion — every row has a kickoff — so the
+    // null-last policy below is tested purely by the Stage-1 keys.
     await expect.poll(() => orderOf(cup))
-      .toEqual(["lc-toluca", "lc-america", "lc-cross"]);
+      .toEqual(["lc-cross", "lc-toluca", "lc-america"]);
     for (const mode of ["gdg", "ppg", "rank"]) {
       await page.getByTestId("col-sort").selectOption(mode);
       // the policy is ON SCREEN while such a key is active
@@ -406,7 +409,13 @@ test("the cross-league note is not printed over a column that has no such row",
     // not on one that is deliberately absent — a mutation that printed
     // this note over every column slipped through exactly that hole.
     await expect(mls.getByTestId("picker-row")).toHaveCount(1);
-    await expect(page.getByTestId("col-sort")).toHaveValue("gdg");
+    // the board opens on KICKOFF now (2026-09-02), which has no null
+    // policy to state — every row has a kickoff — so the note is
+    // correctly ABSENT until a Stage-1 key is chosen. Assert that first,
+    // then switch to the key whose policy this test is actually about.
+    await expect(page.getByTestId("col-sort")).toHaveValue("kickoff");
+    await expect(page.getByTestId("col-null-note")).toHaveCount(0);
+    await page.getByTestId("col-sort").selectOption("gdg");
     // the note is the BOARD's since sorting moved to the matchday
     // (2026-09-01): it renders ONCE beside the board control — because a
     // withheld-gap row exists somewhere on the board — and never inside

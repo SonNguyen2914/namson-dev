@@ -110,8 +110,17 @@ export const SORT_MODES: SortMode[] = [
 
 export interface ColumnSort { mode: SortModeId; dir: SortDir; }
 
-/** The board's own rule: |GD/g gap| descending. */
-export const DEFAULT_SORT: ColumnSort = { mode: "gdg", dir: "desc" };
+/** The board's own rule: kickoff, earliest first (2026-09-02).
+ *
+ *  It was |GD/g gap| descending, which made sense when a column was a
+ *  ranked list. The board is DAY-MAJOR now — the matchday is the
+ *  structure and the sort only ranks within it — so the honest default
+ *  inside a day is the order the football actually happens in. A ranking
+ *  is a question you ask of a day; time is what a day IS.
+ *
+ *  |GD/g gap| stays as the tiebreak in defaultOrder() below, so two
+ *  fixtures kicking off together still fall in the old order. */
+export const DEFAULT_SORT: ColumnSort = { mode: "kickoff", dir: "asc" };
 
 export const modeById = (id: string): SortMode | undefined =>
   SORT_MODES.find((m) => m.id === id);
