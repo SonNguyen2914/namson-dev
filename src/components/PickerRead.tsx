@@ -161,16 +161,87 @@ export function RegTimeNote({ note }: { note: string }) {
   );
 }
 
-export function ShapeChip({ shape }: { shape: Shape }) {
-  // the same traffic light as the gap chips: a CLEAN shape is three
-  // greens by definition, so its chip is green; HOLLOW is the red read
-  const tone =
-    shape === "CLEAN" ? "border-up/50 bg-up/10 text-up"
-    : shape === "HOLLOW" ? "border-neg/50 bg-neg/10 text-neg"
-    : "border-warn/50 bg-warn/10 text-warn";
+/** A dimension DISSENTS when its gap is not positive. This is the same
+ *  partition shapeRead() builds `flat` from, so the chip's cut, the lit
+ *  tier label and the popover's sentence all derive from ONE predicate
+ *  and cannot drift apart. */
+export const dissents = (gap: number) => gap <= 0;
+
+/** WHICH CUT THE CHIP TAKES. Inside SPLIT at most one unit can dissent —
+ *  the backend calls it HOLLOW when both do — so these three are mutually
+ *  exclusive and exhaustive over SPLIT's 14 sign-patterns: 6 attack,
+ *  6 defence, and 2 where the units are fine and only the table lags.
+ *  That last one has no dissenting unit at all, so under any single-axis
+ *  scheme it would draw nothing and read as CLEAN; the compound mark is
+ *  what makes the odd case look odd. */
+export function cutOf(read: ReadLike):
+    { axis: "h" | "v" | "x"; level: boolean } | null {
+  if (read.shape !== "SPLIT") return null;
+  const g = read.tier_gaps;
+  if (dissents(g.atk)) return { axis: "h", level: g.atk === 0 };
+  if (dissents(g.def)) return { axis: "v", level: g.def === 0 };
+  return { axis: "x", level: g.ovr === 0 };
+}
+
+/** THE SHAPE, AS A WORD THE BOARD SHOT THROUGH (2026-09-01).
+ *
+ *  SPLIT was the plurality label — 27 of 54 live rows, 14 of the 27
+ *  sign-patterns against CLEAN's one — and it said only that the read was
+ *  mixed, so the chip on the most cards carried the least information. It
+ *  is now CUT, and the axis of the cut is the answer: horizontal when
+ *  attack gave way, vertical when defence did, both when the units lead
+ *  and the table does not. The word is still a word and never a code; the
+ *  geometry around it carries the rest.
+ *
+ *  SPLIT also loses the amber it never earned. On a card where amber
+ *  already means level, ripeness and cross-league caveat, a taxonomy
+ *  label was wearing a verdict hue — the only warm colour left here is a
+ *  tear that genuinely means "level". CLEAN and HOLLOW are real verdicts,
+ *  keep green and red, and are never cut.
+ *
+ *  A cut chip renders the word twice over: once as the real, TRANSPARENT
+ *  text node — which keeps the accessible name and satisfies an
+ *  exact-text assertion, because toBeVisible() is geometry and not colour
+ *  — and once inside each piece through `data-w` + `::after`, which never
+ *  enters textContent and so can never be matched a second time. The
+ *  geometry lives in globals.css under THE SHAPE CHIP. */
+export function ShapeChip({ read }: { read: ReadLike }) {
+  const shape = read.shape;
+  const cut = cutOf(read);
+
+  if (!cut) {
+    const tone =
+      shape === "CLEAN" ? "border-up/50 bg-up/10 text-up"
+        : "border-neg/50 bg-neg/10 text-neg";
+    return (
+      <span data-testid="shape-chip" data-cut="none"
+        className={`sc sc-intact font-mono text-[10px] uppercase tracking-[0.16em] ${tone}`}>
+        <span className="sc-w">{shape}</span>
+      </span>
+    );
+  }
+
+  const piece = (k: string) => (
+    <i key={k} className={`sc-half sc-${k}`} data-w={shape} aria-hidden />
+  );
   return (
-    <span className={`rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] ${tone}`}>
-      {shape}
+    <span data-testid="shape-chip" data-cut={cut.axis}
+      data-cut-tone={cut.level ? "level" : "behind"}
+      className={`sc sc-cut sc-${cut.axis} ${cut.level ? "sc-level" : ""} font-mono text-[10px] uppercase tracking-[0.16em] text-ink-hi`}>
+      {cut.axis === "x" ? (
+        <>
+          <i className="sc-grp" aria-hidden>{piece("a")}{piece("b")}</i>
+          {piece("c")}
+          <i className="sc-tear sc-t1" aria-hidden />
+          <i className="sc-tear sc-t2" aria-hidden />
+        </>
+      ) : (
+        <>
+          {piece("a")}{piece("b")}
+          <i className="sc-tear sc-t1" aria-hidden />
+        </>
+      )}
+      <span className="sc-w">{shape}</span>
     </span>
   );
 }
@@ -197,14 +268,29 @@ export function TierGaps({ read }: { read: ReadLike }) {
             <TierCell key={label} label={label} gap={gap} />
           ))}
         </span>
-        <ShapeChip shape={read.shape} />
+        <ShapeChip read={read} />
         <span
           className="inline-flex items-end gap-2.5 font-mono text-[10px] tabular-nums text-ink-low"
-          title="tier pairs, favourite v opponent">
-          {([["ovr", read.tiers.ovr], ["atk", read.tiers.atk],
-             ["def", read.tiers.def]] as const).map(([lbl, pr]) => (
-            <span key={lbl} className="inline-flex flex-col items-center gap-[2px] leading-none">
-              <span className="text-[7.5px] uppercase tracking-[0.12em] text-ink-faint">
+          title="tier pairs, favourite v opponent — a name in its own colour is a unit that does not back the pick">
+          {/* A dissenting dimension's NAME lights in its own verdict tone.
+              Same dissents() predicate the chip's cut uses, so the lit
+              label always names what the shot severed and the two can
+              never disagree. Weight carries it a second way, so the read
+              survives for anyone the hues fail.
+              NOTE data-tier, NOT data-dim: picker-blend-cup.spec.ts locates
+              '[data-dim="overall"]' UNQUALIFIED by tier-cell, so a second
+              data-dim on a wrapper would resolve to two elements and fail
+              Playwright's strict mode. */}
+          {([["ovr", read.tier_gaps.ovr, read.tiers.ovr],
+             ["atk", read.tier_gaps.atk, read.tiers.atk],
+             ["def", read.tier_gaps.def, read.tiers.def]] as const)
+            .map(([lbl, gap, pr]) => (
+            <span key={lbl} data-tier={lbl} data-dissent={dissents(gap)}
+              className="inline-flex flex-col items-center gap-[2px] leading-none">
+              <span className={`text-[7.5px] uppercase tracking-[0.12em] ${
+                gap > 0 ? "text-ink-faint"
+                  : gap === 0 ? "font-semibold text-warn"
+                    : "font-semibold text-neg"}`}>
                 {lbl}
               </span>
               <span>{pr[0]}v{pr[1]}</span>
