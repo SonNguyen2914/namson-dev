@@ -350,13 +350,17 @@ type EvidenceLayer = { artifacts?: Record<string, Artifact>;
   card_version?: string; content_hash_basis?: string;
   refused?: string; unavailable?: string };
 
+/* Named so the state banner can walk the layers generically — it counts
+   refusals across all of them rather than hand-listing, which is what
+   keeps a new layer from silently escaping the count. */
+type CardLayers = { identity?: Refusable<Identity>;
+  market?: Refusable<MarketLayer>; pick?: Refusable<PickLayer>;
+  ftts?: FttsLayer; splits?: SplitsLayer;
+  precedents?: PrecedentsLayer; style_notes?: StyleLayer;
+  inplay_plan?: InplayLayer; evidence?: EvidenceLayer };
+
 type Card = { card_version?: string; competition?: string;
-  fixture_id?: number; headline?: Headline;
-  layers?: { identity?: Refusable<Identity>;
-    market?: Refusable<MarketLayer>; pick?: Refusable<PickLayer>;
-    ftts?: FttsLayer; splits?: SplitsLayer;
-    precedents?: PrecedentsLayer; style_notes?: StyleLayer;
-    inplay_plan?: InplayLayer; evidence?: EvidenceLayer } };
+  fixture_id?: number; headline?: Headline; layers?: CardLayers };
 
 type CardResponse = { generated_at?: string; content_hash?: string;
   emission?: string; prediction_run_id?: string | null; card?: Card;
@@ -388,11 +392,185 @@ function refusalOf(b: unknown): string | null {
   return null;
 }
 
+/* A refusal renders VERBATIM — the charter's rule. The only thing added
+   is a dotted underline under any glossary term the sentence happens to
+   contain, which changes no words and hides nothing. */
+function glossed(text: string): React.ReactNode {
+  const terms = Object.keys(GLOSSARY)
+    .sort((a, b) => b.length - a.length)
+    .filter((t) => text.toLowerCase().includes(t.toLowerCase()));
+  if (terms.length === 0) return text;
+  const re = new RegExp(`(${terms.map((t) =>
+    t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "ig");
+  return text.split(re).map((part, i) => {
+    const hit = terms.find((t) => t.toLowerCase() === part.toLowerCase());
+    return hit
+      ? <Gloss key={i} term={hit}>{part}</Gloss>
+      : <span key={i}>{part}</span>;
+  });
+}
+
 function RefusalNote({ text }: { text: string }) {
   return (
     <p className="rounded-lg border border-dashed border-line px-3 py-2 font-mono text-[11px] leading-relaxed text-ink-low">
-      {text}
+      {glossed(text)}
     </p>
+  );
+}
+
+/* ---------- C: WHAT KIND OF CARD IS THIS ------------------------------
+ *
+ *  A refused card refuses in several places at once, and on a no-book
+ *  fixture EVERY one of those refusals has the same cause. Read top to
+ *  bottom that is five separate disappointments; said once at the top it
+ *  is one understood fact, and the reader learns immediately that the
+ *  card is informational rather than broken.
+ *
+ *  Nothing here replaces a refusal. Every block still renders its own
+ *  words verbatim below — the charter's rule, because "books: []" once
+ *  meant three different absences at once. This only names the pattern
+ *  and says what SURVIVES it, which the card has never done.
+ *
+ *  Derived, never hand-written: the count, the shared cause and the
+ *  surviving list all come from the payload, so a fixture that refuses
+ *  for some other reason gets an honest banner rather than this one. */
+
+const LAYER_NAMES: Record<string, string> = {
+  market: "market", pick: "fee gate", ftts: "first-scorer band",
+  precedents: "precedents", splits: "splits", style_notes: "style",
+  inplay_plan: "in-play",
+};
+
+/** Every refusal on the card, including the ones nested inside a layer
+ *  that is otherwise present — the fee gate and the late-opener window
+ *  both refuse without their parent refusing. */
+function collectRefusals(layers: CardLayers | undefined):
+    { key: string; text: string }[] {
+  if (!layers) return [];
+  const out: { key: string; text: string }[] = [];
+  const push = (key: string, v: unknown) => {
+    const r = refusalOf(v);
+    if (r && r !== "absent from the card payload") out.push({ key, text: r });
+  };
+  for (const k of ["market", "ftts", "precedents", "splits", "style_notes"]) {
+    push(k, (layers as Record<string, unknown>)[k]);
+  }
+  const pick = layers.pick as { gate?: unknown } | undefined;
+  if (pick && !refusalOf(pick)) push("pick", pick.gate);
+  else push("pick", layers.pick);
+  const ip = layers.inplay_plan as
+    { danger_windows?: { late_opener?: unknown } } | undefined;
+  if (ip && !refusalOf(ip)) push("inplay_plan", ip.danger_windows?.late_opener);
+  else push("inplay_plan", layers.inplay_plan);
+  return out;
+}
+
+function CardState({ layers, headline }: {
+  layers?: CardLayers; headline?: Headline;
+}) {
+  const refusals = collectRefusals(layers);
+  if (refusals.length < 2) return null;   // one refusal explains itself
+
+  // the shared cause, only claimed when EVERY refusal actually shares it
+  const noBook = refusals.every((r) => /\bbook\b/i.test(r.text));
+  const refusedKeys = new Set(refusals.map((r) => r.key));
+  const surviving = Object.entries(LAYER_NAMES)
+    .filter(([k]) => !refusedKeys.has(k)
+      && layers?.[k as keyof CardLayers] !== undefined)
+    .map(([, name]) => name);
+
+  const refusedNames = refusals
+    .map((r) => LAYER_NAMES[r.key] ?? r.key).join(", ");
+
+  return (
+    <div data-testid="card-state"
+      className="rounded-xl border border-skylive/30 bg-skylive/5 px-4 py-3.5">
+      <p className="text-[13px] font-semibold leading-snug text-ink-hi">
+        {noBook
+          ? "This card has no market to price against — so it prices nothing."
+          : `${refusals.length} of this card's layers are refusing.`}
+      </p>
+      <p className="mt-1.5 text-[12px] leading-relaxed text-ink-mid">
+        {noBook ? (
+          <>
+            <b className="text-ink-hi">
+              {refusals.length} blocks below refuse, and they all refuse for
+              the same reason:
+            </b>{" "}
+            no stored book for this fixture. That single absence is what turns
+            the headline into {String(headline?.value ?? "REFUSED")}, and it is
+            why the {refusedNames} blocks each say “no book” in their own words.
+          </>
+        ) : (
+          <>The {refusedNames} blocks each name their own reason below.</>
+        )}
+      </p>
+      {surviving.length > 0 && (
+        <p className="mt-1.5 text-[12px] leading-relaxed text-ink-mid">
+          Everything measured from{" "}
+          <b className="text-ink-hi">football rather than price</b> is still
+          here and still valid: {surviving.join(", ")}. Read this card for what
+          the teams do, not for what to back.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ---------- A: a definition behind each piece of jargon ---------------
+ *  The same idiom as the board's tier-read popover, so it is not a new
+ *  thing to learn. Definitions only — never a per-fixture reading, which
+ *  could not be derived and would have to be written per card. */
+const GLOSSARY: Record<string, string> = {
+  "fee-inclusive edge":
+    "The edge left AFTER the exchange fee is subtracted, using the exact "
+    + "per-order rounding — not the headline edge. It is the only number "
+    + "this project acts on, which is why a card with no ask cannot "
+    + "produce one.",
+  "T-10 lock":
+    "A snapshot taken 10 minutes before kickoff. It is the canonical "
+    + "frozen book: once taken, later price moves cannot rewrite what the "
+    + "card claimed beforehand.",
+  "price-native":
+    "The live model reads strength from the market price itself. With no "
+    + "book there is no price, so it has nothing to read — which is why it "
+    + "refuses rather than falling back to a guess.",
+  "de-vigged":
+    "A book with the bookmaker's margin removed, so the three prices sum "
+    + "to 100%. Only then can they be read as probabilities.",
+  "Wilson band":
+    "The range the true rate plausibly sits in given how few matches were "
+    + "observed. A wide band means few matches — do not lean on the "
+    + "headline number.",
+  "shrunk":
+    "Raw is what actually happened. Shrunk pulls that toward the league "
+    + "average in proportion to how few matches it rests on, so a rate "
+    + "from 25 matches moves a lot and one from 228 barely moves.",
+  "clean_11v11":
+    "Measured only on matches with eleven players a side throughout. A "
+    + "sending-off changes the game so completely that those matches are "
+    + "excluded rather than averaged in.",
+};
+
+function Gloss({ term, children }: { term: string; children?: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const def = GLOSSARY[term];
+  if (!def) return <>{children ?? term}</>;
+  return (
+    <span className="relative inline-block">
+      <button type="button" data-testid="gloss" data-term={term}
+        aria-expanded={open}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen((o) => !o); }}
+        className="cursor-help border-b border-dotted border-skylive/70 bg-transparent p-0 text-inherit">
+        {children ?? term}
+      </button>
+      {open && (
+        <span data-testid="gloss-def"
+          className="absolute left-0 top-[calc(100%+6px)] z-20 block w-64 rounded-lg border border-line-strong bg-elev2 p-3 text-[11px] font-normal normal-case leading-relaxed tracking-normal text-ink-mid shadow-xl">
+          {def}
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -1997,6 +2175,8 @@ export default function SuggestionCard({ competition, eventId }: {
         ) : (
           <div className="space-y-4">
             <HeadlineBlock h={card.headline} />
+
+            <CardState layers={layers} headline={card.headline} />
 
             {idRefusal ? <RefusalNote text={idRefusal} /> : id && (
               <p className="font-mono text-[9px] leading-relaxed text-ink-faint">
