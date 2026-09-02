@@ -700,11 +700,11 @@ img.glyph-soft   { opacity: 0.11; filter: grayscale(1) brightness(1.1); }
    which unit gave way, so the chip on the most cards carried the least
    information. It is now CUT, and the axis of the cut is the answer:
 
-     horizontal                 attack gave way
-     vertical                   defence gave way
-     vertical + horizontal-left both units lead, only the table lags
-     no cut                     CLEAN and HOLLOW, which are real verdicts
-                                and keep their hue
+     horizontal   attack gave way
+     vertical     defence gave way
+     no cut       CLEAN and HOLLOW, real verdicts that keep their hue —
+                  and the SPLIT whose only dissent is the TABLE, which
+                  wears the old amber box, because there is no unit to cut
 
    Tear tone is --neg when that dimension is behind, --warn when level —
    the same traffic light as the tier cells, never gold.
@@ -733,6 +733,8 @@ img.glyph-soft   { opacity: 0.11; filter: grayscale(1) brightness(1.1); }
   --sc-ang-h: -4deg;
   --sc-ang-v: 4deg;
   --sc-tone: var(--neg);
+  --sc-plate-edge: var(--line-strong);
+  --sc-plate-tint: transparent;
   position: relative; display: inline-flex; align-items: center;
   justify-content: center; padding: 4px 8px; line-height: 1;
   isolation: isolate; flex: none;
@@ -744,12 +746,29 @@ img.glyph-soft   { opacity: 0.11; filter: grayscale(1) brightness(1.1); }
 .sc-half {
   position: absolute; inset: 0; z-index: 2;
   display: flex; align-items: center; justify-content: center;
-  border: 1px solid var(--line-strong); border-radius: 6px;
-  background: linear-gradient(180deg, rgba(255,255,255,.05),
+  border: 1px solid var(--sc-plate-edge); border-radius: 6px;
+  background-color: var(--sc-plate-tint);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.05),
     rgba(255,255,255,.012) 55%, rgba(0,0,0,.12));
   font: inherit; letter-spacing: inherit; text-transform: inherit;
   color: var(--ink-hi);
 }
+
+/* THE TABLE, SAID SEPARATELY FROM THE UNITS (2026-09-02).
+   The cut says which UNIT gave way. It cannot also say that the overall
+   tier gap fails to back the pick, because that is a different fact and
+   often true at the same time — a row can be cut for attack while the
+   table is level underneath it.
+   So the PLATE carries it: when ovr does not back the pick the box takes
+   a tint and a coloured edge, the way the old SPLIT chip did. The word
+   stays --ink-hi; only the plate is tinted, so the two channels never
+   compete for the same ink. In practice this is always the amber case —
+   no live row has ever had ovr < 0 while a unit still led, so the red
+   variant is correctness, not something the board shows today. */
+.sc-ovr-level  { --sc-plate-edge: rgba(251,191,36,.50);
+                 --sc-plate-tint: rgba(251,191,36,.10); }
+.sc-ovr-behind { --sc-plate-edge: rgba(248,113,113,.50);
+                 --sc-plate-tint: rgba(248,113,113,.10); }
 .sc-half::after { content: attr(data-w); }
 .sc-tear {
   position: absolute; z-index: 3; pointer-events: none;
@@ -777,35 +796,10 @@ img.glyph-soft   { opacity: 0.11; filter: grayscale(1) brightness(1.1); }
 .sc-v .sc-t1 { top: -15%; height: 130%; left: 50%; width: 1px;
   margin-left: -.5px; transform: rotate(var(--sc-ang-v)); }
 
-/* both cuts — three pieces, so the left half is a GROUP. Its own clip
-   stops the inner horizontal shear spilling past the vertical cut (as
-   loose quadrants the top-left slid into the right piece and the
-   bottom-left pulled away from it), and the group slides down as one,
-   which carries the horizontal seam to 50% + the displacement. */
-.sc-x .sc-grp { position: absolute; inset: 0; z-index: 2;
-  transform: translateY(var(--sc-d));
-  clip-path: polygon(0 0, calc(50% + var(--sc-tilt-x)) 0,
-    calc(50% - var(--sc-tilt-x)) 100%, 0 100%); }
-.sc-x .sc-grp .sc-a { transform: translateX(var(--sc-d));
-  clip-path: polygon(0 0, 100% 0, 100% calc(50% - var(--sc-tilt-y)),
-    0 calc(50% + var(--sc-tilt-y))); }
-.sc-x .sc-grp .sc-b { transform: translateX(calc(var(--sc-d) * -1));
-  clip-path: polygon(0 calc(50% + var(--sc-tilt-y)),
-    100% calc(50% - var(--sc-tilt-y)), 100% 100%, 0 100%); }
-.sc-x .sc-c { transform: translateY(calc(var(--sc-d) * -1));
-  clip-path: polygon(calc(50% + var(--sc-tilt-x)) 0, 100% 0, 100% 100%,
-    calc(50% - var(--sc-tilt-x)) 100%); }
-.sc-x .sc-t1 { top: -15%; height: 130%; left: 50%; width: 1px;
-  margin-left: -.5px; transform: rotate(var(--sc-ang-v)); }
-/* TRANSFORM-ORIGIN matters here and nowhere else. Every other tear spans
-   the whole box, so its own centre already sits on the seam's pivot at
-   50%. This one stops at the vertical cut, so its centre is at x~21.5%;
-   rotate about that and the tear CROSSES the seam instead of lying on
-   it. Its right edge is exactly chip-x 50% — the pivot the polygon turns
-   around — so origin 100% puts the two lines on the same axis. */
-.sc-x .sc-t2 { left: -7%; width: 57%; top: calc(50% + var(--sc-d));
-  height: 1px; margin-top: -.5px;
-  transform-origin: 100% 50%; transform: rotate(var(--sc-ang-h)); }
-
 /* the two real verdicts are never cut */
-.sc-intact { border: 1px solid var(--line-strong); border-radius: 6px; }
+.sc-intact { border: 1px solid var(--sc-plate-edge); border-radius: 6px;
+  background-color: var(--sc-plate-tint); }
+.sc-clean  { --sc-plate-edge: rgba(52,211,153,.50);
+             --sc-plate-tint: rgba(52,211,153,.10); }
+.sc-hollow { --sc-plate-edge: rgba(248,113,113,.50);
+             --sc-plate-tint: rgba(248,113,113,.10); }

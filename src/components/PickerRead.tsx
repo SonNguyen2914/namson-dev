@@ -167,20 +167,44 @@ export function RegTimeNote({ note }: { note: string }) {
  *  and cannot drift apart. */
 export const dissents = (gap: number) => gap <= 0;
 
-/** WHICH CUT THE CHIP TAKES. Inside SPLIT at most one unit can dissent —
- *  the backend calls it HOLLOW when both do — so these three are mutually
- *  exclusive and exhaustive over SPLIT's 14 sign-patterns: 6 attack,
- *  6 defence, and 2 where the units are fine and only the table lags.
- *  That last one has no dissenting unit at all, so under any single-axis
- *  scheme it would draw nothing and read as CLEAN; the compound mark is
- *  what makes the odd case look odd. */
-export function cutOf(read: ReadLike):
-    { axis: "h" | "v" | "x"; level: boolean } | null {
+/** WHICH CUT THE CHIP TAKES — or none at all.
+ *
+ *  Inside SPLIT at most one UNIT can dissent; the backend calls it HOLLOW
+ *  when both do. So there are exactly three SPLIT cases, and only two of
+ *  them are a cut:
+ *
+ *    attack gave way   (atk <= 0)  ->  horizontal
+ *    defence gave way  (def <= 0)  ->  vertical
+ *    neither did, the table lags   ->  NO CUT
+ *
+ *  That third case has no unit to sever — both units back the pick and it
+ *  is the overall tier that does not — so it wears the old amber box
+ *  instead, which is now a statement rather than a class label: the units
+ *  are fine, the table is not. (2026-09-02: this replaced a compound
+ *  vertical-plus-horizontal mark. It was the most complex geometry in the
+ *  set, spent on the rarest case, and every alignment bug lived in it.) */
+export function cutOf(read: ReadLike): { axis: "h" | "v"; level: boolean } | null {
   if (read.shape !== "SPLIT") return null;
   const g = read.tier_gaps;
   if (dissents(g.atk)) return { axis: "h", level: g.atk === 0 };
   if (dissents(g.def)) return { axis: "v", level: g.def === 0 };
-  return { axis: "x", level: g.ovr === 0 };
+  return null;
+}
+
+/** THE PLATE'S OWN CHANNEL: does the table back the pick?
+ *
+ *  Separate from the cut on purpose. A row can be cut for attack while the
+ *  overall gap is level underneath it, and one mark cannot say both. So
+ *  the CUT names the unit and the BOX names the table — tinted edge and
+ *  wash when ovr does not back the pick, exactly the old SPLIT chip. The
+ *  word itself stays --ink-hi so the two channels never fight for ink.
+ *  CLEAN and HOLLOW take their own hue through the same two variables. */
+function plateClass(read: ReadLike): string {
+  if (read.shape === "CLEAN") return "sc-clean";
+  if (read.shape === "HOLLOW") return "sc-hollow";
+  const ovr = read.tier_gaps.ovr;
+  if (ovr > 0) return "";
+  return ovr === 0 ? "sc-ovr-level" : "sc-ovr-behind";
 }
 
 /** THE SHAPE, AS A WORD THE BOARD SHOT THROUGH (2026-09-01).
@@ -208,14 +232,15 @@ export function cutOf(read: ReadLike):
 export function ShapeChip({ read }: { read: ReadLike }) {
   const shape = read.shape;
   const cut = cutOf(read);
+  const plate = plateClass(read);
+  const ink =
+    shape === "CLEAN" ? "text-up"
+      : shape === "HOLLOW" ? "text-neg" : "text-ink-hi";
 
   if (!cut) {
-    const tone =
-      shape === "CLEAN" ? "border-up/50 bg-up/10 text-up"
-        : "border-neg/50 bg-neg/10 text-neg";
     return (
       <span data-testid="shape-chip" data-cut="none"
-        className={`sc sc-intact font-mono text-[10px] uppercase tracking-[0.16em] ${tone}`}>
+        className={`sc sc-intact ${plate} ${ink} font-mono text-[10px] uppercase tracking-[0.16em]`}>
         <span className="sc-w">{shape}</span>
       </span>
     );
@@ -227,20 +252,9 @@ export function ShapeChip({ read }: { read: ReadLike }) {
   return (
     <span data-testid="shape-chip" data-cut={cut.axis}
       data-cut-tone={cut.level ? "level" : "behind"}
-      className={`sc sc-cut sc-${cut.axis} ${cut.level ? "sc-level" : ""} font-mono text-[10px] uppercase tracking-[0.16em] text-ink-hi`}>
-      {cut.axis === "x" ? (
-        <>
-          <i className="sc-grp" aria-hidden>{piece("a")}{piece("b")}</i>
-          {piece("c")}
-          <i className="sc-tear sc-t1" aria-hidden />
-          <i className="sc-tear sc-t2" aria-hidden />
-        </>
-      ) : (
-        <>
-          {piece("a")}{piece("b")}
-          <i className="sc-tear sc-t1" aria-hidden />
-        </>
-      )}
+      className={`sc sc-cut sc-${cut.axis} ${cut.level ? "sc-level" : ""} ${plate} text-ink-hi font-mono text-[10px] uppercase tracking-[0.16em]`}>
+      {piece("a")}{piece("b")}
+      <i className="sc-tear sc-t1" aria-hidden />
       <span className="sc-w">{shape}</span>
     </span>
   );
