@@ -1,28 +1,70 @@
-import type {
-  GetServerSideProps,
-  InferGetServerSidePropsType,
-} from "next";
+import type { GetServerSideProps } from "next";
 import Head from "next/head";
 import Link from "next/link";
+import {
+  StudyHubAccessGate,
+  StudyHubLogoutButton,
+} from "@/components/StudyHubAccess";
 import type { StudyCourse } from "@/lib/studyHubManifest";
 
 const NOTES_REPOSITORY =
   "https://github.com/SonNguyen2914/study-hub-notes";
 
 type StudyHubPageProps = {
+  access: "authorized" | "empty" | "locked" | "unconfigured";
   semester: string;
   courses: StudyCourse[];
 };
 
-export const getServerSideProps = (async () => {
+export const getServerSideProps = (async ({ req, res }) => {
+  res.setHeader("Cache-Control", "private, no-store, max-age=0");
+  res.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive");
   // Keep the manifest server-owned. Only the fields needed to draw the
   // dashboard are deliberately serialized into the page response.
-  const { studyHubManifest } = await import("@/lib/studyHubManifest");
+  const { assertValidStudyHubManifest, studyHubManifest } =
+    await import("@/lib/studyHubManifest");
+  assertValidStudyHubManifest(studyHubManifest);
+  const courses = [...studyHubManifest.courses];
+
+  // An empty catalog contains no private links, so the shell can remain
+  // previewable before setup. The moment a course is added, fail closed.
+  if (courses.length === 0) {
+    return {
+      props: {
+        access: "empty",
+        semester: studyHubManifest.semester,
+        courses,
+      },
+    };
+  }
+
+  const { getStudyHubAuthConfiguration, isStudyHubSessionValid } =
+    await import("@/server/studyHubAuth");
+  const auth = getStudyHubAuthConfiguration();
+  if (!auth.configured) {
+    return {
+      props: {
+        access: "unconfigured",
+        semester: studyHubManifest.semester,
+        courses: [],
+      },
+    };
+  }
+  if (!isStudyHubSessionValid(req.headers.cookie)) {
+    return {
+      props: {
+        access: "locked",
+        semester: studyHubManifest.semester,
+        courses: [],
+      },
+    };
+  }
 
   return {
     props: {
+      access: "authorized",
       semester: studyHubManifest.semester,
-      courses: [...studyHubManifest.courses],
+      courses,
     },
   };
 }) satisfies GetServerSideProps<StudyHubPageProps>;
@@ -108,7 +150,12 @@ function CourseCard({ course }: { course: StudyCourse }) {
             {course.semester}
           </p>
           <h3 className="mt-3 text-2xl font-medium tracking-[-0.04em] text-ink-hi">
-            {course.title}
+            <Link
+              href={`/study-hub/${encodeURIComponent(course.slug)}`}
+              className="transition-colors hover:text-accent"
+            >
+              {course.title}
+            </Link>
           </h3>
         </div>
         <span className="rounded-full border border-line px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-ink-low">
@@ -116,11 +163,17 @@ function CourseCard({ course }: { course: StudyCourse }) {
         </span>
       </div>
 
-      <div className="mt-8 grid gap-2 sm:grid-cols-3">
+      <div className="mt-8 grid gap-2 sm:grid-cols-2">
+        <Link
+          href={`/study-hub/${encodeURIComponent(course.slug)}`}
+          className="rounded-lg border border-accent/30 bg-accent/5 px-3 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-accent transition-colors hover:border-accent/60"
+        >
+          Workspace →
+        </Link>
         <a
           href={course.googleDriveUrl}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
           className="rounded-lg border border-line px-3 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-mid transition-colors hover:border-line-strong hover:text-ink-hi"
         >
           Drive <Arrow />
@@ -128,7 +181,7 @@ function CourseCard({ course }: { course: StudyCourse }) {
         <a
           href={course.notebookLmUrl}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
           className="rounded-lg border border-line px-3 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-mid transition-colors hover:border-line-strong hover:text-ink-hi"
         >
           NotebookLM <Arrow />
@@ -136,7 +189,7 @@ function CourseCard({ course }: { course: StudyCourse }) {
         <a
           href={courseNotesUrl(course.notesPath)}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
           className="rounded-lg border border-line px-3 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-mid transition-colors hover:border-line-strong hover:text-ink-hi"
         >
           Notes <Arrow />
@@ -147,9 +200,22 @@ function CourseCard({ course }: { course: StudyCourse }) {
 }
 
 export default function StudyHub({
+  access,
   semester,
   courses,
-}: InferGetServerSidePropsType<typeof getServerSideProps>) {
+}: StudyHubPageProps) {
+  if (access === "locked" || access === "unconfigured") {
+    return (
+      <>
+        <Head>
+          <title>Study Hub access — namson.dev</title>
+          <meta name="robots" content="noindex,nofollow,noarchive" />
+        </Head>
+        <StudyHubAccessGate configured={access === "locked"} />
+      </>
+    );
+  }
+
   return (
     <>
       <Head>
@@ -158,6 +224,7 @@ export default function StudyHub({
           name="description"
           content="A private launchpad for course sources, study workspaces, and reviewed notes."
         />
+        <meta name="robots" content="noindex,nofollow,noarchive" />
       </Head>
 
       <div className="min-h-screen bg-bs text-ink-mid">
@@ -192,6 +259,7 @@ export default function StudyHub({
               >
                 Match lab
               </Link>
+              {access === "authorized" && <StudyHubLogoutButton />}
             </nav>
           </div>
         </header>

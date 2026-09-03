@@ -13,9 +13,15 @@ test.describe("Study Hub shell", () => {
   test("renders the empty Fall 2026 dashboard without inventing courses", async ({
     page,
   }) => {
-    await page.goto("/study-hub");
+    const response = await page.goto("/study-hub");
 
+    expect(response?.headers()["cache-control"]).toContain("no-store");
+    expect(response?.headers()["x-robots-tag"]).toContain("noindex");
     await expect(page).toHaveTitle("Study Hub — namson.dev");
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+      "content",
+      "noindex,nofollow,noarchive",
+    );
     await expect(
       page.getByRole("heading", { name: "One quiet place to begin." }),
     ).toBeVisible();

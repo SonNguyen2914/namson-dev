@@ -1,6 +1,6 @@
 # Personal Study Hub Setup
 
-This document records the confirmed starting point and the initial integration boundaries for adding the Personal Study Hub to `namson-dev`. It is a setup record, not an implementation specification.
+This document records the confirmed application baseline, the implemented Version 1 boundaries, and the steps for adding course resources without committing private materials.
 
 ## Confirmed application baseline
 
@@ -10,8 +10,8 @@ This document records the confirmed starting point and the initial integration b
 - The repository does not pin Node.js in an engine or version file. GitHub Actions uses Node.js 20; Next.js 16.2.10 requires Node.js 20.9.0 or newer.
 - Browser-facing pages and components live under `src/pages` and `src/components`.
 - Server-side Next.js API routes live under `src/pages/api`. The existing bet-suggester routes proxy requests to a separate backend.
-- `SUGGESTER_BACKEND_URL` is the only application-specific runtime environment variable referenced by the current source. It is read on the server and defaults to `http://localhost:8000`; Playwright separately defaults it to the deployed read-only shadow backend.
-- No database client, schema, migration system, or authentication provider is present in this repository.
+- The existing bet-suggester reads `SUGGESTER_BACKEND_URL` on the server and defaults to `http://localhost:8000`; Playwright separately defaults it to the deployed read-only shadow backend.
+- No database client, schema, migration system, or third-party authentication provider is present. Study Hub uses a small single-user, signed-cookie access gate with secrets supplied by the server environment.
 - Vercel deploys the site from pushes to `main`. Non-default branches receive preview builds.
 
 ## Existing commands
@@ -36,12 +36,50 @@ The Playwright configuration serves the production build on port 3123 by default
 - **API credentials** must be read and used only on the server. They must never be exposed through `NEXT_PUBLIC_` variables, client bundles, source control, or logs.
 - **Retrieval scope** stays deliberately small: Version 1 will not add a vector database or a full retrieval-augmented generation system.
 
-## Configuration still to be decided
+## Implemented Version 1
 
-No Study Hub environment-variable names are confirmed yet. Define them only when an implementation selects a concrete server-side provider or integration, document names without values, and keep local values in ignored environment files and deployment secrets.
+- `/study-hub` is a server-rendered dashboard. It remains safely previewable while the course manifest is empty.
+- `src/lib/studyHubManifest.ts` is the typed, validated course catalog. Every configured course has a title, semester, Google Drive URL, NotebookLM URL, and private-notes path.
+- `/study-hub/[slug]` is the protected course workspace with resource links and a live-prompt draft interface.
+- The access gate uses an HTTP-only, same-site, signed cookie. Course links fail closed when access secrets are absent, and login attempts are rate-limited.
+- `/api/study-hub/prompt` validates the session, origin, rate, course, and prompt length before calling a server-only provider adapter.
+- The first provider adapter supports an OpenAI-compatible chat-completions endpoint. The UI and API contract do not depend on a named vendor, so another adapter can replace it later.
+- Prompt responses stay in browser memory, are labelled as unreviewed drafts, and are never written into notes automatically.
+- The prompt system explicitly states that it cannot read Drive, NotebookLM, or private notes. Version 1 performs no ingestion, vector search, or RAG.
 
-External access eventually required for implementation will include the relevant Google account and Drive permissions, access to the private `study-hub-notes` repository, course-specific NotebookLM links, and credentials for the selected live-prompting provider. Secret values should be entered only in the provider or deployment secret manager, never in documentation or chat transcripts.
+## Server configuration
 
-## First implementation slice
+Copy `.env.example` to an ignored `.env.local` for local development, or add the same names to the Vercel deployment secret manager. Never commit or paste their values into documentation.
 
-The read-only dashboard shell is available at `/study-hub`. Its typed, server-owned course manifest lives in `src/lib/studyHubManifest.ts` and carries course title, semester, Google Drive link, NotebookLM link, and notes-repository path. The initial manifest is deliberately empty until the course list and links are confirmed. No AI call or content ingestion is part of this slice.
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `STUDY_HUB_ACCESS_PASSWORD` | Before adding courses | Single-user access phrase; minimum 12 characters |
+| `STUDY_HUB_SESSION_SECRET` | Before adding courses | Signs 12-hour sessions; minimum 32 random characters |
+| `STUDY_HUB_AI_PROVIDER` | For live prompting | Set to `openai-compatible` for the included adapter |
+| `STUDY_HUB_AI_BASE_URL` | For live prompting | HTTPS base URL for the provider's compatible API |
+| `STUDY_HUB_AI_MODEL` | For live prompting | Provider model identifier |
+| `STUDY_HUB_AI_API_KEY` | For live prompting | Server-side provider credential |
+
+The access password, session secret, and API key are server-only. Do not prefix them with `NEXT_PUBLIC_`. The empty dashboard works without configuration; once the manifest contains a course, missing access configuration produces a locked setup screen instead of serializing private links.
+
+## Add a course after materials are ready
+
+1. Keep professor files in the course's access-controlled Google Drive folder.
+2. Create the course-specific NotebookLM workspace and copy its link.
+3. In `study-hub-notes`, create a course folder under `fall-2026/` using the existing templates. Commit only curated Markdown output.
+4. Add one confirmed entry to `studyHubManifest.courses`:
+
+```ts
+{
+  slug: "confirmed-course-slug",
+  title: "Confirmed course title",
+  semester: "Fall 2026",
+  googleDriveUrl: "https://drive.google.com/...",
+  notebookLmUrl: "https://notebooklm.google.com/...",
+  notesPath: "fall-2026/confirmed-course-slug",
+}
+```
+
+5. Run `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `npm run test:e2e` before pushing.
+
+The manifest rejects malformed or duplicate slugs, non-Google resource hosts, mismatched semesters, unsafe notes paths, and non-HTTPS external links. Course PDFs, textbooks, credentials, and raw AI transcripts remain outside Git.
