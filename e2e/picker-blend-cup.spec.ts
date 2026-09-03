@@ -774,3 +774,59 @@ test("a league card keeps its hub link", async ({ page }) => {
       "href", new RegExp(`^/bet-suggester/${slug}/[^/]+$`));
   }
 });
+
+// --------------------------------------------- the venue, and the badge
+
+// THE 2026-08-08 LESSON ON A NEW SURFACE. The card printed the
+// provider's `home` label as an "H" badge into the Leagues Cup — the one
+// competition that stages "home" ties in the opponent's country. On
+// 2026-09-02 BOTH semi-finals were Liga MX clubs at US grounds (Toluca v
+// León, Houston; América v Monterrey, Carson) and both cards said H.
+// Fitted per category, a real home ground is +135 rating points and a
+// Liga MX side "home" at a US venue is −150 — a 285-point swing, about
+// 78% of the gap between the best and worst club in Liga MX.
+
+const HOUSTON = { name: "Shell Energy Stadium", city: "Houston, Texas",
+                  country: "USA" };
+
+const venueBoard = (vc: unknown, favSide: "home" | "away" = "home") => ({
+  ...BOARD,
+  rows: [{ ...EARLY, fav_side: favSide, venue: HOUSTON, venue_class: vc }],
+});
+
+test("a neutral ground SAYS neutral, rather than calling somebody home",
+  async ({ page }) => {
+    await open(page, venueBoard({ class: "NEUTRAL", home_side: null }));
+    const badge = page.getByTestId("home-badge").first();
+    await expect(badge).toHaveText("N");
+    await expect(badge).toHaveAttribute("data-venue", "NEUTRAL");
+    await expect(badge).toHaveAttribute("title", /neither club plays in this country/);
+  });
+
+test("a labelled home side in the opponent's country is not shown as home",
+  async ({ page }) => {
+    // fav IS the labelled home side, but the venue is the away side's
+    // country — so the favourite is away, whatever the label says
+    await open(page, venueBoard(
+      { class: "OPPONENT_COUNTRY", home_side: "away" }, "home"));
+    await expect(page.getByTestId("home-badge").first()).toHaveText("A");
+  });
+
+test("a domestic fixture still trusts the provider's label", async ({ page }) => {
+  await open(page, venueBoard({ class: "DOMESTIC", home_side: "home" }, "home"));
+  await expect(page.getByTestId("home-badge").first()).toHaveText("H");
+  await open(page, venueBoard({ class: "DOMESTIC", home_side: "home" }, "away"));
+  await expect(page.getByTestId("home-badge").first()).toHaveText("A");
+});
+
+test("an unknown venue renders NO badge — an absent one is a fact",
+  async ({ page }) => {
+    await open(page, venueBoard({ class: "UNKNOWN", home_side: null }));
+    await expect(page.getByTestId("home-badge")).toHaveCount(0);
+  });
+
+test("a row the backend sent no venue_class for renders no badge",
+  async ({ page }) => {
+    await open(page, venueBoard(null));
+    await expect(page.getByTestId("home-badge")).toHaveCount(0);
+  });

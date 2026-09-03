@@ -30,7 +30,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { dayLabel, fmtDate, localDay } from "../lib/matchday";
 import {
-  BoardRefusal, BoardRow, LeagueMeta, leagueLabel, rowHref,
+  BoardRefusal, BoardRow, LeagueMeta, homeBadge, leagueLabel, rowHref,
 } from "../lib/pickerApi";
 import {
   ReviewLeagueMeta, ReviewRefusal, ReviewRow,
@@ -158,7 +158,7 @@ function FormStrip({ form, name, className = "" }: {
 function RowCard({ row, rank, modeId, clubCount }: {
   row: BoardRow; rank: number; modeId: SortModeId; clubCount: number;
 }) {
-  const favHome = row.fav_side === "home";
+  const badge = homeBadge(row);
   const w = row.weights;
   const cross = row.cross_league === true;
   const anchor = anchorFor(row, modeId);
@@ -243,10 +243,15 @@ function RowCard({ row, rank, modeId, clubCount }: {
               title={`${row.favourite} v ${row.opponent}`}>
               {row.favourite}
             </span>
-            <span className="flex-none rounded border border-line px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-low"
-              title={favHome ? "the favourite is at home" : "the favourite is away"}>
-              {favHome ? "H" : "A"}
-            </span>
+            {badge && (
+              <span data-testid="home-badge" data-venue={row.venue_class?.class}
+                className={`flex-none rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] ${
+                  badge.text === "N"
+                    ? "border-warn/40 text-warn" : "border-line text-ink-low"}`}
+                title={badge.title}>
+                {badge.text}
+              </span>
+            )}
             <FormStrip form={row.form?.fav} name={row.favourite}
               className="ml-auto pl-2" />
           </span>

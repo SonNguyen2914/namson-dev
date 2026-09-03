@@ -84,6 +84,15 @@ export interface BoardRow {
   favourite: string;
   opponent: string;
   fav_side: "home" | "away";
+  venue?: { name?: string | null; city?: string | null;
+            country?: string | null } | null;
+  /** Whether this venue is anybody's home ground — see the backend's
+   *  picker/board.venue_class. DOMESTIC trusts the provider's label;
+   *  NEUTRAL means nobody is home; TRUE_HOME / OPPONENT_COUNTRY name
+   *  which side actually is, whatever the label says; UNKNOWN refuses. */
+  venue_class?: { class: "DOMESTIC" | "NEUTRAL" | "TRUE_HOME"
+                       | "OPPONENT_COUNTRY" | "UNKNOWN";
+                  home_side: "home" | "away" | null } | null;
   resolution: Record<string, string>;
   /** NULL on a cross-league cup fixture: the two clubs were rated in
    *  different competitions and their rates were never on one scale, so
@@ -174,6 +183,39 @@ export const LEAGUE_LABEL: Record<string, string> = {
   ligamx: "Liga MX",
   leaguescup: "Leagues Cup",
 };
+
+/** THE BADGE BESIDE THE FAVOURITE, and what it is allowed to claim.
+ *
+ *  It used to be `fav_side === "home" ? "H" : "A"`, straight from the
+ *  provider's label — which is worthless in the Leagues Cup, where a
+ *  "home" fixture is routinely staged in the opponent's country. On
+ *  2026-09-02 both semi-finals were Liga MX clubs at US grounds and both
+ *  cards printed H.
+ *
+ *  So the badge now answers a question it can actually support: is the
+ *  FAVOURITE at home AT THIS VENUE? "N" when the ground is nobody's,
+ *  and nothing at all when the venue is unknown — an absent badge is a
+ *  fact, and a wrong one costs 285 rating points of read. */
+export function homeBadge(row: BoardRow):
+    { text: string; title: string } | null {
+  const vc = row.venue_class;
+  const favHome = row.fav_side === "home";
+  const where = row.venue?.city ? ` — ${row.venue.city}` : "";
+
+  if (!vc || vc.class === "UNKNOWN") return null;
+  if (vc.class === "NEUTRAL") {
+    return { text: "N",
+      title: `neutral ground: neither club plays in this country${where}` };
+  }
+  // DOMESTIC trusts the label; the two cross-border classes name the
+  // side that is genuinely at home, which may not be the labelled one.
+  const favIsHome = vc.class === "DOMESTIC"
+    ? favHome
+    : (vc.home_side === "home") === favHome;
+  return favIsHome
+    ? { text: "H", title: `the favourite is at home${where}` }
+    : { text: "A", title: `the favourite is away${where}` };
+}
 
 export const leagueLabel = (slug: string) => LEAGUE_LABEL[slug] ?? slug;
 
