@@ -3,7 +3,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { proxy } from "../../../lib/suggesterProxy";
 
 const ALLOWED = new Set([
-  "scoreboard", "schedule", "standings", "markets", "odds",
+  "scoreboard", "schedule", "standings", "markets", "odds", "approval",
 ]);
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
