@@ -119,8 +119,9 @@ function RankDumbbell({ row, clubCount }: { row: BoardRow; clubCount: number }) 
  *  match hubs' form chips: a draw is not a warning. Oldest→newest, so
  *  the rightmost cell is the latest result; the title spells it out. */
 const FORM_SLOTS = 5;
-function FormStrip({ form, name, className = "" }: {
-  form?: string | null; name: string; className?: string;
+function FormStrip({ form, name, scope, cupScope, className = "" }: {
+  form?: string | null; name: string; scope?: string;
+  cupScope?: boolean; className?: string;
 }) {
   if (!form) return null;
   // FIXED WIDTH, right-aligned (2026-09-01): five slots always, empty
@@ -133,8 +134,17 @@ function FormStrip({ form, name, className = "" }: {
   const pad = FORM_SLOTS - letters.length;
   const slots = [...Array(pad).fill(null), ...letters];
   return (
-    <span data-testid="form-strip" aria-hidden
-      title={`${name} — last ${form.length}, oldest→newest: ${form} (rightmost is latest)`}
+    // NOT aria-hidden. The strip was invisible to a screen reader
+    // entirely, so its only description was a mouse-only tooltip. It has
+    // a real accessible name now, and that name states the COMPETITION —
+    // a cup row's WWWW is its cup run, and reading it as league form is
+    // exactly what happened on the semi-final night.
+    <span data-testid="form-strip" role="img"
+      data-scope={scope}
+      aria-label={`${name} — last ${form.length} in ${scope ?? "this competition"}`
+        + `, oldest to newest: ${form.split("").join(" ")}`}
+      title={`${name} — last ${form.length} in ${scope ?? "this competition"}`
+        + `, oldest→newest: ${form} (rightmost is latest)`}
       className={`inline-flex flex-none items-center gap-[2px] ${className}`}>
       {slots.map((c, i) => {
         const latest = i === FORM_SLOTS - 1 && c != null;
@@ -148,6 +158,16 @@ function FormStrip({ form, name, className = "" }: {
               latest ? " ring-1 ring-ink-hi/70 ring-offset-1 ring-offset-bs" : ""}`} />
         );
       })}
+      {/* Only a CUP scope gets a visible mark. A league row's form being
+          league form is what every reader already assumes, so labelling
+          it would cost every card pixels to say nothing. The surprising
+          case is the one that has to speak. */}
+      {cupScope && (
+        <span data-testid="form-scope"
+          className="ml-1 font-mono text-[7px] uppercase tracking-[0.1em] text-ink-faint">
+          cup
+        </span>
+      )}
     </span>
   );
 }
@@ -253,6 +273,7 @@ function RowCard({ row, rank, modeId, clubCount }: {
               </span>
             )}
             <FormStrip form={row.form?.fav} name={row.favourite}
+              scope={row.form?.scope} cupScope={row.form?.scope_is_cup}
               className="ml-auto pl-2" />
           </span>
           <span className="mt-0.5 flex min-w-0 items-center gap-2">
@@ -262,6 +283,7 @@ function RowCard({ row, rank, modeId, clubCount }: {
               <span className="text-ink-faint">vs </span>{row.opponent}
             </span>
             <FormStrip form={row.form?.opp} name={row.opponent}
+              scope={row.form?.scope} cupScope={row.form?.scope_is_cup}
               className="ml-auto pl-2" />
           </span>
         </span>

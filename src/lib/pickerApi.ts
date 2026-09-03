@@ -78,7 +78,11 @@ export interface BoardRow {
    *  null/absent when the sweep knows nothing of the club (early
    *  season, new competition) — a blank is a fact, not an empty
    *  string, and an older payload simply has no strips. */
-  form?: { fav?: string | null; opp?: string | null } | null;
+  form?: { fav?: string | null; opp?: string | null;
+           /** The competition these results were swept from. The sweep is
+            *  per COLUMN, so a cup row's WWWW is its cup run — not the
+            *  club's league form. */
+           scope?: string; scope_is_cup?: boolean } | null;
   home: string;
   away: string;
   favourite: string;

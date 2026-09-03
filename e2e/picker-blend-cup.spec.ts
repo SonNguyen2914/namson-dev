@@ -830,3 +830,48 @@ test("a row the backend sent no venue_class for renders no badge",
     await open(page, venueBoard(null));
     await expect(page.getByTestId("home-badge")).toHaveCount(0);
   });
+
+// ------------------------------------ the form strip names its own scope
+
+// The sweep is per COLUMN, so a Leagues Cup row's WWWW is its CUP run —
+// three or four knockout games — and not the club's league form. Source
+// has said so since 2026-09-01; the CARD never did. On the semi-final
+// night León's WWWW was read as league form, when they sit 7th in the
+// Apertura on W3 D1 L2.
+
+const formBoard = (scope: string, isCup: boolean) => ({
+  ...BOARD,
+  rows: [{ ...EARLY, form: { fav: "WWWWW", opp: "LDLWL",
+                             scope, scope_is_cup: isCup } }],
+});
+
+test("a cup row's form strip says CUP, and names the competition",
+  async ({ page }) => {
+    await open(page, formBoard("Leagues Cup", true));
+    const strip = page.getByTestId("form-strip").first();
+    await expect(strip).toHaveAttribute("data-scope", "Leagues Cup");
+    await expect(strip).toHaveAttribute("aria-label", /in Leagues Cup/);
+    await expect(page.getByTestId("form-scope").first()).toHaveText("cup");
+  });
+
+test("a league row carries NO visible scope mark — it is what a reader assumes",
+  async ({ page }) => {
+    await open(page, formBoard("Liga MX", false));
+    await expect(page.getByTestId("form-strip").first())
+      .toHaveAttribute("data-scope", "Liga MX");
+    // the competition is still in the accessible name, just not in pixels
+    await expect(page.getByTestId("form-strip").first())
+      .toHaveAttribute("aria-label", /in Liga MX/);
+    await expect(page.getByTestId("form-scope")).toHaveCount(0);
+  });
+
+test("the form strip is reachable by a screen reader, not aria-hidden",
+  async ({ page }) => {
+    // it carried aria-hidden with a mouse-only title, so its whole
+    // content was unavailable to anyone not using a pointer
+    await open(page, formBoard("Liga MX", false));
+    const strip = page.getByTestId("form-strip").first();
+    await expect(strip).toHaveAttribute("role", "img");
+    await expect(strip).not.toHaveAttribute("aria-hidden", /.*/);
+    await expect(strip).toHaveAttribute("aria-label", /oldest to newest: W W W W W/);
+  });
