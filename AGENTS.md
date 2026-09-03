@@ -87,8 +87,15 @@ Set it explicitly unless you mean to smoke-test live:
 SUGGESTER_BACKEND_URL=http://localhost:8000 npx playwright test
 ```
 
-`e2e/contract-deterministic.spec.ts` needs no backend at all; the other
-four specs do.
+Most specs are hermetic: they serve recorded payloads through
+`page.route` and never reach a backend. Three mock nothing and need a
+live backend — `decision-safety`, `lineups` and `scouting-consistency`
+— and each skips with a stated reason when the backend it reaches lacks
+the data. `picker.spec.ts` and `asean.spec.ts` also carry tests named
+"unmocked on purpose" that exercise the real proxy allowlist and
+tolerate any backend answer. That list is as of 2026-09-03; the durable
+check is `grep -L 'page.route' e2e/*.spec.ts`, which names the specs
+with no mocks at all.
 
 ## 5. Hydration
 
