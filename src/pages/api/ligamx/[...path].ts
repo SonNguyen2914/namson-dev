@@ -4,6 +4,7 @@ import { proxy } from "../../../lib/suggesterProxy";
 
 const ALLOWED = new Set([
   "scoreboard", "schedule", "standings", "markets", "odds", "status",
+  "approval",
 ]);
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {

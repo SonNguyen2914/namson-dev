@@ -6,7 +6,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { proxy } from "../../../lib/suggesterProxy";
 
-const ALLOWED = new Set(["findings"]);
+const ALLOWED = new Set(["findings", "live-coverage"]);
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const segs = ((req.query.path as string[]) || []).join("/");

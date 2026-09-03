@@ -5,8 +5,12 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { proxy } from "../../../lib/suggesterProxy";
 
+// No `approval` here: the backend has never served /api/laliga/approval
+// (mls, epl and ligamx have one; La Liga's approval state is read from
+// /status). The entry was copied from the EPL list and forwarded to a
+// backend 404 — e2e/proxy-allowlists.spec.ts pins the refusal.
 const ALLOWED = new Set(["scoreboard", "schedule", "standings", "markets",
-                         "odds", "status", "approval"]);
+                         "odds", "status"]);
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const segs = ((req.query.path as string[]) || []).join("/");
