@@ -30,7 +30,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { dayLabel, fmtDate, localDay } from "../lib/matchday";
 import {
-  BoardRefusal, BoardRow, LeagueMeta, homeBadge, leagueLabel, rowHref,
+  BoardRefusal, BoardRow, LeagueMeta, homeBadge, leagueLabel, rowHref, seasonDisagreement,
 } from "../lib/pickerApi";
 import {
   ReviewLeagueMeta, ReviewRefusal, ReviewRow,
@@ -206,7 +206,7 @@ function RowCard({ row, rank, modeId, clubCount }: {
             is the FALLBACK for a row that carries no weight — a read
             reconstructed through the legacy switch — and never a second
             claim standing beside the number. */}
-        {w ? <SeasonWeight w={w} /> : row.src === "prior" && (
+        {w ? <SeasonWeight w={w} alt={seasonDisagreement(row)} /> : row.src === "prior" && (
           <span
             title="rated on last season's final table — this season has too few games played"
             className="rounded border border-warn/40 bg-warn/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">

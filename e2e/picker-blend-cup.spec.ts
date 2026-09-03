@@ -875,3 +875,50 @@ test("the form strip is reachable by a screen reader, not aria-hidden",
     await expect(strip).not.toHaveAttribute("aria-hidden", /.*/);
     await expect(strip).toHaveAttribute("aria-label", /oldest to newest: W W W W W/);
   });
+
+// ------------------------- what this season alone says, when it differs
+
+// At six games played w_current = 6/(6+10) = 0.375, so the table the
+// board ranks on is 62.5% LAST season. Defensible — ledger row 25, and
+// the market sides with it — but it was SILENT. On 2026-09-02 the two
+// Leagues Cup semis ordered one way on the blend and the other way on
+// this season alone, and nothing on the card said a choice had been made.
+
+const seasonBoard = (gdg: number, currentGdg: number | null) => ({
+  ...BOARD,
+  rows: [{ ...EARLY, gdg_gap: gdg,
+           current_only: currentGdg === null ? null
+             : { ppg_gap: null, gdg_gap: currentGdg, rank_gap: null } }],
+});
+
+test("a materially different current-season read is on the chip, with both numbers",
+  async ({ page }) => {
+    await open(page, seasonBoard(0.67, 1.17));
+    const chip = page.getByTestId("season-weight").first();
+    await expect(chip).toHaveAttribute("data-alt", "+1.17");
+    await expect(chip).toHaveAttribute("title", /ON THIS SEASON ALONE/);
+    await expect(chip).toHaveAttribute("title", /\+1\.17/);
+    await expect(chip).toHaveAttribute("title", /\+0\.67/);
+    await expect(page.getByTestId("season-alt")).toHaveCount(1);
+  });
+
+test("a close agreement is NOT marked — showing both would be noise",
+  async ({ page }) => {
+    // 0.10 apart, under the 0.25 display threshold
+    await open(page, seasonBoard(1.30, 1.40));
+    await expect(page.getByTestId("season-alt")).toHaveCount(0);
+    await expect(page.getByTestId("season-weight").first())
+      .not.toHaveAttribute("data-alt", /.*/);
+  });
+
+test("a SIGN flip is always marked, however small", async ({ page }) => {
+  // 0.10 apart, but the two cuts disagree about who is better at all
+  await open(page, seasonBoard(0.05, -0.05));
+  await expect(page.getByTestId("season-alt")).toHaveCount(1);
+});
+
+test("a row with no counterfactual is unmarked, not marked as agreeing",
+  async ({ page }) => {
+    await open(page, seasonBoard(0.67, null));
+    await expect(page.getByTestId("season-alt")).toHaveCount(0);
+  });

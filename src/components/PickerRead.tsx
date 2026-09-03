@@ -107,7 +107,14 @@ export function TierCell({ label, gap }: { label: string; gap: number }) {
  *  or above it. A side rated with NO prior row at all is called out,
  *  because 100% is not the top of the same scale — it is a different
  *  basis. */
-export function SeasonWeight({ w }: { w: BlendWeights }) {
+export function SeasonWeight({ w, alt }: {
+  w: BlendWeights;
+  /** What this season ALONE concludes, when it differs materially. The
+   *  chip already answers "how much of this rating is this season"; the
+   *  natural place to answer "and what would this season alone say" is
+   *  the same chip, not a new one. */
+  alt?: { blended: number; current: number; delta: number } | null;
+}) {
   const current = weightIsCurrent(w.min);
   const soloSide = w.basis.home === "current_only"
     || w.basis.away === "current_only";
@@ -118,14 +125,24 @@ export function SeasonWeight({ w }: { w: BlendWeights }) {
         ? ` · FROZEN-WEIGHT CONTROL w=${w.constant}` : "")
     + (soloSide
         ? " · a side with no prior-season row is rated on this season"
-          + " alone and reported at 100%" : "");
+          + " alone and reported at 100%" : "")
+    + (alt
+        ? ` · ON THIS SEASON ALONE the GD/g gap is ${dec(alt.current)},`
+          + ` not ${dec(alt.blended)} — the board ranks on the blend, and`
+          + ` this says what the other cut would have concluded`
+        : "");
   return (
-    <span data-testid="season-weight" data-w={w.min ?? ""} title={title}
+    <span data-testid="season-weight" data-w={w.min ?? ""}
+      data-alt={alt ? dec(alt.current) : undefined} title={title}
       className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] ${
         current
           ? "border-accent/40 bg-accent/5 text-accent"
           : "border-warn/40 bg-warn/5 text-warn"}`}>
       {pctThisSeason(w.min)} this szn
+      {alt && (
+        <span data-testid="season-alt" aria-hidden
+          className="ml-1 opacity-70">*</span>
+      )}
     </span>
   );
 }

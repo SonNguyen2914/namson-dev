@@ -88,6 +88,13 @@ export interface BoardRow {
   favourite: string;
   opponent: string;
   fav_side: "home" | "away";
+  /** What THIS SEASON ALONE says, at w=1.0. Annotation, never a second
+   *  verdict — the board still ranks on the blend. It exists so a reader
+   *  can see that a choice was made: at 6 games played the table is
+   *  62.5% LAST season, and on 2026-09-02 the two Leagues Cup semis
+   *  ordered one way on the blend and the other way on this season. */
+  current_only?: { ppg_gap?: number | null; gdg_gap?: number | null;
+                   rank_gap?: number | null } | null;
   venue?: { name?: string | null; city?: string | null;
             country?: string | null } | null;
   /** Whether this venue is anybody's home ground — see the backend's
@@ -219,6 +226,25 @@ export function homeBadge(row: BoardRow):
   return favIsHome
     ? { text: "H", title: `the favourite is at home${where}` }
     : { text: "A", title: `the favourite is away${where}` };
+}
+
+/** Does this season alone reach a MATERIALLY different number?
+ *
+ *  0.25 GD/g is a display threshold, not a finding — it is about a goal
+ *  every four games, which is roughly the smallest gap that reorders
+ *  adjacent rows on a real board. Below it the two views agree closely
+ *  enough that showing both is noise; a SIGN flip always qualifies,
+ *  because that is the two cuts disagreeing about who is better. */
+export const CURRENT_ONLY_MATERIAL = 0.25;
+
+export function seasonDisagreement(row: BoardRow):
+    { blended: number; current: number; delta: number } | null {
+  const b = row.gdg_gap, c = row.current_only?.gdg_gap;
+  if (typeof b !== "number" || typeof c !== "number") return null;
+  const delta = c - b;
+  const flips = (b >= 0) !== (c >= 0);
+  if (!flips && Math.abs(delta) < CURRENT_ONLY_MATERIAL) return null;
+  return { blended: b, current: c, delta };
 }
 
 export const leagueLabel = (slug: string) => LEAGUE_LABEL[slug] ?? slug;
