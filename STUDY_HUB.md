@@ -42,6 +42,6 @@ No Study Hub environment-variable names are confirmed yet. Define them only when
 
 External access eventually required for implementation will include the relevant Google account and Drive permissions, access to the private `study-hub-notes` repository, course-specific NotebookLM links, and credentials for the selected live-prompting provider. Secret values should be entered only in the provider or deployment secret manager, never in documentation or chat transcripts.
 
-## Recommended first implementation slice
+## First implementation slice
 
-Build a read-only Study Hub dashboard shell backed by a typed server-side course manifest. Start with course title, semester, Google Drive link, NotebookLM link, and notes-repository path; add no AI call or content ingestion until that navigation and boundary model is reviewed.
+The read-only dashboard shell is available at `/study-hub`. Its typed, server-owned course manifest lives in `src/lib/studyHubManifest.ts` and carries course title, semester, Google Drive link, NotebookLM link, and notes-repository path. The initial manifest is deliberately empty until the course list and links are confirmed. No AI call or content ingestion is part of this slice.

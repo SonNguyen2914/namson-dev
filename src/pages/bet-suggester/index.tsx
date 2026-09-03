@@ -283,6 +283,7 @@ export default function PickerBoard() {
             {label}
           </NavChip>
         ))}
+        <NavChip href="/study-hub" active={false}>Study Hub</NavChip>
       </TopBar>
 
       {/* max-w-[96rem], not the app's usual 5xl: four columns of match
