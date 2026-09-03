@@ -733,3 +733,44 @@ test("form strips draw last results per side; absent form draws nothing", async 
   await expect(ligamx.getByTestId("picker-row")
     .filter({ hasText: "Atlas" }).getByTestId("form-strip")).toHaveCount(0);
 });
+
+// ------------------------------------------ the way in, per competition
+
+// A card is the way INTO a fixture, and every card links to
+// /bet-suggester/<league>/<event_id>. That is a real page for the four
+// leagues and nothing at all for the cup: `leaguescup` has no hub, the
+// backend serves no per-match route for it, so the link landed on the
+// site's 404 (reported 2026-09-03, clicking a Leagues Cup card on the
+// landing page). The cup's card must open the competition page that
+// already exists — and a folded cup row, drawn inside a league column,
+// is still a cup fixture and must go to the same place.
+
+const wayIn = (row: import("@playwright/test").Locator) =>
+  row.getByRole("link", { name: /^open / });
+
+test("a Leagues Cup card opens the competition page, not a hub that does not exist",
+  async ({ page }) => {
+    await open(page);
+    const cup = col(page, "leaguescup").getByTestId("picker-row").first();
+    await expect(wayIn(cup)).toHaveAttribute(
+      "href", "/bet-suggester/comp/leagues-cup");
+  });
+
+test("a folded cup card in a league column still opens the cup's page",
+  async ({ page }) => {
+    await open(page, FOLDED_BOARD);
+    const row = col(page, "ligamx").getByTestId("picker-row").first();
+    await expect(row).toHaveAttribute("data-league", "leaguescup");
+    await expect(wayIn(row)).toHaveAttribute(
+      "href", "/bet-suggester/comp/leagues-cup");
+  });
+
+test("a league card keeps its hub link", async ({ page }) => {
+  await open(page);
+  for (const slug of ["mls", "epl", "laliga", "ligamx"]) {
+    const rows = col(page, slug).getByTestId("picker-row");
+    if ((await rows.count()) === 0) continue;
+    await expect(wayIn(rows.first())).toHaveAttribute(
+      "href", new RegExp(`^/bet-suggester/${slug}/[^/]+$`));
+  }
+});

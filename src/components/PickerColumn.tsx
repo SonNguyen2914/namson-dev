@@ -30,7 +30,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { dayLabel, fmtDate, localDay } from "../lib/matchday";
 import {
-  BoardRefusal, BoardRow, LeagueMeta, leagueLabel,
+  BoardRefusal, BoardRow, LeagueMeta, leagueLabel, rowHref,
 } from "../lib/pickerApi";
 import {
   ReviewLeagueMeta, ReviewRefusal, ReviewRow,
@@ -231,7 +231,7 @@ function RowCard({ row, rank, modeId, clubCount }: {
           number, so the column scans as a ranked ladder without reading
           a word. The whole block stays the link in. */}
       <Link
-        href={`/bet-suggester/${row.league}/${row.event_id}`}
+        href={rowHref(row)}
         aria-label={`open ${row.favourite} versus ${row.opponent}`}
         className="mt-2.5 flex items-start gap-3 rounded-md outline-none transition-colors hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bs">
         <span className="min-w-0 flex-1">

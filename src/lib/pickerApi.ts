@@ -177,6 +177,25 @@ export const LEAGUE_LABEL: Record<string, string> = {
 
 export const leagueLabel = (slug: string) => LEAGUE_LABEL[slug] ?? slug;
 
+/** Where a card goes when opened. The four leagues have a match hub at
+ *  /bet-suggester/<slug>/<event_id>; a cup does not — there is no hub
+ *  page for `leaguescup` and the backend serves no per-match route for
+ *  it — so its card opens the competition page that already exists.
+ *  Keyed by the picker's column slug; the value is the comp viewer's
+ *  key. A cup slug missing from this map would fall through to the hub
+ *  pattern and land on the site's 404, which is exactly how a Leagues
+ *  Cup card on the landing page failed on 2026-09-03. */
+export const CUP_COMP_KEY: Record<string, string> = {
+  leaguescup: "leagues-cup",
+};
+
+export const rowHref = (row: { league: string; event_id: string }) => {
+  const comp = CUP_COMP_KEY[row.league];
+  return comp
+    ? `/bet-suggester/comp/${comp}`
+    : `/bet-suggester/${row.league}/${row.event_id}`;
+};
+
 /** The board's fixed column order. A slug the payload serves that is not
  *  in this list still gets a column, appended after these four — a new
  *  league arriving in the registry must not disappear from the board. */
