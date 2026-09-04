@@ -79,7 +79,7 @@ The access password, session secret, course catalog, and API key are server-only
       "title": "Confirmed course title",
       "semester": "Fall 2026",
       "googleDriveUrl": null,
-      "notebookLmUrl": "https://notebooklm.google.com/...",
+      "notebookLmUrl": "https://notebook.google.com/notebook/...",
       "notesPath": "fall-2026/confirmed-course-slug"
     }
   ]
@@ -88,4 +88,4 @@ The access password, session secret, course catalog, and API key are server-only
 
 5. Run `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `npm run test:e2e` before pushing.
 
-Use `null` for `googleDriveUrl` when materials live only in NotebookLM. When a Drive URL is supplied, the loader requires a supported Google host. It also rejects malformed JSON, malformed or duplicate slugs, mismatched semesters, unsafe notes paths, and non-HTTPS external links. Course PDFs, textbooks, credentials, private resource URLs, and raw AI transcripts remain outside Git.
+Use `null` for `googleDriveUrl` when materials live only in NotebookLM. When a Drive URL is supplied, the loader requires a supported Google host. NotebookLM links may use Google's current `notebook.google.com` host or its earlier `notebooklm.google.com` host. The loader also rejects malformed JSON, malformed or duplicate slugs, mismatched semesters, unsafe notes paths, and non-HTTPS external links. Course PDFs, textbooks, credentials, private resource URLs, and raw AI transcripts remain outside Git.

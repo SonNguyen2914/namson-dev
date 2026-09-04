@@ -65,7 +65,7 @@ export function assertValidStudyHubManifest(manifest: StudyHubManifest) {
     }
     assertExpectedHost(
       course.notebookLmUrl,
-      ["notebooklm.google.com"],
+      ["notebook.google.com", "notebooklm.google.com"],
       "NotebookLM",
     );
     if (

@@ -94,7 +94,7 @@ test("Study Hub manifest accepts only validated resource boundaries", () => {
       title: "Test course",
       semester: "Fall 2026",
       googleDriveUrl: "https://drive.google.com/drive/folders/test",
-      notebookLmUrl: "https://notebooklm.google.com/notebook/test",
+      notebookLmUrl: "https://notebook.google.com/notebook/test",
       notesPath: "fall-2026/test-course",
     }],
   };
@@ -126,7 +126,7 @@ test("Study Hub loads private course links only from the server environment", ()
       title: "Notebook-only course",
       semester: "Fall 2026",
       googleDriveUrl: null,
-      notebookLmUrl: "https://notebooklm.google.com/notebook/test",
+      notebookLmUrl: "https://notebook.google.com/notebook/test",
       notesPath: "fall-2026/notebook-only-course",
     }],
   };
