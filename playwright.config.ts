@@ -30,6 +30,14 @@ export default defineConfig({
     url: `http://localhost:${PORT}`,
     timeout: 120_000,
     reuseExistingServer: !process.env.CI,
-    env: { SUGGESTER_BACKEND_URL: BACKEND },
+    env: {
+      SUGGESTER_BACKEND_URL: BACKEND,
+      // Never let a developer's private Study Hub catalog/database leak into
+      // the hermetic public-shell browser tests.
+      STUDY_HUB_COURSES_JSON: "",
+      STUDY_HUB_DATABASE_PATH: "",
+      STUDY_HUB_ACCESS_PASSWORD: "",
+      STUDY_HUB_SESSION_SECRET: "",
+    },
   },
 });

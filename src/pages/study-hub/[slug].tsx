@@ -3,18 +3,22 @@ import Head from "next/head";
 import Link from "next/link";
 import { StudyHubAccessGate, StudyHubLogoutButton } from "@/components/StudyHubAccess";
 import { StudyPrompt } from "@/components/StudyPrompt";
+import { QuizletExport } from "@/components/QuizletExport";
 import type { StudyCourse } from "@/lib/studyHubManifest";
+import type { StudyHubCourseData } from "@/lib/studyHubData";
 
 type LockedProps = {
   access: "locked" | "unconfigured";
   course: null;
   promptingConfigured: false;
+  courseData: null;
 };
 
 type AuthorizedProps = {
   access: "authorized";
   course: StudyCourse;
   promptingConfigured: boolean;
+  courseData: StudyHubCourseData;
 };
 
 type CoursePageProps = LockedProps | AuthorizedProps;
@@ -43,6 +47,7 @@ export const getServerSideProps = (async ({ params, req, res }) => {
         access: "unconfigured",
         course: null,
         promptingConfigured: false,
+        courseData: null,
       },
     };
   }
@@ -52,6 +57,7 @@ export const getServerSideProps = (async ({ params, req, res }) => {
         access: "locked",
         course: null,
         promptingConfigured: false,
+        courseData: null,
       },
     };
   }
@@ -67,11 +73,20 @@ export const getServerSideProps = (async ({ params, req, res }) => {
 
   const { getStudyPromptProviderStatus } =
     await import("@/server/studyHubProvider");
+  const { ensureManifestCourses, getCourseRow, getStudyHubCourseData, getStudyHubDatabase } =
+    await import("@/server/studyHubDb");
+  const database = getStudyHubDatabase();
+  if (database) ensureManifestCourses(database, studyHubManifest);
+  const stored = database ? getCourseRow(database, course.slug) : null;
+  const runtimeCourse = !course.googleDriveUrl && stored?.drive_folder_id
+    ? { ...course, googleDriveUrl: `https://drive.google.com/drive/folders/${stored.drive_folder_id}` as `https://${string}` }
+    : course;
   return {
     props: {
       access: "authorized",
-      course,
+      course: runtimeCourse,
       promptingConfigured: getStudyPromptProviderStatus().configured,
+      courseData: getStudyHubCourseData(database, course.slug),
     },
   };
 }) satisfies GetServerSideProps<CoursePageProps>;
@@ -115,7 +130,7 @@ export default function CourseWorkspace(props: CoursePageProps) {
     );
   }
 
-  const { course, promptingConfigured } = props;
+  const { course, promptingConfigured, courseData } = props;
   return (
     <>
       <Head>
@@ -183,12 +198,46 @@ export default function CourseWorkspace(props: CoursePageProps) {
             />
           </section>
 
+          <section className="mt-12 grid gap-4 lg:grid-cols-2" aria-label="Indexed course activity">
+            <div className="rounded-2xl border border-line bg-elev p-6">
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="text-xl font-medium tracking-[-0.03em] text-ink-hi">Upcoming</h2>
+                <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">{courseData.upcoming.length} shown</span>
+              </div>
+              <div className="mt-5 space-y-3">
+                {courseData.upcoming.length > 0 ? courseData.upcoming.slice(0, 6).map((event) => (
+                  <article key={event.id} className="border-l border-accent/40 pl-4">
+                    <p className="text-sm text-ink-hi">{event.title}</p>
+                    <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-faint">
+                      {event.dueAt ? new Date(event.dueAt).toLocaleString() : event.kind}
+                    </p>
+                  </article>
+                )) : <p className="text-sm leading-6 text-ink-low">No deadlines have been indexed yet.</p>}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-line bg-elev p-6">
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="text-xl font-medium tracking-[-0.03em] text-ink-hi">Recent sources</h2>
+                <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">{courseData.sourceCount} indexed</span>
+              </div>
+              <div className="mt-5 space-y-3">
+                {courseData.recentSources.length > 0 ? courseData.recentSources.slice(0, 6).map((source) => (
+                  <article key={source.id}>
+                    {source.url ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="text-sm text-ink-hi hover:text-accent">{source.title} ↗</a> : <p className="text-sm text-ink-hi">{source.title}</p>}
+                    <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-faint">{source.kind} · {source.provider}</p>
+                  </article>
+                )) : <p className="text-sm leading-6 text-ink-low">The worker will place newly discovered material here.</p>}
+              </div>
+            </div>
+          </section>
+
           <div className="mt-12">
             <StudyPrompt
               courseSlug={course.slug}
               configured={promptingConfigured}
             />
           </div>
+          <QuizletExport courseSlug={course.slug} configured={promptingConfigured} />
         </main>
       </div>
     </>

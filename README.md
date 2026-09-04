@@ -1,5 +1,9 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
 
+## Personal Study Hub
+
+The private, local-first Academic Agent lives at `/study-hub`. Read [STUDY_HUB.md](./STUDY_HUB.md) for the application boundary, [ACADEMIC_AGENT.md](./ACADEMIC_AGENT.md) for the architecture and safety contract, and [SETUP_CHECKLIST.md](./SETUP_CHECKLIST.md) for the account-owner setup steps.
+
 ## Getting Started
 
 First, run the development server:

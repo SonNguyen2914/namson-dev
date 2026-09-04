@@ -73,10 +73,13 @@ export default async function handler(
   }
 
   try {
-    const result = await provider.complete(course, prompt);
+    const { getStudyHubDatabase, retrieveStudySources } = await import("@/server/studyHubDb");
+    const sources = retrieveStudySources(getStudyHubDatabase(), course.slug, prompt);
+    const result = await provider.complete(course, prompt, sources);
     res.status(200).json({
       answer: result.answer,
       provider: result.provider,
+      citations: result.citations,
       reviewStatus: "draft",
     });
   } catch (error) {

@@ -7,24 +7,34 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "study-hub:doctor": "tsx scripts/study-hub-doctor.ts",
+    "study-hub:backup": "tsx scripts/study-hub-backup.ts",
+    "study-hub:google-auth": "tsx scripts/study-hub-google-auth.ts",
+    "study-hub:start": "next start --hostname 127.0.0.1 --port 3125",
+    "study-hub:sync": "tsx scripts/study-hub-sync.ts",
+    "study-hub:worker": "tsx scripts/study-hub-worker.ts"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.3.0",
+    "better-sqlite3": "^12.4.1",
+    "cheerio": "^1.0.0",
     "geist": "^1.7.2",
-    "next": "16.2.10",
+    "next": "16.3.4",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.10",
+    "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5"
   }
 }

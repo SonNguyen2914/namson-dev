@@ -6,6 +6,7 @@ import {
   StudyHubLogoutButton,
 } from "@/components/StudyHubAccess";
 import type { StudyCourse } from "@/lib/studyHubManifest";
+import type { StudyHubDashboardData } from "@/lib/studyHubData";
 
 const NOTES_REPOSITORY =
   "https://github.com/SonNguyen2914/study-hub-notes";
@@ -14,6 +15,7 @@ type StudyHubPageProps = {
   access: "authorized" | "empty" | "locked" | "unconfigured";
   semester: string;
   courses: StudyCourse[];
+  dashboard: StudyHubDashboardData | null;
 };
 
 export const getServerSideProps = (async ({ req, res }) => {
@@ -34,6 +36,7 @@ export const getServerSideProps = (async ({ req, res }) => {
         access: "empty",
         semester: studyHubManifest.semester,
         courses,
+        dashboard: null,
       },
     };
   }
@@ -47,6 +50,7 @@ export const getServerSideProps = (async ({ req, res }) => {
         access: "unconfigured",
         semester: studyHubManifest.semester,
         courses: [],
+        dashboard: null,
       },
     };
   }
@@ -56,15 +60,27 @@ export const getServerSideProps = (async ({ req, res }) => {
         access: "locked",
         semester: studyHubManifest.semester,
         courses: [],
+        dashboard: null,
       },
     };
   }
 
+  const { ensureManifestCourses, getCourseRow, getStudyHubDashboardData, getStudyHubDatabase } =
+    await import("@/server/studyHubDb");
+  const database = getStudyHubDatabase();
+  if (database) ensureManifestCourses(database, studyHubManifest);
+  const runtimeCourses = database ? courses.map((course) => {
+    const stored = getCourseRow(database, course.slug);
+    return !course.googleDriveUrl && stored?.drive_folder_id
+      ? { ...course, googleDriveUrl: `https://drive.google.com/drive/folders/${stored.drive_folder_id}` as `https://${string}` }
+      : course;
+  }) : courses;
   return {
     props: {
       access: "authorized",
       semester: studyHubManifest.semester,
-      courses,
+      courses: runtimeCourses,
+      dashboard: getStudyHubDashboardData(database),
     },
   };
 }) satisfies GetServerSideProps<StudyHubPageProps>;
@@ -209,6 +225,7 @@ export default function StudyHub({
   access,
   semester,
   courses,
+  dashboard,
 }: StudyHubPageProps) {
   if (access === "locked" || access === "unconfigured") {
     return (
@@ -316,6 +333,74 @@ export default function StudyHub({
             </div>
           </section>
 
+          {access === "authorized" && dashboard && (
+            <section className="border-b border-line bg-elev/20">
+              <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 sm:px-8 lg:grid-cols-[1.35fr_1fr]">
+                <div>
+                  <div className="flex items-end justify-between gap-4">
+                    <div>
+                      <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">Now · Timeline</p>
+                      <h2 className="mt-3 text-2xl font-medium tracking-[-0.04em] text-ink-hi">Upcoming work</h2>
+                    </div>
+                    <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-faint">{dashboard.eventCount} tracked</span>
+                  </div>
+                  <div className="mt-6 space-y-2">
+                    {dashboard.upcoming.length > 0 ? dashboard.upcoming.slice(0, 6).map((event) => (
+                      <article key={event.id} className="flex gap-4 rounded-xl border border-line bg-bs p-4">
+                        <time className="w-20 shrink-0 font-mono text-[10px] uppercase leading-5 text-accent" dateTime={event.dueAt ?? undefined}>
+                          {event.dueAt ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(event.dueAt)) : "Open"}
+                        </time>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-ink-hi">{event.title}</p>
+                          <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-faint">{event.courseTitle} · {event.kind}</p>
+                        </div>
+                      </article>
+                    )) : (
+                      <p className="rounded-xl border border-dashed border-line px-5 py-8 text-sm text-ink-low">No indexed deadlines yet. The first Canvas sync will populate this timeline.</p>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-end justify-between gap-4">
+                    <div>
+                      <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">System · Health</p>
+                      <h2 className="mt-3 text-2xl font-medium tracking-[-0.04em] text-ink-hi">Connectors</h2>
+                    </div>
+                    <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-faint">{dashboard.sourceCount} sources</span>
+                  </div>
+                  <div className="mt-6 overflow-hidden rounded-xl border border-line">
+                    {dashboard.connectors.map((connector) => (
+                      <div key={connector.id} className="flex items-center justify-between gap-4 border-b border-line bg-bs px-4 py-3 last:border-b-0">
+                        <div>
+                          <p className="text-sm text-ink-hi">{connector.label}</p>
+                          <p className="mt-1 font-mono text-[9px] text-ink-faint">
+                            {connector.lastSuccessAt ? `Last success ${new Date(connector.lastSuccessAt).toLocaleString()}` : "Waiting for setup"}
+                          </p>
+                        </div>
+                        <span className={`rounded-full border px-2 py-1 font-mono text-[8px] uppercase tracking-[0.13em] ${connector.state === "healthy" ? "border-up/30 text-up" : connector.state === "error" ? "border-neg/30 text-neg" : "border-line text-ink-low"}`}>
+                          {connector.state}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {dashboard.recentSources.length > 0 && (
+                <div className="mx-auto max-w-6xl px-5 pb-14 sm:px-8">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">What changed</p>
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {dashboard.recentSources.slice(0, 6).map((source) => (
+                      <article key={source.id} className="rounded-lg border border-line bg-bs p-4">
+                        <p className="truncate text-sm text-ink-hi">{source.title}</p>
+                        <p className="mt-2 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-faint">{source.courseTitle} · {source.provider}</p>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
           <section
             id="courses"
             className="mx-auto max-w-6xl scroll-mt-20 px-5 py-20 sm:px-8 sm:py-24"
@@ -402,7 +487,7 @@ export default function StudyHub({
                 Review AI output before it becomes a permanent note.
               </p>
               <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-ink-faint">
-                Live prompting · planned
+                Local agent · {dashboard?.databaseConfigured ? "ready" : "setup pending"}
               </span>
             </div>
           </section>

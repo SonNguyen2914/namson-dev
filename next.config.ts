@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  serverExternalPackages: ["better-sqlite3"],
 
   // /bet-suggester was the league carousel until 2026-08-30; it is the
   // picker board now, and the carousel moved to /bet-suggester/leagues.

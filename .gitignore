@@ -45,3 +45,7 @@ next-env.d.ts
 # Playwright
 /playwright-report/
 /test-results/
+
+# Local Study Hub runtime state
+/.data/
+/logs/

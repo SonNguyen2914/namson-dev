@@ -5,6 +5,7 @@ type Draft = {
   prompt: string;
   answer: string;
   provider: string;
+  citations: Array<{ citation: string; title: string; url: string | null; provider: string }>;
 };
 
 export function StudyPrompt({
@@ -33,7 +34,7 @@ export function StudyPrompt({
         body: JSON.stringify({ courseSlug, prompt: cleanPrompt }),
       });
       const payload = await response.json().catch(() => null) as
-        | { answer?: unknown; provider?: unknown; error?: unknown }
+        | { answer?: unknown; provider?: unknown; citations?: unknown; error?: unknown }
         | null;
       const answer = payload?.answer;
       const provider = payload?.provider;
@@ -56,6 +57,15 @@ export function StudyPrompt({
           prompt: cleanPrompt,
           answer,
           provider,
+          citations: Array.isArray(payload?.citations)
+            ? payload.citations.filter((value): value is Draft["citations"][number] => {
+                if (!value || typeof value !== "object") return false;
+                const citation = value as Record<string, unknown>;
+                return typeof citation.citation === "string" && typeof citation.title === "string"
+                  && (typeof citation.url === "string" || citation.url === null)
+                  && typeof citation.provider === "string";
+              })
+            : [],
         },
       ]);
       setPrompt("");
@@ -87,8 +97,22 @@ export function StudyPrompt({
       </div>
 
       <p className="mt-4 max-w-2xl text-sm leading-6 text-ink-mid">
-        This assistant does not automatically read Drive, NotebookLM, or private notes. Include the context you want it to use, then verify the response against your course sources.
+        The assistant searches the locally indexed course material and returns the excerpts it used. Verify every draft against the linked original before acting on it.
       </p>
+
+      <div className="mt-5 flex flex-wrap gap-2" aria-label="Study prompt starters">
+        {[
+          ["Study guide", "Create a structured study guide from the most relevant indexed material. Separate core concepts, examples, and questions I should be able to answer."],
+          ["Deadline plan", "Use the indexed deadlines and assignment instructions to make a realistic study plan. Flag any uncertainty or conflicting date."],
+          ["Check understanding", "Quiz me on the most important concepts in the indexed sources. Start with one question at a time and do not reveal the answer yet."],
+        ].map(([label, value]) => (
+          <button key={label} type="button" disabled={!configured || submitting}
+            onClick={() => setPrompt(value)}
+            className="rounded-full border border-line px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.13em] text-ink-low transition-colors hover:border-line-strong hover:text-ink-hi disabled:opacity-40">
+            {label}
+          </button>
+        ))}
+      </div>
 
       {drafts.length > 0 && (
         <div className="mt-8 space-y-4" aria-live="polite">
@@ -110,6 +134,22 @@ export function StudyPrompt({
               <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-ink-hi">
                 {draft.answer}
               </p>
+              {draft.citations.length > 0 && (
+                <div className="mt-5 border-t border-line pt-4">
+                  <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-faint">Sources used</p>
+                  <ul className="mt-2 space-y-1 text-xs text-ink-mid">
+                    {draft.citations.map((citation) => (
+                      <li key={citation.citation}>
+                        {citation.url ? (
+                          <a className="hover:text-accent" href={citation.url} target="_blank" rel="noopener noreferrer">
+                            [{citation.citation}] {citation.title} ↗
+                          </a>
+                        ) : <span>[{citation.citation}] {citation.title}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </article>
           ))}
         </div>
