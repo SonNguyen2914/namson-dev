@@ -57,9 +57,9 @@ export const getServerSideProps = (async ({ params, req, res }) => {
   }
 
   const slug = typeof params?.slug === "string" ? params.slug : "";
-  const { assertValidStudyHubManifest, studyHubManifest } =
+  const { loadStudyHubManifest } =
     await import("@/lib/studyHubManifest");
-  assertValidStudyHubManifest(studyHubManifest);
+  const studyHubManifest = loadStudyHubManifest();
   const course = studyHubManifest.courses.find(
     (candidate) => candidate.slug === slug,
   );
@@ -155,11 +155,22 @@ export default function CourseWorkspace(props: CoursePageProps) {
           </p>
 
           <section className="mt-12 grid gap-3 sm:grid-cols-3" aria-label="Course resources">
-            <ResourceLink
-              href={course.googleDriveUrl}
-              label="Google Drive"
-              description="Professor-provided source materials"
-            />
+            {course.googleDriveUrl ? (
+              <ResourceLink
+                href={course.googleDriveUrl}
+                label="Google Drive"
+                description="Durable source-material archive"
+              />
+            ) : (
+              <article className="rounded-xl border border-line bg-elev p-5">
+                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">
+                  Google Drive · not linked
+                </span>
+                <span className="mt-3 block text-sm leading-6 text-ink-mid">
+                  This course uses sources loaded directly into NotebookLM.
+                </span>
+              </article>
+            )}
             <ResourceLink
               href={course.notebookLmUrl}
               label="NotebookLM"

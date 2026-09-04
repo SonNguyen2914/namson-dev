@@ -1,8 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import {
-  assertValidStudyHubManifest,
-  studyHubManifest,
-} from "@/lib/studyHubManifest";
+import { loadStudyHubManifest } from "@/lib/studyHubManifest";
 import {
   getStudyHubAuthConfiguration,
   isStudyHubSessionValid,
@@ -54,7 +51,7 @@ export default async function handler(
     });
   }
 
-  assertValidStudyHubManifest(studyHubManifest);
+  const studyHubManifest = loadStudyHubManifest();
   const course = studyHubManifest.courses.find(
     (candidate) => candidate.slug === courseSlug,
   );

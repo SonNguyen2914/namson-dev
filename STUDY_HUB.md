@@ -29,7 +29,7 @@ The Playwright configuration serves the production build on port 3123 by default
 
 ## Version 1 integration boundaries
 
-- **Google Drive** remains the source of professor-provided materials. The application should link to those materials rather than copy them into either Git repository.
+- **Google Drive** is the recommended durable archive for professor-provided materials, but it is optional when a course's sources are loaded directly into NotebookLM. The application links to Drive when present rather than copying materials into either Git repository.
 - **`study-hub-notes`** is the private, curated Markdown knowledge store. Only reviewed notes and study outputs belong there.
 - **NotebookLM** remains the dedicated study workspace. Version 1 should expose course-specific external links to NotebookLM rather than attempt an undocumented direct integration.
 - **Live prompting** should use a provider-neutral server-side interface so the UI is not coupled to one model vendor.
@@ -39,7 +39,7 @@ The Playwright configuration serves the production build on port 3123 by default
 ## Implemented Version 1
 
 - `/study-hub` is a server-rendered dashboard. It remains safely previewable while the course manifest is empty.
-- `src/lib/studyHubManifest.ts` is the typed, validated course catalog. Every configured course has a title, semester, Google Drive URL, NotebookLM URL, and private-notes path.
+- `src/lib/studyHubManifest.ts` parses and validates the server-only course catalog. Every configured course has a title, semester, NotebookLM URL, and private-notes path; its Google Drive URL may be `null`. Private URLs are never stored in this public repository.
 - `/study-hub/[slug]` is the protected course workspace with resource links and a live-prompt draft interface.
 - The access gate uses an HTTP-only, same-site, signed cookie. Course links fail closed when access secrets are absent, and login attempts are rate-limited.
 - `/api/study-hub/prompt` validates the session, origin, rate, course, and prompt length before calling a server-only provider adapter.
@@ -55,31 +55,37 @@ Copy `.env.example` to an ignored `.env.local` for local development, or add the
 | --- | --- | --- |
 | `STUDY_HUB_ACCESS_PASSWORD` | Before adding courses | Single-user access phrase; minimum 12 characters |
 | `STUDY_HUB_SESSION_SECRET` | Before adding courses | Signs 12-hour sessions; minimum 32 random characters |
+| `STUDY_HUB_COURSES_JSON` | To add courses | Server-only JSON catalog containing course names and private resource links |
 | `STUDY_HUB_AI_PROVIDER` | For live prompting | Set to `openai-compatible` for the included adapter |
 | `STUDY_HUB_AI_BASE_URL` | For live prompting | HTTPS base URL for the provider's compatible API |
 | `STUDY_HUB_AI_MODEL` | For live prompting | Provider model identifier |
 | `STUDY_HUB_AI_API_KEY` | For live prompting | Server-side provider credential |
 
-The access password, session secret, and API key are server-only. Do not prefix them with `NEXT_PUBLIC_`. The empty dashboard works without configuration; once the manifest contains a course, missing access configuration produces a locked setup screen instead of serializing private links.
+The access password, session secret, course catalog, and API key are server-only. Do not prefix them with `NEXT_PUBLIC_`. The empty dashboard works without configuration; once the catalog contains a course, missing access configuration produces a locked setup screen instead of serializing private links.
 
 ## Add a course after materials are ready
 
-1. Keep professor files in the course's access-controlled Google Drive folder.
-2. Create the course-specific NotebookLM workspace and copy its link.
+1. Create the course-specific NotebookLM workspace and load its sources.
+2. Optionally keep the original professor files in an access-controlled Google Drive folder as a durable archive.
 3. In `study-hub-notes`, create a course folder under `fall-2026/` using the existing templates. Commit only curated Markdown output.
-4. Add one confirmed entry to `studyHubManifest.courses`:
+4. Store the confirmed catalog as `STUDY_HUB_COURSES_JSON` in `.env.local` and the deployment secret manager. Do not put real links in tracked source files. Its shape is:
 
-```ts
+```json
 {
-  slug: "confirmed-course-slug",
-  title: "Confirmed course title",
-  semester: "Fall 2026",
-  googleDriveUrl: "https://drive.google.com/...",
-  notebookLmUrl: "https://notebooklm.google.com/...",
-  notesPath: "fall-2026/confirmed-course-slug",
+  "semester": "Fall 2026",
+  "courses": [
+    {
+      "slug": "confirmed-course-slug",
+      "title": "Confirmed course title",
+      "semester": "Fall 2026",
+      "googleDriveUrl": null,
+      "notebookLmUrl": "https://notebooklm.google.com/...",
+      "notesPath": "fall-2026/confirmed-course-slug"
+    }
+  ]
 }
 ```
 
 5. Run `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `npm run test:e2e` before pushing.
 
-The manifest rejects malformed or duplicate slugs, non-Google resource hosts, mismatched semesters, unsafe notes paths, and non-HTTPS external links. Course PDFs, textbooks, credentials, and raw AI transcripts remain outside Git.
+Use `null` for `googleDriveUrl` when materials live only in NotebookLM. When a Drive URL is supplied, the loader requires a supported Google host. It also rejects malformed JSON, malformed or duplicate slugs, mismatched semesters, unsafe notes paths, and non-HTTPS external links. Course PDFs, textbooks, credentials, private resource URLs, and raw AI transcripts remain outside Git.

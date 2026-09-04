@@ -21,9 +21,9 @@ export const getServerSideProps = (async ({ req, res }) => {
   res.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive");
   // Keep the manifest server-owned. Only the fields needed to draw the
   // dashboard are deliberately serialized into the page response.
-  const { assertValidStudyHubManifest, studyHubManifest } =
+  const { loadStudyHubManifest } =
     await import("@/lib/studyHubManifest");
-  assertValidStudyHubManifest(studyHubManifest);
+  const studyHubManifest = loadStudyHubManifest();
   const courses = [...studyHubManifest.courses];
 
   // An empty catalog contains no private links, so the shell can remain
@@ -170,14 +170,20 @@ function CourseCard({ course }: { course: StudyCourse }) {
         >
           Workspace →
         </Link>
-        <a
-          href={course.googleDriveUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="rounded-lg border border-line px-3 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-mid transition-colors hover:border-line-strong hover:text-ink-hi"
-        >
-          Drive <Arrow />
-        </a>
+        {course.googleDriveUrl ? (
+          <a
+            href={course.googleDriveUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg border border-line px-3 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-mid transition-colors hover:border-line-strong hover:text-ink-hi"
+          >
+            Drive <Arrow />
+          </a>
+        ) : (
+          <span className="rounded-lg border border-line px-3 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
+            Drive · not linked
+          </span>
+        )}
         <a
           href={course.notebookLmUrl}
           target="_blank"
@@ -368,8 +374,8 @@ export default function StudyHub({
                   index="01"
                   label="Source"
                   title="Google Drive"
-                  description="Professor-provided files remain in their original, access-controlled home. Course cards link out to them."
-                  status="Per course"
+                  description="An optional durable archive for professor-provided files. Courses can use NotebookLM-only sources instead."
+                  status="Optional"
                 />
                 <ResourceCard
                   index="02"

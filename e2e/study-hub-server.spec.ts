@@ -8,6 +8,7 @@ import {
 import { consumeStudyHubRateLimit } from "../src/server/studyHubRateLimit";
 import {
   assertValidStudyHubManifest,
+  loadStudyHubManifest,
   type StudyCourse,
   type StudyHubManifest,
 } from "../src/lib/studyHubManifest";
@@ -18,6 +19,7 @@ import {
 
 const ORIGINAL_PASSWORD = process.env.STUDY_HUB_ACCESS_PASSWORD;
 const ORIGINAL_SECRET = process.env.STUDY_HUB_SESSION_SECRET;
+const ORIGINAL_COURSES = process.env.STUDY_HUB_COURSES_JSON;
 const AI_ENVIRONMENT = [
   "STUDY_HUB_AI_PROVIDER",
   "STUDY_HUB_AI_BASE_URL",
@@ -39,6 +41,11 @@ test.afterEach(() => {
     delete process.env.STUDY_HUB_SESSION_SECRET;
   } else {
     process.env.STUDY_HUB_SESSION_SECRET = ORIGINAL_SECRET;
+  }
+  if (ORIGINAL_COURSES === undefined) {
+    delete process.env.STUDY_HUB_COURSES_JSON;
+  } else {
+    process.env.STUDY_HUB_COURSES_JSON = ORIGINAL_COURSES;
   }
   for (const name of AI_ENVIRONMENT) {
     const original = ORIGINAL_AI_ENVIRONMENT[name];
@@ -92,6 +99,10 @@ test("Study Hub manifest accepts only validated resource boundaries", () => {
     }],
   };
   expect(() => assertValidStudyHubManifest(valid)).not.toThrow();
+  expect(() => assertValidStudyHubManifest({
+    ...valid,
+    courses: [{ ...valid.courses[0], googleDriveUrl: null }],
+  })).not.toThrow();
 
   expect(() => assertValidStudyHubManifest({
     ...valid,
@@ -105,6 +116,25 @@ test("Study Hub manifest accepts only validated resource boundaries", () => {
     ...valid,
     courses: [{ ...valid.courses[0], notesPath: "../outside" }],
   })).toThrow(/notes path/);
+});
+
+test("Study Hub loads private course links only from the server environment", () => {
+  const configured: StudyHubManifest = {
+    semester: "Fall 2026",
+    courses: [{
+      slug: "notebook-only-course",
+      title: "Notebook-only course",
+      semester: "Fall 2026",
+      googleDriveUrl: null,
+      notebookLmUrl: "https://notebooklm.google.com/notebook/test",
+      notesPath: "fall-2026/notebook-only-course",
+    }],
+  };
+  process.env.STUDY_HUB_COURSES_JSON = JSON.stringify(configured);
+  expect(loadStudyHubManifest()).toEqual(configured);
+
+  process.env.STUDY_HUB_COURSES_JSON = "not-json";
+  expect(() => loadStudyHubManifest()).toThrow(/not valid JSON/);
 });
 
 test("Study Hub prompt adapter keeps provider details on the server boundary", async () => {
@@ -150,6 +180,6 @@ test("Study Hub prompt adapter keeps provider details on the server boundary", a
   });
   expect(requestAuthorization).toBe("Bearer test-api-key");
   expect(requestBody).toContain("You do not have access");
-  expect(requestBody).not.toContain(course.googleDriveUrl);
+  expect(requestBody).not.toContain(course.googleDriveUrl!);
   expect(requestBody).not.toContain(course.notebookLmUrl);
 });
