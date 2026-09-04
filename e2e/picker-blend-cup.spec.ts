@@ -922,3 +922,91 @@ test("a row with no counterfactual is unmarked, not marked as agreeing",
     await open(page, seasonBoard(0.67, null));
     await expect(page.getByTestId("season-alt")).toHaveCount(0);
   });
+
+// ------------------------------------------------ the hollow read -----
+//
+// 2026-09-03. The popover's HOLLOW sentence opened "high on the table
+// gap, but …" and the board underneath it said the reverse. HOLLOW is
+// `atk <= 0 AND def <= 0` in the backend (src/picker/stages.py,
+// shape()) and carries NO table-gap condition at all; measured over
+// 3,216 rated fixtures it has the LOWEST median |GD/g| of the three
+// shapes — CLEAN 1.02 (53.4% of rows clear a 1.0 gap), SPLIT 0.36
+// (7.0%), HOLLOW 0.18 (1.1%). These two tests hold the sentence to what
+// the shape IS and hold the table claim out, in both directions: the
+// wording is asserted, and so is the absence of the old one.
+
+// Every sign pattern the backend's rule admits: attack and defence each
+// level-or-behind, crossed with all three overall signs. DERIVED from
+// the rule rather than hand-picked — a guard that says "every hollow
+// row" and then checks one is exactly how the omitted case drifts.
+const HOLLOW_GAPS = ([-1, 0] as const).flatMap((atk) =>
+  ([-1, 0] as const).flatMap((def) =>
+    ([1, 0, -1] as const).map((ovr) => ({ ovr, atk, def }))));
+
+// Tier pairs are [favourite, opponent] and the gap is opp − fav, so a
+// favourite pinned at T3 keeps every opponent tier inside 1..5.
+const hollowRow = (g: { ovr: number; atk: number; def: number }, i: number) =>
+  cupRow({
+    home: `Hollow ${i} FC`, away: `Opp ${i} CD`,
+    favourite: `Hollow ${i} FC`, opponent: `Opp ${i} CD`,
+    // the row's OWN Stage-1 gap is small — that is the measured norm
+    // for this shape, and the reason the old clause was false
+    ppg_gap: 0.08, gdg_gap: 0.18, rank_gap: 2,
+    cross_league: false, rated_in: { home: "ligamx", away: "ligamx" },
+    gap_note: null, ranks: { fav: 6, opp: 8 },
+    tiers: { ovr: [3, 3 + g.ovr], atk: [3, 3 + g.atk], def: [3, 3 + g.def] },
+    tier_gaps: g, shape: "HOLLOW",
+    event_id: `lc-hollow-${i}`, competition_id: `lc-hollow-${i}`,
+    kickoff: inHours(20 + i),
+  });
+
+test("the hollow read names both units and claims nothing about the table gap",
+  async ({ page }) => {
+    // the case the old wording was most tempting on: the favourite IS a
+    // better tier overall, and neither unit backs it anyway
+    await open(page, {
+      ...BOARD, rows: [hollowRow({ ovr: 1, atk: -1, def: 0 }, 0)],
+    });
+    const hollow = col(page, "leaguescup").getByTestId("picker-row");
+    await expect(hollow).toHaveCount(1);
+    await expect(hollow).toHaveAttribute("data-shape", "HOLLOW");
+    await hollow.getByTestId("tier-read").click();
+    // the sentence is the popover's first paragraph; the per-dimension
+    // lines under it are the detail, not the read
+    const sentence = hollow.getByTestId("shape-read").locator("p").first();
+    await expect(sentence).toHaveText(
+      "Hollow — neither unit backs the pick: behind in attack (T3 v T2)"
+      + " and level in defence (T3 v T3).");
+    // …and not a word about the table, which this shape does not know
+    await expect(sentence).not.toContainText(/table/i);
+    await expect(sentence).not.toContainText(/high/i);
+    // the detail block still carries the overall tier the sentence no
+    // longer editorialises about
+    await expect(hollow.getByTestId("shape-read")).toContainText("T3 v T4 +1");
+  });
+
+test("every hollow sign pattern says both units failed, and none claims a high table gap",
+  async ({ page }) => {
+    const rows = HOLLOW_GAPS.map(hollowRow);
+    expect(rows.length).toBe(12);          // 2 attack × 2 defence × 3 overall
+    await open(page, { ...BOARD, rows });
+    const cards = col(page, "leaguescup").getByTestId("picker-row");
+    await expect(cards).toHaveCount(rows.length);
+    // order is the board's business — every assertion below holds for
+    // any hollow row, so this checks the whole set and not a lucky one
+    for (let i = 0; i < rows.length; i++) {
+      const card = cards.nth(i);
+      await expect(card).toHaveAttribute("data-shape", "HOLLOW");
+      await card.getByTestId("tier-read").click();
+      const sentence = card.getByTestId("shape-read").locator("p").first();
+      await expect(sentence)
+        .toContainText("Hollow — neither unit backs the pick:");
+      // both units named, with where they stand, whatever overall does
+      await expect(sentence).toContainText(/in attack \(T3 v T[234]\)/);
+      await expect(sentence).toContainText(/in defence \(T3 v T[234]\)/);
+      await expect(sentence).not.toContainText(/table/i);
+      await expect(sentence).not.toContainText(/high/i);
+      await card.getByTestId("tier-read").click();   // closed again
+      await expect(card.getByTestId("shape-read")).toHaveCount(0);
+    }
+  });

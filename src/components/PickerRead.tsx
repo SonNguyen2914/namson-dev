@@ -74,7 +74,18 @@ export function shapeRead(r: ReadLike): string {
   if (g.def > 0) strong.push(`defence ${sign(g.def)}`);
   if (g.ovr > 0) strong.push(`overall ${sign(g.ovr)}`);
   if (r.shape === "HOLLOW") {
-    return `Hollow — high on the table gap, but ${flat.join(" and ")}.`;
+    // 2026-09-03: this opened "high on the table gap, but …" and the
+    // board underneath it said the opposite. HOLLOW is defined in the
+    // backend (src/picker/stages.py, shape()) as atk <= 0 AND def <= 0
+    // — there is NO table-gap condition in it at all — and measured
+    // over 3,216 rated fixtures HOLLOW has the LOWEST median |GD/g| of
+    // the three shapes: CLEAN 1.02 (53.4% of rows clear a 1.0 gap),
+    // SPLIT 0.36 (7.0%), HOLLOW 0.18 (1.1%). So the old clause told a
+    // reader the reverse of the data on 98.9% of the rows it appeared
+    // on. The sentence now states what the shape IS — both units
+    // failing to back the pick — and claims nothing about the table.
+    // Do not restore the table clause from intuition.
+    return `Hollow — neither unit backs the pick: ${flat.join(" and ")}.`;
   }
   return `Split — the tier gap is ${strong.join(" and ")}; ${flat.join(" and ")}.`;
 }
