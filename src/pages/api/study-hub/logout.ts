@@ -9,15 +9,17 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
-    return res.status(405).json({ error: "Method not allowed" });
+    res.status(405).json({ error: "Method not allowed" });
+    return;
   }
   if (!requestHasSameOrigin(req.headers)) {
-    return res.status(403).json({ error: "Origin rejected" });
+    res.status(403).json({ error: "Origin rejected" });
+    return;
   }
 
   res.setHeader(
     "Set-Cookie",
     clearStudyHubSessionCookie(requestUsesHttps(req.headers)),
   );
-  return res.status(204).end();
+  res.status(204).end();
 }

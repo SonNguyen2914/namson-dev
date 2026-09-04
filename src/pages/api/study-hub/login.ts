@@ -15,34 +15,40 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
-    return res.status(405).json({ error: "Method not allowed" });
+    res.status(405).json({ error: "Method not allowed" });
+    return;
   }
   if (!requestHasSameOrigin(req.headers)) {
-    return res.status(403).json({ error: "Origin rejected" });
+    res.status(403).json({ error: "Origin rejected" });
+    return;
   }
   if (!getStudyHubAuthConfiguration().configured) {
-    return res.status(503).json({ error: "Study Hub access is not configured" });
+    res.status(503).json({ error: "Study Hub access is not configured" });
+    return;
   }
 
   const client = studyHubClientAddress(req.headers);
   if (!consumeStudyHubRateLimit(`login:${client}`, 8, 15 * 60_000)) {
-    return res.status(429).json({ error: "Too many attempts; try again later" });
+    res.status(429).json({ error: "Too many attempts; try again later" });
+    return;
   }
 
   const password = typeof req.body?.password === "string"
     ? req.body.password
     : "";
   if (password.length > 256) {
-    return res.status(401).json({ error: "Access phrase not accepted" });
+    res.status(401).json({ error: "Access phrase not accepted" });
+    return;
   }
   const session = createStudyHubSession(password);
   if (!session) {
-    return res.status(401).json({ error: "Access phrase not accepted" });
+    res.status(401).json({ error: "Access phrase not accepted" });
+    return;
   }
 
   res.setHeader(
     "Set-Cookie",
     studyHubSessionCookie(session, requestUsesHttps(req.headers)),
   );
-  return res.status(204).end();
+  res.status(204).end();
 }

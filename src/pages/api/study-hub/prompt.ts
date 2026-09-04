@@ -22,21 +22,26 @@ export default async function handler(
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
-    return res.status(405).json({ error: "Method not allowed" });
+    res.status(405).json({ error: "Method not allowed" });
+    return;
   }
   if (!requestHasSameOrigin(req.headers)) {
-    return res.status(403).json({ error: "Origin rejected" });
+    res.status(403).json({ error: "Origin rejected" });
+    return;
   }
   if (!getStudyHubAuthConfiguration().configured) {
-    return res.status(503).json({ error: "Study Hub access is not configured" });
+    res.status(503).json({ error: "Study Hub access is not configured" });
+    return;
   }
   if (!isStudyHubSessionValid(req.headers.cookie)) {
-    return res.status(401).json({ error: "Study Hub session required" });
+    res.status(401).json({ error: "Study Hub session required" });
+    return;
   }
 
   const client = studyHubClientAddress(req.headers);
   if (!consumeStudyHubRateLimit(`prompt:${client}`, 12, 60_000)) {
-    return res.status(429).json({ error: "Prompt limit reached; wait a minute" });
+    res.status(429).json({ error: "Prompt limit reached; wait a minute" });
+    return;
   }
 
   const courseSlug = typeof req.body?.courseSlug === "string"
@@ -46,9 +51,10 @@ export default async function handler(
     ? req.body.prompt.trim()
     : "";
   if (!prompt || prompt.length > MAX_PROMPT_LENGTH) {
-    return res.status(400).json({
+    res.status(400).json({
       error: `Prompt must contain 1–${MAX_PROMPT_LENGTH} characters`,
     });
+    return;
   }
 
   const studyHubManifest = loadStudyHubManifest();
@@ -56,17 +62,19 @@ export default async function handler(
     (candidate) => candidate.slug === courseSlug,
   );
   if (!course) {
-    return res.status(404).json({ error: "Course not found" });
+    res.status(404).json({ error: "Course not found" });
+    return;
   }
 
   const provider = getStudyPromptProvider();
   if (!provider) {
-    return res.status(503).json({ error: "Live prompting is not configured" });
+    res.status(503).json({ error: "Live prompting is not configured" });
+    return;
   }
 
   try {
     const result = await provider.complete(course, prompt);
-    return res.status(200).json({
+    res.status(200).json({
       answer: result.answer,
       provider: result.provider,
       reviewStatus: "draft",
@@ -75,6 +83,6 @@ export default async function handler(
     const message = error instanceof Error && error.name === "AbortError"
       ? "Prompt provider timed out"
       : "Prompt provider failed";
-    return res.status(502).json({ error: message });
+    res.status(502).json({ error: message });
   }
 }
