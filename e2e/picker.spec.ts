@@ -364,8 +364,11 @@ test("a hollow row is marked differently from a clean one", async ({ page }) => 
   await expect(hollow.getByText("HOLLOW", { exact: true })).toBeVisible();
   await expect(clean.getByText("CLEAN", { exact: true })).toBeVisible();
   await hollow.getByTestId("tier-read").click();
+  // 2026-09-03: was /high on the table gap, but/ — a claim the shape rule
+  // does not make (HOLLOW is atk <= 0 AND def <= 0, no table condition) and
+  // that the data contradicts on 98.9% of hollow rows. See PickerRead.tsx.
   await expect(
-    hollow.getByTestId("shape-read").getByText(/high on the table gap, but/i))
+    hollow.getByTestId("shape-read").getByText(/neither unit backs the pick/i))
     .toBeVisible();
   await expect(
     hollow.getByTestId("shape-read").getByText(/behind in defence/i))
