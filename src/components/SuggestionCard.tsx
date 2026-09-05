@@ -235,8 +235,15 @@ type TiltLabel = { label?: "SIEGE" | "STERILE_POSSESSION" | "CONTEST";
 type Threat = { tilt?: number; fav?: "home" | "away"; basis?: string;
   refused?: string; unavailable?: string };
 
+// The triple rides under the WIN column's key, `p_win`, and the block
+// declares it under `quantity_key` (backend position.WinProbability
+// .FIELD). It was `p` until 2026-09-05 -- the grids' own hazard column
+// name on this same payload (exposure, precedents, danger windows) --
+// so a reader lining numbers up by key could set a win probability
+// beside an equaliser hazard. This file was the reader that held the
+// backend's rename open; it moved with the source in one change.
 type LiveNow = { minute?: string | null; captured_at?: string | null;
-  score?: string | null; p?: LiveTriple;
+  score?: string | null; p_win?: LiveTriple; quantity_key?: string;
   lambdas?: { home?: number; away?: number } | null; basis?: string;
   state?: LiveState | null;
   refused?: string; unavailable?: string };
@@ -1878,7 +1885,7 @@ function LiveNowBlock({ l, updatedAt, stale, tick, fetchedAt, exposure,
   // a refusal is the collector's own sentence, rendered verbatim in the
   // same note every other refused block on this card uses
   const r = refusalOf(l);
-  const p = l.p;
+  const p = l.p_win;
   return (
     <div data-testid="live-now"
       className="rounded-xl border border-live/40 bg-live/5 p-4">

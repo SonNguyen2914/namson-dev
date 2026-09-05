@@ -397,7 +397,10 @@ const LIVE_NOW = {
   minute: "63'",
   captured_at: "2026-08-21T19:53:02.114820+00:00",
   score: "1-0",
-  p: { home: 0.6412, draw: 0.2411, away: 0.1177 },
+  // under the WIN column's key, declared -- `p` is the hazard column's
+  // key on this payload and the backend no longer fills it here
+  p_win: { home: 0.6412, draw: 0.2411, away: 0.1177 },
+  quantity_key: "p_win",
   lambdas: { home: 1.4321, away: 1.0212 },
   basis: "inplay-wire-v1 | anchor: canonical T-10 lock ce8944f6 "
     + "de-vigged 3-way | calibration exact | state minute 63 score 1-0",
@@ -407,7 +410,8 @@ const LIVE_NOW_LATER = {
   minute: "78'",
   captured_at: "2026-08-21T20:08:04.551190+00:00",
   score: "2-1",
-  p: { home: 0.5109, draw: 0.2203, away: 0.2688 },
+  p_win: { home: 0.5109, draw: 0.2203, away: 0.2688 },
+  quantity_key: "p_win",
   lambdas: { home: 1.4321, away: 1.0212 },
   basis: "inplay-wire-v1 | anchor: canonical T-10 lock ce8944f6 "
     + "de-vigged 3-way | calibration exact | state minute 78 score 2-1",
