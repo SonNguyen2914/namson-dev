@@ -70,6 +70,7 @@ import {
 import { Eyebrow } from "../../components/ui";
 import { ArchiveMenu } from "../../components/ArchiveMenu";
 import { LeagueColumn } from "../../components/PickerColumn";
+import WatchedStrip from "../../components/WatchedStrip";
 import {
   Collapse, NavChip, RouteProgress, SkeletonRows, TopBar,
 } from "../../components/chrome";
@@ -416,6 +417,16 @@ export default function PickerBoard() {
           the same page twice. Cached 90s server-side; “built” is when the
           board was assembled, not when you asked for it.
         </p>
+
+        {/* ---- the watched strip: the HOLD/EXIT stage, above the columns ----
+            docs/HOLD-EXIT-DESIGN.md's surface. It polls its own endpoint
+            on its own 15s clock and renders NOTHING when no declared
+            match is live — absent, not empty — so on an ordinary
+            pre-match board this line costs the reader nothing. It is
+            deliberately ABOVE the season banner and the columns: a
+            position that is live now outranks a note about which season
+            rates a club. */}
+        <WatchedStrip />
 
         {/* --------------- the season-basis banner, not a footnote --------------- */}
         {priorLeagues.length > 0 && (

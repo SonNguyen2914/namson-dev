@@ -554,6 +554,288 @@ export interface BotsResponse {
   generated_at: string;
 }
 
+// --- the watched strip (the HOLD/EXIT stage's surface) -----------------
+//
+// docs/HOLD-EXIT-DESIGN.md, "The surface — a live strip above the picker
+// board". Three backend modules already hold everything it renders, and
+// each of them is per-fixture and operator-only:
+//
+//   watchlist.state() / .coverage()   the declared monitored set, and
+//                                     whether a watch has the whole match
+//                                     or joined part-way through it
+//   live_read.read_for_fixture()      the four decaying components, per
+//                                     side, persisted at the tick
+//   card.operator_view()["positions"] position.evaluate() per held leg —
+//                                     the branch view, the certainty
+//                                     premium, and every refusal by name
+//
+// ONE READ, NOT N+1. The strip polls a single endpoint that folds those
+// three together. A per-fixture fan-out at a 15s cadence would re-ask the
+// watchlist once per match and re-read the tape N times for a surface
+// whose whole point is that it is bounded by the watchlist.
+//
+// EVERY FIELD BELOW IS A KEY THE BACKEND ALREADY EMITS. `coverage` is
+// watchlist.coverage() verbatim, `read` is read_for_fixture() verbatim,
+// and each entry in `positions` is position.evaluate() exactly as
+// card.operator_view re-flattens it, with the card's own
+// `exit_is_obtainable` withdrawal beside it. Nothing here restates a
+// backend sentence in this file's own words.
+//
+// THE REGISTRIES RIDE ON THE PAYLOAD. `refusal_codes` is
+// position.REFUSAL_CODES and `policy_codes` is watchlist.POLICY_CODES,
+// both verbatim, so the strip names a refusal in the registry's OWN
+// words and derives the set it looks for from the registry rather than
+// hand-listing a subset of it.
+//
+// WHICH MATCHES `matches` HOLDS is the backend's call and not this
+// file's: the monitored set whose tape shows play, by the watchlist's
+// own startedness rule (tape outranks the calendar). The strip renders
+// every match it is handed and filters none — dropping a match because
+// one of its numbers is missing is the defect this whole stage exists
+// against.
+
+/** watchlist.coverage() — what this watch has actually observed. */
+export interface WatchedCoverage {
+  monitored: boolean;
+  complete_history: boolean;
+  no_history_is_not_quiet: string;
+  history?: string;
+  joined_phase?: string;
+  joined_phase_meaning?: string;
+  joined_minute?: number | null;
+  joined_score_home?: number | null;
+  joined_score_away?: number | null;
+  unobserved_before_minute?: number | null;
+  watching_since?: string | null;
+  source?: string;
+  source_meaning?: string;
+  actor?: string;
+  policy?: string;
+  policy_code?: string;
+  basis?: string | null;
+}
+
+/** One component of the live read, as `_Read.as_payload()` emits it.
+ *  THE VALUE RIDES UNDER A KEY THAT CARRIES ITS UNIT — `shot_read_per_90`,
+ *  `possession_read_percent` — and the block names that key in
+ *  `value_key`. Read it as `c[c.value_key]`, never as `c[c.component_key]`:
+ *  the value used to ride under the component's own name, which put the
+ *  four floats one uniform subscript apart and let the composite the
+ *  design forbids fall out of a one-line fold over the four blocks.
+ *  Three of these are rates per 90 match-minutes and one is a
+ *  percentage; the backend's `the_wall_has_a_limit` says what that does
+ *  and does not stop. */
+export interface LiveReadComponentPayload {
+  component: string;
+  component_key: string;
+  /** the key on THIS object that carries the number, unit included */
+  value_key: string;
+  kind: string;
+  kind_meaning: string;
+  unit: string;
+  meaning: string;
+  observed_seconds: number | null;
+  observed_intervals: number | null;
+  note?: string | null;
+  no_composite_before_m1: string;
+  /** only on possession_read — the input this project distrusts by name */
+  possession_is_distrusted?: string;
+  [key: string]: unknown;
+}
+
+/** live_read.state_key(row): the conditioning coordinates, with the
+ *  leading/level/trailing word DERIVED from the two numbers beside it. */
+export interface LiveReadState {
+  side: string;
+  minute: number | null;
+  score_home: number | null;
+  score_away: number | null;
+  goal_difference: number | null;
+  score_state: string | null;
+  conditionable: boolean;
+  read_version: string;
+  half_life_seconds: number;
+  observed_from_kickoff: boolean;
+  baseline_is_not_built: string;
+  refusal_code?: string;
+  refusal?: string;
+}
+
+export interface LiveReadSide {
+  side: string;
+  captured_at: string;
+  live_stat_snapshot_id: number;
+  half_life_seconds: number;
+  observed_since: string | null;
+  observed_from_kickoff: boolean;
+  state: LiveReadState;
+  components: Record<string, LiveReadComponentPayload>;
+  basis?: string | null;
+}
+
+export interface LiveReadPayload {
+  version: string;
+  read_version: string;
+  fixture_id: number;
+  monitored: boolean;
+  coverage: WatchedCoverage;
+  components_registry: Record<string, { kind: string; unit: string; meaning: string }>;
+  kinds: Record<string, string>;
+  sides: Record<string, LiveReadSide>;
+  /** present INSTEAD of sides when nothing has been persisted: "not a
+   *  match in which nothing has happened" */
+  words?: string;
+  [key: string]: unknown;
+}
+
+/** One branch of an outcome — B1's honest shape. A binary never pays its
+ *  expectation: it pays `dollars` with probability `probability`. */
+export interface OutcomeBranch {
+  outcome: string;
+  probability: number;
+  percent: number;
+  dollars: string;
+  cents: number;
+}
+
+export interface BranchSide {
+  label?: string;
+  source?: string;
+  expectation_dollars?: string;
+  expectation_cents?: number;
+  branches?: OutcomeBranch[];
+  says?: string;
+  why?: string;
+  quantity?: { kind?: string; answers?: string; n?: number; band?: (number | null)[] } & Record<string, unknown>;
+  /** the sell side refuses by name on a book that cannot pay it */
+  refused?: string;
+  refusal_code?: string;
+  certain_means_obtainable?: string;
+  certainty_is_the_product?: string;
+}
+
+export interface CertaintyAsymmetry {
+  rule: string;
+  /** null/undefined is NOT "ahead" — the strip fails closed on it (G1) */
+  position_is_ahead?: boolean | null;
+  protects?: string;
+  cannot_protect?: string;
+  finding?: string;
+}
+
+export interface CertaintyPremium {
+  applies: boolean;
+  asymmetry?: CertaintyAsymmetry;
+  line?: string;
+  minute?: number;
+  score?: string;
+  held?: { side: string; goals_for: number; goals_against: number;
+           state: string; derived_from: string };
+  contracts?: string;
+  cost_of_certainty_dollars?: string;
+  cost_of_certainty_cents?: number;
+  cost_of_certainty_fraction_of_hold_ev?: number | null;
+  removes?: { probability_of_zero: number; percent: number; says: string };
+  premium?: { setting_fraction_of_hold_ev: number;
+              cost_is_at_or_below_setting?: boolean; says: string; dial: string };
+  sell?: { bid_cents?: number; net_dollars?: string; net_cents?: number;
+           gross_dollars?: string; fee_dollars?: string };
+  hold?: { expected_dollars?: string; expected_cents?: number } & Record<string, unknown>;
+  not_an_edge?: string;
+  not_a_recommendation?: string;
+  /** refuses by name — no_bid / thin_bid / stale_quote / thin_cell_floor … */
+  refused?: string;
+  refusal_code?: string;
+  refusal_codes?: Record<string, string>;
+}
+
+/** card._withdraw_unobtainable_exit(): whether the exit figure is one the
+ *  book will actually pay, and the code that withdrew it if not. */
+export interface ExitIsObtainable {
+  obtainable: boolean;
+  consulted?: string[];
+  refusal_code?: string | null;
+  refused?: string | null;
+  withdrawn?: string[];
+  rule?: string;
+}
+
+export interface WatchedPosition {
+  journal_entry?: {
+    bet_id: number; outcome_key: string; market_ticker?: string;
+    stated_price_dollars?: string | number | null;
+    stated_size?: string | number | null;
+    recorded_at?: string | null; size_basis?: string;
+  } & Record<string, unknown>;
+  position?: {
+    outcome_key: string; side: string; size: string;
+    entry_price: number | null; entry_cost_dollars: string | null;
+    entry_note: string;
+  };
+  /** null when the exit is not obtainable — WITHDRAWN, not missing */
+  value_now_cents?: number | null;
+  value_now_withdrawn?: string;
+  value_at_settlement_cents?: number | null;
+  hold_vs_exit?: { says?: string; refused?: string } & Record<string, unknown>;
+  branch_view?: { why?: string; certain_means_obtainable?: string;
+                  sell?: BranchSide;
+                  hold?: { engine_read?: BranchSide;
+                           conditioned_grid?: BranchSide } };
+  certainty_premium?: CertaintyPremium;
+  exit_is_obtainable?: ExitIsObtainable;
+  exposure?: { applies?: boolean; refused?: string; refusal_code?: string }
+             & Record<string, unknown>;
+  red_card_void?: { refused?: string; refusal_code?: string } & Record<string, unknown>;
+  /** every top-level executability finding rides under its REGISTRY name
+   *  (no_bid / thin_bid / stale_quote / …), which is how the strip finds
+   *  them without hand-listing one */
+  [code: string]: unknown;
+}
+
+export interface WatchedMatch {
+  fixture_id: number;
+  competition_slug: string;
+  home: string;
+  away: string;
+  espn_event_id?: string | null;
+  /** the tape row's own state — every field may refuse by name */
+  state: {
+    in_play: boolean;
+    minute: number | null;
+    score_home: number | null;
+    score_away: number | null;
+    clock_display?: string | null;
+    match_state?: string | null;
+    captured_at?: string | null;
+    /** position.REFUSAL_CODES names: not_in_play / no_minute / no_score */
+    refusals?: { code: string; refused: string }[];
+  };
+  coverage: WatchedCoverage;
+  read: LiveReadPayload;
+  positions: WatchedPosition[];
+  /** journal.held_positions()'s own wording when nothing is on */
+  positions_note?: string | null;
+}
+
+export interface WatchedStripResponse {
+  version: string;
+  generated_at: string;
+  /** the live plane is not configured — words, never a plausible empty set */
+  dormant?: boolean;
+  detail?: string;
+  matches: WatchedMatch[];
+  /** SPLIT BY SOURCE AND NEVER TOTALLED: a human-selected set carries
+   *  selection bias by construction and one that follows open positions
+   *  does not, so folding them into one number destroys a distinction no
+   *  later work can recover. */
+  monitored_by_source: Record<string, number[]>;
+  /** a position nobody declared — the census-of-nothing finding */
+  open_positions_not_monitored: number[];
+  refusal_codes: Record<string, string>;
+  policy_codes?: Record<string, string>;
+  standing?: Record<string, string>;
+}
+
 const base = "/api/bet-suggester";
 
 async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -644,6 +926,13 @@ export const api = {
       matchId ? `/live-signals?match_id=${matchId}` : "/live-signals"),
 
   bots: () => getJson<BotsResponse>("/bots"),
+
+  // The HOLD/EXIT strip's one read. ONE endpoint, polled at 15s beside
+  // the backend's live tick — see the contract above. A 404 (the proxy
+  // and the backend route are not built yet), a 403 (operator
+  // credentials) or a dead backend all throw, and the strip renders
+  // NOTHING rather than an empty section: absent, not empty.
+  watchedStrip: () => getJson<WatchedStripResponse>("/watched-strip"),
 };
 
 // -- formatting helpers -------------------------------------------------
