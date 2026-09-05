@@ -351,7 +351,8 @@ export async function syncCanvas(db: Database.Database): Promise<CanvasSyncResul
       const items = Array.isArray(courseModule.items) ? courseModule.items.map(asRecord) : [];
       const content = items.map((item) => {
         const due = iso(item.due_at);
-        return `- ${text(item.type)}: ${text(item.title)}${due ? ` (due ${due})` : ""}${text(item.html_url) ? ` — ${text(item.html_url)}` : ""}`;
+        const itemUrl = text(item.external_url) || text(item.html_url);
+        return `- ${text(item.type)}: ${text(item.title)}${due ? ` (due ${due})` : ""}${itemUrl ? ` — ${itemUrl}` : ""}`;
       }).join("\n");
       const result = upsertSource(db, {
         courseId: row.id, provider: "canvas", externalId: `course:${canvasId}:module:${moduleId}`,
@@ -360,6 +361,17 @@ export async function syncCanvas(db: Database.Database): Promise<CanvasSyncResul
       });
       seen++; if (result.changed) changed++;
       for (const item of items) {
+        const externalUrl = text(item.external_url);
+        if (externalUrl) {
+          try {
+            const parsed = new URL(externalUrl);
+            if (parsed.protocol === "https:") {
+              externalLinks.push({ courseId: row.id, courseSlug: row.slug, url: parsed.href });
+            }
+          } catch {
+            // Malformed module links remain visible in Canvas but are not followed.
+          }
+        }
         const dueAt = iso(item.due_at);
         if (!dueAt) continue;
         const event = upsertAcademicEvent(db, {

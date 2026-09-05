@@ -332,12 +332,17 @@ test("Canvas sync ingests permitted course material without write requests", asy
     const url = new URL(input instanceof Request ? input.url : String(input));
     const payload = url.pathname === "/api/v1/courses"
       ? [{ id: 998, name: "CS 9998 Canvas Course", course_code: "CS 9998", syllabus_body: '<p>Read the <a href="https://github.com/example/course">course repository</a>.</p>', term: { name: "Fall 2026" } }]
-      : [];
+      : url.pathname === "/api/v1/courses/998/modules"
+        ? [{ id: 7, name: "Course resources", items: [{ id: 8, type: "ExternalUrl", title: "Notes", external_url: "https://github.com/example/course" }] }]
+        : [];
     return new Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json" } });
   };
   const result = await syncCanvas(db);
-  expect(result).toMatchObject({ courses: 1, seen: 1, changed: 1 });
-  expect(result.externalLinks).toEqual([expect.objectContaining({ url: "https://github.com/example/course" })]);
+  expect(result).toMatchObject({ courses: 1, seen: 2, changed: 2 });
+  expect(result.externalLinks).toEqual([
+    expect.objectContaining({ url: "https://github.com/example/course" }),
+    expect.objectContaining({ url: "https://github.com/example/course" }),
+  ]);
   expect(methods.every((method) => method === "GET")).toBe(true);
   expect(retrieveStudySources(db, "canvas-course", "course repository")[0].title).toContain("syllabus");
 });
