@@ -10,6 +10,7 @@
     "test:e2e": "playwright test",
     "study-hub:doctor": "tsx scripts/study-hub-doctor.ts",
     "study-hub:backup": "tsx scripts/study-hub-backup.ts",
+    "study-hub:canvas-login": "tsx scripts/study-hub-canvas-login.ts",
     "study-hub:google-auth": "tsx scripts/study-hub-google-auth.ts",
     "study-hub:start": "next start --hostname 127.0.0.1 --port 3125",
     "study-hub:sync": "tsx scripts/study-hub-sync.ts",

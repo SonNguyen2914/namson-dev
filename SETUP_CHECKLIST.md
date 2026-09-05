@@ -4,13 +4,14 @@ All application code is ready. The remaining steps grant the local worker access
 
 ## 1. Canvas
 
-1. Sign in to the Canvas account that contains the courses.
-2. Open **Account → Settings → Approved Integrations → New Access Token**. Some schools disable personal tokens; in that case ask the Canvas administrator for a read-only developer-key/OAuth integration.
-3. Put the school origin, such as `https://school.instructure.com`, in `CANVAS_BASE_URL` and the token in `CANVAS_ACCESS_TOKEN`.
+1. Put the school origin, such as `https://school.instructure.com`, in `CANVAS_BASE_URL`.
+2. If Canvas provides **Account → Settings → Approved Integrations → New Access Token**, put that token in `CANVAS_ACCESS_TOKEN`.
+3. If the school disables personal tokens, leave `CANVAS_ACCESS_TOKEN` empty, set `CANVAS_AUTH_MODE=browser-session`, and run `npm run study-hub:canvas-login`. Complete the normal school login in the Chrome window. The resulting local cookie file is ignored by Git and stored with owner-only permissions.
 4. Leave `CANVAS_COURSE_IDS` empty to discover all active courses, or add comma-separated numeric IDs from course URLs.
 5. Run `npm run study-hub:sync`, then `npm run study-hub:doctor`.
 
 The connector only sends GET requests. Canvas may hide locked items or endpoints that the student role cannot access; the worker does not bypass those controls.
+Browser-session mode uses the same access already granted to the signed-in student. If CPP expires the session, the connector stops and asks the owner to run `study-hub:canvas-login` again; it does not automate passwords or MFA.
 
 ## 2. Google Drive and the NotebookLM bridge
 

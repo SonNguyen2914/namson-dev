@@ -6,7 +6,6 @@ loadEnvConfig(process.cwd());
 const checks = [
   ["Access gate", Boolean(process.env.STUDY_HUB_ACCESS_PASSWORD && process.env.STUDY_HUB_SESSION_SECRET)],
   ["Database", Boolean(process.env.STUDY_HUB_DATABASE_PATH)],
-  ["Canvas", Boolean(process.env.CANVAS_BASE_URL && process.env.CANVAS_ACCESS_TOKEN)],
   ["GitHub token (optional)", Boolean(process.env.GITHUB_READ_TOKEN)],
   ["Google Drive write switch", process.env.GOOGLE_DRIVE_SYNC_ENABLED === "true"],
   ["Google OAuth", Boolean(process.env.GOOGLE_OAUTH_CLIENT_ID && process.env.GOOGLE_OAUTH_CLIENT_SECRET && process.env.GOOGLE_OAUTH_REFRESH_TOKEN)],
@@ -17,7 +16,11 @@ const checks = [
 async function main() {
   const { configuredStudyHubDatabasePath, ensureManifestCourses, getStudyHubDatabase } = await import("../src/server/studyHubDb");
   const { loadStudyHubManifest } = await import("../src/lib/studyHubManifest");
-  for (const [label, configured] of checks) console.log(`${configured ? "ready" : "pending"}  ${label}`);
+  const { getCanvasAuthStatus } = await import("../src/server/studyHubCanvas");
+  for (const [label, configured] of checks.slice(0, 2)) console.log(`${configured ? "ready" : "pending"}  ${label}`);
+  const canvas = getCanvasAuthStatus();
+  console.log(`${canvas.ready ? "ready" : "pending"}  Canvas${canvas.mode ? ` (${canvas.mode})` : ""}`);
+  for (const [label, configured] of checks.slice(2)) console.log(`${configured ? "ready" : "pending"}  ${label}`);
   const db = getStudyHubDatabase();
   if (db) {
     ensureManifestCourses(db, loadStudyHubManifest());

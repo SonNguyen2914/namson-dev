@@ -26,7 +26,7 @@ import {
   upsertAcademicEvent,
   upsertSource,
 } from "../src/server/studyHubDb";
-import { extractSafeExternalLinks, htmlToText, syncCanvas } from "../src/server/studyHubCanvas";
+import { extractSafeExternalLinks, getCanvasAuthStatus, htmlToText, syncCanvas } from "../src/server/studyHubCanvas";
 import { syncGitHub } from "../src/server/studyHubGithub";
 import { quizletCardsFromAnswer } from "../src/pages/api/study-hub/quizlet";
 
@@ -45,7 +45,7 @@ const ORIGINAL_AI_ENVIRONMENT = Object.fromEntries(
 const ORIGINAL_FETCH = global.fetch;
 const ORIGINAL_DATABASE = process.env.STUDY_HUB_DATABASE_PATH;
 const CONNECTOR_ENVIRONMENT = [
-  "CANVAS_BASE_URL", "CANVAS_ACCESS_TOKEN", "CANVAS_COURSE_IDS",
+  "CANVAS_BASE_URL", "CANVAS_ACCESS_TOKEN", "CANVAS_AUTH_MODE", "CANVAS_BROWSER_STORAGE_STATE", "CANVAS_COURSE_IDS",
   "GITHUB_READ_TOKEN", "STUDY_HUB_GITHUB_REPOSITORIES_JSON",
   "STUDY_HUB_INCLUDE_STUDENT_DISCUSSIONS_IN_AI",
 ] as const;
@@ -265,6 +265,21 @@ test("Canvas content extraction drops executable markup and keeps only safe exte
   expect(htmlToText(html)).toContain("Week 1Read this.");
   expect(htmlToText(html)).not.toContain("steal");
   expect(extractSafeExternalLinks(html)).toEqual(["https://github.com/example/course"]);
+});
+
+test("Canvas browser mode fails closed until an owner login is saved", async () => {
+  process.env.STUDY_HUB_DATABASE_PATH = ":memory:";
+  process.env.CANVAS_BASE_URL = "https://canvas.test/";
+  delete process.env.CANVAS_ACCESS_TOKEN;
+  process.env.CANVAS_AUTH_MODE = "browser-session";
+  process.env.CANVAS_BROWSER_STORAGE_STATE = `.data/nonexistent-canvas-session-${Date.now()}.json`;
+
+  expect(getCanvasAuthStatus()).toEqual({
+    configured: true,
+    ready: false,
+    mode: "browser-session",
+  });
+  await expect(syncCanvas(getStudyHubDatabase()!)).rejects.toThrow(/study-hub:canvas-login/);
 });
 
 test("student discussion stays out of external AI retrieval until explicitly enabled", () => {

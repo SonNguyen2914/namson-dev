@@ -10,6 +10,7 @@ Study Hub is a local-first, read-only academic operations system. A production N
 - Every ingested source is hashed and versioned. Nothing is automatically deleted when upstream content disappears.
 - Google Drive writes require `GOOGLE_DRIVE_SYNC_ENABLED=true`; without that explicit switch the connector remains inert.
 - Credentials remain in ignored `.env.local`, never in browser bundles, Git, URLs, or routine logs.
+- Schools that disable Canvas tokens can use an owner-authenticated, local browser session. The connector still issues only GET requests, never captures a password or MFA response, and stops for manual reauthentication when the school expires the session.
 - AI output is always an unreviewed draft. Retrieval excerpts are treated as untrusted data and source links are returned with the answer.
 
 ## Implemented data flow

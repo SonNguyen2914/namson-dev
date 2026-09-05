@@ -1,5 +1,8 @@
 import type Database from "better-sqlite3";
 import { load } from "cheerio";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import type { APIRequestContext } from "@playwright/test";
 import {
   findOrCreateCanvasCourse,
   markMissingCanvasRecords,
@@ -68,21 +71,126 @@ function linkNext(header: string | null) {
   return null;
 }
 
+type CanvasConfig = {
+  baseUrl: URL;
+  token: string | null;
+  browserStatePath: string | null;
+};
+
+type CanvasResponse = {
+  ok: boolean;
+  status: number;
+  url: string;
+  headers: Headers;
+  json(): Promise<unknown>;
+  bytes(): Promise<Buffer>;
+};
+
+type CanvasTransport = {
+  get(url: URL, timeoutMs: number): Promise<CanvasResponse>;
+  close(): Promise<void>;
+};
+
+function configuredBrowserStatePath() {
+  const configured = process.env.CANVAS_BROWSER_STORAGE_STATE?.trim() || ".data/canvas-browser-session.json";
+  return resolve(process.cwd(), configured);
+}
+
 function canvasConfig() {
   const base = process.env.CANVAS_BASE_URL?.trim();
   const token = process.env.CANVAS_ACCESS_TOKEN?.trim();
-  if (!base || !token) return null;
+  const browserMode = process.env.CANVAS_AUTH_MODE?.trim() === "browser-session";
+  if (!base || (!token && !browserMode)) return null;
   const url = new URL(base);
   if (url.protocol !== "https:") throw new Error("CANVAS_BASE_URL must use HTTPS");
-  return { baseUrl: new URL(url.href.endsWith("/") ? url.href : `${url.href}/`), token };
+  return {
+    baseUrl: new URL(url.href.endsWith("/") ? url.href : `${url.href}/`),
+    token: token || null,
+    browserStatePath: token ? null : configuredBrowserStatePath(),
+  } satisfies CanvasConfig;
 }
 
 export function isCanvasConfigured() {
-  return Boolean(process.env.CANVAS_BASE_URL?.trim() && process.env.CANVAS_ACCESS_TOKEN?.trim());
+  return canvasConfig() !== null;
+}
+
+export function getCanvasAuthStatus() {
+  const config = canvasConfig();
+  if (!config) return { configured: false, ready: false, mode: null as "token" | "browser-session" | null };
+  const mode = config.token ? "token" as const : "browser-session" as const;
+  return {
+    configured: true,
+    ready: Boolean(config.token || (config.browserStatePath && existsSync(config.browserStatePath))),
+    mode,
+  };
+}
+
+async function canvasTransport(config: CanvasConfig): Promise<CanvasTransport> {
+  if (config.token) {
+    return {
+      async get(url, timeoutMs) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          const headers: Record<string, string> = { Accept: "application/json" };
+          if (url.origin === config.baseUrl.origin) headers.Authorization = `Bearer ${config.token}`;
+          const response = await fetch(url, { headers, redirect: "follow", signal: controller.signal });
+          return {
+            ok: response.ok,
+            status: response.status,
+            url: response.url,
+            headers: response.headers,
+            json: () => response.json(),
+            bytes: async () => Buffer.from(await response.arrayBuffer()),
+          };
+        } finally {
+          clearTimeout(timeout);
+        }
+      },
+      async close() {},
+    };
+  }
+
+  const storageStatePath = config.browserStatePath!;
+  if (!existsSync(storageStatePath)) {
+    throw new Error("Canvas browser login is missing. Run npm run study-hub:canvas-login and complete CPP sign-in.");
+  }
+  const { request } = await import("@playwright/test");
+  const context: APIRequestContext = await request.newContext({
+    storageState: storageStatePath,
+    extraHTTPHeaders: { Accept: "application/json" },
+  });
+  return {
+    async get(url, timeoutMs) {
+      const response = await context.get(url.href, { timeout: timeoutMs });
+      const responseHeaders = response.headers();
+      const safeHeaders = new Headers();
+      for (const name of ["content-length", "content-type", "link"]) {
+        const value = responseHeaders[name];
+        if (value) safeHeaders.set(name, value);
+      }
+      return {
+        ok: response.ok(),
+        status: response.status(),
+        url: response.url(),
+        headers: safeHeaders,
+        json: () => response.json(),
+        bytes: () => response.body(),
+      };
+    },
+    async close() {
+      await context.storageState({ path: storageStatePath });
+      await context.dispose();
+    },
+  };
 }
 
 class CanvasClient {
-  constructor(private baseUrl: URL, private token: string) {}
+  private constructor(private baseUrl: URL, private transport: CanvasTransport) {}
+
+  static async create(config: CanvasConfig) {
+    return new CanvasClient(config.baseUrl, await canvasTransport(config));
+  }
 
   async pages(pathname: string, parameters: Record<string, string | string[]> = {}) {
     const first = new URL(pathname.replace(/^\//, ""), this.baseUrl);
@@ -112,21 +220,25 @@ class CanvasClient {
     return asRecord(await response.json());
   }
 
+  async close() {
+    await this.transport.close();
+  }
+
   private async request(url: string) {
     const target = new URL(url);
     if (target.origin !== this.baseUrl.origin) throw new Error("Canvas pagination changed origin");
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30_000);
-    try {
-      const response = await fetch(target, {
-        headers: { Authorization: `Bearer ${this.token}`, Accept: "application/json" },
-        signal: controller.signal,
-      });
-      if (!response.ok) throw new Error(`Canvas API returned ${response.status}`);
-      return response;
-    } finally {
-      clearTimeout(timeout);
+    const response = await this.transport.get(target, 30_000);
+    if (!response.ok) {
+      const hint = response.status === 401 || response.status === 403
+        ? "; run npm run study-hub:canvas-login if CPP requires a new sign-in"
+        : "";
+      throw new Error(`Canvas API ${target.pathname} returned ${response.status}${hint}`);
     }
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.toLowerCase().includes("json")) {
+      throw new Error("Canvas browser session expired or was redirected to CPP Signon. Run npm run study-hub:canvas-login.");
+    }
+    return response;
   }
 }
 
@@ -138,19 +250,18 @@ export async function downloadCanvasAsset(urlValue: string, expectedSize: number
   const configuredMax = Number(process.env.STUDY_HUB_MAX_FILE_BYTES || 52_428_800);
   const maxBytes = Number.isFinite(configuredMax) ? Math.max(1_048_576, configuredMax) : 52_428_800;
   if (expectedSize !== null && expectedSize > maxBytes) throw new Error("Canvas asset exceeds the archive size limit");
-  const headers: Record<string, string> = {};
-  if (url.origin === config.baseUrl.origin) headers.Authorization = `Bearer ${config.token}`;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120_000);
+  const transport = await canvasTransport(config);
   try {
-    const response = await fetch(url, { headers, redirect: "follow", signal: controller.signal });
+    const response = await transport.get(url, 120_000);
     if (!response.ok) throw new Error(`Canvas asset returned ${response.status}`);
     const contentLength = Number(response.headers.get("content-length"));
     if (Number.isFinite(contentLength) && contentLength > maxBytes) throw new Error("Canvas asset exceeds the archive size limit");
-    const bytes = Buffer.from(await response.arrayBuffer());
+    const bytes = await response.bytes();
     if (bytes.byteLength > maxBytes) throw new Error("Canvas asset exceeds the archive size limit");
     return { bytes, contentType: response.headers.get("content-type") || "application/octet-stream" };
-  } finally { clearTimeout(timeout); }
+  } finally {
+    await transport.close();
+  }
 }
 
 function collectDiscussionText(topic: Json) {
@@ -173,7 +284,8 @@ function externalLinksFrom(content: string, courseId: string, courseSlug: string
 export async function syncCanvas(db: Database.Database): Promise<CanvasSyncResult> {
   const config = canvasConfig();
   if (!config) throw new Error("Canvas is not configured");
-  const client = new CanvasClient(config.baseUrl, config.token);
+  const client = await CanvasClient.create(config);
+  try {
   const syncStartedAt = new Date().toISOString();
   const onlyIds = new Set(
     (process.env.CANVAS_COURSE_IDS ?? "").split(",").map((value) => value.trim()).filter(Boolean),
@@ -214,9 +326,9 @@ export async function syncCanvas(db: Database.Database): Promise<CanvasSyncResul
     const [modules, assignments, pages, discussions, files, announcements, quizzes, submissions, calendarEvents] = await Promise.all([
       client.pages(`api/v1/courses/${canvasId}/modules`, { "include[]": "items", per_page: "100" }),
       client.pages(`api/v1/courses/${canvasId}/assignments`, { order_by: "due_at", per_page: "100" }),
-      client.pages(`api/v1/courses/${canvasId}/pages`, { sort: "updated_at", order: "desc", per_page: "100" }),
-      client.pages(`api/v1/courses/${canvasId}/discussion_topics`, { order_by: "recent_activity", per_page: "100" }),
-      client.pages(`api/v1/courses/${canvasId}/files`, { sort: "updated_at", order: "desc", per_page: "100" }),
+      client.optionalPages(`api/v1/courses/${canvasId}/pages`, { sort: "updated_at", order: "desc", per_page: "100" }),
+      client.optionalPages(`api/v1/courses/${canvasId}/discussion_topics`, { order_by: "recent_activity", per_page: "100" }),
+      client.optionalPages(`api/v1/courses/${canvasId}/files`, { sort: "updated_at", order: "desc", per_page: "100" }),
       client.pages("api/v1/announcements", {
         "context_codes[]": `course_${canvasId}`,
         start_date: new Date(Date.now() - 365 * 86_400_000).toISOString(),
@@ -293,7 +405,13 @@ export async function syncCanvas(db: Database.Database): Promise<CanvasSyncResul
       const page = asRecord(raw);
       const pageSlug = text(page.url);
       if (!pageSlug) continue;
-      const detail = await client.get(`api/v1/courses/${canvasId}/pages/${encodeURIComponent(pageSlug)}`);
+      let detail: Json;
+      try {
+        detail = await client.get(`api/v1/courses/${canvasId}/pages/${encodeURIComponent(pageSlug)}`);
+      } catch {
+        // A page can be unpublished or removed between list and detail requests.
+        continue;
+      }
       const html = text(detail.body);
       const result = upsertSource(db, {
         courseId: row.id, provider: "canvas", externalId: `course:${canvasId}:page:${pageSlug}`,
@@ -430,4 +548,7 @@ export async function syncCanvas(db: Database.Database): Promise<CanvasSyncResul
   }
 
   return { seen, changed, courses: courseCount, externalLinks };
+  } finally {
+    await client.close();
+  }
 }
