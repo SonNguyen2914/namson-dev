@@ -10,8 +10,10 @@
 // Decision safety (frontend invariant): everything here is shadow /
 // observational. The λ number is display-only and carries its
 // "unproven vs constant baseline" label verbatim; the style axes carry
-// their measured-non-predictive label verbatim — that label is a
-// measured finding, not decoration.
+// their display-only label verbatim, and that label now states the
+// MEASURED answer and names the artifact that measured it (style-axes-m2:
+// no axis beats plain hazard out of sample, on the powered full corpus or
+// on styles-v1's own three leagues) — a measured finding, not decoration.
 //
 // The in-play section leads with LIVE NOW: while (and only while) the
 // fixture is in play the backend attaches layers.inplay_plan.live_now,

@@ -1504,13 +1504,15 @@ function MapBlock({ map, registry }: {
 // --- 7. what this surface knows it cannot draw -------------------------
 //
 // REGISTERED, NOT PRETENDED. B3 (a blended live rate, to be shown BESIDE
-// the engine's read as a second opinion and never in its place) does not
-// exist in the backend tree this file was built against: there is no
-// src/live/live_rates.py, so no payload carries a blended rate and no
-// shape of one has been recorded. Rather than draw a block against a
-// shape nobody sends — which is how a surface certifies a reader that
-// cannot read the real payload — the hole is written down here with the
-// condition that closes it.
+// the engine's read as a second opinion and never in its place) SHIPPED
+// after this surface was built (backend 688a696, src/live/live_rates.py)
+// and REFUSES EVERY BLEND: M1 published k but not the shots-to-goals
+// conversion k was fitted with, so live_rates carries a registered hole
+// and its table is empty. No POSITION payload carries a blended rate and
+// no shape of one has been recorded off an emitter. Rather than draw a
+// block against a shape nobody sends — which is how a surface certifies a
+// reader that cannot read the real payload — the hole is written down
+// here with the condition that closes it.
 //
 // The guard this pays for: a key named below that ARRIVES on a position
 // is NAMED on the surface instead of being silently dropped, and the day
