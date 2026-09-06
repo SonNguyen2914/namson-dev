@@ -2247,7 +2247,8 @@ const BEHIND = {
           + "exit side has no CERTAIN figure for it. Showing the whole "
           + "position at the top of the book would state a certainty the "
           + "operator cannot obtain, and no clip is priced in its place "
-          + "— B4 is not built.",
+          + "— no clip enters this branch; a clip is a different trade "
+          + "under partial_exit.",
         refusal_code: "thin_bid",
         certain_means_obtainable: "CERTAIN MEANS OBTAINABLE",
       },

@@ -985,7 +985,13 @@ export interface EntryMap {
   favourite?: { fav_side?: string; fav_p?: number; band?: string;
                 source?: string; read_from?: string;
                 refusal_code?: string; refused?: string };
-  red_card?: { void?: boolean; withdraws?: boolean; withdrawal?: string | null;
+  // `withdrawal` is an OBJECT (position._red_card: {code, because, rule}),
+  // never a string. It was typed `string | null` and rendered as a bare
+  // React child, which throws "Objects are not valid as a React child" the
+  // first time a watched fixture carries a dismissal or an unreadable tape.
+  red_card?: { void?: boolean; withdraws?: boolean;
+               withdrawal?: { code?: string; because?: string;
+                              rule?: string } | null;
                witness?: unknown; tape_note?: string; rule?: string };
   /** the map's OWN start witnesses — never this file's clock */
   match_now?: { started: boolean; note?: string; witness?: string;

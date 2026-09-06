@@ -1441,11 +1441,20 @@ function MapBlock({ map, registry }: {
         </p>
       )}
 
-      {map.red_card?.void ? (
+      {map.red_card?.withdraws || map.red_card?.void ? (
         <p data-testid="watched-map-voided"
           className="mt-1 text-[12px] leading-relaxed text-warn">
-          {map.red_card.withdrawal ?? "a dismissal voids every grid-derived "
-            + "number on this map from first sighting"}
+          {/* the withdrawal is an object; render ITS OWN words, by name.
+              `because` says which witness (or which failure to consult
+              one) withdrew the map, `rule` states the rule -- neither is
+              restated here. The gate is `withdraws`, the QUESTION, not
+              `void`, the FACT: an unreadable tape withdraws without
+              asserting a dismissal, and reading the fact would draw a
+              full map on a tape nobody could read. */}
+          {[map.red_card.withdrawal?.because, map.red_card.withdrawal?.rule]
+            .filter(Boolean).join(" ")
+            || "a dismissal voids every grid-derived number on this map "
+               + "from first sighting"}
         </p>
       ) : map.red_card?.tape_note ? (
         <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">

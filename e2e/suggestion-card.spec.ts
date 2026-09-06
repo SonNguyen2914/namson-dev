@@ -364,8 +364,8 @@ const CARD_PAYLOAD = {
           + "from first sighting — all priors were measured on 11-v-11 "
           + "play (clean_11v11), and the runtime gate refuses from the "
           + "first dismissal (src/live/patterns.py)",
-        cash_out_ladder: "NOT YET SHIPPED — no exit policy is quoted; "
-          + "placeholder kept so the absence stays on the template",
+        cash_out_ladder:
+          "NOT BUILT, AND NOT COMING — this stage will not recommend a cash-out (docs/HOLD-EXIT-DESIGN.md, 'What this stage will not do'), and the one exit rule anyone tried here is recorded SUPPORTED BY TWO SLATES, BOTH OF WHICH WE LOST. NOT ADOPTED (research_archive/cashout_ripeness_2026-08-13.md). No exit policy is quoted anywhere on this card. The operator payload's fraction ladder prices what the book pays for a quarter, a half, three quarters and the whole, and recommends none of them",
       },
       evidence: {
         artifacts: {
@@ -798,7 +798,7 @@ test.describe("suggestion card (recorded payloads)", () => {
       await expect(
         page.getByText(/a red card VOIDS every grid number/i).first())
         .toBeVisible();
-      await expect(page.getByText(/NOT YET SHIPPED/).first())
+      await expect(page.getByText(/NOT BUILT, AND NOT COMING/).first())
         .toBeVisible();
       // decision safety: shadow framing on the panel, never a bare TAKE
       await expect(page.getByText(/shadow · not advice/i).first())
@@ -1443,7 +1443,8 @@ test.describe("the ladder: exposure, tick age, and the position", () => {
       await expect(
         page.getByText(/a red card VOIDS every grid number/i).first())
         .toBeVisible();
-      await expect(page.getByText(/cash-out ladder: NOT YET SHIPPED/))
+      await expect(
+        page.getByText(/cash-out ladder: NOT BUILT, AND NOT COMING/))
         .toBeVisible();
     });
 });
