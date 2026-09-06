@@ -1521,11 +1521,14 @@ export const UNRENDERED_PAYLOAD_KEYS: Record<string, {
   finding: string; closes_when: string;
 }> = {
   blended_rate: {
-    finding: "B3 is not in the backend tree this surface was built "
-      + "against (there is no src/live/live_rates.py), so no blended "
-      + "rate is drawn beside the engine's read and nothing on this "
-      + "card stands in for one. This is an absent second opinion, not "
-      + "agreement with the engine.",
+    finding: "B3 SHIPPED (backend 688a696, src/live/live_rates.py) and "
+      + "REFUSES EVERY BLEND: M1 published k but not the shots-to-goals "
+      + "conversion k was fitted with, so live_rates carries a "
+      + "registered hole, m1_conversion_unpublished, and its table is "
+      + "empty. No POSITION payload carries `blended_rate` yet, so "
+      + "nothing on this card stands in for one and nothing is drawn. "
+      + "This is an absent second opinion, not agreement with the "
+      + "engine.",
     closes_when: "a position payload carries `blended_rate` AND its "
       + "shape has been recorded off the backend's own emitter; then "
       + "this record retires and the rate is drawn BESIDE the engine's "

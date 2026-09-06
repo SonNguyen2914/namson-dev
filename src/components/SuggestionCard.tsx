@@ -332,7 +332,17 @@ type HeldPosition = {
   stale_quote?: { finding?: string; age_seconds?: number | null;
     ceiling_seconds?: number } | null;
   exposure?: Refusable<Exposure>;
-  red_card_void?: { void?: boolean; witness?: string[] | null;
+  // `withdraws` is the QUESTION and `void` is the FACT, and they are not
+  // the same key. An unreadable tape sets withdraws TRUE and void FALSE by
+  // design: nothing is imputed (no dismissal is invented) and nothing is
+  // ruled out (none can be), so every grid number, the exposure and the
+  // engine read are withdrawn while no dismissal is asserted. A reader
+  // gating on `void` renders NOTHING in that state — a card with its
+  // numbers gone and no sentence saying why, which is the fail-open the
+  // backend spent two rounds closing. `withdrawal` carries the words.
+  red_card_void?: { void?: boolean; withdraws?: boolean;
+    withdrawal?: { code?: string; because?: string; rule?: string } | null;
+    witness?: string[] | null;
     tape_note?: string | null; rule?: string; survives?: string | null };
   arithmetic?: { exit?: ExitArith | null;
     settlement?: { cents?: number; fee_note?: string } | null;
@@ -1824,10 +1834,18 @@ function HeldPositionBlock({ h }: { h: HeldPosition }) {
           <RefusalNote text={h.stale_quote.finding} />
         </div>
       )}
-      {h.red_card_void?.void && h.red_card_void.rule && (
+      {/* gate on the QUESTION, not the FACT — see the type above */}
+      {(h.red_card_void?.withdraws || h.red_card_void?.void)
+        && (h.red_card_void.withdrawal?.rule || h.red_card_void.rule) && (
         <p data-testid="red-card-void"
           className="mt-2 rounded-lg border border-warn/40 px-3 py-2 font-mono text-[10px] leading-relaxed text-warn">
-          {h.red_card_void.rule}
+          {/* the withdrawal's own words when it has them: `because` says
+              which witness, or which failure to consult one, withdrew
+              these numbers. Neither is restated here. */}
+          {h.red_card_void.withdrawal?.because
+            ? `${h.red_card_void.withdrawal.because} `
+            : ""}
+          {h.red_card_void.withdrawal?.rule ?? h.red_card_void.rule}
           {h.red_card_void.survives && ` ${h.red_card_void.survives}`}
         </p>
       )}
