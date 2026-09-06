@@ -760,6 +760,243 @@ export interface ExitIsObtainable {
   rule?: string;
 }
 
+// --- B4, the partial exit -------------------------------------------
+//
+// position._partial_exit(), as it rides on card.operator_view's held
+// positions. RECORDED, NOT IMAGINED: every key below was read off a
+// payload this repo's own emitter produced (src/live/position.py, via
+// tests/test_partial_exit.py's helpers) on 2026-09-06 — see the header
+// of e2e/watched-strip.spec.ts for the capture.
+//
+// THREE THINGS THE TYPES THEMSELVES CARRY.
+//  - A REFUSED ROW HAS NO `realises`. It is absent, not zeroed, and the
+//    optionality here is the shape the backend actually sends.
+//  - A ROW WITHDRAWN ON A SHARED LADDER keeps what it would have
+//    realised ALONE, under a different key, so the surface can never
+//    print the withdrawn figure as if it stood. `obtainable_alone` and
+//    `realises_alone_withdrawn` are that pair.
+//  - `no_whole_contract` CARRIES NO CODE. A quarter of three contracts
+//    is not a book finding, it is arithmetic, and position.py refuses
+//    to borrow a registry name for it — so neither does this type.
+
+export interface PartialExitAllocation {
+  seq: number; price: string; qty: string; fee: string;
+}
+
+/** What a fraction realises: the walk, the exact per-level fee, the net.
+ *  ABSENT on a refused row and on a row with no whole contract. */
+export interface PartialExitRealises {
+  contracts: string;
+  average_price_dollars: string;
+  average_price_cents?: number;
+  worst_level_price_dollars?: string;
+  gross_dollars: string;
+  fee_dollars: string;
+  fee_cents?: number;
+  net_dollars: string;
+  net_cents?: number;
+  levels_walked: number;
+  allocations: PartialExitAllocation[];
+  /** duplicated verbatim at block level, where the strip renders it once */
+  fee_basis?: string;
+}
+
+/** What the fraction LEAVES EXPOSED. The expectation is a MEAN the
+ *  remainder never pays, and it refuses in the collector's own words
+ *  when the engine's read is withdrawn. */
+export interface PartialExitRemains {
+  contracts: string;
+  settles_yes_dollars?: string;
+  settles_no_dollars?: string;
+  outcome_if_remainder_settles_yes_dollars?: string;
+  outcome_if_remainder_settles_no_dollars?: string;
+  expected_at_engine_read_dollars?: string | null;
+  expected_at_engine_read_cents?: number | null;
+  expected_basis?: string;
+  expected_refused?: string;
+  says: string;
+}
+
+/** card._hold_fractions_to_the_ladder(): what the ONE ladder was asked
+ *  on a leg held more than once. Present on every row of such a leg,
+ *  whether it held or not. */
+export interface PartialExitLegConsult {
+  positions_on_leg: number;
+  combined_contracts: string;
+  ladder_resting_total: string;
+  holds: boolean;
+  says: string;
+  unpriced_contracts?: string;
+  positions_not_priced?: number[];
+}
+
+export interface PartialExitFraction {
+  fraction: number;
+  label: string;
+  contracts: string;
+  of_contracts: string;
+  executability: {
+    consulted: string[]; refused_under: string[]; rule?: string;
+    /** "shared_exit_book" when the leg, not this position, withdrew it */
+    refused_by?: string;
+  };
+  obtainable: boolean;
+  realises?: PartialExitRealises;
+  remains?: PartialExitRemains;
+  matches_whole_position_exit?: boolean | null;
+  vs_whole_position?: string;
+  says: string;
+  /** refused by name — the code is position.REFUSAL_CODES' own */
+  refusal_code?: string;
+  refused?: string;
+  also_refused_under?: string[] | null;
+  refusals?: Record<string, string>;
+  /** withdrawn on a ladder shared by two positions on one leg */
+  obtainable_alone?: boolean;
+  realises_alone_withdrawn?: PartialExitRealises;
+  vs_whole_position_alone?: string;
+  leg_consult?: PartialExitLegConsult;
+  /** whole contracts, rounded DOWN — and NO registry code borrowed */
+  rounded_down_from?: string;
+  rounding?: string;
+  no_whole_contract?: string;
+}
+
+export interface PartialExitBook {
+  source: string;
+  quote_id: number | null;
+  captured_at?: string | null;
+  levels: { price_dollars: string | null; size: string | null }[];
+  resting_total: string | null;
+  depth_levels_available: number;
+  levels_from_another_quote_dropped: number;
+  top_of_book?: { bid_dollars: string | null; size: string | null };
+  best_level_matches_top_of_book?: boolean | null;
+  /** the depth read FAILED — a named absence, never folded into "no depth" */
+  depth_read?: string | null;
+  depth_read_note?: string;
+  basis?: string;
+}
+
+export interface PartialExit {
+  applies: boolean;
+  rule: string;
+  fractions: PartialExitFraction[];
+  fractions_priced: number;
+  book: PartialExitBook;
+  executability: {
+    consulted: string[]; order_basis?: string;
+    refused_under_by_fraction: Record<string, string[]>; rule?: string;
+  };
+  fee_basis: string;
+  whole_contracts: string;
+  not_a_recommendation: string;
+  common_case: string;
+  refusal_code?: string | null;
+  refused?: string | null;
+  withdrawn_on_shared_ladder?: string[];
+  withdrawn_on_shared_ladder_rule?: string;
+}
+
+// --- B2, the minute-0 map --------------------------------------------
+//
+// src/live/entry_map.py's `entry-map-v1`, recorded the same way. The map
+// is drawn AT PURCHASE and does not re-condition on the live state; when
+// a ball has been kicked the payload says so itself under `match_now`.
+//
+// THE CATEGORY WALL RIDES IN THE TYPES. A branch's held quantity is
+// EITHER a win probability (`quantity_key: "p_win"`) or a LOWER BOUND on
+// one (`"lower_bound_on_p_win"`), the two are not comparable, and they
+// carry their numbers under DIFFERENT keys. Read the number through
+// `quantity_key` — never off a key spelled in the reader — which is the
+// same discipline `value_key` enforces on the live read's components.
+
+export interface EntryMapQuantity {
+  quantity: string;
+  answers: string;
+  /** the key on THIS object carrying the fraction; `${key}_percent` and
+   *  `${key}_wilson_band_percent` carry the percentage and its band */
+  quantity_key: string;
+  n: number | null;
+  source_cell?: string;
+  note?: string;
+  category_rule?: string;
+  [key: string]: unknown;
+}
+
+export interface EntryMapReached {
+  state: string;
+  p_first_goal_percent?: number;
+  p_first_goal_wilson_band_percent?: number[];
+  n?: number;
+  k?: number;
+  composed_from?: string[];
+  source_cell?: string;
+  either_side?: string;
+  /** no grid splits the opener by scorer — refused, never imputed */
+  by_side?: { refusal_code?: string; refused?: string };
+  refusal_code?: string;
+  refused?: string;
+}
+
+export interface EntryMapDollars {
+  settles?: { if_your_side_wins_dollars: string; otherwise_dollars: string };
+  pnl?: { if_your_side_wins_dollars: string; otherwise_dollars: string };
+  branches_not_averages?: string;
+  /** `priced: false` where the held number is a LOWER BOUND — an
+   *  expectation off a bound is the 2026-09-02 substitution in dollars */
+  expected?: {
+    priced?: boolean; quantity_key?: string; not_priced?: string;
+    category_rule?: string;
+    settlement_dollars?: string; settlement_dollars_wilson_band?: string[];
+    pnl_dollars?: string; pnl_dollars_wilson_band?: string[];
+    n?: number; certainty_vs_mean?: string;
+    refusal_code?: string; refused?: string;
+  };
+}
+
+export interface EntryMapBranch {
+  state?: string;
+  grid?: string;
+  minute?: number;
+  opener?: { role: string; side: string };
+  relation_to_you?: string;
+  reached?: EntryMapReached;
+  your_contract?: {
+    contract: string; held: boolean; quantity?: EntryMapQuantity;
+    refusal_code?: string; refused?: string;
+  };
+  dollars?: EntryMapDollars;
+  /** the whole branch refuses — e.g. no pre-kickoff favourite to band on */
+  refusal_code?: string;
+  refused?: string;
+}
+
+export interface EntryMap {
+  version: string;
+  charter?: string;
+  a_map_not_a_verdict: string;
+  not_a_signal?: string;
+  no_response_window: string;
+  drawn_from: string;
+  fixture?: { id: number; competition_slug?: string };
+  position?: Record<string, unknown>;
+  grids?: { variant?: string; min_n_floor?: number; floor_rule?: string };
+  favourite?: { fav_side?: string; fav_p?: number; band?: string;
+                source?: string; read_from?: string;
+                refusal_code?: string; refused?: string };
+  red_card?: { void?: boolean; withdraws?: boolean; withdrawal?: string | null;
+               witness?: unknown; tape_note?: string; rule?: string };
+  /** the map's OWN start witnesses — never this file's clock */
+  match_now?: { started: boolean; note?: string; witness?: string;
+                tape?: Record<string, unknown> };
+  you_are?: { role: string; side: string; says: string } | null;
+  voided?: boolean;
+  branches: Record<string, EntryMapBranch>;
+  refusals?: { count_by_code: Record<string, number>; total: number;
+               rule?: string; codes?: Record<string, string> };
+}
+
 export interface WatchedPosition {
   journal_entry?: {
     bet_id: number; outcome_key: string; market_ticker?: string;
@@ -786,6 +1023,11 @@ export interface WatchedPosition {
   exposure?: { applies?: boolean; refused?: string; refusal_code?: string }
              & Record<string, unknown>;
   red_card_void?: { refused?: string; refusal_code?: string } & Record<string, unknown>;
+  /** B4 — four sizes of one trade, walked down the actual bid ladder.
+   *  Rides BESIDE the card, outside content_hash. */
+  partial_exit?: PartialExit;
+  /** B2 — the map drawn at minute 0, at purchase. */
+  entry_map?: EntryMap;
   /** every top-level executability finding rides under its REGISTRY name
    *  (no_bid / thin_bid / stale_quote / …), which is how the strip finds
    *  them without hand-listing one */

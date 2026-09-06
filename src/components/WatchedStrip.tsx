@@ -64,8 +64,9 @@
 // surface making the recommendation the whole stage refuses to make.
 import { useEffect, useRef, useState } from "react";
 import {
-  CertaintyPremium, LiveReadComponentPayload, LiveReadSide, WatchedMatch,
-  WatchedPosition, WatchedStripResponse, api, money,
+  CertaintyPremium, EntryMap, EntryMapBranch, LiveReadComponentPayload,
+  LiveReadSide, PartialExit, PartialExitFraction, PartialExitRealises,
+  WatchedMatch, WatchedPosition, WatchedStripResponse, api, money,
 } from "../lib/suggesterApi";
 import { Eyebrow } from "./ui";
 
@@ -131,42 +132,61 @@ type Refusal = { code: string; where: string; says: string };
 const isObj = (x: unknown): x is Record<string, unknown> =>
   typeof x === "object" && x !== null && !Array.isArray(x);
 
-/** Every coded refusal on one position, in the registry's own order so
- *  two positions never report the same findings in different orders. */
+/** Every coded refusal on one position — WALKED, not hand-listed.
+ *
+ *  This used to enumerate six block PATHS by hand, which was fine while
+ *  a position had six blocks. B4's partial exit refuses per FRACTION and
+ *  B2's map refuses per BRANCH, per CONTRACT and per cell, so a
+ *  hand-listed path set would have gone on being green while the new
+ *  refusals went unnamed — the shape that let a league disarm itself on
+ *  every boot for as long as a test called "both planes" listed two of
+ *  three. The walk finds both shapes the payload uses, at any depth:
+ *
+ *    (a) a block keyed by its own REGISTRY NAME carrying a `finding`
+ *        (`no_bid`, `thin_bid`, `stale_quote`, and whatever ninth
+ *        finding is added next), and
+ *    (b) any object carrying a `refusal_code` with its `refused`
+ *        sentence.
+ *
+ *  Ordered by the registry's own order, then by path, so two positions
+ *  never report the same findings in different orders. An unregistered
+ *  code still renders — under its bare name, never glossed with a guess. */
 function positionRefusals(
   p: WatchedPosition, registry: Record<string, string>,
 ): Refusal[] {
-  const out: Refusal[] = [];
+  const found: { code: string; where: string; says: string }[] = [];
   const seen = new Set<string>();
   const push = (code: unknown, where: string, says: unknown) => {
     if (typeof code !== "string" || !code) return;
     const key = `${code}@${where}`;
     if (seen.has(key)) return;
     seen.add(key);
-    out.push({ code, where,
+    found.push({ code, where,
       says: typeof says === "string" && says ? says : "" });
   };
-  // (a) registry-derived: the executability findings, in registry order
-  for (const code of Object.keys(registry)) {
-    const blk = (p as Record<string, unknown>)[code];
-    if (isObj(blk) && typeof blk.finding === "string") {
-      push(code, code, blk.finding);
+  const walk = (node: unknown, path: string) => {
+    if (Array.isArray(node)) {
+      node.forEach((v, i) => walk(v, `${path}[${i}]`));
+      return;
     }
-  }
-  // (b) the blocks that refuse by code
-  const named: [string, unknown][] = [
-    ["certainty_premium", p.certainty_premium],
-    ["branch_view.sell", p.branch_view?.sell],
-    ["branch_view.hold.conditioned_grid", p.branch_view?.hold?.conditioned_grid],
-    ["exposure", p.exposure],
-    ["exit_is_obtainable", p.exit_is_obtainable],
-    ["red_card_void", p.red_card_void],
-  ];
-  for (const [where, blk] of named) {
-    if (!isObj(blk)) continue;
-    push(blk.refusal_code, where, blk.refused);
-  }
-  return out;
+    if (!isObj(node)) return;
+    push(node.refusal_code, path || "position", node.refused);
+    for (const [k, v] of Object.entries(node)) {
+      // (a) a finding riding under its own registry name
+      if (k in registry && isObj(v) && typeof v.finding === "string") {
+        push(k, path ? `${path}.${k}` : k, v.finding);
+      }
+      walk(v, path ? `${path}.${k}` : k);
+    }
+  };
+  walk(p as Record<string, unknown>, "");
+  const order = Object.keys(registry);
+  const rank = (c: string) => {
+    const i = order.indexOf(c);
+    return i < 0 ? order.length : i;
+  };
+  return found.sort((a, b) =>
+    rank(a.code) - rank(b.code) || a.where.localeCompare(b.where));
 }
 
 /** The read's own refusals: one per side, off the state row that was
@@ -538,6 +558,9 @@ function PositionBlock({ p, registry }: {
       <Ledger p={p} />
       <Branches p={p} />
       <Certainty cert={cert} />
+      <PartialExits pe={p.partial_exit} registry={registry} />
+      <MapBlock map={p.entry_map} registry={registry} />
+      <NotBuiltUpstream p={p} />
       <RefusalList refusals={refusals} registry={registry}
         testid="watched-position-refusals"
         heading="refused on this position" />
@@ -839,7 +862,689 @@ function Asymmetry({ cert }: { cert: CertaintyPremium }) {
   );
 }
 
-// --- 5. the refusals, by name -----------------------------------------
+// --- 5. B4, the partial exit ------------------------------------------
+//
+// "Price 25/50/75/100% against the actual book rather than the top of
+// it, since the top of it is often 0-1 contracts" (HOLD-EXIT-DESIGN B4).
+// The backend walks the yes-side ladder captured with the SAME quote row
+// the whole-position figure reads and states, per fraction, what it
+// REALISES and what it LEAVES EXPOSED.
+//
+// NO FRACTION IS HIGHLIGHTED. Every row gets the same border, the same
+// ink and the same weight; the rows sit in the registry's own order
+// (25 / 50 / 75 / 100) and nothing sorts them by attractiveness. A
+// surface that made one row look like the answer would be recommending
+// a clip, which is the one thing this stage does not do — and gold is
+// brand here, never a verdict, so no row is ever gold either.
+//
+// A WITHDRAWN ROW SAYS SO. On a leg held twice the ladder is one pool,
+// and the card withdraws the rows the pool cannot pay together. The
+// withdrawn figure is kept by the payload under its OWN key
+// (`realises_alone_withdrawn`) and is rendered under that name, struck
+// out of the claim, so the number is visible as history and never as an
+// exit the operator can have.
+
+/** Whole-dollar rendering of the payload's own decimal strings. The
+ *  string is never re-derived: it is parsed only to choose the sign, and
+ *  the payload's digits are what is printed. */
+function dollars(x: string | null | undefined): string | null {
+  if (x == null || x === "") return null;
+  const v = Number(x);
+  if (!Number.isFinite(v)) return null;
+  return v < 0 ? `−$${Math.abs(v).toFixed(2)}` : `$${v.toFixed(2)}`;
+}
+
+function Realises({ r, withdrawn }: {
+  r: PartialExitRealises; withdrawn?: boolean;
+}) {
+  return (
+    <div data-testid={withdrawn ? "watched-fraction-realises-withdrawn"
+                                : "watched-fraction-realises"}
+      className="mt-1">
+      <p className="font-mono text-[12px] tabular-nums text-ink-hi">
+        {withdrawn && (
+          <span className="font-sans text-[11px] uppercase tracking-[0.12em] text-warn">
+            withdrawn ·{" "}
+          </span>
+        )}
+        net {dollars(r.net_dollars)}
+        <span className="text-ink-faint">
+          {" "}· {r.contracts} contracts at {r.average_price_dollars} average
+          {" "}across {r.levels_walked} level{r.levels_walked === 1 ? "" : "s"}
+          {" "}· gross {dollars(r.gross_dollars)} less fee{" "}
+          {dollars(r.fee_dollars)}
+        </span>
+      </p>
+      <ul className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
+        {r.allocations?.map((a) => (
+          <li key={a.seq}
+            className="font-mono text-[10px] tabular-nums text-ink-faint">
+            {a.qty} @ ${a.price} <span className="text-ink-low">fee ${a.fee}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function Fraction({ f }: { f: PartialExitFraction }) {
+  const withdrawnByLeg = f.executability?.refused_by === "shared_exit_book";
+  const alone = f.realises_alone_withdrawn;
+  return (
+    // IDENTICAL CHROME ON EVERY ROW. Same border, same padding, same
+    // ink — a priced row and a refused row differ only in the words
+    // they carry, never in prominence.
+    <li data-testid="watched-fraction" data-label={f.label}
+      data-obtainable={String(f.obtainable)}
+      data-withdrawn-by={f.executability?.refused_by ?? ""}
+      className="rounded-lg border border-line px-3 py-2">
+      <p className="flex flex-wrap items-baseline gap-x-2">
+        <span className="font-mono text-[13px] tabular-nums text-ink-hi">
+          {f.label}
+        </span>
+        <span className="font-mono text-[11px] tabular-nums text-ink-low">
+          {f.contracts} of {f.of_contracts} contracts
+        </span>
+        {f.rounded_down_from && (
+          <span className="font-mono text-[10px] text-warn">
+            rounded down from {f.rounded_down_from}
+          </span>
+        )}
+      </p>
+
+      {/* the row's own arithmetic, or its own absence — never both */}
+      {f.realises ? <Realises r={f.realises} /> : null}
+
+      {f.no_whole_contract && (
+        // NO REGISTRY CODE IS BORROWED HERE. A quarter of three
+        // contracts is arithmetic about the position, not a finding
+        // about the book, and the payload refuses to label it with one.
+        <p data-testid="watched-fraction-no-whole"
+          className="mt-1 text-[11px] leading-relaxed text-warn">
+          {f.no_whole_contract}
+        </p>
+      )}
+
+      {f.refused && (
+        <p data-testid="watched-fraction-refused" data-code={f.refusal_code}
+          className="mt-1 text-[12px] leading-relaxed text-warn">
+          <span className="font-mono font-semibold">
+            {withdrawnByLeg ? "withdrawn · " : "refused · "}
+          </span>
+          {f.refused}
+        </p>
+      )}
+      {/* a second finding never hides behind the first */}
+      {f.refusals && Object.keys(f.refusals).length > 1 && (
+        <ul className="mt-1 space-y-0.5">
+          {Object.keys(f.refusals).filter((c) => c !== f.refusal_code)
+            .map((c) => (
+              <li key={c} data-testid="watched-fraction-also-refused"
+                data-code={c}
+                className="text-[11px] leading-relaxed text-warn">
+                {f.refusals![c]}
+              </li>
+            ))}
+        </ul>
+      )}
+
+      {alone && (
+        <>
+          <Realises r={alone} withdrawn />
+          <p className="mt-0.5 text-[11px] leading-relaxed text-ink-faint">
+            That figure is what this row would have realised on a ladder
+            nobody else was on. It is kept here as the withdrawn number
+            and is not an exit this position can take: the ladder is one
+            pool and the leg is held more than once.
+          </p>
+        </>
+      )}
+
+      {f.leg_consult && (
+        <p data-testid="watched-fraction-leg-consult"
+          data-holds={String(f.leg_consult.holds)}
+          className={`mt-1 text-[11px] leading-relaxed ${
+            f.leg_consult.holds ? "text-ink-faint" : "text-warn"}`}>
+          {f.leg_consult.says}
+          {f.leg_consult.unpriced_contracts && (
+            <> A sibling position on this leg could not be priced at all;
+              its {f.leg_consult.unpriced_contracts} contract(s) are
+              counted into that total rather than assumed away.</>
+          )}
+        </p>
+      )}
+
+      {f.remains && (
+        <p data-testid="watched-fraction-remains"
+          className="mt-1 text-[12px] leading-relaxed text-ink-mid">
+          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
+            remains{" "}
+          </span>
+          {f.remains.says}
+          {f.remains.expected_at_engine_read_dollars != null && (
+            <span className="text-ink-faint">
+              {" "}Expected at the engine&apos;s read:{" "}
+              {dollars(f.remains.expected_at_engine_read_dollars)}
+              {f.remains.expected_basis ? ` — ${f.remains.expected_basis}` : ""}
+            </span>
+          )}
+          {f.remains.expected_refused && (
+            <span className="block text-warn">
+              {f.remains.expected_refused}
+            </span>
+          )}
+        </p>
+      )}
+
+      {(f.vs_whole_position || f.vs_whole_position_alone) && (
+        <p data-testid="watched-fraction-vs-whole"
+          data-matches={String(f.matches_whole_position_exit)}
+          className="mt-1 text-[11px] leading-relaxed text-ink-faint">
+          {f.vs_whole_position ?? f.vs_whole_position_alone}
+        </p>
+      )}
+      <p className="mt-1 text-[11px] leading-relaxed text-ink-low">
+        {f.says}
+      </p>
+    </li>
+  );
+}
+
+function PartialExits({ pe, registry }: {
+  pe: PartialExit | undefined; registry: Record<string, string>;
+}) {
+  if (!pe) {
+    // ABSENT, NOT EMPTY — and absent is not "no clip is available".
+    return (
+      <p data-testid="watched-partial-exit-absent"
+        className="mt-3 text-[12px] leading-relaxed text-warn">
+        No partial-exit block on this payload. That is a block this read
+        did not carry, not a finding that a clip is unobtainable, and no
+        fraction is priced in its place.
+      </p>
+    );
+  }
+  const book = pe.book;
+  return (
+    <div data-testid="watched-partial-exit"
+      className="mt-3 rounded-lg border border-line px-3 py-2.5">
+      <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
+        partial exit · {pe.fractions.length} sizes of one trade ·{" "}
+        {pe.fractions_priced} priced
+      </p>
+
+      {/* THE BOOK THE ROWS WALK, stated before the rows do. */}
+      <p data-testid="watched-partial-exit-book"
+        data-source={book?.source}
+        className="mt-1 font-mono text-[11px] leading-relaxed text-ink-low">
+        ladder: {(book?.source ?? "unknown").replace(/_/g, " ")}
+        {book?.quote_id != null ? ` · quote #${book.quote_id}` : ""}
+        {book?.resting_total != null
+          ? ` · ${book.resting_total} resting across ${
+              book.levels?.length ?? 0} level(s)` : ""}
+        {book?.captured_at ? ` · captured ${book.captured_at}` : ""}
+        {book?.levels?.length ? (
+          <span className="block text-ink-faint">
+            {book.levels.map((l) => `${l.size} @ $${l.price_dollars}`).join(" · ")}
+          </span>
+        ) : null}
+        {book?.levels_from_another_quote_dropped
+          ? (
+            <span className="block text-warn">
+              {book.levels_from_another_quote_dropped} depth level(s)
+              belonging to another quote were dropped rather than
+              substituted.
+            </span>
+          ) : null}
+        {book?.best_level_matches_top_of_book === false && (
+          <span className="block text-warn">
+            The best level on the ladder does not match the quote&apos;s own
+            top of book.
+          </span>
+        )}
+      </p>
+
+      {/* A FAILED DEPTH READ IS NAMED, never folded into "no depth". */}
+      {book?.depth_read && (
+        <p data-testid="watched-partial-exit-depth-failed"
+          className="mt-1 rounded-md border border-warn/40 bg-warn/5 px-2.5 py-2 text-[11px] leading-relaxed text-warn">
+          The depth read failed: {book.depth_read}
+          {book.depth_read_note ? ` — ${book.depth_read_note}` : ""}
+        </p>
+      )}
+
+      {/* the block itself may refuse, and then no row prints a figure */}
+      {pe.refused && (
+        <p data-testid="watched-partial-exit-refused" data-code={pe.refusal_code}
+          className="mt-1 text-[12px] leading-relaxed text-warn">
+          {pe.refused}
+        </p>
+      )}
+
+      {pe.withdrawn_on_shared_ladder?.length ? (
+        <p data-testid="watched-partial-exit-withdrawn"
+          className="mt-1 text-[12px] leading-relaxed text-warn">
+          Withdrawn on the shared ladder:{" "}
+          {pe.withdrawn_on_shared_ladder.join(", ")}. {" "}
+          {pe.withdrawn_on_shared_ladder_rule}
+        </p>
+      ) : null}
+
+      <ul className="mt-2 space-y-2">
+        {pe.fractions.map((f) => <Fraction key={f.label} f={f} />)}
+      </ul>
+
+      {/* every caveat the block carries, once, in the accessible tree */}
+      <div className="mt-2 space-y-1 text-[11px] leading-relaxed text-ink-faint">
+        <p>{pe.rule}</p>
+        <p>{pe.fee_basis}</p>
+        <p>{pe.whole_contracts}</p>
+        <p>{pe.common_case}</p>
+        <p data-testid="watched-partial-exit-not-a-recommendation">
+          {pe.not_a_recommendation}
+        </p>
+        {pe.executability?.rule && <p>{pe.executability.rule}</p>}
+        {pe.executability?.consulted?.length ? (
+          <p data-testid="watched-partial-exit-consulted">
+            Every row consulted, in the registry&apos;s own order:{" "}
+            {pe.executability.consulted.map((c) =>
+              registry[c] ? `${c} (${registry[c]})` : c).join("; ")}.
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+// --- 6. B2, the minute-0 map ------------------------------------------
+//
+// The map drawn AT PURCHASE: match states that may arise, the measured
+// frequency of what happened from each in the corpus with its n and its
+// Wilson band, and what the held contract settles at either way.
+//
+// IT IS A MAP, NOT A VERDICT, and the payload says so in its own words,
+// which are rendered rather than paraphrased. Which branch a match takes
+// is not known at minute 0 and nothing here claims to know it.
+//
+// THE CATEGORY WALL IS RENDERED, NOT ASSUMED. A branch's held number is
+// either a win probability or a LOWER BOUND on one; they answer
+// different questions, they are not comparable, and they never share a
+// bar or a column here. The number is read through the payload's own
+// `quantity_key` — the same discipline the live read's `value_key`
+// enforces — so this file can never quietly read one as the other.
+//
+// THE BRANCHES ARE THE PAYLOAD'S, DERIVED. entry_map.BRANCHES carries
+// four; a fifth needs no edit here. (The brief for this surface said
+// three; the registry says four, and the registry is what is drawn.)
+
+/** The number a branch's held quantity carries, read through the key the
+ *  payload names. Never off a key spelled in this file. */
+function quantityNumbers(q: Record<string, unknown> | undefined) {
+  if (!q || typeof q.quantity_key !== "string") return null;
+  const key = q.quantity_key;
+  const pct = q[`${key}_percent`];
+  const band = q[`${key}_wilson_band_percent`];
+  return {
+    key,
+    percent: typeof pct === "number" ? pct : null,
+    band: Array.isArray(band) ? (band as (number | null)[]) : null,
+    n: typeof q.n === "number" ? q.n : null,
+    answers: typeof q.answers === "string" ? q.answers : "",
+    note: typeof q.note === "string" ? q.note : "",
+    cell: typeof q.source_cell === "string" ? q.source_cell : "",
+  };
+}
+
+/** The reader-facing name of a quantity, derived from its own key so a
+ *  lower bound can never be labelled as an estimate. */
+const QUANTITY_WORD: Record<string, string> = {
+  p_win: "P(this contract wins)",
+  lower_bound_on_p_win: "LOWER BOUND on P(this contract wins)",
+};
+
+function bandText(band: (number | null)[] | null): string {
+  if (!band || band.length < 2 || band.some((x) => x == null)) return "";
+  return ` · band [${band[0]}, ${band[1]}]`;
+}
+
+/** Every refusal on the map THIS SURFACE DRAWS, collected once and used
+ *  twice: to render the rows and to state how many of the map's own
+ *  tally are visible. One collector, so the printed number can never
+ *  drift from the rows beside it. */
+function mapRefusalsDrawn(map: EntryMap): { where: string; code: string }[] {
+  const out: { where: string; code: string }[] = [];
+  const add = (where: string, code: unknown) => {
+    if (typeof code === "string" && code) out.push({ where, code });
+  };
+  add("favourite", map.favourite?.refusal_code);
+  for (const [k, b] of Object.entries(map.branches ?? {})) {
+    add(`${k}.branch`, b.refusal_code);
+    add(`${k}.your_contract`, b.your_contract?.refusal_code);
+    add(`${k}.reached`, b.reached?.refusal_code);
+    add(`${k}.reached.by_side`, b.reached?.by_side?.refusal_code);
+    add(`${k}.expected`, b.dollars?.expected?.refusal_code);
+  }
+  return out;
+}
+
+function MapBranch({ name, b }: { name: string; b: EntryMapBranch }) {
+  const q = quantityNumbers(b.your_contract?.quantity as
+    Record<string, unknown> | undefined);
+  const exp = b.dollars?.expected;
+  const priced = exp != null && exp.priced !== false
+    && exp.refusal_code == null && exp.settlement_dollars != null;
+  return (
+    <li data-testid="watched-map-branch" data-branch={name}
+      data-quantity={q?.key ?? ""}
+      className="rounded-lg border border-line px-3 py-2">
+      <p className="text-[12px] leading-relaxed text-ink-hi">
+        {b.state ?? name.replace(/_/g, " ")}
+      </p>
+      {b.relation_to_you && (
+        <p className="text-[11px] leading-relaxed text-ink-low">
+          {b.relation_to_you}
+        </p>
+      )}
+
+      {/* the whole branch may refuse — and then it carries no number */}
+      {b.refusal_code && (
+        <p data-testid="watched-map-refusal" data-where={`${name}.branch`}
+          data-code={b.refusal_code}
+          className="mt-1 text-[12px] leading-relaxed text-warn">
+          {b.refused}
+        </p>
+      )}
+
+      {b.reached && (
+        <p data-testid="watched-map-reached"
+          className="mt-1 font-mono text-[11px] leading-relaxed text-ink-mid">
+          {b.reached.p_first_goal_percent != null ? (
+            <>
+              reaching this state: {b.reached.p_first_goal_percent.toFixed(1)}%
+              {bandText(b.reached.p_first_goal_wilson_band_percent ?? null)}
+              {b.reached.n != null ? ` · n=${b.reached.n.toLocaleString()}` : ""}
+              {b.reached.k != null ? ` · k=${b.reached.k.toLocaleString()}` : ""}
+            </>
+          ) : (
+            <span data-testid={b.reached.refusal_code
+              ? "watched-map-refusal" : undefined}
+              data-where={`${name}.reached`} data-code={b.reached.refusal_code}
+              className="text-warn">
+              {b.reached.refused ?? "no measured rate for reaching this state"}
+            </span>
+          )}
+          <span className="block font-sans text-[11px] text-ink-faint">
+            {b.reached.state}
+            {b.reached.either_side ? ` — ${b.reached.either_side}` : ""}
+            {b.reached.composed_from?.length
+              ? ` (composed from ${b.reached.composed_from.join(", ")})` : ""}
+          </span>
+          {b.reached.by_side?.refusal_code && (
+            <span data-testid="watched-map-refusal"
+              data-where={`${name}.reached.by_side`}
+              data-code={b.reached.by_side.refusal_code}
+              className="block font-sans text-[11px] text-warn">
+              {b.reached.by_side.refused}
+            </span>
+          )}
+        </p>
+      )}
+
+      {/* THE HELD CONTRACT. The word beside the number is derived from
+          the quantity's own key, so a bound is never drawn as an
+          estimate and the two never share a bar. */}
+      {b.your_contract?.refusal_code ? (
+        <p data-testid="watched-map-refusal"
+          data-where={`${name}.your_contract`}
+          data-code={b.your_contract.refusal_code}
+          className="mt-1 text-[12px] leading-relaxed text-warn">
+          {b.your_contract.refused}
+        </p>
+      ) : q ? (
+        <p data-testid="watched-map-contract"
+          className="mt-1 text-[12px] leading-relaxed text-ink-mid">
+          <span className="font-mono text-[13px] tabular-nums text-ink-hi">
+            {q.percent != null ? `${q.percent.toFixed(1)}%` : "—"}
+          </span>{" "}
+          {/* THE WORD IS DERIVED FROM THE KEY, and it has its own handle
+              so a guard can read the LABEL rather than the paragraph —
+              the payload's `answers` sentence beside it also contains
+              the phrase "LOWER BOUND", which is exactly how a scan of
+              the whole block would keep passing while the label drifted
+              to calling a bound an estimate. */}
+          <span data-testid="watched-map-quantity-word"
+            data-quantity-key={q.key}
+            className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
+            {QUANTITY_WORD[q.key] ?? q.key.replace(/_/g, " ")}
+          </span>
+          <span className="font-mono text-[10px] text-ink-faint">
+            {bandText(q.band)}
+            {q.n != null ? ` · n=${q.n.toLocaleString()}` : ""}
+          </span>
+          <span className="block text-[11px] text-ink-faint">
+            answers: {q.answers}
+          </span>
+          {q.note && (
+            <span className="block text-[11px] text-ink-faint">{q.note}</span>
+          )}
+        </p>
+      ) : null}
+
+      {/* WHAT IT PAYS — the two outcomes, always, beside any mean. */}
+      {b.dollars?.settles && (
+        <p data-testid="watched-map-dollars"
+          className="mt-1 font-mono text-[11px] tabular-nums text-ink-mid">
+          settles {dollars(b.dollars.settles.if_your_side_wins_dollars)} or{" "}
+          {dollars(b.dollars.settles.otherwise_dollars)}
+          {b.dollars.pnl && (
+            <> · P&amp;L {dollars(b.dollars.pnl.if_your_side_wins_dollars)} or{" "}
+              {dollars(b.dollars.pnl.otherwise_dollars)}</>
+          )}
+        </p>
+      )}
+      {exp && (
+        priced ? (
+          <p data-testid="watched-map-expected"
+            className="mt-0.5 font-mono text-[11px] tabular-nums text-ink-faint">
+            expected {dollars(exp.settlement_dollars)}
+            {exp.settlement_dollars_wilson_band?.length === 2
+              ? ` · band [${exp.settlement_dollars_wilson_band.join(", ")}]` : ""}
+            {exp.n != null ? ` · n=${exp.n.toLocaleString()}` : ""}
+            <span className="block font-sans text-ink-faint">
+              {exp.certainty_vs_mean}
+            </span>
+          </p>
+        ) : exp.refusal_code ? (
+          <p data-testid="watched-map-refusal" data-where={`${name}.expected`}
+            data-code={exp.refusal_code}
+            className="mt-0.5 text-[11px] leading-relaxed text-warn">
+            {exp.refused}
+          </p>
+        ) : (
+          // NOT REFUSED — REFUSED BY TYPE. An expectation off a LOWER
+          // BOUND would be the 2026-09-02 substitution in dollars, so
+          // the backend never computes one and the block says why. It
+          // carries no registry code because nothing was missing.
+          <p data-testid="watched-map-expected-not-priced"
+            className="mt-0.5 text-[11px] leading-relaxed text-warn">
+            {exp.not_priced}
+          </p>
+        )
+      )}
+      {b.dollars?.branches_not_averages && (
+        <p className="mt-0.5 text-[11px] leading-relaxed text-ink-faint">
+          {b.dollars.branches_not_averages}
+        </p>
+      )}
+    </li>
+  );
+}
+
+function MapBlock({ map, registry }: {
+  map: EntryMap | undefined; registry: Record<string, string>;
+}) {
+  if (!map) return null;   // absent, not empty — no map, no block
+  const branches = map.branches ?? {};
+  const names = Object.keys(branches);
+  const fav = map.favourite;
+  const started = map.match_now?.started === true;
+  // DERIVED FROM THE PAYLOAD'S OWN TALLY, NEVER FROM A GUESS. The map
+  // counts every refusal on itself; this surface draws the branch-level
+  // ones. Both numbers are printed so a reader can see the difference
+  // rather than be told the visible ones are all of them.
+  const shown = mapRefusalsDrawn(map).length;
+  const tally = map.refusals?.total ?? null;
+  // ONE CATEGORY RULE, QUOTED ONCE — the payload writes the same
+  // sentence on every quantity that carries one.
+  const categoryRule = names.map((k) =>
+    (branches[k].your_contract?.quantity as Record<string, unknown> | undefined)
+      ?.category_rule).find((x) => typeof x === "string") as string | undefined;
+
+  return (
+    <div data-testid="watched-entry-map" data-started={String(started)}
+      className="mt-3 rounded-lg border border-line px-3 py-2.5">
+      <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
+        the map · {map.drawn_from} · {map.version}
+      </p>
+
+      {/* WHETHER A BALL HAS BEEN KICKED IS THE PAYLOAD'S ANSWER, not a
+          clock in this file. A started fixture keeps the map and says
+          the map is history, in the backend's own words. */}
+      <p data-testid="watched-map-when"
+        className={`mt-1 text-[11px] leading-relaxed ${
+          started ? "text-warn" : "text-ink-faint"}`}>
+        {map.match_now?.witness ? `${map.match_now.witness} ` : ""}
+        {map.match_now?.note}
+      </p>
+
+      <p data-testid="watched-map-favourite"
+        className="mt-1 text-[12px] leading-relaxed text-ink-mid">
+        {fav?.refusal_code ? (
+          <span data-testid="watched-map-refusal" data-where="favourite"
+            data-code={fav.refusal_code} className="text-warn">
+            {fav.refused}
+          </span>
+        ) : (
+          <>
+            Favourite at the lock: {fav?.fav_side}
+            {fav?.fav_p != null ? ` at ${(fav.fav_p * 100).toFixed(1)}%` : ""}
+            {fav?.band ? `, gap band ${fav.band}` : ""}.
+            {map.you_are ? ` ${map.you_are.says}.` : ""}
+          </>
+        )}
+      </p>
+
+      {map.grids && (
+        <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
+          Cells read on the {map.grids.variant} variant, floor n ≥{" "}
+          {map.grids.min_n_floor}. {map.grids.floor_rule}
+        </p>
+      )}
+
+      {map.red_card?.void ? (
+        <p data-testid="watched-map-voided"
+          className="mt-1 text-[12px] leading-relaxed text-warn">
+          {map.red_card.withdrawal ?? "a dismissal voids every grid-derived "
+            + "number on this map from first sighting"}
+        </p>
+      ) : map.red_card?.tape_note ? (
+        <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
+          {map.red_card.tape_note}
+        </p>
+      ) : null}
+
+      {names.length > 0 && (
+        <ul className="mt-2 space-y-2">
+          {names.map((k) => (
+            <MapBranch key={k} name={k} b={branches[k]} />
+          ))}
+        </ul>
+      )}
+
+      <div className="mt-2 space-y-1 text-[11px] leading-relaxed text-ink-faint">
+        <p data-testid="watched-map-not-a-verdict">{map.a_map_not_a_verdict}</p>
+        <p data-testid="watched-map-no-window">{map.no_response_window}</p>
+        {map.not_a_signal && <p>{map.not_a_signal}</p>}
+        {categoryRule && (
+          <p data-testid="watched-map-category-rule">{categoryRule}</p>
+        )}
+        {tally != null && (
+          <p data-testid="watched-map-refusal-count">
+            The map counts {tally} refusal{tally === 1 ? "" : "s"} on itself
+            {map.refusals?.count_by_code
+              ? ` (${Object.keys(map.refusals.count_by_code).sort()
+                  .map((c) => `${c} ${map.refusals!.count_by_code[c]}`)
+                  .join(", ")})`
+              : ""}
+            ; {shown} of them {shown === 1 ? "is" : "are"} drawn above. The
+            rest sit inside grid subtrees this surface does not draw —
+            they are counted here rather than left to be assumed away.
+            {map.refusals?.codes && (
+              <span className="block">
+                {Object.keys(map.refusals.codes).map((c) =>
+                  `${c}: ${registry[c] ?? map.refusals!.codes![c]}`).join(" · ")}
+              </span>
+            )}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// --- 7. what this surface knows it cannot draw -------------------------
+//
+// REGISTERED, NOT PRETENDED. B3 (a blended live rate, to be shown BESIDE
+// the engine's read as a second opinion and never in its place) does not
+// exist in the backend tree this file was built against: there is no
+// src/live/live_rates.py, so no payload carries a blended rate and no
+// shape of one has been recorded. Rather than draw a block against a
+// shape nobody sends — which is how a surface certifies a reader that
+// cannot read the real payload — the hole is written down here with the
+// condition that closes it.
+//
+// The guard this pays for: a key named below that ARRIVES on a position
+// is NAMED on the surface instead of being silently dropped, and the day
+// its shape is recorded the record retires with the block that replaces
+// it. `closes_when` is the whole point; an absence label without one is
+// prose, not a record.
+export const UNRENDERED_PAYLOAD_KEYS: Record<string, {
+  finding: string; closes_when: string;
+}> = {
+  blended_rate: {
+    finding: "B3 is not in the backend tree this surface was built "
+      + "against (there is no src/live/live_rates.py), so no blended "
+      + "rate is drawn beside the engine's read and nothing on this "
+      + "card stands in for one. This is an absent second opinion, not "
+      + "agreement with the engine.",
+    closes_when: "a position payload carries `blended_rate` AND its "
+      + "shape has been recorded off the backend's own emitter; then "
+      + "this record retires and the rate is drawn BESIDE the engine's "
+      + "read — never in its place — with its own registered hole "
+      + "beside it.",
+  },
+};
+
+function NotBuiltUpstream({ p }: { p: WatchedPosition }) {
+  const present = Object.keys(UNRENDERED_PAYLOAD_KEYS)
+    .filter((k) => (p as Record<string, unknown>)[k] !== undefined);
+  if (present.length === 0) return null;
+  return (
+    <div data-testid="watched-unrendered" className="mt-3">
+      {present.map((k) => (
+        <p key={k} data-testid="watched-unrendered-key" data-key={k}
+          className="rounded-md border border-warn/40 bg-warn/5 px-2.5 py-2 text-[11px] leading-relaxed text-warn">
+          This payload carries <span className="font-mono">{k}</span>, and
+          this surface has no recorded shape for it, so it is named rather
+          than drawn or dropped. {UNRENDERED_PAYLOAD_KEYS[k].finding}{" "}
+          Closes when: {UNRENDERED_PAYLOAD_KEYS[k].closes_when}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+// --- 8. the refusals, by name -----------------------------------------
 
 function RefusalList({ refusals, registry, testid, heading }: {
   refusals: Refusal[];
