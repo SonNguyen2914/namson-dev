@@ -1234,3 +1234,178 @@ const FLAGS: Record<string, string> = {
 };
 
 export const flag = (team: string): string => FLAGS[team] ?? "⚽";
+
+// --- B0c, the watchlist: DECLARING which matches are watched ----------
+//
+// THE RULE THAT DECIDES THIS WHOLE SHAPE. `/api/admin/live/watchlist` is
+// operator-gated on all three verbs, and `actor` is required there and
+// never defaulted — "a declaration with nobody's name on it cannot be
+// held to anything". namson.dev is public and lib/suggesterProxy.ts
+// injects no credentials, so every call below takes the operator's own
+// token as an ARGUMENT and sends it as one header. Nothing here reads an
+// env var, nothing is cached in storage, and no actor is ever supplied
+// by this module: a missing name is forwarded as a missing name so the
+// backend refuses it in the sentence that owns the rule.
+//
+// THE SET IS APPEND-ONLY. `remove` is a REQUEST. Once a fixture has
+// started the backend refuses it and RECORDS the refusal — a 200 with
+// `recorded: true` and a `policy_code` that says which witness refused.
+// That is not an error state and this module does not turn it into one:
+// every call resolves, and the caller reads `policy` / `policy_code`.
+
+/** One declaration attempt's answer — the shape of watchlist._result().
+ *  `policy` leads with its registry code and is the backend's own
+ *  wording; render it verbatim rather than paraphrasing it. */
+export interface WatchlistDeclaration {
+  fixture_id: number;
+  recorded: boolean;
+  policy_code: string;
+  policy: string;
+  version: string;
+  event_id?: number;
+  action?: "add" | "remove" | "remove_refused";
+  source?: string;
+  actor?: string;
+  occurred_at?: string;
+  joined_phase?: string | null;
+  joined_minute?: number | null;
+  basis?: string | null;
+  /** the live plane is not configured — words, never a plausible empty set */
+  dormant?: boolean;
+  detail?: string;
+  [standing: string]: unknown;
+}
+
+/** What this proxy resolved the board's ESPN reference to, beside the
+ *  backend's own bytes. The join is never a guess — see
+ *  pages/api/bet-suggester/live-watchlist/index.ts. */
+export interface WatchlistDeclareResponse {
+  resolved_fixture: {
+    espn_event_id: string;
+    fixture_id: number;
+    competition: string | null;
+    kickoff_utc: string | null;
+  };
+  watchlist: WatchlistDeclaration;
+}
+
+/** watchlist.state(). Counts are SPLIT BY SOURCE and never totalled: a
+ *  human-selected set carries selection bias by construction and one
+ *  that follows open positions does not. */
+export interface WatchlistState {
+  version: string;
+  generated_at: string;
+  monitored_fixture_ids: number[];
+  monitored_by_source: Record<string, number[]>;
+  declared_ever_fixture_ids: number[];
+  declared_ever_count: number;
+  removed_before_kickoff: number[];
+  removed_before_kickoff_count: number;
+  currently_removed_fixture_ids: number[];
+  re_declarations_count: number;
+  removal_attempts_refused_count: number;
+  removal_attempts_refused: {
+    fixture_id: number; actor: string; occurred_at: string;
+    policy_code: string; reason: string | null;
+  }[];
+  open_positions_not_monitored: number[];
+  log_total: number;
+  log_truncated: boolean;
+  log_truncation: string | null;
+  registries?: {
+    actions?: Record<string, string>;
+    sources?: Record<string, string>;
+    policy_codes?: Record<string, string>;
+    phases?: Record<string, string>;
+  };
+  dormant?: boolean;
+  detail?: string;
+  [standing: string]: unknown;
+}
+
+export interface WatchlistSyncResult {
+  checked: number;
+  declared: number[];
+  already_declared: number[];
+  unknown_fixture: number[];
+  open_positions_not_monitored: number[];
+  actor: string;
+  generated_at: string;
+  version: string;
+  dormant?: boolean;
+  detail?: string;
+  [standing: string]: unknown;
+}
+
+/** ESPN reference -> live-plane fixture, for a whole board in one call.
+ *  A reference that resolves to nothing carries a null AND a note; the
+ *  two absences ("no fixture row" / "we could not ask") stay apart. */
+export interface WatchlistResolveResponse {
+  resolved: Record<string, {
+    fixture_id: number; competition: string | null;
+    kickoff_utc: string | null;
+  } | null>;
+  notes: Record<string, string>;
+  asked: number;
+  unreadable_references: string[];
+}
+
+const wlBase = `${base}/live-watchlist`;
+
+/** The operator token travels as ONE header and lives nowhere else. */
+const wlHeaders = (token: string): Record<string, string> =>
+  ({ "x-admin-token": token });
+
+/** Read the backend's error body rather than inventing one: every
+ *  refusal on this surface is written somewhere in the backend's own
+ *  words, and a paraphrase would be this layer's claim, not the
+ *  record's. */
+async function wlJson<T>(res: Response): Promise<T> {
+  const raw = await res.text();
+  let body: unknown = null;
+  try { body = JSON.parse(raw); } catch { /* non-JSON body kept as text */ }
+  if (!res.ok) {
+    const b = body as { detail?: unknown; error?: unknown } | null;
+    const said = typeof b?.detail === "string" ? b.detail
+      : typeof b?.error === "string" ? b.error
+      : raw.slice(0, 400);
+    throw new Error(said || `watchlist ${res.status}`);
+  }
+  return body as T;
+}
+
+export const watchlistApi = {
+  /** The declared set and its log. Operator-gated: with no token the
+   *  backend refuses, and the refusal is the honest answer. */
+  state: (token: string, signal?: AbortSignal) =>
+    fetch(`${wlBase}?log=200`, { headers: wlHeaders(token), signal })
+      .then((r) => wlJson<WatchlistState>(r)),
+
+  /** ESPN references -> fixture ids, so a row can say whether it is in
+   *  the set. Gated behind the same token as the read. */
+  resolve: (token: string, eventIds: string[], signal?: AbortSignal) =>
+    fetch(`${wlBase}/resolve`, {
+      method: "POST", signal,
+      headers: { ...wlHeaders(token), "Content-Type": "application/json" },
+      body: JSON.stringify({ event_ids: eventIds }),
+    }).then((r) => wlJson<WatchlistResolveResponse>(r)),
+
+  /** Declare, or ask for a removal. `actor` is passed straight through,
+   *  blank included — the backend owns the sentence that refuses a
+   *  nameless declaration and it should be the one to say it. */
+  declare: (token: string, eventId: string,
+            action: "add" | "remove", actor: string, reason?: string) => {
+    const qs = new URLSearchParams({ event_id: eventId, action, actor });
+    if (reason) qs.set("reason", reason);
+    return fetch(`${wlBase}?${qs.toString()}`,
+      { method: "POST", headers: wlHeaders(token) })
+      .then((r) => wlJson<WatchlistDeclareResponse>(r));
+  },
+
+  /** "Watch everything I hold." Idempotent, removes nothing, and names
+   *  its own source — it follows the journal's rows, not a preference. */
+  syncPositions: (token: string) =>
+    fetch(`${wlBase}/sync-positions`,
+      { method: "POST", headers: wlHeaders(token) })
+      .then((r) => wlJson<WatchlistSyncResult>(r)),
+};

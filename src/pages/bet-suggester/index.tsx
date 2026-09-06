@@ -70,6 +70,9 @@ import {
 import { Eyebrow } from "../../components/ui";
 import { ArchiveMenu } from "../../components/ArchiveMenu";
 import { LeagueColumn } from "../../components/PickerColumn";
+import {
+  WatchDeclarationProvider, WatchPanel,
+} from "../../components/WatchDeclaration";
 import WatchedStrip from "../../components/WatchedStrip";
 import {
   Collapse, NavChip, RouteProgress, SkeletonRows, TopBar,
@@ -286,6 +289,14 @@ export default function PickerBoard() {
         ))}
       </TopBar>
 
+      {/* B0c — SELECTING MATCHES TO WATCH. The provider holds the
+          operator's token and name (in this tab's memory and nowhere
+          else), reads the declared set, and resolves this board's ESPN
+          references to live-plane fixture ids in one call so a row can
+          say whether it is declared. It renders no chrome of its own:
+          the panel is placed by this page, and each row's control by
+          components/PickerColumn.tsx. */}
+      <WatchDeclarationProvider eventIds={rows.map((r) => r.event_id)}>
       {/* max-w-[96rem], not the app's usual 5xl: four columns of match
           cards need the width, and each column stays a readable ~22rem.
           The intro copy below keeps its own measure (max-w-2xl). */}
@@ -312,14 +323,23 @@ export default function PickerBoard() {
           <h1 className="mt-2 text-2xl font-bold uppercase tracking-[0.02em] text-ink-hi [font-family:var(--font-archivo)] [font-stretch:115%] sm:text-3xl">
             Every fixture, ranked
           </h1>
-          {/* The one honest line of framing. Not "bet these". */}
-          <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-ink-low">
-            Every upcoming fixture in the four in-season leagues and the
-            Leagues Cup, ranked by how far apart the two clubs sit in their own
-            league&apos;s table. No model
-            runs on this page, no number below is a probability or an edge of
-            ours, and nothing here is a recommendation — the ranking says where
-            to look, and you are the one who picks.
+          {/* THE ONE HONEST LINE OF FRAMING. Not "bet these".
+              2026-09-06, PROSE CUT: the opening inventory — "every
+              upcoming fixture in the four in-season leagues and the
+              Leagues Cup" — went. The H1, the four league lights beside
+              it and the four columns below already say it, and it was a
+              sentence of scene-setting standing between the reader and
+              the board. Everything that survived is either the ranking
+              key (what the big number on each card MEANS) or a
+              decision-safety invariant, and none of it is negotiable:
+              e2e/picker.spec.ts pins all four phrases. */}
+          <p data-testid="board-framing"
+            className="mt-2 max-w-3xl text-[13px] leading-relaxed text-ink-low">
+            Ranked by how far apart the two clubs sit in their own
+            league&apos;s table. No model runs on this page, no number below
+            is a probability or an edge of ours, and nothing here is a
+            recommendation — the ranking says where to look, and you are the
+            one who picks.
           </p>
         </div>
 
@@ -412,11 +432,29 @@ export default function PickerBoard() {
             </span>
           )}
         </div>
-        <p className="mt-2 font-mono text-[10px] tracking-wide text-ink-faint">
-          kickoffs render in {TZ} — one fixed zone for everyone, so the page is
-          the same page twice. Cached 90s server-side; “built” is when the
-          board was assembled, not when you asked for it.
+        {/* 2026-09-06, PROSE CUT. This was two lines of mechanics above
+            the board. What SURVIVES is the pair of facts a reader needs
+            in order to read the numbers beside them — which zone the
+            kickoffs are in, and that “built” is the board's assembly
+            instant rather than this request's. WHY the zone is fixed and
+            what the cache does are explanations of machinery, and they
+            moved into the legend disclosure at the foot of the page
+            under "times · caching", where a reader who wants them can
+            open them. No assertion pinned either sentence. */}
+        <p data-testid="board-times"
+          className="mt-2 font-mono text-[10px] tracking-wide text-ink-faint">
+          kickoffs in {TZ} · cached 90s · “built” is when the board was
+          assembled, not when you asked for it
         </p>
+
+        {/* B0c's operator panel — one closed line until it is wanted.
+            It sits directly above the strip because the strip renders
+            the matches this panel DECLARES: read the set, declare a
+            fixture, or declare every fixture you hold a position on.
+            With no token it still renders and says so on its own chip
+            — the page tells the truth about what it can and cannot do
+            rather than hiding the control. */}
+        <WatchPanel />
 
         {/* ---- the watched strip: the HOLD/EXIT stage, above the columns ----
             docs/HOLD-EXIT-DESIGN.md's surface. It polls its own endpoint
@@ -435,6 +473,15 @@ export default function PickerBoard() {
             <Eyebrow tone="warn">
               {priorLeagues.length} of {leagues.length} leagues · rated on last season
             </Eyebrow>
+            {/* WHAT STAYS ON ARRIVAL: the leagues and their games
+                played, and the one sentence that says what the numbers
+                below them are made of. That is the caveat; everything
+                else here was the derivation.
+                2026-09-06, PROSE CUT: the blend's arithmetic moved into
+                the disclosure under it. It is STILL IN THE ACCESSIBLE
+                TREE — a native <details>, so its text is in the document
+                whether or not it is open — and e2e/picker-blend-cup.spec
+                pins it there explicitly now rather than incidentally. */}
             <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ink-mid">
               {priorLeagues
                 .map(([slug, m]) => `${leagueLabel(slug)} ${m.min_current_gp ?? "?"} GP`)
@@ -442,14 +489,23 @@ export default function PickerBoard() {
               {/* explicit {" "}: JSX ate the leading space of the text node
                   after this expression and shipped "Under 8games played" */}
               . These leagues are still early, so LAST SEASON carries most
-              of the rating.{" "}
-              Nothing switches at a threshold any more: each club is a
-              weighted average of both seasons, by that club&apos;s own games
-              played — w = GP / (GP + {SEASON_BLEND_K}), so {SEASON_BLEND_K}{" "}
-              games is the point where the two weigh the same. Every row
-              prints its own share on the chip beside the rank, and rank
-              and tiers are re-derived from the blended rates.
+              of the rating.
             </p>
+            <details data-testid="prior-banner-blend" className="mt-2">
+              <summary className="cursor-pointer list-none font-mono text-[10px] uppercase tracking-[0.14em] text-warn/80 transition-colors hover:text-warn">
+                <span aria-hidden className="mr-1.5">▸</span>
+                how the two seasons are weighed
+              </summary>
+              <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ink-mid">
+                Nothing switches at a threshold: each club is a weighted
+                average of both seasons, by that club&apos;s own games
+                played — w = GP / (GP + {SEASON_BLEND_K}), so{" "}
+                {SEASON_BLEND_K} games is the point where the two weigh the
+                same. Every row prints its own share on the chip beside the
+                rank, and rank and tiers are re-derived from the blended
+                rates.
+              </p>
+            </details>
           </section>
         )}
 
@@ -583,7 +639,29 @@ export default function PickerBoard() {
             one reader who came looking for a definition. */}
         <Collapse eyebrow="legend" title="How to read a row"
           defaultOpen={false} className="mt-12 border-t border-line pt-6">
-          <dl className="space-y-4 text-sm leading-relaxed text-ink-low">
+          {/* data-testid added 2026-09-06: the season banner now carries
+              its own closed disclosure with the same "GP / (GP + 10)"
+              sentence in it, so an unscoped page-wide getByText().first()
+              resolves to that one instead of this definition. The legend
+              is addressable now rather than found by document order. */}
+          <dl data-testid="legend"
+            className="space-y-4 text-sm leading-relaxed text-ink-low">
+            {/* Moved here 2026-09-06 from a two-line note above the
+                board. The FACTS it carried — the zone, and what "built"
+                means — stayed up there beside the numbers they qualify;
+                this is the reasoning, which a reader needs once and
+                never again. */}
+            <div>
+              <dt className="text-ink-hi">times · caching</dt>
+              <dd className="mt-1">
+                Kickoffs render in {TZ} for everyone, whatever the reader&apos;s
+                own clock says, so the page is the same page twice and two
+                people comparing it are comparing one thing. The board is
+                assembled server-side and cached for 90 seconds, which is why
+                &ldquo;built&rdquo; can be a little behind the moment you
+                asked — it is the assembly instant, not your request&apos;s.
+              </dd>
+            </div>
             <div>
               <dt className="text-ink-hi">GD/g gap · ppg gap · rank gap</dt>
               <dd className="mt-1">
@@ -743,6 +821,7 @@ export default function PickerBoard() {
           threshold, and neither does this page. Not betting advice.
         </footer>
       </main>
+      </WatchDeclarationProvider>
     </div>
   );
 }

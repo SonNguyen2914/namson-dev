@@ -43,6 +43,7 @@ import {
   dec, sign,
 } from "./PickerRead";
 import { ReviewTail } from "./ReviewCard";
+import { WatchToggle } from "./WatchDeclaration";
 import { Eyebrow } from "./ui";
 
 // ---------------------------------------------------------------------
@@ -348,6 +349,17 @@ function RowCard({ row, rank, modeId, clubCount }: {
             leg pays on 90 minutes, so "54¢" is not the price of going
             through. */}
         {row.reg_time_note && <RegTimeNote note={row.reg_time_note} />}
+        {/* B0c — DECLARING THIS MATCH WATCHED (docs/HOLD-EXIT-DESIGN.md).
+            Under the price rather than beside the kickoff, because the
+            control needs the card's full width to print the backend's
+            own words when a declaration is refused — and a refused
+            removal is the record working, not an error. It renders
+            whether or not an operator token is present and says which it
+            is; with none it opens the panel that asks for one, so it is
+            never a silent no-op. Off the board it renders nothing at
+            all: there is no provider, so there is no control. */}
+        <WatchToggle eventId={row.event_id}
+          label={`${row.favourite} v ${row.opponent}`} />
       </div>
     </article>
   );

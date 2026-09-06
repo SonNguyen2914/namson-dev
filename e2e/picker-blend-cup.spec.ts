@@ -366,9 +366,29 @@ test("the banner explains the blend rather than a threshold", async ({ page }) =
   // has no season table of its own to be rated on
   await expect(banner).toContainText("3 of 4 leagues");
   await expect(banner).toContainText("Liga MX 6 GP");
-  await expect(banner).toContainText(/weighted average of both seasons/i);
-  await expect(banner).toContainText("GP / (GP + 10)");
   await expect(banner).not.toContainText(/Under 8/i);
+  // The CAVEAT is on arrival: what the numbers below are made of.
+  await expect(banner.getByText(/LAST SEASON carries most of the rating/))
+    .toBeVisible();
+
+  // 2026-09-06, PROSE CUT. The blend's ARITHMETIC moved from this
+  // paragraph into a disclosure inside the same banner, and this
+  // assertion moved with it rather than being left to pass incidentally
+  // on a <details> body. Two things are asserted, not one: the sentence
+  // is still in the document (a native <details> keeps it in the
+  // accessible tree whether or not it is open), and it is NOT shouting
+  // on arrival.
+  const blend = banner.getByTestId("prior-banner-blend");
+  await expect(blend).not.toHaveAttribute("open", /.*/);
+  await expect(blend.getByText(/weighted average of both seasons/i))
+    .toBeHidden();
+  await expect(blend).toContainText(/weighted average of both seasons/i);
+  await expect(blend).toContainText("GP / (GP + 10)");
+  await blend.locator("summary").click();
+  await expect(blend).toHaveAttribute("open", /.*/);
+  await expect(blend.getByText(/weighted average of both seasons/i))
+    .toBeVisible();
+  await expect(blend.getByText("GP / (GP + 10)")).toBeVisible();
 });
 
 // ------------------------------- a withheld gap is not a small gap -----
@@ -480,13 +500,19 @@ test("the legend defines the share, the withheld gap and regulation time",
   async ({ page }) => {
     await open(page);
     await page.getByRole("button", { name: /how to read a row/i }).click();
-    await expect(page.getByText("38% this szn", { exact: true }).first())
+    // SCOPED TO THE LEGEND (2026-09-06). The season banner now carries
+    // the same "GP / (GP + 10)" sentence inside its own closed
+    // disclosure, and a page-wide getByText().first() resolved to that
+    // hidden copy — a locator that found this definition by document
+    // order rather than by identity. Same claim, addressed properly.
+    const legend = page.getByTestId("legend");
+    await expect(legend.getByText("38% this szn", { exact: true }).first())
       .toBeVisible();
-    await expect(page.getByText(/GP \/ \(GP \+ 10\)/).first()).toBeVisible();
-    await expect(page.getByText(/mean of two league positions is not a position/i))
+    await expect(legend.getByText(/GP \/ \(GP \+ 10\)/).first()).toBeVisible();
+    await expect(legend.getByText(/mean of two league positions is not a position/i))
       .toBeVisible();
-    await expect(page.getByText(/n\/a · cross-league/)).toBeVisible();
-    await expect(page.getByText(/regulation time/i).first()).toBeVisible();
+    await expect(legend.getByText(/n\/a · cross-league/)).toBeVisible();
+    await expect(legend.getByText(/regulation time/i).first()).toBeVisible();
   });
 
 // ----------------------------------------------------- responsiveness --
