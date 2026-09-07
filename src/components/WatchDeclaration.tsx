@@ -316,6 +316,25 @@ function Count({ label, value, warnWhenOver = false }: {
   );
 }
 
+/** READ-ONLY access to the operator token this provider already holds.
+ *
+ *  ONE TOKEN, TWO SURFACES. The watch toggle declares a match and the
+ *  HOLD/EXIT strip reads it back; both are gated by the same
+ *  `_admin_ok` on the same backend, so asking the operator to type the
+ *  credential twice would be this page inventing a second secret. The
+ *  strip therefore reads it from HERE rather than holding one of its
+ *  own — components/WatchedStrip.tsx is mounted inside this provider by
+ *  pages/bet-suggester/index.tsx.
+ *
+ *  IT ADDS NO STORAGE AND NO WRITE. This returns the state the panel
+ *  already keeps for the life of the tab; nothing is persisted by this
+ *  hook, no caller may set the token through it, and outside the
+ *  provider it returns "" — which the strip renders as "no token is
+ *  held", never as an error and never as an empty watchlist. */
+export function useWatchToken(): string {
+  return useContext(WatchCtx)?.token ?? "";
+}
+
 /** The operator panel. A DISCLOSURE, closed on arrival: the board is a
  *  place to look and this is a place to declare, so it costs one line
  *  until it is wanted. Rendered by the page, not by the provider, so it

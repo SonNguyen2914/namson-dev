@@ -1079,6 +1079,23 @@ export interface WatchedStripResponse {
   monitored_by_source: Record<string, number[]>;
   /** a position nobody declared — the census-of-nothing finding */
   open_positions_not_monitored: number[];
+  /** A DECLARED FIXTURE THAT IS NOT IN `matches`, and the only way a
+   *  monitored match can be missing from the strip. api/main.py's
+   *  WATCHED_STRIP_OPEN["no_identity_row"] registers it: WatchedMatch's
+   *  identity fields (competition_slug / home / away) come off a
+   *  `fixture` row and this plane holds them nowhere else, so the route
+   *  reports the id rather than inventing a match block for it. The
+   *  surface DRAWS this list — a match that silently drops off the
+   *  strip is the defect this stage was reported for, and the backend's
+   *  own record says an operator watching `matches` alone would not
+   *  see it. */
+  monitored_not_described?: {
+    fixture_id: number;
+    /** watchlist.POLICY_CODES, not position.REFUSAL_CODES */
+    policy_code: string;
+    refused: string;
+    registered?: { finding: string; closes_when: string };
+  }[];
   refusal_codes: Record<string, string>;
   policy_codes?: Record<string, string>;
   standing?: Record<string, string>;
@@ -1176,12 +1193,79 @@ export const api = {
   bots: () => getJson<BotsResponse>("/bots"),
 
   // The HOLD/EXIT strip's one read. ONE endpoint, polled at 15s beside
-  // the backend's live tick — see the contract above. A 404 (the proxy
-  // and the backend route are not built yet), a 403 (operator
-  // credentials) or a dead backend all throw, and the strip renders
-  // NOTHING rather than an empty section: absent, not empty.
-  watchedStrip: () => getJson<WatchedStripResponse>("/watched-strip"),
+  // the backend's live tick — see the contract above.
+  //
+  // THE TOKEN IS AN ARGUMENT AND IS HELD NOWHERE. The backend gates
+  // this read with `_admin_ok` because the payload carries POSITIONS —
+  // stated size and price paid, the two fields the journal's public
+  // projection redacts. The token is typed by a person into
+  // WatchDeclaration's panel and lives in that component's state for as
+  // long as the tab does; it is never in an env var, never in
+  // localStorage, never in this module. It travels as ONE header,
+  // exactly as watchlistApi does, so one token serves the watch toggle
+  // and this read alike.
+  //
+  // A FAILURE THROWS A WatchedStripRefusal, NOT A BARE Error. "no
+  // route", "no credential", "the credential you typed was refused" and
+  // "nothing answered at all" used to arrive at the surface as one
+  // blank space, which is how this strip spent its whole life invisible
+  // in production. The status and the backend's own sentence ride on
+  // the error so the surface can say WHICH of them it is looking at.
+  watchedStrip: (token?: string) => fetchWatchedStrip(token ?? ""),
 };
+
+/** A watched-strip read that did not produce a payload.
+ *
+ *  Every field here is EVIDENCE, never a paraphrase: `status` is the
+ *  status the proxy returned (null when nothing answered at all),
+ *  `said` is the backend's own `detail`/`error` string verbatim (empty
+ *  when it sent none — an absent sentence is not an invented one), and
+ *  `sentToken` records whether this client actually had a token to
+ *  send. The surface needs all three to keep "you have typed no token"
+ *  apart from "the token you typed was refused". */
+export class WatchedStripRefusal extends Error {
+  readonly status: number | null;
+  readonly said: string;
+  readonly sentToken: boolean;
+  constructor(status: number | null, said: string, sentToken: boolean) {
+    super(said || (status == null
+      ? "the watched-strip read got no answer at all"
+      : `the watched-strip read answered ${status}`));
+    this.name = "WatchedStripRefusal";
+    this.status = status;
+    this.said = said;
+    this.sentToken = sentToken;
+  }
+}
+
+async function fetchWatchedStrip(token: string):
+    Promise<WatchedStripResponse> {
+  const sent = token !== "";
+  let res: Response;
+  try {
+    res = await fetch(`${base}/watched-strip`,
+      { headers: sent ? { "x-admin-token": token } : {} });
+  } catch (err) {
+    // Nothing answered. NOT folded into a status — an unreachable proxy
+    // and a refusal are different findings and the surface says which
+    // one it has.
+    throw new WatchedStripRefusal(null, String(err), sent);
+  }
+  const raw = await res.text();
+  let body: unknown = null;
+  try { body = JSON.parse(raw); } catch { /* non-JSON body kept as text */ }
+  if (!res.ok) {
+    // The backend's own words, or the proxy's. Never this layer's
+    // paraphrase — every refusal on this surface is written down
+    // somewhere upstream and a gloss here would be a second claim.
+    const b = body as { detail?: unknown; error?: unknown } | null;
+    const said = typeof b?.detail === "string" ? b.detail
+      : typeof b?.error === "string" ? b.error
+      : "";
+    throw new WatchedStripRefusal(res.status, said, sent);
+  }
+  return body as WatchedStripResponse;
+}
 
 // -- formatting helpers -------------------------------------------------
 export const pct = (x: number) => `${(x * 100).toFixed(1)}%`;

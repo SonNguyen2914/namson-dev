@@ -20,13 +20,33 @@
 // the branches are drawn beside the expectation, always, and the
 // expectation is labelled as the figure the position never pays.
 //
-// ABSENT, NOT EMPTY. The pattern is LiveScoreboard's: poll at 15s
-// (matching the backend's live tick), and render NOTHING when there is
-// nothing live to show, so the board is never cluttered pre-match. The
-// one thing that is NOT nothing: an open position on a fixture nobody
-// declared. That is the census-of-nothing finding and it renders even
-// when no match is live, because it is exactly the shape of the leg this
-// stage was built for.
+// ABSENT, NOT EMPTY — AND REFUSED IS NEITHER. The pattern is
+// LiveScoreboard's: poll at 15s (matching the backend's live tick), and
+// render NOTHING when the read came back and said there is nothing to
+// show, so the board is never cluttered pre-match. Two things are NOT
+// nothing:
+//   - an open position on a fixture nobody declared. That is the
+//     census-of-nothing finding and it renders even when no match is
+//     live, because it is exactly the shape of the leg this stage was
+//     built for; and a declared fixture the route could not describe,
+//     which is the only way a monitored match can be missing from
+//     `matches` and is drawn for the same reason;
+//   - A READ THAT DID NOT HAPPEN. Until 2026-09-06 this component had a
+//     single `catch` for "no route, no credential, or a dead backend"
+//     and drew nothing for all three. There was no proxy route in front
+//     of the backend endpoint, so in production every poll 404'd, this
+//     surface has NEVER RENDERED, and a reader saw a board with no live
+//     section and concluded there was nothing live. That conclusion was
+//     about a set nobody counted. So a poll that produced no payload is
+//     now DRAWN, with its status and the upstream sentence, and it says
+//     which of the four it was. Absent and refused are different facts.
+//
+// SON'S INVARIANT, AND WHAT THIS FILE OWES IT: "any matches that is
+// selected at any moment while it is still in play to be in the Live
+// section". Every declared match is drawn — nothing on this surface
+// filters — and the ones whose state block says in_play are drawn FIRST,
+// in their own group, each marked in real text. A match that silently
+// drops off this section is the bug.
 //
 // FOUR RULES THIS FILE IS RESPONSIBLE FOR, each paid for elsewhere:
 //
@@ -66,8 +86,10 @@ import { useEffect, useRef, useState } from "react";
 import {
   CertaintyPremium, EntryMap, EntryMapBranch, LiveReadComponentPayload,
   LiveReadSide, PartialExit, PartialExitFraction, PartialExitRealises,
-  WatchedMatch, WatchedPosition, WatchedStripResponse, api, money,
+  WatchedMatch, WatchedPosition, WatchedStripResponse, WatchedStripRefusal,
+  api, money,
 } from "../lib/suggesterApi";
+import { useWatchToken } from "./WatchDeclaration";
 import { Eyebrow } from "./ui";
 
 const POLL_MS = 15000; // matches the backend's 15s live tick, as LiveScoreboard does
@@ -211,6 +233,14 @@ const stateRefusals = (m: WatchedMatch): Refusal[] =>
 // --- the strip --------------------------------------------------------
 
 export default function WatchedStrip() {
+  // ONE TOKEN, TWO SURFACES. The read is operator-gated because the
+  // payload carries POSITIONS, and the operator has already typed a
+  // token into the watch panel to declare a match. It is read from that
+  // provider (WatchDeclaration's useWatchToken, read-only) rather than
+  // held here: a second field for the same secret would be this surface
+  // inventing a credential. Outside the provider it is "" and the
+  // section says so.
+  const token = useWatchToken();
   const [data, setData] = useState<WatchedStripResponse | null>(null);
   // A FAILED POLL IS NOT A QUIET MATCH. LiveScoreboard can keep its last
   // payload silently because a scoreline that is 30s old is still a
@@ -218,37 +248,86 @@ export default function WatchedStrip() {
   // so when the newest poll fails the strip keeps showing what it had
   // and SAYS the numbers are from the earlier read, with the clock.
   const [staleSince, setStaleSince] = useState<string | null>(null);
+  // ABSENT AND REFUSED ARE DIFFERENT FACTS, AND THIS IS WHERE THEY
+  // SEPARATE. Until this round every failure — no proxy route, no
+  // credential, a credential the backend refused, a dead backend —
+  // arrived as one blank space, and the blank space read as "no live
+  // matches". It never was: the strip has never rendered in production
+  // at all. So a read that produced no payload is now kept, with its
+  // status and the backend's own sentence, and DRAWN.
+  const [refusal, setRefusal] = useState<WatchedStripRefusal | null>(null);
+  // Whether the first poll has come back. Before it has, this surface
+  // knows nothing and renders nothing — that is absence with a reason,
+  // not a claim about the watchlist.
+  const [asked, setAsked] = useState(false);
   const lastOk = useRef<string | null>(null);
 
   useEffect(() => {
     let alive = true;
     const load = async () => {
       try {
-        const r = await api.watchedStrip();
+        const r = await api.watchedStrip(token);
         if (!alive) return;
         lastOk.current = r.generated_at;
         setData(r);
+        setRefusal(null);
         setStaleSince(null);
-      } catch {
-        // no route, no credential, or a dead backend. With nothing ever
-        // loaded the strip stays ABSENT; with a payload in hand it stays
-        // up and dated.
-        if (alive && lastOk.current) setStaleSince(lastOk.current);
+        setAsked(true);
+      } catch (e) {
+        if (!alive) return;
+        setAsked(true);
+        // The refusal is KEPT, never swallowed. A throw that is not a
+        // WatchedStripRefusal has no status and no upstream sentence,
+        // and is wrapped as exactly that rather than glossed.
+        setRefusal(e instanceof WatchedStripRefusal ? e
+          : new WatchedStripRefusal(null, String(e), token !== ""));
+        // With a payload in hand the figures stay up and dated.
+        if (lastOk.current) setStaleSince(lastOk.current);
       }
     };
     load();
     const id = setInterval(load, POLL_MS);
     return () => { alive = false; clearInterval(id); };
-  }, []);
+    // Re-read the moment a token is typed or changed: the operator
+    // should not have to reload the page to see the section they were
+    // just told needs a credential.
+  }, [token]);
 
-  if (!data || data.dormant) return null;
+  // NOTHING HAS BEEN READ YET — not a statement about the watchlist.
+  if (!data && !asked) return null;
+  // READ, AND REFUSED. Drawn, because a blank Live section is read as
+  // "no live matches" and this surface has no evidence for that.
+  if (!data) return refusal ? <GateNotice r={refusal} /> : null;
+  if (data.dormant) return null;
   const matches = data.matches ?? [];
   const orphans = data.open_positions_not_monitored ?? [];
-  // ABSENT, NOT EMPTY — with the one exception that is a finding.
-  if (matches.length === 0 && orphans.length === 0) return null;
+  // A DECLARED MATCH THAT IS NOT IN `matches`. The backend registers
+  // this hole (WATCHED_STRIP_OPEN["no_identity_row"]) and says in the
+  // record that an operator watching the strip alone would not see it.
+  // Drawing it here is what closes that half: a match that silently
+  // drops off this surface is the defect the stage was reported for.
+  const undescribed = data.monitored_not_described ?? [];
+  // ABSENT, NOT EMPTY — with the exceptions that are findings.
+  if (matches.length === 0 && orphans.length === 0
+      && undescribed.length === 0) return null;
 
   const registry = data.refusal_codes ?? {};
   const bySource = data.monitored_by_source ?? {};
+  // IN PLAY FIRST, AND THE FLAG IS THE PAYLOAD'S OWN. `state.in_play`
+  // is `match_state == "in"` on the backend and nothing else; a match
+  // with no state block is NOT folded into "in play" here, it is simply
+  // not in that group, and its missing fields already refuse by name on
+  // the card. The split is a partition of the SAME set the payload
+  // sent — nothing is filtered, nothing is dropped, and the two groups
+  // add back to `matches` exactly. Array.prototype.sort is not used:
+  // two lists make the partition obvious and keep the payload's own
+  // order inside each.
+  const live = matches.filter(isInPlay);
+  const rest = matches.filter((m) => !isInPlay(m));
+  // The tape states that MEAN in play, as the PAYLOAD carries them.
+  // null = this payload published no such registry, and this surface
+  // then makes no claim about which states are in play.
+  const inPlayStates = inPlayStatesOf(data);
 
   return (
     <section data-testid="watched-strip" aria-labelledby="watched-strip-h"
@@ -290,6 +369,17 @@ export default function WatchedStrip() {
           generated at {staleSince} and none of it has been refreshed —
           these prices are quoted off a book with an age ceiling, so
           treat them as that read and not as now.
+          {/* WHY it failed, in the layer's own words rather than as a
+              shrug. A refused credential and a dead backend leave the
+              same stale figures on the page and are not the same
+              problem. */}
+          {refusal && (
+            <span data-testid="watched-stale-why" className="block">
+              {" "}The failed read answered{" "}
+              {refusal.status == null ? "nothing at all" : refusal.status}
+              {refusal.said ? `: ${refusal.said}` : "."}
+            </span>
+          )}
         </p>
       )}
 
@@ -305,22 +395,272 @@ export default function WatchedStrip() {
         </p>
       )}
 
+      {undescribed.length > 0 && (
+        <div data-testid="watched-undescribed"
+          className="mt-3 rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-[12px] leading-relaxed text-warn">
+          <p>
+            {undescribed.length} declared fixture
+            {undescribed.length === 1 ? " is" : "s are"} monitored and{" "}
+            {undescribed.length === 1 ? "is" : "are"} NOT drawn as a match
+            below — the read could not name{" "}
+            {undescribed.length === 1 ? "it" : "them"}. A match that
+            silently drops off this section is the defect this stage was
+            reported for, so{" "}
+            {undescribed.length === 1 ? "it is" : "they are"} listed here
+            by id instead.
+          </p>
+          <ul className="mt-1.5 space-y-1.5">
+            {undescribed.map((u) => (
+              <li key={u.fixture_id} data-testid="watched-undescribed-row"
+                data-fixture={u.fixture_id}>
+                <span className="font-mono font-semibold">
+                  fixture {u.fixture_id}
+                </span>
+                {/* watchlist.POLICY_CODES, NOT position.REFUSAL_CODES.
+                    The two vocabularies are disjoint by construction —
+                    a policy code names a decision about the monitored
+                    SET, a refusal code names a number that could not be
+                    produced — so this rides under its own heading and
+                    is never counted with the refusals. */}
+                {u.policy_code && (
+                  <span className="font-mono text-ink-faint">
+                    {" "}· policy {u.policy_code}
+                  </span>
+                )}
+                {u.refused && <> — {u.refused}</>}
+                {u.registered?.closes_when && (
+                  <span className="block text-ink-low">
+                    Closes when: {u.registered.closes_when}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* IN PLAY FIRST, AND SAID OUT LOUD. Son's invariant is that a
+          match selected while it is still in play is in the Live
+          section; the one that must never be lost is the one the ball
+          is moving in. So the in-play group is drawn FIRST, under a
+          heading of its own, and every card in it carries a mark in
+          real text. The rest of the declared set follows, complete: a
+          fixture that has not kicked off keeps its minute-0 map and a
+          fixture whose read refused keeps its refusal. Nothing here
+          filters. */}
       <div className="mt-5 space-y-5">
-        {matches.map((m) => (
-          <MatchBlock key={m.fixture_id} m={m} registry={registry}
-            policyCodes={data.policy_codes ?? {}} />
-        ))}
+        {live.length > 0 && (
+          <section aria-labelledby="watched-group-in-play"
+            className="space-y-5">
+            <p id="watched-group-in-play" data-testid="watched-group"
+              data-group="in_play" data-count={live.length}
+              className="flex items-baseline gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-live">
+              <span aria-hidden
+                className="h-1.5 w-1.5 rounded-full bg-live" />
+              in play now · {live.length}
+              <span className="sr-only">
+                {" "}— drawn first, before every other declared match.
+                These are the fixtures whose state block says in_play,
+                which upstream is the newest state-tape row&apos;s
+                match_state read against the registry of states that
+                mean in play
+                {inPlayStates
+                  ? ` (${inPlayStates.join(", ")}, as this payload
+                     publishes them)`
+                  : " (this payload publishes no such registry, so the "
+                    + "states themselves are not named here)"}.
+              </span>
+            </p>
+            {live.map((m) => (
+              <MatchBlock key={m.fixture_id} m={m} registry={registry}
+                policyCodes={data.policy_codes ?? {}}
+                inPlayStates={inPlayStates} />
+            ))}
+          </section>
+        )}
+        {rest.length > 0 && (
+          <section aria-labelledby="watched-group-not-in-play"
+            className="space-y-5">
+            <p id="watched-group-not-in-play" data-testid="watched-group"
+              data-group="not_in_play" data-count={rest.length}
+              className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
+              not in play on the tape · {rest.length}
+              <span className="sr-only">
+                {" "}— still declared and still drawn in full. A fixture
+                that has not kicked off carries the map it was bought
+                against, and a fixture whose tape could not be read says
+                so by name; neither is dropped from this section.
+              </span>
+            </p>
+            {rest.map((m) => (
+              <MatchBlock key={m.fixture_id} m={m} registry={registry}
+                policyCodes={data.policy_codes ?? {}}
+                inPlayStates={inPlayStates} />
+            ))}
+          </section>
+        )}
       </div>
+
+      <UndrawnEnvelope data={data} />
+    </section>
+  );
+}
+
+/** Whether the payload's own state block says this fixture is in play.
+ *
+ *  STRICT, AND UNRECOGNISED NEVER FOLDS INTO A MEANINGFUL CLASS. This
+ *  reads the flag the backend computed and computes nothing of its own
+ *  — never the fixture row, never the calendar, never "it has a
+ *  minute". A tape read that FAILED sets the flag fail-closed false
+ *  beside a `tape_unreadable` refusal. A missing state block, a missing
+ *  flag or any non-true value therefore means NOT in this group; it
+ *  does not mean the match is quiet, and the card says which of its
+ *  fields are missing by name. */
+const isInPlay = (m: WatchedMatch): boolean => m.state?.in_play === true;
+
+/** The tape states that MEAN in play, as the payload itself carries
+ *  them — never a string typed into this file.
+ *
+ *  THIS IS THE ROUND'S OWN LESSON, PAID FOR TWICE. The first draft of
+ *  the in-play mark checked `match_state !== "in"` and would have
+ *  lit a false contradiction on every card the day a second started
+ *  state joined the class. That is precisely the venue-class failure
+ *  this repo has already shipped once — twelve green tests spoke the
+ *  CODE's vocabulary while the feed spoke its own — and the backend has
+ *  since replaced its own `== "in"` with a lookup into watchlist's
+ *  PHASE_OF_STARTED_STATE, published on the payload as
+ *  `in_play_states`.
+ *
+ *  WALKED, NOT PATH-ADDRESSED, for the same reason positionRefusals is:
+ *  the key's home on the envelope is a property of the payload's shape
+ *  and has already moved once. A payload that carries no such registry
+ *  yields NULL, and null means this surface MAKES NO CLAIM about which
+ *  states are in play — it does not fall back to a guess. */
+function inPlayStatesOf(data: WatchedStripResponse): string[] | null {
+  let found: string[] | null = null;
+  const walk = (node: unknown, depth: number) => {
+    if (found !== null || depth > 4) return;
+    if (Array.isArray(node)) { node.forEach((v) => walk(v, depth + 1)); return; }
+    if (!isObj(node)) return;
+    for (const [k, v] of Object.entries(node)) {
+      if (k === "in_play_states" && Array.isArray(v)
+          && v.length > 0 && v.every((x) => typeof x === "string")) {
+        found = v as string[];
+        return;
+      }
+      walk(v, depth + 1);
+    }
+  };
+  walk(data as unknown as Record<string, unknown>, 0);
+  return found;
+}
+
+// --- the section, read and refused ------------------------------------
+//
+// WHY THIS EXISTS AT ALL, and it is the whole point of this round. The
+// strip has been mounted on the landing page since 707a564 and has
+// never rendered in production: the proxy route did not exist, so every
+// poll 404'd, and the component treated "no route, no credential, or a
+// dead backend" as a single reason to draw nothing. A reader saw an
+// ordinary board and concluded there was nothing live. THAT WAS NEVER
+// MEASURED — the section had not been read at all.
+//
+// So: a read that produced no payload is drawn, and it says which of
+// the four it was. The status and the upstream sentence are printed
+// verbatim; this component adds no diagnosis of its own beyond mapping
+// the status to which sentence is true, and prints the status beside
+// the sentence so a reader can check one against the other.
+//
+// WHAT IT MUST NEVER SAY is that no match is live. It has no evidence
+// for that: the set it would have counted is exactly the thing it could
+// not read.
+function GateNotice({ r }: { r: WatchedStripRefusal }) {
+  const gated = r.status === 401 || r.status === 403;
+  const kind = gated ? (r.sentToken ? "token_refused" : "needs_token")
+    : r.status === 404 ? "no_route"
+    : r.status == null || r.status === 502 ? "unreachable"
+    : "unexpected_status";
+  const headline =
+    kind === "needs_token"
+      ? "This section is operator-gated and no token is held in this tab."
+    : kind === "token_refused"
+      ? "The operator token held in this tab was refused by the read."
+    : kind === "no_route"
+      ? "The read this section polls is not there."
+    : kind === "unreachable"
+      ? "Nothing answered the read."
+    : "The read answered a status this section has no handling for.";
+  const next =
+    kind === "needs_token"
+      ? "Type your operator token into the watch panel on this page — the "
+        + "same token the watch toggle uses — and the matches you declared "
+        + "are read here."
+    : kind === "token_refused"
+      ? "The token in the watch panel on this page is the one that was "
+        + "sent. The backend's own sentence for the refusal is above."
+    : kind === "no_route"
+      ? "That is a missing endpoint, not an empty watchlist: no set was "
+        + "counted, because nothing was asked."
+    : kind === "unreachable"
+      ? "The read did not get past the proxy to a backend that could "
+        + "answer it, so nothing about the declared set was learned on "
+        + "this poll — this is not a refusal and not an empty watchlist."
+      : "No branch of this section knows what that status means, so it "
+        + "is printed as it arrived rather than sorted into one of the "
+        + "reasons above.";
+  return (
+    <section data-testid="watched-strip" data-state="refused"
+      aria-labelledby="watched-strip-h"
+      className="mt-8 rounded-2xl border border-warn/40 bg-warn/5 px-4 py-5 sm:px-6">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <Eyebrow tone="accent">watched · hold / exit</Eyebrow>
+        <h2 id="watched-strip-h" className="text-lg font-medium text-ink-hi">
+          The matches you declared
+        </h2>
+      </div>
+      {/* A LIVE REGION, BUT NOT role="status". The distinction is not
+          cosmetic: the picker board draws one role="status" skeleton per
+          league while it loads and e2e/restructure.spec.ts counts them
+          (`toHaveCount(4)`), so a fifth status node anywhere on this
+          page silently breaks a guard that has nothing to do with this
+          section. `aria-live` gives the announcement without taking a
+          role another surface is counting. */}
+      <p data-testid="watched-strip-gate" data-kind={kind}
+        data-status={r.status == null ? "none" : String(r.status)}
+        data-token-held={r.sentToken ? "true" : "false"}
+        aria-live="polite"
+        className="mt-2 max-w-3xl text-[13px] leading-relaxed text-warn">
+        {headline}{" "}
+        {/* THE ANSWER, DERIVED FROM THE NUMBER BESIDE IT. The status is
+            printed next to the sentence it selected, so a reader can
+            check the claim against the evidence rather than trust it. */}
+        The read answered{" "}
+        <span className="font-mono">
+          {r.status == null ? "nothing at all" : r.status}
+        </span>
+        {r.said ? <> and said: “{r.said}”.</> : "."}{" "}
+        {next}
+      </p>
+      <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-ink-low">
+        This section has NOT been read, so nothing here says whether a
+        match is live. A blank space would have said that, and it would
+        have been a claim about a set nobody counted — which is why this
+        is drawn refused rather than left out. Absent and refused are
+        different facts.
+      </p>
     </section>
   );
 }
 
 // --- one watched match ------------------------------------------------
 
-function MatchBlock({ m, registry, policyCodes }: {
+function MatchBlock({ m, registry, policyCodes, inPlayStates }: {
   m: WatchedMatch;
   registry: Record<string, string>;
   policyCodes: Record<string, string>;
+  /** the payload's own in-play tape states, or null when it published
+   *  none — null means no claim, never a fallback guess */
+  inPlayStates: string[] | null;
 }) {
   const hue = hueFor(m.competition_slug);
   const hid = `watched-${m.fixture_id}-h`;
@@ -336,10 +676,28 @@ function MatchBlock({ m, registry, policyCodes }: {
   const positions = m.positions ?? [];
   const shared = [...stateRefusals(m), ...readRefusals(m)];
 
+  const live = isInPlay(m);
+  // THE WORD IS DERIVED FROM THE VALUE BESIDE IT. `in_play` IS
+  // `match_state == "in"` upstream, so a payload claiming one without
+  // the other did not come off that emitter. The mark still follows the
+  // flag — nothing is regrouped or dropped on a suspicion — but the
+  // disagreement is stated rather than smoothed over, because a stored
+  // label free to drift from the value it was computed from is how a
+  // winner-first score string rendered every defeat as a win.
+  const stateWord = m.state?.match_state ?? null;
+  // DERIVED FROM THE REGISTRY THE PAYLOAD CARRIES, never from a string
+  // typed here. With no registry on the payload there is no claim to
+  // make and none is made — a surface that guessed the class would be
+  // the venue-class failure all over again.
+  const markDisagrees = live && inPlayStates !== null
+    && (stateWord === null || !inPlayStates.includes(stateWord));
+
   return (
     <article data-testid="watched-match" data-fixture={m.fixture_id}
+      data-in-play={live ? "true" : "false"}
       aria-labelledby={hid}
-      className="rounded-xl border border-line bg-bs px-4 py-4 sm:px-5">
+      className={`rounded-xl border bg-bs px-4 py-4 sm:px-5 ${
+        live ? "border-live/50" : "border-line"}`}>
       <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         {hue && (
           <i aria-hidden className="h-2 w-2 shrink-0 rounded-full"
@@ -348,6 +706,23 @@ function MatchBlock({ m, registry, policyCodes }: {
         <h3 id={hid} className="text-[15px] font-medium text-ink-hi">
           {m.home} <span className="text-ink-faint">v</span> {m.away}
         </h3>
+        {live && (
+          <span data-testid="watched-in-play"
+            data-match-state={stateWord ?? "absent"}
+            data-derived={markDisagrees ? "disagrees" : "agrees"}
+            className="rounded-full border border-live px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-live">
+            in play
+            <span className="sr-only">
+              {" "}— this fixture&apos;s newest state-tape row reads
+              match_state {stateWord === null
+                ? "with no value at all"
+                : `“${stateWord}”`}, and its state block says in_play, so
+              it is drawn in the in-play group at the top of this
+              section. Both are shown so one can be checked against the
+              other.
+            </span>
+          </span>
+        )}
         <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
           {m.competition_slug}
         </span>
@@ -363,6 +738,23 @@ function MatchBlock({ m, registry, policyCodes }: {
           </span>
         </span>
       </header>
+
+      {markDisagrees && (
+        <p data-testid="watched-in-play-disagrees"
+          className="mt-2 rounded-md border border-warn/40 bg-warn/5 px-2.5 py-2 text-[12px] leading-relaxed text-warn">
+          This payload says in_play is true while the same state block
+          reads match_state{" "}
+          {stateWord === null ? "with no value at all" : `“${stateWord}”`}
+          , which is not one of the states this same payload publishes as
+          meaning in play ({(inPlayStates ?? []).join(", ")}). Upstream
+          in_play IS that lookup and is computed from nothing else, so
+          the two cannot disagree on a payload from that emitter. The
+          mark above follows the flag and this fixture is not regrouped
+          or hidden on a suspicion — but the disagreement is stated
+          rather than resolved here, because which of the two describes
+          this row is not something this surface can know.
+        </p>
+      )}
 
       {/* COVERAGE — the mid-way-join answer, and it is a POLICY fact
           about the monitored set, not a refused number, so it is worded
@@ -1538,6 +1930,126 @@ export const UNRENDERED_PAYLOAD_KEYS: Record<string, {
       + "beside it.",
   },
 };
+
+// --- 7b. what this surface knows it cannot draw, at the ENVELOPE ------
+//
+// THE SAME RECORD, ONE LEVEL UP, AND FOR THE SAME REASON. B3's hole is
+// registered per POSITION above; the payload's own envelope has holes
+// too, and this round found one the hard way: while this file was being
+// written the backend owner was adding an `in_play_not_declared` block
+// to the same response — matches the tape says are under way that
+// NOBODY DECLARED. That is the second half of Son's invariant and it
+// has no recorded shape on this surface yet. Drawing a block against a
+// shape nobody has emitted is how a surface certifies a reader that
+// cannot read the real payload; dropping it silently is how a whole
+// section spends its life invisible. So it is written down, with the
+// condition that closes it.
+//
+// THE THREE SETS ARE DISJOINT AND THEY COVER THE PAYLOAD. Every
+// envelope key is CONSUMED (read and drawn here), BOOKKEEPING (an
+// identifier that carries no finding about any match), or REGISTERED
+// (carries a finding this surface does not draw). A key in none of them
+// is NAMED on the surface the moment it arrives, and a key in two of
+// them fails the guard in e2e/watched-strip.spec.ts — which is what
+// makes a record retire when the block that replaces it ships, instead
+// of standing as prose after it stops being true.
+
+/** Envelope keys this surface actually reads and draws. */
+export const CONSUMED_ENVELOPE_KEYS: readonly string[] = [
+  "generated_at", "dormant", "matches", "monitored_by_source",
+  "open_positions_not_monitored", "monitored_not_described",
+  "refusal_codes", "policy_codes",
+];
+
+/** Envelope keys that identify the payload rather than describe a
+ *  match. Not drawn, and nothing about a fixture is lost by that. */
+export const BOOKKEEPING_ENVELOPE_KEYS: readonly string[] = ["version"];
+
+/** Envelope keys that CARRY A FINDING this surface does not draw. */
+export const UNRENDERED_ENVELOPE_KEYS: Record<string, {
+  finding: string; closes_when: string;
+}> = {
+  in_play_not_declared: {
+    finding: "the tape's own list of matches that are under way and that "
+      + "NOBODY DECLARED — the second half of the invariant this stage "
+      + "was reported for (a match cannot be selected once it has "
+      + "kicked off, because the watch toggle lives on a board whose "
+      + "fixtures leave it at kickoff). It was being added to this route "
+      + "while this surface was being built, so no shape of it has been "
+      + "recorded off a finished emitter and nothing here draws one.",
+    closes_when: "the block's shape is recorded off this route's own "
+      + "emitter and it is drawn — beside the declared set and never "
+      + "mixed into it, because a set you chose and a set the tape "
+      + "offered are different evidence; then retire this record.",
+  },
+  standing: {
+    finding: "the route's own charter sentences (it shows, it does not "
+      + "decide; one read not N+1; this route writes nothing; every "
+      + "match is drawn). They describe the ROUTE rather than any "
+      + "fixture, and this surface states its own charter in its own "
+      + "prose rather than quoting the backend's at the reader.",
+    closes_when: "a standing sentence stops being true of this surface, "
+      + "or one of them starts carrying a per-fixture finding; then it "
+      + "is drawn where that finding belongs and this record retires.",
+  },
+  detail: {
+    finding: "the reason a DORMANT plane gave for having no watchlist. "
+      + "This surface renders nothing at all when `dormant` is true, so "
+      + "the reason is dropped with it — a plane that is not configured "
+      + "and a board with nothing declared look identical to a reader.",
+    closes_when: "the dormant answer is drawn the way a refused read now "
+      + "is — as a section that says which of the two it is — and this "
+      + "record retires with the guard in e2e/watched-strip.spec.ts that "
+      + "pins dormant to an absent strip.",
+  },
+};
+
+/** Envelope keys on THIS payload that no set above accounts for.
+ *  Derived from the payload, never hand-listed. */
+function unaccountedEnvelopeKeys(data: WatchedStripResponse): string[] {
+  const known = new Set([
+    ...CONSUMED_ENVELOPE_KEYS, ...BOOKKEEPING_ENVELOPE_KEYS,
+    ...Object.keys(UNRENDERED_ENVELOPE_KEYS),
+  ]);
+  return Object.keys(data).filter((k) => !known.has(k)).sort();
+}
+
+function UndrawnEnvelope({ data }: { data: WatchedStripResponse }) {
+  const registered = Object.keys(UNRENDERED_ENVELOPE_KEYS)
+    .filter((k) => (data as unknown as Record<string, unknown>)[k] !== undefined).sort();
+  const unaccounted = unaccountedEnvelopeKeys(data);
+  if (registered.length === 0 && unaccounted.length === 0) return null;
+  return (
+    <div data-testid="watched-envelope-undrawn"
+      className="mt-4 border-t border-line pt-3 text-[11px] leading-relaxed text-ink-faint">
+      {registered.length > 0 && (
+        <p data-testid="watched-envelope-registered"
+          data-keys={registered.join(",")}>
+          This payload also carries{" "}
+          <span className="font-mono">{registered.join(", ")}</span>, which
+          this surface does not draw. Each is a written-down hole rather
+          than an oversight:{" "}
+          {registered.map((k) =>
+            `${k} — ${UNRENDERED_ENVELOPE_KEYS[k].finding} Closes when: `
+            + `${UNRENDERED_ENVELOPE_KEYS[k].closes_when}`).join(" ")}
+        </p>
+      )}
+      {unaccounted.length > 0 && (
+        <p data-testid="watched-envelope-unaccounted"
+          data-keys={unaccounted.join(",")}
+          className="mt-1.5 text-warn">
+          This payload carries{" "}
+          <span className="font-mono">{unaccounted.join(", ")}</span>, and
+          this surface has no record of{" "}
+          {unaccounted.length === 1 ? "it" : "them"} at all — not drawn,
+          not registered. It is named here rather than dropped, and the
+          record it is missing from is
+          UNRENDERED_ENVELOPE_KEYS in this file.
+        </p>
+      )}
+    </div>
+  );
+}
 
 function NotBuiltUpstream({ p }: { p: WatchedPosition }) {
   const present = Object.keys(UNRENDERED_PAYLOAD_KEYS)

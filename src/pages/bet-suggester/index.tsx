@@ -458,10 +458,23 @@ export default function PickerBoard() {
 
         {/* ---- the watched strip: the HOLD/EXIT stage, above the columns ----
             docs/HOLD-EXIT-DESIGN.md's surface. It polls its own endpoint
-            on its own 15s clock and renders NOTHING when no declared
-            match is live — absent, not empty — so on an ordinary
-            pre-match board this line costs the reader nothing. It is
-            deliberately ABOVE the season banner and the columns: a
+            on its own 15s clock and renders NOTHING when the read came
+            back and said there is nothing to draw — absent, not empty —
+            so on an ordinary pre-match board this line costs the reader
+            nothing. A read that could not HAPPEN is a different fact and
+            renders as a refusal with its status: the endpoint is
+            operator-gated and, with no proxy in front of it, this
+            section spent its whole life invisible in production while
+            looking exactly like "nothing is live".
+
+            IT IS MOUNTED INSIDE WatchDeclarationProvider ON PURPOSE, and
+            that placement is load-bearing rather than incidental: the
+            strip reads the operator token the watch panel already holds
+            (useWatchToken, read-only), so declaring a match and reading
+            it back take ONE token typed once. Moving this outside the
+            provider would silently gate the whole section.
+
+            It is deliberately ABOVE the season banner and the columns: a
             position that is live now outranks a note about which season
             rates a club. */}
         <WatchedStrip />

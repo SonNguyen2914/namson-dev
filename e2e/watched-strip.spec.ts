@@ -2654,21 +2654,78 @@ function codesIn(node: unknown, found = new Set<string>()): Set<string> {
 
 // -------------------------------------------------- absent, not empty
 
-test("with the endpoint as it really is today, the strip is absent and "
-   + "the board is unharmed", async ({ page }) => {
-  // UNMOCKED ON PURPOSE. There is no /api/bet-suggester/watched-strip
-  // proxy and no backend route behind it yet (see the hand-off note in
-  // suggesterApi.ts), so this exercises the real 404 path through the
-  // real Next proxy layer. A component whose data source does not exist
-  // must cost the landing page NOTHING.
-  const resp = await openSettled(page, undefined);
-  await expect(page.getByRole("heading", { name: "Every fixture, ranked" }))
-    .toBeVisible();
-  // NON-VACUITY: the strip really did ask, and really was refused. An
-  // absence with no request behind it would prove nothing.
-  expect(resp.status()).not.toBe(200);
-  await expect(strip(page)).toHaveCount(0);
-});
+// THIS TEST PINNED THE DEFECT, AND IT HAD TO CHANGE. Say it loudly,
+// because a test that changes is the one place a regression hides.
+//
+// It used to read: "with the endpoint as it really is today, the strip
+// is absent and the board is unharmed", and it asserted
+// `toHaveCount(0)` on a non-200. That was TRUE and it was the bug. The
+// backend route existed; there was no proxy in front of it; every poll
+// in production 404'd; the component's single catch drew nothing for
+// "no route, no credential, or a dead backend" alike — so this section
+// has never once rendered on namson.dev, and the blank space where it
+// should be reads to any operator as "no match is live". It was a claim
+// about a set nobody had counted, and this test certified it.
+//
+// The proxy exists now and the endpoint is operator-gated, so the
+// honest answer to an unauthenticated poll is a REFUSAL WITH WORDS. The
+// replacement is stricter, not looser: it still runs unmocked against
+// the real proxy and the real backend, it still requires the board to
+// be unharmed, and it now also requires the section to say what
+// happened and to derive the status it prints from the response that
+// actually came back.
+test("with the endpoint as it really is today, the strip is REFUSED in "
+   + "words rather than absent, and the board is unharmed",
+  async ({ page }) => {
+    // UNMOCKED ON PURPOSE — the real Next proxy and the real backend.
+    const resp = await openSettled(page, undefined);
+    await expect(page.getByRole("heading", { name: "Every fixture, ranked" }))
+      .toBeVisible();
+    // NON-VACUITY: it really did ask, and really was refused.
+    expect(resp.status()).not.toBe(200);
+
+    const section = strip(page);
+    await expect(section).toBeVisible();
+    await expect(section).toHaveAttribute("data-state", "refused");
+
+    const gate = page.getByTestId("watched-strip-gate");
+    // THE STATUS IS DERIVED FROM THE RESPONSE, not typed here. A number
+    // written into this file would go on passing the day the route
+    // starts answering something else.
+    await expect(gate).toHaveAttribute("data-status", String(resp.status()));
+    // No token was typed on this page, and the section says so rather
+    // than blaming the backend for it.
+    await expect(gate).toHaveAttribute("data-token-held", "false");
+
+    // AND IT MAY NOT CLAIM THE THING IT COULD NOT MEASURE.
+    const text = (await section.innerText()).toLowerCase();
+    expect(text).toContain("has not been read");
+    for (const lie of ["no live matches", "no matches are live",
+                       "nothing is live", "no declared match"]) {
+      expect(text, `a section that was refused must not claim "${lie}"`)
+        .not.toContain(lie);
+    }
+  });
+
+test("the proxy route exists and relays the BACKEND's answer, not "
+   + "Next's 404", async ({ request }) => {
+    // The whole defect in one assertion. Before this round
+    // /api/bet-suggester/watched-strip was not a route at all, so this
+    // returned Next's own 404 page — HTML, authored by the framework,
+    // with nothing of the backend in it. Now the status and the body
+    // are the backend's.
+    const r = await request.get("/api/bet-suggester/watched-strip");
+    expect(r.headers()["content-type"]).toContain("application/json");
+    const body = await r.json();
+    // A refusal is FIRST-CLASS: it arrives with the refusing layer's own
+    // sentence under `detail` (FastAPI) or `error` (this proxy, and only
+    // when the backend was never reached).
+    expect(typeof (body.detail ?? body.error)).toBe("string");
+    expect((body.detail ?? body.error).length).toBeGreaterThan(0);
+    // and the proxy holds no credential of its own: an unauthenticated
+    // call is NOT quietly upgraded into a payload
+    expect(r.status()).not.toBe(200);
+  });
 
 test("nothing declared, nothing rendered — absent, not empty",
   async ({ page }) => {
@@ -3652,4 +3709,522 @@ test("one column on a phone: the strip stacks and the page does not "
     const overflow = await page.evaluate(() =>
       document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+// ======================================================================
+// THE LIVE SECTION CAN RENDER AT ALL
+// ======================================================================
+//
+// Son's invariant, in his words: "any matches that is selected at any
+// moment while it is still in play to be in the Live section". Three
+// things broke it and this file owns the first: the section could NEVER
+// render. The read is operator-gated, there was no proxy route in front
+// of it, and the component's fetch sent no token — so every poll in
+// production 404'd and the surface stayed absent. A blank Live section
+// reads as "nothing is live", and that was never measured.
+//
+// What is at stake in this block:
+//   - ABSENT AND REFUSED ARE DIFFERENT FACTS. Five rounds have been
+//     spent on that distinction and this is the surface where it is
+//     most expensive to get wrong.
+//   - ONE TOKEN, TWO SURFACES. The token the watch toggle already holds
+//     is the token this read sends, as ONE header. A second field for
+//     the same secret would be the page inventing a credential.
+//   - IN PLAY FIRST AND UNMISTAKABLE, and NOTHING IS FILTERED. The two
+//     groups add back to the payload's own set, exactly.
+
+/** The watch panel's own reads, so a token can be typed without the
+ *  panel reaching a real backend. Registered by the caller BEFORE the
+ *  strip's route, since Playwright matches routes in reverse order. */
+async function watchlistRoutes(page: Page) {
+  await page.route("**/api/bet-suggester/live-watchlist**", (r) =>
+    r.fulfill(json({
+      version: "watchlist-v1",
+      generated_at: "2026-09-04T12:00:00Z",
+      monitored_fixture_ids: [], monitored_by_source: {},
+      coverage: [], open_positions_not_monitored: [], log: [],
+      registries: { actions: {}, sources: {}, policy_codes: {}, phases: {} },
+    })));
+}
+
+/** Type an operator token into the watch panel — the SAME field the
+ *  watch toggle uses. Nothing in the bundle knows this value. */
+async function typeToken(page: Page, token: string) {
+  await page.getByTestId("watch-panel").locator("summary").click();
+  await page.locator("#watch-token").fill(token);
+}
+
+const gate = (page: Page) => page.getByTestId("watched-strip-gate");
+
+// ------------------------------------------------- refused, not absent
+
+test("with no token typed, the Live section SAYS it needs one — it does "
+   + "not vanish", async ({ page }) => {
+    // The backend's own refusal shape: FastAPI's HTTPException(403,
+    // "operator credentials required"), which is what
+    // api/main.py's bet_suggester_watched_strip raises.
+    await openSettled(page, { detail: "operator credentials required" }, 403);
+    await expect(strip(page)).toBeVisible();
+    await expect(gate(page)).toHaveAttribute("data-kind", "needs_token");
+    await expect(gate(page)).toHaveAttribute("data-token-held", "false");
+    await expect(gate(page)).toHaveAttribute("data-status", "403");
+    // the reader is told the section exists, what it needs and where
+    await expect(gate(page)).toContainText("no token is held in this tab");
+    await expect(gate(page)).toContainText("watch panel");
+    // THE BACKEND'S OWN SENTENCE, verbatim — never a paraphrase
+    await expect(gate(page)).toContainText("operator credentials required");
+    // and no match block is drawn against a payload that never arrived
+    await expect(page.getByTestId("watched-match")).toHaveCount(0);
+  });
+
+test("a token that the backend refuses is reported as a REFUSED TOKEN, "
+   + "not as a missing one", async ({ page }) => {
+    // Two states that look identical if the surface only counts blanks:
+    // "you have typed nothing" and "what you typed was refused". The
+    // second is the one that needs a different action from the reader.
+    await watchlistRoutes(page);
+    await routes(page, { detail: "operator credentials required" }, 403);
+    await page.goto("/bet-suggester");
+    await expect(gate(page)).toHaveAttribute("data-kind", "needs_token");
+    await typeToken(page, "a-token-the-backend-does-not-like");
+    await expect(gate(page)).toHaveAttribute("data-kind", "token_refused");
+    await expect(gate(page)).toHaveAttribute("data-token-held", "true");
+    await expect(gate(page)).toContainText("was refused by the read");
+  });
+
+test("a missing route is named as a missing route, never as an empty "
+   + "watchlist", async ({ page }) => {
+    await openSettled(page, { error: "not found" }, 404);
+    await expect(gate(page)).toHaveAttribute("data-kind", "no_route");
+    await expect(gate(page)).toContainText("is not there");
+    await expect(gate(page)).toContainText("not an empty watchlist");
+    await expect(gate(page)).toContainText("404");
+  });
+
+test("a backend that was never reached is named as that, and not as a "
+   + "refusal", async ({ page }) => {
+    await openSettled(page, {
+      error: "proxy_unreachable",
+      detail: "the strip's backend was never reached, so there is no "
+        + "answer to relay — this is not a refusal and not an empty "
+        + "watchlist" }, 502);
+    await expect(gate(page)).toHaveAttribute("data-kind", "unreachable");
+    await expect(gate(page)).toContainText("never reached");
+  });
+
+test("a refused section never claims that nothing is live", async ({ page }) => {
+    // THE WHOLE POINT. The set it would have counted is exactly the
+    // thing it could not read, so it has no evidence for the sentence a
+    // blank space was saying on its behalf.
+    for (const [body, status] of [
+      [{ detail: "operator credentials required" }, 403],
+      [{ error: "not found" }, 404],
+      [{ error: "proxy_unreachable" }, 502],
+    ] as [unknown, number][]) {
+      // Playwright matches routes in reverse registration order, so
+      // each pass's handler wins over the last.
+      await openSettled(page, body, status);
+      const text = (await strip(page).innerText()).toLowerCase();
+      expect(text).toContain("has not been read");
+      for (const lie of ["no live matches", "no matches are live",
+                         "nothing is live", "no declared match",
+                         "no match is live"]) {
+        expect(text, `status ${status} must not claim "${lie}"`)
+          .not.toContain(lie);
+      }
+    }
+  });
+
+test("a 200 that says nothing is declared is still ABSENT — the refusal "
+   + "render never swallows the empty case", async ({ page }) => {
+    // NON-VACUITY FOR THE OTHER DIRECTION. Now that a failed read draws
+    // a section, the honest empty answer must still draw none, or this
+    // round would have traded one wrong blank for one wrong box.
+    const resp = await openSettled(page, EMPTY);
+    expect(resp.status()).toBe(200);
+    await expect(strip(page)).toHaveCount(0);
+  });
+
+// ------------------------------------------------- one token, one header
+
+test("the read carries the operator token the watch toggle holds, as ONE "
+   + "header, and only once a person has typed it", async ({ page }) => {
+    const seen: (string | undefined)[] = [];
+    const otherCreds: string[] = [];
+    await watchlistRoutes(page);
+    await page.route("**/api/picker/board**", (r) => r.fulfill(json(BOARD)));
+    await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW)));
+    await page.route(`**${STRIP_URL}**`, (r) => {
+      const h = r.request().headers();
+      seen.push(h["x-admin-token"]);
+      for (const k of Object.keys(h)) {
+        if (/authorization|cookie|api[-_]?key|token/i.test(k)
+            && k !== "x-admin-token") otherCreds.push(k);
+      }
+      return r.fulfill(json(seen.length === 1 ? EMPTY : STRIP));
+    });
+    await page.goto("/bet-suggester");
+    await expect
+      .poll(() => seen.length, { timeout: 15_000 }).toBeGreaterThan(0);
+    // BEFORE a token is typed: no header. The site holds no credential
+    // and never sends one it does not have.
+    expect(seen[0]).toBeUndefined();
+
+    await typeToken(page, "operator-token-typed-by-a-person");
+    // Typing it RE-READS — the operator does not reload the page to see
+    // the section they were just told needs a credential.
+    await expect(strip(page)).toBeVisible();
+    await expect(page.getByTestId("watched-match").first()).toBeVisible();
+    expect(seen[seen.length - 1]).toBe("operator-token-typed-by-a-person");
+    // and nothing else that could be a credential rode along
+    expect(otherCreds).toEqual([]);
+  });
+
+// ---------------------------------------------- in play first, and marked
+
+/** The payload with its matches in the WORST possible order for this
+ *  rule: every not-in-play fixture ahead of every in-play one. The
+ *  recorded STRIP already happens to list the live ones first, so a
+ *  surface that did no ordering at all would pass against it. */
+const REORDERED = {
+  ...STRIP,
+  matches: [...STRIP.matches].sort(
+    (a, b) => Number(a.state.in_play) - Number(b.state.in_play)),
+};
+
+test("every in-play match is drawn before every match that is not",
+  async ({ page }) => {
+    await open(page, REORDERED);
+    await expect(strip(page)).toBeVisible();
+    // NON-VACUITY: the served order really is the wrong one, so an
+    // unordered surface fails here.
+    expect(REORDERED.matches.map((m) => m.state.in_play))
+      .not.toEqual(REORDERED.matches.map((m) => m.state.in_play).sort(
+        (a, b) => Number(b) - Number(a)));
+
+    const drawn = await page.getByTestId("watched-match")
+      .evaluateAll((els) => els.map((e) => ({
+        fixture: Number(e.getAttribute("data-fixture")),
+        live: e.getAttribute("data-in-play") === "true",
+      })));
+    // EVERY declared match is still here — the ordering filters nothing
+    expect(drawn.length).toBe(REORDERED.matches.length);
+    expect(new Set(drawn.map((d) => d.fixture)))
+      .toEqual(new Set(REORDERED.matches.map((m) => m.fixture_id)));
+    // and the live ones are a PREFIX of the drawn order
+    const liveFlags = drawn.map((d) => d.live);
+    expect(liveFlags).toEqual([...liveFlags].sort(
+      (a, b) => Number(b) - Number(a)));
+    // DERIVED FROM THE PAYLOAD, never a number typed here
+    const expected = REORDERED.matches.filter((m) => m.state.in_play);
+    expect(drawn.filter((d) => d.live).map((d) => d.fixture))
+      .toEqual(expected.map((m) => m.fixture_id));
+  });
+
+test("the two groups partition the declared set — nothing is filtered "
+   + "and nothing is counted twice", async ({ page }) => {
+    await open(page, REORDERED);
+    // Wait for the strip to have DECIDED. `evaluateAll` on an empty
+    // locator returns [] and would make every count below vacuously
+    // agree with zero.
+    await expect(strip(page)).toBeVisible();
+    await expect(page.getByTestId("watched-group").first()).toBeVisible();
+    const groups = await page.getByTestId("watched-group")
+      .evaluateAll((els) => els.map((e) => ({
+        group: e.getAttribute("data-group"),
+        count: Number(e.getAttribute("data-count")),
+      })));
+    const total = groups.reduce((n, g) => n + g.count, 0);
+    expect(total).toBe(REORDERED.matches.length);
+    const live = groups.find((g) => g.group === "in_play");
+    expect(live?.count).toBe(
+      REORDERED.matches.filter((m) => m.state.in_play).length);
+    // the in-play heading is the FIRST of the two in the DOM
+    expect(groups[0].group).toBe("in_play");
+  });
+
+test("an in-play match is marked in real text, and the mark cites the "
+   + "value it was derived from", async ({ page }) => {
+    await open(page, STRIP);
+    for (const m of STRIP.matches) {
+      const card = match(page, m.fixture_id);
+      const mark = card.getByTestId("watched-in-play");
+      if (m.state.in_play) {
+        await expect(mark).toBeVisible();
+        // THE WORD IS DERIVED FROM THE VALUE BESIDE IT: `in_play` is
+        // `match_state == "in"` upstream, so the mark carries the raw
+        // match_state it was computed from and a reader can check one
+        // against the other.
+        await expect(mark).toHaveAttribute(
+          "data-match-state", m.state.match_state ?? "absent");
+        // real text in the accessible tree, never a title= attribute
+        await expect(mark).toContainText("in play");
+        await expect(card).toHaveAttribute("data-in-play", "true");
+      } else {
+        await expect(mark).toHaveCount(0);
+        await expect(card).toHaveAttribute("data-in-play", "false");
+      }
+    }
+    // and the mark carries NOTHING on a title
+    expect(await strip(page).locator("[title]").count()).toBe(0);
+  });
+
+test("a payload whose in_play disagrees with the match_state it is "
+   + "computed from says so, and is still drawn", async ({ page }) => {
+    // in_play IS match_state == "in" upstream and is computed from
+    // nothing else, so these two cannot disagree on a payload from that
+    // emitter. If one ever arrives, the surface may not smooth it over —
+    // and it may not drop the fixture either.
+    const bent = {
+      ...STRIP,
+      // THE REGISTRY RIDES ON THE PAYLOAD, and the surface reads it from
+      // there. api/main.py publishes `in_play_states` off watchlist's
+      // PHASE_OF_STARTED_STATE — it replaced its own `== "in"` with that
+      // lookup, so a second started state can join the class in ONE
+      // place. A string typed into this file would go on passing while
+      // the surface lit a false contradiction on every half-time card.
+      in_play_not_declared: { in_play_states: ["in"] },
+      matches: STRIP.matches.map((m) => m.fixture_id !== 101 ? m : {
+        ...m, state: { ...m.state, match_state: "post" },
+      }),
+    };
+    await open(page, bent);
+    const card = match(page, 101);
+    await expect(card).toBeVisible();
+    await expect(card).toHaveAttribute("data-in-play", "true");
+    await expect(card.getByTestId("watched-in-play"))
+      .toHaveAttribute("data-derived", "disagrees");
+    await expect(card.getByTestId("watched-in-play-disagrees"))
+      .toContainText("post");
+    // every other card is unaffected — one bent row is not a reason to
+    // annotate the rest
+    await expect(page.getByTestId("watched-in-play-disagrees"))
+      .toHaveCount(1);
+  });
+
+// ------------------------------------ a match may never drop off silently
+
+test("a monitored fixture whose read REFUSES is still drawn, with the "
+   + "refusal in its own words", async ({ page }) => {
+    // The read is the block most likely to be missing on a live match,
+    // and a surface that hid the match when the read failed would lose
+    // exactly the fixture Son is asking never to lose.
+    const readless = {
+      ...STRIP,
+      matches: STRIP.matches.map((m) => m.fixture_id !== 202 ? m : {
+        ...m,
+        read: { version: "live-read-v1", sides: {},
+          words: "the live read for this fixture FAILED (relation "
+            + "\"live_read\" does not exist), so nothing was read — this "
+            + "is not a match in which nothing has happened" },
+      }),
+    };
+    await open(page, readless);
+    const card = match(page, 202);
+    await expect(card).toBeVisible();
+    // still in the in-play group, still first
+    await expect(card).toHaveAttribute("data-in-play", "true");
+    await expect(card.getByTestId("watched-read-absent"))
+      .toContainText("this is not a match in which nothing has happened");
+    // and the rest of the set is untouched
+    await expect(page.getByTestId("watched-match"))
+      .toHaveCount(STRIP.matches.length);
+  });
+
+test("a declared fixture the route could not describe is drawn by id "
+   + "rather than dropped", async ({ page }) => {
+    // api/main.py registers this hole itself
+    // (WATCHED_STRIP_OPEN["no_identity_row"]): a monitored fixture with
+    // no `fixture` row gets no entry in `matches`, because WatchedMatch
+    // needs competition_slug / home / away and the plane holds them
+    // nowhere else. The backend's own record says an operator watching
+    // the strip alone would not see it. This is the half that closes.
+    const undescribed = {
+      ...EMPTY,
+      monitored_not_described: [{
+        fixture_id: 777,
+        policy_code: "unknown_fixture",
+        refused: "unknown_fixture: this fixture id is not one this live "
+          + "plane holds a row for",
+        registered: {
+          finding: "a monitored fixture whose `fixture` row is not there "
+            + "gets no entry in `matches`",
+          closes_when: "the strip gains a recorded shape for a declared "
+            + "match with no identity row",
+        },
+      }],
+    };
+    await open(page, undescribed);
+    // it renders even though NOTHING else is on this payload — a
+    // declared match missing from the strip is the defect the stage was
+    // reported for
+    await expect(strip(page)).toBeVisible();
+    const row = page.getByTestId("watched-undescribed-row");
+    await expect(row).toHaveAttribute("data-fixture", "777");
+    await expect(row).toContainText("unknown_fixture");
+    await expect(row).toContainText("Closes when:");
+    // THE TWO VOCABULARIES STAY DISJOINT: this is a POLICY code about
+    // the monitored set, and it is never counted with the refusals.
+    await expect(page.getByTestId("watched-undescribed"))
+      .toContainText("policy unknown_fixture");
+    await expect(page.getByTestId("watched-refusal")).toHaveCount(0);
+  });
+
+test("when the newest poll fails, the stale banner says WHY, not just "
+   + "that it did", async ({ page }) => {
+    // A refused credential and a dead backend leave the same stale
+    // figures on the page and are not the same problem.
+    let served = 0;
+    await page.route("**/api/picker/board**", (r) => r.fulfill(json(BOARD)));
+    await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW)));
+    await page.route(`**${STRIP_URL}**`, (r) =>
+      served++ === 0 ? r.fulfill(json(STRIP))
+        : r.fulfill(json({ detail: "operator credentials required" }, 403)));
+    await page.goto("/bet-suggester");
+    await expect(strip(page)).toBeVisible();
+    const why = page.getByTestId("watched-stale-why");
+    await expect(why).toBeVisible({ timeout: 25_000 });
+    await expect(why).toContainText("403");
+    await expect(why).toContainText("operator credentials required");
+    // and the figures are still there
+    await expect(match(page, 101).getByTestId("watched-pnl"))
+      .toContainText("$31.84");
+  });
+
+test("the refused section takes no role=status — the board's skeleton "
+   + "count is not this section's to change", async ({ page }) => {
+    // A REGRESSION THIS ROUND ACTUALLY CAUSED, kept as a guard. The
+    // picker board draws one role="status" skeleton PER LEAGUE while it
+    // loads and e2e/restructure.spec.ts asserts `toHaveCount(4)` on
+    // them. The refusal notice first shipped with role="status" on it,
+    // so the moment this section started rendering at all — which is the
+    // whole point of this round — a guard in another file went red for a
+    // reason that had nothing to do with the board. The notice is a live
+    // region by `aria-live` instead: same announcement, no borrowed
+    // role.
+    await openSettled(page, { detail: "operator credentials required" }, 403);
+    await expect(gate(page)).toBeVisible();
+    expect(await strip(page).getByRole("status").count()).toBe(0);
+    // and it is STILL announced — dropping the role must not have
+    // dropped the announcement
+    await expect(gate(page)).toHaveAttribute("aria-live", "polite");
+  });
+
+test("a state the payload's own registry does not call in play is NOT "
+   + "flagged as a contradiction — the class is read, never guessed",
+  async ({ page }) => {
+    // THE OTHER DIRECTION OF THE SAME RULE, and the one a hand-listed
+    // "in" would fail. The backend's in-play class comes from
+    // watchlist.PHASE_OF_STARTED_STATE, so a SECOND started state can
+    // join it without a line changing here. A surface that tested
+    // `match_state !== "in"` would light a false contradiction on every
+    // card carrying that new state.
+    const twoStates = {
+      ...STRIP,
+      in_play_not_declared: { in_play_states: ["in", "ht"] },
+      matches: STRIP.matches.map((m) => m.fixture_id !== 101 ? m : {
+        ...m, state: { ...m.state, match_state: "ht" },
+      }),
+    };
+    await open(page, twoStates);
+    const card = match(page, 101);
+    await expect(card.getByTestId("watched-in-play")).toBeVisible();
+    await expect(card.getByTestId("watched-in-play"))
+      .toHaveAttribute("data-derived", "agrees");
+    await expect(page.getByTestId("watched-in-play-disagrees"))
+      .toHaveCount(0);
+  });
+
+test("with no in-play registry on the payload, the surface makes NO "
+   + "claim about the class", async ({ page }) => {
+    // The recorded STRIP publishes no `in_play_states`. Absent evidence
+    // is not evidence of agreement OR of contradiction, so nothing is
+    // asserted either way — and the fixture is still drawn and still
+    // marked off its own flag.
+    const bent = {
+      ...STRIP,
+      matches: STRIP.matches.map((m) => m.fixture_id !== 101 ? m : {
+        ...m, state: { ...m.state, match_state: "post" },
+      }),
+    };
+    await open(page, bent);
+    await expect(match(page, 101).getByTestId("watched-in-play"))
+      .toBeVisible();
+    await expect(page.getByTestId("watched-in-play-disagrees"))
+      .toHaveCount(0);
+  });
+
+// ---------------------------- the envelope's registered holes
+
+test("the three envelope sets are disjoint — a registered hole cannot be "
+   + "closed without retiring its record", async () => {
+    // THE PATTERN THIS ROUND ASKED FOR, both directions. A key that
+    // starts being drawn lands in CONSUMED; if its record is left
+    // standing in UNRENDERED_ENVELOPE_KEYS the prose outlives the hole,
+    // which is the failure the whole registry exists to prevent.
+    const {
+      CONSUMED_ENVELOPE_KEYS, BOOKKEEPING_ENVELOPE_KEYS,
+      UNRENDERED_ENVELOPE_KEYS,
+    } = await import("../src/components/WatchedStrip");
+    const sets: [string, string[]][] = [
+      ["consumed", [...CONSUMED_ENVELOPE_KEYS]],
+      ["bookkeeping", [...BOOKKEEPING_ENVELOPE_KEYS]],
+      ["registered", Object.keys(UNRENDERED_ENVELOPE_KEYS)],
+    ];
+    for (const [an, a] of sets) {
+      for (const [bn, b] of sets) {
+        if (an >= bn) continue;
+        const both = a.filter((k) => b.includes(k));
+        expect(both, `${an} and ${bn} both claim ${both.join(", ")}`)
+          .toEqual([]);
+      }
+    }
+    // AND EVERY RECORD CARRIES ITS CLOSING CONDITION. A hole written
+    // down without one is prose, not a record.
+    for (const [k, v] of Object.entries(UNRENDERED_ENVELOPE_KEYS)) {
+      expect(v.finding.length, `${k} has no finding`).toBeGreaterThan(40);
+      expect(v.closes_when.length, `${k} has no closes_when`)
+        .toBeGreaterThan(40);
+    }
+  });
+
+test("an envelope key no set accounts for is NAMED on the surface",
+  async ({ page }) => {
+    // A NEW HOLE MUST FAIL LOUDLY. The backend gained a whole new
+    // envelope block while this surface was being written; the next one
+    // announces itself instead of vanishing.
+    await open(page, { ...STRIP, some_new_block: { note: "unrecorded" } });
+    const un = page.getByTestId("watched-envelope-unaccounted");
+    await expect(un).toBeVisible();
+    await expect(un).toHaveAttribute("data-keys", "some_new_block");
+    await expect(un).toContainText("no record of it at all");
+  });
+
+test("a registered envelope hole that ARRIVES is named with the "
+   + "condition that closes it, and is still not drawn",
+  async ({ page }) => {
+    // `in_play_not_declared` is the block the backend owner was adding
+    // to this very route while this surface was being built: matches the
+    // tape says are under way that nobody declared. It has no recorded
+    // shape here, so it is written down rather than drawn against a
+    // shape nobody emitted.
+    await open(page, {
+      ...STRIP,
+      in_play_not_declared: {
+        matches: [{ fixture_id: 8888 }], counts: { in_play: 1 },
+        in_play_states: ["in"],
+      },
+    });
+    const reg = page.getByTestId("watched-envelope-registered");
+    await expect(reg).toBeVisible();
+    await expect(reg).toContainText("in_play_not_declared");
+    await expect(reg).toContainText("Closes when:");
+    // NAMING IS NOT RENDERING: no match block is drawn for a fixture
+    // that arrived inside a shape this surface has never been shown.
+    await expect(match(page, 8888)).toHaveCount(0);
+    await expect(page.getByTestId("watched-match"))
+      .toHaveCount(STRIP.matches.length);
+    // and nothing unaccounted-for rode in with it
+    await expect(page.getByTestId("watched-envelope-unaccounted"))
+      .toHaveCount(0);
   });
