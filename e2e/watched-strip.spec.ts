@@ -1,4 +1,14 @@
 import { expect, test } from "@playwright/test";
+// STATIC, not `await import(...)` inside the test. A dynamic import is
+// executed by Node at RUNTIME and bypasses Playwright's TypeScript
+// transform, so Node reads the .tsx source itself and dies on
+// "Cannot use import statement outside a module". It passed locally on a
+// warm transform cache and failed on the clean CI checkout, which is the
+// only honest signal of the two.
+import {
+  CONSUMED_ENVELOPE_KEYS, BOOKKEEPING_ENVELOPE_KEYS,
+  UNRENDERED_ENVELOPE_KEYS,
+} from "../src/components/WatchedStrip";
 
 // The watched strip — the HOLD/EXIT stage's surface, above the league
 // columns on /bet-suggester.
@@ -4162,10 +4172,6 @@ test("the three envelope sets are disjoint — a registered hole cannot be "
     // starts being drawn lands in CONSUMED; if its record is left
     // standing in UNRENDERED_ENVELOPE_KEYS the prose outlives the hole,
     // which is the failure the whole registry exists to prevent.
-    const {
-      CONSUMED_ENVELOPE_KEYS, BOOKKEEPING_ENVELOPE_KEYS,
-      UNRENDERED_ENVELOPE_KEYS,
-    } = await import("../src/components/WatchedStrip");
     const sets: [string, string[]][] = [
       ["consumed", [...CONSUMED_ENVELOPE_KEYS]],
       ["bookkeeping", [...BOOKKEEPING_ENVELOPE_KEYS]],
