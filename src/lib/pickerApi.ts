@@ -50,6 +50,21 @@ export type TierPair = [number, number];
 
 export type Shape = "CLEAN" | "HOLLOW" | "SPLIT";
 
+/** How the three shapes ORDER, declared beside the type they order so
+ *  the two cannot drift apart. CLEAN is a gap the tiers back on all
+ *  three dimensions and HOLLOW is one they do not back at all, so this
+ *  is "how well backed", descending.
+ *
+ *  It is `Record<Shape, number>` on purpose: a value added to `Shape`
+ *  fails the BUILD here rather than falling through a `??` in
+ *  lib/pickerSort.ts into the bucket that means "this row has no
+ *  shape". A shape the board has never heard of is not a row without
+ *  one, and the sort control says so in words when such a row is
+ *  actually on the board. */
+export const SHAPE_ORDER: Record<Shape, number> = {
+  CLEAN: 2, SPLIT: 1, HOLLOW: 0,
+};
+
 export interface KalshiQuote {
   event_ticker: string | null;
   ticker: string | null;
@@ -319,5 +334,29 @@ export async function fetchBoard(days: number, signal?: AbortSignal): Promise<Bo
     } catch { /* non-JSON body; the status is all we have */ }
     throw new Error(detail || `board request failed (${r.status})`);
   }
-  return r.json();
+  // A 200 IS NOT A PAYLOAD. `return r.json()` folded three findings
+  // into one: a SyntaxError in the browser's own vocabulary for a 204
+  // or an upstream HTML error page — which is debugging text, not the
+  // named situation this function is careful to give every other
+  // failure — and, worse because it does not throw at all, a literal
+  // `null` body handed back typed as Board. The caller renders that as
+  // the board having nothing on it, which is a claim about the slate
+  // made off a read that never landed.
+  const raw = await r.text();
+  let body: unknown;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    throw new Error(
+      `the server answered ${r.status} with a body that is not JSON `
+      + `(${raw.length} characters) — that is an answer we could not `
+      + "read, not an empty board");
+  }
+  if (body === null || typeof body !== "object") {
+    throw new Error(
+      `the server answered ${r.status} with ${JSON.stringify(body)} `
+      + "where a board was expected — there is no payload here, and it "
+      + "must not be read as an empty one");
+  }
+  return body as Board;
 }

@@ -57,26 +57,120 @@ type Tournament = {
 
 const pct = (p: number) => `${(p * 100).toFixed(p >= 0.1 ? 0 : 1)}%`;
 
+// FOUR FACTS, NOT ONE BLANK.
+//
+// The header above says "the 404 is the feature switch" — a competition
+// with no tournament answers 404 and this component renders nothing, on
+// purpose and unconditionally, so /comp/[key] needs no per-competition
+// frontend code. That design is kept exactly. What was wrong is that
+// EVERY other outcome arrived at the same `setT(null)` on the same line:
+// a 500, a proxy timeout, a body that would not parse. So a backend that
+// fell over rendered as "this competition has no tournament" — a claim
+// about the competition made off a read that never landed.
+//
+// The switch is now the thing it claims to be: it is the 404 status
+// specifically that means "no tournament here", and only it. Anything
+// else is named, in the failure's own words. Three states, the type
+// LaligaDashboard.tsx's `settle()` established; redeclared here rather
+// than imported because src/lib is not this change's to add to, and the
+// duplication is named so a later extraction knows what it collects.
+type Read<T> =
+  | { s: "asking" }
+  | { s: "absent" }                       // the 404 — the feature switch
+  | { s: "failed"; why: string }
+  | { s: "ok"; d: T };
+
+/** The failure's own words, never a shrug. */
+const why = (e: unknown): string =>
+  e instanceof Error ? e.message : String(e);
+
+/** The read behind what is drawn did not land; what IS drawn is the
+ *  earlier answer. Said as real text, in the refusal ink family — never
+ *  the up/neg traffic light, which here would read as a verdict on a
+ *  tie. Declared at module scope: a component created during render
+ *  resets its state on every render, and this repo's lint makes that an
+ *  error. */
+function StaleNotice({ reason }: { reason: string | null }) {
+  if (reason === null) return null;
+  return (
+    <p data-testid="tournament-read-stale" role="status"
+      className="mb-3 rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-[12px] leading-relaxed text-warn">
+      The tournament read failed: {reason}. Everything below is from the
+      last read that answered and has not been refreshed.
+    </p>
+  );
+}
+
 export default function TournamentView({ compKey }: { compKey: string }) {
-  const [t, setT] = useState<Tournament | null>(null);
+  const [read, setRead] = useState<Read<Tournament>>({ s: "asking" });
+  // A forecast that arrived once is KEPT when a later poll fails; the
+  // poll is five minutes apart, so a stale bracket beats a vanished one.
+  const [lastOk, setLastOk] = useState<Tournament | null>(null);
+  // A COMPETITION'S ANSWER MUST NOT SURVIVE INTO THE NEXT COMPETITION.
+  // /comp/[key] keeps this component mounted across a client-side hop,
+  // so without a reset the previous key's forecast would be drawn under
+  // the new key's name. React's "adjust state when input changes"
+  // pattern — a conditional setState during RENDER, which LivePanel.tsx
+  // already uses for its lever tracking — not a setState in an effect
+  // body, which this repo's lint makes an error.
+  const [forKey, setForKey] = useState(compKey);
+  if (forKey !== compKey) {
+    setForKey(compKey);
+    setRead({ s: "asking" });
+    setLastOk(null);
+  }
 
   useEffect(() => {
     let alive = true;
-    const load = () =>
-      fetch(`/api/comp/${compKey}/tournament`)
-        .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-        .then((j) => { if (alive) setT(j); })
-        .catch(() => { if (alive) setT(null); });
+    const load = async () => {
+      try {
+        const r = await fetch(`/api/comp/${compKey}/tournament`);
+        if (!alive) return;
+        // THE SWITCH, AND NOTHING ELSE THROUGH IT.
+        if (r.status === 404) { setRead({ s: "absent" }); return; }
+        if (!r.ok) {
+          setRead({ s: "failed", why: `the tournament read answered ${r.status}` });
+          return;
+        }
+        const j = (await r.json()) as Tournament;
+        if (!alive) return;
+        setLastOk(j);
+        setRead({ s: "ok", d: j });
+      } catch (e) {
+        if (alive) setRead({ s: "failed", why: why(e) });
+      }
+    };
     load();
     const poll = setInterval(load, 300000);
     return () => { alive = false; clearInterval(poll); };
   }, [compKey]);
 
-  if (!t) return null;
+  // NOTHING ASKED YET, and THE ANSWER WAS "no tournament for this
+  // competition" — the only two states that may draw nothing at all.
+  if (read.s === "asking" || read.s === "absent") return null;
+
+  if (read.s === "failed" && !lastOk) {
+    return (
+      <section className="mt-10 rounded-2xl border border-warn/40 bg-warn/5 p-5">
+        <Eyebrow>tournament</Eyebrow>
+        <p data-testid="tournament-read-failed" role="status"
+          className="mt-2 text-[12px] leading-relaxed text-warn">
+          The tournament read failed: {read.why}. That is not this
+          competition having no tournament — a competition without one
+          answers 404, and this did not. It is that we could not ask.
+        </p>
+      </section>
+    );
+  }
+
+  const t = read.s === "ok" ? read.d : lastOk!;
+  const staleWhy = read.s === "failed" ? read.why : null;
+
   if (t.available === false) {
     return (
       <section className="mt-10 rounded-2xl border border-dashed border-line p-5">
         <Eyebrow>tournament</Eyebrow>
+        <StaleNotice reason={staleWhy} />
         <p className="mt-2 font-mono text-[11px] text-ink-faint">
           forecast withheld — {t.reason}
         </p>
@@ -91,6 +185,7 @@ export default function TournamentView({ compKey }: { compKey: string }) {
     <Reveal>
       <section className="mt-12">
         <Eyebrow className="mb-2">bracket · forecast</Eyebrow>
+        <StaleNotice reason={staleWhy} />
         <h3 className="mb-1 text-lg font-medium text-ink-hi">
           Road to the title{" "}
           <span className="text-sm font-normal text-ink-low">

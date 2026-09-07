@@ -127,3 +127,278 @@ test.describe("EPL scenario fee policy", () => {
       await expect(page.getByText(/ceil-to-centicent/i)).toBeVisible();
     });
 });
+
+// ====================================================================
+// THE SHARED MATCH HUB — the 2026-09-07 sweep
+// ====================================================================
+//
+// Hermetic, like the block above: one recorded match payload per test,
+// varied in the one field under examination. Every shape below is the
+// backend's (src/live/runs.py `_input_quality`, src/mls.py `_h2h`,
+// src/comp_match.py lineups), not invented — the two worst bugs on the
+// card next door both came from hand-written fixtures that agreed with
+// the frontend instead of with the emitter.
+
+type Hub = import("@playwright/test").Page;
+
+async function openHub(page: Hub, patch: Record<string, unknown> = {},
+                       matchPatch: Record<string, unknown> = {}) {
+  const body = JSON.parse(JSON.stringify(MATCH_PAYLOAD));
+  Object.assign(body, patch);
+  Object.assign(body.match, matchPatch);
+  await page.route("**/api/card/**", (r) =>
+    r.fulfill({ status: 200, contentType: "application/json",
+                body: JSON.stringify({ card: null }) }));
+  await page.route(`**/api/epl/match/${EVENT}`, (r) =>
+    r.fulfill({ status: 200, contentType: "application/json",
+                body: JSON.stringify(body) }));
+  await page.goto(`/bet-suggester/epl/${EVENT}`);
+  return body;
+}
+
+/** A completed run carrying the FIVE input-quality states the backend
+ *  actually freezes on every run. */
+const RUN_WITH_QUALITY = {
+  run_type: "t10", captured_at: "2026-08-22T18:20:00+00:00",
+  seed: 7, n_simulations: 20000,
+  outcomes: { home_win: 0.5, draw: 0.25, away_win: 0.25 },
+  input_quality: {
+    TEAM_DATA_FRESH: true, PLAYER_DATA_FRESH: false,
+    AVAILABILITY_COMPLETE: false, LINEUP_CONFIRMED: true,
+    GOALKEEPER_CONFIRMED: false,
+  },
+};
+
+test.describe("input quality is the payload's set, not a list typed here", () => {
+  test("all FIVE states the backend freezes are drawn — the two that "
+    + "were silently dropped included", async ({ page }) => {
+      // src/live/runs.py `_input_quality` has emitted five states since
+      // Phase 5. QUALITY_LABELS hand-listed three, so PLAYER_DATA_FRESH
+      // and AVAILABILITY_COMPLETE rode on every run, were false on most
+      // of them, and were drawn on none — a panel that exists so
+      // missing data cannot read as silent confidence, silent about two
+      // fifths of it.
+      await openHub(page, { model: { model_version: "epl-2026-v0",
+                                     primary: RUN_WITH_QUALITY } });
+      const chips = page.getByTestId("input-quality-chip");
+      await expect(chips).toHaveCount(5);
+      for (const k of ["TEAM_DATA_FRESH", "PLAYER_DATA_FRESH",
+        "AVAILABILITY_COMPLETE", "LINEUP_CONFIRMED",
+        "GOALKEEPER_CONFIRMED"]) {
+        await expect(page.getByTestId("input-quality")
+          .locator(`[data-key="${k}"]`)).toHaveCount(1);
+      }
+      // and a false one says PENDING rather than going quiet
+      await expect(page.getByTestId("input-quality")
+        .locator('[data-key="PLAYER_DATA_FRESH"]')).toContainText("pending");
+    });
+
+  test("a state the backend adds tomorrow is drawn under its own name",
+    async ({ page }) => {
+      const q = { ...RUN_WITH_QUALITY.input_quality,
+                  REFEREE_ASSIGNED: false };
+      await openHub(page, { model: { primary:
+        { ...RUN_WITH_QUALITY, input_quality: q } } });
+      await expect(page.getByTestId("input-quality-chip")).toHaveCount(6);
+      await expect(page.getByTestId("input-quality")
+        .locator('[data-key="REFEREE_ASSIGNED"]'))
+        .toContainText("referee assigned");
+    });
+
+  test("input_quality NULL is not five pending chips and is not an "
+    + "absent panel — it says the run recorded none", async ({ page }) => {
+      await openHub(page, { model: { primary:
+        { ...RUN_WITH_QUALITY, input_quality: null } } });
+      await expect(page.getByTestId("input-quality-chip")).toHaveCount(0);
+      await expect(page.getByTestId("input-quality-absent"))
+        .toContainText("NOT a statement that the inputs were complete");
+    });
+});
+
+test.describe("a bar is drawn from the numbers beside it, or not at all", () => {
+  test("an unreadable side draws NO bar — it is not a zero", async ({ page }) => {
+      // `(Number.isFinite(h) ? h : 0)` folded an unreadable stat into a
+      // measured zero, so a home value ESPN did not send printed "—"
+      // while the bar beneath it handed the away side the whole width.
+      // state "post" so the Match stats collapse is open by default
+      await openHub(page, {}, { state: "post", detail: "FT", stats: [
+        { key: "possession", label: "Possession", home: undefined,
+          away: "62" },
+      ] });
+      await expect(page.getByTestId("stat-bar-possession")).toHaveCount(0);
+      await expect(page.getByTestId("stat-unreadable-possession"))
+        .toContainText("a share cannot be formed from one number");
+    });
+
+  test("neither side readable draws no 50/50 either — no split is not "
+    + "parity", async ({ page }) => {
+      await openHub(page, {}, { state: "post", detail: "FT", stats: [
+        { key: "shots", label: "Shots", home: "—", away: "—" },
+      ] });
+      await expect(page.getByTestId("stat-bar-shots")).toHaveCount(0);
+      await expect(page.getByTestId("stat-unreadable-shots"))
+        .toContainText("neither side");
+    });
+
+  test("two real numbers still draw the bar — including a real zero",
+    async ({ page }) => {
+      // the control. Without it the two tests above pass against a
+      // component that never draws a bar at all.
+      await openHub(page, {}, { state: "post", detail: "FT", stats: [
+        { key: "corners", label: "Corners", home: "7", away: "0" },
+      ] });
+      await expect(page.getByTestId("stat-bar-corners")).toHaveCount(1);
+      await expect(page.getByTestId("stat-unreadable-corners"))
+        .toHaveCount(0);
+    });
+});
+
+test.describe("team news: could not ask is not not yet announced", () => {
+  const SIDE = (over: Record<string, unknown> = {}) => ({
+    formation: "4-3-3", released: true, confirmed: true,
+    starters: [{ name: "A. Player", position: "F", jersey: "9" }],
+    bench: [], key_absences: null, key_absences_reason: null, ...over });
+
+  test("a side the backend could not resolve does NOT read as awaiting "
+    + "team news", async ({ page }) => {
+      // `!side?.released` gave a NULL side and an unreleased side the
+      // same sentence. "Awaiting team news" asserts the XI has not been
+      // announced yet, which is a claim about the world; a null side is
+      // us not having asked. The honest version of this distinction
+      // already lived four fields down on key_absences.
+      await openHub(page, { lineups: { home: null, away: SIDE(),
+                                       strength_available: true } });
+      const absent = page.getByTestId("xi-side-absent");
+      await expect(absent).toBeVisible();
+      await expect(absent).toContainText("NOT a statement that the XI is unannounced");
+      // and the side that IS unreleased keeps its own, different words
+      await openHub(page, { lineups: { home: SIDE({ released: false,
+        starters: [] }), away: SIDE(), strength_available: true } });
+      await expect(page.getByText("awaiting team news")).toBeVisible();
+      await expect(page.getByTestId("xi-side-absent")).toHaveCount(0);
+    });
+
+  test("an XI reported released with nobody in it says so rather than "
+    + "rendering an empty list", async ({ page }) => {
+      await openHub(page, { lineups: { home: SIDE({ starters: [] }),
+                                       away: SIDE(),
+                                       strength_available: true } });
+      await expect(page.getByTestId("xi-released-empty"))
+        .toContainText("an empty list where eleven names should be");
+    });
+
+});
+
+test.describe("an unrecognised orientation refuses; it does not fold", () => {
+  test("an H2H row with no at_vs does not attribute the two scores to "
+    + "a side", async ({ page }) => {
+      // `g.at_vs === "@"` meant every value that was not the string "@"
+      // — null included — became HOME, and the two scores printed the
+      // wrong way round beside the letter. src/mls.py `_h2h`'s LEGACY
+      // branch passes ESPN's `atVs` through raw and takes `result` from
+      // the provider's own `gameResult`, and its sibling `_last_five`
+      // folds the same unknown the OPPOSITE way. Two folds, opposite
+      // defaults, one flag — the ESPN winner-first bug of 2026-07-24,
+      // one branch over.
+      await openHub(page, {}, { scouting: { last_five: [], head_to_head: [
+        { perspective: "ARS", result: "W", home_score: "1",
+          away_score: "2", at_vs: null, opponent: "MUN",
+          date: "2026-04-02T00:00Z" },
+      ] } });
+      await page.getByRole("button", { name: /ESPN form \+ H2H/i }).click();
+      const row = page.getByTestId("h2h-unoriented");
+      await expect(row).toBeVisible();
+      await expect(row).toContainText("no home/away orientation");
+      await expect(row).toContainText("are NOT attributed to a side");
+    });
+
+  test("a row that DOES carry an orientation is still read normally",
+    async ({ page }) => {
+      // the control: the refusal must not swallow the working case.
+      await openHub(page, {}, { scouting: { last_five: [], head_to_head: [
+        { perspective: "ARS", result: "L", home_score: "1",
+          away_score: "2", at_vs: "vs", opponent: "MUN",
+          date: "2026-04-02T00:00Z" },
+      ] } });
+      await page.getByRole("button", { name: /ESPN form \+ H2H/i }).click();
+      await expect(page.getByTestId("h2h-unoriented")).toHaveCount(0);
+      // perspective is HOME here, so its own score comes first and the
+      // letter agrees with the digits: 1-2 is an L.
+      await expect(page.getByText("ARS 1–2 MUN")).toBeVisible();
+    });
+});
+
+test.describe("a failed refresh is not an up-to-date page", () => {
+  test("the page says the numbers are held when the poll fails",
+    async ({ page }) => {
+      // The 30s poll keeps the last good payload when it fails, which
+      // is right — blanking a live page would read as the match
+      // stopping. Nothing said so, while a panel below labelled the
+      // book it was showing "current market book · live".
+      let calls = 0;
+      await page.route("**/api/card/**", (r) =>
+        r.fulfill({ status: 200, contentType: "application/json",
+                    body: JSON.stringify({ card: null }) }));
+      await page.route(`**/api/epl/match/${EVENT}`, (r) => {
+        calls += 1;
+        if (calls === 1) {
+          return r.fulfill({ status: 200,
+            contentType: "application/json",
+            body: JSON.stringify(MATCH_PAYLOAD) });
+        }
+        return r.fulfill({ status: 503, contentType: "application/json",
+                           body: "{}" });
+      });
+      // the clock is installed BEFORE the page loads: the 30s poll's
+      // interval is created during mount, and a clock installed after
+      // that does not own it.
+      await page.clock.install();
+      await page.goto(`/bet-suggester/epl/${EVENT}`);
+      await expect(page.getByText("Arsenal").first()).toBeVisible();
+      await expect(page.getByTestId("feed-stale")).toHaveCount(0);
+      await page.clock.runFor("00:35");
+      const stale = page.getByTestId("feed-stale");
+      await expect(stale).toContainText("last refresh FAILED");
+      await expect(stale).toContainText("not current");
+      // and the numbers are still there — this is not a blank page
+      await expect(page.getByText("Arsenal").first()).toBeVisible();
+    });
+});
+
+test.describe("a column's caveat is on the page, not on a title", () => {
+  test("the net-edge column states that its two halves come from "
+    + "different moments", async ({ page }) => {
+      // A signed percentage in green or red, whose disclosure that it
+      // subtracts a CURRENT ask from a FROZEN model probability is
+      // reachable only by hovering, is a number that reads as an edge
+      // and is not one — on the one table an operator reads down
+      // looking for something to act on.
+      await openHub(page);
+      const basis = page.getByTestId("markets-column-basis");
+      await expect(basis).toBeVisible();
+      await expect(basis).toContainText("CURRENT ask");
+      await expect(basis).toContainText("Kalshi's entry fee");
+      await expect(basis).toContainText("payout multiple at the buyable ask");
+      // pre-kickoff there is nothing to warn about
+      await expect(page.getByTestId("edge-vs-repriced-book"))
+        .toHaveCount(0);
+    });
+
+  test("on a STARTED match the table says the card one section up "
+    + "refuses this very number", async ({ page }) => {
+      // card.py `_pick` refuses `repriced_book` on any started fixture
+      // and computes no edge, because HOLD-EXIT-DESIGN forbids claiming
+      // an in-play edge. This table computes it anyway, from a T-10
+      // model against a book the match has repriced — and SuggestionCard
+      // renders INSIDE this component, so one screen carried the
+      // refusal and the number it refuses a few hundred pixels apart,
+      // with nothing anywhere saying so.
+      await openHub(page, {}, { state: "in", detail: "2H", minute: "63'" });
+      const warn = page.getByTestId("edge-vs-repriced-book");
+      await expect(warn).toBeVisible();
+      await expect(warn).toContainText("repriced_book");
+      await expect(warn).toContainText("it is not an edge");
+      // it is the refusal family's ink, never the accent
+      await expect(warn).toHaveClass(/text-warn/);
+    });
+});

@@ -242,6 +242,224 @@ const stateRefusals = (m: WatchedMatch): Refusal[] =>
   (m.state?.refusals ?? []).map((r) => ({
     code: r.code, where: "state", says: r.refused }));
 
+// --- a refusal renders ONCE ------------------------------------------
+//
+// WHAT WAS WRONG, IN THE OPERATOR'S OWN WORDS: "every refusal renders
+// TWICE: once as the route's coded sentence and once as the registry's
+// definition", and a code that fired on four fractions and on the whole
+// position printed its paragraph five times over. The finding is not
+// five findings. So the surface now carries ONE CHIP PER CODE, with the
+// number of sites on it, and the sentences — the block's own and the
+// registry's definition — live once each inside the card's single
+// disclosure.
+//
+// GROUPED BY CODE, ORDERED BY THE REGISTRY. `positionRefusals` already
+// walks the payload and sorts by the registry's own order, so this
+// preserves that order and never re-ranks: the first site of a code
+// fixes where the chip sits.
+
+type CodeGroup = { code: string; sites: Refusal[] };
+
+function groupByCode(rs: Refusal[]): CodeGroup[] {
+  const out: CodeGroup[] = [];
+  for (const r of rs) {
+    const hit = out.find((g) => g.code === r.code);
+    if (hit) hit.sites.push(r); else out.push({ code: r.code, sites: [r] });
+  }
+  return out;
+}
+
+// --- the method notes, DERIVED FROM THE PAYLOAD'S OWN BYTES ----------
+//
+// WHY THIS IS A WALK AND NOT A LIST OF PATHS. Every standing sentence
+// this stage writes — BRANCHES_NOT_AVERAGES, the fee basis, the whole-
+// contracts rule, "a map, not a verdict", M0's no-response-window
+// sentence, the category rule — rides on the payload under a dozen
+// different keys, on every block that carries one, so the same sentence
+// reached the surface four and five times over. A hand-listed set of
+// note paths is the shape this repo has already been bitten by: it
+// stays green while the omitted case drifts. So the notes are WALKED
+// out of the match payload, DEDUPED BY TEXT (which is what collapses
+// one rule repeated per block and per fraction into a single line) and
+// kept in the payload's own order of first appearance.
+//
+// THE THRESHOLD IS A JUDGEMENT AND IT IS PRINTED AS ONE. A prose note
+// is a string of at least NOTE_MIN_CHARS characters; below that a value
+// is a label, a code, a price or a clock. Nothing is classified by key
+// NAME, so a sentence added to the payload tomorrow appears here
+// without an edit to this file.
+//
+// WHAT IS EXCLUDED, AND WHY NEITHER IS AN OMISSION:
+//   - a sentence that is already a REFUSAL's sentence. It is rendered
+//     once in the refusal ledger beside its code; printing it again as
+//     a note is the exact duplication this block exists to end;
+//   - anything under `registered`. Those are the payload's own
+//     REGISTERED HOLES — a finding and its `closes_when` — which is
+//     bookkeeping about the payload rather than a fact about this
+//     match, and it does not belong on an operator surface. It stays in
+//     the payload, which is where a guard reads it.
+const NOTE_MIN_CHARS = 60;
+const NOTE_SKIP_KEYS = new Set([
+  "registered", "refusal_codes", "policy_codes", "standing",
+]);
+
+function proseNotes(node: unknown, skip: Set<string>,
+                    out: string[] = [], seen = new Set<string>()): string[] {
+  if (Array.isArray(node)) {
+    for (const v of node) proseNotes(v, skip, out, seen);
+    return out;
+  }
+  if (!isObj(node)) return out;
+  for (const [k, v] of Object.entries(node)) {
+    if (NOTE_SKIP_KEYS.has(k)) continue;
+    if (typeof v === "string") {
+      const t = v.trim();
+      if (t.length >= NOTE_MIN_CHARS && !skip.has(t) && !seen.has(t)) {
+        seen.add(t);
+        out.push(t);
+      }
+      continue;
+    }
+    proseNotes(v, skip, out, seen);
+  }
+  return out;
+}
+
+// --- can the tape be read at all? ------------------------------------
+//
+// THREE ANSWERS, AND THE FIRST TWO ARE NOT THE SAME FACT. This is the
+// distinction that must survive the collapse: a competition nobody
+// tapes and a tape read that FAILED must never look alike, and neither
+// of them is "a quiet match".
+//
+//   read      the newest state-tape row was read and is described.
+//   failed    the read itself failed — position.UnreadableTape reached
+//             this response and every field was withdrawn. The route
+//             names it (`tape_unreadable`) and nothing here re-derives
+//             it.
+//   no_row    the read succeeded and there is no row for this fixture.
+//             DERIVED FROM THE TWO FIELDS THE ROUTE FILLS OFF THE ROW
+//             ITSELF: a row that exists carries a capture clock and a
+//             match_state; one that does not carries neither.
+//
+// FAIL-CLOSED, AND THE ORDER IS THE WHOLE POINT: `failed` is tested
+// FIRST, because a failed read also leaves both fields null, and
+// reading that as `no_row` would turn "we could not look" into "there
+// is nothing there" — the fold this surface exists against.
+type TapeVerdict = "read" | "failed" | "no_row";
+
+export function tapeVerdictOf(m: WatchedMatch): TapeVerdict {
+  const refusals = m.state?.refusals ?? [];
+  if (refusals.some((r) => r?.code === "tape_unreadable")) return "failed";
+  const st = m.state;
+  if (st == null) return "no_row";
+  const noRow = (st.captured_at == null || st.captured_at === "")
+    && (st.match_state == null || st.match_state === "");
+  return noRow ? "no_row" : "read";
+}
+
+/** The competitions the STATE COLLECTOR folds over, as the payload
+ *  itself publishes them — walked, never typed here, and null when the
+ *  payload publishes no such list.
+ *
+ *  NULL MEANS NO CLAIM. With no published fold this surface says "no
+ *  state-tape row for this fixture" and stops. It does not guess that
+ *  the competition is untaped: "we tape it and it wrote nothing" and
+ *  "nothing tapes it" are different findings and only the payload can
+ *  tell them apart. */
+function stateTapedCompetitions(data: WatchedStripResponse): string[] | null {
+  let found: string[] | null = null;
+  const walk = (node: unknown, depth: number) => {
+    if (found !== null || depth > 4) return;
+    if (Array.isArray(node)) { node.forEach((v) => walk(v, depth + 1)); return; }
+    if (!isObj(node)) return;
+    for (const [k, v] of Object.entries(node)) {
+      if (k === "collector_folds_over" && Array.isArray(v)
+          && v.length > 0 && v.every((x) => typeof x === "string")) {
+        found = v as string[];
+        return;
+      }
+      walk(v, depth + 1);
+    }
+  };
+  walk(data as unknown as Record<string, unknown>, 0);
+  return found;
+}
+
+/** The one line a match the tape cannot read gets, in the payload's own
+ *  terms and never imputing which of the two it is. */
+function tapeLine(m: WatchedMatch, verdict: TapeVerdict,
+                  taped: string[] | null): string {
+  if (verdict === "failed") {
+    return "the tape read FAILED — every figure is withdrawn, and "
+      + "nothing here says whether this match is running";
+  }
+  if (taped === null) return "no state-tape row for this fixture";
+  return taped.includes(m.competition_slug)
+    ? "the collector taps this competition and has written no state-tape "
+      + "row for this fixture"
+    : "no state tape for this competition — the collector does not fold "
+      + "over it, so no row was ever written";
+}
+
+// --- a list the payload did not carry is not a list of nothing --------
+//
+// THE FIX THAT HELD ONE FILE OVER AND NOT IN THIS ONE. WatchDeclaration
+// closed exactly this shape for the declared set — *"DERIVED FROM THE
+// PAYLOAD'S OWN SHAPE, not from its truthiness … Absence of the list is
+// not a list of nothing"* — and gave the answer its own name
+// (`setIsReadable`) so a row reads "declared set unread" rather than
+// "not watched". This file kept `data.matches ?? []`, which reads "the
+// payload carried no `matches` key" as "no match is declared" and then
+// returns NULL: a blank Live section, which is the one conclusion this
+// whole component exists against, produced from an answer that said
+// nothing. The same shape, one file over. It is closed the same way.
+//
+// REQUIRED, NOT OPTIONAL, AND THE DIFFERENCE COMES OFF THE RECORDED
+// CONTRACT rather than from a judgement here: `matches` and
+// `open_positions_not_monitored` are declared NON-OPTIONAL in
+// lib/suggesterApi.ts's WatchedStripResponse — every payload recorded
+// off this route carries both — so a payload without one is an answer
+// this surface could not read, not an empty set.
+// `monitored_not_described` and `policy_codes` are declared optional
+// there and are read as optional here.
+//
+// EVERY LIST THIS SURFACE COUNTS GOES THROUGH ONE READER, so a fourth
+// one cannot be the one that forgets, and the set is cross-checked
+// against CONSUMED_ENVELOPE_KEYS by the guard in
+// e2e/watched-strip.spec.ts.
+export const REQUIRED_LISTS: readonly string[] = [
+  "matches", "open_positions_not_monitored",
+];
+
+/** The list under `key`, or NULL when the payload carried no list
+ *  there. Never `[]` — an empty list is a finding and this is not one. */
+function requiredList<T>(data: WatchedStripResponse, key: string): T[] | null {
+  const v = (data as unknown as Record<string, unknown>)[key];
+  return Array.isArray(v) ? (v as T[]) : null;
+}
+
+/** The required lists this payload did not carry, NAMED. Drawn, because
+ *  the alternative is the blank that means "nothing is live". */
+function UnreadableLists({ keys }: { keys: readonly string[] }) {
+  if (keys.length === 0) return null;
+  const one = keys.length === 1;
+  return (
+    <p data-testid="watched-lists-unreadable" data-keys={keys.join(",")}
+      aria-live="polite"
+      className="mt-3 rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-[12px] leading-relaxed text-warn">
+      This read answered without{" "}
+      <span className="font-mono">{keys.join(", ")}</span> — {one
+        ? "a list this section counts"
+        : "lists this section counts"}, and every payload recorded off
+      this route carries {one ? "it" : "them"}. Nothing is drawn from{" "}
+      {one ? "it" : "them"} and NOTHING HERE SAYS THE SET IS EMPTY: a
+      count off a key that never arrived would be this section reporting
+      a number nobody sent.
+    </p>
+  );
+}
+
 // --- the strip --------------------------------------------------------
 
 export default function WatchedStrip() {
@@ -311,17 +529,35 @@ export default function WatchedStrip() {
   // "no live matches" and this surface has no evidence for that.
   if (!data) return refusal ? <GateNotice r={refusal} /> : null;
   if (data.dormant) return null;
-  const matches = data.matches ?? [];
-  const orphans = data.open_positions_not_monitored ?? [];
+  // A KEY THE PAYLOAD DID NOT CARRY IS NOT AN EMPTY LIST — read through
+  // `requiredList`, never through `?? []`. See the block above it.
+  const matches = requiredList<WatchedMatch>(data, "matches");
+  const orphans = requiredList<number>(data, "open_positions_not_monitored");
+  const unreadableLists = REQUIRED_LISTS.filter(
+    (k) => requiredList(data, k) === null);
   // A DECLARED MATCH THAT IS NOT IN `matches`. The backend registers
   // this hole (WATCHED_STRIP_OPEN["no_identity_row"]) and says in the
   // record that an operator watching the strip alone would not see it.
   // Drawing it here is what closes that half: a match that silently
   // drops off this surface is the defect the stage was reported for.
+  //
+  // OPTIONAL ON THE RECORDED CONTRACT, so its absence is not a failed
+  // read: `monitored_not_described?` is declared optional in
+  // lib/suggesterApi.ts because payloads recorded off this route do not
+  // all carry it. Folding an absent OPTIONAL key to an empty list says
+  // only what the contract says; folding an absent REQUIRED one would
+  // be a claim, which is why the two are read differently.
   const undescribed = data.monitored_not_described ?? [];
-  // ABSENT, NOT EMPTY — with the exceptions that are findings.
-  if (matches.length === 0 && orphans.length === 0
+  // ABSENT, NOT EMPTY — with the exceptions that are findings, and
+  // A LIST THAT COULD NOT BE READ IS NEVER ONE OF THE EMPTY CASES.
+  if (unreadableLists.length === 0
+      && matches!.length === 0 && orphans!.length === 0
       && undescribed.length === 0) return null;
+  // From here the two are drawn as far as they were readable. A list
+  // that was NOT readable draws no rows AND is named by
+  // `UnreadableLists` below — it never quietly contributes zero.
+  const matchRows = matches ?? [];
+  const orphanRows = orphans ?? [];
 
   const registry = data.refusal_codes ?? {};
   const bySource = data.monitored_by_source ?? {};
@@ -334,12 +570,17 @@ export default function WatchedStrip() {
   // add back to `matches` exactly. Array.prototype.sort is not used:
   // two lists make the partition obvious and keep the payload's own
   // order inside each.
-  const live = matches.filter(isInPlay);
-  const rest = matches.filter((m) => !isInPlay(m));
+  const live = matchRows.filter(isInPlay);
+  const rest = matchRows.filter((m) => !isInPlay(m));
   // The tape states that MEAN in play, as the PAYLOAD carries them.
   // null = this payload published no such registry, and this surface
   // then makes no claim about which states are in play.
   const inPlayStates = inPlayStatesOf(data);
+  // THE COLLECTOR'S OWN COMPETITION FOLD, from the payload or not at
+  // all. It is what tells "no state tape is written for this
+  // competition" apart from "the tape read FAILED" on a match with no
+  // row — the one distinction the collapse below must not lose.
+  const stateTaped = stateTapedCompetitions(data);
 
   return (
     <section data-testid="watched-strip" aria-labelledby="watched-strip-h"
@@ -366,13 +607,31 @@ export default function WatchedStrip() {
           </span>
         </p>
       </div>
-      <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-ink-low">
-        The live read, the position, both branches and what certainty
-        costs — for the matches you declared, and only those. Nothing here
-        is a recommendation and no line names a moment to do anything:
-        it states what the market will pay to end the exposure and what
-        that costs against a measured base rate. You decide.
-      </p>
+      {/* ONE LINE, NOT FOUR. The charter used to open this section as a
+          paragraph above every match; it is the same sentence on every
+          poll and it was shouting over the one match the ball is moving
+          in. The rule it states has not changed and is not hidden — it
+          is the summary of the section's own disclosure, one line down,
+          and every card repeats nothing of it. */}
+      <details data-testid="watched-strip-charter" className="mt-2">
+        {/* THE CHARTER IS THE SUMMARY, NOT THE CONTENTS. Compressing
+            the paragraph to one line was right; putting the whole of it
+            behind a CLOSED disclosure was not, because a reader arrives
+            without the one sentence that says whose call this is — and
+            `innerText` agrees, which is how the guard caught it. The
+            line that states the rule is now the visible half and the
+            elaboration is what folds away. */}
+        <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
+          nothing here is a recommendation — you decide
+        </summary>
+        <p className="mt-1.5 max-w-3xl text-[12px] leading-relaxed text-ink-low">
+          The live read, the position, both branches and what certainty
+          costs — for the matches you declared, and only those. No line
+          names a moment to do anything: it states what the market will
+          pay to end the exposure and what that costs against a measured
+          base rate. You decide.
+        </p>
+      </details>
 
       {staleSince && (
         <p data-testid="watched-stale" role="status"
@@ -395,13 +654,15 @@ export default function WatchedStrip() {
         </p>
       )}
 
-      {orphans.length > 0 && (
+      <UnreadableLists keys={unreadableLists} />
+
+      {orphanRows.length > 0 && (
         <p data-testid="watched-orphans"
           className="mt-3 rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-[12px] leading-relaxed text-warn">
-          {orphans.length} open position{orphans.length === 1 ? " is" : "s are"}{" "}
-          on {orphans.length === 1 ? "a fixture" : "fixtures"} nobody
-          declared — fixture {orphans.join(", ")}.{" "}
-          {orphans.length === 1 ? "It is" : "They are"} not being read
+          {orphanRows.length} open position{orphanRows.length === 1 ? " is" : "s are"}{" "}
+          on {orphanRows.length === 1 ? "a fixture" : "fixtures"} nobody
+          declared — fixture {orphanRows.join(", ")}.{" "}
+          {orphanRows.length === 1 ? "It is" : "They are"} not being read
           here. A set that silently omits an open position is a census of
           nothing, so it is named rather than dropped.
         </p>
@@ -440,11 +701,13 @@ export default function WatchedStrip() {
                   </span>
                 )}
                 {u.refused && <> — {u.refused}</>}
-                {u.registered?.closes_when && (
-                  <span className="block text-ink-low">
-                    Closes when: {u.registered.closes_when}
-                  </span>
-                )}
+                {/* THE REGISTERED HOLE IS NOT DRAWN. `u.registered`
+                    carries the route's own finding and its
+                    `closes_when` — bookkeeping about the payload, not a
+                    fact about this fixture — and it stays in the
+                    payload, where a guard reads it, rather than sitting
+                    on an operator surface. What the operator needs, the
+                    policy code and its sentence, is above. */}
               </li>
             ))}
           </ul>
@@ -486,7 +749,7 @@ export default function WatchedStrip() {
             {live.map((m) => (
               <MatchBlock key={m.fixture_id} m={m} registry={registry}
                 policyCodes={data.policy_codes ?? {}}
-                inPlayStates={inPlayStates} />
+                inPlayStates={inPlayStates} stateTaped={stateTaped} />
             ))}
           </section>
         )}
@@ -496,7 +759,7 @@ export default function WatchedStrip() {
               {rest.map((m) => (
                 <MatchBlock key={m.fixture_id} m={m} registry={registry}
                   policyCodes={data.policy_codes ?? {}}
-                  inPlayStates={inPlayStates} />
+                  inPlayStates={inPlayStates} stateTaped={stateTaped} />
               ))}
             </CollapsedGroup>
           </section>
@@ -787,14 +1050,41 @@ function GateNotice({ r }: { r: WatchedStripRefusal }) {
 }
 
 // --- one watched match ------------------------------------------------
+//
+// TWO SHAPES, AND WHICH ONE IS DECIDED BY WHETHER THE TAPE COULD BE
+// READ AT ALL.
+//
+// THE FINDING THAT FORCED THIS. A declared fixture with no tape row
+// rendered a full card: four paragraphs of charter and coverage prose,
+// three refusals — not_in_play, no_minute, no_score — each printed
+// twice, once as the route's coded sentence and once as the registry's
+// definition, and a closing paragraph of the payload's own registered
+// holes. All of it says one thing: THERE IS NO ROW. Thirty-seven of
+// those buried the one match the ball was moving in.
+//
+// So a match the tape cannot read is ONE LINE: the clubs, the
+// competition, and which of the two absences it is. Nothing is
+// filtered, nothing leaves the DOM and nothing leaves the record — the
+// line is still an <article> with the same testid, the same fixture id
+// and the same in-play flag as a card, and every refusal it carries is
+// still named, once, inside its own disclosure. A COUNT IS NOT A
+// CENSUS: what collapses is the DISPLAY.
+//
+// THE ONE-LINE FORM IS ONLY TAKEN WHEN THERE IS NOTHING ELSE TO SHOW.
+// A position on the fixture, or a persisted read on it, is drawn as a
+// card however silent the tape is — those are figures, and a figure is
+// never collapsed into a line about the tape.
 
-function MatchBlock({ m, registry, policyCodes, inPlayStates }: {
+function MatchBlock({ m, registry, policyCodes, inPlayStates, stateTaped }: {
   m: WatchedMatch;
   registry: Record<string, string>;
   policyCodes: Record<string, string>;
   /** the payload's own in-play tape states, or null when it published
    *  none — null means no claim, never a fallback guess */
   inPlayStates: string[] | null;
+  /** the competitions the state collector folds over, as the payload
+   *  publishes them, or null for NO CLAIM */
+  stateTaped: string[] | null;
 }) {
   const hue = hueFor(m.competition_slug);
   const hid = `watched-${m.fixture_id}-h`;
@@ -808,7 +1098,14 @@ function MatchBlock({ m, registry, policyCodes, inPlayStates }: {
   const minute = st.minute != null ? `${Math.round(st.minute)}'` : null;
   const cover = m.coverage;
   const positions = m.positions ?? [];
+  const readSides = Object.keys(m.read?.sides ?? {});
+  // EVERY REFUSAL ON THIS MATCH, COLLECTED ONCE AND USED TWICE: as the
+  // chips beside the block that could not produce a number, and as the
+  // ledger inside this card's one disclosure. One collector, so a chip
+  // and its sentence can never drift apart.
   const shared = [...stateRefusals(m), ...readRefusals(m)];
+  const perPosition = positions.map((p) => positionRefusals(p, registry));
+  const allRefusals = [...shared, ...perPosition.flat()];
 
   const live = isInPlay(m);
   // THE WORD IS DERIVED FROM THE VALUE BESIDE IT. `in_play` IS
@@ -826,20 +1123,73 @@ function MatchBlock({ m, registry, policyCodes, inPlayStates }: {
   const markDisagrees = live && inPlayStates !== null
     && (stateWord === null || !inPlayStates.includes(stateWord));
 
+  const verdict = tapeVerdictOf(m);
+  const asLine = verdict !== "read" && positions.length === 0
+    && readSides.length === 0;
+
+  const identity = (
+    <>
+      {hue && (
+        <i aria-hidden className="h-2 w-2 shrink-0 rounded-full"
+          style={{ background: hue }} />
+      )}
+      <h3 id={hid} className="text-[15px] font-medium text-ink-hi">
+        {m.home} <span className="text-ink-faint">v</span> {m.away}
+      </h3>
+      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
+        {m.competition_slug}
+      </span>
+    </>
+  );
+
+  if (asLine) {
+    return (
+      <article data-testid="watched-match" data-fixture={m.fixture_id}
+        data-in-play={live ? "true" : "false"} data-render="line"
+        data-tape={verdict}
+        aria-labelledby={hid}
+        className="rounded-xl border border-line bg-bs px-4 py-2.5">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          {identity}
+          <span data-testid="watched-match-oneline" data-tape={verdict}
+            className="ml-auto text-right font-mono text-[11px] leading-snug text-warn">
+            {tapeLine(m, verdict, stateTaped)}
+          </span>
+        </div>
+        {/* THE SUMMARY IS A LABEL, NOT A CLAIM. It read "why there is
+            nothing to read here", which asserts the very thing the two
+            reads below may not have established: `positions.length ===
+            0` is also what a FAILED journal read looks like and
+            `sides` is empty on a live read that FAILED, so this line
+            is taken on a match where two reads could not be made and
+            the summary above them said there was nothing to read. What
+            this surface can honestly say is which shape it drew.
+
+            AND THE TWO SENTENCES ARE DRAWN, not left to the prose walk.
+            On a CARD `read.words` and `positions_note` sit on the face;
+            on a line they had no home, so they fell through
+            `proseNotes`' >= 60-character threshold — into an unlabelled
+            grey note if they were long enough, and out of the DOM
+            entirely if they were not. */}
+        <CardNotes m={m} registry={registry} refusals={allRefusals}
+          summary="what this line does not say · method · every refusal"
+          shown={[readAbsentWords(m), m.positions_note,
+                  possessionCaveat(m), ...faceProse(m)]}
+          lead={<LineReads m={m} />} />
+        <UncodedAbsences m={m} registry={registry} />
+      </article>
+    );
+  }
+
   return (
     <article data-testid="watched-match" data-fixture={m.fixture_id}
-      data-in-play={live ? "true" : "false"}
+      data-in-play={live ? "true" : "false"} data-render="card"
+      data-tape={verdict}
       aria-labelledby={hid}
       className={`rounded-xl border bg-bs px-4 py-4 sm:px-5 ${
         live ? "border-live/50" : "border-line"}`}>
       <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        {hue && (
-          <i aria-hidden className="h-2 w-2 shrink-0 rounded-full"
-            style={{ background: hue }} />
-        )}
-        <h3 id={hid} className="text-[15px] font-medium text-ink-hi">
-          {m.home} <span className="text-ink-faint">v</span> {m.away}
-        </h3>
+        {identity}
         {live && (
           <span data-testid="watched-in-play"
             data-match-state={stateWord ?? "absent"}
@@ -857,9 +1207,6 @@ function MatchBlock({ m, registry, policyCodes, inPlayStates }: {
             </span>
           </span>
         )}
-        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
-          {m.competition_slug}
-        </span>
         <span data-testid="watched-scoreline"
           className="ml-auto font-mono text-sm tabular-nums text-ink-hi">
           {score ?? (
@@ -890,75 +1237,405 @@ function MatchBlock({ m, registry, policyCodes, inPlayStates }: {
         </p>
       )}
 
+      {/* THE TAPE, WHEN IT COULD NOT BE READ AND THERE ARE STILL
+          FIGURES TO DRAW. The card keeps its line: a position priced
+          off a book is not evidence that the match was observed, and a
+          silent header would let the figures below stand as if it had
+          been. */}
+      {verdict !== "read" && (
+        <p data-testid="watched-match-oneline" data-tape={verdict}
+          className="mt-2 font-mono text-[11px] leading-snug text-warn">
+          {tapeLine(m, verdict, stateTaped)}
+        </p>
+      )}
+
       {/* COVERAGE — the mid-way-join answer, and it is a POLICY fact
           about the monitored set, not a refused number, so it is worded
-          and coded under its own vocabulary. */}
-      <p data-testid="watched-coverage"
-        className={`mt-2 text-[12px] leading-relaxed ${
+          and coded under its own vocabulary. THE CHIP IS THE ANSWER AND
+          THE SENTENCES ARE IN THE DISCLOSURE: `complete_history` is a
+          boolean the operator reads at a glance, and the coverage prose
+          — which watch, from whom, under which policy — is method. */}
+      <p data-testid="watched-coverage" data-complete={
+          cover?.complete_history === true ? "true"
+            : cover?.complete_history === false ? "false" : "unknown"}
+        className={`mt-2 font-mono text-[11px] ${
           cover?.complete_history ? "text-ink-faint" : "text-warn"}`}>
         {cover?.complete_history
-          ? `Declared before kickoff — ${cover.history ?? "the read spans the whole match"}.`
-          : <>
-              {cover?.history ?? "This watch did not begin at kickoff."}{" "}
-              {cover?.no_history_is_not_quiet}
-              {cover?.unobserved_before_minute != null && (
-                <> The tape before minute {cover.unobserved_before_minute} does
-                   not exist for this watch.</>
-              )}
-            </>}
-        {cover?.source && (
-          <span className="text-ink-faint">
-            {" "}Source: {cover.source.replace(/_/g, " ")}
-            {cover.source_meaning ? ` — ${cover.source_meaning}` : ""}
-            {cover.actor ? `, declared by ${cover.actor}` : ""}.
-          </span>
-        )}
+          ? "history · complete — declared before kickoff"
+          : cover == null
+            ? "history · no coverage block on this payload"
+            : "history · PARTIAL — this watch did not begin at kickoff"}
+        {cover?.unobserved_before_minute != null
+          && ` · nothing before minute ${cover.unobserved_before_minute}`}
         {cover?.policy_code && (
-          <span className="text-ink-faint">
-            {" "}Policy: {cover.policy_code}
-            {policyCodes[cover.policy_code]
-              ? ` — ${policyCodes[cover.policy_code]}` : ""}.
-          </span>
+          <span className="text-ink-faint"> · policy {cover.policy_code}</span>
         )}
+        <span className="sr-only">
+          {" "}— what this watch actually observed. The words behind it,
+          and the policy code&apos;s own definition, are in “method,
+          definitions and every refusal in full” at the foot of this
+          card.
+        </span>
       </p>
 
       {/* 1 — THE STATE: the live read's components */}
       <ReadBlock m={m} />
 
       {/* 2..5 — per held position */}
+      {/* NO POSITION, OR NO ANSWER — AND THEY ARE NOT THE SAME FACT.
+          `positions_note` is the route's own sentence for a journal
+          read that REFUSED or FAILED; an empty list beside it does not
+          mean nothing is held, it means nobody could look. So when the
+          payload carries the note it is DRAWN, and excluded from the
+          notes below rather than printed twice.
+
+          AND AN EMPTY LIST WITH NO NOTE SAYS NOTHING AT ALL. This
+          branch used to read "nothing is held on this fixture", with
+          the comment beside it claiming that a silent empty list "is
+          the one case where 'nothing is held' is what the payload
+          actually said". It is the exact opposite: api/main.py's
+          `_positions` puts journal.held_positions' own `refused`
+          wording on `positions_note` WHENEVER the list is empty, so an
+          empty list with no note is a payload that did not answer —
+          and this surface was answering for it, in its own words, with
+          the louder of the two claims. */}
       {positions.length === 0 ? (
         <p data-testid="watched-no-position"
-          className="mt-4 border-t border-line pt-3 text-[12px] leading-relaxed text-ink-low">
-          {m.positions_note
-            ?? "Nothing is on this fixture. It is watched, and the read "
-               + "above is being scored either way — which is what "
-               + "declaring it before the evidence buys."}
+          data-note={m.positions_note ? "payload" : "unstated"}
+          className="mt-3 border-t border-line pt-3 text-[11px] leading-relaxed text-warn">
+          {m.positions_note ?? (
+            <>this response carries no position on this fixture and no
+              words for that
+              <span className="sr-only">
+                {" "}— every payload recorded off this route puts the
+                journal read&apos;s own sentence here when it holds no
+                position, so an empty list with nothing beside it is an
+                answer that was not given, and not a finding about what
+                is on this fixture.
+              </span>
+            </>
+          )}
         </p>
       ) : positions.map((p, i) => (
         <PositionBlock key={p.journal_entry?.bet_id ?? i} p={p}
-          registry={registry} />
+          refusals={perPosition[i]} />
       ))}
 
-      {/* the refusals that belong to the MATCH rather than to a position */}
-      <RefusalList refusals={shared} registry={registry}
-        testid="watched-match-refusals"
-        heading="refused on this match" />
+      {/* the refusals that belong to the MATCH rather than to a
+          position — as CHIPS. Their sentences and the registry's own
+          definitions are in the one disclosure below, once each. */}
+      <RefusalChips refusals={shared} testid="watched-match-refusals" />
+
+      {/* ONE DISCLOSURE PER CARD. Method, definitions and every refusal
+          in full — real text in the accessible tree, and not a word of
+          it above the match. */}
+      <CardNotes m={m} registry={registry} refusals={allRefusals}
+        policyCodes={policyCodes}
+        shown={[readAbsentWords(m), m.positions_note,
+                possessionCaveat(m), ...faceProse(m)]} />
+      <UncodedAbsences m={m} registry={registry} />
     </article>
   );
 }
 
+// --- the chips, and the one disclosure behind them --------------------
+
+/** A refusal, ONCE, as a short chip carrying its registry name and how
+ *  many sites on this block produced it.
+ *
+ *  THE NAME IS ON THE SURFACE AND THE SENTENCE IS ONE CLICK AWAY. A
+ *  refusal is first-class here as it always was — named, counted, never
+ *  imputed and never zero-filled — but a finding that fired on four
+ *  fractions is ONE finding, and it now reads as one. `data-code` and
+ *  `data-sites` are what a guard reads; the ledger inside the card's
+ *  disclosure carries the block's own sentence for every site and the
+ *  registry's definition of the name, each exactly once. */
+function RefusalChips({ refusals, testid }: {
+  refusals: Refusal[]; testid: string;
+}) {
+  const groups = groupByCode(refusals);
+  if (groups.length === 0) return null;
+  return (
+    <ul data-testid={testid} data-codes={groups.length}
+      className="mt-2 flex flex-wrap items-center gap-1.5">
+      {groups.map((g) => (
+        <li key={g.code} data-testid="watched-refusal" data-code={g.code}
+          data-sites={g.sites.length}
+          className="rounded border border-warn/50 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-warn">
+          {g.code.replace(/_/g, " ")}
+          {g.sites.length > 1 && (
+            <span className="text-ink-faint"> ×{g.sites.length}</span>
+          )}
+          {/* A CHIP IS A NAME, AND THAT INCLUDES THE HALF ONLY A
+              SCREEN READER HEARS. `innerText` carries sr-only text, so
+              a paragraph here made the chip a paragraph for one reader
+              and a name for the other — which is the same surface
+              saying two different things. The count and where the
+              definition lives are what a name needs; the reason each
+              block gave is in the disclosure, once. */}
+          <span className="sr-only">
+            {" "}— refused at {g.sites.length}{" "}
+            {g.sites.length === 1 ? "block" : "blocks"}; defined below.
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** ONE DISCLOSURE PER CARD: the refusal ledger and the method notes.
+ *
+ *  WHAT IS IN HERE AND WHY IT IS NOT ON THE SURFACE. Every sentence
+ *  below is either a definition (what a number means, what a rule is,
+ *  what the payload refuses to claim) or a refusal's own reason. None
+ *  of it is a figure and none of it changes between polls, so on the
+ *  surface it was noise that grew with the number of blocks — the same
+ *  rule repeated per block and per fraction, over four paragraphs,
+ *  above a match that was actually being played.
+ *
+ *  IT IS REAL TEXT IN THE ACCESSIBLE TREE. A <details> is a disclosure,
+ *  not a tooltip and not a `title=`: the summary is a control, the
+ *  content is markup a screen reader reaches by opening it, and nothing
+ *  here rides on an attribute or on a colour.
+ *
+ *  WHAT IS NOT IN HERE: the payload's REGISTERED HOLES. `registered`
+ *  subtrees are skipped by the walk — a finding about the payload's own
+ *  unfinished business, with its `closes_when`, is bookkeeping for a
+ *  guard and not something to hand an operator mid-match. */
+function CardNotes({ m, registry, refusals, policyCodes, summary,
+                     shown = [], lead }: {
+  m: WatchedMatch;
+  registry: Record<string, string>;
+  refusals: Refusal[];
+  policyCodes?: Record<string, string>;
+  summary?: string;
+  /** sentences this card already draws on its face. Excluded from the
+   *  notes so that NOTHING on a card is rendered twice — which is the
+   *  whole point of this block. */
+  shown?: (string | null | undefined)[];
+  /** blocks a CARD draws on its face and a LINE has no room for, drawn
+   *  here first and under their own testids rather than left to the
+   *  prose walk, which classifies by length and drops anything short */
+  lead?: React.ReactNode;
+}) {
+  const groups = groupByCode(refusals);
+  // The refusal sentences are rendered in the ledger; excluded from the
+  // notes so no sentence on this card appears twice.
+  const said = new Set<string>([
+    ...refusals.map((r) => r.says).filter(Boolean),
+    ...shown.filter((x): x is string => typeof x === "string" && x !== ""),
+  ]);
+  const notes = proseNotes(m, said);
+  const policy = m.coverage?.policy_code;
+  if (groups.length === 0 && notes.length === 0 && lead == null) return null;
+  return (
+    <details data-testid="watched-card-notes" className="mt-3">
+      <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
+        {summary ?? "method · definitions · every refusal in full"}
+      </summary>
+      <div className="mt-2 space-y-2 border-l border-line pl-3">
+        {lead}
+        {groups.length > 0 && (
+          <ul data-testid="watched-refusal-ledger"
+            className="space-y-1.5">
+            {groups.map((g) => (
+              <li key={g.code} data-testid="watched-refusal-detail"
+                data-code={g.code} data-sites={g.sites.length}
+                className="text-[12px] leading-relaxed text-warn">
+                <span className="font-mono font-semibold">{g.code}</span>
+                {/* THE REGISTRY'S DEFINITION, ONCE PER CODE. A code the
+                    payload's registry does not define is shown as the
+                    bare name rather than glossed with a guess. */}
+                {registry[g.code]
+                  ? <span className="text-ink-low"> — {registry[g.code]}</span>
+                  : (
+                    <span className="text-ink-low">
+                      {" "}— this payload&apos;s registry does not define this
+                      name, so nothing is put in its place.
+                    </span>
+                  )}
+                <ul className="mt-0.5 space-y-0.5">
+                  {g.sites.map((r) => (
+                    <li key={`${r.code}@${r.where}`}
+                      data-testid="watched-refusal-site" data-where={r.where}
+                      className="text-[11px] leading-relaxed text-ink-mid">
+                      <span className="font-mono text-ink-faint">{r.where}</span>
+                      {r.says ? <> — {r.says}</> : null}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        )}
+        {policy && policyCodes?.[policy] && (
+          <p data-testid="watched-coverage-policy" data-code={policy}
+            className="text-[11px] leading-relaxed text-ink-faint">
+            {/* THE OTHER VOCABULARY, UNDER ITS OWN HEADING AND NEVER
+                COUNTED WITH THE REFUSALS ABOVE: a policy code names a
+                decision about the monitored SET, a refusal code names a
+                number that could not be produced. */}
+            policy {policy} — {policyCodes[policy]}
+          </p>
+        )}
+        {notes.map((t) => (
+          <p key={t} data-testid="watched-note"
+            className="text-[11px] leading-relaxed text-ink-faint">
+            {t}
+          </p>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+/** THE TWO READS A ONE-LINE MATCH HAS NO ROOM FOR, drawn inside its
+ *  disclosure under their own testids.
+ *
+ *  WHY THIS EXISTS. The line is taken when the tape could not be read
+ *  AND there is no position AND no read side — and the last two are
+ *  ALSO exactly what a journal read that FAILED and a live read that
+ *  FAILED look like (api/main.py `_positions` returns `[]` with the
+ *  failure on `positions_note`; `_read` returns `sides: {}` with the
+ *  failure on `read.words`). On a card both sentences sit on the face.
+ *  On a line they had nowhere to go, so they fell through
+ *  `proseNotes`, which keeps a string only if it is at least
+ *  NOTE_MIN_CHARS long and then prints it as an unlabelled method note
+ *  — a failed read rendered as a definition, or dropped outright.
+ *
+ *  IT DOES NOT CLASSIFY THEM, BECAUSE IT CANNOT. Neither key carries a
+ *  code, so "we could not look" and "there is nothing" arrive as one
+ *  untyped string and this surface cannot tell them apart. That is
+ *  REGISTERED — UNCODED_ABSENCE_KEYS, below, with the condition that
+ *  closes it — and until it closes, the payload's own sentence is
+ *  drawn verbatim and nothing is inferred from it. */
+function LineReads({ m }: { m: WatchedMatch }) {
+  const read = readAbsent(m);
+  const held = m.positions_note;
+  return (
+    <>
+      <p data-testid="watched-line-read" data-source={read.source}
+        className="text-[11px] leading-relaxed text-warn">
+        the live read — {read.words}
+      </p>
+      <p data-testid="watched-line-positions"
+        data-note={held ? "payload" : "unstated"}
+        className="text-[11px] leading-relaxed text-warn">
+        the journal read — {held ?? "this response carries no position on "
+          + "this fixture and no words for that, so nothing here says "
+          + "whether one is held"}
+      </p>
+    </>
+  );
+}
+
 // --- 1. the state: the live read's four components, per side ----------
+//
+// THE READ'S OWN ABSENCE STAYS ON THE FACE OF THE CARD, and it is the
+// only prose that does. `live_read`'s words are the difference between
+// "no component read has been persisted" (a statement about the
+// collector) and "THE LIVE READ COULD NOT BE READ" (a statement about
+// this poll), and folding those two together is the failure this stage
+// was built against. So it is drawn where the read would have been —
+// and, because it is drawn, it is excluded from the card's notes rather
+// than printed a second time down there.
+
+/** The words for a read with no sides — THE PAYLOAD'S, or a named
+ *  absence about the payload itself, and the two are told apart by
+ *  `source` rather than by reading the sentence.
+ *
+ *  THIS FILE NO LONGER WRITES THE BACKEND'S OWN ABSENT-CASE SENTENCE.
+ *  The fallback used to be live_read.read_for_fixture's wording for
+ *  "no component read has been persisted", typed out here — so a
+ *  payload that carried NO words at all rendered as a positive
+ *  statement about the collector that nothing on the response
+ *  supports, in the same ink and under the same testid as the
+ *  backend's own. A read block with neither sides nor words is a
+ *  payload that said nothing; that is what is said, and `source`
+ *  is what a guard reads. */
+function readAbsent(m: WatchedMatch): {
+  words: string; source: "payload" | "unstated";
+} {
+  const w = m.read?.words;
+  if (typeof w === "string" && w.trim() !== "") {
+    return { words: w, source: "payload" };
+  }
+  return {
+    source: "unstated",
+    words: "This response carries no live read for this fixture and no "
+      + "words for its absence — neither a persisted read nor a reason "
+      + "there is none. Nothing here says the collector wrote nothing.",
+  };
+}
+
+const readAbsentWords = (m: WatchedMatch): string => readAbsent(m).words;
+
+
+/** THE CAVEAT IS ONE FACT ABOUT ONE COMPONENT, NOT ONE PER SIDE. The
+ *  payload hangs `possession_is_distrusted` on the possession component
+ *  of every side that has one, so drawing it where it hangs put the
+ *  same sentence on the face twice — home and away — and a third time
+ *  in the card's disclosure, which is precisely what the card's note
+ *  guard exists to catch. It is read once here, drawn once under the
+ *  two sides (beside the numbers it qualifies, not hidden behind a
+ *  disclosure), and passed to CardNotes as already-said so the prose
+ *  walk does not repeat it. */
+/** EVERY PAYLOAD SENTENCE A POSITION DRAWS ON ITS FACE, in one place.
+ *
+ *  The note walk collects payload prose over a length threshold into the
+ *  card's one disclosure, and CardNotes excludes whatever the face has
+ *  already said. Each of these was drawn on the face by a block that
+ *  meant to — the asymmetry FINDING is about this position and its own
+ *  comment says it stays on the card, while the RULE beside it is the
+ *  same paragraph on every position ever priced and belongs in the
+ *  disclosure — but none of them was declared, so each landed in both
+ *  places. They are collected here rather than beside each caller so
+ *  that "what the face says" is one readable list instead of an
+ *  argument spread over three call sites. */
+function faceProse(m: WatchedMatch): string[] {
+  const out: (string | null | undefined)[] = [];
+  for (const p of m.positions ?? []) {
+    const cert = p.certainty_premium;
+    out.push(cert?.line, cert?.asymmetry?.finding);
+    // A FAILED DEPTH READ IS NAMED ON THE FACE, never folded into "no
+    // depth" — so it is said here too.
+    const book = p.partial_exit?.book;
+    out.push(book?.depth_read, book?.depth_read_note);
+    // THE ROUNDING RULE IS STATED ON EVERY ROW IT CHANGES, and the row
+    // states it inside its own `no_whole_contract` sentence. The
+    // standing paragraph under `rounding` is that same text, so leaving
+    // it to the prose walk put the rule on the face and again in the
+    // disclosure — one rule, read twice.
+    for (const f of p.partial_exit?.fractions ?? []) {
+      out.push(f?.rounding, f?.no_whole_contract);
+    }
+    out.push(p.partial_exit?.not_a_recommendation, mapCategoryRule(p.entry_map),
+             p.entry_map?.a_map_not_a_verdict, p.entry_map?.no_response_window,
+             p.entry_map?.not_a_signal, p.entry_map?.match_now?.witness,
+             p.entry_map?.match_now?.note);
+  }
+  return out.filter((x): x is string => typeof x === "string" && x !== "");
+}
+
+function possessionCaveat(m: WatchedMatch): string | null {
+  for (const side of Object.values(m.read?.sides ?? {})) {
+    for (const c of Object.values(side?.components ?? {})) {
+      const w = c?.possession_is_distrusted;
+      if (typeof w === "string" && w) return w;
+    }
+  }
+  return null;
+}
 
 function ReadBlock({ m }: { m: WatchedMatch }) {
   const sides = m.read?.sides ?? {};
   const names = Object.keys(sides);
   if (names.length === 0) {
+    const absent = readAbsent(m);
     return (
-      <p data-testid="watched-read-absent"
+      <p data-testid="watched-read-absent" data-source={absent.source}
         className="mt-3 rounded-lg border border-line bg-elev2 px-3 py-2 text-[12px] leading-relaxed text-warn">
-        {m.read?.words
-          ?? "No component read has been persisted for this fixture. That "
-             + "is not a match in which nothing has happened."}
+        {absent.words}
       </p>
     );
   }
@@ -969,13 +1646,25 @@ function ReadBlock({ m }: { m: WatchedMatch }) {
     const ia = order.indexOf(a), ib = order.indexOf(b);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
   });
+  const caveat = possessionCaveat(m);
   return (
-    <div data-testid="watched-read" className="mt-3 grid gap-3 sm:grid-cols-2">
-      {names.map((side) => (
-        <ReadSideBlock key={side} side={sides[side]}
-          team={side === "home" ? m.home : side === "away" ? m.away : side} />
-      ))}
-    </div>
+    <>
+      <div data-testid="watched-read" className="mt-3 grid gap-3 sm:grid-cols-2">
+        {names.map((side) => (
+          <ReadSideBlock key={side} side={sides[side]}
+            team={side === "home" ? m.home : side === "away" ? m.away : side} />
+        ))}
+      </div>
+      {caveat && (
+        // IN THE ACCESSIBLE TREE, NOT ON A title=, and not behind the
+        // disclosure either: a reader must not receive the possession
+        // number without the sentence that distrusts it.
+        <p data-testid="watched-possession-caveat"
+          className="mt-2 text-[11px] leading-relaxed text-warn">
+          {caveat}
+        </p>
+      )}
+    </>
   );
 }
 
@@ -1008,19 +1697,22 @@ function ReadSideBlock({ side, team }: { side: LiveReadSide; team: string }) {
           <ComponentRow key={key} c={comps[key]} />
         ))}
       </dl>
-      <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
-        Decaying reads, half-life {side.half_life_seconds}s of MATCH
-        time, {side.observed_from_kickoff
-          ? "observed from kickoff"
-          : "observed only from the minute this watch began"}.{" "}
-        {/* NO COMPOSITE BEFORE M1: the four are not even in the same
-            units, and a hand-weighted blend of them would look
-            authoritative while encoding nothing but somebody's
-            intuition. Each rides under its own name here for the same
-            reason it does on the payload. */}
-        These four are shown separately and are never combined into one
-        number — the weights have not been fitted, and a composite would
-        be a claim.
+      {/* THE UNITS AND THE SPAN, WHICH ARE PART OF THE NUMBERS. The
+          rules about them — that the four are never combined, that a
+          composite would be a claim — are the same sentence on every
+          side of every card, so they ride in the card's one disclosure
+          instead of under each of the four blocks. */}
+      <p data-testid="watched-read-basis"
+        className="mt-2 font-mono text-[10px] text-ink-faint">
+        half-life {side.half_life_seconds}s match time ·{" "}
+        {side.observed_from_kickoff
+          ? "from kickoff"
+          : "from the minute this watch began"}
+        <span className="sr-only">
+          {" "}— decaying reads. The four components are never combined
+          into one number; the payload&apos;s own words for why are in the
+          disclosure at the foot of this card.
+        </span>
       </p>
     </div>
   );
@@ -1049,27 +1741,21 @@ function ComponentRow({ c }: { c: LiveReadComponentPayload }) {
           : <>{v.toFixed(2)}{" "}
               <span className="font-mono text-[10px] text-ink-faint">{c.unit}</span></>}
       </dd>
-      {c?.possession_is_distrusted && (
-        // IN THE ACCESSIBLE TREE, NOT ON A title=. This is the input the
-        // charter distrusts by name; a reader who cannot see the caveat
-        // must not receive the number without it.
-        <p data-testid="watched-possession-caveat"
-          className="w-full text-[11px] leading-relaxed text-warn">
-          {c.possession_is_distrusted}
-        </p>
-      )}
+
     </div>
   );
 }
 
 // --- 2..5 — the position, the branches, the certainty, the refusals ---
 
-function PositionBlock({ p, registry }: {
-  p: WatchedPosition; registry: Record<string, string>;
+function PositionBlock({ p, refusals }: {
+  p: WatchedPosition;
+  /** WALKED ONCE, BY THE CARD. The same collector feeds these chips and
+   *  the card's ledger, so a chip and its sentence cannot drift. */
+  refusals: Refusal[];
 }) {
   const pos = p.position;
   const cert = p.certainty_premium;
-  const refusals = positionRefusals(p, registry);
   return (
     <div data-testid="watched-position"
       data-bet={p.journal_entry?.bet_id ?? ""}
@@ -1084,12 +1770,11 @@ function PositionBlock({ p, registry }: {
       <Ledger p={p} />
       <Branches p={p} />
       <Certainty cert={cert} />
-      <PartialExits pe={p.partial_exit} registry={registry} />
-      <MapBlock map={p.entry_map} registry={registry} />
+      <PartialExits pe={p.partial_exit} />
+      <MapBlock map={p.entry_map} />
       <NotBuiltUpstream p={p} />
-      <RefusalList refusals={refusals} registry={registry}
-        testid="watched-position-refusals"
-        heading="refused on this position" />
+      <RefusalChips refusals={refusals}
+        testid="watched-position-refusals" />
     </div>
   );
 }
@@ -1151,20 +1836,30 @@ function Ledger({ p }: { p: WatchedPosition }) {
           )}
         </dd>
       </div>
-      <p className="w-full text-[11px] leading-relaxed text-ink-faint">
+      {/* THE UNITS, NOT THE ESSAY. What mark-to-bid means, why the
+          entry fee is not in it and why it should least influence the
+          decision are the same three sentences on every position on
+          every card; they ride in the card's one disclosure. What
+          cannot move is the WITHHELD word and the code that withheld
+          it, because that is a fact about THIS number. */}
+      <p className="w-full font-mono text-[10px] text-ink-faint">
         {pnl != null ? (
-          <>Mark-to-bid: what hitting the live bid nets today, less what
-            the position cost. The entry fee is not in that cost, and the
-            entry is sunk either way — this figure is here because you
-            would compute it anyway, and it is the one number on this card
-            that should least influence the decision.</>
+          <>mark-to-bid, entry sunk
+            <span className="sr-only">
+              {" "}— what hitting the live bid nets today less what the
+              position cost. The entry fee is not in that cost. This is
+              the one number on this card that should least influence the
+              decision; the payload&apos;s own words are in the disclosure
+              below.
+            </span>
+          </>
         ) : (
-          <>P&amp;L is WITHHELD rather than shown as a dash: the exit it
-            would be marked against was withdrawn
-            {withheldBy ? ` under ${withheldBy}` : ""}, and marking a
-            position against a bid the book will not pay is the same false
-            certainty one key over.{" "}
-            {p.value_now_withdrawn ?? ""}</>
+          <span data-testid="watched-pnl-withheld-why" className="text-warn">
+            withheld{withheldBy ? ` under ${withheldBy}` : ""} — the exit
+            it would be marked against was withdrawn, and marking a
+            position against a bid the book will not pay is the same
+            false certainty one key over
+          </span>
         )}
       </p>
     </dl>
@@ -1185,7 +1880,11 @@ function Branches({ p }: { p: WatchedPosition }) {
           hold
         </p>
         {hold?.refused ? (
-          <p className="mt-1 text-[12px] leading-relaxed text-warn">{hold.refused}</p>
+          <p data-testid="watched-hold-refused"
+            data-code={hold.refusal_code ?? ""}
+            className="mt-1 font-mono text-[11px] uppercase tracking-[0.1em] text-warn">
+            refused{hold.refusal_code ? ` · ${hold.refusal_code}` : ""}
+          </p>
         ) : hold?.branches ? (
           <>
             <p className="mt-1 font-mono text-[15px] tabular-nums text-ink-hi">
@@ -1209,16 +1908,19 @@ function Branches({ p }: { p: WatchedPosition }) {
                 </li>
               ))}
             </ul>
-            {hold.says && (
-              <p className="mt-1.5 text-[11px] leading-relaxed text-ink-faint">
-                {hold.says}
-              </p>
-            )}
             {hold.quantity?.n != null && (
               <p className="mt-1 font-mono text-[10px] text-ink-faint">
                 n={hold.quantity.n.toLocaleString()}
-                {hold.quantity.band && hold.quantity.band.every((x) => x != null)
-                  ? ` · band [${hold.quantity.band.join(", ")}]` : ""}
+                {/* A BOOLEAN OVER AN EMPTY SET IS NOT A FACT, and the
+                    correct version of this check was already one
+                    function over. `band.every(x => x != null)` is TRUE
+                    for `[]`, so a band array with nothing in it drew
+                    " · band []" — a band rendered for a quantity that
+                    has none. `bandText` (the map's reader) requires two
+                    endpoints and neither of them null; it is the reader
+                    both places use now, so the two cannot disagree
+                    about what a band is. */}
+                {bandText(hold.quantity.band ?? null)}
               </p>
             )}
           </>
@@ -1234,7 +1936,14 @@ function Branches({ p }: { p: WatchedPosition }) {
         </p>
         {sell?.refused ? (
           <p data-testid="watched-sell-refused"
-            className="mt-1 text-[12px] leading-relaxed text-warn">{sell.refused}</p>
+            data-code={sell.refusal_code ?? ""}
+            className="mt-1 font-mono text-[11px] uppercase tracking-[0.1em] text-warn">
+            refused{sell.refusal_code ? ` · ${sell.refusal_code}` : ""}
+            <span className="sr-only">
+              {" "}— no figure is drawn in its place. The reason is in
+              the disclosure at the foot of this card.
+            </span>
+          </p>
         ) : sell?.branches ? (
           <>
             <p className="mt-1 font-mono text-[15px] tabular-nums text-ink-hi">
@@ -1251,11 +1960,6 @@ function Branches({ p }: { p: WatchedPosition }) {
                 </li>
               ))}
             </ul>
-            {sell.says && (
-              <p className="mt-1.5 text-[11px] leading-relaxed text-ink-faint">
-                {sell.says}
-              </p>
-            )}
           </>
         ) : (
           <p className="mt-1 text-[12px] leading-relaxed text-warn">
@@ -1263,11 +1967,11 @@ function Branches({ p }: { p: WatchedPosition }) {
           </p>
         )}
       </div>
-      {bv?.why && (
-        <p className="text-[11px] leading-relaxed text-ink-faint sm:col-span-2">
-          {bv.why}
-        </p>
-      )}
+      {/* `hold.says`, `sell.says` and `branch_view.why` are the
+          BRANCHES_NOT_AVERAGES rule and its two glosses — the same
+          three sentences under every position on the card. They ride in
+          the card's one disclosure; the branches themselves, which are
+          the thing the 2026-09-02 card collapsed, stay here. */}
     </div>
   );
 }
@@ -1308,32 +2012,31 @@ function Certainty({ cert }: { cert: CertaintyPremium | undefined }) {
               {frac != null ? ` · ${(frac * 100).toFixed(1)}% of hold EV` : ""}
             </span>
           </p>
+          {/* THE LINE STAYS. It is the only sentence here that is
+              made of THIS position's own numbers — the hold figure, the
+              net bid and the state the ahead/behind word was derived
+              from — so a reader can check the word against the numbers
+              beside it. `removes.says`, `premium.says` and
+              `not_a_recommendation` are standing rules, identical on
+              every position on the card, and they ride in the card's
+              one disclosure. */}
           {cert.line && (
             <p data-testid="watched-certainty-line"
               className="mt-1.5 font-mono text-[11px] leading-relaxed text-ink-mid">
               {cert.line}
             </p>
           )}
-          {cert.removes?.says && (
-            <p className="mt-1.5 text-[12px] leading-relaxed text-ink-mid">
-              {cert.removes.says}
-            </p>
-          )}
-          {cert.premium?.says && (
-            <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
-              {cert.premium.says}
-            </p>
-          )}
-          {cert.not_a_recommendation && (
-            <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
-              {cert.not_a_recommendation}
-            </p>
-          )}
         </>
       ) : (
         <p data-testid="watched-certainty-refused"
-          className="mt-1 text-[12px] leading-relaxed text-warn">
-          {cert.refused ?? "the certainty premium does not apply here"}
+          data-code={cert.refusal_code ?? ""}
+          className="mt-1 font-mono text-[11px] uppercase tracking-[0.1em] text-warn">
+          refused{cert.refusal_code ? ` · ${cert.refusal_code}` : ""}
+          <span className="sr-only">
+            {" "}— the certainty premium is not priced here and nothing
+            stands in for it. The reason is in the disclosure at the foot
+            of this card.
+          </span>
         </p>
       )}
       <Asymmetry cert={cert} />
@@ -1379,11 +2082,17 @@ function Asymmetry({ cert }: { cert: CertaintyPremium }) {
           strip does not assume it is.{" "}
         </strong>
       )}
-      {a?.finding ? <>{a.finding}{" "}</> : null}
-      {a?.rule
-        ?? "Certainty is cheap exactly when you are winning and dear "
-           + "exactly when you are losing, and that is structural, not a "
-           + "setting: it protects gains and cannot protect losses."}
+      {/* THE FINDING IS ABOUT THIS POSITION AND STAYS ON THE FACE OF
+          THE CARD. `a.rule` is CERTAINTY_IS_ASYMMETRIC — the same
+          paragraph on every position ever priced — and it rides in the
+          card's one disclosure. G1 itself does not move: an ahead
+          position still carries this line, a behind one still leads
+          with the escalation, and an unknown one still fails closed. */}
+      {a?.finding
+        ? <>{a.finding}</>
+        : (behind || unknown ? null
+           : <>Certainty is cheap when you are winning and dear when you
+               are losing — structural, not a setting.</>)}
     </p>
   );
 }
@@ -1491,24 +2200,31 @@ function Fraction({ f }: { f: PartialExitFraction }) {
         </p>
       )}
 
+      {/* THE NAME, NOT THE PARAGRAPH. A stale book refuses all four
+          fractions AND the whole position with one sentence; printing
+          it five times is what buried the rows it applied to. The code
+          is here, on the row that could not be priced, and the sentence
+          is once in the card's ledger. */}
       {f.refused && (
         <p data-testid="watched-fraction-refused" data-code={f.refusal_code}
-          className="mt-1 text-[12px] leading-relaxed text-warn">
-          <span className="font-mono font-semibold">
-            {withdrawnByLeg ? "withdrawn · " : "refused · "}
+          className="mt-1 font-mono text-[11px] uppercase tracking-[0.1em] text-warn">
+          {withdrawnByLeg ? "withdrawn" : "refused"}
+          {f.refusal_code ? ` · ${f.refusal_code}` : ""}
+          <span className="sr-only">
+            {" "}— no figure is drawn for this fraction. The reason is in
+            the disclosure at the foot of this card.
           </span>
-          {f.refused}
         </p>
       )}
       {/* a second finding never hides behind the first */}
       {f.refusals && Object.keys(f.refusals).length > 1 && (
-        <ul className="mt-1 space-y-0.5">
+        <ul className="mt-1 flex flex-wrap gap-1.5">
           {Object.keys(f.refusals).filter((c) => c !== f.refusal_code)
             .map((c) => (
               <li key={c} data-testid="watched-fraction-also-refused"
                 data-code={c}
-                className="text-[11px] leading-relaxed text-warn">
-                {f.refusals![c]}
+                className="font-mono text-[10px] uppercase tracking-[0.1em] text-warn">
+                also refused · {c}
               </li>
             ))}
         </ul>
@@ -1517,11 +2233,15 @@ function Fraction({ f }: { f: PartialExitFraction }) {
       {alone && (
         <>
           <Realises r={alone} withdrawn />
-          <p className="mt-0.5 text-[11px] leading-relaxed text-ink-faint">
-            That figure is what this row would have realised on a ladder
-            nobody else was on. It is kept here as the withdrawn number
-            and is not an exit this position can take: the ladder is one
-            pool and the leg is held more than once.
+          <p className="mt-0.5 font-mono text-[10px] text-ink-faint">
+            what this row would have realised alone — not an exit this
+            position can take
+            <span className="sr-only">
+              {" "}— the ladder is one pool and this leg is held more
+              than once, so the figure is kept as history rather than
+              offered. The rule is in the disclosure at the foot of this
+              card.
+            </span>
           </p>
         </>
       )}
@@ -1529,35 +2249,36 @@ function Fraction({ f }: { f: PartialExitFraction }) {
       {f.leg_consult && (
         <p data-testid="watched-fraction-leg-consult"
           data-holds={String(f.leg_consult.holds)}
-          className={`mt-1 text-[11px] leading-relaxed ${
+          className={`mt-1 font-mono text-[10px] ${
             f.leg_consult.holds ? "text-ink-faint" : "text-warn"}`}>
-          {f.leg_consult.says}
-          {f.leg_consult.unpriced_contracts && (
-            <> A sibling position on this leg could not be priced at all;
-              its {f.leg_consult.unpriced_contracts} contract(s) are
-              counted into that total rather than assumed away.</>
-          )}
+          shared ladder · {f.leg_consult.holds ? "holds" : "does NOT hold"}
+          {f.leg_consult.unpriced_contracts
+            ? ` · ${f.leg_consult.unpriced_contracts} sibling contract(s) `
+              + "unpriced and counted in" : ""}
+          <span className="sr-only">
+            {" "}— the ladder&apos;s own words are in the disclosure at the
+            foot of this card; a sibling that could not be priced is
+            counted into the total rather than assumed away.
+          </span>
         </p>
       )}
 
       {f.remains && (
         <p data-testid="watched-fraction-remains"
-          className="mt-1 text-[12px] leading-relaxed text-ink-mid">
-          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
+          className="mt-1 font-mono text-[11px] tabular-nums text-ink-mid">
+          <span className="text-[10px] uppercase tracking-[0.12em] text-ink-faint">
             remains{" "}
           </span>
-          {f.remains.says}
+          {f.remains.contracts != null
+            ? `${f.remains.contracts} contracts exposed` : "exposed"}
           {f.remains.expected_at_engine_read_dollars != null && (
             <span className="text-ink-faint">
-              {" "}Expected at the engine&apos;s read:{" "}
+              {" "}· expected{" "}
               {dollars(f.remains.expected_at_engine_read_dollars)}
-              {f.remains.expected_basis ? ` — ${f.remains.expected_basis}` : ""}
             </span>
           )}
           {f.remains.expected_refused && (
-            <span className="block text-warn">
-              {f.remains.expected_refused}
-            </span>
+            <span className="text-warn"> · expectation refused</span>
           )}
         </p>
       )}
@@ -1565,28 +2286,33 @@ function Fraction({ f }: { f: PartialExitFraction }) {
       {(f.vs_whole_position || f.vs_whole_position_alone) && (
         <p data-testid="watched-fraction-vs-whole"
           data-matches={String(f.matches_whole_position_exit)}
-          className="mt-1 text-[11px] leading-relaxed text-ink-faint">
-          {f.vs_whole_position ?? f.vs_whole_position_alone}
+          className="mt-1 font-mono text-[10px] text-ink-faint">
+          vs the whole position ·{" "}
+          {f.matches_whole_position_exit === true ? "matches"
+            : f.matches_whole_position_exit === false ? "differs"
+            : "not stated"}
         </p>
       )}
-      <p className="mt-1 text-[11px] leading-relaxed text-ink-low">
-        {f.says}
-      </p>
+      {/* `f.says`, `f.remains.says` and the vs-whole sentence are the
+          payload's prose for this row. They ride in the card's one
+          disclosure, deduped — four fractions carry four near-identical
+          copies of the same rule. */}
     </li>
   );
 }
 
-function PartialExits({ pe, registry }: {
-  pe: PartialExit | undefined; registry: Record<string, string>;
-}) {
+function PartialExits({ pe }: { pe: PartialExit | undefined }) {
   if (!pe) {
     // ABSENT, NOT EMPTY — and absent is not "no clip is available".
     return (
       <p data-testid="watched-partial-exit-absent"
-        className="mt-3 text-[12px] leading-relaxed text-warn">
-        No partial-exit block on this payload. That is a block this read
-        did not carry, not a finding that a clip is unobtainable, and no
-        fraction is priced in its place.
+        className="mt-3 font-mono text-[11px] text-warn">
+        partial exit · ABSENT from this payload
+        <span className="sr-only">
+          {" "}— a block this read did not carry, which is not a finding
+          that a clip is unobtainable. No fraction is priced in its
+          place.
+        </span>
       </p>
     );
   }
@@ -1605,9 +2331,17 @@ function PartialExits({ pe, registry }: {
         className="mt-1 font-mono text-[11px] leading-relaxed text-ink-low">
         ladder: {(book?.source ?? "unknown").replace(/_/g, " ")}
         {book?.quote_id != null ? ` · quote #${book.quote_id}` : ""}
+        {/* MISSING IS NEVER ZERO, on the ladder as everywhere else. This
+            read `book.levels?.length ?? 0`, so a book that carried a
+            resting total and NO level list printed "…resting across 0
+            level(s)" — a measured empty ladder and an absent one in the
+            same words, on the line that says what the fractions below
+            were walked against. */}
         {book?.resting_total != null
           ? ` · ${book.resting_total} resting across ${
-              book.levels?.length ?? 0} level(s)` : ""}
+              Array.isArray(book.levels)
+                ? `${book.levels.length} level(s)`
+                : "a level list this payload did not carry"}` : ""}
         {book?.captured_at ? ` · captured ${book.captured_at}` : ""}
         {book?.levels?.length ? (
           <span className="block text-ink-faint">
@@ -1642,17 +2376,24 @@ function PartialExits({ pe, registry }: {
       {/* the block itself may refuse, and then no row prints a figure */}
       {pe.refused && (
         <p data-testid="watched-partial-exit-refused" data-code={pe.refusal_code}
-          className="mt-1 text-[12px] leading-relaxed text-warn">
-          {pe.refused}
+          className="mt-1 font-mono text-[11px] uppercase tracking-[0.1em] text-warn">
+          refused{pe.refusal_code ? ` · ${pe.refusal_code}` : ""}
+          <span className="sr-only">
+            {" "}— no fraction below prints a figure. The reason is in
+            the disclosure at the foot of this card.
+          </span>
         </p>
       )}
 
       {pe.withdrawn_on_shared_ladder?.length ? (
         <p data-testid="watched-partial-exit-withdrawn"
-          className="mt-1 text-[12px] leading-relaxed text-warn">
-          Withdrawn on the shared ladder:{" "}
-          {pe.withdrawn_on_shared_ladder.join(", ")}. {" "}
-          {pe.withdrawn_on_shared_ladder_rule}
+          className="mt-1 font-mono text-[11px] text-warn">
+          withdrawn on the shared ladder:{" "}
+          {pe.withdrawn_on_shared_ladder.join(", ")}
+          <span className="sr-only">
+            {" "}— the rule that withdrew them is in the disclosure at
+            the foot of this card.
+          </span>
         </p>
       ) : null}
 
@@ -1660,24 +2401,36 @@ function PartialExits({ pe, registry }: {
         {pe.fractions.map((f) => <Fraction key={f.label} f={f} />)}
       </ul>
 
-      {/* every caveat the block carries, once, in the accessible tree */}
-      <div className="mt-2 space-y-1 text-[11px] leading-relaxed text-ink-faint">
-        <p>{pe.rule}</p>
-        <p>{pe.fee_basis}</p>
-        <p>{pe.whole_contracts}</p>
-        <p>{pe.common_case}</p>
-        <p data-testid="watched-partial-exit-not-a-recommendation">
+      {/* THE BLOCK'S FIVE STANDING SENTENCES — the ladder rule, the fee
+          basis, whole contracts and the common case — are identical
+          under every position on every card and are drawn ONCE, in the
+          card's one disclosure, by the walk that collects them from this
+          payload's own bytes. What stays here is what is about THIS
+          block: the sentence that says four sizes are not a menu, and
+          which rows were consulted, by name. */}
+      {/* THE NEGATION IS THE POINT OF THE BLOCK. Four priced sizes of
+          one trade look like a menu; this is the sentence that says they
+          are not one, and it belongs under them rather than in a
+          disclosure a reader may never open. Declared as face-said so
+          the walk does not draw it a second time. */}
+      {pe.not_a_recommendation && (
+        <p data-testid="watched-partial-exit-not-a-recommendation"
+          className="mt-2 text-[11px] leading-relaxed text-ink-faint">
           {pe.not_a_recommendation}
         </p>
-        {pe.executability?.rule && <p>{pe.executability.rule}</p>}
-        {pe.executability?.consulted?.length ? (
-          <p data-testid="watched-partial-exit-consulted">
-            Every row consulted, in the registry&apos;s own order:{" "}
-            {pe.executability.consulted.map((c) =>
-              registry[c] ? `${c} (${registry[c]})` : c).join("; ")}.
-          </p>
-        ) : null}
-      </div>
+      )}
+      {pe.executability?.consulted?.length ? (
+        <p data-testid="watched-partial-exit-consulted"
+          data-consulted={pe.executability.consulted.join(",")}
+          className="mt-2 font-mono text-[10px] text-ink-faint">
+          consulted, in the registry&apos;s own order:{" "}
+          {pe.executability.consulted.join(" · ")}
+          <span className="sr-only">
+            {" "}— each of those names is defined once, with the reason it
+            fired, in the disclosure at the foot of this card.
+          </span>
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -1776,8 +2529,8 @@ function MapBranch({ name, b }: { name: string; b: EntryMapBranch }) {
       {b.refusal_code && (
         <p data-testid="watched-map-refusal" data-where={`${name}.branch`}
           data-code={b.refusal_code}
-          className="mt-1 text-[12px] leading-relaxed text-warn">
-          {b.refused}
+          className="mt-1 font-mono text-[10px] uppercase tracking-[0.1em] text-warn">
+          refused · {b.refusal_code}
         </p>
       )}
 
@@ -1795,13 +2548,14 @@ function MapBranch({ name, b }: { name: string; b: EntryMapBranch }) {
             <span data-testid={b.reached.refusal_code
               ? "watched-map-refusal" : undefined}
               data-where={`${name}.reached`} data-code={b.reached.refusal_code}
-              className="text-warn">
-              {b.reached.refused ?? "no measured rate for reaching this state"}
+              className="uppercase tracking-[0.1em] text-warn">
+              {b.reached.refusal_code
+                ? `refused · ${b.reached.refusal_code}`
+                : "no measured rate for reaching this state"}
             </span>
           )}
           <span className="block font-sans text-[11px] text-ink-faint">
             {b.reached.state}
-            {b.reached.either_side ? ` — ${b.reached.either_side}` : ""}
             {b.reached.composed_from?.length
               ? ` (composed from ${b.reached.composed_from.join(", ")})` : ""}
           </span>
@@ -1809,8 +2563,8 @@ function MapBranch({ name, b }: { name: string; b: EntryMapBranch }) {
             <span data-testid="watched-map-refusal"
               data-where={`${name}.reached.by_side`}
               data-code={b.reached.by_side.refusal_code}
-              className="block font-sans text-[11px] text-warn">
-              {b.reached.by_side.refused}
+              className="block text-[10px] uppercase tracking-[0.1em] text-warn">
+              by side refused · {b.reached.by_side.refusal_code}
             </span>
           )}
         </p>
@@ -1823,8 +2577,12 @@ function MapBranch({ name, b }: { name: string; b: EntryMapBranch }) {
         <p data-testid="watched-map-refusal"
           data-where={`${name}.your_contract`}
           data-code={b.your_contract.refusal_code}
-          className="mt-1 text-[12px] leading-relaxed text-warn">
-          {b.your_contract.refused}
+          className="mt-1 font-mono text-[10px] uppercase tracking-[0.1em] text-warn">
+          refused · {b.your_contract.refusal_code}
+          <span className="sr-only">
+            {" "}— no number is drawn for this branch. The reason is in
+            the disclosure at the foot of this card.
+          </span>
         </p>
       ) : q ? (
         <p data-testid="watched-map-contract"
@@ -1847,12 +2605,10 @@ function MapBranch({ name, b }: { name: string; b: EntryMapBranch }) {
             {bandText(q.band)}
             {q.n != null ? ` · n=${q.n.toLocaleString()}` : ""}
           </span>
-          <span className="block text-[11px] text-ink-faint">
-            answers: {q.answers}
-          </span>
-          {q.note && (
-            <span className="block text-[11px] text-ink-faint">{q.note}</span>
-          )}
+          {/* `answers` and `note` are the payload's gloss on the
+              quantity; the WORD above is derived from its own key and
+              is what keeps a bound from reading as an estimate. The
+              gloss rides in the card's one disclosure. */}
         </p>
       ) : null}
 
@@ -1876,15 +2632,12 @@ function MapBranch({ name, b }: { name: string; b: EntryMapBranch }) {
             {exp.settlement_dollars_wilson_band?.length === 2
               ? ` · band [${exp.settlement_dollars_wilson_band.join(", ")}]` : ""}
             {exp.n != null ? ` · n=${exp.n.toLocaleString()}` : ""}
-            <span className="block font-sans text-ink-faint">
-              {exp.certainty_vs_mean}
-            </span>
           </p>
         ) : exp.refusal_code ? (
           <p data-testid="watched-map-refusal" data-where={`${name}.expected`}
             data-code={exp.refusal_code}
-            className="mt-0.5 text-[11px] leading-relaxed text-warn">
-            {exp.refused}
+            className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-warn">
+            refused · {exp.refusal_code}
           </p>
         ) : (
           // NOT REFUSED — REFUSED BY TYPE. An expectation off a LOWER
@@ -1892,23 +2645,34 @@ function MapBranch({ name, b }: { name: string; b: EntryMapBranch }) {
           // the backend never computes one and the block says why. It
           // carries no registry code because nothing was missing.
           <p data-testid="watched-map-expected-not-priced"
-            className="mt-0.5 text-[11px] leading-relaxed text-warn">
-            {exp.not_priced}
+            className="mt-0.5 font-mono text-[10px] text-warn">
+            NOT PRICED — an expectation off a LOWER BOUND would be a
+            substitution in dollars
+            <span className="sr-only">
+              {" "}— the payload&apos;s own words are in the disclosure at
+              the foot of this card. This carries no registry code
+              because nothing was missing.
+            </span>
           </p>
         )
       )}
-      {b.dollars?.branches_not_averages && (
-        <p className="mt-0.5 text-[11px] leading-relaxed text-ink-faint">
-          {b.dollars.branches_not_averages}
-        </p>
-      )}
+      {/* BRANCHES_NOT_AVERAGES rides on every branch of every map. It
+          is one rule and it is drawn once, in the card's disclosure. */}
     </li>
   );
 }
 
-function MapBlock({ map, registry }: {
-  map: EntryMap | undefined; registry: Record<string, string>;
-}) {
+/** The category rule the payload writes on every quantity that carries
+ *  one — read once, so the block that draws it and the walk that must
+ *  skip it can never disagree about which string it is. */
+function mapCategoryRule(map: EntryMap | undefined): string | undefined {
+  const branches = map?.branches ?? {};
+  return Object.keys(branches).map((k) =>
+    (branches[k]?.your_contract?.quantity as Record<string, unknown> | undefined)
+      ?.category_rule).find((x) => typeof x === "string") as string | undefined;
+}
+
+function MapBlock({ map }: { map: EntryMap | undefined }) {
   if (!map) return null;   // absent, not empty — no map, no block
   const branches = map.branches ?? {};
   const names = Object.keys(branches);
@@ -1922,9 +2686,7 @@ function MapBlock({ map, registry }: {
   const tally = map.refusals?.total ?? null;
   // ONE CATEGORY RULE, QUOTED ONCE — the payload writes the same
   // sentence on every quantity that carries one.
-  const categoryRule = names.map((k) =>
-    (branches[k].your_contract?.quantity as Record<string, unknown> | undefined)
-      ?.category_rule).find((x) => typeof x === "string") as string | undefined;
+  const categoryRule = mapCategoryRule(map);
 
   return (
     <div data-testid="watched-entry-map" data-started={String(started)}
@@ -1936,9 +2698,16 @@ function MapBlock({ map, registry }: {
       {/* WHETHER A BALL HAS BEEN KICKED IS THE PAYLOAD'S ANSWER, not a
           clock in this file. A started fixture keeps the map and says
           the map is history, in the backend's own words. */}
-      <p data-testid="watched-map-when"
-        className={`mt-1 text-[11px] leading-relaxed ${
+      <p data-testid="watched-map-when" data-started={String(started)}
+        className={`mt-1 font-mono text-[10px] ${
           started ? "text-warn" : "text-ink-faint"}`}>
+        {/* THE PAYLOAD'S OWN WORDS, NOT A SENTENCE WRITTEN HERE. The
+            note says WHAT WAS READ to conclude the match has not begun
+            — "neither the fixture row nor any state-tape row" — and a
+            frontend string saying "before a ball was kicked" asserts
+            the same conclusion while dropping the evidence for it. That
+            substitution is the winner-first-score-string shape: a word
+            rendered beside numbers it is no longer derived from. */}
         {map.match_now?.witness ? `${map.match_now.witness} ` : ""}
         {map.match_now?.note}
       </p>
@@ -1961,9 +2730,8 @@ function MapBlock({ map, registry }: {
       </p>
 
       {map.grids && (
-        <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
-          Cells read on the {map.grids.variant} variant, floor n ≥{" "}
-          {map.grids.min_n_floor}. {map.grids.floor_rule}
+        <p className="mt-1 font-mono text-[10px] text-ink-faint">
+          {map.grids.variant} · floor n ≥ {map.grids.min_n_floor}
         </p>
       )}
 
@@ -1977,14 +2745,13 @@ function MapBlock({ map, registry }: {
               `void`, the FACT: an unreadable tape withdraws without
               asserting a dismissal, and reading the fact would draw a
               full map on a tape nobody could read. */}
-          {[map.red_card.withdrawal?.because, map.red_card.withdrawal?.rule]
-            .filter(Boolean).join(" ")
-            || "a dismissal voids every grid-derived number on this map "
+          {map.red_card.withdrawal?.because
+            ?? "a dismissal voids every grid-derived number on this map "
                + "from first sighting"}
-        </p>
-      ) : map.red_card?.tape_note ? (
-        <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
-          {map.red_card.tape_note}
+          <span className="sr-only">
+            {" "}— the rule that withdraws them is in the disclosure at
+            the foot of this card.
+          </span>
         </p>
       ) : null}
 
@@ -1996,6 +2763,14 @@ function MapBlock({ map, registry }: {
         </ul>
       )}
 
+      {/* THE MAP'S OWN CAVEATS STAY ON THE MAP. Each says something a
+          reader must not receive these numbers without: that this is a
+          map and not a verdict, that M0 measured no response window,
+          and that the two quantities are not the same thing and cannot
+          be compared — the rule that stops the 2026-09-02 substitution.
+          A disclosure at the foot of the card is one click too far from
+          the numbers they qualify. All four are declared as face-said,
+          so the prose walk does not draw them a second time. */}
       <div className="mt-2 space-y-1 text-[11px] leading-relaxed text-ink-faint">
         <p data-testid="watched-map-not-a-verdict">{map.a_map_not_a_verdict}</p>
         <p data-testid="watched-map-no-window">{map.no_response_window}</p>
@@ -2003,26 +2778,30 @@ function MapBlock({ map, registry }: {
         {categoryRule && (
           <p data-testid="watched-map-category-rule">{categoryRule}</p>
         )}
-        {tally != null && (
-          <p data-testid="watched-map-refusal-count">
-            The map counts {tally} refusal{tally === 1 ? "" : "s"} on itself
-            {map.refusals?.count_by_code
-              ? ` (${Object.keys(map.refusals.count_by_code).sort()
-                  .map((c) => `${c} ${map.refusals!.count_by_code[c]}`)
-                  .join(", ")})`
-              : ""}
-            ; {shown} of them {shown === 1 ? "is" : "are"} drawn above. The
-            rest sit inside grid subtrees this surface does not draw —
-            they are counted here rather than left to be assumed away.
-            {map.refusals?.codes && (
-              <span className="block">
-                {Object.keys(map.refusals.codes).map((c) =>
-                  `${c}: ${registry[c] ?? map.refusals!.codes![c]}`).join(" · ")}
-              </span>
-            )}
-          </p>
-        )}
       </div>
+
+      {/* THE TWO COUNTS, WHICH ARE NUMBERS AND NOT PROSE. The map's own
+          tally and how many of them this surface drew, from ONE
+          collector, so the printed count cannot drift from the rows
+          above it. */}
+      {tally != null && (
+        <p data-testid="watched-map-refusal-count"
+          data-total={tally} data-drawn={shown}
+          className="mt-2 font-mono text-[10px] text-ink-faint">
+          {tally} refusals counted on this map · {shown} drawn above
+          {map.refusals?.count_by_code
+            ? ` (${Object.keys(map.refusals.count_by_code).sort()
+                .map((c) => `${c} ${map.refusals!.count_by_code[c]}`)
+                .join(" · ")})`
+            : ""}
+          <span className="sr-only">
+            {" "}— the rest sit inside grid subtrees this surface does not
+            draw. They are counted here rather than left to be assumed
+            away, and every name above is defined in the disclosure at
+            the foot of this card.
+          </span>
+        </p>
+      )}
     </div>
   );
 }
@@ -2064,6 +2843,127 @@ export const UNRENDERED_PAYLOAD_KEYS: Record<string, {
       + "beside it.",
   },
 };
+
+// --- 7a. an absence this surface cannot tell from a FAILURE -----------
+//
+// THE TAPE'S FAILURE IS CODED AND THE OTHER TWO READS' ARE NOT — the
+// same shape, one reader over, which is this stage's whole lesson.
+//
+// `tapeVerdictOf` can tell "the tape read FAILED" from "there is no
+// row" because the route puts a REGISTERED CODE on the payload for the
+// first (`tape_unreadable`, in position.REFUSAL_CODES), and the strip
+// derives the two answers from that code rather than from prose. The
+// live read and the journal read fail through the same route, in the
+// same request, and neither failure is coded:
+//
+//   read.words       api/main.py `_read` writes "THE LIVE READ COULD
+//                    NOT BE READ: …" here on a failure, and
+//                    live_read.read_for_fixture writes "no component
+//                    read has been persisted …" here on an absence.
+//                    ONE untyped key, two opposite facts.
+//   positions_note   api/main.py `_positions` writes card._layer's
+//                    failure sentence here when journal.held_positions
+//                    threw, and journal.held_positions' own `refused`
+//                    wording here when the list is legitimately empty.
+//                    ONE untyped key, two opposite facts.
+//
+// So this surface draws both sentences VERBATIM and infers nothing
+// from them: it does not colour them differently, does not fold either
+// into a class, and does not sniff the prose for a keyword — matching
+// on "COULD NOT BE READ" would be the venue-class failure exactly (the
+// code's vocabulary standing in for the provider's), and it would go
+// silently wrong the day the wording changed.
+//
+// IT IS REGISTERED RATHER THAN FAKED. The record below carries the
+// finding and the condition that closes it, and `uncodedAbsencesClosed`
+// derives — from the payload, never from a key spelled here — whether
+// the block has since grown a code. The guard in
+// e2e/watched-strip.spec.ts fails BOTH ways: if a third uncoded
+// absence of this shape appears without a record, and if a registered
+// one is closed while its record still stands.
+export const UNCODED_ABSENCE_KEYS: Record<string, {
+  block: "read" | "match"; finding: string; closes_when: string;
+}> = {
+  "read.words": {
+    block: "read",
+    finding: "a live read that FAILED and a fixture with no persisted "
+      + "read arrive under the SAME key, as prose, with no refusal code "
+      + "on the block. api/main.py `_read` and "
+      + "live_read.read_for_fixture both write `words`, so this surface "
+      + "cannot derive which of the two it has and renders the "
+      + "payload's own sentence without classifying it. `we could not "
+      + "look` and `there is nothing to look at` are different facts "
+      + "and this one distinction is not available here.",
+    closes_when: "the read block carries a refusal code beside its "
+      + "words — any `*refusal_code` on the read whose value is in "
+      + "position.REFUSAL_CODES, which is the registry the payload "
+      + "already ships — the way the tape's failure carries "
+      + "`tape_unreadable`; then this surface derives the two answers "
+      + "the way tapeVerdictOf does and this record retires, or the "
+      + "guard fails.",
+  },
+  "positions_note": {
+    block: "match",
+    finding: "a journal read that FAILED and a fixture that holds "
+      + "nothing arrive under the SAME key, as prose, with no refusal "
+      + "code beside it. api/main.py `_positions` returns card._layer's "
+      + "failure sentence on this key and journal.held_positions' own "
+      + "`refused` wording on it, and an empty `positions` list sits "
+      + "beside both — so an open position nobody could read is drawn "
+      + "in the same ink as a fixture with no position on it.",
+    closes_when: "the match block carries a refusal code beside the "
+      + "note — any `*refusal_code` on the match whose value is in "
+      + "position.REFUSAL_CODES; then the two are told apart here and "
+      + "this record retires, or the guard fails.",
+  },
+};
+
+/** Whether a block has grown a CODE for its absence — DERIVED, never a
+ *  key name typed here: any key whose name ends `refusal_code` and
+ *  whose value is a name the payload's own registry defines. */
+function codedRefusalOn(node: unknown, registry: Record<string, string>,
+                        skip: string[] = []): boolean {
+  if (!isObj(node)) return false;
+  return Object.entries(node).some(([k, v]) =>
+    !skip.includes(k) && k.endsWith("refusal_code")
+    && typeof v === "string" && v in registry);
+}
+
+/** The registered records on THIS match whose closing condition has
+ *  been met — a record that should have been retired. Empty is the
+ *  healthy answer and the guard reads it either way. */
+export function uncodedAbsencesClosed(
+  m: WatchedMatch, registry: Record<string, string>,
+): string[] {
+  return Object.keys(UNCODED_ABSENCE_KEYS).filter((k) => {
+    const where = UNCODED_ABSENCE_KEYS[k].block;
+    const node = where === "read" ? m.read : m;
+    return codedRefusalOn(node, registry, where === "read" ? ["sides"] : []);
+  });
+}
+
+/** OFF THE SURFACE, LIKE EVERY OTHER RECORD ON THIS FILE. The keys the
+ *  match actually carried, and any record whose condition has been met,
+ *  as DATA on a hidden node — bookkeeping a guard reads, never a
+ *  paragraph handed to an operator mid-match. */
+function UncodedAbsences({ m, registry }: {
+  m: WatchedMatch; registry: Record<string, string>;
+}) {
+  const present = Object.keys(UNCODED_ABSENCE_KEYS).filter((k) => {
+    const r = UNCODED_ABSENCE_KEYS[k];
+    const node = (r.block === "read" ? m.read : m) as
+      Record<string, unknown> | undefined;
+    const leaf = k.split(".").pop()!;
+    return node != null && typeof node[leaf] === "string"
+      && (node[leaf] as string) !== "";
+  });
+  const closed = uncodedAbsencesClosed(m, registry);
+  if (present.length === 0 && closed.length === 0) return null;
+  return (
+    <div hidden data-testid="watched-uncoded-absence"
+      data-keys={present.join(",")} data-closed={closed.join(",")} />
+  );
+}
 
 // --- 7b. what this surface knows it cannot draw, at the ENVELOPE ------
 //
@@ -2110,7 +3010,16 @@ export const UNRENDERED_ENVELOPE_KEYS: Record<string, {
       + "kicked off, because the watch toggle lives on a board whose "
       + "fixtures leave it at kickoff). It was being added to this route "
       + "while this surface was being built, so no shape of it has been "
-      + "recorded off a finished emitter and nothing here draws one.",
+      + "recorded off a finished emitter and NO MATCH FROM IT IS DRAWN. "
+      + "ONE FIELD OF ITS `coverage` IS READ AND THE READING IS NAMED "
+      + "HERE RATHER THAN LEFT IMPLICIT: `collector_folds_over`, the "
+      + "state collector's own competition registry, which is the only "
+      + "thing on this payload that tells `no state tape is written for "
+      + "this competition` apart from `the tape read FAILED` on a "
+      + "declared match with no row. It is a list of slugs and carries "
+      + "no claim about any fixture; the LIST of undeclared in-play "
+      + "matches, which is what this record is about, is still not "
+      + "drawn.",
     closes_when: "the block's shape is recorded off this route's own "
       + "emitter and it is drawn — beside the declared set and never "
       + "mixed into it, because a set you chose and a set the tape "
@@ -2148,96 +3057,66 @@ function unaccountedEnvelopeKeys(data: WatchedStripResponse): string[] {
   return Object.keys(data).filter((k) => !known.has(k)).sort();
 }
 
+// OFF THE SURFACE, AND THAT IS THE POINT.
+//
+// This block used to render the records above as prose at the foot of
+// the Live section: the finding, and the `closes_when`, for
+// `in_play_not_declared`, `standing` and `detail`. That is developer
+// commentary about the payload's own unfinished business, and it was
+// sitting under an operator's live matches. The operator said so.
+//
+// THE RECORD IS NOT WEAKENED, IT IS MOVED TO WHERE IT BELONGS. It is
+// exported from this file — which is where the guard in
+// e2e/watched-strip.spec.ts imports it from — and the keys the payload
+// actually carried are emitted as DATA, on a hidden node, so a guard
+// can still fail BOTH ways: when a key arrives that no set accounts
+// for, and when a registered hole is closed without its record being
+// retired. Nothing here is drawn, and `hidden` keeps it out of the
+// accessible tree as well as off the screen: it is not a caveat a
+// reader is being denied, it is bookkeeping a reader was being handed.
 function UndrawnEnvelope({ data }: { data: WatchedStripResponse }) {
   const registered = Object.keys(UNRENDERED_ENVELOPE_KEYS)
     .filter((k) => (data as unknown as Record<string, unknown>)[k] !== undefined).sort();
   const unaccounted = unaccountedEnvelopeKeys(data);
   if (registered.length === 0 && unaccounted.length === 0) return null;
   return (
-    <div data-testid="watched-envelope-undrawn"
-      className="mt-4 border-t border-line pt-3 text-[11px] leading-relaxed text-ink-faint">
+    <div hidden data-testid="watched-envelope-undrawn">
       {registered.length > 0 && (
-        <p data-testid="watched-envelope-registered"
-          data-keys={registered.join(",")}>
-          This payload also carries{" "}
-          <span className="font-mono">{registered.join(", ")}</span>, which
-          this surface does not draw. Each is a written-down hole rather
-          than an oversight:{" "}
-          {registered.map((k) =>
-            `${k} — ${UNRENDERED_ENVELOPE_KEYS[k].finding} Closes when: `
-            + `${UNRENDERED_ENVELOPE_KEYS[k].closes_when}`).join(" ")}
-        </p>
+        <span data-testid="watched-envelope-registered"
+          data-keys={registered.join(",")} />
       )}
       {unaccounted.length > 0 && (
-        <p data-testid="watched-envelope-unaccounted"
-          data-keys={unaccounted.join(",")}
-          className="mt-1.5 text-warn">
-          This payload carries{" "}
-          <span className="font-mono">{unaccounted.join(", ")}</span>, and
-          this surface has no record of{" "}
-          {unaccounted.length === 1 ? "it" : "them"} at all — not drawn,
-          not registered. It is named here rather than dropped, and the
-          record it is missing from is
-          UNRENDERED_ENVELOPE_KEYS in this file.
-        </p>
+        <span data-testid="watched-envelope-unaccounted"
+          data-keys={unaccounted.join(",")} />
       )}
     </div>
   );
 }
 
+// OFF THE SURFACE, FOR THE SAME REASON AS THE ENVELOPE'S RECORDS.
+// A key this surface has no recorded shape for is still NOT DRAWN and
+// still NOT DROPPED: it is emitted as data on a hidden node, and the
+// record that names it — the finding and its `closes_when` — is
+// exported above, where the guard reads it. What changed is that an
+// operator watching a live match is no longer handed a paragraph about
+// a measurement's unpublished constant.
 function NotBuiltUpstream({ p }: { p: WatchedPosition }) {
   const present = Object.keys(UNRENDERED_PAYLOAD_KEYS)
     .filter((k) => (p as Record<string, unknown>)[k] !== undefined);
   if (present.length === 0) return null;
   return (
-    <div data-testid="watched-unrendered" className="mt-3">
+    <div hidden data-testid="watched-unrendered" data-keys={present.join(",")}>
       {present.map((k) => (
-        <p key={k} data-testid="watched-unrendered-key" data-key={k}
-          className="rounded-md border border-warn/40 bg-warn/5 px-2.5 py-2 text-[11px] leading-relaxed text-warn">
-          This payload carries <span className="font-mono">{k}</span>, and
-          this surface has no recorded shape for it, so it is named rather
-          than drawn or dropped. {UNRENDERED_PAYLOAD_KEYS[k].finding}{" "}
-          Closes when: {UNRENDERED_PAYLOAD_KEYS[k].closes_when}
-        </p>
+        <span key={k} data-testid="watched-unrendered-key" data-key={k} />
       ))}
     </div>
   );
 }
 
-// --- 8. the refusals, by name -----------------------------------------
-
-function RefusalList({ refusals, registry, testid, heading }: {
-  refusals: Refusal[];
-  registry: Record<string, string>;
-  testid: string;
-  heading: string;
-}) {
-  if (refusals.length === 0) return null;
-  return (
-    <div data-testid={testid} className="mt-3">
-      <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
-        {heading} · {refusals.length}
-      </p>
-      <ul className="mt-1.5 space-y-1.5">
-        {refusals.map((r) => (
-          <li key={`${r.code}@${r.where}`} data-testid="watched-refusal"
-            data-code={r.code}
-            className="text-[12px] leading-relaxed text-warn">
-            <span className="font-mono font-semibold">{r.code}</span>
-            <span className="font-mono text-ink-faint"> · {r.where}</span>
-            {/* the block's own sentence, then the REGISTRY's definition
-                of the name — both visible, neither on a title=. A code
-                the payload's registry does not define is shown as the
-                bare name rather than glossed with a guess. */}
-            {r.says && <> — {r.says}</>}
-            {registry[r.code] && (
-              <span className="block text-ink-low">
-                {r.code}: {registry[r.code]}
-              </span>
-            )}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
+// --- 8. the refusals ---------------------------------------------------
+//
+// There is no list component here any more. A refusal renders as a chip
+// (RefusalChips, above) and its sentence and definition render once, in
+// the card's one disclosure (CardNotes, above). The two share one
+// collector, so a chip on the surface and a sentence behind the
+// disclosure can never disagree about what fired.

@@ -26,7 +26,7 @@
 // the board's own rule), then to served order, so every sort is
 // deterministic and a re-render cannot shuffle equal rows.
 
-import { BoardRow } from "./pickerApi";
+import { BoardRow, SHAPE_ORDER } from "./pickerApi";
 
 export type SortDir = "asc" | "desc";
 
@@ -92,11 +92,27 @@ export const SORT_MODES: SortMode[] = [
   // the tiers back on all three dimensions, HOLLOW is a gap they do not
   // back at all — so descending reads best-backed first, and one flip
   // surfaces the traps. Ties fall to the board's own |GD/g| tiebreak,
-  // which is exactly the order wanted inside a bucket. Shape exists on
-  // every row (tiers survive even a cross-league tie), so this key has
-  // no null case and no note.
+  // which is exactly the order wanted inside a bucket.
+  //
+  // AN UNRECOGNISED SHAPE REFUSES; IT DOES NOT SORT AS "NO SHAPE"
+  // (2026-09-07). The rank came from a three-key object literal typed
+  // here, with `?? null` behind it and a comment asserting "this key
+  // has no null case and no note". Both halves of that were wrong at
+  // once: a fourth value from the backend — src/picker is where the
+  // vocabulary is decided and it has grown before — folds through the
+  // `??` into the SAME null bucket as "this row has no value", which
+  // parks it silently at the end of a column while the sentence that
+  // would explain the position is suppressed by the very assertion
+  // that it cannot happen. The board's own rule is that an unrecognised
+  // provider value refuses in words rather than joining a meaningful
+  // class, so the note is declared and shown WHEN SUCH A ROW IS THERE.
+  // The ranking is derived from SHAPE_ORDER in pickerApi.ts, beside the
+  // `Shape` type it orders, so a value added to one is a value the
+  // other is missing rather than a value that quietly sorts last.
   { id: "shape", label: "shape", defaultDir: "desc",
-    value: (r) => ({ CLEAN: 2, SPLIT: 1, HOLLOW: 0 })[r.shape] ?? null },
+    value: (r) => SHAPE_ORDER[r.shape] ?? null,
+    nullNote: "a shape this board does not recognise sorts last",
+    nullNoteOnlyWhenPresent: true },
   { id: "ask", label: "ask price", defaultDir: "asc",
     value: (r) => r.kalshi?.ask_c ?? null,
     nullNote: "no quote sorts last" },

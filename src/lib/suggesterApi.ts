@@ -1063,6 +1063,22 @@ export interface WatchedMatch {
   positions: WatchedPosition[];
   /** journal.held_positions()'s own wording when nothing is on */
   positions_note?: string | null;
+  /** S1 / G6, card._shared_exit_book: a leg held by TWO positions holds
+   *  every fraction row and every whole-position claim to the ONE bid
+   *  ladder, and what does not fit is withdrawn IN PLACE on the
+   *  positions above. This block carries the leg's own finding.
+   *
+   *  TYPED AS `unknown` ON PURPOSE. The route emits it (api/main.py
+   *  `_positions` returns it and the match block carries it) and this
+   *  file had no field for it at all, so the key arrived on every
+   *  payload with nothing declaring it. Its inner shape is
+   *  card._shared_exit_book's and has NOT been recorded off that
+   *  emitter here; writing a plausible one by hand is how a TS type
+   *  stops matching what the backend sends, which crashed this very
+   *  strip once (a withdrawal typed as a string and sent as an
+   *  object). Naming the key without claiming its shape is the honest
+   *  half. */
+  shared_exit_book?: unknown;
 }
 
 export interface WatchedStripResponse {
@@ -1099,14 +1115,114 @@ export interface WatchedStripResponse {
   refusal_codes: Record<string, string>;
   policy_codes?: Record<string, string>;
   standing?: Record<string, string>;
+  /** SON'S INVARIANT, THE HALF THE PICKER CANNOT SERVE: every fixture
+   *  the STATE TAPE shows under way that nobody declared. The watch
+   *  toggle lives on the picker board and
+   *  src/picker/board.fixtures_from_scoreboard defaults to
+   *  states=("pre",), so a fixture leaves that board the instant it
+   *  kicks off — this list is the only place an already-started match
+   *  can be picked up, and every entry carries the id
+   *  watchlist.declare() takes.
+   *
+   *  NOT DRAWN YET, AND REGISTERED AS SUCH:
+   *  WatchedStrip.tsx's UNRENDERED_ENVELOPE_KEYS["in_play_not_declared"]
+   *  holds the finding and the condition that retires it. The key is
+   *  declared here because the backend emits it on EVERY response
+   *  including the dormant one, and a contract that omits a key the
+   *  route always sends is a stale type — the shape this repo has
+   *  already been bitten by.
+   *
+   *  `matches` is a list; `in_play` on an entry is `boolean | null`,
+   *  and the null is load-bearing: a tape row whose `match_state` is
+   *  outside watchlist.TAPE_STATES fails CLOSED into
+   *  `state_unclassifiable` with `in_play: null` — WITHDRAWN, never
+   *  false — rather than being folded into "not in play". The inner
+   *  entry shape is deliberately left open: it has not been recorded
+   *  off this route's own emitter, and hand-writing one is what the
+   *  registered record above exists to prevent. */
+  in_play_not_declared?: {
+    matches: unknown[];
+    state_unclassifiable: unknown[];
+    not_described: unknown[];
+    counts: {
+      in_play: number;
+      state_unclassifiable: number;
+      not_described: number;
+    };
+    window_seconds: number;
+    window_basis: string;
+    in_play_states: string[];
+    /** counts are NULL, never 0, when the tape read itself failed —
+     *  `unavailable` then carries the reason and the empty lists above
+     *  are not a measurement */
+    coverage: {
+      rows_in_window: number | null;
+      fixtures_in_window: number | null;
+      competitions_in_window: string[] | null;
+      collector_folds_over: string[];
+      models_computed_for: string[];
+      unavailable?: string;
+      says: string;
+    };
+    is: string;
+    is_not_a_ranking: string;
+    not_a_view?: string;
+    /** card._layer's shape when the whole block could not be assembled
+     *  — the block degrades itself and the declared matches are
+     *  untouched */
+    unavailable?: string;
+  };
 }
 
 const base = "/api/bet-suggester";
 
+/** A read that answered with something that is not a payload.
+ *
+ *  `res.json()` used to be returned straight from here, which folded
+ *  three different findings into one: a SyntaxError in the browser's
+ *  own vocabulary ("Unexpected end of JSON input") for a 204 or an
+ *  HTML error page, and — worse, because it does not throw at all — a
+ *  literal `null` body handed back typed as T. A caller that destructures
+ *  T then crashes somewhere else entirely, and a caller that guards with
+ *  `?.` renders the branch that means "there is nothing".
+ *
+ *  The status is carried so a caller can tell a refusal from a
+ *  malformed answer, and the first bytes of the body are carried as
+ *  EVIDENCE rather than paraphrased. */
+export class ApiBodyError extends Error {
+  readonly status: number;
+  readonly body: string;
+  constructor(status: number, why: string, body: string) {
+    super(why);
+    this.name = "ApiBodyError";
+    this.status = status;
+    this.body = body;
+  }
+}
+
 async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${base}${path}`, init);
-  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
-  return res.json();
+  const raw = await res.text();
+  if (!res.ok) throw new Error(`API ${res.status}: ${raw}`);
+  let body: unknown;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    throw new ApiBodyError(res.status,
+      `the read answered ${res.status} with a body that is not JSON `
+      + `(${raw.length} characters) — this is an ANSWER we could not `
+      + "read, not an empty result",
+      raw.slice(0, 400));
+  }
+  if (body === null || body === undefined) {
+    // A 200 CARRYING `null` IS NOT AN EMPTY PAYLOAD. Returned as T it
+    // reaches every caller as the shape that means "there is nothing".
+    throw new ApiBodyError(res.status,
+      `the read answered ${res.status} with a null body — there is no `
+      + "payload here, and a caller must not read that as an empty one",
+      raw.slice(0, 400));
+  }
+  return body as T;
 }
 
 export const api = {
@@ -1251,18 +1367,52 @@ async function fetchWatchedStrip(token: string):
     // one it has.
     throw new WatchedStripRefusal(null, String(err), sent);
   }
-  const raw = await res.text();
+  let raw: string;
+  try {
+    raw = await res.text();
+  } catch (err) {
+    // The proxy ANSWERED and the body stream broke. A status with no
+    // body is still a status, so it rides on the refusal.
+    throw new WatchedStripRefusal(res.status,
+      `the strip read answered ${res.status} and the body could not be `
+      + `read to the end (${String(err)})`, sent);
+  }
+  let parsed = false;
   let body: unknown = null;
-  try { body = JSON.parse(raw); } catch { /* non-JSON body kept as text */ }
+  try { body = JSON.parse(raw); parsed = true; }
+  catch { /* non-JSON body kept as text below */ }
   if (!res.ok) {
     // The backend's own words, or the proxy's. Never this layer's
     // paraphrase — every refusal on this surface is written down
     // somewhere upstream and a gloss here would be a second claim.
+    // A body that is not JSON still carries evidence: the first bytes
+    // of an HTML error page name the gateway that produced it, and
+    // dropping them left the surface with a bare status.
     const b = body as { detail?: unknown; error?: unknown } | null;
     const said = typeof b?.detail === "string" ? b.detail
       : typeof b?.error === "string" ? b.error
-      : "";
+      : parsed ? "" : raw.trim().slice(0, 400);
     throw new WatchedStripRefusal(res.status, said, sent);
+  }
+  // A 200 IS NOT A PAYLOAD. Until 2026-09-07 an unparseable body left
+  // `body` at its initialiser and this line returned `null` typed as
+  // WatchedStripResponse — ten lines under a comment promising that a
+  // failure THROWS a WatchedStripRefusal. The strip then read a null
+  // envelope and rendered the branch that means "nothing is declared",
+  // which is the census-of-nothing this whole surface exists against.
+  if (!parsed) {
+    throw new WatchedStripRefusal(res.status,
+      `the strip read answered ${res.status} with a body that is not `
+      + `JSON (${raw.length} characters) — an ANSWER WE COULD NOT `
+      + "READ, which is not an empty watchlist and not a dormant "
+      + `plane: ${raw.trim().slice(0, 200)}`, sent);
+  }
+  if (body === null || typeof body !== "object") {
+    throw new WatchedStripRefusal(res.status,
+      `the strip read answered ${res.status} with ${JSON.stringify(body)} `
+      + "where an envelope was expected — no version, no matches and no "
+      + "registries, so nothing here can be told apart from nothing "
+      + "being declared", sent);
   }
   return body as WatchedStripResponse;
 }
@@ -1446,14 +1596,36 @@ const wlHeaders = (token: string): Record<string, string> =>
  *  record's. */
 async function wlJson<T>(res: Response): Promise<T> {
   const raw = await res.text();
+  let parsed = false;
   let body: unknown = null;
-  try { body = JSON.parse(raw); } catch { /* non-JSON body kept as text */ }
+  try { body = JSON.parse(raw); parsed = true; }
+  catch { /* non-JSON body kept as text below */ }
   if (!res.ok) {
     const b = body as { detail?: unknown; error?: unknown } | null;
     const said = typeof b?.detail === "string" ? b.detail
       : typeof b?.error === "string" ? b.error
       : raw.slice(0, 400);
     throw new Error(said || `watchlist ${res.status}`);
+  }
+  // THE SAME SHAPE fetchWatchedStrip HAD, ONE FUNCTION OVER. A 200 with
+  // an unparseable body left `body` null and returned it typed as T, so
+  // a declare that was never recorded and a declare that answered
+  // nothing reached the panel identically. Every caller here reads the
+  // result as a RECORD of what the operator declared; a null one reads
+  // as "nothing was declared", which is a claim about the operator's
+  // own preregistration.
+  if (!parsed) {
+    throw new Error(
+      `the watchlist read answered ${res.status} with a body that is `
+      + `not JSON (${raw.length} characters) — an answer we could not `
+      + "read, which is not an empty watchlist: "
+      + raw.trim().slice(0, 200));
+  }
+  if (body === null || typeof body !== "object") {
+    throw new Error(
+      `the watchlist read answered ${res.status} with `
+      + `${JSON.stringify(body)} where a payload was expected — `
+      + "nothing here can be told apart from nothing being declared");
   }
   return body as T;
 }

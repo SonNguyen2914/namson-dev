@@ -44,7 +44,11 @@ function loadSaved(matchId: string): Saved | null {
   try {
     const raw = localStorage.getItem(storeKey(matchId));
     return raw ? (JSON.parse(raw) as Saved) : null;
-  } catch { return null; }
+  } catch {
+    /* SWALLOWED(livepanel:saved-read-parse) — registered in
+       e2e/missing-is-not-zero.spec.ts with its closes_when. */
+    return null;
+  }
 }
 
 export default function LivePanel({ matchId, liveLevers }: {
@@ -103,7 +107,10 @@ export default function LivePanel({ matchId, liveLevers }: {
                          attH, attA, trackLive, res,
                          savedAt: savedAt || new Date().toISOString() };
       localStorage.setItem(storeKey(matchId), JSON.stringify(s));
-    } catch { /* storage full/blocked — nothing to do */ }
+    } catch {
+      /* SWALLOWED(livepanel:storage-write) — registered in
+         e2e/missing-is-not-zero.spec.ts with its closes_when. */
+    }
   }, [matchId, scoreH, scoreA, minute, phaseId, redH, redA, attH, attA, trackLive, res, savedAt]);
 
   function pickPhase(id: PhaseId) {
@@ -321,6 +328,21 @@ export default function LivePanel({ matchId, liveLevers }: {
       </button>
 
       {err && <p className="mt-3 text-sm text-live">{err}</p>}
+
+      {/* A STALE READ MUST NOT WEAR THE CURRENT INPUTS. When the run
+          fails, `res` keeps the LAST read that succeeded — which is the
+          right call, a blank is worse — but it sits directly under the
+          score, minute and lever controls the reader has since moved, so
+          it reads as the answer to what is on screen. It is not. The
+          block says which state it priced, in its own numbers. */}
+      {err && res && (
+        <p data-testid="live-read-stale"
+          className="mt-3 rounded-md border border-warn/40 bg-warn/5 px-2.5 py-1.5 text-[11px] leading-relaxed text-warn">
+          The read below is the previous one — {res.live_state.score} at{" "}
+          {res.live_state.minutes_elapsed}′ — and not a pricing of the
+          state entered above. Nothing here has been recomputed.
+        </p>
+      )}
 
       {res && !loading && (
         <div className="mt-7">

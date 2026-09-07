@@ -1,15 +1,11 @@
 // Catch-all proxy for the MLS data endpoints (read-only GETs).
+// The forwarded set is LEAGUE_PROXY_ALLOWED.mls in lib/suggesterProxy.ts.
 import type { NextApiRequest, NextApiResponse } from "next";
-import { proxy } from "../../../lib/suggesterProxy";
-
-const ALLOWED = new Set([
-  "scoreboard", "schedule", "standings", "markets", "odds", "approval",
-]);
+import { leagueRouteAllowed, proxy } from "../../../lib/suggesterProxy";
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const segs = ((req.query.path as string[]) || []).join("/");
-  const ok = ALLOWED.has(segs) || /^match\/\d{1,12}$/.test(segs);
-  if (req.method !== "GET" || !ok) {
+  if (req.method !== "GET" || !leagueRouteAllowed("mls", segs)) {
     return res.status(404).json({ error: "unknown mls route" });
   }
   const qs = req.url?.includes("?") ? "?" + req.url.split("?")[1] : "";

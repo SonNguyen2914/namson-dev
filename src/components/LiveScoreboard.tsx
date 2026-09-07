@@ -63,6 +63,73 @@ function ReadFailed({ what, r, testid }: {
   );
 }
 
+// ---------------------------------------------------------------------
+// A STALE TYPE IS A LIE THE COMPILER AGREES WITH.
+//
+// `LiveScoreEntry.red_home` / `red_away` are declared `boolean` in
+// src/lib/suggesterApi.ts. The backend has never sent one. The value
+// comes off `MatchLiveSnapshot.red_home` / `MatchResult.red_home`, both
+// `Column(Integer, default=0)`, filled by `src/live_feed.py` counting
+// "red card" details (`red_home += 1`), and handed straight out by
+// `live_state.scoreboard_entries()`. The rest of the codebase already
+// knows: `LiveStateFetch.red_home` is typed `number | boolean` with the
+// comment "count (legacy: boolean)", and LivePanel.tsx coerces with
+// `Number(s.red_home) || 0`. This one file did not, and it cost two
+// separate defects:
+//
+//   1. `{m.red_home && <marker/>}` over the integer 0 renders the
+//      literal "0" as a text node beside the team's name, because
+//      `0 && x` is `0` and React draws a number child. On every card
+//      with no red card — which is nearly all of them.
+//   2. A second dismissal was invisible. Two reds and one red drew the
+//      identical single block, so a count the feed took the trouble to
+//      carry was thrown away at the render.
+//
+// The type is not this change's to edit (src/lib is another owner's), so
+// the coercion is local and the mismatch is REGISTERED below rather than
+// left as a silent narrowing.
+//
+// An unrecognised value REFUSES. It does not fold into 0, because "no
+// red card" and "we cannot read the red-card field" are different facts
+// and only one of them is about the football.
+function redCount(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v) && v >= 0) return Math.trunc(v);
+  if (typeof v === "boolean") return v ? 1 : 0;   // the legacy shape
+  return null;
+}
+
+/** Dismissals for one side. The marker is a red block, but the block is
+ *  DECORATION: the count and the word ride in the accessible tree as
+ *  real text, because a colour is not a caveat carrier and neither is a
+ *  `title=` attribute. An unreadable field says so instead of drawing
+ *  the same nothing a clean sheet draws. */
+function RedCards({ team, raw }: { team: string; raw: unknown }) {
+  const n = redCount(raw);
+  if (n === null) {
+    return (
+      <span data-testid="red-unreadable"
+        className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-warn">
+        red-card count unreadable for {team}
+      </span>
+    );
+  }
+  if (n === 0) return null;
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1" data-testid="red-cards"
+      data-count={n}>
+      <span aria-hidden className="inline-block h-3 w-2 rounded-[2px] bg-live" />
+      {n > 1 && (
+        <span aria-hidden className="font-mono text-[10px] tabular-nums text-live">
+          ×{n}
+        </span>
+      )}
+      <span className="sr-only">
+        {team}: {n} red card{n === 1 ? "" : "s"}
+      </span>
+    </span>
+  );
+}
+
 export default function LiveScoreboard() {
   const [read, setRead] = useState<Read<LiveScoreEntry[]>>({ s: "asking" });
   // A payload that arrived once is KEPT when a later poll fails, and it
@@ -160,30 +227,77 @@ function LiveMarketStream({ a, home, away, signals }: {
           </div>
         </div>
       )}
+      {/* A DERIVATION ON A `title=` IS NOT IN THE ACCESSIBLE TREE, AND
+          THE FOOTER USED TO INSTRUCT THE READER TO HOVER FOR IT. Two
+          numbers on this block — the attack multipliers and the pattern
+          share — are the model's own inputs, and everything that says
+          where they came from lived on a tooltip: unreachable by
+          keyboard, unreachable on touch, unread by a screen reader. The
+          market page already retired this exact shape (its header names
+          it as rule (b)); this is the same shape one component over.
+          The derivation is real text now, in a `<details>` the reader
+          can open by any means. */}
       {lev && (
-        <p className="mb-1.5 font-mono text-[11px] text-ink-low"
-          title={lev.basis
-            ? `SoT ${lev.basis.sot_home}-${lev.basis.sot_away} · shots ${lev.basis.shots_home}-${lev.basis.shots_away} · share ${lev.basis.actual_share_home} vs expected ${lev.basis.expected_share_home} · volume ${lev.basis.volume_actual ?? "?"} vs expected ${lev.basis.volume_expected ?? "?"} · weight ${lev.basis.weight}`
-            : undefined}>
-          auto levers · {lev.source}: attack {home} {lev.home.toFixed(2)}× / {away} {lev.away.toFixed(2)}×
-          {lev.def_home != null && lev.def_home !== 1 && (
-            <> · openness {lev.def_home.toFixed(2)}×</>
-          )}
-        </p>
+        <div className="mb-1.5">
+          <p className="font-mono text-[11px] text-ink-low">
+            auto levers · {lev.source}: attack {home} {lev.home.toFixed(2)}× / {away} {lev.away.toFixed(2)}×
+            {lev.def_home != null && lev.def_home !== 1 && (
+              <> · openness {lev.def_home.toFixed(2)}×</>
+            )}
+          </p>
+          <details data-testid="lever-basis" className="mt-1">
+            <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
+              where these multipliers come from
+            </summary>
+            {lev.basis ? (
+              <p className="mt-1 font-mono text-[10px] leading-relaxed text-ink-faint">
+                On target {lev.basis.sot_home}–{lev.basis.sot_away} · shots{" "}
+                {lev.basis.shots_home}–{lev.basis.shots_away} · home share{" "}
+                {lev.basis.actual_share_home} against an expected{" "}
+                {lev.basis.expected_share_home} · volume{" "}
+                {lev.basis.volume_actual ?? "not sent"} against an expected{" "}
+                {lev.basis.volume_expected ?? "not sent"} · weight{" "}
+                {lev.basis.weight}, over {lev.basis.minutes}′.
+              </p>
+            ) : (
+              <p className="mt-1 font-mono text-[10px] leading-relaxed text-warn">
+                The read carried no basis for these multipliers, so the
+                derivation cannot be shown. The numbers above are the
+                model&apos;s inputs and nothing here says how they were
+                reached.
+              </p>
+            )}
+          </details>
+        </div>
       )}
       {lev?.momentum && (
-        <p className="mb-3 font-mono text-[11px] text-ink-low"
-          title={`Decayed threat pressure ${lev.momentum.pressure_home} vs ${lev.momentum.pressure_away} over the last ${lev.momentum.window_min}' — tilts the attack levers ×${lev.momentum.mult_home}/${lev.momentum.mult_away}, capped ±12%`}>
-          pattern · last {lev.momentum.window_min}&apos;:{" "}
-          <span className={lev.momentum.recent_share_home >= 0.5 ? "text-ink-hi" : ""}>
-            {home} {Math.round(lev.momentum.recent_share_home * 100)}%
-          </span>
-          {" / "}
-          <span className={lev.momentum.recent_share_home < 0.5 ? "text-ink-hi" : ""}>
-            {away} {Math.round((1 - lev.momentum.recent_share_home) * 100)}%
-          </span>
-          {" of the threat"}
-        </p>
+        <div className="mb-3">
+          <p className="font-mono text-[11px] text-ink-low">
+            pattern · last {lev.momentum.window_min}&apos;:{" "}
+            <span className={lev.momentum.recent_share_home >= 0.5 ? "text-ink-hi" : ""}>
+              {home} {Math.round(lev.momentum.recent_share_home * 100)}%
+            </span>
+            {" / "}
+            <span className={lev.momentum.recent_share_home < 0.5 ? "text-ink-hi" : ""}>
+              {away} {Math.round((1 - lev.momentum.recent_share_home) * 100)}%
+            </span>
+            {" of the threat"}
+          </p>
+          <details data-testid="momentum-basis" className="mt-1">
+            <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
+              what the pattern read does to the numbers above
+            </summary>
+            <p className="mt-1 font-mono text-[10px] leading-relaxed text-ink-faint">
+              Decayed threat pressure {lev.momentum.pressure_home} against{" "}
+              {lev.momentum.pressure_away} over the last{" "}
+              {lev.momentum.window_min}′, read at{" "}
+              {lev.momentum.as_of_minute}′. It tilts the attack levers by{" "}
+              ×{lev.momentum.mult_home} / ×{lev.momentum.mult_away}, capped
+              at ±12%. It is a description of the last few minutes, not a
+              forecast of the next few.
+            </p>
+          </details>
+        </div>
       )}
       <div className="overflow-x-auto rounded-xl border border-line">
         <div className="min-w-[520px]">
@@ -217,6 +331,22 @@ function LiveMarketStream({ a, home, away, signals }: {
                           ? "Easy win — live model calls this near-certain while the price still pays"
                           : `${sg.side} signal on your watched market`} — live model ${pct(sg.live_probability)} vs market ${pct(sg.market_probability)}${sg.minute != null ? ` at ${Math.round(sg.minute)}'` : ""}`}>
                         {sg.kind === "easy_win" ? "💰 easy" : sg.side}{sg.minute != null ? ` ${Math.round(sg.minute)}'` : ""}
+                        {/* "💰 easy" and a bare "BUY" carry no meaning of
+                            their own; the whole of what the badge claims
+                            lived on the `title=` beside them, so a
+                            screen-reader user got a word and lost the
+                            claim. The claim is in the accessible tree
+                            now, and it is DERIVED FROM THE NUMBERS it is
+                            drawn from rather than restating the label. */}
+                        <span className="sr-only">
+                          {" — "}
+                          {sg.kind === "easy_win"
+                            ? "easy win: the live model calls this near-certain while the price still pays"
+                            : `${sg.side} signal on a market you are watching`}
+                          {`; live model ${pct(sg.live_probability)} against a market ${pct(sg.market_probability)}`}
+                          {sg.minute != null ? ` at ${Math.round(sg.minute)} minutes` : ""}
+                          . Informational — the market already knows the score.
+                        </span>
                       </span>
                     )}
                   </span>
@@ -260,8 +390,8 @@ function LiveMarketStream({ a, home, away, signals }: {
       <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
         Re-simulated every ~30s from the live state, shot stats, and the
         play-by-play pattern (who&apos;s attacking now). The market already
-        knows the score — differences are a read, not an edge. Hover the
-        levers for their full derivation.
+        knows the score — differences are a read, not an edge. The
+        derivations open above; nothing on this block needs a hover.
       </p>
     </div>
   );
@@ -387,6 +517,18 @@ function LiveExtras({ m }: { m: LiveScoreEntry }) {
             signals={signalRows} />
         </Collapse>
       )}
+      {/* AVAILABLE AND EMPTY IS A THIRD ANSWER AGAIN. `available` true
+          with zero rows fell between the unavailable line above and the
+          block below and drew nothing at all — the same pixels as a read
+          that never happened, which is the shape this file exists to
+          keep apart. */}
+      {statsOk && statsOk.available && statsOk.rows.length === 0 && (
+        <p data-testid="live-stats-empty"
+          className="mb-4 text-[11px] leading-relaxed text-ink-faint">
+          The stats read answered for this match and carried no stat rows
+          in it — the broadcast feed has published none yet.
+        </p>
+      )}
       {statsOk && statsOk.available && statsOk.rows.length > 0 && (
         <Collapse eyebrow="live" title="Match stats" className="mb-6">
           <div className="space-y-2.5">
@@ -394,10 +536,26 @@ function LiveExtras({ m }: { m: LiveScoreEntry }) {
               const colors = matchColors(statsOk.home_team || m.home,
                                          statsOk.away_team || m.away);
               return statsOk.rows.map((r) => {
-                const h = parseFloat(r.home) || 0;
-                const a = parseFloat(r.away) || 0;
-                const tot = h + a;
-                const pctH = tot > 0 ? (h / tot) * 100 : 50;
+                // MISSING IS NOT ZERO, AND AN UNDEFINED SHARE IS NOT 50/50.
+                //
+                // This was `parseFloat(r.home) || 0`, and `|| 0` swallows
+                // three different facts into one number: a genuine "0", a
+                // value ESPN did not send ("", null, "—"), and a value in
+                // a form this parse does not understand. All three then
+                // fed `tot > 0 ? … : 50`, so an unread pair drew a
+                // perfect half-and-half bar — a measured dead heat, drawn
+                // off nothing. The numbers beside it were the provider's
+                // own strings, so the row said "—  possession  —" over a
+                // bar claiming an even split.
+                //
+                // The bar is now DERIVED FROM THE NUMBERS BESIDE IT: it
+                // is drawn only when both parse and at least one is
+                // non-zero. Anything else says which of the two it is.
+                const h = parseFloat(r.home);
+                const a = parseFloat(r.away);
+                const read = Number.isFinite(h) && Number.isFinite(a);
+                const tot = read ? h + a : 0;
+                const pctH = tot > 0 ? (h / tot) * 100 : 0;
                 return (
                   <div key={r.key}>
                     <div className="flex items-baseline justify-between gap-3 text-sm">
@@ -405,12 +563,21 @@ function LiveExtras({ m }: { m: LiveScoreEntry }) {
                       <span className="min-w-0 truncate text-center text-xs text-ink-low">{r.label}</span>
                       <span className="w-14 shrink-0 text-right font-mono tabular-nums text-ink-hi">{r.away}</span>
                     </div>
-                    <div className="mt-1 flex h-1.5 gap-0.5 overflow-hidden rounded-full">
-                      <div className="rounded-full" style={{
-                        width: `${pctH}%`, background: colors.home, opacity: 0.85 }} />
-                      <div className="flex-1 rounded-full" style={{
-                        background: colors.away, opacity: 0.85 }} />
-                    </div>
+                    {tot > 0 ? (
+                      <div className="mt-1 flex h-1.5 gap-0.5 overflow-hidden rounded-full">
+                        <div className="rounded-full" style={{
+                          width: `${pctH}%`, background: colors.home, opacity: 0.85 }} />
+                        <div className="flex-1 rounded-full" style={{
+                          background: colors.away, opacity: 0.85 }} />
+                      </div>
+                    ) : (
+                      <p data-testid="stat-share-undrawn" data-key={r.key}
+                        className="mt-1 font-mono text-[9px] leading-none tracking-wide text-ink-faint">
+                        {read
+                          ? "both sides zero — there is no share to split"
+                          : "no share drawn — one of these values is not a number"}
+                      </p>
+                    )}
                   </div>
                 );
               });
@@ -486,9 +653,7 @@ function LiveCard({ m }: { m: LiveScoreEntry }) {
             <span className="block text-3xl sm:text-4xl">{flag(m.home)}</span>
             <p className="mt-2 flex items-center justify-end gap-2 truncate text-sm text-ink-mid sm:text-lg">
               {m.home}
-              {m.red_home && (
-                <span title="red card" className="inline-block h-3 w-2 rounded-[2px] bg-live" />
-              )}
+              <RedCards team={m.home} raw={m.red_home} />
             </p>
           </div>
 
@@ -523,9 +688,7 @@ function LiveCard({ m }: { m: LiveScoreEntry }) {
           <div className="min-w-0 flex-1 text-left">
             <span className="block text-3xl sm:text-4xl">{flag(m.away)}</span>
             <p className="mt-2 flex items-center gap-2 truncate text-sm text-ink-mid sm:text-lg">
-              {m.red_away && (
-                <span title="red card" className="inline-block h-3 w-2 rounded-[2px] bg-live" />
-              )}
+              <RedCards team={m.away} raw={m.red_away} />
               {m.away}
             </p>
           </div>

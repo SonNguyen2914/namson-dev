@@ -192,7 +192,24 @@ test.describe("Liga MX board", () => {
     await expect(sec.locator("h4")).toHaveCount(0);
   });
 
-  test("a not-deployed backend yields honest placeholders, not a crash",
+  // THIS TEST PINNED THE DEFECT, AND IT IS SAID LOUDLY (2026-09-07).
+  //
+  // It used to assert that a backend answering 404 on EVERY route left
+  // "loading fixtures…" and "loading standings" on screen — and it
+  // passed, because `.catch(() => {})` left each state at its initial
+  // `null` and `null` is the branch that renders "loading". A permanent
+  // "loading…" is a lie: it says the answer is on its way when nothing
+  // is coming. The 2026-09-06 pass fixed LigamxDashboard (`settle()`,
+  // three states) and this pin was left behind certifying the old
+  // behaviour, so the spec went red the moment the code got it right.
+  // The sibling case in friendlies.spec.ts already asserts the correct
+  // direction — `expect(body).not.toMatch(/loading fixtures/i)` — which
+  // is what made the disagreement visible.
+  //
+  // A test that pins the defect is worse than no test. Rewritten to the
+  // fact: a dead backend must SAY it is unavailable, and must not wear
+  // the word that means "still coming".
+  test("a not-deployed backend says unavailable — it does not load for ever",
     async ({ page }) => {
       for (const route of ["scoreboard", "standings", "schedule**",
                            "markets", "odds"]) {
@@ -201,10 +218,14 @@ test.describe("Liga MX board", () => {
                       body: JSON.stringify({ error: "unknown ligamx route" }) }));
       }
       await page.goto("/bet-suggester?league=ligamx");
-      // the page stands, states its loading placeholders, invents nothing
-      await expect(page.getByText(/loading fixtures/i)).toBeVisible();
-      await expect(page.getByText(/loading standings/i)).toBeVisible();
+      await expect(page.getByText(/liga mx fixture feed unavailable/i))
+        .toBeVisible();
+      await expect(page.getByText(/standings feed unavailable/i)).toBeVisible();
       const body = (await page.locator("body").innerText());
+      // …and the word that means "the answer is coming" is gone
+      expect(body).not.toMatch(/loading fixtures/i);
+      expect(body).not.toMatch(/loading standings/i);
+      // the page stands and invents nothing
       expect(body).not.toMatch(/\bTAKE\b/);
       expect(body).not.toMatch(/H \d+ · D \d+ · A \d+/);
     });

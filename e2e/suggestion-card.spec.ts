@@ -1,4 +1,9 @@
 import { expect, test } from "@playwright/test";
+import fs from "node:fs";
+import path from "node:path";
+
+import { BOOKKEEPING_PAYLOAD_FIELDS, REDUNDANT_PAYLOAD_FIELDS,
+  UNRENDERED_PAYLOAD_FIELDS } from "../src/components/SuggestionCard";
 
 // The per-fixture SUGGESTION CARD (card-v1). Hermetic: every request is
 // a recorded payload (the card is derived from the real
@@ -984,8 +989,21 @@ test.describe("suggestion card (recorded payloads)", () => {
       await expect(page.getByTestId("threat-fav")).toHaveText("home");
 
       // the definition is reachable rather than dropped — rendered
-      // from the payload, never retyped in the component
-      expect(await threat.getAttribute("title")).toBe(THREAT_BASIS);
+      // from the payload, never retyped in the component.
+      //
+      // CHANGED 2026-09-07, AND SAID OUT LOUD BECAUSE CHANGING A
+      // STANDING PIN IS NOT A FREE MOVE. The intent of this line is
+      // unchanged and is the same sentence as before: the definition
+      // must be reachable. What changed is that "reachable" used to
+      // mean a `title` attribute, and a title attribute is not in the
+      // accessible tree, does not exist on touch, and never survives a
+      // copy of the page — so the definition was reachable by mouse
+      // users alone. It is now real text. The assertion moved with the
+      // mechanism; it did not weaken, and the two pins below it (no
+      // em-dash, no <p> in this subtree) are untouched, which is why
+      // the definition renders as a sibling rather than inside.
+      await expect(page.getByTestId("threat-basis"))
+        .toHaveText(THREAT_BASIS);
 
       // the pairing: the number and the label sit in the same readout,
       // which is precisely what read as broken while one was a dash
@@ -1727,3 +1745,512 @@ test.describe("entry cost: what crossing costs and what resting costs",
           .first()).toBeVisible();
       });
   });
+
+// ====================================================================
+// THE OPEN REGISTER (2026-09-07)
+// ====================================================================
+//
+// The rule this round set: either make a thing impossible by absence or
+// by construction, or REGISTER it — and the guard must fail BOTH if a
+// new hole appears unregistered AND if a registered one is closed
+// without retiring its record.
+//
+// SuggestionCard declares 262 payload fields and draws 212. The other
+// fifty were invisible: not refused, not dashed, not named. Two of them
+// are why the register exists — `fair_now` is the probability the
+// settlement value is computed FROM and carries its own `refused`, and
+// `executions` is what actually filled. The rest are classified and the
+// classification is checked here against the source, not asserted.
+//
+// DERIVED, NOT TYPED. The candidate set comes from the component's own
+// text — the fields its types declare, minus the fields its code
+// reads — so a field added to a type tomorrow and never drawn fails
+// this test on the day it lands. A hand-typed list of the same fifty
+// names would go stale silently, which is the failure the register
+// exists to prevent and would be a fine joke to commit inside it.
+
+const CARD_SRC = fs.readFileSync(
+  path.join(__dirname, "../src/components/SuggestionCard.tsx"), "utf8");
+
+/** A NAME IS NOT A READ, AND PROSE IS NOT CODE — this test learned both
+ *  the hard way, in that order, and both are written down rather than
+ *  quietly fixed, because a guard that cannot fail is the exact shape
+ *  this register exists to catch.
+ *
+ *  FIRST: comments only. A bare `\bname\b` over the component's text
+ *  matched `label="equalized in window"` and data-testid="no-safe-
+ *  window" — two strings with nothing to do with `live_now.state.
+ *  window` — so the register's `window` record read as DRAWN and the
+ *  mutation that should have caught a deleted namer passed.
+ *
+ *  SECOND: strings out wholesale. That took the code with it. Template
+ *  literals carry real expressions inside `${...}` (`venue_class` and
+ *  `version` are drawn only from inside one), and a string that is
+ *  EXACTLY a field name is a key, not prose — STAT_ROWS reads
+ *  `shots`, `on_target` and `corners` through literal keys and nothing
+ *  else. Dropping those made three drawn fields look like holes.
+ *
+ *  So: comments go; a template literal keeps its `${...}` and loses its
+ *  text; a plain string survives only if the whole of it is a bare
+ *  identifier. What is left is code, and a field name in it is a read.
+ */
+function stripProse(t: string): string {
+  return t
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1")
+    // a template literal keeps its interpolations and loses its text
+    .replace(/`(?:[^`\\]|\\.)*`/g, (lit) =>
+      [...lit.matchAll(/\$\{([\s\S]*?)\}/g)].map((m) => m[1]).join(" "))
+    // a plain string survives only when the WHOLE of it names a field
+    .replace(/"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'/g, (lit) => {
+      const inner = lit.slice(1, -1);
+      return /^[A-Za-z_][A-Za-z0-9_]*$/.test(inner) ? inner : " ";
+    });
+}
+
+const REGISTER_MARK = "/* ---------- THE OPEN REGISTER FOR THIS SURFACE";
+const HELPERS_MARK = "/* ---------- small helpers";
+
+function declaredFields(): string[] {
+  const types = stripProse(CARD_SRC.slice(0, CARD_SRC.indexOf(REGISTER_MARK)));
+  const out = new Set<string>();
+  for (const m of types.matchAll(/([a-z_][a-z0-9_]*)\s*\??\s*:/gi)) out.add(m[1]);
+  return [...out];
+}
+
+function readsField(name: string): boolean {
+  const body = stripProse(CARD_SRC.slice(CARD_SRC.indexOf(HELPERS_MARK)));
+  return new RegExp(`\\b${name}\\b`).test(body);
+}
+
+/** The three sets, read out of the component's own exports. */
+function registerSets() {
+  return {
+    redundant: Object.keys(REDUNDANT_PAYLOAD_FIELDS),
+    bookkeeping: [...BOOKKEEPING_PAYLOAD_FIELDS],
+    registered: Object.keys(UNRENDERED_PAYLOAD_FIELDS),
+  };
+}
+
+test.describe("the open register", () => {
+  test("the three sets are disjoint, and every record carries its "
+    + "closing condition", () => {
+      const sets = Object.entries(registerSets());
+      for (const [an, a] of sets) {
+        for (const [bn, b] of sets) {
+          if (an >= bn) continue;
+          const both = a.filter((k) => b.includes(k));
+          expect(both, `${an} and ${bn} both claim ${both.join(", ")}`)
+            .toEqual([]);
+        }
+      }
+      // A hole written down without a closing condition is prose, not a
+      // record: it can never retire, so it never converges.
+      for (const [k, v] of Object.entries(UNRENDERED_PAYLOAD_FIELDS)) {
+        expect(v.finding.length, `${k} has no finding`).toBeGreaterThan(40);
+        expect(v.closes_when.length, `${k} has no closes_when`)
+          .toBeGreaterThan(40);
+      }
+      // and a redundancy claim has to name the field that carries the
+      // fact instead — an unnamed one is an assertion, not a check.
+      for (const [k, v] of Object.entries(REDUNDANT_PAYLOAD_FIELDS)) {
+        expect(v.length, `${k} names no field that carries it`)
+          .toBeGreaterThan(3);
+      }
+    });
+
+  test("A NEW HOLE FAILS: every declared field this file does not draw "
+    + "is accounted for by exactly one set", () => {
+      const accounted = new Set(Object.values(registerSets()).flat());
+      const undrawn = declaredFields().filter((f) => !readsField(f));
+      const unaccounted = undrawn.filter((f) => !accounted.has(f)).sort();
+      expect(unaccounted,
+        "these payload fields are declared, never drawn, and in no set — "
+        + "draw them, or register them with a closes_when: "
+        + unaccounted.join(", ")).toEqual([]);
+      // the derivation has to be finding something, or it proves nothing
+      expect(undrawn.length).toBeGreaterThan(20);
+    });
+
+  test("A CLOSED HOLE FAILS: a registered field that starts being drawn "
+    + "must have its record retired", () => {
+      const stale: string[] = [];
+      for (const k of Object.values(registerSets()).flat()) {
+        if (!readsField(k)) continue;
+        // reading a field only to NAME it on screen is not drawing it;
+        // that case is declared on the record and checked below.
+        if (UNRENDERED_PAYLOAD_FIELDS[k]?.named_on_surface) continue;
+        stale.push(k);
+      }
+      expect(stale,
+        "these fields are now drawn while their record still stands — "
+        + "retire the record: " + stale.join(", ")).toEqual([]);
+    });
+
+  test("a record that claims to be NAMED on the surface really is",
+    () => {
+      const named = Object.entries(UNRENDERED_PAYLOAD_FIELDS)
+        .filter(([, v]) => v.named_on_surface).map(([k]) => k);
+      // otherwise the flag becomes a way to silence the staleness check
+      expect(named.length).toBeGreaterThan(0);
+      for (const k of named) {
+        expect(readsField(k),
+          `${k} claims named_on_surface and nothing reads it`).toBe(true);
+      }
+    });
+});
+
+// ====================================================================
+// THE 2026-09-07 SWEEP — a failed read wearing the face of a good one
+// ====================================================================
+//
+// Every payload below is the backend's own shape, taken from
+// src/live/card.py rather than invented, because two incidents on this
+// exact block came from hand-written fixtures that agreed with the
+// frontend instead of with the emitter.
+
+// card.TAPE_HISTORY_UNREADABLE_WORDS, verbatim (head of it — the whole
+// sentence is long and the assertion below matches on its load-bearing
+// clauses). It rides on `inplay_plan` ONLY when the whole-tape read
+// FAILED, and nothing on this surface read it until this sweep.
+const TAPE_HISTORY_WORDS = "the state-tape history could not be read, "
+  + "so no earlier row can be shown not to hold a start — and none can "
+  + "be shown not to hold a DISMISSAL either. FAIL-CLOSED ON BOTH: the "
+  + "fixture is treated as started, no fee-inclusive edge is quoted, "
+  + "and every number the dismissal witness governs is WITHDRAWN under "
+  + "`tape_unreadable` rather than quoted.";
+
+function withInplay(extra: Record<string, unknown>) {
+  const c = JSON.parse(JSON.stringify(CARD_PAYLOAD));
+  Object.assign(c.card.layers.inplay_plan, extra);
+  return c;
+}
+
+test.describe("a failed read is not an empty one", () => {
+  test("a FAILED tape-history read renders its own sentence — the "
+    + "cause of every withdrawal below it", async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page, withInplay({
+        tape_history: { unavailable: true,
+                        consequence: TAPE_HISTORY_WORDS } }));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const note = page.getByTestId("tape-history-unreadable");
+      await expect(note).toBeVisible();
+      // the words, not a paraphrase — this is the distinction the whole
+      // block exists to make, so it is asserted on the clauses that
+      // make it: a READ that failed, failing CLOSED, withdrawing rather
+      // than quoting.
+      await expect(note).toContainText("could not be read");
+      await expect(note).toContainText("FAIL-CLOSED ON BOTH");
+      await expect(note).toContainText("WITHDRAWN");
+      // and it is in the accessible tree as text, not on an attribute
+      expect(await note.getAttribute("title")).toBeNull();
+    });
+
+  test("a card whose tape read WORKED renders no such note — the key's "
+    + "absence is the finding", async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page);              // the recorded settled card
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      // the card rendered (the recorded settled card's in-play words)
+      await expect(
+        page.getByText(/a red card VOIDS every grid number/i).first())
+        .toBeVisible();
+      await expect(page.getByTestId("tape-history-unreadable"))
+        .toHaveCount(0);
+    });
+
+  test("an in-play key this surface never declared is NAMED, not "
+    + "dropped", async ({ page }) => {
+      // THE WHOLE POINT. `tape_history` spent its life invisible
+      // because it was on the payload and not on the type — the
+      // register cannot see that class of hole, because it compares
+      // this file to itself. The next one announces itself.
+      await serveMatch(page);
+      await serveCard(page, withInplay({
+        some_new_block: { note: "unrecorded" } }));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const un = page.getByTestId("inplay-unaccounted-key");
+      await expect(un).toHaveCount(1);
+      await expect(un).toHaveAttribute("data-key", "some_new_block");
+      await expect(un).toContainText("no recorded shape");
+    });
+
+  test("a live-state key this surface never declared is NAMED too — "
+    + "the level `window` was found hiding at", async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page, withLiveNow(
+        withState(LIVE_NOW, { ...LIVE_STATE, another_axis: { p: 1 } })));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const un = page.getByTestId("live-state-unaccounted-key");
+      await expect(un).toHaveCount(1);
+      await expect(un).toHaveAttribute("data-key", "another_axis");
+    });
+
+  test("the WINDOWED read is named with its record rather than "
+    + "silently dropped", async ({ page }) => {
+      // card.py attaches `window` to EVERY state it emits: a share of
+      // the last few match-minutes, whose docstring says it rides
+      // "BESIDE the cumulative one and NEVER IN ITS PLACE". This
+      // surface draws the cumulative counts alone, which puts it
+      // exactly in their place — so the payload's arrival is stated.
+      await serveMatch(page);
+      await serveCard(page, withLiveNow(withState(LIVE_NOW,
+        { ...LIVE_STATE, window: { share: { refused: "n/a" } } })));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const w = page.getByTestId("live-window-registered");
+      await expect(w).toBeVisible();
+      await expect(w).toContainText("cumulative over the whole match");
+      // it is REGISTERED, not unaccounted — the two must not collide
+      await expect(page.getByTestId("live-state-unaccounted-key"))
+        .toHaveCount(0);
+    });
+});
+
+test.describe("gold is brand, never a verdict", () => {
+  const withGate = (verdict: string) => {
+    const c = JSON.parse(JSON.stringify(CARD_PAYLOAD));
+    c.card.layers.pick = { run_type: "t10", canonical_t10_lock: true,
+      gate: { ask: 0.42, all_in_cost: 0.4271, edge_fee_inclusive: 0.0121,
+              fee_floor: 0.03, verdict } };
+    return c;
+  };
+
+  test("WARNED — not an invitation is NOT painted in the accent",
+    async ({ page }) => {
+      // card.WARNED_VERDICT. HeadlineBlock already withholds the accent
+      // from a warned number, in its own words, because "the accent
+      // colour, which the eye reads as 'take this', is withheld and the
+      // warning outranks the meaning" — and the fee gate one block over
+      // gilded everything that was not the literal string "REFUSED".
+      // One payload, two blocks, opposite colours, on the finding that
+      // says in words it is not an invitation.
+      await serveMatch(page);
+      await serveCard(page, withGate("WARNED — not an invitation"));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const v = page.getByTestId("gate-verdict");
+      await expect(v).toHaveText("WARNED — not an invitation");
+      await expect(v).toHaveAttribute("data-ink", "warn");
+      await expect(v).toHaveClass(/text-warn/);
+      await expect(v).not.toHaveClass(/text-accent/);
+    });
+
+  test("a verdict this vocabulary does not know lands in the refusal "
+    + "family, never in the GO one", async ({ page }) => {
+      // an unrecognised value REFUSES; it does not fold into the class
+      // that reads as an invitation.
+      await serveMatch(page);
+      await serveCard(page, withGate("SOMETHING_NEW"));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await expect(page.getByTestId("gate-verdict"))
+        .toHaveAttribute("data-ink", "warn");
+    });
+
+  test("PLAYABLE is the one verdict that earns it", async ({ page }) => {
+    // the control: without this the test above passes against a
+    // component that paints everything amber, which proves nothing.
+    await serveMatch(page);
+    await serveCard(page, withGate("PLAYABLE"));
+    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    await expect(page.getByTestId("gate-verdict"))
+      .toHaveAttribute("data-ink", "accent");
+  });
+});
+
+test.describe("missing is never zero, on the bar as well as the digits", () => {
+  test("a triple missing a member draws NO segment for it, and says the "
+    + "widths do not sum", async ({ page }) => {
+      // The header of the component forbids "a zero bar standing in for
+      // a missing forecast" and the bar read `?? 0`, which is one. The
+      // possession bar forty lines up already refuses to draw half a
+      // split; this is the same rule, one function over.
+      await serveMatch(page);
+      await serveCard(page, withLiveNow({ ...LIVE_NOW,
+        p_win: { home: 0.6412, away: 0.1177 } }));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const segs = page.getByTestId("live-prob-bar").locator("div");
+      await expect(segs).toHaveCount(2);
+      await expect(segs.nth(0)).toHaveAttribute("data-side", "home");
+      await expect(segs.nth(1)).toHaveAttribute("data-side", "away");
+      // the digits already said so; now the picture agrees with them
+      const note = page.getByTestId("live-prob-incomplete");
+      await expect(note).toContainText("draw");
+      await expect(note).toContainText("do not sum to the whole");
+    });
+
+  test("a complete triple draws all three and claims nothing missing",
+    async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page, withLiveNow(LIVE_NOW));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await expect(page.getByTestId("live-prob-bar").locator("div"))
+        .toHaveCount(3);
+      await expect(page.getByTestId("live-prob-incomplete"))
+        .toHaveCount(0);
+    });
+
+  test("a one-sided possession pair carries NO percent sign it has not "
+    + "earned", async ({ page }) => {
+      // With both sides present the printed pair IS the derived share,
+      // so it is a percentage by construction. With one side missing it
+      // is the raw tape value, and the block is deliberately
+      // "indifferent to whether the tape counts possession 0-100 or
+      // 0-1" — so a `%` glued onto it decides a scale question this
+      // block declines to decide, and renders 0.62 as "0.6%".
+      await serveMatch(page);
+      await serveCard(page, withLiveNow(withState(LIVE_NOW,
+        { possession: { home: 0.62, away: null } })));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const row = page.getByTestId("live-stat-possession");
+      await expect(row).toContainText("0.62");
+      await expect(row).not.toContainText("%");
+      await expect(page.getByTestId("possession-unscaled"))
+        .toContainText("carries no unit");
+      await expect(page.getByTestId("possession-bar")).toHaveCount(0);
+    });
+
+  test("both sides present still read as percentages", async ({ page }) => {
+    await serveMatch(page);
+    await serveCard(page, withLiveNow(withState(LIVE_NOW, LIVE_STATE)));
+    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    await expect(page.getByTestId("live-stat-possession"))
+      .toContainText("61.4%");
+    await expect(page.getByTestId("possession-unscaled")).toHaveCount(0);
+  });
+});
+
+test.describe("a caveat lives in the accessible tree, not on a title", () => {
+  test("LIVE_STATE_BASIS — the rule every dash in the block depends on "
+    + "— is real text", async ({ page }) => {
+      // card.LIVE_STATE_BASIS ends "A NULL is the provider's silence
+      // and renders as unknown: missing is never zero". It rode on a
+      // `title` attribute under a comment claiming the dashes "are only
+      // honest if it is readable somewhere". A title attribute is not
+      // somewhere.
+      const BASIS = "the same state-tape row the triple above was read "
+        + "from. A NULL is the provider's silence and renders as "
+        + "unknown: missing is never zero.";
+      await serveMatch(page);
+      await serveCard(page, withLiveNow(
+        withState(LIVE_NOW, { ...LIVE_STATE, basis: BASIS })));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const b = page.getByTestId("live-state-basis");
+      await expect(b).toBeVisible();
+      await expect(b).toContainText("missing is never zero");
+      // the text is IN the node, not hanging off it
+      expect(await b.innerText()).toContain("provider's silence");
+    });
+
+  test("the threat's own definition is beside the number, not in a "
+    + "tooltip", async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page, withLiveNow(withState(LIVE_NOW, LIVE_STATE)));
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const b = page.getByTestId("threat-basis");
+      await expect(b).toBeVisible();
+      await expect(b).toContainText("share of shots + on-target + corners");
+      // and the row no longer hides it on an attribute
+      expect(await page.getByTestId("live-stat-threat")
+        .getAttribute("title")).toBeNull();
+    });
+
+  test("what CROSS and REST mean is on the page once, as text",
+    async ({ page }) => {
+      // Six cost cells carried these paragraphs on `title` attributes.
+      // They define the two words the whole block compares.
+      await serveMatch(page);
+      await serveCard(page);              // the recorded card carries EXECUTION
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await expect(page.getByTestId("exec-route-cross"))
+        .toContainText("lifts the ask and fills now");
+      await expect(page.getByTestId("exec-route-rest"))
+        .toContainText("joins the best bid and waits");
+      // once, not once per cell
+      await expect(page.getByTestId("exec-route-cross")).toHaveCount(1);
+      // and no cost cell hides a definition on an attribute any more
+      expect(await page.getByTestId("exec-home-cross")
+        .getAttribute("title")).toBeNull();
+    });
+
+  test("what the content hash COVERS is text, not a tooltip",
+    async ({ page }) => {
+      await serveMatch(page);
+      await serveCard(page);
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await expect(page.getByTestId("content-hash-basis"))
+        .toContainText("sha256");
+    });
+});
+
+test.describe("a label followed by nothing is not an absence", () => {
+  test("every identity field that is missing renders a dash — including "
+    + "venue_class, which is a REGISTERED backend absence",
+    async ({ page }) => {
+      // card.CARD_ABSENCES carries venue_class as "UNAVAILABLE (the
+      // venue-class read is not built on the live plane yet)", so a
+      // card with no venue class is the NORMAL case — and the line used
+      // to end "venue class:" with white space after the colon.
+      const c = JSON.parse(JSON.stringify(CARD_PAYLOAD));
+      c.card.layers.identity = { home: "Columbus Crew", away: "CF Montréal",
+        status: "post" };
+      await serveMatch(page);
+      await serveCard(page, c);
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      const id = page.getByTestId("identity");
+      await expect(id).toContainText("venue class: — (not on the payload)");
+      await expect(id).toContainText("kickoff —");
+      await expect(id).toContainText("venue —");
+    });
+});
+
+// --- the MLS hub's rich lineup block ---------------------------------
+//
+// This case needs a competition with `rich: true` (a per-player
+// strength feed), which of the four hubs is MLS alone — EPL and La Liga
+// have no xG/90 source and their config says so, so the absences block
+// does not render there at all. It lives here because this file already
+// serves the MLS match payload hermetically.
+
+const SIDE_XI = (over: Record<string, unknown> = {}) => ({
+  formation: "4-2-3-1", released: true, confirmed: true,
+  starters: [{ name: "A. Player", position: "F", jersey: "9",
+               xg90: 0.41, apps: 20 }],
+  bench: [], key_absences: null, key_absences_reason: null, ...over });
+
+test.describe("the MLS hub's team news", () => {
+  async function openWithLineups(page: Pg, lineups: unknown) {
+    const body = JSON.parse(JSON.stringify(MATCH_PAYLOAD));
+    body.lineups = lineups;
+    await page.route(`**/api/mls/match/${EVENT}`, (r) =>
+      r.fulfill({ status: 200, contentType: "application/json",
+                  body: JSON.stringify(body) }));
+    await serveCard(page);
+    await page.goto(`/bet-suggester/mls/${EVENT}`);
+  }
+
+  test("key_absences [] is a MEASURED zero and says so; null keeps its "
+    + "own, different words", async ({ page }) => {
+      // The type's own comment has always said `[]` means "it computed
+      // them and nobody is missing" and `null` means it could not — and
+      // `[]` rendered as nothing at all, the same blank the not-rich
+      // case and the never-computed case get. Three facts, one face.
+      await openWithLineups(page, {
+        home: SIDE_XI({ key_absences: [] }),
+        away: SIDE_XI({ key_absences: null,
+          key_absences_reason: "a club did not resolve" }),
+        strength_available: true });
+      await expect(page.getByTestId("absences-none"))
+        .toContainText("measured result, not an absent read");
+      await expect(
+        page.getByText(/NOT a statement that nobody is missing/).first())
+        .toBeVisible();
+    });
+
+  test("a side the backend could not resolve does not read as awaiting "
+    + "team news", async ({ page }) => {
+      await openWithLineups(page, { home: null, away: SIDE_XI(),
+                                    strength_available: true });
+      await expect(page.getByTestId("xi-side-absent"))
+        .toContainText("NOT a statement that the XI is unannounced");
+    });
+});

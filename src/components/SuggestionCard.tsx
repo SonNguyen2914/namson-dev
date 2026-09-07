@@ -219,12 +219,28 @@ type LiveState = {
   tilt_label?: TiltLabel | "SIEGE" | "STERILE_POSSESSION" | "CONTEST"
     | null;
   tilt_note?: string;
+  // THE WINDOWED READ, DECLARED AND NOT DRAWN. Typed opaquely on
+  // purpose: this file has no recorded shape for it, and drawing a
+  // block against a shape nobody recorded is how a surface certifies a
+  // reader that cannot read the real payload. It is REGISTERED instead
+  // — UNRENDERED_PAYLOAD_FIELDS.window carries the finding and the
+  // condition that closes it — so it is named rather than dropped.
+  window?: Record<string, unknown>;
   // WHY these counts can be read as one minute of one match (backend
   // LIVE_STATE_BASIS), including the rule the dashes above depend on:
   // a null is the provider's silence, and missing is never zero. It is
   // rendered from the payload rather than restated in copy here, so
   // the two can never drift into saying different things.
   basis?: string };
+
+/** The keys of `live_now.state` this file DECLARES. Anything else the
+ *  backend attaches is NAMED on screen by the namer below rather than
+ *  dropped — the same closure `INPLAY_DECLARED_KEYS` gives the layer
+ *  above, at the level where `window` was found hiding. */
+export const LIVE_STATE_DECLARED_KEYS: readonly string[] = [
+  "possession", "shots", "on_target", "corners", "cards", "threat",
+  "tilt_label", "tilt_note", "window", "basis",
+];
 
 type TiltLabel = { label?: "SIEGE" | "STERILE_POSSESSION" | "CONTEST";
   note?: string; refused?: string; unavailable?: string };
@@ -278,9 +294,30 @@ type Exposure = {
   honesty?: string; not_a_plan?: string;
   refused?: string; unavailable?: string };
 
+// A FAILED READ, IN THE READER'S OWN WORDS. Present on `inplay_plan`
+// ONLY when the whole-tape history read FAILED (backend card.py
+// `history_failed`) and absent on every card whose read worked — so the
+// key's PRESENCE is the finding. `consequence` is
+// card.TAPE_HISTORY_UNREADABLE_WORDS, which names what the failure
+// fails closed on: the fixture is treated as started, the band comes
+// from the pre-kickoff anchor or refuses thin_book, no fee-inclusive
+// edge is quoted, and every number the dismissal witness governs is
+// WITHDRAWN under `tape_unreadable` rather than quoted.
+//
+// IT WAS NOT ON THIS TYPE until 2026-09-07 and nothing here read it.
+// The per-block `tape_unreadable` refusals did render, so the card was
+// not silent — but the one sentence saying the cause was a READ THAT
+// FAILED, rather than a tape with nothing on it, was dropped on the
+// floor. That is this repo's oldest bug shape and the exact reason the
+// backend emits the sentence at all: its own text ends "See
+// inplay_plan.tape_history for the read's own failure", pointing at a
+// key this surface did not have.
+type TapeHistory = { unavailable?: boolean; consequence?: string };
+
 type InplayLayer = {
   live_now?: LiveNow;
   exposure?: Refusable<Exposure>;
+  tape_history?: TapeHistory;
   danger_windows?: { equalizer_hazard_peak?: Refusable<HazardPeak>;
     late_opener?: Refusable<Cell> };
   red_card_rule?: string; cash_out_ladder?: string;
@@ -384,6 +421,333 @@ type Card = { card_version?: string; competition?: string;
 type CardResponse = { generated_at?: string; content_hash?: string;
   emission?: string; prediction_run_id?: string | null; card?: Card;
   live_tick?: LiveTick; positions?: PositionsBlock };
+
+/* ---------- THE OPEN REGISTER FOR THIS SURFACE (2026-09-07) ----------
+ *
+ * WHY IT EXISTS. This file declares 258 payload fields and draws 208 of
+ * them. The other fifty were invisible: not refused, not dashed, not
+ * named — absent, with nothing anywhere saying they had arrived and
+ * been dropped. Two of them are the reason this register was written.
+ * `fair_now` is the probability `value at settlement` is computed FROM,
+ * and it carries its own `refused`, so a settlement value could render
+ * beside a refusal nobody could see. `executions` is what actually
+ * filled, and a position block quoting "value now" for a hundred
+ * contracts while forty of them never filled is not a rounding error,
+ * it is the wrong number.
+ *
+ * THE RULE THIS ROUND SET. Either make a thing impossible by absence or
+ * by construction, or REGISTER it — with the condition that closes it
+ * written into the code, and a guard that fails BOTH if a new hole
+ * appears unregistered AND if a registered one is closed without
+ * retiring its record. The pattern is `WatchedStrip`'s
+ * UNRENDERED_ENVELOPE_KEYS and it is honest, finite and convergent.
+ *
+ * THE THREE SETS ARE DISJOINT AND THEY COVER WHAT IS NOT DRAWN. Every
+ * declared field this file does not read is REDUNDANT (a second face of
+ * a field that IS drawn — the guard names which), BOOKKEEPING (it
+ * identifies the payload and says nothing about a match), or REGISTERED
+ * (it carries a finding this surface does not draw). A field in none of
+ * them, or in two of them, fails the guard in
+ * e2e/suggestion-card.spec.ts — which is what makes a record retire
+ * when the block that replaces it ships, instead of standing as prose
+ * after it stops being true.
+ *
+ * WHAT THIS REGISTER CANNOT SEE, said plainly rather than left for the
+ * next round to find. It is derived from the TYPES IN THIS FILE against
+ * the code in this file, so it catches a field this file declares and
+ * drops. It cannot catch a key the backend sends that this file never
+ * declared at all — which is exactly how `inplay_plan.tape_history`,
+ * the sentence saying a tape read FAILED, hid until 2026-09-07. That
+ * hole is closed for `inplay_plan` by the runtime namer below and is
+ * open everywhere else; `INPLAY_DECLARED_KEYS` carries the condition.
+ */
+
+/** Not drawn because a field that IS drawn carries the same fact. The
+ *  value names it, so the claim is checkable rather than asserted. */
+export const REDUNDANT_PAYLOAD_FIELDS: Record<string, string> = {
+  all_in_cents: "all_in_dollars — the same money, and the dollar string "
+    + "is the backend's exact Decimal rather than a re-scaled integer",
+  ceiling_seconds: "stale_quote.finding — the collector's sentence states "
+    + "the ceiling it breached",
+  difference_cents: "hold_vs_exit.says — the backend's own sentence about "
+    + "the difference, rendered verbatim, carries the figure",
+  difference_cents_per_contract: "hold_vs_exit.says",
+  end_minute: "cell_window.note",
+  entry_cost_dollars: "position.entry_price beside position.entry_note",
+  fee_cents: "fee_dollars",
+  fee_cents_per_contract: "fee_dollars",
+  fee_helper: "the execution layer's fee_helpers line, which names both "
+    + "helpers and their rounding",
+  fee_note: "the execution layer's fee_helpers line",
+  gross_dollars: "all_in_dollars and fee_dollars, which sum to it",
+  headline_rate: "effective_rate beside rounding_multiple — the charged "
+    + "rate and its multiple over the headline",
+  net_dollars: "value_now_cents, rendered through usd()",
+  offset_from_cell_start: "cell_window.note",
+  per_contract_dollars: "per_contract_cents",
+  position_size: "position.size",
+  read_at_minute: "cell_window.note",
+  start_minute: "cell_window.note",
+  stated_price_dollars: "position.entry_price",
+  stated_size: "position.size",
+  top_of_book_size: "thin_bid.finding — the sentence states the depth it "
+    + "found",
+};
+
+/** Not drawn because they identify the payload rather than describe a
+ *  match. Nothing about a fixture is lost by leaving them out. */
+export const BOOKKEEPING_PAYLOAD_FIELDS: readonly string[] = [
+  "built", "code", "competition_scope", "espn_event_id", "fixture_id",
+  "price_basis", "recorded_at", "size_basis", "tape_row",
+];
+
+/** CARRIES A FINDING THIS SURFACE DOES NOT DRAW. Each entry is a live
+ *  record: what is missing from the screen, and what closes it. */
+export const UNRENDERED_PAYLOAD_FIELDS: Record<string, {
+  finding: string; closes_when: string;
+  /** Set when this surface READS the field solely in order to NAME it
+   *  on screen. Naming is not drawing, so the record still stands —
+   *  but the guard must not mistake the naming for the record having
+   *  been closed. The guard requires the naming to actually exist, so
+   *  deleting it fails just as loudly as leaving a stale record. */
+  named_on_surface?: boolean;
+}> = {
+  fair_now: {
+    finding: "THE PROBABILITY THE SETTLEMENT VALUE IS COMPUTED FROM. "
+      + "`value at settlement (at the read)` renders as a dollar figure "
+      + "with no p beside it, while position.py carries p, its basis, "
+      + "its source and its own `refused` on this key. So a card can "
+      + "show a settlement value whose probability was REFUSED, with "
+      + "the refusal nowhere on screen — a number standing where a "
+      + "named absence should be, which is the shape this whole card "
+      + "exists to prevent.",
+    closes_when: "the settlement figure is drawn with fair_now.p, its "
+      + "band and its basis beside it, and fair_now.refused renders as "
+      + "a RefusalNote IN PLACE OF the dollar figure rather than under "
+      + "it; then this record retires.",
+  },
+  executions: {
+    finding: "WHAT ACTUALLY FILLED. The block quotes value-now and "
+      + "value-at-settlement for the journal's STATED size, and the "
+      + "journal separately carries rows, filled contracts, contracts "
+      + "sold early, open contracts, orders not filled and closes. A "
+      + "hundred-contract position of which forty filled is worth what "
+      + "forty are worth; quoting the stated size is not conservative, "
+      + "it is wrong, and nothing on this surface says which size the "
+      + "money figures used.",
+    closes_when: "the position header states the OPEN contract count "
+      + "beside the stated size whenever they differ, and the money "
+      + "figures name which of the two they were computed on; then this "
+      + "record and its five children retire together.",
+  },
+  filled_contracts: { finding: "a child of `executions` — see that "
+    + "record; the count that fills the gap between stated and open.",
+    closes_when: "the `executions` record closes — the open count "
+    + "reaches the position header and the money figures name the "
+    + "size they were computed on; these five children retire with "
+    + "it, together, because none of them is a separate hole." },
+  contracts_sold_early: { finding: "a child of `executions` — see that "
+    + "record; contracts already exited, which the value figures do not "
+    + "know about.", closes_when: "the `executions` record closes — the open count "
+    + "reaches the position header and the money figures name the "
+    + "size they were computed on; these five children retire with "
+    + "it, together, because none of them is a separate hole." },
+  open_contracts: { finding: "a child of `executions` — see that record; "
+    + "this is the size the money figures SHOULD be computed on.",
+    closes_when: "the `executions` record closes — the open count "
+    + "reaches the position header and the money figures name the "
+    + "size they were computed on; these five children retire with "
+    + "it, together, because none of them is a separate hole." },
+  not_filled: { finding: "a child of `executions` — see that record; "
+    + "orders that never became a position at all.",
+    closes_when: "the `executions` record closes — the open count "
+    + "reaches the position header and the money figures name the "
+    + "size they were computed on; these five children retire with "
+    + "it, together, because none of them is a separate hole." },
+  closed_early: { finding: "a child of `executions` — see that record.",
+    closes_when: "the `executions` record closes — the open count "
+    + "reaches the position header and the money figures name the "
+    + "size they were computed on; these five children retire with "
+    + "it, together, because none of them is a separate hole." },
+  arithmetic: {
+    finding: "THE WORKING BEHIND THE TWO MONEY FIGURES. `arithmetic."
+      + "exit` is contracts × bid, gross, fee and net as exact decimal "
+      + "strings, and `arithmetic.settlement` carries the fee note. The "
+      + "card prints the two totals and none of the steps, so a reader "
+      + "cannot check a figure against the fee that produced it — on a "
+      + "surface whose largest standing caveat is that the fee rounding "
+      + "granularity is an OPEN QUESTION worth 2.27x to 50.00x on small "
+      + "clips.",
+    closes_when: "the exit figure expands to its four terms on demand, "
+      + "as the entry-cost block already does for cross and rest; then "
+      + "this record and `maker_exit` retire.",
+  },
+  maker_exit: { finding: "the sentence about exiting as a MAKER rather "
+    + "than crossing to the bid — the one execution quantity this "
+    + "project measured and did not kill (resting beat crossing by "
+    + "$12-18/leg). The entry side of that comparison is drawn in full "
+    + "by the entry-cost block; the exit side is on the payload and is "
+    + "not drawn at all, so the card is asymmetric about the one thing "
+    + "it has evidence for.",
+    closes_when: "the `arithmetic` record closes AND the exit figure "
+    + "carries the maker route beside the taker one, so the exit side "
+    + "of the rest-versus-cross comparison is drawn as fully as the "
+    + "entry side already is; then this retires with it." },
+  executable_now: {
+    finding: "WHAT THE THIN BID CAN ACTUALLY PAY. `thin_bid` renders "
+      + "its finding — that the top of the book cannot take the whole "
+      + "position — and drops the arithmetic for the part it CAN take. "
+      + "The reader is told the exit is not there and not told how much "
+      + "of it is.",
+    closes_when: "the thin-bid note carries executable_now's contracts "
+      + "and net beside the finding, held to the one ladder the backend "
+      + "already withdraws unpayable claims against; then it retires.",
+  },
+  common_case: {
+    finding: "THE BASE RATE FOR THE REFUSAL BESIDE IT. `no_bid` and "
+      + "`thin_bid` each carry a sentence saying how usual this state "
+      + "is — the measured median in-play bid size is 0-1 contracts, so "
+      + "no exit is the COMMON case, not an anomaly. Without it a "
+      + "refusal reads as this fixture being unlucky rather than as the "
+      + "regime the stage operates in, which is the misreading the "
+      + "sentence was written to prevent.",
+    closes_when: "the no-bid and thin-bid notes render common_case "
+      + "beneath their finding, as the exposure block already renders "
+      + "its honesty line; then it retires.",
+  },
+  witness: {
+    finding: "WHICH WITNESS SAW THE DISMISSAL. `red_card_void` draws "
+      + "`because` and `rule` and drops the witness list, so a "
+      + "withdrawal corroborated by two witnesses and one resting on a "
+      + "single uncorroborated sighting render identically — and the "
+      + "backend distinguishes them by name (card.py: 'corroborated by "
+      + "the state tape's last snapshot', 'uncorroborated (single "
+      + "witness)', 'UNVERIFIED - the two witnesses disagree').",
+    closes_when: "the withdrawal note names its witnesses; then this "
+      + "record and `tape_note` retire.",
+  },
+  tape_note: { finding: "the tape read's own note on the withdrawal — a "
+    + "child of the `witness` finding, and the place a read FAILURE "
+    + "rather than an absent sighting would be said.",
+    closes_when: "the `witness` record closes — the withdrawal note "
+    + "names its witnesses and says whether they corroborate, disagree "
+    + "or stand alone; this note retires with it, being the same "
+    + "finding at one more level of detail." },
+  quantity_key: {
+    finding: "WHICH QUANTITY THE TRIPLE IS. The backend declares it "
+      + "(position.WinProbability.FIELD) precisely because this payload "
+      + "carries BOTH win probabilities and equaliser hazards, and B7 "
+      + "made confusing the two impossible in the backend by "
+      + "construction. On screen the three numbers are labelled home / "
+      + "draw / away and nothing says they are p(win) rather than a "
+      + "hazard — the discriminator the backend went to the trouble of "
+      + "shipping is dropped by the reader it was shipped for. This "
+      + "file was the reader that held the p -> p_win rename open.",
+    closes_when: "the live triple is labelled with quantity_key on "
+      + "screen, and a quantity_key this surface does not recognise "
+      + "REFUSES the triple rather than drawing it under the win "
+      + "label; then it retires.",
+  },
+  units: {
+    finding: "THE UNIT OF `survives`. CellFigure renders it through "
+      + "pct1(), which glues a percent sign on whatever arrives, while "
+      + "the payload states the unit separately and this surface never "
+      + "reads it. The sign is asserted, not derived — the same shape "
+      + "as the possession pair that used to wear a `%` it had not "
+      + "earned, closed one block over on 2026-09-07.",
+    closes_when: "CellFigure takes the unit from the payload and "
+      + "refuses to format a figure whose unit it does not recognise; "
+      + "then it retires.",
+  },
+  grid: {
+    finding: "WHICH GRID ARTIFACT THE CELL CAME FROM. Every precedent "
+      + "cell, every map branch and the exposure cell carry `grid` — "
+      + "comeback_by_strength, late_opener, scoreless_fav_decay, "
+      + "equalizer_hazard — and this surface draws `role` and "
+      + "`source_cell` and never the grid. Two cells from two different "
+      + "measurements, with different definitions, different corpora "
+      + "and different n, render under headers that look alike, and it "
+      + "is on the recorded payload this suite already serves. It is "
+      + "the same family as `variant` one field over: the provenance a "
+      + "band is only interpretable against.",
+    closes_when: "each cell header names its grid beside its role, so "
+      + "two cells drawn one above the other can be told apart by the "
+      + "measurement behind them; then this record retires with "
+      + "`variant`.",
+  },
+  variant: {
+    finding: "WHICH GRID THE EXPOSURE CAME FROM. clean_11v11 excludes "
+      + "every match with a sending-off; the pooled variant does not. "
+      + "The card glosses clean_11v11 by name in its GLOSSARY and then "
+      + "never tells the reader which variant the number in front of "
+      + "them is, so two materially different measurements render "
+      + "identically.",
+    closes_when: "the exposure header names the variant and renders "
+      + "variant_basis beside it; then this record and `variant_basis` "
+      + "retire.",
+  },
+  variant_basis: { finding: "the sentence defining the variant — a "
+    + "child of the `variant` finding.", closes_when: "the `variant` record closes — the exposure header "
+    + "names which grid the cell came from; this sentence is drawn "
+    + "beside it and retires with it." },
+  applies: {
+    finding: "WHETHER THE EXPOSURE APPLIES AT ALL. The block draws its "
+      + "cells whenever they are present and never consults the "
+      + "backend's own statement that this fixture is or is not a case "
+      + "the measurement covers, so `applies: false` with cells "
+      + "attached would render as a live reading.",
+    closes_when: "the block gates on applies and renders `subject` when "
+      + "it is false; then this record and `subject` retire.",
+  },
+  subject: { finding: "what the exposure is a statement ABOUT — a child "
+    + "of the `applies` finding, and the sentence that would explain a "
+    + "false one.", closes_when: "the `applies` record closes — the block gates on "
+    + "applies and renders this sentence whenever it is false; this "
+    + "retires with it, being the words that gate's refusal needs." },
+  window: {
+    finding: "THE WINDOWED READ, WHICH THE CUMULATIVE SHARE IS NOT A "
+      + "SUBSTITUTE FOR. card.py `_live_state` attaches `window` on "
+      + "EVERY state it emits — a share of what accrued in the last few "
+      + "match-minutes and how much accrued per minute, with their own "
+      + "refusal vocabulary (patterns.WINDOW_REFUSALS, itself a "
+      + "registered hole for being a SECOND vocabulary) and their own "
+      + "registered absence, WINDOW_AXES_UNMEASURED. The emitter's "
+      + "docstring says they ride 'BESIDE the cumulative one and NEVER "
+      + "IN ITS PLACE' — and this surface drew the cumulative one "
+      + "alone, which puts it exactly in their place: 76% of the "
+      + "threat across ninety minutes and 76% of it since the 80th are "
+      + "different facts and rendered as one number. It was not on this "
+      + "type at all until 2026-09-07, so nothing declared it, nothing "
+      + "drew it, and nothing said it had arrived.",
+    closes_when: "the window block's shape is RECORDED off card.py's "
+      + "own emitter (never hand-written — two incidents on this same "
+      + "sub-block came from hand-written fixtures agreeing with the "
+      + "frontend instead of with the backend) and drawn BESIDE the "
+      + "cumulative counts with each labelled as to its span, its "
+      + "refusals named, and WINDOW_AXES_UNMEASURED rendered verbatim; "
+      + "then this record retires.",
+    named_on_surface: true,
+  },
+  partial_n: {
+    finding: "A SPLIT COMPUTED ON FEWER MATCHES THAN ITS HEADER CLAIMS. "
+      + "SplitsSide prints n_total in the header and every condition's "
+      + "own n in its row; partial_n says the side's rows rest on a "
+      + "subset, and it is dropped. A percentage whose denominator is "
+      + "overstated is the noise-floor error this project measures "
+      + "everything against.",
+    closes_when: "the splits header states partial_n beside n_total "
+      + "whenever it is present; then it retires.",
+  },
+};
+
+/** The keys of `inplay_plan` this file DECLARES. The runtime namer
+ *  below reports any other key the backend attaches, so the next
+ *  `tape_history` announces itself on screen instead of being dropped
+ *  for a round. Pinned to the type by the guard, so it cannot drift. */
+export const INPLAY_DECLARED_KEYS: readonly string[] = [
+  "live_now", "exposure", "tape_history", "danger_windows",
+  "red_card_rule", "cash_out_ladder", "refused", "unavailable",
+];
 
 /* ---------- small helpers ---------- */
 
@@ -735,8 +1099,8 @@ function money(s?: string) {
 // that could not tell them apart passed while this cell rendered a
 // dash — which is precisely the blank-instead-of-a-reason failure the
 // whole card exists to prevent.
-function ExecLegCell({ leg, label, side, note }: {
-  leg?: ExecLeg; label: string; side: string; note?: string;
+function ExecLegCell({ leg, label, side }: {
+  leg?: ExecLeg; label: string; side: string;
 }) {
   if (!leg || leg.refused) {
     return (
@@ -753,7 +1117,7 @@ function ExecLegCell({ leg, label, side, note }: {
   }
   return (
     <div data-testid={`exec-${side}-${label}`}
-      className="rounded-lg border border-line px-2.5 py-2" title={note}>
+      className="rounded-lg border border-line px-2.5 py-2">
       <p className="font-mono text-[9px] uppercase tracking-wide text-ink-faint">
         {label}
         {leg.price != null && (
@@ -779,9 +1143,8 @@ function ExecLegCell({ leg, label, side, note }: {
   );
 }
 
-function ExecutionOutcomeRow({ side, o, routes }: {
+function ExecutionOutcomeRow({ side, o }: {
   side: string; o?: ExecOutcome;
-  routes?: { cross?: string; rest?: string };
 }) {
   const r = refusalOf(o);
   return (
@@ -797,10 +1160,8 @@ function ExecutionOutcomeRow({ side, o, routes }: {
       {r ? <RefusalNote text={r} /> : (
         <>
           <div className="grid grid-cols-2 gap-2">
-            <ExecLegCell leg={o?.cross} label="cross" side={side}
-              note={routes?.cross} />
-            <ExecLegCell leg={o?.rest} label="rest" side={side}
-              note={routes?.rest} />
+            <ExecLegCell leg={o?.cross} label="cross" side={side} />
+            <ExecLegCell leg={o?.rest} label="rest" side={side} />
           </div>
           {/* the comparison. Two dollar figures — no accent colour is
               spent on making either read as an instruction.
@@ -862,6 +1223,32 @@ function ExecutionBlock({ x }: { x?: Refusable<ExecutionLayer> }) {
         )}
       </Eyebrow>
 
+      {/* WHAT "CROSS" AND "REST" MEAN, once, as text — not six times as
+          a tooltip. These are the backend's own route definitions
+          (execution_view `routes`), and each is a paragraph: that a
+          cross LIFTS THE ASK AND FILLS NOW at the full taker rate, and
+          that a rest JOINS THE BEST BID AND WAITS at a quarter of it —
+          and, in the rest's own last sentence, that IMPROVING on the
+          bid costs more and is a different figure, not quoted here.
+
+          They rode on a `title` attribute on each of the six cost
+          cells until 2026-09-07. A tooltip is not in the accessible
+          tree, does not exist on touch, and never reaches a copy of
+          the page, so the two words this whole block compares were
+          undefined for most readers while their definitions sat unread
+          on the payload. Once, under the heading that governs all six
+          cells, is where they belong. */}
+      {(ex.routes?.cross || ex.routes?.rest) && (
+        <div data-testid="exec-routes" className="space-y-1">
+          {(["cross", "rest"] as const).map((k) => ex.routes?.[k] && (
+            <p key={k} data-testid={`exec-route-${k}`}
+              className="font-mono text-[9px] leading-relaxed text-ink-faint">
+              {ex.routes[k]}
+            </p>
+          ))}
+        </div>
+      )}
+
       {/* THE LINE THAT MAY NEVER BE DROPPED, and it goes ABOVE the
           numbers rather than under them: a saving read without it is
           the wrong number. Styled as a warning, like the ladder's
@@ -874,8 +1261,7 @@ function ExecutionBlock({ x }: { x?: Refusable<ExecutionLayer> }) {
       )}
 
       {SIDES.map((k) => (
-        <ExecutionOutcomeRow key={k} side={k} o={ex.outcomes?.[k]}
-          routes={ex.routes} />
+        <ExecutionOutcomeRow key={k} side={k} o={ex.outcomes?.[k]} />
       ))}
 
       {/* not an edge, and the clip it was all computed at */}
@@ -909,6 +1295,34 @@ function ExecutionBlock({ x }: { x?: Refusable<ExecutionLayer> }) {
 
 const OUTCOME_LABEL: Record<string, string> = {
   home_win: "home", draw: "draw", away_win: "away" };
+
+/* THE GATE'S VERDICT IS NOT A TWO-VALUED THING, and painting it as one
+ * put GOLD on the words "WARNED — not an invitation".
+ *
+ * Floodlit's rule is that the accent is BRAND and never a verdict, and
+ * HeadlineBlock a thousand lines up already knows it: it withholds the
+ * accent from a WARNED number because "the accent colour, which the eye
+ * reads as 'take this', is withheld and the warning outranks the
+ * meaning". The fix held at the headline and the identical shape stood
+ * one block over — `verdict === "REFUSED" ? warn : accent` gilded
+ * EVERYTHING that was not the literal string "REFUSED", and the backend
+ * emits exactly three (card.py: "REFUSED", "PLAYABLE", and
+ * WARNED_VERDICT = "WARNED — not an invitation"). So on a warned card
+ * the headline rendered amber and the fee gate rendered the same
+ * finding in gold, on one payload, with "shadow · not advice" beside it
+ * only because the string was not "REFUSED".
+ *
+ * THE GATE IS CLOSED BY CONSTRUCTION RATHER THAN BY LISTING WHAT IS
+ * BAD. Exactly one token earns the accent; every other verdict — the
+ * warned one, and any verdict this vocabulary gains after today —
+ * lands in the refusal family, which is the safe direction to be wrong
+ * in. An unrecognised value never folds into the GO class.
+ */
+const ACCENT_VERDICT = "PLAYABLE";
+
+function verdictInk(verdict: string): "accent" | "warn" {
+  return verdict.trim().toUpperCase() === ACCENT_VERDICT ? "accent" : "warn";
+}
 
 function PickBlock({ p }: { p?: Refusable<PickLayer> }) {
   const r = refusalOf(p);
@@ -951,15 +1365,15 @@ function PickBlock({ p }: { p?: Refusable<PickLayer> }) {
       )}
       {gate?.verdict && (
         <p className="font-mono text-[11px]">
-          <span className={`uppercase tracking-wide ${
-            gate.verdict === "REFUSED" ? "text-warn" : "text-accent"}`}>
+          <span data-testid="gate-verdict" data-ink={verdictInk(gate.verdict)}
+            className={`uppercase tracking-wide ${
+              verdictInk(gate.verdict) === "accent"
+                ? "text-accent" : "text-warn"}`}>
             {gate.verdict}
           </span>
-          {gate.verdict !== "REFUSED" && (
-            <span className="ml-2 text-[9px] uppercase tracking-[0.14em] text-ink-faint">
-              shadow · not advice
-            </span>
-          )}
+          <span className="ml-2 text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+            shadow · not advice
+          </span>
         </p>
       )}
       {gateRefusal && <RefusalNote text={gateRefusal} />}
@@ -1464,24 +1878,82 @@ function LiveStateBlock({ st }: { st: LiveState }) {
     <div data-testid="live-state"
       className="mt-3 space-y-1.5 border-t border-line pt-3">
       {/* the backend's own sentence about what these counts are and
-          what a null among them means, reachable on the header rather
-          than dropped — the payload carries it and the dashes below
-          are only honest if it is readable somewhere */}
-      <p title={st.basis}
-        className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+          what a null among them means. It is the rule the dashes below
+          depend on — card.LIVE_STATE_BASIS ends "A NULL is the
+          provider's silence and renders as unknown: MISSING IS NEVER
+          ZERO" — so it renders as TEXT.
+
+          It rode on a `title` attribute until 2026-09-07, under a
+          comment saying the dashes "are only honest if it is readable
+          somewhere". A title attribute is not somewhere: it is absent
+          from the accessible tree, unreachable on touch, and gone from
+          any copy of the page. The caveat that makes every dash in
+          this block mean something cannot be the one thing a reader
+          cannot get at. Same rule the tilt note four blocks down
+          already follows — its note sits WITH its chip, not only in
+          the tooltip — and the same rule the exposure honesty line
+          follows. */}
+      <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
         match state · observed on the tape, not modelled
       </p>
+      {/* the same closure one level down, at the level `window` was
+          found hiding: a state key nobody declared is NAMED. */}
+      <UnaccountedKeys o={st} declared={LIVE_STATE_DECLARED_KEYS}
+        where="the live state" testid="live-state-unaccounted" />
+      {/* THE WINDOWED READ IS REGISTERED, NOT DRAWN AND NOT DROPPED.
+          card.py attaches it to every state; this surface has no
+          recorded shape for it, and the cumulative counts above are
+          the numbers it exists to keep from being read as the whole
+          story. Named here, with its record, rather than quietly
+          absent. */}
+      {st.window !== undefined && (
+        <p data-testid="live-window-registered"
+          className="rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 font-mono text-[9px] leading-relaxed text-warn">
+          this row carries a WINDOWED read — what accrued in the last
+          few match-minutes — and this surface does not draw it. The
+          counts above are cumulative over the whole match, which is a
+          different fact. {UNRENDERED_PAYLOAD_FIELDS.window.closes_when}
+        </p>
+      )}
+      {st.basis && (
+        <p data-testid="live-state-basis"
+          className="font-mono text-[9px] normal-case leading-relaxed tracking-normal text-ink-faint">
+          {st.basis}
+        </p>
+      )}
 
       {hasKey(st, "possession") && (
         <div>
-          {/* with both sides present the printed pair IS the bar's two
-              shares. One side alone cannot form a share, so it prints
-              as it arrived, read as the percentage possession always
-              is — and the missing half stays a dash rather than being
-              completed. */}
+          {/* With both sides present the printed pair IS the bar's two
+              shares, so it is a percentage by construction and wears
+              the sign.
+
+              WITH ONE SIDE MISSING IT IS NOT. The share is what makes
+              this block "indifferent to whether the tape counts
+              possession 0-100 or 0-1" (the comment above); the raw
+              pair is not, and printing it with a `%` glued on decided
+              the scale question this block deliberately declines to
+              decide. A tape counting 0-1 renders 0.62 as "0.6%" — a
+              wrong number in a unit this card cannot vouch for, next
+              to a dash for the half that would have revealed the
+              scale. So the unit goes on the DERIVED share only; the
+              raw value prints at its own precision, exactly as the
+              threat index one block down already does. */}
           <StatPair id="possession" label="possession"
             pair={share ?? pos}
-            fmt={(v) => (v == null ? "—" : `${v.toFixed(1)}%`)} />
+            fmt={share
+              ? (v) => (v == null ? "—" : `${v.toFixed(1)}%`)
+              : liveIndex} />
+          {!share && pos && (isNum(pos.home) !== isNum(pos.away)) && (
+            <p data-testid="possession-unscaled"
+              className="font-mono text-[9px] leading-relaxed text-ink-faint">
+              one side only — with no second number there is no share to
+              draw and no way to tell whether the tape counted this
+              0-100 or 0-1, so it prints as it arrived and carries no
+              unit. The missing half is not completed from 100 minus
+              this one.
+            </p>
+          )}
           {share && (
             <div data-testid="possession-bar"
               className="mt-1 flex h-1.5 overflow-hidden rounded-full border border-line">
@@ -1515,8 +1987,8 @@ function LiveStateBlock({ st }: { st: LiveState }) {
           <div className="mt-1"><RefusalNote text={threatRefusal} /></div>
         </div>
       ) : (
-        <div data-testid="live-stat-threat" title={threat?.basis}
-          className="flex items-baseline justify-between gap-3">
+        <div data-testid="live-stat-threat"
+          className="flex flex-wrap items-baseline justify-between gap-x-3">
           <span className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">
             threat
           </span>
@@ -1536,6 +2008,27 @@ function LiveStateBlock({ st }: { st: LiveState }) {
           </span>
         </div>
       ))}
+
+      {/* WHAT THE SHARE IS A SHARE OF, as text, immediately beneath the
+          number it defines. `basis` is card.THREAT_DEFINITION — "the
+          favourite's share of shots + on-target + corners", plus the
+          fact that the favourite side is price-native off the de-vigged
+          game book. The type's own comment says this definition is
+          "carried on the payload and rendered, never retyped here"; it
+          was carried and put in a `title`, which renders it to nobody.
+
+          It sits OUTSIDE the `live-stat-threat` node on purpose. That
+          subtree carries two standing pins from the em-dash incident —
+          that it contains no em-dash, and no <p> — and both are about
+          a REFUSAL or a dash standing where the number should be. This
+          definition is neither, and quietly widening those pins to let
+          prose in would blunt the guard that caught that bug. */}
+      {hasKey(st, "threat") && !threatRefusal && threat?.basis && (
+        <p data-testid="threat-basis"
+          className="font-mono text-[9px] leading-relaxed text-ink-faint">
+          {threat.basis}
+        </p>
+      )}
 
       {(st.tilt_label != null || st.tilt_note != null) && (
         <div data-testid="live-tilt" className="pt-0.5">
@@ -1605,14 +2098,25 @@ function TickAge({ tick, fetchedAt }: {
   }
   const age = tick.age_seconds + Math.max(0, (now - fetchedAt) / 1000);
   const late = tick.interval_seconds != null && age > tick.interval_seconds;
+  // `basis` says what the age is measured FROM — it was a tooltip, and
+  // a tooltip is not in the accessible tree. It reads as text beside
+  // the number it qualifies, in the same normal-case ink the other
+  // basis lines on this card use.
   return (
-    <span data-testid="tick-age" title={tick.basis}
-      className={late ? "text-warn" : undefined}>
-      state captured {Math.round(age)}s ago
-      {tick.interval_seconds != null
-        && ` · collector interval ${tick.interval_seconds}s`}
-      {late && " · a tick has not landed"}
-    </span>
+    <>
+      <span data-testid="tick-age" className={late ? "text-warn" : undefined}>
+        state captured {Math.round(age)}s ago
+        {tick.interval_seconds != null
+          && ` · collector interval ${tick.interval_seconds}s`}
+        {late && " · a tick has not landed"}
+      </span>
+      {tick.basis && (
+        <span data-testid="tick-basis"
+          className="ml-1.5 normal-case tracking-normal text-ink-faint">
+          {tick.basis}
+        </span>
+      )}
+    </>
   );
 }
 
@@ -1941,13 +2445,40 @@ function LiveNowBlock({ l, updatedAt, stale, tick, fetchedAt, exposure,
               <span key={s.key} className={s.ink}>{s.key}</span>
             ))}
           </div>
+          {/* A MISSING MEMBER DRAWS NO SEGMENT. This read `?? 0`, which
+              is the zero bar this file's own header forbids in so many
+              words ("never a zero bar standing in for a missing
+              forecast") and which the possession bar forty lines up
+              already refuses to do — half a split is not a split. A
+              drawn 0%-wide segment says "this outcome has no chance"
+              while the number directly beneath it says "—", so the bar
+              and the numbers told different stories about the same
+              key.
+
+              Not reachable from today's emitter: card.py builds the
+              triple from row.p_home/p_draw/p_away in one dict and
+              refuses the whole block when p_home is null, so it emits
+              three or none. The TYPE permits a partial one, this
+              render zero-filled it, and no test covered the case — so
+              it is closed by construction rather than left resting on
+              the emitter continuing to agree with us. */}
           <div data-testid="live-prob-bar"
             className="mt-1.5 flex h-2 overflow-hidden rounded-full border border-line">
-            {LIVE_SIDES.map((s) => (
-              <div key={s.key} className={s.bar}
-                style={{ width: `${(p?.[s.key] ?? 0) * 100}%` }} />
+            {LIVE_SIDES.filter((s) => isNum(p?.[s.key])).map((s) => (
+              <div key={s.key} data-side={s.key} className={s.bar}
+                style={{ width: `${p![s.key]! * 100}%` }} />
             ))}
           </div>
+          {LIVE_SIDES.some((s) => !isNum(p?.[s.key])) && (
+            <p data-testid="live-prob-incomplete"
+              className="mt-1 font-mono text-[9px] leading-relaxed text-warn">
+              the bar draws only the outcomes the tape row carried a
+              number for — {LIVE_SIDES.filter((s) => !isNum(p?.[s.key]))
+                .map((s) => s.key).join(", ")} carried none, so no
+              segment stands in for it and the widths below do not sum
+              to the whole.
+            </p>
+          )}
           <div className="mt-1.5 flex items-baseline justify-between font-mono text-lg tabular-nums">
             {LIVE_SIDES.map((s) => (
               <span key={s.key} className={s.num}>
@@ -2005,6 +2536,44 @@ function LiveNowBlock({ l, updatedAt, stale, tick, fetchedAt, exposure,
 
 /* ---------- in-play plan ---------- */
 
+/* A KEY THE BACKEND SENDS THAT THIS FILE NEVER DECLARED.
+ *
+ * The register above is derived from this file's types against this
+ * file's code, so it catches a field declared and dropped. It is blind
+ * to the other direction, and that blindness has a name: `tape_history`
+ * — the sentence saying a state-tape read FAILED — rode on
+ * `inplay_plan` while this type had no such key, so nothing declared
+ * it, nothing drew it, and nothing said it had arrived.
+ *
+ * This closes that direction for the in-play layer, which is the one
+ * the hold/exit stage lives on. An unaccounted key is NAMED on the
+ * surface rather than drawn (drawing a shape nobody recorded is how a
+ * surface certifies a reader that cannot read the real payload) or
+ * dropped (which is the bug this exists to end).
+ */
+function UnaccountedKeys({ o, declared, where, testid }: {
+  o?: object | null; declared: readonly string[]; where: string;
+  testid: string;
+}) {
+  if (o == null || typeof o !== "object") return null;
+  const extra = Object.keys(o).filter((k) => !declared.includes(k));
+  if (extra.length === 0) return null;
+  return (
+    <div data-testid={testid}>
+      {extra.map((k) => (
+        <p key={k} data-testid={`${testid}-key`} data-key={k}
+          className="rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 font-mono text-[10px] leading-relaxed text-warn">
+          {where} carries <span className="font-mono">{k}</span>, and this
+          surface has no recorded shape for it — so it is named rather
+          than drawn or dropped. Whatever finding it holds is NOT on this
+          card.
+        </p>
+      ))}
+    </div>
+  );
+}
+
+
 function InplayBlock({ p, updatedAt, stale, tick, fetchedAt, positions }: {
   p?: InplayLayer; updatedAt: string | null; stale: boolean;
   tick?: LiveTick; fetchedAt: number | null; positions?: PositionsBlock;
@@ -2017,6 +2586,28 @@ function InplayBlock({ p, updatedAt, stale, tick, fetchedAt, positions }: {
   const lateRefusal = late ? refusalOf(late) : null;
   return (
     <div className="space-y-3">
+      {/* A KEY NOBODY DECLARED IS NAMED, NOT DROPPED — see the
+          component: the register above compares this file to itself and
+          cannot see a key the backend adds. This compares the payload
+          to the type, which is how `tape_history` should have been
+          caught. */}
+      <UnaccountedKeys o={p} declared={INPLAY_DECLARED_KEYS}
+        where="the in-play layer" testid="inplay-unaccounted" />
+      {/* THE READ FAILED, AND THAT IS NOT THE SAME FACT AS AN EMPTY
+          TAPE. It goes FIRST and it is styled as a warning, because it
+          governs every block beneath it: the withdrawals below say
+          `tape_unreadable` in their own words, and this is the sentence
+          that says why there was nothing to consult. A card whose read
+          worked carries no such key and renders exactly as before. */}
+      {p?.tape_history && (
+        <p data-testid="tape-history-unreadable"
+          className="rounded-lg border border-warn/40 px-3 py-2 font-mono text-[10px] leading-relaxed text-warn">
+          {p.tape_history.consequence
+            ?? "the state-tape history read FAILED and the payload "
+              + "carried no sentence saying what that fails closed on — "
+              + "this is a failed read, not an empty tape"}
+        </p>
+      )}
       {/* first and dominant while the fixture is in play; absent from
           the payload — and so from the DOM — pre and post */}
       {p?.live_now && (
@@ -2079,8 +2670,16 @@ function EvidenceLine({ e, resp }: { e?: EvidenceLayer; resp: CardResponse }) {
         </p>
       )}
       {resp.content_hash && (
-        <p className="mt-0.5 break-all" title={e?.content_hash_basis}>
-          hash {resp.content_hash}
+        <p className="mt-0.5 break-all">hash {resp.content_hash}</p>
+      )}
+      {/* WHAT THE HASH COVERS, as text. It was a tooltip; a hash whose
+          scope is only in a tooltip is a number nobody can check,
+          because "this card is hashed" and "this card is hashed EXCEPT
+          the clock and the position that ride outside it" are
+          different claims and only the second one is true. */}
+      {e?.content_hash_basis && (
+        <p data-testid="content-hash-basis" className="mt-0.5">
+          {e.content_hash_basis}
         </p>
       )}
       <p className="mt-0.5">
@@ -2206,11 +2805,26 @@ export default function SuggestionCard({ competition, eventId }: {
             <CardState layers={layers} headline={card.headline} />
 
             {idRefusal ? <RefusalNote text={idRefusal} /> : id && (
-              <p className="font-mono text-[9px] leading-relaxed text-ink-faint">
-                {(id as Identity).home} vs {(id as Identity).away} ·{" "}
-                {(id as Identity).kickoff_utc} · {(id as Identity).venue} ·{" "}
-                {(id as Identity).status} · venue class:{" "}
-                {(id as Identity).venue_class}
+              /* EVERY FIELD GETS A DASH WHEN IT IS ABSENT. This
+                 interpolated six values raw between separators, so a
+                 missing one closed up into "· ·" and the line ended
+                 "venue class:" with nothing after the colon. That last
+                 one is not hypothetical: venue_class is a REGISTERED
+                 absence in the backend (card.CARD_ABSENCES, "the
+                 venue-class read is not built on the live plane yet"),
+                 so a label followed by white space is the normal
+                 render — a named absence drawn as a blank, which is
+                 the one thing this card is for. */
+              <p data-testid="identity"
+                className="font-mono text-[9px] leading-relaxed text-ink-faint">
+                {[
+                  `${(id as Identity).home ?? "—"} vs ${(id as Identity).away ?? "—"}`,
+                  (id as Identity).kickoff_utc ?? "kickoff —",
+                  (id as Identity).venue ?? "venue —",
+                  (id as Identity).status ?? "status —",
+                  `venue class: ${(id as Identity).venue_class
+                    ?? "— (not on the payload)"}`,
+                ].join(" · ")}
               </p>
             )}
 

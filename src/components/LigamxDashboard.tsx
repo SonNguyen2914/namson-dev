@@ -201,14 +201,7 @@ export default function LigamxDashboard() {
                     <span className="text-ink-faint"> vs </span>
                     {f.away.short || f.away.name}
                   </span>
-                  {oddsMap[f.id]?.outcomes && (
-                    <span className="shrink-0 font-mono text-[10px] tabular-nums text-ink-low"
-                      title="liga-mx-2026-v0 shadow odds — not advice">
-                      {Math.round((oddsMap[f.id].outcomes!.home_win ?? 0) * 100)}
-                      /{Math.round((oddsMap[f.id].outcomes!.draw ?? 0) * 100)}
-                      /{Math.round((oddsMap[f.id].outcomes!.away_win ?? 0) * 100)}
-                    </span>
-                  )}
+                  <WeekOdds o={oddsMap[f.id]} model="liga-mx-2026-v0" />
                   <span className="hidden truncate font-mono text-[10px] text-ink-faint sm:block">
                     {f.venue}
                   </span>
@@ -320,11 +313,53 @@ function TeamLine({ s, live }: { s: Side; live: boolean }) {
   );
 }
 
+// ONE FORMATTER FOR ONE OUTCOME, AND EVERY PLACE THIS FILE DRAWS ONE
+// GOES THROUGH IT.
+//
+// A probability the backend did not send is drawn as an em dash. It is
+// never drawn as 0: "0" is a measured claim about what the model thinks
+// of a result, and a key that is absent was never measured. `OddsChip`
+// already had that rule and its own local formatter to keep it — and
+// the seven-day list above, in this same file, carried an inline copy
+// that read `(outcomes!.draw ?? 0) * 100` on all three legs, so a
+// payload missing `draw` rendered "45/0/30". That is the shape this
+// repo has now paid for four rounds running: the fix holds at the named
+// site and the same shape stands one function over. There is ONE
+// formatter now, so the two cannot disagree again.
+function outcomePct(p: Record<string, number> | undefined, k: string): string {
+  return p != null && p[k] != null ? `${Math.round(p[k] * 100)}` : "—";
+}
+
+// The seven-day list's shadow chip. Same formatter as the fixture
+// card's, and the label that makes three bare numbers safe to read is
+// REAL TEXT IN THE ACCESSIBLE TREE — it used to live only on a `title=`,
+// where a screen reader met "45/25/30" with nothing saying whose
+// numbers they were or that they are not advice. The label carries no
+// em dash of its own: inside this chip an em dash means exactly one
+// thing, "this leg was not measured", and a second use would blunt it.
+function WeekOdds({ o, model }: { o?: OddsRow; model: string }) {
+  if (!o?.outcomes) return null;
+  const run = o.locked ? "t-10 lock" : "shadow";
+  return (
+    <span data-testid="week-odds"
+      className="shrink-0 font-mono text-[10px] tabular-nums text-ink-low">
+      <span className="sr-only">
+        {model} {run} odds, not advice. Home / draw / away:{" "}
+      </span>
+      {outcomePct(o.outcomes, "home_win")}
+      /{outcomePct(o.outcomes, "draw")}
+      /{outcomePct(o.outcomes, "away_win")}
+      <span className="ml-1.5 uppercase tracking-wide text-ink-faint" aria-hidden>
+        {run}
+      </span>
+    </span>
+  );
+}
+
 function OddsChip({ o }: { o?: OddsRow }) {
   const p = o?.outcomes;
   if (!p) return null;
-  const pct = (k: string) =>
-    p[k] != null ? `${Math.round(p[k] * 100)}` : "—";
+  const pct = (k: string) => outcomePct(p, k);
   return (
     <div className="mt-2 flex items-center justify-between rounded-lg bg-accent/10 px-2 py-1 font-mono text-[10px] tabular-nums">
       <span className="text-ink-low">

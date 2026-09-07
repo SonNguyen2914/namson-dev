@@ -233,6 +233,23 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
             match feed unavailable — retrying every 30s
           </p>
         )}
+        {/* A REFRESH THAT FAILED IS NOT A PAGE THAT IS UP TO DATE. The
+            30s poll keeps the last good payload on screen when it
+            fails — which is right, blanking a live page would read as
+            the match stopping — but nothing said so, and one panel
+            below labels the book it is showing "current market book ·
+            live" with an accent dot beside it. Held numbers under a
+            live label is a failed read wearing the face of a good one.
+            The timestamp beside it is honest (fetchedAt only advances
+            on success), so this line is what makes it readable. */}
+        {err && m && (
+          <p data-testid="feed-stale"
+            className="mt-4 rounded-xl border border-warn/40 px-4 py-2.5 font-mono text-[10px] leading-relaxed text-warn">
+            the last refresh FAILED — every number below is held from
+            the previous successful fetch, not current. Retrying every
+            30s.
+          </p>
+        )}
 
         {m && (
           <>
@@ -430,10 +447,23 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
 function FormStrip({ form, name }: { form?: string | null; name?: string }) {
   if (!form) return null;
   const letters = form.split("");
+  // THE READING KEY IS NOT A TOOLTIP. Every fact this strip carries —
+  // which team, how many matches, which end is the latest, and the
+  // W/L/D letters themselves — lived on a `title` attribute under an
+  // `aria-hidden`, so the strip was five coloured squares and nothing
+  // else to anyone not hovering a mouse over it: colour as the sole
+  // carrier of meaning, and the caveat that makes the ORDER readable
+  // out of reach. The squares stay decorative (the letters are the
+  // fact, not the tint) and the sentence is real text in the
+  // accessible tree.
+  const key = `${name ?? "this team"} — last ${form.length}, `
+    + `oldest to newest: ${letters.join(", ")}; rightmost is latest`;
   return (
-    <span data-testid="hero-form" aria-hidden
-      title={`${name ?? ""} — last ${form.length}, oldest→newest: ${form} (rightmost is latest)`}
+    <span data-testid="hero-form"
       className="inline-flex flex-none items-center gap-[2px]">
+      <span className="sr-only">{key}</span>
+      <span aria-hidden data-testid="hero-form-cells" title={key}
+        className="inline-flex flex-none items-center gap-[2px]">
       {letters.map((c, i) => (
         <i key={i} data-r={c}
           className={`h-[7px] w-[7px] rounded-[1.5px] ${
@@ -443,6 +473,7 @@ function FormStrip({ form, name }: { form?: string | null; name?: string }) {
             i === letters.length - 1
               ? " ring-1 ring-ink-hi/70 ring-offset-1 ring-offset-bs" : ""}`} />
       ))}
+      </span>
     </span>
   );
 }
@@ -495,25 +526,56 @@ function Stat({ label, value }: { label: string; value: string }) {
 // Shows what team-selection data existed when the run was made. The
 // model does NOT use lineups yet; this exists so missing data reads as
 // PENDING, never as silent confidence.
-const QUALITY_LABELS: Array<[string, string]> = [
-  ["LINEUP_CONFIRMED", "lineup"],
-  ["GOALKEEPER_CONFIRMED", "keeper"],
-  ["TEAM_DATA_FRESH", "team form"],
-];
+//
+// THE SET IS THE PAYLOAD'S, NOT A LIST TYPED HERE. It used to be three
+// hand-written pairs, and the backend has emitted FIVE states since
+// Phase 5 (src/live/runs.py `_input_quality`: TEAM_DATA_FRESH,
+// PLAYER_DATA_FRESH, AVAILABILITY_COMPLETE, LINEUP_CONFIRMED,
+// GOALKEEPER_CONFIRMED). PLAYER_DATA_FRESH and AVAILABILITY_COMPLETE
+// ride on every run, are false on most of them, and were drawn on
+// none — a panel whose whole reason to exist is that missing data must
+// not read as silent confidence was itself silent about two fifths of
+// it. A guard that names a rule and then hand-lists a subset stays
+// green while the omitted case drifts, so this enumerates what
+// ARRIVED and only prettifies the names it happens to know.
+const QUALITY_LABELS: Record<string, string> = {
+  LINEUP_CONFIRMED: "lineup",
+  GOALKEEPER_CONFIRMED: "keeper",
+  TEAM_DATA_FRESH: "team form",
+  PLAYER_DATA_FRESH: "player data",
+  AVAILABILITY_COMPLETE: "availability",
+};
 
 function InputQuality({ run }: { run?: ModelRun }) {
   const q = run?.input_quality;
-  if (!q) return null;
+  // null is NOT "everything pending": it means the run recorded no
+  // quality block at all, which is a different fact and gets its own
+  // words rather than an absent panel that reads as nothing to report.
+  if (q === null) {
+    return (
+      <div className="mt-4 border-t border-line pt-3">
+        <p data-testid="input-quality-absent"
+          className="font-mono text-[9px] uppercase leading-relaxed tracking-[0.14em] text-ink-faint">
+          input quality at run time — not recorded on this run. This is
+          NOT a statement that the inputs were complete.
+        </p>
+      </div>
+    );
+  }
+  if (!q) return null;                 // no run at all: nothing to say
+  const keys = Object.keys(q).sort();
   return (
     <div className="mt-4 border-t border-line pt-3">
       <p className="mb-2 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
         input quality at run time
       </p>
-      <div className="flex flex-wrap gap-1.5">
-        {QUALITY_LABELS.map(([key, label]) => {
+      <div data-testid="input-quality" className="flex flex-wrap gap-1.5">
+        {keys.map((key) => {
           const ok = q[key];
+          const label = QUALITY_LABELS[key]
+            ?? key.toLowerCase().replace(/_/g, " ");
           return (
-            <span key={key}
+            <span key={key} data-testid="input-quality-chip" data-key={key}
               className={`rounded-md border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide ${
                 ok ? "border-up/40 text-up"
                    : "border-line text-ink-faint"}`}>
@@ -768,6 +830,30 @@ function MarketsTable({ m, run, book, families, cfg }: {
   m: Match; run?: ModelRun; book: Book | null; families: Family[];
   cfg: HubCfg;
 }) {
+  // THE NET EDGE COLUMN AND THE CARD ONE SECTION UP DISAGREE ON A
+  // STARTED MATCH, AND THE PAGE SAID SO NOWHERE.
+  //
+  // Since 2026-09-06 the suggestion card's fee gate refuses by NAME on
+  // any started fixture: card.py `_pick` takes the start witness and
+  // refuses `repriced_book`, "computing no edge and no disagreement
+  // against a book the match has moved", because HOLD-EXIT-DESIGN's own
+  // last section forbids claiming an in-play edge — none has been
+  // measured and two slates were lost testing one.
+  //
+  // This table computes exactly that number anyway: modelP minus a
+  // CURRENT ask minus the fee, from a T-10 model frozen before
+  // kickoff, for every market on a book the match has since repriced —
+  // and paints it green when it is positive. SuggestionCard renders
+  // INSIDE this component, so on a live fixture one screen carries the
+  // refusal and the number it refuses, a few hundred pixels apart.
+  //
+  // The column is NOT suppressed here: removing a data column from
+  // four league hubs on one agent's reading is a product decision, not
+  // a render fix, and the numbers are real prices. What is fixed is
+  // that the disagreement is now stated where the number is, in the
+  // card's own vocabulary, instead of being left for a reader to
+  // notice. Recorded in the sweep report as the open item it is.
+  const started = m.state === "in";
   const [closed, setClosed] = useState<Set<string>>(
     () => new Set(COLLAPSED_FAMILIES));
   // every probability the stored run knows, keyed the way the backend
@@ -824,11 +910,43 @@ function MarketsTable({ m, run, book, families, cfg }: {
           <div className="min-w-[560px]">
             <div className="grid grid-cols-[minmax(0,1fr)_5.5rem_5rem_5.5rem_5.5rem] items-center gap-x-3 border-b border-line bg-elev px-4 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-low">
               <span>Market</span>
-              <span className="text-right" title={cfg.likelihoodTooltip}>Likelihood</span>
-              <span className="text-right" title={cfg.netEdgeTooltip}>Net edge</span>
-              <span className="text-right"
-                title="Payout multiple at the buyable ask price">Mult</span>
+              <span className="text-right">Likelihood</span>
+              <span className="text-right">Net edge</span>
+              <span className="text-right">Mult</span>
               <span className="text-right">Ask / Bid</span>
+            </div>
+            {/* WHAT THE THREE COMPUTED COLUMNS ARE, as text under the
+                header they qualify.
+
+                They were `title` attributes, and the NET EDGE one is
+                not a nicety: it is the sentence saying that this column
+                subtracts a CURRENT ask from a FROZEN model probability
+                — "a frozen-model-vs-current-market gap across two
+                moments, not the T-10 frozen-book edge". A signed
+                percentage in green or red, with the fact that its two
+                halves come from different moments reachable only by
+                hovering, is a number that reads as an edge and is not
+                one. A tooltip is not in the accessible tree, does not
+                exist on touch, and never survives a copy of the page —
+                and this is the one table on the site an operator reads
+                down looking for something to act on. */}
+            <div data-testid="markets-column-basis"
+              className="space-y-0.5 border-b border-line px-4 py-2.5 font-mono text-[9px] leading-relaxed text-ink-faint">
+              <p>likelihood — {cfg.likelihoodTooltip}</p>
+              <p>net edge — {cfg.netEdgeTooltip}</p>
+              <p>mult — payout multiple at the buyable ask price</p>
+              {started && (
+                <p data-testid="edge-vs-repriced-book" className="text-warn">
+                  THIS MATCH HAS STARTED. The suggestion card above
+                  refuses a fee-inclusive edge on a started fixture by
+                  name (<span className="font-mono">repriced_book</span>)
+                  and computes none, because no in-play edge has been
+                  measured. The net edge column below still subtracts a
+                  CURRENT ask from a model frozen before kickoff, against
+                  a book this match has already repriced — so it is not
+                  the same claim the card makes, and it is not an edge.
+                </p>
+              )}
             </div>
             {fams.map((f) => {
               const fold = closed.has(f.key);
@@ -1010,11 +1128,23 @@ function LiveBlock({ m, promoted, hex }: {
   );
 }
 
+// THE BAR IS DRAWN FROM THE TWO NUMBERS PRINTED ABOVE IT, OR IT IS NOT
+// DRAWN. It used to read `(Number.isFinite(h) ? h : 0)` on each side,
+// which folds an unreadable stat into a measured zero: a home value
+// ESPN did not send printed as "—" while the bar beneath it gave the
+// away side the whole width, so the picture said one team had all of
+// something the numbers said was unknown. Missing is never zero, and
+// the bar must never tell a different story from the digits beside it.
+//
+// The 50/50 fallback had the same fault one branch over: with both
+// sides unreadable it drew a dead heat. Half a split is not a split
+// and no split at all is not parity — the bar is simply absent, the
+// dashes stand alone, and nothing is implied.
 function StatBar({ s, m, hex }: { s: StatRow; m: Match; hex: string }) {
   const h = parseFloat(s.home ?? "");
   const a = parseFloat(s.away ?? "");
-  const total = (Number.isFinite(h) ? h : 0) + (Number.isFinite(a) ? a : 0);
-  const hw = total > 0 ? (h / total) * 100 : 50;
+  const both = Number.isFinite(h) && Number.isFinite(a);
+  const total = both ? h + a : 0;
   return (
     <div>
       <div className="mb-1 flex items-baseline justify-between font-mono text-[11px] tabular-nums">
@@ -1022,12 +1152,24 @@ function StatBar({ s, m, hex }: { s: StatRow; m: Match; hex: string }) {
         <span className="uppercase tracking-[0.14em] text-ink-faint">{s.label}</span>
         <span className="text-ink-hi">{s.away ?? "—"}</span>
       </div>
-      <div className="flex h-1 gap-0.5 overflow-hidden rounded-full">
-        <div className="rounded-full"
-          style={{ width: `${hw}%`,
-            background: sideColor(m.home, hex) }} />
-        <div className="flex-1 rounded-full bg-elev2" />
-      </div>
+      {both && total > 0 && (
+        <div data-testid={`stat-bar-${s.key}`}
+          className="flex h-1 gap-0.5 overflow-hidden rounded-full">
+          <div className="rounded-full"
+            style={{ width: `${(h / total) * 100}%`,
+              background: sideColor(m.home, hex) }} />
+          <div className="flex-1 rounded-full bg-elev2" />
+        </div>
+      )}
+      {!both && (
+        <p data-testid={`stat-unreadable-${s.key}`}
+          className="font-mono text-[9px] leading-relaxed text-ink-faint">
+          no bar — {Number.isFinite(h) || Number.isFinite(a)
+            ? "one side of this stat is not on the feed, and a share "
+              + "cannot be formed from one number"
+            : "neither side of this stat is on the feed"}.
+        </p>
+      )}
     </div>
   );
 }
@@ -1064,6 +1206,11 @@ function XiRow({ p, rich }: { p: XiPlayer; rich: boolean }) {
 
 function SideXi({ side, team, rich }: {
   side: SideLineup | null; team?: string; rich: boolean }) {
+  // `undefined` = the group is not drawable at all (see the comment on
+  // the first block); `null` = the backend could not compute; `[]` = it
+  // computed and found nobody. Three facts, three faces, one source.
+  const absences: Absence[] | null | undefined =
+    rich && side && side.released ? side.key_absences : undefined;
   return (
     <div className="rounded-2xl border border-line p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -1075,9 +1222,31 @@ function SideXi({ side, team, rich }: {
         )}
       </div>
 
-      {!side?.released ? (
+      {/* "AWAITING" IS A CLAIM ABOUT THE WORLD, and it may only be made
+          when there is a side object to have made it from. A null side
+          is the backend not resolving this club at all — we could not
+          ask — and saying "awaiting team news" there asserts that the
+          XI simply has not been announced yet, which we do not know.
+          The honest version of this distinction already lives four
+          fields down on `key_absences` ("This is NOT a statement that
+          nobody is missing"); it is the same distinction and it now
+          reads the same way. */}
+      {!side ? (
+        <p data-testid="xi-side-absent"
+          className="rounded-xl border border-dashed border-line px-3 py-4 text-center font-mono text-[10px] leading-relaxed tracking-[0.1em] text-ink-faint">
+          no lineup record for this side — the feed carried nothing to
+          read. This is NOT a statement that the XI is unannounced.
+        </p>
+      ) : !side.released ? (
         <p className="rounded-xl border border-dashed border-line px-3 py-4 text-center font-mono text-[10px] uppercase tracking-[0.15em] text-ink-faint">
           awaiting team news
+        </p>
+      ) : side.starters.length === 0 ? (
+        <p data-testid="xi-released-empty"
+          className="rounded-xl border border-dashed border-line px-3 py-4 text-center font-mono text-[10px] leading-relaxed tracking-[0.1em] text-ink-faint">
+          the feed reports this XI as released and carried no players in
+          it — an empty list where eleven names should be, not eleven
+          names we chose not to show.
         </p>
       ) : (
         <>
@@ -1093,26 +1262,54 @@ function SideXi({ side, team, rich }: {
         </>
       )}
 
-      {rich && side && side.key_absences === null && (
+      {/* AN ABSENCE IS AN ABSENCE FROM SOMETHING. Every block below
+          says what is missing from THIS XI, so none of them can be
+          drawn before the XI is released: on an unreleased side the
+          backend's `[]` is not a measured zero, it is nobody having
+          been named yet, and "computed — nobody of note is missing"
+          would be a measurement this fixture never had. Released is
+          therefore a precondition of the whole group rather than a
+          condition on one branch of it, so a fourth block added later
+          inherits it. */}
+      {absences === null && (
         <div className="mt-3 border-t border-line pt-3">
           <p className="mb-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
             not starting
           </p>
           <p className="font-mono text-[10px] leading-relaxed text-ink-low">
-            not available — {side.key_absences_reason
+            not available — {side?.key_absences_reason
               || "the backend did not compute absences for this fixture"}.
             This is NOT a statement that nobody is missing.
           </p>
         </div>
       )}
 
-      {rich && side && side.key_absences != null && side.key_absences.length > 0 && (
+      {/* A MEASURED ZERO IS A RESULT AND GETS SAID. `[]` means the
+          backend computed absences and found nobody missing — the type
+          comment above says so in as many words — and it used to render
+          as nothing at all, which is the same face this block gives the
+          not-rich case and the never-computed case. Three different
+          facts, one blank. */}
+      {absences?.length === 0 && (
+        <div className="mt-3 border-t border-line pt-3">
+          <p className="mb-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+            not starting
+          </p>
+          <p data-testid="absences-none"
+            className="font-mono text-[10px] leading-relaxed text-ink-low">
+            computed — nobody of note is missing from this XI. This is a
+            measured result, not an absent read.
+          </p>
+        </div>
+      )}
+
+      {absences != null && absences.length > 0 && (
         <div className="mt-3 border-t border-line pt-3">
           <p className="mb-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
             not starting
           </p>
           <div className="space-y-1">
-            {side.key_absences.map((a, i) => (
+            {absences.map((a, i) => (
               <div key={i} className="flex items-baseline gap-2 font-mono text-[11px]">
                 <span className="min-w-0 flex-1 truncate text-ink-hi">
                   {a.name}
@@ -1254,10 +1451,52 @@ function ScoutingSection({ m }: { m: Match }) {
                 {sc.head_to_head.map((g, i) => {
                   // ESPN gives the score in that MATCH's home-away
                   // order; reorder it to perspective-first so W/L/D
-                  // always agrees with the numbers the eye reads
+                  // always agrees with the numbers the eye reads.
+                  //
+                  // THE ORIENTATION FLAG IS THE ONLY THING THAT MAKES
+                  // THE REORDER TRUE, AND IT CAN BE MISSING. This read
+                  // `g.at_vs === "@"`, so ANY value that was not the
+                  // string "@" — null, undefined, a drifted provider
+                  // token — silently became "home" and the two scores
+                  // were printed the wrong way round: a 1-2 defeat
+                  // rendered "PERSP 2-1 OPP" beside the letter L. The
+                  // backend's own legacy branch (src/mls.py `_h2h`,
+                  // still parsed "so a restored old field keeps
+                  // working") passes `atVs` through RAW and takes
+                  // `result` from the provider's `gameResult` rather
+                  // than deriving it from the digits — and its sibling
+                  // `_last_five` folds the same unknown the OPPOSITE
+                  // way (`== "vs"` else away). Two folds, opposite
+                  // defaults, one flag: exactly the ESPN
+                  // winner-first bug of 2026-07-24, one branch over.
+                  //
+                  // An unrecognised value REFUSES. It does not fold
+                  // into a meaningful class, and the digits are not
+                  // attributed to a side the payload did not name.
+                  const known = g.at_vs === "@" || g.at_vs === "vs";
                   const away = g.at_vs === "@";
                   const mine = away ? g.away_score : g.home_score;
                   const theirs = away ? g.home_score : g.away_score;
+                  if (!known) {
+                    return (
+                      <div key={i} data-testid="h2h-unoriented"
+                        className="flex items-start gap-2 font-mono text-[11px]">
+                        <span className="w-4 text-center text-ink-low">
+                          {g.result ?? "?"}
+                        </span>
+                        <span className="min-w-0 flex-1 leading-relaxed text-ink-faint">
+                          {g.home_score}–{g.away_score} vs {g.opponent} —
+                          the payload carried no home/away orientation for
+                          this meeting, so the two scores are NOT
+                          attributed to a side here. Shown in the
+                          provider&apos;s own order.
+                        </span>
+                        <span className="shrink-0 text-ink-faint">
+                          {fmtShortDate(g.date)}
+                        </span>
+                      </div>
+                    );
+                  }
                   return (
                     <div key={i} className="flex items-center gap-2 font-mono text-[11px]">
                       <span className={`w-4 text-center ${

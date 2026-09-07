@@ -51,6 +51,12 @@ type MktSortKey = "likelihood" | "edge" | "multiplier";
 // decided the 90 minutes end level. The strategy engine therefore allows
 // them only in candidates made ENTIRELY of ET/pens legs (main bet = the
 // draw, next step = who wins it), never mixed with 90-minute winners.
+/** The failure's own words, never a shrug. Same helper, same sentence,
+ *  as LiveScoreboard.tsx and BracketView.tsx; redeclared per file for the
+ *  stated reason that src/lib is not this change's to add to. */
+const why = (e: unknown): string =>
+  e instanceof Error ? e.message : String(e);
+
 const ET_REFINEMENT_KEYS = new Set([
   "home_win_et", "away_win_et", "home_win_pens", "away_win_pens",
 ]);
@@ -77,6 +83,25 @@ export default function MatchDetail() {
   const [mktCollapsed, setMktCollapsed] = useState<Set<string>>(new Set());
   const [mktTab, setMktTab] = useState<"lines" | "players" | "reference">("lines");
   const [refOdds, setRefOdds] = useState<ReferenceOddsResponse | null>(null);
+  // A FAILED READ IS NOT AN EMPTY ONE — FOUR MORE OF THEM, ON THIS PAGE.
+  //
+  // Four side reads on this page ended in a bare `catch {}` whose comment
+  // said the section "just won't render": the scouting blurbs, the player
+  // props, the post-match settlement record and the team news. Each of
+  // those sections ALSO legitimately renders nothing when the backend has
+  // nothing for this match, so the failure and the absence were the same
+  // pixels — the shape LiveScoreboard closed for five reads and the
+  // league hubs closed for six, standing untouched one page over. On the
+  // props section it is worse than a blank: `if (pp.available)` means a
+  // read that failed and a read that answered "no props for this fixture"
+  // are indistinguishable, and the reader concludes the model has no
+  // player estimates here.
+  //
+  // Named now, in the failure's own words, in one block above the
+  // sections they are missing from. `warn` is the refusal ink family on
+  // this stage; nothing here is coloured up or neg, because a read that
+  // did not land is a coverage fact and not a verdict on a bet.
+  const [failedReads, setFailedReads] = useState<Record<string, string>>({});
 
   const load = useCallback(async (force: boolean) => {
     if (!matchId) return;
@@ -114,23 +139,38 @@ export default function MatchDetail() {
           const l = ls.live.find((x) => x.match_id === matchId);
           if (l && alive) setTeams({ home: l.home, away: l.away });
         }
-      } catch { /* fall back to the id codes */ }
+      } catch {
+        /* SWALLOWED(market:team-name-resolution) */
+        // JUDGED AND LEFT, EXPLICITLY. This read resolves the DISPLAY
+        // NAMES only, and its failure is already visible without a
+        // sentence: the hero falls back to the match id's own codes
+        // ("BRA vs SRB"), which are shown, are true, and are not a
+        // claim that anything is missing. Nothing is folded into a
+        // lookalike absence here, so there is nothing to name.
+      }
       // Scouting blurbs — independent of the name resolution above.
       try {
         const ti = await api.teamInfo(matchId);
         if (alive) setTeamInfo(ti);
-      } catch { /* no blurbs — card just won't render */ }
-      // Player props — model estimates; section hides itself if unavailable.
+      } catch (e) {
+        if (alive) setFailedReads((p) => ({ ...p, "scouting blurbs": why(e) }));
+      }
+      // Player props — model estimates. `available` false is the
+      // backend's own answer; a rejection is not.
       try {
         const pp = await api.playerProps(matchId);
         if (alive && pp.available) setPProps(pp);
-      } catch { /* no player data — section won't render */ }
+      } catch (e) {
+        if (alive) setFailedReads((p) => ({ ...p, "player props": why(e) }));
+      }
       // Post-match research record (result + settlement); renders only
       // once the match is over and a closing snapshot exists.
       try {
         const rs = await api.research(matchId);
         if (alive && rs.result && rs.closing.length) setResearch(rs);
-      } catch { /* no settlement view */ }
+      } catch (e) {
+        if (alive) setFailedReads((p) => ({ ...p, "settlement record": why(e) }));
+      }
     })();
     // Team news: kickoff/venue for the hero + official lineups once posted
     // (~1h before kickoff). Polled so a viewer parked on the page catches the
@@ -141,7 +181,15 @@ export default function MatchDetail() {
         if (!alive) return;
         setNews(tn);
         setTeams((t) => t ?? { home: tn.home_team, away: tn.away_team });
-      } catch { /* hero just won't show venue/countdown */ }
+        // this read polls; an answer RETIRES the failure line rather
+        // than leaving a stale one over live content
+        setFailedReads((p) => {
+          if (!("team news" in p)) return p;
+          const n = { ...p }; delete n["team news"]; return n;
+        });
+      } catch (e) {
+        if (alive) setFailedReads((p) => ({ ...p, "team news": why(e) }));
+      }
     };
     loadNews();
     const newsPoll = setInterval(loadNews, 120000);
@@ -286,7 +334,10 @@ export default function MatchDetail() {
       try {
         const r = await api.liveScores();
         if (alive) setLiveNow(r.live.find((l) => !l.is_finished) ?? null);
-      } catch { /* chip just stays hidden */ }
+      } catch {
+        /* SWALLOWED(market:live-chip) — registered in
+           e2e/missing-is-not-zero.spec.ts with its closes_when. */
+      }
     };
     check();
     const id = setInterval(check, 45000);
@@ -325,6 +376,23 @@ export default function MatchDetail() {
       </TopBar>
 
       <div className="mx-auto max-w-4xl px-5 py-10">
+
+        {/* EVERY READ THAT DID NOT HAPPEN, NAMED — above the sections
+            they are missing from, so the reader meets the reason before
+            the gap. Each of these sections can also be legitimately
+            empty, which is exactly why the two must not look alike. */}
+        {Object.keys(failedReads).length > 0 && (
+          <div data-testid="match-read-failures" className="mb-8 space-y-1.5">
+            {Object.entries(failedReads).map(([what, w]) => (
+              <p key={what} data-testid={`read-failed-${what.replace(/\s+/g, "-")}`}
+                role="status"
+                className="rounded-md border border-warn/40 bg-warn/5 px-2.5 py-1.5 text-[11px] leading-relaxed text-warn">
+                The {what} read failed: {w}. That is not this match having
+                no {what} — it is that we could not ask.
+              </p>
+            ))}
+          </div>
+        )}
 
         {/* ============ HERO — the matchup ============ */}
         <header className="hero-ambient mt-8 mb-12 rounded-3xl pb-2 text-center">
@@ -1019,7 +1087,7 @@ function ModelPrediction({ summary, scorelines, xg, home, away }: {
         <div className="mb-6">
           <div className="grid grid-cols-2 gap-3">
             <ChanceChip label="Goes to extra time?" p={adv.p_reach_et} />
-            <ChanceChip label="Goes to penalties?" p={adv.p_reach_pens ?? 0} />
+            <ChanceChip label="Goes to penalties?" p={adv.p_reach_pens} />
           </div>
           <p className="mt-2.5 text-[11px] leading-relaxed text-ink-faint">
             {etNote}
@@ -1116,7 +1184,32 @@ function FtCell({ label, value, lead }: { label: string; value: number; lead: bo
   );
 }
 
-function ChanceChip({ label, p }: { label: string; p: number }) {
+// A CHANCE THAT WAS NOT COMPUTED IS NOT A CHANCE OF ZERO.
+//
+// `p_reach_pens` is `number | null` on the payload's own type, and the
+// penalties chip used to be called with `p={adv.p_reach_pens ?? 0}`.
+// A null therefore rendered "0%" over an empty bar — a measured claim
+// that this tie cannot reach penalties, made off a number the engine
+// never produced. The extra-time chip beside it, on the same row, was
+// already handed a non-null field and needed no default, which is how
+// the zero-fill on the second one stayed invisible.
+//
+// The prop now ADMITS the absence rather than being defended against
+// it: a missing value cannot reach `pct()` because the type that
+// reaches `pct()` is narrowed first, and there is no default to write.
+function ChanceChip({ label, p }: { label: string; p: number | null | undefined }) {
+  if (p == null) {
+    return (
+      <div className="rounded-xl border border-warn/40 bg-warn/5 p-4">
+        <p className="text-xs text-ink-mid">{label}</p>
+        <p data-testid="chance-unmeasured"
+          className="mt-1.5 font-mono text-[11px] leading-relaxed text-warn">
+          not computed for this tie — that is an absence, not a zero
+          chance
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="rounded-xl border border-line bg-bs p-4">
       <p className="text-xs text-ink-mid">{label}</p>
@@ -1355,8 +1448,23 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
     if (!ft) return [];
     const out: FineAtom[] = [];
     let listed = 0;
-    const drawTot = (adv?.home_win_et ?? 0) + (adv?.away_win_et ?? 0)
-      + (adv?.home_win_pens ?? 0) + (adv?.away_win_pens ?? 0);
+    // A PARTIAL BREAKDOWN IS NOT A BREAKDOWN. All four method weights
+    // are optional on the payload's type, and this sum used to zero-fill
+    // each of them: with three present and one missing the total was
+    // positive, the split ran, and the missing leg was then read back as
+    // `adv!.away_win_pens!` — `undefined <= 0` is false, so it was not
+    // skipped, and `undefined / drawTot` put a NaN probability into the
+    // scenario engine that every guarantee downstream is computed from.
+    // Either the whole split is there or the draw stays one undivided
+    // atom, which is what a missing breakdown honestly means.
+    const split = adv && [adv.home_win_et, adv.away_win_et,
+                          adv.home_win_pens, adv.away_win_pens]
+      .every((v) => typeof v === "number" && Number.isFinite(v))
+      ? { het: adv.home_win_et!, aet: adv.away_win_et!,
+          hp: adv.home_win_pens!, ap: adv.away_win_pens! }
+      : null;
+    const drawTot = split
+      ? split.het + split.aet + split.hp + split.ap : 0;
     for (const s of scorelines) {
       const [h, a] = s.score.split("-").map(Number);
       if (Number.isNaN(h) || Number.isNaN(a) || s.prob <= 0) continue;
@@ -1365,12 +1473,12 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
         out.push({ id: `S${h}_${a}`, p: s.prob, h, a,
                    method: h > a ? "H90" : "A90",
                    label: `${h > a ? home : away} wins ${h}-${a}` });
-      } else if (fine && drawTot > 0) {
+      } else if (fine && split && drawTot > 0) {
         const parts: [string, string, number][] = [
-          ["DHet", `then ${home} wins in extra time`, adv!.home_win_et!],
-          ["DAet", `then ${away} wins in extra time`, adv!.away_win_et!],
-          ["DHp", `then ${home} wins on penalties`, adv!.home_win_pens!],
-          ["DAp", `then ${away} wins on penalties`, adv!.away_win_pens!],
+          ["DHet", `then ${home} wins in extra time`, split.het],
+          ["DAet", `then ${away} wins in extra time`, split.aet],
+          ["DHp", `then ${home} wins on penalties`, split.hp],
+          ["DAp", `then ${away} wins on penalties`, split.ap],
         ];
         for (const [mth, lbl, w] of parts) {
           if (w <= 0) continue;
@@ -1707,6 +1815,29 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
                     </p>
                   )
                 )}
+                {/* THREE NUMBERS OVER AN EMPTY SET ARE NOT THREE FACTS.
+                    `rungs` is empty whenever the scenario space is —
+                    the simulation carried no full-time distribution, so
+                    there are no atoms and nothing to price the selected
+                    legs against. These tiles used to render it anyway:
+                    "Strategy wins 0%", "Best case +$0.00" in the accent
+                    green a profit is drawn in, "Expected value +$0.00",
+                    and a BLANK where the best case's chance goes. Every
+                    one of those is a measured claim about a build that
+                    was never evaluated, and the reduce over zero atoms
+                    is the same `all([])` this project has already had
+                    to name once. Either the ladder exists and the tiles
+                    are computed from it, or it does not and they say
+                    so. */}
+                {rungs.length === 0 ? (
+                  <p data-testid="scenario-space-empty"
+                    className="mb-4 rounded-xl border border-warn/40 bg-warn/5 px-3 py-2.5 text-xs leading-relaxed text-warn">
+                    No scenario space to price this build against — the
+                    simulation carried no full-time distribution for this
+                    match, so there are no outcomes to walk. That is a
+                    missing read, not a strategy worth $0.
+                  </p>
+                ) : (
                 <div className="mb-4 grid grid-cols-3 gap-3">
                   <div className="rounded-xl border border-line bg-bs p-3">
                     <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">Strategy wins</p>
@@ -1714,11 +1845,11 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
                   </div>
                   <div className="rounded-xl border border-line bg-bs p-3">
                     <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">Best case</p>
-                    <p className={`mt-1 font-mono text-xl tabular-nums ${(selBest?.pnl ?? 0) >= 0 ? "text-accent" : "text-neg"}`}>
-                      {(selBest?.pnl ?? 0) >= 0 ? "+" : "−"}${Math.abs(selBest?.pnl ?? 0).toFixed(2)}
+                    <p className={`mt-1 font-mono text-xl tabular-nums ${selBest!.pnl >= 0 ? "text-accent" : "text-neg"}`}>
+                      {selBest!.pnl >= 0 ? "+" : "−"}${Math.abs(selBest!.pnl).toFixed(2)}
                     </p>
                     <p className="font-mono text-[10px] tabular-nums text-ink-faint">
-                      {selBest ? `${pct(selBest.p)} chance` : ""}
+                      {pct(selBest!.p)} chance
                     </p>
                   </div>
                   <div className="rounded-xl border border-line bg-bs p-3">
@@ -1728,6 +1859,7 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
                     </p>
                   </div>
                 </div>
+                )}
 
                 {/* the payout ladder — every distinct net outcome this build
                     can produce; one flat rung when the legs are disjoint,

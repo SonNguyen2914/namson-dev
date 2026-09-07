@@ -17,8 +17,36 @@ import {
 } from "../lib/suggesterApi";
 import { Eyebrow, Reveal } from "./ui";
 
+// A FAILED READ IS NOT AN EMPTY ONE — and on a bracket the empty one is
+// a claim about the tournament. This component's read used to end in
+// `.catch(() => {})` over a state initialised to `null`, and the very
+// next line was `if (!b || b.quarterfinals.length === 0) return null`.
+// A 503 and "the knockout draw has not been made" were therefore the
+// identical nothing: the section vanished, and a reader concluded there
+// was no bracket when the truth was that we could not ask.
+//
+// Three states — asking / failed / ok — the type LaligaDashboard.tsx's
+// `settle()` established and LiveScoreboard.tsx redeclared. Redeclared
+// again here for the same stated reason (src/lib is not this change's to
+// add to), and the duplication is named so a later extraction knows what
+// it is collecting.
+type Read<T> =
+  | { s: "asking" }
+  | { s: "failed"; why: string }
+  | { s: "ok"; d: T };
+
+/** The failure's own words, never a shrug. */
+const why = (e: unknown): string =>
+  e instanceof Error ? e.message : String(e);
+
 export default function BracketView() {
-  const [b, setB] = useState<BracketResponse | null>(null);
+  const [read, setRead] = useState<Read<BracketResponse>>({ s: "asking" });
+  // A bracket that arrived once is KEPT when a later poll fails, and is
+  // drawn beside a line saying the read behind it is the earlier one. A
+  // 60-second-old bracket is still the bracket; a vanished section is a
+  // different claim. STATE, NOT A REF: it is read during render, and a
+  // ref read during render is an error under this repo's lint.
+  const [lastOk, setLastOk] = useState<BracketResponse | null>(null);
   const [, setTick] = useState(0); // ticking clock for per-card countdowns
 
   useEffect(() => {
@@ -26,19 +54,62 @@ export default function BracketView() {
     // ONE bracket call carries probs + edges — no per-match prediction
     // fetches (those triggered fresh backend sims every cache expiry,
     // multiplied per viewer).
-    const load = () => api.bracket().then((r) => { if (alive) setB(r); }).catch(() => {});
+    const load = async () => {
+      try {
+        const r = await api.bracket();
+        if (!alive) return;
+        setLastOk(r);
+        setRead({ s: "ok", d: r });
+      } catch (e) {
+        if (alive) setRead({ s: "failed", why: why(e) });
+      }
+    };
     load();
     const poll = setInterval(load, 60000);
     const tick = setInterval(() => setTick((t) => t + 1), 1000);
     return () => { alive = false; clearInterval(poll); clearInterval(tick); };
   }, []);
 
-  if (!b || b.quarterfinals.length === 0) return null;
+  // NOTHING HAS BEEN ASKED YET. Absence with a reason, not a claim about
+  // whether a knockout draw exists.
+  if (read.s === "asking") return null;
+
+  // ASKED, AND THE READ DID NOT LAND, with nothing earlier to fall back
+  // on. Small and plain, in the `warn` refusal family — never the up/neg
+  // traffic light, which on this surface reads as a verdict on a match.
+  if (read.s === "failed" && !lastOk) {
+    return (
+      <section>
+        <Eyebrow className="mb-2">bracket</Eyebrow>
+        <p data-testid="bracket-read-failed" role="status"
+          className="rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-[12px] leading-relaxed text-warn">
+          The bracket read failed: {read.why}. That is not the knockout
+          draw being unmade — it is that we could not ask.
+        </p>
+      </section>
+    );
+  }
+
+  const b = read.s === "ok" ? read.d : lastOk!;
+
+  // ASKED, ANSWERED, AND THE ANSWER WAS "THE DRAW IS NOT MADE". The one
+  // branch that may render nothing at all: the group stage is still
+  // running and there is no road to draw. That is a fact the backend
+  // supplied, not a silence.
+  if (read.s === "ok" && b.quarterfinals.length === 0) return null;
 
   return (
     <Reveal>
       <section>
         <Eyebrow className="mb-2">bracket</Eyebrow>
+        {read.s === "failed" && (
+          <p data-testid="bracket-read-failed" role="status"
+            className="mb-3 rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-[12px] leading-relaxed text-warn">
+            The bracket read failed: {read.why}. The road below is from the
+            last read that answered and has not been refreshed — the
+            probabilities, edges and results on it may have moved since.
+          </p>
+        )}
         <h3 className="mb-8 text-lg font-medium text-ink-hi">
           Road to the final <span className="text-sm font-normal text-ink-low">· model win probabilities + edge</span>
         </h3>
@@ -142,9 +213,19 @@ function BracketCard({ m, emphasis = false, small = false }: {
   // The higher of the two win probabilities gets the green (accent) tint,
   // regardless of whether it clears 50% — a draw can leave the favourite
   // under 50%, but it's still the model's pick.
-  const hp = m.probs?.home_win ?? 0;
-  const ap = m.probs?.away_win ?? 0;
-  const homeLeads = hp >= ap;
+  //
+  // A LEADER IS A COMPARISON AND A COMPARISON NEEDS TWO NUMBERS. These
+  // read `m.probs?.home_win ?? 0` and `?? 0`, so a card carrying one
+  // side's probability and not the other still produced a winner — off
+  // a 0 nobody measured — and that winner is drawn in the accent green
+  // this surface uses to mean "the model's pick". A colour is a verdict
+  // here, so it may not be derived from a missing number. With either
+  // side unread NEITHER line is tinted, which is what "we do not know
+  // who is ahead" looks like.
+  const hp = m.probs?.home_win;
+  const ap = m.probs?.away_win;
+  const homeLeads: boolean | null =
+    typeof hp === "number" && typeof ap === "number" ? hp >= ap : null;
 
   const pad = small ? "p-2.5" : "p-3";
   const border = emphasis && !finished ? "border-accent/30" : "border-line";
@@ -158,7 +239,8 @@ function BracketCard({ m, emphasis = false, small = false }: {
     } ${emphasis ? "bg-elev" : ""} ${soon ? "ring-soon" : ""}`}>
       <TeamLine
         name={m.home} resolved={m.home_resolved}
-        prob={m.probs?.home_win} edge={m.probs?.home_edge} leader={homeLeads}
+        prob={m.probs?.home_win} edge={m.probs?.home_edge}
+        leader={homeLeads === true}
         score={m.result?.home_goals}
         state={finished ? (m.result!.winner === "home" ? "win" : "loss") : "none"}
         small={small} forecast={m.forecast?.home}
@@ -166,7 +248,8 @@ function BracketCard({ m, emphasis = false, small = false }: {
       <div className="my-1.5 h-px bg-line" />
       <TeamLine
         name={m.away} resolved={m.away_resolved}
-        prob={m.probs?.away_win} edge={m.probs?.away_edge} leader={!homeLeads}
+        prob={m.probs?.away_win} edge={m.probs?.away_edge}
+        leader={homeLeads === false}
         score={m.result?.away_goals}
         state={finished ? (m.result!.winner === "away" ? "win" : "loss") : "none"}
         small={small} forecast={m.forecast?.away}
@@ -216,7 +299,13 @@ function TeamLine({ name, resolved, prob, edge, leader, score, state, small, for
   const showForecast = !resolved && forecast != null;
 
   return (
-    <div className="flex items-center gap-2">
+    // `data-leader` is the verdict this row makes, out where a guard can
+    // read it. The claim is carried by a colour — accent ink on the
+    // side the model prefers — and a colour cannot be asserted on
+    // honestly, so the same fact rides as an attribute derived from the
+    // same `leader` the tint is.
+    <div className="flex items-center gap-2"
+      data-testid="bracket-team" data-leader={leader ? "true" : "false"}>
       <span className={`shrink-0 ${small ? "text-sm" : "text-base"} ${showForecast ? "opacity-60" : ""}`}>
         {resolved ? flag(name) : showForecast ? flag(forecast!.team) : "•"}
       </span>

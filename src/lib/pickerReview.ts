@@ -276,5 +276,29 @@ export async function fetchReview(back: number, signal?: AbortSignal): Promise<R
     } catch { /* non-JSON body; the status is all we have */ }
     throw new Error(detail || `review request failed (${r.status})`);
   }
-  return r.json();
+  // A 200 IS NOT A PAYLOAD. `return r.json()` folded three findings
+  // into one: a SyntaxError in the browser's own vocabulary for a 204
+  // or an upstream HTML error page — which is debugging text, not the
+  // named situation this function is careful to give every other
+  // failure — and, worse because it does not throw at all, a literal
+  // `null` body handed back typed as Review. The caller renders that as
+  // the review having nothing on it, which is a claim about the slate
+  // made off a read that never landed.
+  const raw = await r.text();
+  let body: unknown;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    throw new Error(
+      `the server answered ${r.status} with a body that is not JSON `
+      + `(${raw.length} characters) — that is an answer we could not `
+      + "read, not an empty review");
+  }
+  if (body === null || typeof body !== "object") {
+    throw new Error(
+      `the server answered ${r.status} with ${JSON.stringify(body)} `
+      + "where a review was expected — there is no payload here, and it "
+      + "must not be read as an empty one");
+  }
+  return body as Review;
 }

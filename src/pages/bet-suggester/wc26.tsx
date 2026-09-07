@@ -48,7 +48,7 @@ import BracketView from "../../components/BracketView";
 import { Eyebrow, Flash, Reveal } from "../../components/ui";
 import { ArchiveMenu } from "../../components/ArchiveMenu";
 import {
-  NavChip, RouteProgress, SkeletonRows, Toaster, TopBar, useScrollSpy,
+  NavChip, RouteProgress, SkeletonRows, Toaster, TopBar, toast, useScrollSpy,
 } from "../../components/chrome";
 
 const POLL_MS = 60 * 1000; // the odds tape is written every 30s; re-read often
@@ -389,7 +389,16 @@ export default function WC26Archive() {
       const board = await api.watchlist() as unknown as WatchlistPayload;
       setWatchlist(board.watchlist ?? []);
       setWatchOrder(board.order ?? null);
-    } catch { /* non-fatal; next poll resyncs */ }
+    } catch {
+      // A CONTROL THAT DID NOTHING MUST NOT LOOK LIKE ONE THAT WORKED.
+      // This swallowed the failure and left the row's watched state
+      // showing whatever it showed before, with no sentence anywhere —
+      // so a press that never reached the backend and a press that
+      // succeeded were the same pixels. The next poll does resync, up
+      // to POLL_MS later; the reader is told now.
+      toast("The watchlist did not update — the backend did not answer. "
+            + "Nothing was changed.");
+    }
   }
 
   const next = matches[0];

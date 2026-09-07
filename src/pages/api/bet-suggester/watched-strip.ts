@@ -33,6 +33,7 @@
 // a refusal. It is labelled `proxy_unreachable` so the surface can name
 // which of the two it is looking at.
 import type { NextApiRequest, NextApiResponse } from "next";
+import { reach } from "../../../lib/suggesterProxy";
 
 const BACKEND = process.env.SUGGESTER_BACKEND_URL || "http://localhost:8000";
 
@@ -53,21 +54,39 @@ export default async function handler(
         + "this route has",
     });
   }
-  try {
-    const r = await fetch(`${BACKEND}/api/bet-suggester/watched-strip`,
-      { headers: operatorHeaders(req) });
-    const raw = await r.text();
-    res.status(r.status);
-    res.setHeader("content-type",
-      r.headers.get("content-type") || "application/json");
-    return res.send(raw);
-  } catch (err) {
+  const got = await reach(`${BACKEND}/api/bet-suggester/watched-strip`,
+    { headers: operatorHeaders(req) });
+  if (!got.reached) {
     return res.status(502).json({
       error: "proxy_unreachable",
       detail: "the strip's backend was never reached, so there is no "
         + "answer to relay — this is not a refusal and not an empty "
         + "watchlist",
+      cause: got.detail,
+    });
+  }
+  const r = got.res;
+  // REACHED, AND THE STATUS IS THE ANSWER. Only the fetch was inside a
+  // try; the body read is below, so a stream that breaks after a 200
+  // cannot be relayed as `proxy_unreachable`. WatchedStrip.tsx reads a
+  // 502 as "unreachable" in words, so producing one for a backend that
+  // answered would put a false sentence on the surface.
+  let raw: string;
+  try {
+    raw = await r.text();
+  } catch (err) {
+    return res.status(502).json({
+      error: "proxy_body_unreadable",
+      upstream_status: r.status,
+      detail: `the strip's backend answered ${r.status} and the body `
+        + "could not be read to the end, so there is nothing to relay. "
+        + "THE BACKEND WAS REACHED: this is not `proxy_unreachable`, "
+        + "not a refusal, and not an empty watchlist",
       cause: String(err),
     });
   }
+  res.status(r.status);
+  res.setHeader("content-type",
+    r.headers.get("content-type") || "application/json");
+  return res.send(raw);
 }

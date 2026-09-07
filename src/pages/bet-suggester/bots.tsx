@@ -110,9 +110,20 @@ function BotCard({ b, start }: { b: BotLedger; start: number }) {
                 <li key={`${p.market_id}-${p.closed_at}`} className="flex items-baseline gap-2 text-xs text-ink-mid">
                   <span className="min-w-0 flex-1 truncate" title={`${p.market_title} — ${p.close_reason}`}>{p.market_title}</span>
                   <span className="shrink-0 font-mono text-[10px] uppercase text-ink-faint">{p.close_reason}</span>
-                  <span className={`shrink-0 font-mono tabular-nums ${(p.net ?? 0) > 0 ? "text-accent" : (p.net ?? 0) < 0 ? "text-neg" : "text-ink-low"}`}>
-                    {(p.net ?? 0) >= 0 ? "+" : ""}{money(p.net ?? 0).replace("−$", "-$")}
-                  </span>
+                  {/* MISSING IS NOT ZERO. `p.net` is optional on the
+                      payload, and `?? 0` drew a trade whose net was
+                      never recorded as a measured break-even — "+$0.00"
+                      in the neutral ink, indistinguishable from a trade
+                      that really came out level. */}
+                  {p.net == null ? (
+                    <span className="shrink-0 font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+                      net not recorded
+                    </span>
+                  ) : (
+                    <span className={`shrink-0 font-mono tabular-nums ${p.net > 0 ? "text-accent" : p.net < 0 ? "text-neg" : "text-ink-low"}`}>
+                      {p.net >= 0 ? "+" : ""}{money(p.net).replace("−$", "-$")}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>

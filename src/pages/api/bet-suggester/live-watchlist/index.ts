@@ -27,6 +27,8 @@
 // refusal is a 200 with `recorded: true`. This route never rewrites
 // that into an error.
 import type { NextApiRequest, NextApiResponse } from "next";
+import { reach, readJson, statusForUnreadableAnswer }
+  from "../../../../lib/suggesterProxy";
 
 const BACKEND = process.env.SUGGESTER_BACKEND_URL || "http://localhost:8000";
 
@@ -38,7 +40,24 @@ function operatorHeaders(req: NextApiRequest): Record<string, string> {
 }
 
 async function passThrough(res: NextApiResponse, r: Response) {
-  const raw = await r.text();
+  // THE BACKEND WAS REACHED AND GAVE A STATUS. If the body stream then
+  // breaks, that status is still a fact and the finding is named for
+  // what it is — not folded into "unreachable", which would say the
+  // backend never answered when it did.
+  let raw: string;
+  try {
+    raw = await r.text();
+  } catch (err) {
+    return res.status(502).json({
+      error: "Backend unreachable",
+      reason: "backend_body_unreadable",
+      upstream_status: r.status,
+      detail: `the backend answered ${r.status} and the body could not `
+        + `be read to the end (${String(err)}) — the backend was `
+        + "reached, and this is not a refusal and not an empty "
+        + "watchlist",
+    });
+  }
   res.status(r.status);
   res.setHeader("content-type",
     r.headers.get("content-type") || "application/json");
@@ -52,15 +71,18 @@ export default async function handler(
   if (req.method === "GET") {
     const log = typeof req.query.log === "string" && /^\d{1,4}$/.test(req.query.log)
       ? req.query.log : "200";
-    try {
-      const r = await fetch(
-        `${BACKEND}/api/admin/live/watchlist?log=${log}`,
-        { headers: operatorHeaders(req) });
-      return passThrough(res, r);
-    } catch (err) {
+    const got = await reach(
+      `${BACKEND}/api/admin/live/watchlist?log=${log}`,
+      { headers: operatorHeaders(req) });
+    if (!got.reached) {
+      // THE ONLY 502 ON THIS BRANCH. The fetch threw, so there is no
+      // status and no body: nothing upstream is known.
       return res.status(502).json({
-        error: "Backend unreachable", detail: String(err) });
+        error: "Backend unreachable",
+        reason: "backend_unreachable",
+        detail: got.detail });
     }
+    return passThrough(res, got.res);
   }
 
   if (req.method !== "POST") {
@@ -90,7 +112,16 @@ export default async function handler(
   }
 
   try {
-    const rr = await fetch(`${BACKEND}/api/news/fixture/${eventId}`);
+    const rg = await reach(`${BACKEND}/api/news/fixture/${eventId}`);
+    if (!rg.reached) {
+      return res.status(502).json({
+        error: "Backend unreachable",
+        reason: "backend_unreachable",
+        detail: `the resolver was never reached (${rg.detail}), so this `
+          + "route cannot name the fixture and declares nothing",
+      });
+    }
+    const rr = rg.res;
     if (!rr.ok) {
       return res.status(rr.status === 404 ? 404 : 502).json({
         error: `event ${eventId} did not resolve to a live-plane fixture `
@@ -98,7 +129,25 @@ export default async function handler(
           + "fixture this route cannot name",
       });
     }
-    const resolved = (await rr.json())?.resolved_fixture;
+    const rp = await readJson(rr);
+    if (!rp.ok) {
+      // AN ANSWER WE COULD NOT READ IS NOT "no such fixture", and it is
+      // not an unreachable backend either. The resolver's status is
+      // relayed so the surface can tell the three apart.
+      return res.status(rr.status).json({
+        error: "resolver_response_not_json",
+        reason: "backend_response_not_json",
+        upstream_status: rr.status,
+        detail: `${rp.why} — whether event ${eventId} has a live-plane `
+          + "fixture is UNKNOWN, and nothing is declared on an id this "
+          + "route could not read",
+        body: rp.raw === null ? null : rp.raw.slice(0, 2000),
+      });
+    }
+    const resolved = (rp.body as { resolved_fixture?: {
+      fixture_id?: number; competition?: string | null;
+      kickoff_utc?: string | null; note?: string | null } } | null)
+      ?.resolved_fixture;
     if (!resolved?.fixture_id) {
       return res.status(404).json({
         error: `event ${eventId} resolves to no live-plane fixture, so `
@@ -110,16 +159,38 @@ export default async function handler(
       fixture_id: String(resolved.fixture_id), action, actor,
     });
     if (reason) qs.set("reason", reason);
-    const wr = await fetch(
+    const wg = await reach(
       `${BACKEND}/api/admin/live/watchlist?${qs.toString()}`,
       { method: "POST", headers: operatorHeaders(req) });
-    const raw = await wr.text();
+    if (!wg.reached) {
+      return res.status(502).json({
+        error: "Backend unreachable",
+        reason: "backend_unreachable",
+        detail: `the declaration was never delivered (${wg.detail}) — `
+          + "nothing was recorded",
+      });
+    }
+    const wr = wg.res;
+    const wp = await readJson(wr);
+    const raw = wp.raw ?? "";
     // The resolved identity rides BESIDE the backend's own bytes so the
     // page can say which fixture id the declaration landed on, and in
     // which live competition, without this layer editing the record.
-    let body: unknown;
-    try { body = JSON.parse(raw); } catch { body = { raw }; }
-    res.status(wr.status);
+    // The backend's own bytes, parsed when they parse and QUOTED with a
+    // named reason when they do not — never silently `{ raw }`, which
+    // reads to a caller as a payload shape rather than as a failure.
+    const body: unknown = wp.ok ? wp.body : { unreadable: wp.why, raw };
+    // AND THE STATUS SAYS SO TOO. Quoting the unreadable answer in the
+    // body was the right half; shipping it under the backend's own 200
+    // was the other half undone. WatchlistDeclareResponse carries an
+    // index signature, so `{ unreadable, raw }` typechecks as a
+    // WatchlistDeclaration, `recorded` reads undefined, and the panel
+    // draws "nothing was recorded" — a claim about the operator's own
+    // preregistration, made off an answer this route could not read,
+    // for a POST that may well have LANDED. A non-2xx from the backend
+    // still relays unchanged; only the success code, which is the one
+    // that lies to `res.ok`, is refused here.
+    res.status(wp.ok ? wr.status : statusForUnreadableAnswer(wr.status));
     return res.json({
       resolved_fixture: {
         espn_event_id: eventId,
@@ -130,7 +201,15 @@ export default async function handler(
       watchlist: body,
     });
   } catch (err) {
-    return res.status(502).json({
-      error: "Backend unreachable", detail: String(err) });
+    // Every backend read on this route goes through `reach`, so an
+    // unreachable backend is answered above by name. What reaches here
+    // is this route's own bug and says so.
+    return res.status(500).json({
+      error: "proxy_route_failed",
+      reason: "proxy_route_failed",
+      detail: `this route threw while assembling the answer `
+        + `(${String(err)}). The backend is NOT known to be `
+        + "unreachable.",
+    });
   }
 }

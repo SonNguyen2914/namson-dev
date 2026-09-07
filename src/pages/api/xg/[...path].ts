@@ -4,15 +4,14 @@
 // or admin route to expose. Spending the provider's shared daily quota is an
 // operator action run from the backend's own script, never something a page
 // load or a crafted URL can trigger.
+//
+// The forwarded set is LEAGUE_PROXY_ALLOWED.xg in lib/suggesterProxy.ts.
 import type { NextApiRequest, NextApiResponse } from "next";
-import { proxy } from "../../../lib/suggesterProxy";
-
-const ALLOWED = new Set(["summary", "friendlies"]);
+import { leagueRouteAllowed, proxy } from "../../../lib/suggesterProxy";
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const segs = ((req.query.path as string[]) || []).join("/");
-  const ok = ALLOWED.has(segs) || /^league\/\d{1,8}$/.test(segs);
-  if (req.method !== "GET" || !ok) {
+  if (req.method !== "GET" || !leagueRouteAllowed("xg", segs)) {
     return res.status(404).json({ error: "unknown xg route" });
   }
   const qs = req.url?.includes("?") ? "?" + req.url.split("?")[1] : "";

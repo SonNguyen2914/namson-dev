@@ -13,6 +13,7 @@
 // a preference, and that is a different kind of evidence from a human
 // selection. The two are never totalled.
 import type { NextApiRequest, NextApiResponse } from "next";
+import { reach } from "../../../../lib/suggesterProxy";
 
 const BACKEND = process.env.SUGGESTER_BACKEND_URL || "http://localhost:8000";
 
@@ -25,18 +26,40 @@ export default async function handler(
   }
   const t = req.headers["x-admin-token"];
   const token = Array.isArray(t) ? t[0] : t;
+  const got = await reach(
+    `${BACKEND}/api/admin/live/watchlist/sync-positions`,
+    { method: "POST",
+      headers: token ? { "x-admin-token": token } : {} });
+  if (!got.reached) {
+    // THE ONLY 502 THIS ROUTE AUTHORS. The fetch threw, so nothing
+    // upstream is known and NOTHING WAS DECLARED — which is a different
+    // fact from a backend that answered and declined.
+    return res.status(502).json({
+      error: "Backend unreachable",
+      reason: "backend_unreachable",
+      detail: got.detail });
+  }
+  const r = got.res;
+  // REACHED: the status is a fact and is relayed. A body stream that
+  // then breaks is named for what it is rather than folded into
+  // "unreachable" — this write may well have LANDED, and saying the
+  // backend was never contacted would be a claim about the journal.
+  let raw: string;
   try {
-    const r = await fetch(
-      `${BACKEND}/api/admin/live/watchlist/sync-positions`,
-      { method: "POST",
-        headers: token ? { "x-admin-token": token } : {} });
-    const raw = await r.text();
-    res.status(r.status);
-    res.setHeader("content-type",
-      r.headers.get("content-type") || "application/json");
-    return res.send(raw);
+    raw = await r.text();
   } catch (err) {
     return res.status(502).json({
-      error: "Backend unreachable", detail: String(err) });
+      error: "Backend unreachable",
+      reason: "backend_body_unreadable",
+      upstream_status: r.status,
+      detail: `the backend answered ${r.status} and the body could not `
+        + `be read to the end (${String(err)}) — the sync request WAS `
+        + "delivered and its result is unknown; it is idempotent and "
+        + "removes nothing, so it is safe to ask again",
+    });
   }
+  res.status(r.status);
+  res.setHeader("content-type",
+    r.headers.get("content-type") || "application/json");
+  return res.send(raw);
 }

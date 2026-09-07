@@ -64,9 +64,43 @@ export default function LaligaDashboard() {
   const [standings, setStandings] = useState<Load<StandingsPayload>>({ s: "loading" });
   const [books, setBooks] = useState<Load<GameBook[]>>({ s: "loading" });
   const [probe, setProbe] = useState<KalshiProbe | null>(null);
-  const [odds, setOdds] = useState<Record<string, OddsRow>>({});
+  // THE ODDS MAP IS A READ, NOT A DEFAULT.
+  //
+  // This file invented `settle()` and the sentence above it, and then
+  // this one state stayed a bare `Record<string, OddsRow>` initialised
+  // to `{}` — which is the *same* collapse the type exists to prevent,
+  // one line down from the fix. `{}` reads per fixture as "no shadow
+  // number for this match", and a failed `/api/laliga/odds` produced
+  // exactly that for every fixture at once: a claim about the model,
+  // made off a read that never landed.
+  //
+  // MLS, EPL and Liga MX each closed this in their own file, each with
+  // the comment "THE ODDS MAP IS A READ, NOT A DEFAULT". La Liga was
+  // left out of that pass, and the e2e guard that pins the fix
+  // (`failed-read-is-not-empty.spec.ts`) hand-listed the same three
+  // hubs — so the one hub still carrying the defect was also the one
+  // hub the guard did not visit. That is the corollary this project
+  // has paid for before: a guard that names a rule and then enumerates
+  // a subset stays green while the omitted case drifts. Both are fixed
+  // together; the spec now derives its hub list.
+  const [odds, setOdds] = useState<Load<Record<string, OddsRow>>>({ s: "loading" });
   const [model, setModel] = useState<OddsPayload | null>(null);
   const [status, setStatus] = useState<StatusPayload | null>(null);
+  // A FAILED MODEL-STATE READ IS NOT A MODEL WITH NO STATE.
+  //
+  // `od` and `sts` are `.catch(() => null)`-ed, and `null` is also what
+  // an answered-but-empty payload leaves behind — so the heading below
+  // printed "State unavailable" for a 503 and for a backend that simply
+  // had nothing to say, the blockers list silently emptied, and the xG
+  // note silently vanished. This file invented `settle()` and the
+  // sentence above it; `odds` was the second state in it still
+  // collapsing loading / failed / empty into one value, and these two
+  // are the third. They are not re-typed here — the model heading has
+  // to keep working off whichever of the two answered — but the FACT
+  // that a read did not land is now stated, in its own line, above the
+  // section whose silences it explains.
+  const [stateReadFailed, setStateReadFailed] =
+    useState<{ odds: boolean; status: boolean }>({ odds: false, status: false });
 
   useEffect(() => {
     let alive = true;
@@ -90,9 +124,16 @@ export default function LaligaDashboard() {
         setProbe(mkt?.kalshi ?? null);
         setModel(od ?? null);
         setStatus(sts ?? null);
-        const map: Record<string, OddsRow> = {};
-        for (const o of od?.odds ?? []) map[o.espn_event_id] = o;
-        setOdds(map);
+        // `null` here can only be the catch above: a 200 with an empty
+        // body still lands as an object.
+        setStateReadFailed({ odds: od == null, status: sts == null });
+        if (od == null) {
+          setOdds({ s: "error" });
+        } else {
+          const map: Record<string, OddsRow> = {};
+          for (const o of od.odds ?? []) map[o.espn_event_id] = o;
+          setOdds({ s: "ok", d: map });
+        }
       });
     };
     load();
@@ -113,6 +154,12 @@ export default function LaligaDashboard() {
     || status?.model_dark;
   const blockers = status?.counts?.blockers ?? [];
   const nr = model?.no_runs_reason;
+  // A FAILED ODDS READ IS NOT AN ABSENT PREDICTION. The map is handed
+  // down only when it was actually read; the failure is stated once,
+  // above the fixtures, rather than looking like every match lacking a
+  // run. Same sentence as the three sibling hubs, so one guard covers
+  // all four.
+  const oddsMap = odds.s === "ok" ? odds.d : {};
 
   return (
     <div className="space-y-14">
@@ -124,6 +171,20 @@ export default function LaligaDashboard() {
             model · {model?.model_version || status?.model_version
               || "laliga-2026-v0"}
           </Eyebrow>
+          {(stateReadFailed.odds || stateReadFailed.status) && (
+            <p data-testid="model-state-read-failed" role="status"
+              className="mb-3 rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-[12px] leading-relaxed text-warn">
+              The{" "}
+              {stateReadFailed.odds && stateReadFailed.status
+                ? "shadow-odds and model-status reads"
+                : stateReadFailed.odds ? "shadow-odds read" : "model-status read"}
+              {" "}did not land. Whatever this section does not say about
+              the model below — its state, its blockers, its xG note — is
+              unread rather than unstated, and the version above it is
+              this page&apos;s own default, not something the backend
+              confirmed on this poll.
+            </p>
+          )}
           <h3 className="mb-2 text-lg font-medium text-ink-hi">
             {dark
               ? "Dark — no approval decision exists"
@@ -185,6 +246,12 @@ export default function LaligaDashboard() {
               · ESPN live feed, 60s poll
             </span>
           </h3>
+          {odds.s === "error" && (
+            <Empty>
+              la liga shadow-odds read failed — no model number is shown on
+              any fixture below, and that is not the same as no run existing
+            </Empty>
+          )}
           {today.s === "loading" ? (
             <Empty>loading fixtures…</Empty>
           ) : today.s === "error" ? (
@@ -202,7 +269,7 @@ export default function LaligaDashboard() {
                   )}
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {g.list.map((f) => (
-                      <FixtureCard key={f.id} f={f} o={odds[f.id]} />
+                      <FixtureCard key={f.id} f={f} o={oddsMap[f.id]} />
                     ))}
                   </div>
                 </div>
@@ -276,14 +343,7 @@ export default function LaligaDashboard() {
                     <span className="text-ink-faint"> vs </span>
                     {f.away.short || f.away.name}
                   </span>
-                  {odds[f.id]?.outcomes && (
-                    <span className="shrink-0 font-mono text-[10px] tabular-nums text-ink-low"
-                      title="laliga-2026-v0 shadow odds — not advice">
-                      {Math.round((odds[f.id].outcomes!.home_win ?? 0) * 100)}
-                      /{Math.round((odds[f.id].outcomes!.draw ?? 0) * 100)}
-                      /{Math.round((odds[f.id].outcomes!.away_win ?? 0) * 100)}
-                    </span>
-                  )}
+                  <WeekOdds o={oddsMap[f.id]} model="laliga-2026-v0" />
                   <span className="hidden truncate font-mono text-[10px] text-ink-faint sm:block">
                     {f.venue}
                   </span>
@@ -309,7 +369,14 @@ export default function LaligaDashboard() {
                   + "mid-august. ESPN serves 20 all-zero rows ranked "
                   + "alphabetically here, and rendering that would "
                   + "fabricate an order"
-                : "standings unavailable"}
+                // AN ANSWERED EMPTY READ MUST NOT BORROW THE FAILURE'S
+                // WORD. This branch said "standings unavailable", which
+                // is what the `error` branch two lines up says about a
+                // read that never landed — the same collapse pointing
+                // the other way. The feed answered here; it carried no
+                // table, and it did not say the season had not started.
+                : "the standings feed answered and carried no table — "
+                  + "not preseason, and not a failed read"}
             </Empty>
           ) : (
             <div className="grid grid-cols-1 gap-6">
@@ -353,13 +420,55 @@ function TeamLine({ s, live }: { s: Side; live: boolean }) {
   );
 }
 
+// ONE FORMATTER FOR ONE OUTCOME, AND EVERY PLACE THIS FILE DRAWS ONE
+// GOES THROUGH IT.
+//
+// A probability the backend did not send is drawn as an em dash. It is
+// never drawn as 0: "0" is a measured claim about what the model thinks
+// of a result, and a key that is absent was never measured. `OddsChip`
+// already had that rule and its own local formatter to keep it — and
+// the seven-day list above, in this same file, carried an inline copy
+// that read `(outcomes!.draw ?? 0) * 100` on all three legs, so a
+// payload missing `draw` rendered "45/0/30". That is the shape this
+// repo has now paid for four rounds running: the fix holds at the named
+// site and the same shape stands one function over. There is ONE
+// formatter now, so the two cannot disagree again.
+function outcomePct(p: Record<string, number> | undefined, k: string): string {
+  return p != null && p[k] != null ? `${Math.round(p[k] * 100)}` : "—";
+}
+
+// The seven-day list's shadow chip. Same formatter as the fixture
+// card's, and the label that makes three bare numbers safe to read is
+// REAL TEXT IN THE ACCESSIBLE TREE — it used to live only on a `title=`,
+// where a screen reader met "45/25/30" with nothing saying whose
+// numbers they were or that they are not advice. The label carries no
+// em dash of its own: inside this chip an em dash means exactly one
+// thing, "this leg was not measured", and a second use would blunt it.
+function WeekOdds({ o, model }: { o?: OddsRow; model: string }) {
+  if (!o?.outcomes) return null;
+  const run = o.locked ? "t-10 lock" : "shadow";
+  return (
+    <span data-testid="week-odds"
+      className="shrink-0 font-mono text-[10px] tabular-nums text-ink-low">
+      <span className="sr-only">
+        {model} {run} odds, not advice. Home / draw / away:{" "}
+      </span>
+      {outcomePct(o.outcomes, "home_win")}
+      /{outcomePct(o.outcomes, "draw")}
+      /{outcomePct(o.outcomes, "away_win")}
+      <span className="ml-1.5 uppercase tracking-wide text-ink-faint" aria-hidden>
+        {run}
+      </span>
+    </span>
+  );
+}
+
 // Renders ONLY when the backend actually sent outcomes — while the
 // model is dark it never mounts, and no zero-bar stands in for it.
 function OddsChip({ o }: { o?: OddsRow }) {
   const p = o?.outcomes;
   if (!p) return null;
-  const pct = (k: string) =>
-    p[k] != null ? `${Math.round(p[k] * 100)}` : "—";
+  const pct = (k: string) => outcomePct(p, k);
   return (
     <div className="mt-2 flex items-center justify-between rounded-lg bg-accent/10 px-2 py-1 font-mono text-[10px] tabular-nums">
       <span className="text-ink-low">

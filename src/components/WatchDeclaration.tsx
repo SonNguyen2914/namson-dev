@@ -484,13 +484,23 @@ function SyncConfirm() {
         </p>
       )}
 
-      {/* THE NUMBER THAT IS MISSING, NAMED. */}
+      {/* THE NUMBER THAT IS MISSING, NAMED — AND ONLY THAT.
+          THE SAME SHAPE THE LIVE CARD WAS REPORTED FOR, ONE SURFACE
+          OVER. This used to print the record's `closes_when` beside its
+          finding, on a confirmation an operator reads before writing a
+          permanent record. The FINDING is operator-facing — it says
+          which number this panel cannot show them before they press —
+          and it stays. The `closes_when` is bookkeeping about this
+          repo's own unfinished business; it is exported in
+          SYNC_PREVIEW_OPEN above, which is where the guard in
+          e2e/watch-declaration.spec.ts reads it, and it is emitted here
+          as data rather than as prose. */}
       {Object.keys(SYNC_PREVIEW_OPEN).map((k) => (
         <p key={k} data-testid="watch-sync-open" data-key={k}
+          data-closes-when-key={SYNC_PREVIEW_OPEN[k].closed_by_state_key}
           className="mt-2 max-w-3xl text-[11px] leading-relaxed text-ink-faint">
           Not shown, and known to be missing — {k}:{" "}
-          {SYNC_PREVIEW_OPEN[k].finding} Closes when:{" "}
-          {SYNC_PREVIEW_OPEN[k].closes_when}
+          {SYNC_PREVIEW_OPEN[k].finding}
         </p>
       ))}
       {closed.length > 0 && (
@@ -627,7 +637,21 @@ export function WatchPanel() {
         {p.hasToken && st && !st.dormant && (
           <dl data-testid="watch-state"
             className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 font-mono text-[11px] tabular-nums text-ink-low sm:grid-cols-3">
-            {sources.map(([name, ids]) => (
+            {/* THE SPLIT BY SOURCE, OR THE WORDS FOR ITS ABSENCE.
+                `st?.monitored_by_source ?? {}` renders NO ROWS when the
+                payload carried no split, which reads as "there are no
+                sources" beside four counts that did arrive — the same
+                fold `countOf` refuses one field over, and the same one
+                WatchedStrip states as "no source counts on this
+                payload". A missing block is named, never drawn as an
+                empty one. */}
+            {sources.length === 0 ? (
+              <div data-testid="watch-sources-absent"
+                className="flex items-baseline gap-2">
+                <dt className="text-ink-faint">by source</dt>
+                <dd className="text-warn">{NOT_ON_PAYLOAD}</dd>
+              </div>
+            ) : sources.map(([name, ids]) => (
               <div key={name} className="flex items-baseline gap-2">
                 <dt className="text-ink-faint">{name}</dt>
                 <dd className="text-ink-mid">{ids.length}</dd>

@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { expect, test } from "@playwright/test";
 
 // A FAILED READ MUST NOT RENDER AS AN EMPTY ONE (2026-09-06).
@@ -64,12 +67,46 @@ async function words(page: Page): Promise<string> {
 }
 
 // ------------------------------------------------------- the four hubs
+//
+// DERIVED FROM THE REGISTRY, NOT TYPED (2026-09-07).
+//
+// This list used to be three literals: mls, epl, ligamx. There were
+// four built hubs. La Liga was the one hand-typed out — and La Liga was
+// also the one hub whose odds map was still a bare `{}` initialised in
+// `useState`, i.e. the one hub still carrying the exact defect these
+// tests exist to pin. A guard that names a rule and then enumerates a
+// subset stays green while the omitted case drifts; this repo has paid
+// for that sentence before, on a test called "both planes" that listed
+// two of three.
+//
+// So the set is read out of the shipping registry — `BUILT_LEAGUES` in
+// leagues.tsx, which is the same set the page dispatches a dashboard
+// from, kept beside that dispatch precisely so the two cannot drift.
+// A league added there is covered here on the next run, or this file
+// fails loudly rather than quietly skipping it.
+const BUILT_LEAGUES: string[] = (() => {
+  const src = readFileSync(
+    join(__dirname, "..", "src", "pages", "bet-suggester", "leagues.tsx"),
+    "utf8");
+  const m = src.match(/const BUILT_LEAGUES = new Set\(\[([\s\S]*?)\]\)/);
+  if (!m) {
+    throw new Error(
+      "leagues.tsx no longer declares `const BUILT_LEAGUES = new Set([...])`. "
+      + "This spec derives its hub list from that registry on purpose. Point "
+      + "it at the new registry — do not re-type the league ids here.");
+  }
+  const ids = [...m[1].matchAll(/"([a-z0-9_-]+)"/g)].map((x) => x[1]);
+  if (ids.length === 0) {
+    throw new Error("BUILT_LEAGUES parsed to an empty set — a guard over an "
+                    + "empty set is not a guard.");
+  }
+  return ids;
+})();
 
-const HUBS: { league: string; url: string; name: string }[] = [
-  { league: "mls", url: "/bet-suggester?league=mls", name: "MLS" },
-  { league: "epl", url: "/bet-suggester?league=epl", name: "EPL" },
-  { league: "ligamx", url: "/bet-suggester?league=ligamx", name: "Liga MX" },
-];
+const HUBS: { league: string; url: string; name: string }[] =
+  BUILT_LEAGUES.map((league) => ({
+    league, url: `/bet-suggester?league=${league}`, name: league,
+  }));
 
 for (const h of HUBS) {
   test(`${h.name}: a dead fixture feed says so — it does not load for ever`,
@@ -86,12 +123,45 @@ for (const h of HUBS) {
       expect(dead).not.toContain("LOADING FIXTURES");
     });
 
+  // A GATE THAT WAITS FOR PROSE IS NOT WAITING FOR THE READ (2026-09-07).
+  //
+  // Both tests below opened with `toContainText(/no .* fixtures/i)` as
+  // their readiness gate. On the La Liga hub `.*` bridges two unrelated
+  // sentences — "**No** odds render until an approval is earned through
+  // the evaluation ladder on real 2026-27 results. **FIXTURES** · LIVE
+  // DATA" satisfies it on the very first paint, while all six reads are
+  // still in flight. The test then walked on against a page that said
+  // LOADING FIXTURES and failed the assertion it exists to make,
+  // whenever the hub happened to be slow. That is the "single failure,
+  // a different spec on each run" this suite has been living with, and
+  // it was a gate matching text that is not the fact it waits for.
+  //
+  // The gate is now the loading state being GONE, which is the fact the
+  // rest of the test needs, and the empty sentence is matched with a
+  // class that cannot cross a sentence boundary.
+  const settled = async (page: Page) => {
+    await expect
+      .poll(async () => (await words(page)).includes("LOADING FIXTURES"),
+            { timeout: 10000 }).toBe(false);
+  };
+  // …AND SCOPED TO THE SECTION UNDER TEST. `/no .* fixtures/i` over the
+  // whole body is satisfied by the SEVEN-DAY section's own empty line
+  // ("no fixtures inside seven days"), so a today's-slate section that
+  // said nothing at all would still pass. The assertion is made against
+  // the slate section itself, found by its own heading.
+  const slate = (page: Page) => page.locator("section").filter({
+    has: page.getByRole("heading", { name: /Today's slate|Next matchday/ }),
+  });
+  const NO_FIXTURES = /\bno [a-z ]{0,40}fixtures\b/i;
+
   test(`${h.name}: an EMPTY fixture feed does not borrow the failure's words`,
     async ({ page }) => {
       await hub(page, h.league);
       await page.goto(h.url);
-      await expect(page.locator("body")).toContainText(/no .* fixtures/i);
+      await settled(page);
       const empty = await words(page);
+      expect((await slate(page).first().innerText()).replace(/\s+/g, " "))
+        .toMatch(NO_FIXTURES);
       expect(empty).not.toContain("UNAVAILABLE — RETRYING");
       expect(empty).not.toContain("LOADING FIXTURES");
     });
@@ -112,7 +182,9 @@ for (const h of HUBS) {
     async ({ page }) => {
       await hub(page, h.league);
       await page.goto(h.url);
-      await expect(page.locator("body")).toContainText(/no .* fixtures/i);
+      await settled(page);
+      expect((await slate(page).first().innerText()).replace(/\s+/g, " "))
+        .toMatch(NO_FIXTURES);
       expect(await words(page)).not.toContain("SHADOW-ODDS READ FAILED");
     });
 
@@ -176,10 +248,19 @@ test("friendlies: healthy reads print no failure line at all",
 
 // --------------------------------------------------- the live scoreboard
 
+// FIXTURES SPEAK THE PROVIDER'S VOCABULARY, NOT THE CODE'S. `red_home`
+// was `false` here — the shape `LiveScoreEntry` declares. The backend
+// has never sent a boolean: the value comes off
+// `MatchLiveSnapshot.red_home` / `MatchResult.red_home`, both
+// `Column(Integer, default=0)`, counted up by `src/live_feed.py`
+// (`red_home += 1`) and handed out unchanged by
+// `live_state.scoreboard_entries()`. The hand-written boolean was
+// certifying the stale type. Integers now, and
+// `missing-is-not-zero.spec.ts` pins what the render does with them.
 const LIVE_MATCH = {
   match_id: "m1", home: "Spain", away: "France",
   home_goals: 2, away_goals: 1, minutes_elapsed: 65,
-  status_short: "2H", red_home: false, red_away: false,
+  status_short: "2H", red_home: 0, red_away: 0,
   goals_list: [], is_finished: false,
 };
 

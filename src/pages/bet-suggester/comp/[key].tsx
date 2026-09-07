@@ -203,7 +203,10 @@ export default function CompViewer() {
       fetch(`/api/comp/${key}/markets`)
         .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
         .then((j) => alive && setMk(j))
-        .catch(() => {});
+        .catch(() => {
+          /* SWALLOWED(comp:kalshi-market-counts) — registered in
+             e2e/missing-is-not-zero.spec.ts with its closes_when. */
+        });
     };
     load();
     poll.id = setInterval(load, 60000);
@@ -290,16 +293,30 @@ export default function CompViewer() {
         {key && <TournamentView compKey={key} />}
 
         <div className="mt-8 flex flex-wrap items-center gap-3 font-mono text-[10px] uppercase tracking-wide">
-          <span className="text-ink-faint">
-            {d?.count ?? 0} upcoming · {ratedCount} with a strength read
-            {d?.finished_hidden ? ` · ${d.finished_hidden} finished hidden` : ""}
-            {mk?.tradeable_events != null
-              ? ` · ${mk.tradeable_events} tradeable on kalshi` : ""}
-          </span>
+          {/* MISSING IS NOT ZERO. This read `{d?.count ?? 0} upcoming`
+              and `ratedCount` off an empty array, so a fixtures read
+              that never landed printed "0 UPCOMING · 0 WITH A STRENGTH
+              READ" — a count of the competition — directly above the
+              line saying the fixtures were unavailable. The counts are
+              a fact about a payload, so they are drawn only when there
+              is a payload. */}
+          {d ? (
+            <span className="text-ink-faint">
+              {d.count} upcoming · {ratedCount} with a strength read
+              {d.finished_hidden ? ` · ${d.finished_hidden} finished hidden` : ""}
+              {mk?.tradeable_events != null
+                ? ` · ${mk.tradeable_events} tradeable on kalshi` : ""}
+            </span>
+          ) : (
+            <span className="text-ink-faint">
+              fixture counts not read
+            </span>
+          )}
           <button onClick={() => setOnlyRated((v) => !v)}
             className={`rounded-md border px-2 py-1 ${onlyRated
               ? "border-accent/50 text-accent" : "border-line text-ink-faint"}`}>
-            {onlyRated ? `rated only · ${ratedCount}` : `all ${d?.count ?? 0}`}
+            {onlyRated ? `rated only · ${ratedCount}`
+              : d ? `all ${d.count}` : "all"}
           </button>
           {[3, 7, 14, 30].map((n) => (
             <button key={n} onClick={() => setDays(n)}
@@ -366,18 +383,36 @@ export default function CompViewer() {
                           </p>
                         )}
                         {f.meaning?.stakes?.home && (() => {
+                          // MISSING IS NOT ZERO, AND HERE THE ZERO WAS
+                          // ARITHMETICALLY IMPOSSIBLE. A record with no
+                          // points figure printed "0 pts" beside its own
+                          // wins — "3W 1D 0L · 0 pts" — which no reader
+                          // can reconcile with the numbers next to it,
+                          // and which is a claim about a group table.
+                          // Same for the draw count: `d` is ASEAN's key
+                          // and `d_shootout` is Leagues Cup's, so a
+                          // competition that sends neither was drawn as
+                          // nil draws rather than as unread. Every part
+                          // is now derived from the field that carries
+                          // it, and an absent field says so.
                           const rec = (r?: { played?: number; w?: number;
                             d?: number; d_shootout?: number; l?: number;
                             points?: number | null;
-                            points_range?: number[] | null }) => r
-                            // d: standard draws (ASEAN); d_shootout:
-                            // Leagues Cup's shootout-decided draws
-                            ? `${r.w}W ${r.d ?? r.d_shootout ?? 0}D ${r.l}L · ` +
-                              (r.points != null ? `${r.points} pts`
-                                : r.points_range
-                                  ? `${r.points_range[0]}–${r.points_range[1]} pts`
-                                  : "0 pts")
-                            : "no matches yet";
+                            points_range?: number[] | null }) => {
+                            if (!r) return "no matches yet";
+                            const draws = r.d ?? r.d_shootout;
+                            const wdl = [
+                              r.w != null ? `${r.w}W` : null,
+                              draws != null ? `${draws}D` : null,
+                              r.l != null ? `${r.l}L` : null,
+                            ].filter(Boolean).join(" ");
+                            const pts = r.points != null ? `${r.points} pts`
+                              : r.points_range
+                                ? `${r.points_range[0]}–${r.points_range[1]} pts`
+                                : "points not published";
+                            return wdl ? `${wdl} · ${pts}`
+                              : `record not published · ${pts}`;
+                          };
                           return (
                             <p className="font-mono text-[11px] leading-relaxed text-ink-low">
                               group phase · {shortClub(f.home?.name)}{" "}

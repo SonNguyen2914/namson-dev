@@ -7,8 +7,18 @@ import { expect, test } from "@playwright/test";
 // only honest signal of the two.
 import {
   CONSUMED_ENVELOPE_KEYS, BOOKKEEPING_ENVELOPE_KEYS,
-  UNRENDERED_ENVELOPE_KEYS,
+  REQUIRED_LISTS, UNCODED_ABSENCE_KEYS,
+  UNRENDERED_ENVELOPE_KEYS, UNRENDERED_PAYLOAD_KEYS,
 } from "../src/components/WatchedStrip";
+
+/** A payload MINUS one key — the shape a route that stopped sending it
+ *  produces. Written as a helper so the served object is the real thing
+ *  with a hole in it, not a hand-built lookalike. */
+function omit<T extends object>(o: T, key: string): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...(o as Record<string, unknown>) };
+  delete out[key];
+  return out;
+}
 
 // The watched strip — the HOLD/EXIT stage's surface, above the league
 // columns on /bet-suggester.
@@ -2617,8 +2627,35 @@ async function expandCollapsed(page: Page) {
   const d = page.getByTestId("watched-collapsed");
   if (await d.count() === 0) return;
   if (await d.first().getAttribute("data-open") === "true") return;
-  await d.first().locator("summary").click();
+  // DIRECT CHILD ONLY. Every card inside this group now carries its
+  // own <details> for method, definitions and refusals, so a descendant
+  // `summary` here matches the group's summary AND each card's.
+  await d.first().locator("> summary").click();
   await expect(d.first()).toHaveAttribute("data-open", "true");
+}
+
+/** THE CARD'S ONE DISCLOSURE, OPENED — for the same reason
+ *  `expandCollapsed` exists.
+ *
+ *  Since the live card was rebuilt, everything that is a DEFINITION
+ *  rather than a figure — a refusal's own sentence, the registry's
+ *  gloss on its name, the standing rules the payload writes on every
+ *  block — lives inside one <details> per card. The operator asked for
+ *  that: "a refusal renders ONCE, as a short chip, its sentence behind
+ *  a disclosure", and "method and definitions move behind one
+ *  disclosure per card". These specs assert CONTENT, so they open it,
+ *  and the collapse itself is pinned by its own tests rather than by
+ *  every assertion in this file accidentally depending on it. */
+async function openNotes(page: Page) {
+  const d = page.getByTestId("watched-card-notes");
+  await d.first().waitFor({ state: "attached", timeout: 3000 })
+    .catch(() => { /* no card on this payload carries notes */ });
+  const n = await d.count();
+  for (let i = 0; i < n; i += 1) {
+    const one = d.nth(i);
+    if (await one.evaluate((e) => (e as HTMLDetailsElement).open)) continue;
+    await one.locator("> summary").click();
+  }
 }
 
 async function open(page: Page, strip: unknown, status = 200) {
@@ -2628,6 +2665,7 @@ async function open(page: Page, strip: unknown, status = 200) {
   await page.goto("/bet-suggester");
   await settled;
   await expandCollapsed(page);
+  await openNotes(page);
 }
 
 /** Open the board and wait until the strip has DECIDED.
@@ -2650,10 +2688,15 @@ async function openSettled(page: Page, strip: unknown, status = 200) {
   const resp = await settled;
   await page.waitForTimeout(1000);
   await expandCollapsed(page);
+  await openNotes(page);
   return resp;
 }
 
 const strip = (page: Page) => page.getByTestId("watched-strip");
+/** The one disclosure a card carries: method, definitions, and every
+ *  refusal's own sentence with the registry's gloss on its name. */
+const notes = (page: Page, fixture: number) =>
+  match(page, fixture).getByTestId("watched-card-notes");
 const match = (page: Page, fixture: number) =>
   page.locator(`[data-testid="watched-match"][data-fixture="${fixture}"]`);
 
@@ -2896,12 +2939,21 @@ test("a component the provider did not send reads as absent, never as "
 test("a mid-way join says so, and says the tape before it does not exist",
   async ({ page }) => {
     await open(page, STRIP);
+    // THE ANSWER IS ON THE FACE OF THE CARD, THE WORDS ARE BEHIND ITS
+    // ONE DISCLOSURE. `complete_history` is what a reader needs at a
+    // glance and it is derived from the payload's own boolean; the
+    // coverage prose is method.
     const cover = match(page, 202).getByTestId("watched-coverage");
+    await expect(cover).toHaveAttribute("data-complete", "false");
+    await expect(cover).toContainText("PARTIAL");
     await expect(cover).toContainText("minute 63");
-    await expect(cover).toContainText("NO HISTORY IS NOT A QUIET MATCH");
+    await expect(cover).toContainText("policy joined_in_play");
+    await expect(notes(page, 202))
+      .toContainText("NO HISTORY IS NOT A QUIET MATCH");
     // and the policy code rides under the POLICY vocabulary, not as a
     // refusal — a decision about the set is not a missing number
-    await expect(cover).toContainText("Policy: joined_in_play");
+    await expect(notes(page, 202).getByTestId("watched-coverage-policy"))
+      .toHaveAttribute("data-code", "joined_in_play");
     await expect(match(page, 202).getByTestId("watched-match-refusals"))
       .not.toContainText("joined_in_play");
   });
@@ -2942,7 +2994,9 @@ test("when the exit is withdrawn the P&L is withheld BY NAME, never "
     await expect(pnl).toContainText("thin_bid");
     await expect(pnl).not.toContainText("$");
     await expect(match(page, 202).getByTestId("watched-ledger"))
-      .toContainText("WITHHELD");
+      .toContainText("withheld · thin_bid");
+    await expect(match(page, 202).getByTestId("watched-pnl-withheld-why"))
+      .toContainText("the exit it would be marked against was withdrawn");
   });
 
 // --------------------------------------------------------- 3. branches
@@ -2956,7 +3010,12 @@ test("the expectation is shown WITH the two outcomes behind it",
     await expect(br).toContainText("settles YES — $1.00 a contract");
     await expect(br).toContainText("22.3%");
     await expect(br).toContainText("settles NO — $0.00 a contract");
-    await expect(br).toContainText("a figure the position never actually pays");
+    // THE RULE THAT NAMES WHAT THE EXPECTATION IS — the same sentence
+    // under every position ever priced — is in the card's one
+    // disclosure. The branches themselves, which are the thing the
+    // 2026-09-02 card collapsed into a difference, are NOT.
+    await expect(notes(page, 101))
+      .toContainText("a figure the position never actually pays");
     // the sell side: ONE branch, and it says so
     await expect(br).toContainText("$77.84");
     await expect(br).toContainText("certain — the bid is hit at this tick");
@@ -2970,8 +3029,14 @@ test("a sell branch the book cannot pay refuses by name instead of "
    + "printing a certain figure", async ({ page }) => {
     await open(page, STRIP);
     const refused = match(page, 202).getByTestId("watched-sell-refused");
+    await expect(refused).toHaveAttribute("data-code", "thin_bid");
     await expect(refused).toContainText("thin_bid");
-    await expect(refused).toContainText("no clip is priced in its place");
+    // THE NAME IS ON THE BLOCK, THE SENTENCE IS ONCE IN THE LEDGER.
+    // Printing it here as well is the duplication this card was rebuilt
+    // to end.
+    await expect(notes(page, 202).locator(
+      '[data-testid="watched-refusal-detail"][data-code="thin_bid"]'))
+      .toContainText("no clip is priced in its place");
     // and no whole-position certainty is printed anywhere beside it
     await expect(match(page, 202).getByTestId("watched-branches"))
       .not.toContainText("certain — the bid is hit at this tick");
@@ -2987,10 +3052,16 @@ test("certainty states what the market pays and what it costs, and calls "
       .toContainText("$0.14");
     await expect(c.getByTestId("watched-certainty-cost"))
       .toContainText("cost of certainty");
+    // THE LINE STAYS ON THE FACE OF THE CARD: it is made of THIS
+    // position's own numbers, so the ahead/behind word can be checked
+    // against them. The standing sentences — the dial's own reading and
+    // "this is not a recommendation" — are the same on every position
+    // and are in the card's one disclosure.
     await expect(c.getByTestId("watched-certainty-line"))
       .toContainText("removes a 22.3% chance of $0");
-    await expect(c).toContainText("at or below the 0.0% premium");
-    await expect(c).toContainText("is not a recommendation");
+    await expect(notes(page, 101))
+      .toContainText("at or below the 0.0% premium");
+    await expect(notes(page, 101)).toContainText("is not a recommendation");
   });
 
 test("a certainty that cannot be priced refuses by name and prices no "
@@ -3011,7 +3082,10 @@ test("a position that is BEHIND says certainty is expensive there",
     await expect(g1).toHaveAttribute("data-ahead", "false");
     await expect(g1).toContainText("Certainty is at its most expensive here");
     await expect(g1).toContainText("THIS POSITION IS NOT AHEAD");
-    await expect(g1).toContainText("STRUCTURALLY CANNOT PROTECT LOSSES");
+    // the payload's own standing RULE is one sentence under every
+    // position ever priced, so it is in the card's one disclosure
+    await expect(notes(page, 202))
+      .toContainText("STRUCTURALLY CANNOT PROTECT LOSSES");
   });
 
 test("a position that is AHEAD still carries the asymmetry — it is "
@@ -3019,8 +3093,12 @@ test("a position that is AHEAD still carries the asymmetry — it is "
     await open(page, STRIP);
     const g1 = match(page, 101).getByTestId("watched-g1");
     await expect(g1).toHaveAttribute("data-ahead", "true");
-    await expect(g1).toContainText("CHEAP EXACTLY WHEN YOU ARE WINNING");
+    // G1 STILL RIDES HERE — one line, derived, on a position that is
+    // winning — and the payload's own paragraph is in the disclosure.
+    await expect(g1).toContainText("cheap when you are winning");
     await expect(g1).not.toContainText("Certainty is at its most expensive here");
+    await expect(notes(page, 101))
+      .toContainText("CHEAP EXACTLY WHEN YOU ARE WINNING");
   });
 
 test("a payload with no asymmetry block FAILS CLOSED — a missing block "
@@ -3067,11 +3145,22 @@ test("every refusal code the payload carries is named on the surface, in "
       expect(shown, `refusal ${code} must be named on the strip`)
         .toContain(code);
     }
-    // and the registry's definition rides with the name
+    // AND THE REGISTRY'S DEFINITION RIDES WITH THE NAME — ONCE. It
+    // used to be printed beside every chip, so a code that fired on
+    // four fractions and the whole position carried five copies of the
+    // same paragraph. It now sits in the card's ledger, one row per
+    // code, and the chip carries the name and how many sites produced
+    // it.
+    for (const code of new Set(shown)) {
+      await expect(page.locator(
+        `[data-testid="watched-refusal-detail"][data-code="${code}"]`).first())
+        .toContainText(REFUSAL_CODES[code]!.slice(0, 40));
+    }
+    // A CHIP IS A CHIP: the definition is NOT repeated on it.
     for (const code of new Set(shown)) {
       await expect(page.locator(
         `[data-testid="watched-refusal"][data-code="${code}"]`).first())
-        .toContainText(REFUSAL_CODES[code]!.slice(0, 40));
+        .not.toContainText(REFUSAL_CODES[code]!.slice(0, 40));
     }
   });
 
@@ -3189,8 +3278,11 @@ test("every fraction the payload carries is drawn, in the payload's own "
       await expect(row.getByTestId("watched-fraction-remains")).toBeVisible();
     }
     // the fee is stated per level walked, not as one fee at the average
-    await expect(block).toContainText("PER LEVEL WALKED");
-    await expect(block).toContainText("never one fee at the blended average");
+    // — in the card's one disclosure, because it is the same sentence
+    // under every position on every card
+    await expect(notes(page, 101)).toContainText("PER LEVEL WALKED");
+    await expect(notes(page, 101))
+      .toContainText("never one fee at the blended average");
   });
 
 test("no fraction is highlighted as a suggestion", async ({ page }) => {
@@ -3318,7 +3410,8 @@ test("a row withdrawn on the shared ladder says so, and the figure it "
           "shared_exit_book");
         await expect(row).toHaveAttribute("data-obtainable", "false");
         await expect(row.getByTestId("watched-fraction-refused"))
-          .toContainText("held 2 times");
+          .toContainText("withdrawn");
+        await expect(notes(page, 505)).toContainText("held 2 times");
         // THE ALONE FIGURE IS VISIBLE AND LABELLED AS WITHDRAWN — it is
         // history, not an exit this position can take.
         const alone = row.getByTestId("watched-fraction-realises-withdrawn");
@@ -3353,6 +3446,9 @@ test("an absent partial-exit block is named as absent, not as an "
       .toHaveCount(0);
     const note = position(page, 84)
       .getByTestId("watched-partial-exit-absent");
+    await expect(note).toContainText("ABSENT from this payload");
+    // ABSENT IS NOT REFUSED, and the distinction is in the accessible
+    // tree rather than on a colour or a dash.
     await expect(note).toContainText("not a finding that a clip is unobtainable");
   });
 
@@ -3503,7 +3599,9 @@ test("a cell the grid never measured refuses by name and shows no "
         `[data-testid="watched-map-refusal"][data-where="${name}.your_contract"]`);
       await expect(at).toHaveCount(1);
       await expect(at).toHaveAttribute("data-code", served);
-      await expect(at).toContainText("no pooled or neighbouring one is substituted");
+      await expect(at).toContainText(served);
+      await expect(notes(page, 404))
+        .toContainText("no pooled or neighbouring one is substituted");
     }
   });
 
@@ -3525,8 +3623,10 @@ test("when the map refuses, the branch numbers are absent and the "
     for (const name of names) {
       await expect(map.locator(
         `[data-testid="watched-map-refusal"][data-where="${name}.branch"]`))
-        .toContainText("conditions on the pre-kickoff favourite");
+        .toContainText("thin_book");
     }
+    await expect(notes(page, 505))
+      .toContainText("conditions on the pre-kickoff favourite");
   });
 
 test("the map states how many refusals it counts on itself and how many "
@@ -3542,7 +3642,8 @@ test("the map states how many refusals it counts on itself and how many "
       // derived from the DOM, so a surface that quietly dropped one
       // could not keep claiming it had drawn it
       const drawn = await map.getByTestId("watched-map-refusal").count();
-      await expect(line).toContainText(`${drawn} of them`);
+      await expect(line).toContainText(`${drawn} drawn above`);
+      await expect(line).toHaveAttribute("data-drawn", String(drawn));
       await expect(line).toContainText("this surface does not draw");
     }
   });
@@ -3595,12 +3696,24 @@ test("a payload key this surface has no recorded shape for is NAMED, "
       }),
     };
     await open(page, withKey);
+    // NAMED, AND NOT ON THE OPERATOR'S SURFACE. The record is still
+    // proven both ways — it is in the DOM, keyed, so a guard fails the
+    // day a key arrives with no record — but the finding and its
+    // `closes_when` are bookkeeping about this repo's own unfinished
+    // business and they no longer sit under a live match. They are read
+    // from the exported record instead, which is where they belong.
     const named = match(page, 101).getByTestId("watched-unrendered-key");
-    await expect(named).toBeVisible();
+    await expect(named).toHaveCount(1);
     await expect(named).toHaveAttribute("data-key", "blended_rate");
-    await expect(named).toContainText("no recorded shape for it");
-    await expect(named).toContainText("Closes when:");
-    await expect(named).toContainText("BESIDE the engine's read");
+    await expect(named).not.toBeVisible();
+    expect(UNRENDERED_PAYLOAD_KEYS.blended_rate.finding.length)
+      .toBeGreaterThan(40);
+    expect(UNRENDERED_PAYLOAD_KEYS.blended_rate.closes_when)
+      .toContain("BESIDE the engine's read");
+    // NOT ONE WORD OF THE RECORD IS ON THE CARD
+    const card = await match(page, 101).innerText();
+    expect(card).not.toContain("Closes when");
+    expect(card).not.toContain("m1_conversion_unpublished");
     // and it is still not DRAWN — naming is not rendering
     await expect(match(page, 101).getByTestId("watched-blended-rate"))
       .toHaveCount(0);
@@ -4040,7 +4153,13 @@ test("collapsed is not omitted — every declared match is still in the "
     expect(new Set(drawn))
       .toEqual(new Set(STRIP.matches.map((m) => m.fixture_id)));
 
-    await page.getByTestId("watched-collapsed").locator("summary").click();
+    // DIRECT CHILD, which is what "the group's own control" means. The
+    // cards inside the group now carry their own disclosure (a line's
+    // two sentences had nowhere else to go), so a descendant selector
+    // matches those summaries too. This is the same `> summary` the
+    // disclosure guard below already uses, and it clicks the same
+    // element it always did.
+    await page.getByTestId("watched-collapsed").locator("> summary").click();
     await expect(page.getByTestId("watched-collapsed"))
       .toHaveAttribute("data-open", "true");
     for (const m of STRIP.matches) {
@@ -4269,7 +4388,12 @@ test("a declared fixture the route could not describe is drawn by id "
     const row = page.getByTestId("watched-undescribed-row");
     await expect(row).toHaveAttribute("data-fixture", "777");
     await expect(row).toContainText("unknown_fixture");
-    await expect(row).toContainText("Closes when:");
+    // THE RECORD COMES OFF THE SURFACE. `registered.closes_when` is
+    // bookkeeping about the route's own unfinished business; the
+    // operator's fact — the id, the policy code and its sentence — is
+    // what stays.
+    await expect(row).not.toContainText("Closes when:");
+    await expect(row).toContainText("not one this live plane holds a row for");
     // THE TWO VOCABULARIES STAY DISJOINT: this is a POLICY code about
     // the monitored set, and it is never counted with the refusals.
     await expect(page.getByTestId("watched-undescribed"))
@@ -4361,6 +4485,254 @@ test("with no in-play registry on the payload, the surface makes NO "
       .toHaveCount(0);
   });
 
+// -------------------------- the live card the operator asked for
+//
+// WHAT WAS REPORTED, IN HIS WORDS: "this is the intended live card?" It
+// was not. On a match with NO tape the surface drew four paragraphs and
+// three refusals, EVERY refusal twice — once as the route's coded
+// sentence and once as the registry's definition — and closed with the
+// payload's own registered holes, `closes_when` and all, under a live
+// match. These are the guards for the four things that changed.
+
+/** A declared fixture whose tape read FAILED, with nothing else on it.
+ *  Recorded off api/main.py's own `_state` under `tape_failed`: every
+ *  field withdrawn, `in_play` FAIL-CLOSED false, and the one coded
+ *  refusal it emits. */
+const TAPE_FAILED = {
+  fixture_id: 606, competition_slug: "mls-2026",
+  home: "Portland Timbers", away: "Vancouver Whitecaps",
+  state: {
+    in_play: false, minute: null, score_home: null, score_away: null,
+    clock_display: null, match_state: null, captured_at: null,
+    refusals: [{ code: "tape_unreadable",
+      refused: "tape_unreadable: the state-tape read for this response "
+        + "FAILED (OperationalError), so nothing above was read: "
+        + "`in_play` is FAIL-CLOSED false and is not a measurement. This "
+        + "says nothing about whether the match is running — only that "
+        + "we could not look" }],
+    basis: "NO STATE WAS READ FOR THIS RESPONSE. Every field above is "
+      + "withdrawn, not measured.",
+  },
+  coverage: { monitored: true, complete_history: true,
+              history: "declared before kickoff",
+              no_history_is_not_quiet: NO_HISTORY_IS_NOT_QUIET },
+  read: { version: "live-read-v1", fixture_id: 606, monitored: true,
+          sides: {},
+          words: "no component read has been persisted for this fixture" },
+  positions: [],
+};
+
+/** A declared fixture in a competition the state collector does not
+ *  fold over: the read SUCCEEDED and there is no row. Every field the
+ *  route fills off the row is null and there is NO `tape_unreadable`. */
+const NO_TAPE_COMP = {
+  ...TAPE_FAILED,
+  fixture_id: 707, competition_slug: "liga-mx-2026",
+  home: "Cruz Azul", away: "Santos",
+  state: {
+    in_play: false, minute: null, score_home: null, score_away: null,
+    clock_display: null, match_state: null, captured_at: null,
+    refusals: [
+      { code: "not_in_play",
+        refused: "not_in_play: the tape says this fixture is None, not "
+          + "in play (no state-tape row for this fixture)" },
+      { code: "no_minute",
+        refused: "no_minute: the tape carries no parseable minute "
+          + "(clock_display=None, no state-tape row for this fixture)" },
+      { code: "no_score",
+        refused: "no_score: the tape carries no score for this tick "
+          + "(score_home=None score_away=None) — missing is never "
+          + "zero-zero" },
+    ],
+    basis: "no state-tape row for this fixture",
+  },
+};
+
+/** The collector's own competition fold, where the route publishes it. */
+const FOLD = {
+  in_play_not_declared: {
+    matches: [], counts: { in_play: 0 },
+    coverage: {
+      rows_in_window: 0, fixtures_in_window: 0,
+      collector_folds_over: ["mls-2026", "epl-2026"],
+      models_computed_for: ["mls-2026"],
+    },
+  },
+};
+
+const UNREADABLE = {
+  ...EMPTY, ...FOLD,
+  matches: [TAPE_FAILED, NO_TAPE_COMP],
+  monitored_by_source: { manual: [606, 707] },
+};
+
+test("a match the tape cannot read is ONE LINE, not a card", async ({ page }) => {
+  await open(page, UNREADABLE);
+  await expect(strip(page)).toBeVisible();
+  // BOTH ARE STILL DRAWN AND STILL IN THE RECORD — the collapse is a
+  // DISPLAY, and a match that silently drops off this section is the
+  // defect the stage was reported for.
+  await expect(page.getByTestId("watched-match")).toHaveCount(2);
+  for (const fx of [606, 707]) {
+    await expect(match(page, fx)).toHaveAttribute("data-render", "line");
+    // and not one of the blocks a card carries
+    await expect(match(page, fx).getByTestId("watched-read")).toHaveCount(0);
+    await expect(match(page, fx).getByTestId("watched-coverage"))
+      .toHaveCount(0);
+    await expect(match(page, fx).getByTestId("watched-scoreline"))
+      .toHaveCount(0);
+  }
+  // ONE LINE MEANS ONE LINE. Everything the line does not say is behind
+  // the card's own disclosure, and the line itself is short.
+  const line = await match(page, 707).getByTestId("watched-match-oneline")
+    .innerText();
+  expect(line.length).toBeLessThan(140);
+});
+
+test("no tape for this competition and a tape read that FAILED never "
+   + "read the same", async ({ page }) => {
+    await open(page, UNREADABLE);
+    // THE READ FAILED — we could not look, and nothing is ruled out.
+    const failed = match(page, 606).getByTestId("watched-match-oneline");
+    await expect(failed).toHaveAttribute("data-tape", "failed");
+    await expect(failed).toContainText("FAILED");
+    await expect(match(page, 606)).toHaveAttribute("data-tape", "failed");
+    // THE READ SUCCEEDED AND NOTHING TAPES THIS COMPETITION — a
+    // different fact, and it is DERIVED from the collector's own fold
+    // on the payload rather than guessed from an empty row.
+    const none = match(page, 707).getByTestId("watched-match-oneline");
+    await expect(none).toHaveAttribute("data-tape", "no_row");
+    await expect(none).toContainText("no state tape for this competition");
+    await expect(none).not.toContainText("FAILED");
+  });
+
+test("with no collector fold on the payload the surface makes NO claim "
+   + "about the competition", async ({ page }) => {
+    // NULL MEANS NO CLAIM. Without the published fold, "we tape it and
+    // it wrote nothing" and "nothing tapes it" cannot be told apart, so
+    // neither is asserted — the venue-class failure, refused.
+    await open(page, { ...EMPTY, matches: [NO_TAPE_COMP],
+                       monitored_by_source: { manual: [707] } });
+    const none = match(page, 707).getByTestId("watched-match-oneline");
+    await expect(none).toContainText("no state-tape row for this fixture");
+    await expect(none).not.toContainText("this competition");
+  });
+
+test("a match with a POSITION on it is never collapsed to a line, "
+   + "however silent the tape", async ({ page }) => {
+    // A FIGURE IS NEVER COLLAPSED INTO A LINE ABOUT THE TAPE. The
+    // collapse exists to stop 37 empty matches burying the one being
+    // played; it must not swallow a position.
+    const held = { ...TAPE_FAILED, fixture_id: 606,
+                   positions: AHEAD.positions };
+    await open(page, { ...EMPTY, ...FOLD, matches: [held],
+                       monitored_by_source: { manual: [606] } });
+    await expect(match(page, 606)).toHaveAttribute("data-render", "card");
+    await expect(match(page, 606).getByTestId("watched-position"))
+      .toHaveCount(1);
+    // and the card still says the tape could not be read
+    await expect(match(page, 606).getByTestId("watched-match-oneline"))
+      .toHaveAttribute("data-tape", "failed");
+  });
+
+test("a refusal renders ONCE — one chip per code, not one per site and "
+   + "not twice per site", async ({ page }) => {
+    await open(page, STRIP);
+    await expect(page.getByTestId("watched-refusal").first()).toBeVisible();
+    // DERIVED FROM THE DOM, BOTH SIDES. Within one position, the number
+    // of chips is the number of DISTINCT codes on it — a code that
+    // fired on four fractions and on the whole position is one finding
+    // and reads as one.
+    let checked = 0;
+    for (const m of STRIP.matches) {
+      for (const pos of m.positions) {
+        const bet = (pos.journal_entry as { bet_id: number }).bet_id;
+        const chips = position(page, bet).getByTestId("watched-refusal");
+        const codes = await chips.evaluateAll((els) =>
+          els.map((e) => e.getAttribute("data-code")!));
+        expect(new Set(codes).size, `position #${bet} repeats a chip`)
+          .toBe(codes.length);
+        // and where a code fired more than once, the chip SAYS how many
+        // rather than being drawn again
+        for (const chip of await chips.all()) {
+          const sites = Number(await chip.getAttribute("data-sites"));
+          expect(sites).toBeGreaterThan(0);
+          if (sites > 1) {
+            await expect(chip).toContainText(`×${sites}`);
+            checked += 1;
+          }
+        }
+      }
+    }
+    expect(checked, "non-vacuity: some code must have fired more than "
+      + "once on one position").toBeGreaterThan(0);
+    // AND THE SENTENCE IS NOT ON THE CHIP AT ALL. This is the half the
+    // operator reported: the coded sentence and the registry definition
+    // both rode beside every name.
+    for (const chip of await page.getByTestId("watched-refusal").all()) {
+      expect((await chip.innerText()).length,
+        "a chip is a name, not a paragraph").toBeLessThan(120);
+    }
+  });
+
+test("no sentence the payload writes is drawn twice on one card",
+  async ({ page }) => {
+    // THE DUPLICATION THAT WAS REPORTED, GUARDED DIRECTLY. Every
+    // standing rule — BRANCHES_NOT_AVERAGES, the fee basis, the
+    // category rule, "a map, not a verdict" — rides on the payload
+    // under every block that carries one, and each used to be drawn
+    // once per block and once per fraction.
+    await open(page, STRIP);
+    for (const m of STRIP.matches) {
+      const seen = await notes(page, m.fixture_id).getByTestId("watched-note")
+        .evaluateAll((els) => els.map((e) => e.textContent!.trim()));
+      expect(new Set(seen).size, `card ${m.fixture_id} repeats a note`)
+        .toBe(seen.length);
+      expect(seen.length, `card ${m.fixture_id} must carry notes`)
+        .toBeGreaterThan(0);
+      // and a note is never ALSO drawn on the face of the card
+      const face = await match(page, m.fixture_id).evaluate((el) => {
+        const d = el.querySelector('[data-testid="watched-card-notes"]');
+        const clone = el.cloneNode(true) as HTMLElement;
+        clone.querySelector('[data-testid="watched-card-notes"]')?.remove();
+        return d ? clone.textContent! : el.textContent!;
+      });
+      for (const note of seen) {
+        expect(face, `card ${m.fixture_id} draws a note twice: ${
+          note.slice(0, 50)}`).not.toContain(note);
+      }
+    }
+  });
+
+test("the method and the definitions are behind ONE disclosure per card, "
+   + "in the accessible tree", async ({ page }) => {
+    await routes(page, STRIP);
+    const settled = page.waitForResponse((r) => r.url().includes(STRIP_URL));
+    await page.goto("/bet-suggester");
+    await settled;
+    await expandCollapsed(page);
+    // NOT OPENED. This is the state a reader arrives in.
+    for (const m of STRIP.matches) {
+      await expect(notes(page, m.fixture_id)).toHaveCount(1);
+    }
+    // A DISCLOSURE, NOT A TOOLTIP: the summary is a real control with
+    // real text, and the content is markup rather than a title
+    // attribute. Nothing on this surface carries meaning on an
+    // attribute — the separate `title` guard proves that half.
+    const sum = notes(page, 101).locator("> summary");
+    await expect(sum).toBeVisible();
+    await expect(sum).toContainText("method");
+    await expect(sum).toContainText("definitions");
+    // CLOSED ON ARRIVAL, and the card above it is short because of it.
+    expect(await notes(page, 101).evaluate(
+      (e) => (e as HTMLDetailsElement).open)).toBe(false);
+    await sum.click();
+    expect(await notes(page, 101).evaluate(
+      (e) => (e as HTMLDetailsElement).open)).toBe(true);
+    await expect(notes(page, 101).getByTestId("watched-note").first())
+      .toBeVisible();
+  });
+
 // ---------------------------- the envelope's registered holes
 
 test("the three envelope sets are disjoint — a registered hole cannot be "
@@ -4397,10 +4769,14 @@ test("an envelope key no set accounts for is NAMED on the surface",
     // envelope block while this surface was being written; the next one
     // announces itself instead of vanishing.
     await open(page, { ...STRIP, some_new_block: { note: "unrecorded" } });
+    // IT FAILS LOUDLY WHERE FAILING LOUDLY BELONGS: in the DOM, for a
+    // guard, not as a paragraph under an operator's live matches. The
+    // key is named, keyed and NOT drawn.
     const un = page.getByTestId("watched-envelope-unaccounted");
-    await expect(un).toBeVisible();
+    await expect(un).toHaveCount(1);
     await expect(un).toHaveAttribute("data-keys", "some_new_block");
-    await expect(un).toContainText("no record of it at all");
+    await expect(un).not.toBeVisible();
+    expect(await strip(page).innerText()).not.toContain("some_new_block");
   });
 
 test("a registered envelope hole that ARRIVES is named with the "
@@ -4419,9 +4795,16 @@ test("a registered envelope hole that ARRIVES is named with the "
       },
     });
     const reg = page.getByTestId("watched-envelope-registered");
-    await expect(reg).toBeVisible();
-    await expect(reg).toContainText("in_play_not_declared");
-    await expect(reg).toContainText("Closes when:");
+    await expect(reg).toHaveCount(1);
+    await expect(reg).toHaveAttribute("data-keys", "in_play_not_declared");
+    // THE RECORD IS INTACT AND IT IS OFF THE SURFACE. It is read from
+    // the exported registry, which is where a guard reads it and where
+    // it cannot be mistaken for something an operator is meant to act
+    // on mid-match.
+    await expect(reg).not.toBeVisible();
+    expect(UNRENDERED_ENVELOPE_KEYS.in_play_not_declared.closes_when.length)
+      .toBeGreaterThan(40);
+    expect(await strip(page).innerText()).not.toContain("Closes when");
     // NAMING IS NOT RENDERING: no match block is drawn for a fixture
     // that arrived inside a shape this surface has never been shown.
     await expect(match(page, 8888)).toHaveCount(0);
@@ -4430,4 +4813,296 @@ test("a registered envelope hole that ARRIVES is named with the "
     // and nothing unaccounted-for rode in with it
     await expect(page.getByTestId("watched-envelope-unaccounted"))
       .toHaveCount(0);
+  });
+
+// ---------------------------- ROUND 5: the same shape, one reader over
+//
+// Every test below is a SHAPE this file had already closed somewhere
+// else and left open here. None of them is a new rule.
+
+test("a payload with no `matches` key is an ANSWER WE COULD NOT READ, "
+   + "not an empty board", async ({ page }) => {
+    // THE FIX HELD ONE FILE OVER AND NOT IN THIS ONE. WatchDeclaration
+    // closed exactly this fold for the declared set ("Absence of the
+    // list is not a list of nothing") and named the answer
+    // `setIsReadable`; this component kept `data.matches ?? []`, which
+    // turns "the payload carried no matches key" into "no match is
+    // declared" and then renders NOTHING — the blank Live section that
+    // reads as "there is nothing live", which is the single conclusion
+    // this whole surface exists against.
+    await openSettled(page, omit(EMPTY, "matches"));
+    await expect(strip(page)).toBeVisible();
+    const said = page.getByTestId("watched-lists-unreadable");
+    await expect(said).toBeVisible();
+    await expect(said).toHaveAttribute("data-keys", "matches");
+    // AND IT CLAIMS NOTHING ABOUT THE SET. Not "0 declared", not "no
+    // match is live" — the count it would have printed is the thing it
+    // could not read.
+    await expect(said).toContainText("NOTHING HERE SAYS THE SET IS EMPTY");
+    await expect(page.getByTestId("watched-match")).toHaveCount(0);
+  });
+
+test("a payload with no `open_positions_not_monitored` is named, not "
+   + "counted as none held", async ({ page }) => {
+    // THE CENSUS-OF-NOTHING FINDING, ONE KEY OVER. An absent list drew
+    // no orphan banner at all, which reads as "no open position is
+    // undeclared" — a claim about a set nobody counted.
+    await openSettled(page, omit(STRIP, "open_positions_not_monitored"));
+    await expect(strip(page)).toBeVisible();
+    await expect(page.getByTestId("watched-lists-unreadable"))
+      .toHaveAttribute("data-keys", "open_positions_not_monitored");
+    await expect(page.getByTestId("watched-orphans")).toHaveCount(0);
+    // the matches it COULD read are still drawn — degrading the whole
+    // surface over one missing list would be the other failure
+    await expect(page.getByTestId("watched-match"))
+      .toHaveCount(STRIP.matches.length);
+  });
+
+test("every list the surface counts is a key the envelope partition "
+   + "accounts for", async () => {
+    // DERIVED FROM THE REGISTRY ON BOTH SIDES. A required list that no
+    // envelope set claims would be counted by this surface and
+    // unaccounted for by its own partition at the same time.
+    for (const k of REQUIRED_LISTS) {
+      expect(CONSUMED_ENVELOPE_KEYS, `${k} is counted but not consumed`)
+        .toContain(k);
+    }
+    expect(REQUIRED_LISTS.length).toBeGreaterThan(1);
+  });
+
+test("a read block with no sides AND no words is a payload that said "
+   + "nothing — this surface does not answer for it", async ({ page }) => {
+    // THE INVENTED ABSENCE. The fallback here used to be
+    // live_read.read_for_fixture's OWN absent-case sentence, typed into
+    // the component — so a payload carrying no words at all rendered a
+    // positive statement about the collector ("no component read has
+    // been persisted for this fixture") that nothing on the response
+    // supports, in the same ink and under the same testid as the
+    // backend's own words.
+    const mute = { ...AHEAD, read: { version: "live-read-v1",
+      fixture_id: AHEAD.fixture_id, monitored: true, sides: {} } };
+    await open(page, { ...EMPTY, matches: [mute],
+                       monitored_by_source: { manual: [mute.fixture_id] } });
+    const absent = match(page, mute.fixture_id)
+      .getByTestId("watched-read-absent");
+    await expect(absent).toHaveAttribute("data-source", "unstated");
+    await expect(absent).not.toContainText("has been persisted");
+    await expect(absent).toContainText("no words for its absence");
+    // and the payload's OWN words, where they exist, are still its own
+    await expect(match(page, 303).getByTestId("watched-read-absent"))
+      .toHaveCount(0);
+  });
+
+test("the payload's own words for an absent read are marked as the "
+   + "payload's", async ({ page }) => {
+    // NON-VACUITY FOR THE TEST ABOVE: `data-source` must actually
+    // separate the two, or "unstated" proves nothing.
+    await open(page, STRIP);
+    const absent = match(page, 303).getByTestId("watched-read-absent");
+    await expect(absent).toHaveAttribute("data-source", "payload");
+    await expect(absent).toContainText("has been persisted");
+  });
+
+test("an empty positions list with NO note is an answer that was not "
+   + "given, not a finding that nothing is held", async ({ page }) => {
+    // api/main.py `_positions` puts journal.held_positions' own
+    // `refused` wording on `positions_note` WHENEVER the list is empty,
+    // so an empty list with nothing beside it is a payload that did not
+    // answer. This branch used to print "nothing is held on this
+    // fixture" — the louder of the two claims, in this file's words.
+    const none = { ...AHEAD, positions: [] };
+    await open(page, { ...EMPTY, matches: [none],
+                       monitored_by_source: { manual: [none.fixture_id] } });
+    const row = match(page, none.fixture_id).getByTestId("watched-no-position");
+    await expect(row).toHaveAttribute("data-note", "unstated");
+    await expect(row).not.toContainText("nothing is held");
+    await expect(row).toContainText("no words for that");
+  });
+
+test("the journal read's own note is drawn as the payload's", async ({ page }) => {
+    // NON-VACUITY, and the case that matters most: a journal read that
+    // FAILED arrives on this key and must reach the surface verbatim.
+    const said = { ...AHEAD, positions: [],
+      positions_note: "the journal read for fixture 101 FAILED "
+        + "(OperationalError) — no position is reported, and that is "
+        + "not a finding that none is held" };
+    await open(page, { ...EMPTY, matches: [said],
+                       monitored_by_source: { manual: [said.fixture_id] } });
+    const row = match(page, said.fixture_id).getByTestId("watched-no-position");
+    await expect(row).toHaveAttribute("data-note", "payload");
+    await expect(row).toContainText("FAILED");
+  });
+
+test("a ONE-LINE match still carries both other reads, and its summary "
+   + "claims nothing about them", async ({ page }) => {
+    // THE LINE IS TAKEN ON `positions.length === 0 && sides === {}`,
+    // and BOTH of those are also what a journal read that FAILED and a
+    // live read that FAILED look like. The summary above them read
+    // "why there is nothing to read here" — an assertion about two
+    // reads that may never have happened — and the two sentences
+    // themselves had no home on a line, so they fell through
+    // proseNotes' length threshold: an unlabelled grey method note if
+    // long enough, out of the DOM if not.
+    await open(page, UNREADABLE);
+    const line = match(page, 707);
+    await expect(line).toHaveAttribute("data-render", "line");
+    const sum = line.getByTestId("watched-card-notes").locator("> summary");
+    await expect(sum).not.toContainText("nothing to read");
+    await expect(line.getByTestId("watched-line-read")).toHaveCount(1);
+    await expect(line.getByTestId("watched-line-positions")).toHaveCount(1);
+    // NEITHER IS CLASSIFIED, because neither can be: the payload gives
+    // one untyped string for two opposite facts, which is registered.
+    await expect(line.getByTestId("watched-line-read"))
+      .toHaveAttribute("data-source", "payload");
+    await expect(line.getByTestId("watched-line-positions"))
+      .toHaveAttribute("data-note", "unstated");
+  });
+
+test("a SHORT note on a one-line match reaches the surface — the prose "
+   + "walk's length threshold does not decide what is drawn",
+  async ({ page }) => {
+    // THE SILENT DROP. `proseNotes` keeps a string only at
+    // NOTE_MIN_CHARS or longer, which is the right rule for a method
+    // note and the wrong one for a finding. A short journal answer on
+    // a collapsed match used to leave the DOM entirely.
+    const short = { ...NO_TAPE_COMP, positions_note: "journal read failed" };
+    await open(page, { ...EMPTY, ...FOLD, matches: [short],
+                       monitored_by_source: { manual: [707] } });
+    await expect(match(page, 707)).toHaveAttribute("data-render", "line");
+    await expect(match(page, 707).getByTestId("watched-line-positions"))
+      .toContainText("journal read failed");
+  });
+
+// ------------------- the absence this surface cannot tell from a failure
+
+test("every uncoded-absence record carries a finding AND the condition "
+   + "that closes it", async () => {
+    for (const [k, v] of Object.entries(UNCODED_ABSENCE_KEYS)) {
+      expect(v.finding.length, `${k} has no finding`).toBeGreaterThan(40);
+      expect(v.closes_when.length, `${k} has no closes_when`)
+        .toBeGreaterThan(40);
+      // the closing condition is the SHAPE the tape's own failure
+      // already has — a code in the registry the payload ships
+      expect(v.closes_when).toContain("REFUSAL_CODES");
+    }
+    expect(Object.keys(UNCODED_ABSENCE_KEYS).length).toBeGreaterThan(1);
+  });
+
+test("the keys that carry an uncoded absence are named as DATA, off the "
+   + "surface", async ({ page }) => {
+    await open(page, STRIP);
+    // 303 carries the read's own words and no journal note.
+    const node = match(page, 303).getByTestId("watched-uncoded-absence");
+    await expect(node).toHaveCount(1);
+    await expect(node).not.toBeVisible();
+    await expect(node).toHaveAttribute("data-keys", /read\.words/);
+    // NOTHING IS CLOSED, so nothing claims to be.
+    await expect(node).toHaveAttribute("data-closed", "");
+    // and the record itself is nowhere on the operator's surface
+    const face = await strip(page).innerText();
+    expect(face).not.toContain("closes_when");
+    expect(face).not.toContain("uncoded");
+  });
+
+test("a registered uncoded absence that gets a CODE is named as closed "
+   + "while its record still stands", async ({ page }) => {
+    // THE GUARD THAT FAILS THE OTHER WAY. The day the route codes the
+    // live read's failure the way it codes the tape's, this record must
+    // be retired — and until it is, the surface says so as data.
+    // ANY name the SERVED registry defines. `stale_quote` is one; the
+    // point is that the code is registered, not which one it is.
+    const coded = { ...UNKNOWN_SIDE, read: { ...UNKNOWN_SIDE.read,
+      refusal_code: "stale_quote" } };
+    await open(page, { ...EMPTY, matches: [coded],
+                       monitored_by_source: { manual: [303] } });
+    await expect(match(page, 303).getByTestId("watched-uncoded-absence"))
+      .toHaveAttribute("data-closed", "read.words");
+    // DERIVED, NOT MATCHED BY NAME: a code the payload's own registry
+    // does not define closes nothing.
+    const bogus = { ...UNKNOWN_SIDE, read: { ...UNKNOWN_SIDE.read,
+      refusal_code: "some_name_no_registry_defines" } };
+    await open(page, { ...EMPTY, matches: [bogus],
+                       monitored_by_source: { manual: [303] } });
+    await expect(match(page, 303).getByTestId("watched-uncoded-absence"))
+      .toHaveAttribute("data-closed", "");
+  });
+
+// ------------------------------------------------ ink is not a verdict
+
+test("up/neg ink is used at exactly ONE place on this surface, and it "
+   + "is the P&L figure", async ({ page }) => {
+    // FLOODLIT, AND THE STAGE'S OWN RULE. Gold is brand and never a
+    // verdict; the cost of certainty is deliberately plain ink because
+    // colouring "it is free to take certainty" green would be this
+    // surface making the recommendation the stage refuses to make.
+    // HOLD-EXIT-DESIGN section 8 says of this component: "only two ink
+    // families are used — plain ink for figures, `warn` for refusals.
+    // No gold, no up/down colour". It is not true today: the P&L
+    // figure is coloured by sign. That is a judgement the operator
+    // owns — a mark-to-market is a state of the position, not an
+    // opinion about a trade — so this guard does not change it. It
+    // ENUMERATES it, so a SECOND up/neg figure cannot appear silently
+    // and read as this surface calling a clip good.
+    await open(page, STRIP);
+    const tinted = await strip(page).evaluateAll((els) => {
+      const out: string[] = [];
+      for (const root of els) {
+        for (const el of Array.from(root.querySelectorAll("*"))) {
+          const c = el.getAttribute("class") ?? "";
+          if (/(^|[\s:])text-(up|neg)(\s|$)/.test(c)) {
+            out.push(el.getAttribute("data-testid") ?? `<${
+              el.tagName.toLowerCase()} class="${c}">`);
+          }
+        }
+      }
+      return out;
+    });
+    expect(tinted.length, "non-vacuity: the served payload must colour "
+      + "at least one figure by sign").toBeGreaterThan(0);
+    expect([...new Set(tinted)]).toEqual(["watched-pnl"]);
+  });
+
+// ------------------------------------------------ missing is never zero
+
+test("a ladder with a resting total and NO level list does not print "
+   + "0 levels", async ({ page }) => {
+    // MISSING IS NEVER ZERO, on the line that says what the fractions
+    // below were walked against. `book.levels?.length ?? 0` drew an
+    // absent level list and a measured empty one in the same words.
+    const pe = AHEAD.positions[0].partial_exit as Record<string, unknown>;
+    const book = pe.book as Record<string, unknown>;
+    const noLevels = { ...AHEAD, positions: [{ ...AHEAD.positions[0],
+      partial_exit: { ...pe, book: omit(book, "levels") } }] };
+    await open(page, { ...EMPTY, matches: [noLevels],
+                       monitored_by_source: { manual: [101] } });
+    const line = match(page, 101).getByTestId("watched-partial-exit-book");
+    await expect(line).not.toContainText("0 level(s)");
+    await expect(line).toContainText("did not carry");
+  });
+
+test("an EMPTY band array is not a band — one reader for both places "
+   + "that draw one", async ({ page }) => {
+    // A BOOLEAN OVER AN EMPTY SET IS NOT A FACT — the corollary this
+    // stage already paid for twice (`clips.holds` true over zero clips,
+    // `ladder_pays_every_fraction` = all([])). `band.every(x => x !=
+    // null)` is TRUE for `[]`, so a quantity whose band array arrived
+    // empty printed " · band []" beside its n. The map's own reader,
+    // `bandText`, has required two non-null endpoints since it was
+    // written; the branch view used its own check and got it wrong.
+    const bv = AHEAD.positions[0].branch_view as Record<string, unknown>;
+    const hold = bv.hold as Record<string, unknown>;
+    const grid = hold.conditioned_grid as Record<string, unknown>;
+    const q = grid.quantity as Record<string, unknown>;
+    const empty = { ...AHEAD, positions: [{ ...AHEAD.positions[0],
+      branch_view: { ...bv, hold: { ...hold, conditioned_grid: {
+        ...grid, quantity: { ...q, band: [] } } } } }] };
+    await open(page, { ...EMPTY, matches: [empty],
+                       monitored_by_source: { manual: [101] } });
+    const held = match(page, 101).getByTestId("watched-branches");
+    await expect(held).toContainText("n=");
+    await expect(held).not.toContainText("band []");
+    // NON-VACUITY: a real band still draws, from the same reader.
+    await open(page, STRIP);
+    await expect(match(page, 101).getByTestId("watched-branches"))
+      .toContainText("band [");
   });

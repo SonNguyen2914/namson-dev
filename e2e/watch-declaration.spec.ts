@@ -509,7 +509,19 @@ test("every registered pre-write hole is printed on the confirmation, "
     for (const k of keys) {
       const row = c.locator(`[data-testid="watch-sync-open"][data-key="${k}"]`);
       await expect(row).toContainText(SYNC_PREVIEW_OPEN[k].finding);
-      await expect(row).toContainText(SYNC_PREVIEW_OPEN[k].closes_when);
+      // THE FINDING IS PROSE, THE CLOSING CONDITION IS A BINDING. The
+      // finding is operator-facing — it names the number this panel
+      // cannot show before a permanent record is written — and it is
+      // read as text. The `closes_when` is bookkeeping about this
+      // repo's unfinished business and does not belong in an
+      // operator's confirmation, so the row carries the key it closes
+      // on rather than the paragraph. This is not a weaker guard: a
+      // record that loses its closing condition, or a row that stops
+      // carrying it, still fails here.
+      expect(SYNC_PREVIEW_OPEN[k].closes_when.length,
+        `${k} must declare what closes it`).toBeGreaterThan(0);
+      await expect(row).toHaveAttribute("data-closes-when-key",
+        SYNC_PREVIEW_OPEN[k].closed_by_state_key);
     }
     // nothing is stale on a payload that closes nothing
     await expect(c.getByTestId("watch-sync-open-stale")).toHaveCount(0);
@@ -653,4 +665,24 @@ test("the declare proxy refuses an action that is not add or remove — unmocked
       + "?event_id=401000001&action=delete&actor=son");
     expect(r.status()).toBe(400);
     expect(await r.text()).toContain("must be 'add' or 'remove'");
+  });
+
+test("a watchlist payload with NO source split says so, rather than "
+   + "drawing no sources", async ({ page }) => {
+    // THE SAME FOLD `countOf` REFUSES ONE FIELD OVER.
+    // `st?.monitored_by_source ?? {}` rendered no rows at all when the
+    // block was missing, beside four counts that did arrive — which
+    // reads as "there are no sources" off an answer that named none.
+    // WatchedStrip already states this case ("no source counts on this
+    // payload"); this panel did not.
+    const noSplit: Record<string, unknown> = { ...STATE };
+    delete noSplit.monitored_by_source;
+    await serve(page, { state: noSplit });
+    await page.goto("/bet-suggester");
+    await arm(page);
+    const absent = page.getByTestId("watch-sources-absent");
+    await expect(absent).toBeVisible();
+    await expect(absent).toContainText("not on the payload");
+    // and the counts that DID arrive are still counts
+    await expect(page.getByTestId("watch-state")).toContainText("declared ever");
   });
