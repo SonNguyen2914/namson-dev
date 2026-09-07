@@ -43,10 +43,22 @@
 //
 // SON'S INVARIANT, AND WHAT THIS FILE OWES IT: "any matches that is
 // selected at any moment while it is still in play to be in the Live
-// section". Every declared match is drawn — nothing on this surface
-// filters — and the ones whose state block says in_play are drawn FIRST,
-// in their own group, each marked in real text. A match that silently
-// drops off this section is the bug.
+// section". Every declared match is drawn — nothing on this surface is
+// filtered out of the record or out of the DOM — and the ones whose
+// state block says in_play are drawn FIRST, in their own group, each
+// marked in real text. A match that silently drops off this section is
+// the bug.
+//
+// AND THE SECOND HALF OF THE SAME INVARIANT, ADDED 2026-09-06. Of 38
+// declared, 17 carried a coverage row saying in its own words "there is
+// no read left to run", 20 had no establishable phase, and ONE had the
+// ball moving in it. Drawing all 38 in full buries the one this stage
+// exists for. Son: "I just want it to be the only match to watch". So
+// the DISPLAY collapses and the RECORD does not: the in-play group is
+// expanded, everything else sits inside one disclosure whose summary is
+// always visible, always carries the total, and always says what those
+// matches are in the TAPE'S OWN WORDS. Absent, collapsed and omitted
+// are three different things; the count is what keeps them apart.
 //
 // FOUR RULES THIS FILE IS RESPONSIBLE FOR, each paid for elsewhere:
 //
@@ -479,24 +491,14 @@ export default function WatchedStrip() {
           </section>
         )}
         {rest.length > 0 && (
-          <section aria-labelledby="watched-group-not-in-play"
-            className="space-y-5">
-            <p id="watched-group-not-in-play" data-testid="watched-group"
-              data-group="not_in_play" data-count={rest.length}
-              className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
-              not in play on the tape · {rest.length}
-              <span className="sr-only">
-                {" "}— still declared and still drawn in full. A fixture
-                that has not kicked off carries the map it was bought
-                against, and a fixture whose tape could not be read says
-                so by name; neither is dropped from this section.
-              </span>
-            </p>
-            {rest.map((m) => (
-              <MatchBlock key={m.fixture_id} m={m} registry={registry}
-                policyCodes={data.policy_codes ?? {}}
-                inPlayStates={inPlayStates} />
-            ))}
+          <section aria-labelledby="watched-group-not-in-play">
+            <CollapsedGroup ms={rest} startOpen={live.length === 0}>
+              {rest.map((m) => (
+                <MatchBlock key={m.fixture_id} m={m} registry={registry}
+                  policyCodes={data.policy_codes ?? {}}
+                  inPlayStates={inPlayStates} />
+              ))}
+            </CollapsedGroup>
           </section>
         )}
       </div>
@@ -517,6 +519,138 @@ export default function WatchedStrip() {
  *  does not mean the match is quiet, and the card says which of its
  *  fields are missing by name. */
 const isInPlay = (m: WatchedMatch): boolean => m.state?.in_play === true;
+
+/** The tape's OWN WORD for this match, verbatim, or a named absence.
+ *
+ *  THE PROVIDER'S VOCABULARY, NEVER THIS FILE'S. Nothing here maps a
+ *  value to a class, folds an unrecognised one into a meaningful one,
+ *  or decides what any word means — `post` is printed because the tape
+ *  said `post`. A row with no value at all gets its own bucket that
+ *  says exactly that, because "the tape said nothing" and "the tape
+ *  said something we do not recognise" are different facts and neither
+ *  is "not in play". */
+export function tapeWordOf(m: WatchedMatch): string {
+  const w = m.state?.match_state;
+  return (typeof w === "string" && w !== "") ? w
+    : "(no match_state on the tape row)";
+}
+
+/** How many of these matches carry the `tape_unreadable` refusal.
+ *
+ *  COUNTED APART, AND DELIBERATELY NOT A BUCKET. `tape_unreadable` is a
+ *  position.REFUSAL_CODES name — a number that could not be PRODUCED —
+ *  and the tally above is the tape's own vocabulary. Counting one as
+ *  the other is the two-vocabularies rule this file is responsible for,
+ *  so this rides as a SUBSET of the tally rather than beside it: a
+ *  failed read also carries no match_state, so it is already inside the
+ *  "(no match_state on the tape row)" bucket, and adding it as a
+ *  seventh bucket would count it twice and break the partition. */
+const unreadableCount = (ms: WatchedMatch[]): number =>
+  ms.filter((m) => (m.state?.refusals ?? [])
+    .some((r) => r?.code === "tape_unreadable")).length;
+
+/** The tally, in the payload's own order of first appearance. */
+function tapeTally(ms: WatchedMatch[]): { word: string; n: number }[] {
+  const out: { word: string; n: number }[] = [];
+  for (const m of ms) {
+    const w = tapeWordOf(m);
+    const hit = out.find((x) => x.word === w);
+    if (hit) hit.n += 1; else out.push({ word: w, n: 1 });
+  }
+  return out;
+}
+
+/** THE DECLARED MATCHES THE TAPE CANNOT READ RIGHT NOW — COLLAPSED,
+ *  NEVER OMITTED, AND NEVER FILTERED OUT OF THE RECORD.
+ *
+ *  WHAT WAS REPORTED. 38 declared: 17 whose coverage row says in its
+ *  own words "there is no read left to run", 20 whose phase could not
+ *  be established at all, and ONE with the ball moving in it. Son: "I
+ *  just want it to be the only match to watch". Drawing all 38 in full
+ *  buries the one this stage exists for under 37 that have no read to
+ *  show.
+ *
+ *  WHAT IS AND IS NOT DONE ABOUT IT. Nothing is filtered from the
+ *  RECORD: the backend still sends every declared fixture
+ *  (WATCHED_STRIP_EVERY_MATCH_IS_DRAWN) and this surface still receives
+ *  and renders every one of them. What changes is the DISPLAY: the
+ *  matches the tape says are in play stay expanded, and the rest sit
+ *  inside one disclosure. ABSENT, COLLAPSED AND OMITTED ARE THREE
+ *  DIFFERENT THINGS, and the count is what keeps them apart — the
+ *  summary is always visible, always carries the total, and always says
+ *  WHAT they are in the tape's own words. A reader who never opens it
+ *  still knows how many there are and what the tape calls each of them,
+ *  which is strictly more than the flat list told them.
+ *
+ *  IT OPENS ITSELF WHEN THERE IS NOTHING ELSE TO LOOK AT. With no
+ *  in-play match, collapsing the whole section would leave a summary
+ *  line where the surface used to be — so the disclosure starts open.
+ *  That is a display judgement and it is written here rather than
+ *  buried: the collapse exists to stop the live match being buried, and
+ *  with no live match there is nothing to bury it. */
+function CollapsedGroup({ ms, startOpen, children }: {
+  ms: WatchedMatch[]; startOpen: boolean; children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(startOpen);
+  const tally = tapeTally(ms);
+  const unread = unreadableCount(ms);
+  return (
+    <details data-testid="watched-collapsed" data-open={open ? "true" : "false"}
+      open={open}
+      onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}
+      className="rounded-xl border border-line bg-bs/40">
+      <summary className="cursor-pointer list-none px-4 py-3">
+        {/* THE COUNT IS ALWAYS VISIBLE. It carries the same testid and
+            the same data-count as the expanded group above it, so the
+            partition guard reads both the same way and a collapsed
+            group can never be mistaken for a shorter set. */}
+        <p id="watched-group-not-in-play" data-testid="watched-group"
+          data-group="not_in_play" data-count={ms.length}
+          className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
+          <span aria-hidden className="mr-1.5">{open ? "▾" : "▸"}</span>
+          not in play on the tape · {ms.length}
+          <span className="sr-only">
+            {" "}— still declared, still on the record and still sent by
+            the backend, which filters nothing. They are COLLAPSED here
+            rather than dropped: {open ? "this list is open" : "open this"}
+            {" "}to see each one in full, with the map a fixture was
+            bought against and every refusal by name.
+          </span>
+        </p>
+        {/* WHAT THEY ARE, IN THE TAPE'S OWN WORDS. Derived by counting
+            the payload's `match_state` values; no word here is mapped,
+            classified or renamed, and a row with no value at all says
+            that rather than being folded into one that has one. */}
+        <p data-testid="watched-collapsed-tally"
+          data-tally={tally.map((t) => `${t.word}=${t.n}`).join(",")}
+          className="mt-1 font-mono text-[10px] text-ink-faint">
+          {tally.map((t) => `${t.word} ${t.n}`).join(" · ")}
+          <span className="sr-only">
+            {" "}— counted by the newest state-tape row&apos;s own
+            match_state, printed verbatim as the provider wrote it. This
+            surface classifies none of them.
+          </span>
+        </p>
+        {unread > 0 && (
+          <p data-testid="watched-collapsed-unreadable" data-count={unread}
+            className="mt-1 font-mono text-[10px] text-warn">
+            of these, {unread} could not be read at all — refusal
+            tape_unreadable
+            <span className="sr-only">
+              {" "}— a subset of the tally above and not a bucket of its
+              own: a failed read carries no match_state, so it is already
+              counted there. This is a refusal code and the tally is the
+              tape&apos;s vocabulary; the two are never added together.
+              It does not mean the match is quiet — only that we could
+              not look.
+            </span>
+          </p>
+        )}
+      </summary>
+      <div className="space-y-5 px-4 pb-4 pt-1">{children}</div>
+    </details>
+  );
+}
 
 /** The tape states that MEAN in play, as the payload itself carries
  *  them — never a string typed into this file.

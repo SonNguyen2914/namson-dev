@@ -113,11 +113,25 @@ type XgFixture = { espn_event_id?: string; home?: string; away?: string;
 
 const j = (r: Response) => (r.ok ? r.json() : Promise.reject(r.status));
 
+// LOADING, FAILED AND EMPTY ARE THREE DIFFERENT FACTS.
+// This file already knew it for the SCOREBOARD — `notDeployed` and
+// `unreachable` are two named failures rather than one blank — and did
+// not for the three reads beside it. A failed markets read left `maps`
+// as `{}`, which every fixture card renders as "no Kalshi book matched
+// this fixture"; a failed xG read left `xg` as `{}`, which renders as
+// "no xG form for these clubs". Both are CLAIMS, and neither read
+// happened. The type is LaligaDashboard.tsx's `settle()`, redeclared
+// here because that file is another owner's and src/lib is not this
+// change's to add to.
+type Load<T> = { s: "loading" } | { s: "error" } | { s: "ok"; d: T };
+const settle = <T,>(v: T | null | undefined): Load<T> =>
+  v == null ? { s: "error" } : { s: "ok", d: v };
+
 export default function FriendliesDashboard() {
   const [today, setToday] = useState<Fixture[] | null>(null);
-  const [week, setWeek] = useState<Fixture[] | null>(null);
-  const [maps, setMaps] = useState<Record<string, MappedRow>>({});
-  const [xg, setXg] = useState<Record<string, XgBlock>>({});
+  const [week, setWeek] = useState<Load<Fixture[]>>({ s: "loading" });
+  const [maps, setMaps] = useState<Load<Record<string, MappedRow>>>({ s: "loading" });
+  const [xg, setXg] = useState<Load<Record<string, XgBlock>>>({ s: "loading" });
   const [listed, setListed] = useState<Listed | null>(null);
   // 404 means the deployed backend does not serve /api/friendlies yet —
   // this page can be ahead of the API it reads. Say so in words instead
@@ -154,12 +168,14 @@ export default function FriendliesDashboard() {
           for (const row of d.fixtures ?? []) {
             if (row.fixture_id) m[row.fixture_id] = row;
           }
-          setMaps(m);
+          setMaps({ s: "ok", d: m });
           setListed(d.listed ?? null);
-        }).catch(() => {});
-      // League-derived xG form. A failure leaves the map empty, and an
-      // absent entry renders nothing at all rather than an empty rating
-      // row — the card must never imply a measurement it does not have.
+        }).catch(() => alive && setMaps({ s: "error" }));
+      // League-derived xG form. An absent entry renders nothing at all
+      // rather than an empty rating row — the card must never imply a
+      // measurement it does not have. A FAILED read used to leave the
+      // same empty map, so "we did not ask" rendered as "these clubs
+      // have no xG form"; it is named now instead.
       fetch("/api/xg/friendlies?days=1").then(j)
         .then((d) => {
           if (!alive) return;
@@ -167,12 +183,13 @@ export default function FriendliesDashboard() {
           for (const row of (d.fixtures ?? []) as XgFixture[]) {
             if (row.espn_event_id) x[row.espn_event_id] = row.xg ?? null;
           }
-          setXg(x);
-        }).catch(() => {});
+          setXg({ s: "ok", d: x });
+        }).catch(() => alive && setXg({ s: "error" }));
     };
     load();
     fetch("/api/friendlies/schedule?days=7").then(j)
-      .then((d) => alive && setWeek(d.fixtures)).catch(() => {});
+      .then((d) => alive && setWeek(settle<Fixture[]>(d?.fixtures ?? [])))
+      .catch(() => alive && setWeek({ s: "error" }));
     const poll = setInterval(load, 60000);
     return () => { alive = false; clearInterval(poll); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -182,6 +199,11 @@ export default function FriendliesDashboard() {
   // matchday, not a calendar day) and fixtures group by LOCAL day —
   // both rules imported from lib/matchday, not re-derived.
   const days = today ? groupByDay(today) : [];
+  // HANDED DOWN ONLY WHEN THEY WERE READ. An empty map from a failed
+  // read is a card saying "no book matched" / "no xG form", which are
+  // claims about Kalshi and about the clubs.
+  const mapsRead = maps.s === "ok" ? maps.d : {};
+  const xgRead = xg.s === "ok" ? xg.d : {};
   const allToday = days.length === 0
     || days.every((g) => localDay(g.list[0].date) === dayKeyOf(new Date()));
   const showDayLabels = days.length > 1 || !allToday;
@@ -280,6 +302,17 @@ export default function FriendliesDashboard() {
               · ESPN club.friendly feed, 60s poll
             </span>
           </h3>
+          {(maps.s === "error" || xg.s === "error") && (
+            <Empty>
+              {maps.s === "error" && xg.s === "error"
+                ? "the kalshi market read and the xG form read both failed"
+                : maps.s === "error"
+                  ? "the kalshi market read failed"
+                  : "the xG form read failed"}
+              {" "}— the cards below carry no book and no rating for that
+              reason, which is not the same as there being none
+            </Empty>
+          )}
           {today === null ? (
             <Empty>loading fixtures…</Empty>
           ) : days.length === 0 ? (
@@ -295,8 +328,8 @@ export default function FriendliesDashboard() {
                   )}
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {g.list.map((f) => (
-                      <FixtureCard key={f.id} f={f} m={maps[f.id]}
-                        x={xg[f.id]} />
+                      <FixtureCard key={f.id} f={f} m={mapsRead[f.id]}
+                        x={xgRead[f.id]} />
                     ))}
                   </div>
                 </div>
@@ -337,13 +370,15 @@ export default function FriendliesDashboard() {
         <section>
           <Eyebrow className="mb-2" tone="accent">next seven days</Eyebrow>
           <h3 className="mb-6 text-lg font-medium text-ink-hi">Fixtures</h3>
-          {week === null ? (
+          {week.s === "loading" ? (
             <Empty>loading schedule…</Empty>
-          ) : week.length === 0 ? (
+          ) : week.s === "error" ? (
+            <Empty>friendlies schedule feed unavailable — retrying every 60s</Empty>
+          ) : week.d.length === 0 ? (
             <Empty>no club friendlies in the next seven days</Empty>
           ) : (
             <div className="divide-y divide-line rounded-2xl border border-line">
-              {week.slice(0, 40).map((f) => (
+              {week.d.slice(0, 40).map((f) => (
                 <div key={f.id}
                   className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
                   <span className="w-28 shrink-0 font-mono text-[11px] uppercase tracking-wide text-ink-faint">

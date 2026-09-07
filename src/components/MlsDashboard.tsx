@@ -25,33 +25,55 @@ type OddsRow = { espn_event_id: string; run_type?: string; locked?: boolean;
 
 const j = (r: Response) => (r.ok ? r.json() : Promise.reject(r.status));
 
+// LOADING, FAILED AND EMPTY ARE THREE DIFFERENT FACTS.
+// Every read on this hub used to end in `.catch(() => {})`, which left
+// the state at its initial `null` — and `null` is the branch that
+// renders "loading fixtures…". So a dead backend spun a loading label
+// for ever, and a failed odds read left an empty map that is
+// indistinguishable from "no prediction run exists for this fixture",
+// which is a claim about the model. The type is LaligaDashboard.tsx's
+// `settle()`, redeclared here rather than imported: that file is
+// another owner's and src/lib is not this change's to add to. Four
+// hubs now carry the same three lines; the duplication is named so a
+// later extraction knows what it is collecting.
+type Load<T> = { s: "loading" } | { s: "error" } | { s: "ok"; d: T };
+const settle = <T,>(v: T | null | undefined): Load<T> =>
+  v == null ? { s: "error" } : { s: "ok", d: v };
+
 export default function MlsDashboard() {
-  const [today, setToday] = useState<Fixture[] | null>(null);
-  const [week, setWeek] = useState<Fixture[] | null>(null);
-  const [tables, setTables] = useState<Conference[] | null>(null);
-  const [books, setBooks] = useState<GameBook[] | null>(null);
-  const [odds, setOdds] = useState<Record<string, OddsRow>>({});
+  const [today, setToday] = useState<Load<Fixture[]>>({ s: "loading" });
+  const [week, setWeek] = useState<Load<Fixture[]>>({ s: "loading" });
+  const [tables, setTables] = useState<Load<Conference[]>>({ s: "loading" });
+  const [books, setBooks] = useState<Load<GameBook[]>>({ s: "loading" });
+  // THE ODDS MAP IS A READ, NOT A DEFAULT. `{}` meant "no shadow number
+  // for this fixture", and a failed read produced exactly that for
+  // every fixture at once.
+  const [odds, setOdds] = useState<Load<Record<string, OddsRow>>>({ s: "loading" });
 
   useEffect(() => {
     let alive = true;
     const load = () => {
       fetch("/api/mls/scoreboard").then(j)
-        .then((d) => alive && setToday(d.fixtures)).catch(() => {});
+        .then((d) => alive && setToday(settle<Fixture[]>(d?.fixtures ?? [])))
+        .catch(() => alive && setToday({ s: "error" }));
       fetch("/api/mls/markets").then(j)
-        .then((d) => alive && setBooks(d.games)).catch(() => {});
+        .then((d) => alive && setBooks(settle<GameBook[]>(d?.games ?? [])))
+        .catch(() => alive && setBooks({ s: "error" }));
       fetch("/api/mls/odds").then(j)
         .then((d) => {
           if (!alive) return;
           const map: Record<string, OddsRow> = {};
           for (const o of d.odds ?? []) map[o.espn_event_id] = o;
-          setOdds(map);
-        }).catch(() => {});
+          setOdds({ s: "ok", d: map });
+        }).catch(() => alive && setOdds({ s: "error" }));
     };
     load();
     fetch("/api/mls/schedule?days=7").then(j)
-      .then((d) => alive && setWeek(d.fixtures)).catch(() => {});
+      .then((d) => alive && setWeek(settle<Fixture[]>(d?.fixtures ?? [])))
+      .catch(() => alive && setWeek({ s: "error" }));
     fetch("/api/mls/standings").then(j)
-      .then((d) => alive && setTables(d.conferences)).catch(() => {});
+      .then((d) => alive && setTables(settle<Conference[]>(d?.conferences ?? [])))
+      .catch(() => alive && setTables({ s: "error" }));
     const poll = setInterval(load, 60000);
     return () => { alive = false; clearInterval(poll); };
   }, []);
@@ -63,7 +85,12 @@ export default function MlsDashboard() {
   // LOCAL day: a Saturday-night slate straddles two UTC dates but is one
   // evening to the viewer, and splitting it would be an artefact of the
   // wire format, not a fact about the football.
-  const days = today ? groupByDay(today) : [];
+  const days = today.s === "ok" ? groupByDay(today.d) : [];
+  // A FAILED ODDS READ IS NOT AN ABSENT PREDICTION. The map is handed
+  // down only when it was actually read; the failure is stated once,
+  // above the fixtures, rather than looking like every match lacking a
+  // run.
+  const oddsMap = odds.s === "ok" ? odds.d : {};
   const allToday = days.length === 0
     || days.every((g) => localDay(g.list[0].date) === dayKeyOf(new Date()));
   const showDayLabels = days.length > 1 || !allToday;
@@ -79,8 +106,16 @@ export default function MlsDashboard() {
               · ESPN live feed, 60s poll
             </span>
           </h3>
-          {today === null ? (
+          {odds.s === "error" && (
+            <Empty>
+              mls shadow-odds read failed — no model number is shown on any
+              fixture below, and that is not the same as no run existing
+            </Empty>
+          )}
+          {today.s === "loading" ? (
             <Empty>loading fixtures…</Empty>
+          ) : today.s === "error" ? (
+            <Empty>mls fixture feed unavailable — retrying every 60s</Empty>
           ) : days.length === 0 ? (
             <Empty>no MLS fixtures scheduled</Empty>
           ) : (
@@ -94,7 +129,7 @@ export default function MlsDashboard() {
                   )}
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {g.list.map((f) => (
-                      <FixtureCard key={f.id} f={f} o={odds[f.id]} />
+                      <FixtureCard key={f.id} f={f} o={oddsMap[f.id]} />
                     ))}
                   </div>
                 </div>
@@ -119,13 +154,15 @@ export default function MlsDashboard() {
             observational output logged for prospective validation, never
             a recommendation. Real-money signals are disabled server-side.
           </p>
-          {books === null ? (
+          {books.s === "loading" ? (
             <Empty>loading books…</Empty>
-          ) : books.length === 0 ? (
+          ) : books.s === "error" ? (
+            <Empty>kalshi book feed unavailable — retrying every 60s</Empty>
+          ) : books.d.length === 0 ? (
             <Empty>no open MLS books right now</Empty>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {books.map((g) => <BookCard key={g.event_ticker} g={g} />)}
+              {books.d.map((g) => <BookCard key={g.event_ticker} g={g} />)}
             </div>
           )}
         </section>
@@ -135,11 +172,15 @@ export default function MlsDashboard() {
         <section>
           <Eyebrow className="mb-2" tone="accent">next seven days</Eyebrow>
           <h3 className="mb-6 text-lg font-medium text-ink-hi">Fixtures</h3>
-          {week === null ? (
+          {week.s === "loading" ? (
             <Empty>loading schedule…</Empty>
+          ) : week.s === "error" ? (
+            <Empty>mls schedule feed unavailable — retrying every 60s</Empty>
+          ) : week.d.length === 0 ? (
+            <Empty>no mls fixtures inside seven days</Empty>
           ) : (
             <div className="divide-y divide-line rounded-2xl border border-line">
-              {week.slice(0, 30).map((f) => (
+              {week.d.slice(0, 30).map((f) => (
                 <Link key={f.id} href={`/bet-suggester/mls/${f.id}`}
                   className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-accent/5">
                   <span className="w-28 shrink-0 font-mono text-[11px] uppercase tracking-wide text-ink-faint">
@@ -150,12 +191,12 @@ export default function MlsDashboard() {
                     <span className="text-ink-faint"> vs </span>
                     {f.away.short || f.away.name}
                   </span>
-                  {odds[f.id]?.outcomes && (
+                  {oddsMap[f.id]?.outcomes && (
                     <span className="shrink-0 font-mono text-[10px] tabular-nums text-ink-low"
                       title="mls-2026-v0 shadow odds — not advice">
-                      {Math.round((odds[f.id].outcomes!.home_win ?? 0) * 100)}
-                      /{Math.round((odds[f.id].outcomes!.draw ?? 0) * 100)}
-                      /{Math.round((odds[f.id].outcomes!.away_win ?? 0) * 100)}
+                      {Math.round((oddsMap[f.id].outcomes!.home_win ?? 0) * 100)}
+                      /{Math.round((oddsMap[f.id].outcomes!.draw ?? 0) * 100)}
+                      /{Math.round((oddsMap[f.id].outcomes!.away_win ?? 0) * 100)}
                     </span>
                   )}
                   <span className="hidden truncate font-mono text-[10px] text-ink-faint sm:block">
@@ -172,11 +213,15 @@ export default function MlsDashboard() {
         <section>
           <Eyebrow className="mb-2" tone="accent">the table</Eyebrow>
           <h3 className="mb-6 text-lg font-medium text-ink-hi">Standings</h3>
-          {tables === null ? (
+          {tables.s === "loading" ? (
             <Empty>loading standings…</Empty>
+          ) : tables.s === "error" ? (
+            <Empty>mls standings feed unavailable — retrying every 60s</Empty>
+          ) : tables.d.length === 0 ? (
+            <Empty>no mls standings published yet</Empty>
           ) : (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {tables.map((c) => <ConferenceTable key={c.conference} c={c} />)}
+              {tables.d.map((c) => <ConferenceTable key={c.conference} c={c} />)}
             </div>
           )}
         </section>

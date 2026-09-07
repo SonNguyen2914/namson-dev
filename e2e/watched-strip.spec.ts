@@ -2598,9 +2598,36 @@ async function routes(page: Page, strip: unknown, status = 200) {
   }
 }
 
+/** THE COLLAPSE IS A DISPLAY DISCLOSURE, AND THESE SPECS ASSERT
+ *  CONTENT. Since 2026-09-06 every declared match whose state block
+ *  does NOT say in_play is drawn inside one `<details>` — the record is
+ *  untouched, the backend still sends all of them and this surface
+ *  still renders all of them, but a closed disclosure hides the cards
+ *  from a visibility assertion. So both entry helpers OPEN it, and the
+ *  collapse itself is pinned by its own tests below ("the not-in-play
+ *  group is COLLAPSED …") rather than by every assertion in this file
+ *  accidentally depending on it. */
+async function expandCollapsed(page: Page) {
+  // The response has landed; React may not have committed yet. A bare
+  // count() here would read 0 for the wrong reason and every later
+  // visibility assertion would fail against a closed disclosure.
+  await page.getByTestId("watched-collapsed")
+    .first().waitFor({ state: "attached", timeout: 3000 })
+    .catch(() => { /* no collapsed group on this payload */ });
+  const d = page.getByTestId("watched-collapsed");
+  if (await d.count() === 0) return;
+  if (await d.first().getAttribute("data-open") === "true") return;
+  await d.first().locator("summary").click();
+  await expect(d.first()).toHaveAttribute("data-open", "true");
+}
+
 async function open(page: Page, strip: unknown, status = 200) {
   await routes(page, strip, status);
+  const settled = page.waitForResponse(
+    (r) => r.url().includes(STRIP_URL)).catch(() => null);
   await page.goto("/bet-suggester");
+  await settled;
+  await expandCollapsed(page);
 }
 
 /** Open the board and wait until the strip has DECIDED.
@@ -2622,6 +2649,7 @@ async function openSettled(page: Page, strip: unknown, status = 200) {
   await page.goto("/bet-suggester");
   const resp = await settled;
   await page.waitForTimeout(1000);
+  await expandCollapsed(page);
   return resp;
 }
 
@@ -3951,6 +3979,175 @@ test("the two groups partition the declared set — nothing is filtered "
       REORDERED.matches.filter((m) => m.state.in_play).length);
     // the in-play heading is the FIRST of the two in the DOM
     expect(groups[0].group).toBe("in_play");
+  });
+
+// ------------------------------------------- the collapse (2026-09-06)
+//
+// THE LIVE SECTION WAS CLUTTERED BY DEAD RECORDS. Of 38 declared, 17
+// carried a coverage row that says in its own words "there is no read
+// left to run", 20 had no establishable phase, and ONE had the ball
+// moving in it. Son: "I just want it to be the only match to watch".
+// The DISPLAY collapses; the RECORD does not. What these tests hold:
+// every declared match is still in the DOM, the count is visible
+// WITHOUT opening anything, the summary says what those matches are in
+// the tape's own words, and the in-play ones are never inside it.
+
+/** Open WITHOUT the helper's expand step, so the default state is what
+ *  is under test. */
+async function openCollapsed(page: Page, strip: unknown) {
+  await routes(page, strip, 200);
+  const settled = page.waitForResponse(
+    (r) => r.url().includes(STRIP_URL)).catch(() => null);
+  await page.goto("/bet-suggester");
+  await settled;
+  await expect(page.getByTestId("watched-strip")).toBeVisible();
+}
+
+test("the not-in-play group is COLLAPSED while a match is in play, and "
+   + "its count is visible without opening it", async ({ page }) => {
+    await openCollapsed(page, STRIP);
+    // NON-VACUITY: the served payload really does have both halves.
+    const liveIds = STRIP.matches.filter((m) => m.state.in_play)
+      .map((m) => m.fixture_id);
+    const restIds = STRIP.matches.filter((m) => !m.state.in_play)
+      .map((m) => m.fixture_id);
+    expect(liveIds.length).toBeGreaterThan(0);
+    expect(restIds.length).toBeGreaterThan(0);
+
+    const d = page.getByTestId("watched-collapsed");
+    await expect(d).toHaveAttribute("data-open", "false");
+    // THE COUNT IS VISIBLE CLOSED. Nothing silently vanishes.
+    const heading = d.getByTestId("watched-group");
+    await expect(heading).toBeVisible();
+    await expect(heading).toHaveAttribute("data-count", String(restIds.length));
+    await expect(heading).toContainText(String(restIds.length));
+    // and the in-play ones are OUTSIDE it, still drawn in full
+    for (const id of liveIds) {
+      await expect(match(page, id)).toBeVisible();
+      expect(await d.locator(`[data-fixture="${id}"]`).count()).toBe(0);
+    }
+  });
+
+test("collapsed is not omitted — every declared match is still in the "
+   + "DOM and one click draws it in full", async ({ page }) => {
+    await openCollapsed(page, STRIP);
+    // ABSENT, COLLAPSED AND OMITTED ARE THREE DIFFERENT THINGS. Closed,
+    // every card is still THERE — this is the assertion that separates
+    // a disclosure from a filter, and a filter would turn it red.
+    const drawn = await page.getByTestId("watched-match")
+      .evaluateAll((els) => els.map(
+        (e) => Number(e.getAttribute("data-fixture"))));
+    expect(new Set(drawn))
+      .toEqual(new Set(STRIP.matches.map((m) => m.fixture_id)));
+
+    await page.getByTestId("watched-collapsed").locator("summary").click();
+    await expect(page.getByTestId("watched-collapsed"))
+      .toHaveAttribute("data-open", "true");
+    for (const m of STRIP.matches) {
+      await expect(match(page, m.fixture_id)).toBeVisible();
+    }
+  });
+
+test("the summary says WHAT the collapsed matches are, in the tape's "
+   + "own words, and the tally partitions them exactly",
+  async ({ page }) => {
+    // THE BATTERY INCLUDES A ROW WITH NO WORD ON IT. The recorded
+    // fixture's not-in-play matches all carry a match_state, so a fold
+    // of the absent case into a meaningful one would never fire against
+    // it — that is exactly how a guard names a rule and then exercises
+    // a subset of it. One row is bent to carry none.
+    const blank = STRIP.matches.filter((m) => !m.state.in_play)[0];
+    const served = {
+      ...STRIP,
+      matches: STRIP.matches.map((m) => m.fixture_id !== blank.fixture_id
+        ? m : { ...m, state: { ...m.state, match_state: null } }),
+    };
+    await openCollapsed(page, served);
+    const rest = served.matches.filter((m) => !m.state.in_play);
+    expect(rest.some((m) => m.state.match_state == null)).toBe(true);
+    expect(rest.some((m) => typeof m.state.match_state === "string")).toBe(true);
+    // DERIVED FROM THE PAYLOAD. The expected tally is counted off the
+    // served match_state values here; the ONE string typed below is the
+    // label for "the tape row carried no word at all", which is the
+    // thing that must not become a word the provider used.
+    const expected = new Map<string, number>();
+    for (const m of rest) {
+      const w = (typeof m.state.match_state === "string"
+                 && m.state.match_state !== "")
+        ? m.state.match_state : "(no match_state on the tape row)";
+      expected.set(w, (expected.get(w) ?? 0) + 1);
+    }
+    const tally = page.getByTestId("watched-collapsed-tally");
+    await expect(tally).toBeVisible();
+    const raw = await tally.getAttribute("data-tally");
+    const got = new Map((raw ?? "").split(",").filter(Boolean).map((kv) => {
+      const i = kv.lastIndexOf("=");
+      return [kv.slice(0, i), Number(kv.slice(i + 1))] as [string, number];
+    }));
+    expect(got).toEqual(expected);
+    // the tally adds back to the heading's count — nothing is bucketed
+    // twice and nothing falls out of every bucket
+    expect([...got.values()].reduce((a, b) => a + b, 0)).toBe(rest.length);
+    for (const w of expected.keys()) await expect(tally).toContainText(w);
+  });
+
+test("a failed tape read is counted apart as a REFUSAL and is not a "
+   + "seventh bucket in the tape's vocabulary", async ({ page }) => {
+    // The two vocabularies stay disjoint one layer down. A match whose
+    // read FAILED carries no match_state and the `tape_unreadable`
+    // refusal; it belongs in the "(no match_state on the tape row)"
+    // bucket ONCE, with the refusal counted beside it as a subset.
+    const target = STRIP.matches.find((m) => !m.state.in_play)!;
+    const bent = {
+      ...STRIP,
+      matches: STRIP.matches.map((m) => m.fixture_id !== target.fixture_id
+        ? m : { ...m, state: {
+            ...m.state, in_play: false, match_state: null,
+            refusals: [{ code: "tape_unreadable",
+              refused: "tape_unreadable: the state-tape read for this "
+                + "response FAILED, so nothing was read" }] } }),
+    };
+    await openCollapsed(page, bent);
+    const un = page.getByTestId("watched-collapsed-unreadable");
+    await expect(un).toBeVisible();
+    await expect(un).toHaveAttribute("data-count", "1");
+    await expect(un).toContainText("tape_unreadable");
+    // and the tally still partitions the whole group exactly once
+    const rest = bent.matches.filter((m) => !m.state.in_play);
+    const raw = await page.getByTestId("watched-collapsed-tally")
+      .getAttribute("data-tally");
+    const buckets = (raw ?? "").split(",").filter(Boolean).map((kv) => {
+      const i = kv.lastIndexOf("=");
+      return { word: kv.slice(0, i), n: Number(kv.slice(i + 1)) };
+    });
+    expect(buckets.reduce((n, b) => n + b.n, 0)).toBe(rest.length);
+    // AN UNRECOGNISED VALUE NEVER FOLDS INTO A MEANINGFUL CLASS. The
+    // row with NO match_state gets a bucket of its own, and that bucket
+    // is not one of the words the provider actually wrote on the OTHER
+    // rows of this same payload — derived from the served values, so a
+    // fold into any of them turns this red whatever the fold picks.
+    const provider = new Set(rest
+      .map((m) => m.state.match_state)
+      .filter((w): w is string => typeof w === "string" && w !== ""));
+    expect(provider.size).toBeGreaterThan(0);
+    const own = buckets.filter((b) => !provider.has(b.word));
+    expect(own.length).toBe(1);
+    expect(own[0].n).toBe(1);
+  });
+
+test("with NO match in play the collapse opens itself — the section "
+   + "never shrinks to a summary line", async ({ page }) => {
+    const none = {
+      ...STRIP,
+      matches: STRIP.matches.map((m) => ({
+        ...m, state: { ...m.state, in_play: false, match_state: "post" } })),
+    };
+    await openCollapsed(page, none);
+    await expect(page.getByTestId("watched-collapsed"))
+      .toHaveAttribute("data-open", "true");
+    for (const m of none.matches) {
+      await expect(match(page, m.fixture_id)).toBeVisible();
+    }
   });
 
 test("an in-play match is marked in real text, and the mark cites the "

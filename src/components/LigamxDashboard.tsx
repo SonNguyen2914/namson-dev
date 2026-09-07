@@ -32,12 +32,25 @@ type Tournament = { name?: string; label?: string;
 
 const j = (r: Response) => (r.ok ? r.json() : Promise.reject(r.status));
 
+// LOADING, FAILED AND EMPTY ARE THREE DIFFERENT FACTS.
+// `.catch(() => {})` left each of these at its initial `null`, and
+// `null` is the branch that renders "loading …" — a dead backend spun
+// that label for ever. The type is LaligaDashboard.tsx's `settle()`,
+// redeclared here because that file is another owner's and src/lib is
+// not this change's to add to.
+type Load<T> = { s: "loading" } | { s: "error" } | { s: "ok"; d: T };
+const settle = <T,>(v: T | null | undefined): Load<T> =>
+  v == null ? { s: "error" } : { s: "ok", d: v };
+
 export default function LigamxDashboard() {
-  const [today, setToday] = useState<Fixture[] | null>(null);
-  const [week, setWeek] = useState<Fixture[] | null>(null);
-  const [tables, setTables] = useState<TournamentTable[] | null>(null);
-  const [books, setBooks] = useState<GameBook[] | null>(null);
-  const [odds, setOdds] = useState<Record<string, OddsRow>>({});
+  const [today, setToday] = useState<Load<Fixture[]>>({ s: "loading" });
+  const [week, setWeek] = useState<Load<Fixture[]>>({ s: "loading" });
+  const [tables, setTables] = useState<Load<TournamentTable[]>>({ s: "loading" });
+  const [books, setBooks] = useState<Load<GameBook[]>>({ s: "loading" });
+  // THE ODDS MAP IS A READ, NOT A DEFAULT: `{}` reads as "no shadow
+  // number for this fixture", which a failed read produced for every
+  // fixture at once.
+  const [odds, setOdds] = useState<Load<Record<string, OddsRow>>>({ s: "loading" });
   const [tournament, setTournament] = useState<Tournament>(null);
 
   useEffect(() => {
@@ -46,24 +59,27 @@ export default function LigamxDashboard() {
       fetch("/api/ligamx/scoreboard").then(j)
         .then((d) => {
           if (!alive) return;
-          setToday(d.fixtures);
+          setToday(settle<Fixture[]>(d?.fixtures ?? []));
           if (d.tournament) setTournament(d.tournament);
-        }).catch(() => {});
+        }).catch(() => alive && setToday({ s: "error" }));
       fetch("/api/ligamx/markets").then(j)
-        .then((d) => alive && setBooks(d.games)).catch(() => {});
+        .then((d) => alive && setBooks(settle<GameBook[]>(d?.games ?? [])))
+        .catch(() => alive && setBooks({ s: "error" }));
       fetch("/api/ligamx/odds").then(j)
         .then((d) => {
           if (!alive) return;
           const map: Record<string, OddsRow> = {};
           for (const o of d.odds ?? []) map[o.espn_event_id] = o;
-          setOdds(map);
-        }).catch(() => {});
+          setOdds({ s: "ok", d: map });
+        }).catch(() => alive && setOdds({ s: "error" }));
     };
     load();
     fetch("/api/ligamx/schedule?days=7").then(j)
-      .then((d) => alive && setWeek(d.fixtures)).catch(() => {});
+      .then((d) => alive && setWeek(settle<Fixture[]>(d?.fixtures ?? [])))
+      .catch(() => alive && setWeek({ s: "error" }));
     fetch("/api/ligamx/standings").then(j)
-      .then((d) => alive && setTables(d.tables)).catch(() => {});
+      .then((d) => alive && setTables(settle<TournamentTable[]>(d?.tables ?? [])))
+      .catch(() => alive && setTables({ s: "error" }));
     const poll = setInterval(load, 60000);
     return () => { alive = false; clearInterval(poll); };
   }, []);
@@ -75,7 +91,10 @@ export default function LigamxDashboard() {
   // LOCAL day: an evening slate straddles two UTC dates (Liga MX
   // kickoffs routinely cross midnight UTC) but is one evening to the
   // viewer, and splitting it would be an artefact of the wire format.
-  const days = today ? groupByDay(today) : [];
+  const days = today.s === "ok" ? groupByDay(today.d) : [];
+  // A FAILED ODDS READ IS NOT AN ABSENT PREDICTION — handed down only
+  // when it was actually read, and the failure stated once.
+  const oddsMap = odds.s === "ok" ? odds.d : {};
   const allToday = days.length === 0
     || days.every((g) => localDay(g.list[0].date) === dayKeyOf(new Date()));
   const showDayLabels = days.length > 1 || !allToday;
@@ -95,8 +114,16 @@ export default function LigamxDashboard() {
               · ESPN live feed, 60s poll
             </span>
           </h3>
-          {today === null ? (
+          {odds.s === "error" && (
+            <Empty>
+              liga mx shadow-odds read failed — no model number is shown on
+              any fixture below, and that is not the same as no run existing
+            </Empty>
+          )}
+          {today.s === "loading" ? (
             <Empty>loading fixtures…</Empty>
+          ) : today.s === "error" ? (
+            <Empty>liga mx fixture feed unavailable — retrying every 60s</Empty>
           ) : days.length === 0 ? (
             <Empty>no Liga MX fixtures scheduled</Empty>
           ) : (
@@ -110,7 +137,7 @@ export default function LigamxDashboard() {
                   )}
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {g.list.map((f) => (
-                      <FixtureCard key={f.id} f={f} o={odds[f.id]} />
+                      <FixtureCard key={f.id} f={f} o={oddsMap[f.id]} />
                     ))}
                   </div>
                 </div>
@@ -137,13 +164,15 @@ export default function LigamxDashboard() {
             recommendation, and real-money signals are disabled
             server-side.
           </p>
-          {books === null ? (
+          {books.s === "loading" ? (
             <Empty>loading books…</Empty>
-          ) : books.length === 0 ? (
+          ) : books.s === "error" ? (
+            <Empty>kalshi book feed unavailable — retrying every 60s</Empty>
+          ) : books.d.length === 0 ? (
             <Empty>no open Liga MX books right now</Empty>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {books.map((g) => <BookCard key={g.event_ticker} g={g} />)}
+              {books.d.map((g) => <BookCard key={g.event_ticker} g={g} />)}
             </div>
           )}
         </section>
@@ -153,13 +182,15 @@ export default function LigamxDashboard() {
         <section>
           <Eyebrow className="mb-2" tone="accent">next seven days</Eyebrow>
           <h3 className="mb-6 text-lg font-medium text-ink-hi">Fixtures</h3>
-          {week === null ? (
+          {week.s === "loading" ? (
             <Empty>loading schedule…</Empty>
-          ) : week.length === 0 ? (
+          ) : week.s === "error" ? (
+            <Empty>liga mx schedule feed unavailable — retrying every 60s</Empty>
+          ) : week.d.length === 0 ? (
             <Empty>no fixtures in the next seven days</Empty>
           ) : (
             <div className="divide-y divide-line rounded-2xl border border-line">
-              {week.slice(0, 30).map((f) => (
+              {week.d.slice(0, 30).map((f) => (
                 <Link key={f.id} href={`/bet-suggester/ligamx/${f.id}`}
                   className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-accent/5">
                   <span className="w-28 shrink-0 font-mono text-[11px] uppercase tracking-wide text-ink-faint">
@@ -170,12 +201,12 @@ export default function LigamxDashboard() {
                     <span className="text-ink-faint"> vs </span>
                     {f.away.short || f.away.name}
                   </span>
-                  {odds[f.id]?.outcomes && (
+                  {oddsMap[f.id]?.outcomes && (
                     <span className="shrink-0 font-mono text-[10px] tabular-nums text-ink-low"
                       title="liga-mx-2026-v0 shadow odds — not advice">
-                      {Math.round((odds[f.id].outcomes!.home_win ?? 0) * 100)}
-                      /{Math.round((odds[f.id].outcomes!.draw ?? 0) * 100)}
-                      /{Math.round((odds[f.id].outcomes!.away_win ?? 0) * 100)}
+                      {Math.round((oddsMap[f.id].outcomes!.home_win ?? 0) * 100)}
+                      /{Math.round((oddsMap[f.id].outcomes!.draw ?? 0) * 100)}
+                      /{Math.round((oddsMap[f.id].outcomes!.away_win ?? 0) * 100)}
                     </span>
                   )}
                   <span className="hidden truncate font-mono text-[10px] text-ink-faint sm:block">
@@ -203,13 +234,15 @@ export default function LigamxDashboard() {
             ESPN itself names; a tournament that has not kicked off shows
             no table at all.
           </p>
-          {tables === null ? (
+          {tables.s === "loading" ? (
             <Empty>loading standings…</Empty>
-          ) : tables.length === 0 ? (
+          ) : tables.s === "error" ? (
+            <Empty>liga mx standings feed unavailable — retrying every 60s</Empty>
+          ) : tables.d.length === 0 ? (
             <Empty>no tournament has produced a result yet</Empty>
           ) : (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {tables.map((t) => <TournamentStandings key={t.table} t={t} />)}
+              {tables.d.map((t) => <TournamentStandings key={t.table} t={t} />)}
             </div>
           )}
         </section>

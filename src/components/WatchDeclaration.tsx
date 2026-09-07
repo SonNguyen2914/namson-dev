@@ -85,6 +85,11 @@ interface Ctx {
   sync: WatchlistSyncResult | null;
   syncError: string;
   syncing: boolean;
+  /** ARMED, NOT FIRED. Pressing "watch everything I hold" opens the
+   *  confirmation and writes nothing; only `runSync` writes. */
+  syncArmed: boolean;
+  armSync: () => void;
+  disarmSync: () => void;
   runSync: () => void;
   reload: () => void;
   boardEventCount: number;
@@ -123,6 +128,19 @@ export function WatchDeclarationProvider({ eventIds, children }: {
   const [sync, setSync] = useState<WatchlistSyncResult | null>(null);
   const [syncError, setSyncError] = useState("");
   const [syncing, setSyncing] = useState(false);
+  // THE BUTTON THAT WROTE 37 PERMANENT RECORDS ON ONE CLICK.
+  // "watch everything I hold" used to call sync-positions straight from
+  // its onClick. One press declared 37 fixtures into an append-only
+  // preregistration in which a removal after kickoff is REFUSED BY
+  // DESIGN, and the only place any count appeared was the result line
+  // afterwards. Son pressed it, did not expect that, and said so: "I
+  // didnt declared those as watching". So the press ARMS a confirmation
+  // and writes nothing; `runSync` is reachable only from the control
+  // inside that confirmation, and the confirmation says what is about
+  // to be declared, every count this surface can actually read, what it
+  // cannot read and why, and that the record cannot be taken back once
+  // a match starts.
+  const [armed, setArmed] = useState(false);
   const [open, setOpen] = useState(false);
 
   const hasToken = token.trim().length > 0;
@@ -233,8 +251,20 @@ export function WatchDeclarationProvider({ eventIds, children }: {
     })();
   }, [hasToken, token, actor, readState, openPanel]);
 
+  // ARMING IS NOT WRITING. With no token this still opens the panel —
+  // the control is never a silent no-op — and with one it opens the
+  // confirmation. Nothing reaches the backend from here.
+  const armSync = useCallback(() => {
+    if (!hasToken) { openPanel(); return; }
+    setOpen(true);
+    setArmed(true);
+  }, [hasToken, openPanel]);
+
+  const disarmSync = useCallback(() => setArmed(false), []);
+
   const runSync = useCallback(() => {
     if (!hasToken) { openPanel(); return; }
+    setArmed(false);
     setSyncing(true);
     void (async () => {
       try {
@@ -257,6 +287,7 @@ export function WatchDeclarationProvider({ eventIds, children }: {
     results, busy, declaredFixtureIds, act, openPanel,
     panelOpen: open, setPanelOpen: setOpen,
     sync, syncError, syncing, runSync,
+    syncArmed: armed, armSync, disarmSync,
     reload: () => { void readState(); },
     boardEventCount: eventIds.length,
   };
@@ -312,6 +343,182 @@ function Count({ label, value, warnWhenOver = false }: {
         ? "text-warn" : "text-ink-mid"}>
         {n === null ? NOT_ON_PAYLOAD : n}
       </dd>
+    </div>
+  );
+}
+
+// ------------------------------------------- "watch everything I hold"
+//
+// WHAT THE BUTTON DOES, SAID BEFORE IT DOES IT.
+// POST /api/admin/live/watchlist/sync-positions declares EVERY fixture
+// the journal holds an open position on, from the source
+// `open_position`, into the append-only preregistration. It is
+// idempotent per source and it removes nothing. The half nobody was
+// told is the half that matters: the record is APPEND-ONLY, and once a
+// fixture has started, a removal is REFUSED and the attempt is itself
+// written as an event (watchlist.ONCE_STARTED_IT_STAYS). A press of
+// this button is therefore a hard-to-reverse, outward-facing action
+// behind a small label, and it is treated as one.
+//
+// THE SENTENCES ARE THE BACKEND'S OWN RULES, PARAPHRASED ONCE AND
+// NAMED. They are not quoted from a payload because the sync route
+// returns nothing until it has already written; the module and the
+// constant each sentence comes from is cited beside it so a reader can
+// check this file against the rule rather than trust it.
+const SYNC_DECLARES = (
+  "every fixture your journal still holds an open position on — not "
+  + "the fixtures on the board, and not the ones you have looked at. "
+  + "They are declared from the source `open_position`, which is "
+  + "counted apart from the ones you chose by hand and never added to "
+  + "them (watchlist.SOURCES_ARE_NOT_MERGED).");
+
+const SYNC_CANNOT_BE_TAKEN_BACK = (
+  "The declared set is APPEND-ONLY and a declaration is not a "
+  + "preference you can revise. Before kickoff you may ask for a "
+  + "removal, and that request is itself written as an event rather "
+  + "than deleting anything. ONCE A MATCH HAS STARTED THE REMOVAL IS "
+  + "REFUSED — the wish is recorded, the watch stands, and the fixture "
+  + "is in the sample for good (watchlist.ONCE_STARTED_IT_STAYS). That "
+  + "is what makes anything later found on this set worth arguing "
+  + "from, and it is why this asks first.");
+
+/** WHAT THIS SURFACE CANNOT KNOW BEFORE THE WRITE, WRITTEN DOWN.
+ *
+ *  The exact number of records the sweep will append is decided inside
+ *  the backend: it declares `watchlist.open_position_fixture_ids(s)`,
+ *  skips any fixture already declared FROM THAT SOURCE
+ *  (`once_per_source=True`), and refuses a fixture nothing tapes by
+ *  name. None of those three sets is on any payload this panel reads.
+ *  The counts below are therefore the ones that ARE readable, each
+ *  named for exactly what it is, and this record says plainly which
+ *  number is missing rather than letting a plausible one stand in for
+ *  it — the same discipline as `countOf` returning null instead of 0.
+ *
+ *  Guarded BOTH WAYS in e2e/watch-declaration.spec.ts: the guard fails
+ *  if a record here is not printed inside the confirmation, and it
+ *  fails the day the watchlist payload starts carrying the key that
+ *  closes one while the record still stands. */
+export const SYNC_PREVIEW_OPEN: Record<string, {
+  finding: string; closes_when: string; closed_by_state_key: string;
+}> = {
+  exact_write_count_unreadable: {
+    finding: "the exact number of rows this sweep will append cannot be "
+      + "read before it runs. `GET /api/admin/live/watchlist` carries "
+      + "the declared set and the open positions that are NOT in it, "
+      + "but not the list of open positions itself and not which of "
+      + "them were already declared from the `open_position` source — "
+      + "so the total the sweep reports as `checked` has no counterpart "
+      + "on any payload this panel can read. The counts shown are the "
+      + "readable ones and are labelled as what they are; none of them "
+      + "is presented as the write count.",
+    closes_when: "the watchlist state payload carries "
+      + "`open_position_fixture_ids` (or the sync route grows a "
+      + "dry-run that returns its own `checked`/`declared` without "
+      + "writing); then this panel states the number it is about to "
+      + "write and this record retires — or the guard fails.",
+    closed_by_state_key: "open_position_fixture_ids",
+  },
+};
+
+/** Registered holes whose closing key HAS arrived on this payload.
+ *  Derived from the payload, never hand-listed: the day the backend
+ *  starts carrying `open_position_fixture_ids`, this returns the
+ *  record that should have been retired and the guard goes red. */
+export function syncPreviewHolesClosed(st: WatchlistState | null): string[] {
+  if (!st) return [];
+  return Object.keys(SYNC_PREVIEW_OPEN).filter((k) =>
+    (st as Record<string, unknown>)[
+      SYNC_PREVIEW_OPEN[k].closed_by_state_key] !== undefined);
+}
+
+/** The confirmation. It writes nothing; it says what pressing the
+ *  control below will write, how many of that this surface can count,
+ *  and that the record cannot be taken back once a match starts. */
+function SyncConfirm() {
+  const p = useContext(WatchCtx);
+  if (!p || !p.syncArmed) return null;
+  const st = p.state;
+  const bySource = st?.monitored_by_source ?? {};
+  const closed = syncPreviewHolesClosed(st);
+  return (
+    <div data-testid="watch-sync-confirm" role="group"
+      aria-labelledby="watch-sync-confirm-h"
+      className="mt-3 rounded-lg border border-warn/40 bg-warn/5 px-3 py-3">
+      <p id="watch-sync-confirm-h"
+        className="font-mono text-[10px] uppercase tracking-[0.14em] text-warn">
+        this writes a permanent record — nothing has been written yet
+      </p>
+      <p data-testid="watch-sync-what"
+        className="mt-2 max-w-3xl text-[12px] leading-relaxed text-ink-low">
+        It will declare {SYNC_DECLARES}
+      </p>
+      <p data-testid="watch-sync-irreversible"
+        className="mt-2 max-w-3xl text-[12px] leading-relaxed text-warn">
+        {SYNC_CANNOT_BE_TAKEN_BACK}
+      </p>
+
+      {/* HOW MANY — every count this panel can actually read, each
+          labelled as the thing it is. A dl rather than a sentence so no
+          two of them can be mistaken for one another, and `Count`
+          prints "not on the payload" rather than 0 for any that is
+          missing. */}
+      {st && !st.dormant ? (
+        <dl data-testid="watch-sync-counts"
+          className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1 font-mono text-[11px] tabular-nums text-ink-low sm:grid-cols-2">
+          <Count label="held, and not in the set right now" warnWhenOver
+            value={st.open_positions_not_monitored} />
+          <Count label="already declared from open positions"
+            value={bySource["open_position"]} />
+          <Count label="in the set right now, every source"
+            value={st.monitored_fixture_ids} />
+          <Count label="declared ever" value={st.declared_ever_count} />
+        </dl>
+      ) : (
+        <p data-testid="watch-sync-uncounted"
+          className="mt-3 max-w-3xl text-[12px] leading-relaxed text-warn">
+          {st?.dormant
+            ? (st.detail ?? "The live plane is not configured.")
+            : "The declared set has not been read on this tab, so this "
+              + "panel can state no count at all — not zero. Re-read the "
+              + "set first if you want a number beside this."}
+        </p>
+      )}
+
+      {/* THE NUMBER THAT IS MISSING, NAMED. */}
+      {Object.keys(SYNC_PREVIEW_OPEN).map((k) => (
+        <p key={k} data-testid="watch-sync-open" data-key={k}
+          className="mt-2 max-w-3xl text-[11px] leading-relaxed text-ink-faint">
+          Not shown, and known to be missing — {k}:{" "}
+          {SYNC_PREVIEW_OPEN[k].finding} Closes when:{" "}
+          {SYNC_PREVIEW_OPEN[k].closes_when}
+        </p>
+      ))}
+      {closed.length > 0 && (
+        <p data-testid="watch-sync-open-stale" data-keys={closed.join(",")}
+          className="mt-2 max-w-3xl text-[11px] leading-relaxed text-warn">
+          This payload now carries{" "}
+          <span className="font-mono">
+            {closed.map((k) => SYNC_PREVIEW_OPEN[k].closed_by_state_key)
+              .join(", ")}
+          </span>
+          , which closes {closed.join(", ")} — the record above is stale
+          and has not been retired. It is named here rather than left to
+          read as current.
+        </p>
+      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <button type="button" onClick={p.runSync} disabled={p.syncing}
+          data-testid="watch-sync-go"
+          className="rounded-md border border-warn/60 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-warn transition-colors hover:border-warn disabled:opacity-40">
+          {p.syncing ? "declaring…" : "declare them — this cannot be undone"}
+        </button>
+        <button type="button" onClick={p.disarmSync} disabled={p.syncing}
+          data-testid="watch-sync-cancel"
+          className="rounded-md border border-line px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low transition-colors hover:border-line-strong hover:text-ink-hi disabled:opacity-40">
+          cancel — write nothing
+        </button>
+      </div>
     </div>
   );
 }
@@ -387,11 +594,23 @@ export function WatchPanel() {
             className="rounded-md border border-line px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low transition-colors hover:border-line-strong hover:text-ink-hi disabled:opacity-40">
             re-read the set
           </button>
-          <button type="button" onClick={p.runSync}
-            disabled={!p.hasToken || p.syncing}
+          {/* ARMS THE CONFIRMATION; IT DOES NOT WRITE. The label says
+              so and the accessible name says so, because the label
+              itself is small and the action behind it is permanent. */}
+          <button type="button" onClick={p.armSync}
+            disabled={p.syncing}
             data-testid="watch-sync"
+            aria-expanded={p.syncArmed}
+            aria-describedby={p.hasToken ? undefined : NEEDS_ID}
+            aria-label={p.hasToken
+              ? "watch everything I hold — shows what would be declared "
+                + "and asks before writing anything"
+              : "watch everything I hold — needs the operator token; "
+                + "opens the panel that asks for it"}
             className="rounded-md border border-line px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low transition-colors hover:border-line-strong hover:text-ink-hi disabled:opacity-40">
-            {p.syncing ? "declaring…" : "watch everything I hold"}
+            {p.syncing ? "declaring…"
+              : p.hasToken ? "watch everything I hold…"
+              : "watch everything I hold · needs token"}
           </button>
         </div>
 
@@ -465,6 +684,9 @@ export function WatchPanel() {
             {p.resolveError}
           </p>
         )}
+
+        {/* WHAT IT WOULD WRITE, BEFORE IT WRITES IT. */}
+        <SyncConfirm />
 
         {/* THE SYNC’s own answer, in its own numbers. */}
         {p.sync && (

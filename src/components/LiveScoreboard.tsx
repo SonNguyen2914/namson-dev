@@ -17,17 +17,73 @@ import TeamNewsSection from "./TeamNews";
 
 const POLL_MS = 15000; // matches the backend's 15s live tick; snapshot reads are free
 
+// A FAILED READ IS NOT AN EMPTY ONE — THE THREE-STATE MODEL.
+//
+// Every fetch on this file used to end in a bare `catch {}` with a
+// comment saying the section "just shows nothing". Five of them. The
+// worst was the live-signal poll: a reader looking at a card with no
+// signal badges concluded there were no signals, when the truth was
+// that we could not ask. That conclusion is about a set nobody counted,
+// and it is the same shape the backend closed by construction with
+// position.UnreadableTape ("no fold can mistake a broken read for an
+// empty one").
+//
+// The codebase already had the move. LaligaDashboard.tsx's `settle()`
+// collapses a failure to {s:"error"} — distinct from {s:"ok",d:[]} —
+// with the comment "Loading, failed and empty are three different
+// facts. Collapsing them is how a dead backend renders as 'no fixtures
+// today'." This is that type, with the failure's own sentence kept so
+// the surface can say WHICH failure it was rather than that there was
+// one. It is redeclared here rather than imported because
+// LaligaDashboard is another owner's file and src/lib is not this
+// change's to add to; the duplication is named so a later extraction
+// knows what it is collecting.
+type Read<T> =
+  | { s: "asking" }
+  | { s: "failed"; why: string }
+  | { s: "ok"; d: T };
+
+/** The failure's own words, never a shrug. */
+const why = (e: unknown): string =>
+  e instanceof Error ? e.message : String(e);
+
+/** One failed read, named, with the sentence that separates it from an
+ *  empty answer. Small and plain: it is a coverage fact, not an alarm,
+ *  and nothing on this surface is coloured up/neg for it. */
+function ReadFailed({ what, r, testid }: {
+  what: string; r: Read<unknown>; testid: string;
+}) {
+  if (r.s !== "failed") return null;
+  return (
+    <p data-testid={testid} data-what={what}
+      className="rounded-md border border-warn/40 bg-warn/5 px-2.5 py-1.5 text-[11px] leading-relaxed text-warn">
+      The {what} read failed: {r.why}. That is not {what} having nothing
+      to show — it is that we could not ask.
+    </p>
+  );
+}
+
 export default function LiveScoreboard() {
-  const [live, setLive] = useState<LiveScoreEntry[]>([]);
+  const [read, setRead] = useState<Read<LiveScoreEntry[]>>({ s: "asking" });
+  // A payload that arrived once is KEPT when a later poll fails, and it
+  // is drawn beside a line saying the read behind it is the earlier
+  // one. A scoreline 30s old is still a scoreline; a blank section is
+  // not. STATE, NOT A REF: it is read during render, and a ref read
+  // during render is a value React does not promise to have re-rendered
+  // for (react-hooks/refs, which is an error in this repo's lint).
+  const [lastOk, setLastOk] = useState<LiveScoreEntry[] | null>(null);
 
   useEffect(() => {
     let alive = true;
     const load = async () => {
       try {
         const r = await api.liveScores();
-        if (alive) setLive(r.live);
-      } catch {
-        /* feed off or unreachable — just show nothing */
+        if (!alive) return;
+        setLastOk(r.live);
+        setRead({ s: "ok", d: r.live });
+      } catch (e) {
+        if (!alive) return;
+        setRead({ s: "failed", why: why(e) });
       }
     };
     load();
@@ -35,11 +91,32 @@ export default function LiveScoreboard() {
     return () => { alive = false; clearInterval(id); };
   }, []);
 
-  if (live.length === 0) return null;
+  // NOTHING HAS BEEN ASKED YET. Absence with a reason, not a claim
+  // about what is being played.
+  if (read.s === "asking") return null;
+  // ASKED, ANSWERED, AND THE ANSWER WAS "NOTHING IS LIVE". The one
+  // branch that may render nothing at all: the section exists so the
+  // board is not cluttered pre-match, and this is the read that says
+  // there is nothing to clutter it with.
+  if (read.s === "ok" && read.d.length === 0) return null;
+
+  const shown = read.s === "ok" ? read.d : (lastOk ?? []);
 
   return (
     <section className="mb-20 space-y-5">
-      {live.map((m) => (
+      {read.s === "failed" && (
+        <p data-testid="live-scores-failed" role="status"
+          className="rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-[12px] leading-relaxed text-warn">
+          The live-score read failed: {read.why}.{" "}
+          {shown.length > 0
+            ? "The match" + (shown.length === 1 ? "" : "es") + " below "
+              + (shown.length === 1 ? "is" : "are") + " from the last read "
+              + "that answered and has not been refreshed."
+            : "Nothing is drawn below, and that is NOT the same as no "
+              + "match being live — this surface could not ask."}
+        </p>
+      )}
+      {shown.map((m) => (
         <Reveal key={m.match_id}>
           <LiveCard m={m} />
         </Reveal>
@@ -191,13 +268,20 @@ function LiveMarketStream({ a, home, away, signals }: {
 }
 
 function LiveExtras({ m }: { m: LiveScoreEntry }) {
-  const [news, setNews] = useState<TeamNewsResponse | null>(null);
-  const [stats, setStats] = useState<LiveStatsResponse | null>(null);
-  const [auto, setAuto] = useState<LiveAutoResponse | null>(null);
+  // FOUR READS, THREE STATES EACH. Each of these was a bare `catch {}`
+  // whose comment said the section "stays hidden": a failed read and a
+  // backend that answered "I have nothing for this match" rendered as
+  // the identical blank. They are now kept apart, and the second is
+  // kept apart from the first by the payload's own `available` flag —
+  // which is a different fact again from a read that never landed.
+  const [news, setNews] = useState<Read<TeamNewsResponse>>({ s: "asking" });
+  const [stats, setStats] = useState<Read<LiveStatsResponse>>({ s: "asking" });
+  const [auto, setAuto] = useState<Read<LiveAutoResponse>>({ s: "asking" });
   // latest BUY/SELL signal per watched market (badges); seen ids so each
   // signal toasts exactly once, and the first fetch primes silently — old
   // signals from before the page opened shouldn't greet you with a storm
-  const [signals, setSignals] = useState<Map<string, LiveSignalRow>>(new Map());
+  const [signals, setSignals] =
+    useState<Read<Map<string, LiveSignalRow>>>({ s: "asking" });
   const seenSignals = useRef<Set<number> | null>(null);
 
   useEffect(() => {
@@ -205,8 +289,8 @@ function LiveExtras({ m }: { m: LiveScoreEntry }) {
     const load = async () => {
       try {
         const tn = await api.teamNews(m.match_id);
-        if (alive) setNews(tn);
-      } catch { /* no lineups — section shows nothing */ }
+        if (alive) setNews({ s: "ok", d: tn });
+      } catch (e) { if (alive) setNews({ s: "failed", why: why(e) }); }
     };
     load();
     const id = setInterval(load, 300000); // squads are settled; 5 min is plenty
@@ -214,8 +298,8 @@ function LiveExtras({ m }: { m: LiveScoreEntry }) {
     const loadStats = async () => {
       try {
         const st = await api.liveStats(m.match_id);
-        if (alive && st.available) setStats(st);
-      } catch { /* stats stay hidden */ }
+        if (alive) setStats({ s: "ok", d: st });
+      } catch (e) { if (alive) setStats({ s: "failed", why: why(e) }); }
     };
     loadStats();
     const id2 = setInterval(loadStats, 30000);
@@ -223,8 +307,8 @@ function LiveExtras({ m }: { m: LiveScoreEntry }) {
     const loadAuto = async () => {
       try {
         const la = await api.liveAuto(m.match_id);
-        if (alive && la.available) setAuto(la);
-      } catch { /* stream stays hidden */ }
+        if (alive) setAuto({ s: "ok", d: la });
+      } catch (e) { if (alive) setAuto({ s: "failed", why: why(e) }); }
     };
     loadAuto();
     const id3 = setInterval(loadAuto, 30000);
@@ -251,28 +335,65 @@ function LiveExtras({ m }: { m: LiveScoreEntry }) {
             }
           }
         }
-        setSignals(latest);
-      } catch { /* signals stay hidden */ }
+        setSignals({ s: "ok", d: latest });
+      } catch (e) {
+        // THE WORST OF THE FIVE. An operator reading a card with no
+        // signal badges concluded there were no signals; the truth was
+        // that the read never landed. Named now, at the place the
+        // absence is read.
+        if (alive) setSignals({ s: "failed", why: why(e) });
+      }
     };
     loadSignals();
     const id4 = setInterval(loadSignals, 30000);
     return () => { alive = false; clearInterval(id); clearInterval(id2); clearInterval(id3); clearInterval(id4); };
   }, [m.match_id]);
 
+  const autoOk = auto.s === "ok" ? auto.d : null;
+  const statsOk = stats.s === "ok" ? stats.d : null;
+  const newsOk = news.s === "ok" ? news.d : null;
+  const signalRows = signals.s === "ok" ? signals.d : new Map();
+
   return (
     <div className="mt-8 border-t border-line pt-6">
-      {auto && auto.available && (
+      {/* EVERY READ THAT DID NOT HAPPEN, NAMED. Grouped so four
+          failures are four lines rather than four silences, and so a
+          reader meets them above the blocks they are missing from. */}
+      <div data-testid="live-extras-failures" className="mb-4 space-y-1.5 empty:mb-0">
+        <ReadFailed what="live model" r={auto} testid="live-auto-failed" />
+        <ReadFailed what="match stats" r={stats} testid="live-stats-failed" />
+        <ReadFailed what="official lineups" r={news} testid="live-news-failed" />
+        <ReadFailed what="live signals" r={signals} testid="live-signals-failed" />
+      </div>
+      {/* ANSWERED, AND THE ANSWER WAS "NOT FOR THIS MATCH". A different
+          fact from the failures above, in the backend's own words where
+          it supplied them. */}
+      {autoOk && !autoOk.available && (
+        <p data-testid="live-auto-unavailable"
+          className="mb-4 text-[11px] leading-relaxed text-ink-faint">
+          The live model answered and has no read for this match
+          {autoOk.reason ? `: ${autoOk.reason}` : "."}
+        </p>
+      )}
+      {statsOk && !statsOk.available && (
+        <p data-testid="live-stats-unavailable"
+          className="mb-4 text-[11px] leading-relaxed text-ink-faint">
+          The stats read answered and has no rows for this match.
+        </p>
+      )}
+      {autoOk && autoOk.available && (
         <Collapse eyebrow="live model" title="Live market read · auto" className="mb-6">
-          <LiveMarketStream a={auto} home={m.home} away={m.away} signals={signals} />
+          <LiveMarketStream a={autoOk} home={m.home} away={m.away}
+            signals={signalRows} />
         </Collapse>
       )}
-      {stats && stats.rows.length > 0 && (
+      {statsOk && statsOk.available && statsOk.rows.length > 0 && (
         <Collapse eyebrow="live" title="Match stats" className="mb-6">
           <div className="space-y-2.5">
             {(() => {
-              const colors = matchColors(stats.home_team || m.home,
-                                         stats.away_team || m.away);
-              return stats.rows.map((r) => {
+              const colors = matchColors(statsOk.home_team || m.home,
+                                         statsOk.away_team || m.away);
+              return statsOk.rows.map((r) => {
                 const h = parseFloat(r.home) || 0;
                 const a = parseFloat(r.away) || 0;
                 const tot = h + a;
@@ -296,30 +417,30 @@ function LiveExtras({ m }: { m: LiveScoreEntry }) {
             })()}
           </div>
           {(() => {
-            const colors = matchColors(stats.home_team || m.home,
-                                       stats.away_team || m.away);
+            const colors = matchColors(statsOk.home_team || m.home,
+                                       statsOk.away_team || m.away);
             return (
               <p className="mt-3 flex items-center gap-2 text-[11px] text-ink-faint">
                 <span className="inline-block h-2 w-2 rounded-full" style={{ background: colors.home }} />
-                {stats.home_team} left
+                {statsOk.home_team} left
                 <span className="mx-1">·</span>
                 <span className="inline-block h-2 w-2 rounded-full" style={{ background: colors.away }} />
-                {stats.away_team} right
+                {statsOk.away_team} right
                 <span className="mx-1">·</span> via ESPN, ~30s behind the broadcast
               </p>
             );
           })()}
         </Collapse>
       )}
-      {news && (
+      {newsOk && (
         <Collapse eyebrow="team news" title="Official lineups" className="mb-6">
-          <TeamNewsSection news={news} home={m.home} away={m.away} />
+          <TeamNewsSection news={newsOk} home={m.home} away={m.away} />
         </Collapse>
       )}
       <Collapse eyebrow="what-if" title="Manual override · test your own state" defaultOpen={false} className="mb-0">
         <LivePanel matchId={m.match_id}
-          liveLevers={auto?.levers && auto.levers.source !== "neutral"
-            ? { home: auto.levers.home, away: auto.levers.away }
+          liveLevers={autoOk?.levers && autoOk.levers.source !== "neutral"
+            ? { home: autoOk.levers.home, away: autoOk.levers.away }
             : null} />
       </Collapse>
     </div>

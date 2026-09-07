@@ -41,43 +41,69 @@ type ModelState = "loading" | "dark" | "approved_no_runs" | "approved"
 
 const j = (r: Response) => (r.ok ? r.json() : Promise.reject(r.status));
 
+// LOADING, FAILED AND EMPTY ARE THREE DIFFERENT FACTS.
+// `.catch(() => {})` left every one of these at its initial `null`, and
+// `null` is the branch that renders "loading …" — so a dead backend
+// spun a loading label for ever. This file already knew the rule for
+// one of its reads: `ModelStatus` splits dark from unavailable, with
+// the comment "collapsing them was the defect". The same split now
+// covers the other five. The type is LaligaDashboard.tsx's `settle()`,
+// redeclared here because that file is another owner's and src/lib is
+// not this change's to add to.
+type Load<T> = { s: "loading" } | { s: "error" } | { s: "ok"; d: T };
+const settle = <T,>(v: T | null | undefined): Load<T> =>
+  v == null ? { s: "error" } : { s: "ok", d: v };
+
 export default function EplDashboard() {
-  const [today, setToday] = useState<Fixture[] | null>(null);
-  const [week, setWeek] = useState<Fixture[] | null>(null);
-  const [tables, setTables] = useState<LeagueTable[] | null>(null);
-  const [books, setBooks] = useState<GameBook[] | null>(null);
-  const [odds, setOdds] = useState<Record<string, OddsRow>>({});
+  const [today, setToday] = useState<Load<Fixture[]>>({ s: "loading" });
+  const [week, setWeek] = useState<Load<Fixture[]>>({ s: "loading" });
+  const [tables, setTables] = useState<Load<LeagueTable[]>>({ s: "loading" });
+  const [books, setBooks] = useState<Load<GameBook[]>>({ s: "loading" });
+  // THE ODDS MAP IS A READ, NOT A DEFAULT: `{}` is "no shadow number
+  // for this fixture", which a failed read produced for all of them at
+  // once. `modelState` already said "unavailable" on a rejection; the
+  // MAP did not, so the fixtures below still read as runless.
+  const [odds, setOdds] = useState<Load<Record<string, OddsRow>>>({ s: "loading" });
   const [modelState, setModelState] = useState<ModelState>("loading");
-  const [disco, setDisco] = useState<Discovery | null>(null);
+  const [disco, setDisco] = useState<Load<Discovery>>({ s: "loading" });
 
   useEffect(() => {
     let alive = true;
     const load = () => {
       fetch("/api/epl/scoreboard").then(j)
-        .then((d) => alive && setToday(d.fixtures)).catch(() => {});
+        .then((d) => alive && setToday(settle<Fixture[]>(d?.fixtures ?? [])))
+        .catch(() => alive && setToday({ s: "error" }));
       fetch("/api/epl/markets").then(j)
-        .then((d) => alive && setBooks(d.games)).catch(() => {});
+        .then((d) => alive && setBooks(settle<GameBook[]>(d?.games ?? [])))
+        .catch(() => alive && setBooks({ s: "error" }));
       fetch("/api/epl/odds").then(j)
         .then((d) => {
           if (!alive) return;
           const map: Record<string, OddsRow> = {};
           for (const o of d.odds ?? []) map[o.espn_event_id] = o;
-          setOdds(map);
+          setOdds({ s: "ok", d: map });
           // trust the backend's explicit state; fall back to
           // "unavailable" rather than inventing "dark" from an absence
           const s = d.model_state as ModelState | undefined;
           setModelState(s && s !== "loading" ? s : "unavailable");
         })
         // a REJECTED fetch is a failure, not a dark model
-        .catch(() => alive && setModelState("unavailable"));
+        .catch(() => {
+          if (!alive) return;
+          setModelState("unavailable");
+          setOdds({ s: "error" });
+        });
     };
     load();
     fetch("/api/epl/schedule?days=7").then(j)
-      .then((d) => alive && setWeek(d.fixtures)).catch(() => {});
+      .then((d) => alive && setWeek(settle<Fixture[]>(d?.fixtures ?? [])))
+      .catch(() => alive && setWeek({ s: "error" }));
     fetch("/api/epl/standings").then(j)
-      .then((d) => alive && setTables(d.tables)).catch(() => {});
+      .then((d) => alive && setTables(settle<LeagueTable[]>(d?.tables ?? [])))
+      .catch(() => alive && setTables({ s: "error" }));
     fetch("/api/epl/markets/discovery").then(j)
-      .then((d) => alive && setDisco(d)).catch(() => {});
+      .then((d) => alive && setDisco(settle<Discovery>(d)))
+      .catch(() => alive && setDisco({ s: "error" }));
     const poll = setInterval(load, 60000);
     return () => { alive = false; clearInterval(poll); };
   }, []);
@@ -86,7 +112,14 @@ export default function EplDashboard() {
   // rule as the MLS hub, and it matters MORE preseason: today's bucket
   // is Aug 21). The heading is derived from the fixtures, never
   // asserted; grouping is by the viewer's LOCAL day.
-  const days = today ? groupByDay(today) : [];
+  const days = today.s === "ok" ? groupByDay(today.d) : [];
+  // A FAILED ODDS READ IS NOT AN ABSENT PREDICTION — the map is handed
+  // down only when it was read, and the failure is stated once.
+  const oddsMap = odds.s === "ok" ? odds.d : {};
+  // The discovery probe qualifies the "no open books" sentence. A
+  // failed probe must not silently narrow that sentence into the plain
+  // one, which reads as a fact about Kalshi.
+  const disc = disco.s === "ok" ? disco.d : null;
   const allToday = days.length === 0
     || days.every((g) => localDay(g.list[0].date) === dayKeyOf(new Date()));
   const showDayLabels = days.length > 1 || !allToday;
@@ -102,8 +135,16 @@ export default function EplDashboard() {
               · ESPN live feed, 60s poll
             </span>
           </h3>
-          {today === null ? (
+          {odds.s === "error" && (
+            <Empty>
+              epl shadow-odds read failed — no model number is shown on any
+              fixture below, and that is not the same as no run existing
+            </Empty>
+          )}
+          {today.s === "loading" ? (
             <Empty>loading fixtures…</Empty>
+          ) : today.s === "error" ? (
+            <Empty>premier league fixture feed unavailable — retrying every 60s</Empty>
           ) : days.length === 0 ? (
             <Empty>no premier league fixtures scheduled</Empty>
           ) : (
@@ -117,7 +158,7 @@ export default function EplDashboard() {
                   )}
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {g.list.map((f) => (
-                      <FixtureCard key={f.id} f={f} o={odds[f.id]} />
+                      <FixtureCard key={f.id} f={f} o={oddsMap[f.id]} />
                     ))}
                   </div>
                 </div>
@@ -133,7 +174,7 @@ export default function EplDashboard() {
           <h3 className="mb-2 text-lg font-medium text-ink-hi">
             Match markets{" "}
             <span className="text-sm font-normal text-ink-low">
-              · {disco?.game_series ?? "KXEPLGAME"} three-way, ask / bid
+              · {disc?.game_series ?? "KXEPLGAME"} three-way, ask / bid
             </span>
           </h3>
           <p className="mb-6 max-w-2xl text-xs leading-relaxed text-ink-low">
@@ -158,18 +199,23 @@ export default function EplDashboard() {
             )}{" "}
             Real-money signals are disabled server-side.
           </p>
-          {books === null ? (
+          {books.s === "loading" ? (
             <Empty>loading books…</Empty>
-          ) : books.length === 0 ? (
+          ) : books.s === "error" ? (
+            <Empty>kalshi book feed unavailable — retrying every 60s</Empty>
+          ) : books.d.length === 0 ? (
             <Empty>
               no open premier league books
-              {disco?.series_exists
-                ? ` — ${disco.game_series} exists but lists no 2026-27 events yet`
-                : ""}
+              {disc?.series_exists
+                ? ` — ${disc.game_series} exists but lists no 2026-27 events yet`
+                : disco.s === "error"
+                  ? " — and the series probe failed, so whether kalshi lists "
+                    + "the series at all is unknown here"
+                  : ""}
             </Empty>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {books.map((g) => <BookCard key={g.event_ticker} g={g} />)}
+              {books.d.map((g) => <BookCard key={g.event_ticker} g={g} />)}
             </div>
           )}
         </section>
@@ -179,13 +225,15 @@ export default function EplDashboard() {
         <section>
           <Eyebrow className="mb-2" tone="accent">next seven days</Eyebrow>
           <h3 className="mb-6 text-lg font-medium text-ink-hi">Fixtures</h3>
-          {week === null ? (
+          {week.s === "loading" ? (
             <Empty>loading schedule…</Empty>
-          ) : week.length === 0 ? (
+          ) : week.s === "error" ? (
+            <Empty>premier league schedule feed unavailable — retrying every 60s</Empty>
+          ) : week.d.length === 0 ? (
             <Empty>no fixtures in the next seven days — season starts Aug 21</Empty>
           ) : (
             <div className="divide-y divide-line rounded-2xl border border-line">
-              {week.slice(0, 30).map((f) => (
+              {week.d.slice(0, 30).map((f) => (
                 <Link key={f.id} href={`/bet-suggester/epl/${f.id}`}
                   className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-accent/5">
                   <span className="w-28 shrink-0 font-mono text-[11px] uppercase tracking-wide text-ink-faint">
@@ -196,12 +244,12 @@ export default function EplDashboard() {
                     <span className="text-ink-faint"> vs </span>
                     {f.away.short || f.away.name}
                   </span>
-                  {odds[f.id]?.outcomes && (
+                  {oddsMap[f.id]?.outcomes && (
                     <span className="shrink-0 font-mono text-[10px] tabular-nums text-ink-low"
                       title="epl-2026-v0 shadow odds — not advice">
-                      {Math.round((odds[f.id].outcomes!.home_win ?? 0) * 100)}
-                      /{Math.round((odds[f.id].outcomes!.draw ?? 0) * 100)}
-                      /{Math.round((odds[f.id].outcomes!.away_win ?? 0) * 100)}
+                      {Math.round((oddsMap[f.id].outcomes!.home_win ?? 0) * 100)}
+                      /{Math.round((oddsMap[f.id].outcomes!.draw ?? 0) * 100)}
+                      /{Math.round((oddsMap[f.id].outcomes!.away_win ?? 0) * 100)}
                     </span>
                   )}
                   <span className="hidden truncate font-mono text-[10px] text-ink-faint sm:block">
@@ -218,9 +266,11 @@ export default function EplDashboard() {
         <section>
           <Eyebrow className="mb-2" tone="accent">the table</Eyebrow>
           <h3 className="mb-6 text-lg font-medium text-ink-hi">Standings</h3>
-          {tables === null ? (
+          {tables.s === "loading" ? (
             <Empty>loading standings…</Empty>
-          ) : tables.length === 0 ? (
+          ) : tables.s === "error" ? (
+            <Empty>premier league standings feed unavailable — retrying every 60s</Empty>
+          ) : tables.d.length === 0 ? (
             // ESPN serves 20 all-zero rows ranked ALPHABETICALLY before
             // a ball is kicked. Rendering that would crown Bournemouth —
             // the backend withholds the table and this states why.
@@ -229,7 +279,7 @@ export default function EplDashboard() {
             </Empty>
           ) : (
             <div className="grid grid-cols-1 gap-6">
-              {tables.map((t) => <StandingsTable key={t.table} t={t} />)}
+              {tables.d.map((t) => <StandingsTable key={t.table} t={t} />)}
             </div>
           )}
         </section>

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { SYNC_PREVIEW_OPEN } from "../src/components/WatchDeclaration";
 
 // SELECTING MATCHES TO WATCH, from the picker board (B0c, 2026-09-06).
 //
@@ -400,15 +401,153 @@ test("a refused removal renders the backend's words verbatim and is not an error
   });
 
 // -------------------------------------------------- watch what I hold
+//
+// THE BUTTON THAT WROTE 37 PERMANENT RECORDS ON ONE CLICK. Pressing
+// "watch everything I hold" used to POST sync-positions straight from
+// its onClick, and the only place a count ever appeared was the result
+// line afterwards. What it writes cannot be taken back: the record is
+// append-only and a removal after kickoff is REFUSED by design. Son
+// pressed it, did not expect that, and said so. So the press ARMS a
+// confirmation and writes nothing, and these tests hold the press and
+// the write apart at the WIRE — `seen.syncCalls` is the only witness
+// that counts, because a confirmation that renders while the request is
+// already gone would satisfy every DOM assertion in this file.
 
-test("watch everything I hold is wired, and reports what it did in its own numbers",
+test("pressing watch-everything-I-hold WRITES NOTHING — it arms a "
+   + "confirmation that says what and how many first", async ({ page }) => {
+    const seen = await serve(page);
+    await page.goto("/bet-suggester");
+    await arm(page);
+    await expect(page.getByTestId("watch-sync-confirm")).toHaveCount(0);
+    await page.getByTestId("watch-sync").click();
+
+    const c = page.getByTestId("watch-sync-confirm");
+    await expect(c).toBeVisible();
+    // THE WIRE IS UNTOUCHED. Give the request a chance to have been
+    // made before asserting it was not: a bare count check on the next
+    // tick passes for the wrong reason.
+    await page.waitForTimeout(500);
+    expect(seen.syncCalls).toBe(0);
+
+    // WHAT it is about to declare — the source, and that it is not the
+    // board and not what you looked at.
+    await expect(c.getByTestId("watch-sync-what"))
+      .toContainText("open position");
+    await expect(c.getByTestId("watch-sync-what"))
+      .toContainText("open_position");
+    // THAT IT CANNOT BE TAKEN BACK, in the words of the rule that owns
+    // it — before the write, not after.
+    const irr = c.getByTestId("watch-sync-irreversible");
+    await expect(irr).toContainText("APPEND-ONLY");
+    await expect(irr).toContainText(/removal is refused/i);
+    await expect(irr).toContainText(/once a match has started/i);
+
+    // HOW MANY — every count is DERIVED from the served state payload,
+    // never a number typed into this assertion.
+    const counts = c.getByTestId("watch-sync-counts");
+    await expect(counts).toContainText(
+      String(STATE.open_positions_not_monitored.length));
+    await expect(counts).toContainText(
+      String(STATE.monitored_fixture_ids.length));
+    await expect(counts).toContainText(String(STATE.declared_ever_count));
+
+    // and cancelling writes nothing either
+    await c.getByTestId("watch-sync-cancel").click();
+    await expect(page.getByTestId("watch-sync-confirm")).toHaveCount(0);
+    await page.waitForTimeout(300);
+    expect(seen.syncCalls).toBe(0);
+  });
+
+test("a count the payload does not carry is NOT ZERO on the confirmation",
   async ({ page }) => {
+    // The panel's own discipline one layer over: `countOf` returns null
+    // for an absent field and the confirmation must print the words,
+    // not a plausible 0 — "no position is unwatched" is a claim, and an
+    // answer that carried no such key made none.
+    const thin: Record<string, unknown> = { ...STATE };
+    delete thin.open_positions_not_monitored;
+    await serve(page, { state: thin });
+    await page.goto("/bet-suggester");
+    await arm(page);
+    await page.getByTestId("watch-sync").click();
+    const counts = page.getByTestId("watch-sync-confirm")
+      .getByTestId("watch-sync-counts");
+    await expect(counts).toContainText("not on the payload");
+    await expect(counts).not.toContainText("held, and not in the set right now 0");
+  });
+
+test("with the set unread the confirmation says it can count nothing — "
+   + "not zero", async ({ page }) => {
+    await serve(page, { state: { error: "boom" }, stateStatus: 503 });
+    await page.goto("/bet-suggester");
+    await arm(page);
+    await page.getByTestId("watch-sync").click();
+    const c = page.getByTestId("watch-sync-confirm");
+    await expect(c.getByTestId("watch-sync-counts")).toHaveCount(0);
+    await expect(c.getByTestId("watch-sync-uncounted"))
+      .toContainText("no count at all");
+    // and the irreversibility is stated whether or not anything counted
+    await expect(c.getByTestId("watch-sync-irreversible"))
+      .toContainText("APPEND-ONLY");
+  });
+
+// THE REGISTER, GUARDED BOTH WAYS. The exact number of rows the sweep
+// appends is not on any payload this panel reads, so it is a REGISTERED
+// hole rather than a number this surface invents. The guard fails if a
+// record stops being printed, and it fails the day the payload starts
+// carrying the key that closes one while the record still stands.
+test("every registered pre-write hole is printed on the confirmation, "
+   + "with its closing condition", async ({ page }) => {
+    await serve(page);
+    await page.goto("/bet-suggester");
+    await arm(page);
+    await page.getByTestId("watch-sync").click();
+    const c = page.getByTestId("watch-sync-confirm");
+    const keys = Object.keys(SYNC_PREVIEW_OPEN);
+    expect(keys.length).toBeGreaterThan(0);
+    await expect(c.getByTestId("watch-sync-open")).toHaveCount(keys.length);
+    for (const k of keys) {
+      const row = c.locator(`[data-testid="watch-sync-open"][data-key="${k}"]`);
+      await expect(row).toContainText(SYNC_PREVIEW_OPEN[k].finding);
+      await expect(row).toContainText(SYNC_PREVIEW_OPEN[k].closes_when);
+    }
+    // nothing is stale on a payload that closes nothing
+    await expect(c.getByTestId("watch-sync-open-stale")).toHaveCount(0);
+  });
+
+test("a registered hole whose closing key ARRIVES on the payload is "
+   + "named as stale rather than left reading as current",
+  async ({ page }) => {
+    // The other direction of the same guard. The day the watchlist
+    // payload carries `open_position_fixture_ids`, the record above is
+    // closed and must be retired; until it is, the surface says so.
+    const closing = SYNC_PREVIEW_OPEN
+      .exact_write_count_unreadable.closed_by_state_key;
+    await serve(page, { state: { ...STATE, [closing]: [4101, 4321] } });
+    await page.goto("/bet-suggester");
+    await arm(page);
+    await page.getByTestId("watch-sync").click();
+    const stale = page.getByTestId("watch-sync-confirm")
+      .getByTestId("watch-sync-open-stale");
+    await expect(stale).toBeVisible();
+    await expect(stale).toContainText(closing);
+    await expect(stale).toContainText("exact_write_count_unreadable");
+  });
+
+test("watch everything I hold writes only from the confirmation, and "
+   + "reports what it did in its own numbers", async ({ page }) => {
     const seen = await serve(page);
     await page.goto("/bet-suggester");
     await arm(page);
     await page.getByTestId("watch-sync").click();
+    await page.getByTestId("watch-sync-confirm")
+      .getByTestId("watch-sync-go").click();
     await expect(page.getByTestId("watch-sync-result")).toBeVisible();
     expect(seen.syncCalls).toBe(1);
+    // the confirmation closes once it has fired: a standing "this
+    // writes a permanent record" beside a result that says it already
+    // did is two claims about one press
+    await expect(page.getByTestId("watch-sync-confirm")).toHaveCount(0);
     const out = page.getByTestId("watch-sync-result");
     await expect(out).toContainText("checked 3");
     await expect(out).toContainText("declared 1");
