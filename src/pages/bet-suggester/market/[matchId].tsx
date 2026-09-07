@@ -5,6 +5,25 @@ import { TZ } from "../../../lib/matchday";
 // On-demand predictions: cached by default, "Refresh" forces a fresh
 // Monte Carlo run against live odds. Shows xG, scoreline distribution,
 // every market priced, and how the prediction evolved over the day.
+//
+// 2026-09-06 — WHAT "WATCH" MEANS HERE, AND WHAT IT NO LONGER PROMISES.
+// Every Watch control on this page used to promise a notification: a toast
+// saying "you'll be pinged when the timing is ripe", a `title=` tooltip
+// saying the same, and a footer sentence naming the moment — "the moment
+// the ripeness score crosses the alert threshold with positive edge". The
+// composite behind all three is withdrawn (src/timing.py WITHDRAWN); the
+// trigger is retired by construction; nothing is dispatched.
+//
+// Two rules from the hold/exit stage are kept here as a result.
+// (a) IT SHOWS; IT DOES NOT DECIDE — no moment is named to act, which
+//     entry_map.NO_RESPONSE_WINDOW and research_archive/
+//     pre_kickoff_horizons both refuse on measured grounds.
+// (b) A CAVEAT ON A `title=` ATTRIBUTE IS NOT IN THE ACCESSIBLE TREE. The
+//     Watch tooltips carried the meaning of the control and nothing else
+//     said it, so a screen-reader user got the button and lost the claim.
+//     Those tooltips are gone and the sentence is real text below the
+//     table. `warn` is the refusal ink family on this stage and no longer
+//     colours the watching state.
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
@@ -139,7 +158,10 @@ export default function MatchDetail() {
     } else {
       await api.watch(matchId, marketId, marketTitle);
       setWatched((prev) => new Set(prev).add(marketId));
-      toast(`Watching: ${marketTitle} — you'll be pinged when the timing is ripe.`);
+      // No notification is sent and none is promised. Watching records that
+      // this market's tape should be read back on the archive page.
+      toast(`Watching: ${marketTitle} — its readings are listed on the WC26 `
+            + `page. Nothing is dispatched.`);
     }
   }
 
@@ -515,7 +537,7 @@ export default function MatchDetail() {
                       onClick={() => toggleWatch(pick!.market_id, pick!.market_title)}
                       className={`mt-4 rounded-lg border px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] transition-colors ${
                         watched.has(pick.market_id)
-                          ? "border-warn/50 text-warn hover:border-warn"
+                          ? "border-line-strong text-ink-mid hover:text-ink-hi"
                           : "border-accent/40 text-accent hover:border-accent hover:bg-accent/5"}`}
                     >
                       {watched.has(pick.market_id) ? "Watching this pick" : "Watch this pick"}
@@ -626,7 +648,7 @@ export default function MatchDetail() {
                       className="text-right transition-colors hover:text-ink-hi">
                       Mult{mktArrow("multiplier")}
                     </button>
-                    <span className="text-right">{settledMap ? "Settled" : "Alert"}</span>
+                    <span className="text-right">{settledMap ? "Settled" : "Watch"}</span>
                   </div>
 
                   {marketGroups.map(({ group, rows }) => {
@@ -669,12 +691,9 @@ export default function MatchDetail() {
                               ) : (
                               <button
                                 onClick={() => toggleWatch(m.market_id, m.market_title)}
-                                title={watched.has(m.market_id)
-                                  ? "Watching — you'll be pinged when the price is ripe. Click to stop."
-                                  : "Notify me when this bet's timing is ripe"}
                                 className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors ${
                                   watched.has(m.market_id)
-                                    ? "border-warn/50 text-warn hover:border-warn"
+                                    ? "border-line-strong text-ink-mid hover:text-ink-hi"
                                     : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"
                                 }`}
                               >
@@ -689,10 +708,16 @@ export default function MatchDetail() {
                   })}
                 </div>
               </div>
-              <p className="mt-3 text-xs leading-relaxed text-ink-faint">
-                Watched bets are polled every 30s. You get a Discord ping + feed entry
-                the moment the ripeness score crosses the alert threshold with positive edge.
-                Multipliers are the buyable ask price, not the midpoint.
+              <p className="mt-3 text-xs leading-relaxed text-ink-faint"
+                 data-testid="watch-means-what">
+                Watch adds a market to the list on the WC26 page, where its
+                stored readings are shown as five separate observations —
+                each in its own unit, each with its n, each naming what it
+                could not be computed from. Nothing is dispatched and no
+                moment is named to act: the 0-100 composite that used to
+                fire a notification at 75 was never measured and is
+                withdrawn. Multipliers are the buyable ask price, not the
+                midpoint.
               </p>
               </>)}
             </section>
@@ -1938,7 +1963,7 @@ function PlayerPropsTab({ pp, onWatch, watched }: {
                 <span className="text-right">
                   <button onClick={() => onWatch(r.market_id!, `${r.player} to score (tournament)`)}
                     className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors ${
-                      watched.has(r.market_id!) ? "border-warn/50 text-warn hover:border-warn"
+                      watched.has(r.market_id!) ? "border-line-strong text-ink-mid hover:text-ink-hi"
                         : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"}`}>
                     {watched.has(r.market_id!) ? "Watching" : "Watch"}
                   </button>

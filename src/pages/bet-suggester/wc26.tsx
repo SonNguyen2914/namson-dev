@@ -12,6 +12,28 @@
 // hero, bracket, ranking board, watchlist and alert panels, reading the
 // same endpoints. Nothing here was re-derived — this is an archive, and
 // an archive that quietly recomputes itself is not one.
+//
+// 2026-09-06 — THE ONE THING THAT DID CHANGE, AND WHY.
+// The watched-markets panel below was the last un-walled "bet now"
+// surface on the site. It printed "alert fires at 75/100", ranked
+// markets by a 0-100 composite score, filled a progress bar with it,
+// and at 75 turned the row's border, its bar and its number `warn` and
+// prefixed it with a clock emoji — a GO colour, on the ink family
+// WatchedStrip reserves for REFUSALS, beside a moment named to act.
+//
+// Not one of the eight numbers behind that composite was ever measured
+// (weights 35/25/20/10/10, a 0.7 damping, a 10-reading "learned" gate,
+// slope*25, a 12-hour urgency ramp). The backend withdrew it: see
+// `src/timing.py`'s WITHDRAWN registry, which rides on the payload this
+// page renders, so a reader who never opens the repo still meets what
+// was taken away and what would license bringing it back. The panel
+// still shows every observation the composite was built out of — the
+// information was never the problem, the verdict was.
+//
+// The charter this now keeps is `src/live/position.py`'s: IT SHOWS; IT
+// DOES NOT DECIDE. No ranking, no threshold, no GO colour, no moment
+// named to act, and every unmeasured constant labelled where a reader
+// meets it.
 import Head from "next/head";
 import { Anton } from "next/font/google";
 import Link from "next/link";
@@ -19,7 +41,7 @@ import { CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import { TZ } from "../../lib/matchday";
 import {
   api, countdown, flag, pct, signedPct, kickoffLocal,
-  RipenessAlert, SuggestionRow, UpcomingMatch, WatchlistEntry,
+  RipenessAlert, SuggestionRow, UpcomingMatch,
 } from "../../lib/suggesterApi";
 import LiveScoreboard from "../../components/LiveScoreboard";
 import BracketView from "../../components/BracketView";
@@ -29,7 +51,7 @@ import {
   NavChip, RouteProgress, SkeletonRows, Toaster, TopBar, useScrollSpy,
 } from "../../components/chrome";
 
-const POLL_MS = 60 * 1000; // watchlist scores move every 30s poll; refresh often
+const POLL_MS = 60 * 1000; // the odds tape is written every 30s; re-read often
 
 // Shared column template so the sortable header bar and every match group's
 // rows line up: Market (flex) | Likelihood | Edge | Multiplier | Alert.
@@ -47,6 +69,140 @@ function stageLabel(group: string): string {
     "3P": "third place", F: "final",
   };
   return rounds[group] ?? `group ${group}`;
+}
+
+// ---------------------------------------------------------------------------
+// The bet-timing board's payload, as `src/timing.py` now emits it.
+//
+// REGISTERED, because it is a hole and not a fix: `src/lib/suggesterApi.ts`
+// still declares `TimingScore { score: number; status: "no_data" |
+// "provisional" | "learned" | "match_over"; components; reasons }` and
+// `api.watchlist()` still declares an `alert_threshold`. None of those five
+// fields exists on the wire any more. That file belongs to another owner
+// this round, so the types below are declared here and the payload is
+// narrowed once, at the single point it enters this page.
+//   closes_when: suggesterApi.ts replaces TimingScore with TapeRead and
+//   drops `alert_threshold` from api.watchlist()'s return type; then these
+//   local declarations and the narrowing cast retire together, and the
+//   e2e spec that pins this record retires with them.
+// ---------------------------------------------------------------------------
+interface TapeObservation {
+  name: string;
+  describes: string;
+  unit: string | null;
+  value: number | null;
+  n: number | null;
+  predictive_status: "unmeasured";
+  refusal_code: string | null;
+  refused: string | null;
+  caveat?: string;
+  direction?: string;
+  kickoff_passed?: boolean;
+  elapsed_minutes?: number | null;
+}
+interface TapeRead {
+  market_id: string;
+  readings: number;
+  window_hours: number;
+  observations: Record<string, TapeObservation>;
+  refusal_counts: Record<string, number>;
+  refusal_codes: Record<string, string>;
+  charter: Record<string, string>;
+  withdrawn: Record<string, { was: string; why: string; licensed_by: string }>;
+  unmeasured_constants: Record<string, {
+    value: number; unit: string; what_it_does: string;
+    measured: boolean; note: string;
+  }>;
+}
+interface WatchedMarket {
+  match_id: string;
+  market_id: string;
+  market_title: string;
+  watched_since: string;
+  timing: TapeRead;
+}
+interface WatchlistPayload {
+  watchlist: WatchedMarket[];
+  order: { key: string; direction: string; is_a_ranking: boolean; note: string };
+  charter: Record<string, string>;
+}
+
+// The order the five observations are drawn in. Fixed, and deliberately NOT
+// the payload's own key order sorted by anything: an ordering that moved
+// with the numbers would be a ranking wearing a different name. Any
+// observation the backend adds and this list does not know is drawn after
+// these, so a new one cannot go silently undrawn.
+const OBSERVATION_ORDER = ["edge_deviate", "price_percentile", "edge_change",
+                           "clock", "volume_24h"];
+
+function orderedObservations(t: TapeRead): [string, TapeObservation][] {
+  const keys = Object.keys(t.observations);
+  const known = OBSERVATION_ORDER.filter((k) => keys.includes(k));
+  const rest = keys.filter((k) => !OBSERVATION_ORDER.includes(k)).sort();
+  return [...known, ...rest].map((k) => [k, t.observations[k]]);
+}
+
+const OBSERVATION_LABEL: Record<string, string> = {
+  edge_deviate: "edge vs this window",
+  price_percentile: "price vs prior readings",
+  edge_change: "edge change",
+  clock: "clock",
+  volume_24h: "24h volume",
+};
+
+/** One observation's number in its OWN unit — never mapped onto 0-1, never
+ *  coloured. Plain ink for a figure; `warn` only ever for a refusal. */
+function observationValue(key: string, o: TapeObservation): string {
+  if (o.value === null) return "—";
+  switch (key) {
+    case "edge_deviate":   return `${o.value >= 0 ? "+" : ""}${o.value.toFixed(2)}σ`;
+    case "price_percentile": return `${(o.value * 100).toFixed(0)}% of ${o.n}`;
+    case "edge_change":    return signedPct(o.value);
+    case "clock":          return o.value < 0
+      ? `${Math.abs(o.value).toFixed(1)}h after kickoff`
+      : `${o.value.toFixed(1)}h to kickoff`;
+    case "volume_24h":     return `$${o.value.toLocaleString("en-US")}`;
+    default:               return String(o.value);
+  }
+}
+
+/** The five observations of one market, plus every refusal by name. */
+function TapeReadRows({ t }: { t: TapeRead }) {
+  return (
+    <dl className="mt-3 space-y-1.5">
+      {orderedObservations(t).map(([key, o]) => (
+        <div key={key} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+          <dt className="w-44 shrink-0 font-mono text-[11px] uppercase tracking-[0.1em] text-ink-faint">
+            {OBSERVATION_LABEL[key] ?? key}
+          </dt>
+          <dd className="min-w-0 flex-1">
+            {o.refusal_code ? (
+              <span className="text-[13px] text-warn" data-testid={`refusal-${key}`}>
+                <span className="font-mono text-[11px] uppercase tracking-[0.1em]">
+                  {o.refusal_code}
+                </span>
+                {" — "}
+                {(o.refused ?? "").replace(`${o.refusal_code}: `, "")}
+              </span>
+            ) : (
+              <>
+                <span className="font-mono text-[13px] tabular-nums text-ink-hi">
+                  {observationValue(key, o)}
+                </span>
+                <span className="ml-2 text-[12px] text-ink-low">{o.describes}</span>
+                {o.caveat && (
+                  <span className="ml-2 text-[11px] text-ink-faint">{o.caveat}</span>
+                )}
+                {o.direction && (
+                  <span className="ml-2 text-[11px] text-ink-faint">{o.direction}</span>
+                )}
+              </>
+            )}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
 // Anton for the WC26 emblem's condensed weight.
@@ -129,9 +285,16 @@ export default function WC26Archive() {
   const [suggestions, setSuggestions] = useState<SuggestionRow[]>([]);
   const [tierUsed, setTierUsed] = useState<number | null>(null);
   const [matches, setMatches] = useState<UpcomingMatch[]>([]);
-  const [watchlist, setWatchlist] = useState<WatchlistEntry[]>([]);
-  const [ripeAlerts, setRipeAlerts] = useState<RipenessAlert[]>([]);
-  const [alertThreshold, setAlertThreshold] = useState(75);
+  const [watchlist, setWatchlist] = useState<WatchedMarket[]>([]);
+  const [watchOrder, setWatchOrder] = useState<WatchlistPayload["order"] | null>(null);
+  // Historical rows written by the RETIRED trigger. Kept because those
+  // notifications really were sent and an archive of a thing that happened
+  // is worth keeping; relabelled because the composite in their `score`
+  // column is withdrawn (src/timing.py REGISTERED_HOLES
+  // ["timing_alerts_table_holds_retired_rows"], whose closing condition
+  // names this surface: every renderer of these rows must date them and say
+  // the trigger that wrote them is gone).
+  const [retiredTriggerRows, setRetiredTriggerRows] = useState<RipenessAlert[]>([]);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [secsToRefresh, setSecsToRefresh] = useState(POLL_MS / 1000);
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -164,9 +327,11 @@ export default function WC26Archive() {
       setSuggestions(s.suggestions);
       setTierUsed(s.tier_used);
       setMatches(m.matches);
-      setWatchlist(wl.watchlist);
-      setAlertThreshold(wl.alert_threshold);
-      setRipeAlerts(al.alerts);
+      // narrowed once, here — see the registered record above TapeRead
+      const board = wl as unknown as WatchlistPayload;
+      setWatchlist(board.watchlist ?? []);
+      setWatchOrder(board.order ?? null);
+      setRetiredTriggerRows(al.alerts);
       setUpdatedAt(new Date());
       setSecsToRefresh(POLL_MS / 1000);
       setError("");
@@ -221,8 +386,9 @@ export default function WC26Archive() {
     try {
       if (watchedIds.has(s.market_id)) await api.unwatch(s.market_id);
       else await api.watch(s.match_id, s.market_id, s.market_title);
-      const wl = await api.watchlist();
-      setWatchlist(wl.watchlist);
+      const board = await api.watchlist() as unknown as WatchlistPayload;
+      setWatchlist(board.watchlist ?? []);
+      setWatchOrder(board.order ?? null);
     } catch { /* non-fatal; next poll resyncs */ }
   }
 
@@ -435,7 +601,7 @@ export default function WC26Archive() {
                     className="text-right transition-colors hover:text-ink-hi">
                     Mult{arrow("multiplier")}
                   </button>
-                  <span className="text-right">Alert</span>
+                  <span className="text-right">Watch</span>
                 </div>
 
                 {groups.map((g) => {
@@ -501,7 +667,7 @@ export default function WC26Archive() {
                               onClick={() => toggleWatch(s)}
                               className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors ${
                                 watchedIds.has(s.market_id)
-                                  ? "border-warn/50 text-warn hover:border-warn"
+                                  ? "border-line-strong text-ink-mid hover:text-ink-hi"
                                   : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"
                               }`}
                             >
@@ -519,78 +685,130 @@ export default function WC26Archive() {
         </section>
         </Reveal>
 
-        {/* Watched bets — ripeness scores */}
+        {/* Watched markets — the tape read. Not a score, not a ranking,
+            not a trigger. Every figure in its own unit, every absence
+            named, and the charter the backend sends printed above them so
+            a reader meets it before the numbers rather than after. */}
         {watchlist.length > 0 && (
           <Reveal>
-          <section className="mb-20">
-            <Eyebrow className="mb-2">bet timing</Eyebrow>
-            <h3 className="mb-4 text-lg font-medium text-ink-hi">
-              Watched bets <span className="text-sm font-normal text-ink-low">· alert fires at {alertThreshold.toFixed(0)}/100</span>
+          <section className="mb-20" data-testid="tape-read-section">
+            <Eyebrow className="mb-2">watched markets</Eyebrow>
+            <h3 className="mb-1 text-lg font-medium text-ink-hi">
+              What the odds tape says
             </h3>
+            <p className="mb-4 max-w-3xl text-[13px] leading-relaxed text-ink-low"
+               data-testid="tape-read-charter">
+              Five observations per market, each in its own unit and each with
+              its n. There is no combined figure, no threshold and no
+              notification: nothing on this panel says when to do anything.{" "}
+              <span className="text-ink-faint">
+                {watchlist[0]?.timing?.charter?.predictive_status_unmeasured}
+              </span>
+            </p>
+            {watchOrder && (
+              <p className="mb-4 max-w-3xl font-mono text-[11px] leading-relaxed text-ink-faint"
+                 data-testid="tape-read-order">
+                order: {watchOrder.key} {watchOrder.direction} ·
+                is_a_ranking: {String(watchOrder.is_a_ranking)} — {watchOrder.note}
+              </p>
+            )}
             <div className="space-y-3">
               {watchlist.map((w) => {
                 const t = w.timing;
-                const ripe = t.score >= alertThreshold;
+                const refused = Object.values(t.refusal_counts ?? {})
+                  .reduce((a, b) => a + b, 0);
                 return (
-                  <Link key={w.market_id} href={`/bet-suggester/market/${w.match_id}`} className="block">
-                    <div className={`cursor-pointer rounded-xl border p-4 transition-colors ${
-                      ripe ? "border-warn/50 bg-warn/5"
-                           : "border-line hover:border-line-strong"
-                    }`}>
-                      <div className="flex items-baseline justify-between gap-4">
-                        <p className="text-sm text-ink-hi">
-                          {ripe && <span className="mr-2">⏰</span>}
-                          {w.market_title}
-                          <span className="ml-2 font-mono text-[11px] text-ink-faint">
-                            {t.readings} readings · {t.status}
-                          </span>
-                        </p>
-                        <p className={`font-mono text-lg tabular-nums ${
-                          ripe ? "text-warn" : "text-ink-mid"
-                        }`}>
-                          {t.score.toFixed(0)}<span className="text-xs text-ink-faint">/100</span>
-                        </p>
-                      </div>
-                      <div className="mt-3 h-1 overflow-hidden rounded-full bg-elev2">
-                        <div
-                          className={`h-full rounded-full ${ripe ? "bg-warn" : "bg-accent/60"}`}
-                          style={{ width: `${Math.min(t.score, 100)}%` }}
-                        />
-                      </div>
-                      {t.reasons[0] && (
-                        <p className="mt-2.5 text-xs text-ink-low">{t.reasons[0]}
-                          {t.reasons[1] && ` · ${t.reasons[1]}`}</p>
-                      )}
+                  <div key={w.market_id}
+                       className="rounded-xl border border-line p-4"
+                       data-testid="tape-read-row">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                      <Link href={`/bet-suggester/market/${w.match_id}`}
+                            className="text-sm text-ink-hi transition-colors hover:text-accent">
+                        {w.market_title}
+                      </Link>
+                      <span className="font-mono text-[11px] text-ink-faint">
+                        {t.readings} reading{t.readings === 1 ? "" : "s"} in the
+                        last {t.window_hours}h
+                        {refused > 0 && ` · ${refused} of 5 refused`}
+                      </span>
                     </div>
-                  </Link>
+                    <TapeReadRows t={t} />
+                  </div>
                 );
               })}
             </div>
+            {watchlist[0]?.timing?.withdrawn && (
+              <details className="mt-4 rounded-xl border border-line p-4"
+                       data-testid="tape-read-withdrawn">
+                <summary className="cursor-pointer font-mono text-[11px] uppercase tracking-[0.14em] text-ink-mid">
+                  what this panel used to show, and why it does not
+                </summary>
+                <dl className="mt-3 space-y-3">
+                  {Object.entries(watchlist[0].timing.withdrawn).map(([k, v]) => (
+                    <div key={k}>
+                      <dt className="font-mono text-[11px] uppercase tracking-[0.1em] text-ink-faint">{k}</dt>
+                      <dd className="text-[12px] leading-relaxed text-ink-low">
+                        <span className="text-ink-mid">was</span> {v.was}.{" "}
+                        <span className="text-ink-mid">why</span> {v.why}.{" "}
+                        <span className="text-ink-mid">what would bring it back</span>{" "}
+                        {v.licensed_by}.
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </details>
+            )}
+            {watchlist[0]?.timing?.unmeasured_constants && (
+              <p className="mt-3 max-w-3xl font-mono text-[11px] leading-relaxed text-ink-faint"
+                 data-testid="tape-read-constants">
+                {Object.entries(watchlist[0].timing.unmeasured_constants).map(
+                  ([k, v]) => `${k} = ${v.value} ${v.unit} (unmeasured: ${v.note})`
+                ).join(" · ")}
+              </p>
+            )}
           </section>
           </Reveal>
         )}
 
-        {/* Recent ripeness alerts */}
-        {ripeAlerts.length > 0 && (
+        {/* Notifications the RETIRED trigger sent. History, drawn as
+            history: full dates rather than a bare clock time (these rows
+            are months old and read as "just now" without one), plain ink
+            rather than `warn`, no clock emoji, and the withdrawal stated
+            above them. Nothing new is ever added here — should_alert()
+            returns False by construction and save_alert() raises. */}
+        {retiredTriggerRows.length > 0 && (
           <Reveal>
-          <section className="mb-20">
-            <Eyebrow className="mb-2">alerts</Eyebrow>
-            <h3 className="mb-4 text-lg font-medium text-ink-hi">
-              Recent bet-window alerts
+          <section className="mb-20" data-testid="retired-trigger-section">
+            <Eyebrow className="mb-2">archive</Eyebrow>
+            <h3 className="mb-1 text-lg font-medium text-ink-hi">
+              Notifications the retired trigger sent
             </h3>
+            <p className="mb-4 max-w-3xl text-[13px] leading-relaxed text-ink-low"
+               data-testid="retired-trigger-note">
+              These were really sent, so they are kept. The figure each one
+              was fired on is a 0-100 composite that no longer exists: none
+              of its weights was ever measured, and the one rule of this
+              family anybody did test is recorded NOT ADOPTED
+              (research_archive/cashout_ripeness_2026-08-13.md — supported by
+              two slates, both of which were lost). The trigger is withdrawn
+              and this list cannot grow.
+            </p>
             <div className="space-y-2">
-              {ripeAlerts.slice(0, 6).map((a, i) => (
+              {retiredTriggerRows.slice(0, 6).map((a, i) => (
                 <div key={i} className="rounded-xl border border-line px-4 py-3 text-sm">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="text-warn">
-                      ⏰ {a.market_title}
-                      <span className="ml-2 font-mono tabular-nums">@ {a.decimal_odds?.toFixed(2)}</span>
-                      <span className="ml-2 font-mono text-xs tabular-nums text-ink-mid">
-                        edge {signedPct(a.edge)} · score {a.score.toFixed(0)}
+                    <span className="text-ink-mid">
+                      {a.market_title}
+                      <span className="ml-2 font-mono tabular-nums text-ink-low">@ {a.decimal_odds?.toFixed(2)}</span>
+                      <span className="ml-2 font-mono text-xs tabular-nums text-ink-faint">
+                        edge {signedPct(a.edge)} · withdrawn composite at the
+                        time {a.score.toFixed(0)}
                       </span>
                     </span>
                     <span className="font-mono text-[11px] text-ink-faint">
-                      {new Date(a.fired_at).toLocaleTimeString("en-US", { timeZone: TZ })}
+                      {new Date(a.fired_at).toLocaleString("en-US", {
+                        timeZone: TZ, year: "numeric", month: "short",
+                        day: "numeric", hour: "2-digit", minute: "2-digit" })}
                     </span>
                   </div>
                 </div>
