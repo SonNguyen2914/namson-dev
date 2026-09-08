@@ -771,6 +771,24 @@ test("a row the backend could not read carries NO state, and says "
   await expect(card.getByTestId("live-state")).not.toContainText("CONTEST");
 });
 
+test("an emitter that BROKE says so in its own words — a failed read is "
+  + "not a row without possession", async ({ page }) => {
+  // card._layer's fault isolation. "We could not look" and "there is
+  // nothing there" are different claims, and the fixed sentence states
+  // a CAUSE — no possession — that nobody observed here.
+  const broke = liveMatch({
+    fixture_id: 701,
+    states: { unavailable: "match states 701 failed to assemble "
+      + "(OperationalError: server closed the connection)" },
+  });
+  await open(page, { ...ENVELOPE, matches: [broke] });
+  const line = liveCard(page, 701).getByTestId("live-state-absent");
+  await expect(line).toContainText("failed to assemble");
+  await expect(line).not.toContainText("carries no possession");
+  await expect(liveCard(page, 701).getByTestId("live-state"))
+    .toHaveAttribute("data-state", "unavailable");
+});
+
 test("the state turns WITH the bars it is derived from", async ({ page }) => {
   // A label whose evidence has flipped away is the thing this placement
   // exists to avoid: the two axes are two of the bars in the block that

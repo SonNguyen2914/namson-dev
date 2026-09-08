@@ -543,9 +543,19 @@ function statesOf(m: WatchedMatch) {
   // BOTH OR NEITHER. The six states are a PAIR by construction — the
   // same cut read from two ends — so one word beside an empty slot
   // would be a claim the payload never makes.
-  if (home && away) return { home, away, conventions: o.conventions };
-  return { refused: typeof o.refused === "string" && o.refused !== ""
-    ? o.refused : typeof o.unavailable === "string" ? o.unavailable : "" };
+  if (home && away) {
+    return { home, away, conventions: o.conventions, broke: "" };
+  }
+  // A READ THAT FAILED IS NOT A ROW WITHOUT POSSESSION. `unavailable`
+  // is card._layer's fault isolation — the emitter itself broke — and
+  // rendering the possession sentence over it would state a CAUSE
+  // nobody observed. "We could not look" and "there is nothing there"
+  // are different claims, and this surface has been burnt by folding
+  // them once already (the fail-closed `in_play: false`).
+  return {
+    broke: typeof o.unavailable === "string" ? o.unavailable : "",
+    refused: typeof o.refused === "string" ? o.refused : "",
+  };
 }
 
 function StateRow({ m }: { m: WatchedMatch }) {
@@ -553,12 +563,13 @@ function StateRow({ m }: { m: WatchedMatch }) {
   if (!got) return null;
   if (!got.home || !got.away) {
     return (
-      <div data-testid="live-state" data-state="absent"
+      <div data-testid="live-state"
+        data-state={got.broke ? "unavailable" : "absent"}
         className="mt-2.5 border-t border-dashed border-line-strong pt-2.5">
         <p data-testid="live-state-absent" data-absence="routine"
-          title={got.refused || undefined}
+          title={got.broke || got.refused || undefined}
           className="font-mono text-[10px] leading-relaxed text-ink-low">
-          {STATE_ABSENT}
+          {got.broke || STATE_ABSENT}
         </p>
       </div>
     );
