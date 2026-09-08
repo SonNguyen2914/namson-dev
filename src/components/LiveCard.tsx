@@ -582,6 +582,25 @@ function triple(v: unknown): [number, number, number] | null {
   return [h * k, d * k, a * k];
 }
 
+/** THE MODEL READING THE MATCH — `model_live` on the payload. The same
+ *  engine as the frozen row above it, solved on B3's blended rates
+ *  instead of the T-10 lock's, so the triple moves with the shots the
+ *  match has actually produced. Read defensively for the same reason as
+ *  the block around it: it refuses far more often than it draws, because
+ *  M1 fitted the shots-to-goals conversion at four minutes and nothing
+ *  interpolates one for minute 47. */
+export function liveReadOf(m: WatchedMatch): {
+  live: [number, number, number]; moved: [number, number, number] | null;
+} | null {
+  const raw = (m as unknown as Record<string, unknown>).model_live;
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const live = triple(o.model_live);
+  if (!live) return null;
+  const moved = triple(o.moved_by);
+  return { live, moved: moved ?? null };
+}
+
 export function triplesOf(m: WatchedMatch): Triples | null {
   const raw = (m as unknown as Record<string, unknown>).model_v_market;
   if (!raw || typeof raw !== "object") return null;
@@ -601,6 +620,7 @@ function ModelVMarket({ m, hc, ac }: {
   m: WatchedMatch; hc: string; ac: string;
 }) {
   const t = triplesOf(m);
+  const live = liveReadOf(m);
   if (!t) {
     return (
       <>
@@ -621,6 +641,14 @@ function ModelVMarket({ m, hc, ac }: {
   return (
     <>
       <TripleBar label="model" v={t.model} hc={hc} ac={ac} />
+      {live && (
+        /* THE SAME ENGINE ON RATES THE MATCH MOVED. Drawn BESIDE the
+           frozen row and never instead of it: which of the two is
+           better against the price this engine calibrates on is
+           unmeasured (price_baseline_unmeasured), so ranking them here
+           would be this card deciding. */
+        <TripleBar label="model · live" v={live.live} hc={hc} ac={ac} />
+      )}
       <TripleBar label="market" v={t.market} hc={hc} ac={ac} dim />
       {/* THE SUBTRACTION OF THE TWO NUMBERS DIRECTLY ABOVE, on the side
           held. PLAIN INK, NEVER COLOURED AND NEVER A VERDICT: an edge

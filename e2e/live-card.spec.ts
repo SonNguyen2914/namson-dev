@@ -415,6 +415,54 @@ test("the caveat under the bars is the BACKEND's sentence, not one typed here",
     await expect(cav).toHaveAttribute("title", /NOT a measured edge/);
   });
 
+test("the model's LIVE read is drawn beside the frozen one, never instead of it",
+  async ({ page }) => {
+    /* The same engine, solved on B3's blended rates — the triple moves
+       with the shots the match produced. Both rows are drawn and
+       neither is ranked: which is better against the price this engine
+       calibrates on is unmeasured (price_baseline_unmeasured), so
+       picking one here would be this card deciding. */
+    await open(page, { ...STRIP, matches: [liveMatch({
+      model_v_market: {
+        model: { home: 62, draw: 21, away: 17 },
+        market: { home: 55, draw: 24, away: 21 },
+        side: "home",
+      },
+      model_live: {
+        model_live: { home: 71, draw: 18, away: 11 },
+        model_frozen: { home: 62, draw: 21, away: 17 },
+        moved_by: { home: 9, draw: -3, away: -6 },
+      },
+    })] });
+    const card = page.getByTestId("live-card").first();
+    const bars = card.getByTestId("live-price-bar");
+    // three rows: the frozen model, the live one, the market
+    await expect(bars).toHaveCount(3);
+    await expect(card).toContainText("model · live");
+    await expect(card).toContainText("model");
+    await expect(card).toContainText("market");
+  });
+
+test("a live read the backend refused leaves the other two rows alone",
+  async ({ page }) => {
+    /* It refuses far more often than it draws — M1 fitted the
+       shots-to-goals conversion at four minutes and nothing
+       interpolates one for minute 47 — so its absence is the NORMAL
+       case and must cost the block nothing. */
+    await open(page, { ...STRIP, matches: [liveMatch({
+      model_v_market: {
+        model: { home: 62, draw: 21, away: 17 },
+        market: { home: 55, draw: 24, away: 21 },
+        side: "home",
+      },
+      model_live: { refused: "no blend is persisted for this fixture" },
+    })] });
+    const card = page.getByTestId("live-card").first();
+    await expect(card.getByTestId("live-price-bar")).toHaveCount(2);
+    await expect(card).not.toContainText("model · live");
+    await expect(card.getByTestId("live-gap")).toHaveCount(1);
+  });
+
 test("a payload with no caveat line still says what the model could not see",
   async ({ page }) => {
     /* THE FALLBACK IS NOT AN EMPTY LINE. Of the three possible states —
