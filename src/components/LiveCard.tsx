@@ -835,6 +835,133 @@ function HazardLine({ p }: { p: WatchedPosition | undefined }) {
 
 const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
+// ---------------------------------------------------------------------
+// YOUR EXIT LINES
+//
+// The operator's own numbers, fixed in the backend's
+// docs/PREREG-picker-shape-paper-2026-09-08.md before the position
+// existed, evaluated per tick by src/live/exit_lines.py and REPORTED
+// here. Nothing on this side computes a line, compares a number against
+// a threshold, or decides which of them matters: every word in the four
+// columns below — the reading, the operator's own number, the verdict
+// word and the sentence under them — is a string the payload already
+// carries. A frontend that recomputed one would be a second
+// implementation of a pre-commitment, free to disagree with the one the
+// ledger records.
+//
+// NOT ASKED IS NOT NOT-FIRED, AND THEY MUST NOT LOOK ALIKE. A line the
+// gate could not put — before the hour, at a level scoreline, on a
+// minute with no measured horizon — draws ONE sentence across the row
+// in faint ink and NO verdict word at all, because a blank in the
+// verdict column reads as "it held". The backend's charter says this is
+// the one that will bite, and it bites hardest here, where a reader
+// takes in a column rather than a payload.
+//
+// PLAIN INK, NEVER THE TRAFFIC LIGHT. up/warn/neg on this board are
+// verdicts about a match. A line firing is not a verdict — it is the
+// operator's own number being reached, attributed to him — so the only
+// emphasis is weight: the fired word sits in ink-hi and everything else
+// is mid or faint.
+// ---------------------------------------------------------------------
+
+/** One line's row, as the backend emits it. Declared HERE rather than
+ *  in lib/suggesterApi.ts: `WatchedPosition` carries an index signature
+ *  for exactly the blocks that ride under their own registry name, and
+ *  every field is read defensively at the point of use — a type is a
+ *  claim about the build, not about the wire. */
+interface ExitLineRow {
+  name?: string;
+  asked?: boolean;
+  /** null when the line was NOT ASKED — never false */
+  fired?: boolean | null;
+  /** the left column: what the gate read, in the backend's words */
+  reads?: string;
+  /** the operator's own number, phrased as his (">= your +6") */
+  against?: string | null;
+  /** the whole sentence, which is what a not-asked row draws */
+  says?: string;
+  code?: string;
+}
+
+interface ExitLinesPayload {
+  lines?: ExitLineRow[];
+  fired?: string[];
+  summary?: { says?: string };
+}
+
+function ExitLines({ p }: { p: WatchedPosition | undefined }) {
+  const block = p?.exit_lines as ExitLinesPayload | undefined;
+  const lines = Array.isArray(block?.lines) ? block.lines : [];
+  if (!p) {
+    return (
+      <Quiet testid="live-exit-lines-absent">
+        nothing is held on this match, so none of your lines is asked
+      </Quiet>
+    );
+  }
+  if (lines.length === 0) {
+    return (
+      <Quiet testid="live-exit-lines-absent">
+        this read carries no exit lines
+      </Quiet>
+    );
+  }
+  return (
+    <div data-testid="live-exit-lines"
+      className="font-mono text-[10.5px] leading-relaxed tabular-nums">
+      {lines.map((ln, i) => {
+        const name = (ln.name ?? "line").replace(/_/g, " ");
+        const asked = ln.asked === true;
+        return (
+          // TWO ROWS PER LINE, NOT FOUR COLUMNS. The draft's single row
+          // is four cells wide and this card is one of four across, so
+          // a one-line layout truncates the reading — `+8.0 v…` beside
+          // a threshold, which is the one part a reader cannot infer.
+          // The name and the verdict frame the line; the numbers sit
+          // under them with room to be read whole.
+          <div key={ln.name ?? i} data-testid="live-exit-line"
+            data-line={ln.name ?? ""}
+            data-state={asked
+              ? (ln.fired === true ? "fired" : "not-fired") : "not-asked"}
+            className="mt-0.5 first:mt-0">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="flex-none text-ink-faint">{name}</span>
+              {asked ? (
+                <span data-testid="live-exit-verdict"
+                  className={`flex-none ${ln.fired === true
+                    ? "font-medium text-ink-hi" : "text-ink-faint"}`}>
+                  {ln.fired === true ? "FIRED" : "not fired"}
+                </span>
+              ) : null}
+            </div>
+            {asked ? (
+              <div className="text-ink-mid">
+                {ln.reads ?? ""}
+                {ln.against ? (
+                  <span className="text-ink-faint"> · {ln.against}</span>
+                ) : null}
+              </div>
+            ) : (
+              // ONE SENTENCE AND NO VERDICT WORD AT ALL. The words are
+              // the payload's own: this side does not know why a line
+              // could not be asked and does not guess.
+              <div className="text-ink-faint">
+                {ln.says ?? "not asked"}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {block?.summary?.says ? (
+        <p data-testid="live-exit-summary"
+          className="mt-1 border-t border-line pt-1 leading-snug text-ink-mid">
+          {block.summary.says}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 /** HELD / WORTH NOW / BID. A withdrawn figure carries THE CODE THAT
  *  WITHDREW IT and is never a dash on its own; a position that is not
  *  held says so rather than printing zeros. */
@@ -1028,6 +1155,12 @@ export function LiveCard({ m, generatedAt, row, clubCount }: {
       <div className="mt-auto">
         <Rule label="position" />
         <PositionBlock p={held} />
+        {/* 7 — THE OPERATOR'S OWN LINES, under the position they are
+            about. The heading says YOUR because the numbers are his and
+            were fixed before the position existed; this card evaluates
+            nothing and reports what the gate found. */}
+        <Rule label="your exit lines" />
+        <ExitLines p={held} />
       </div>
     </article>
   );

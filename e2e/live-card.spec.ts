@@ -257,6 +257,78 @@ const STATES_ABSENT = {
   basis: MISSING_IS_NEVER_EVEN,
 };
 
+// ------------------------------------------------- YOUR EXIT LINES
+//
+// RECORDED OFF THE EMITTER, not written by hand: every key and every
+// sentence below was printed by src/live/exit_lines.py's own
+// `evaluate()` on the state it names. Only the blocks the card reads
+// are kept (`lines`, `summary`), the way the position fixture keeps a
+// reduced `certainty_premium` — but nothing here is REWORDED, because
+// a fixture in the reader's vocabulary certifies a reader that cannot
+// read the real payload.
+
+/** A one-goal lead at 65' under a siege: both lines reached, the
+ *  next-goal line asked at level scorelines and so not asked here. */
+const EXIT_LINES_BOTH_FIRED = {
+  version: "exit-lines-v1",
+  lines: [
+    { name: "exposure", asked: true, fired: true,
+      reads: "+8.0 vs frozen", against: ">= your +6" },
+    { name: "imminence", asked: true, fired: true,
+      reads: "35.8% equaliser in 15'", against: ">= your 30%" },
+    { name: "next_goal", asked: false, fired: null,
+      against: "< your 30%", code: "level_scoreline",
+      says: "not asked - the score is 1-0 and this line is asked at "
+        + "level scorelines only" },
+  ],
+  fired: ["exposure", "imminence"],
+  summary: { says: "both fired · exiting now banks $38.50 and gives up "
+      + "$2.70", fired: ["exposure", "imminence"], blocked: false },
+};
+
+/** THE STATE THE PREREG SAYS IS THE COMMON ONE: level at 45', before
+ *  the operator's own clock gate, on a minute M1 never measured. Not
+ *  one line could be ASKED, and not one of them did not fire. */
+const EXIT_LINES_NONE_ASKED = {
+  version: "exit-lines-v1",
+  lines: [
+    { name: "exposure", asked: false, fired: null, against: ">= your +6",
+      code: "before_minute_60",
+      says: "not asked - the operator's line opens at 60' and it is 45'" },
+    { name: "imminence", asked: false, fired: null,
+      against: ">= your 30%", code: "level_scoreline",
+      says: "not asked - the scoreline is level at 45', and the "
+        + "equaliser hazard conditions on a lead" },
+    { name: "next_goal", asked: false, fired: null, against: "< your 30%",
+      code: "minute_not_measured",
+      says: "not asked - minute_not_measured: 45' is not a horizon" },
+  ],
+  fired: [],
+  summary: { says: "none of your lines was asked on this tick",
+    fired: [], blocked: null },
+};
+
+/** One fired, and the operator's own ceiling REFUSING the exit it
+ *  fired on — a block, recorded with its price, and the position
+ *  continues. */
+const EXIT_LINES_BLOCKED = {
+  version: "exit-lines-v1",
+  lines: [
+    { name: "exposure", asked: true, fired: true,
+      reads: "+7.1 vs frozen", against: ">= your +6" },
+    { name: "imminence", asked: true, fired: false,
+      reads: "24% equaliser in 15'", against: ">= your 30%" },
+    { name: "next_goal", asked: false, fired: null,
+      against: "< your 30%", code: "level_scoreline",
+      says: "not asked - the score is 1-0 and this line is asked at "
+        + "level scorelines only" },
+  ],
+  fired: ["exposure"],
+  summary: { says: "exposure fired · your certainty ceiling BLOCKS this "
+      + "exit: it costs 34.0% of hold EV, above the 20.0% you set. The "
+      + "position continues", fired: ["exposure"], blocked: true },
+};
+
 const COVERAGE = {
   monitored: true, complete_history: true,
   history: "declared before kickoff",
@@ -294,6 +366,7 @@ function liveMatch(over: Record<string, unknown> = {}) {
       value_now_cents: 7784.0,
       certainty_premium: { applies: true, sell: { bid_cents: 77 } },
       exit_is_obtainable: { obtainable: true },
+      exit_lines: EXIT_LINES_BOTH_FIRED,
     }],
     // The bars above read 58.4/41.6 on possession, so the ball axis
     // sits INSIDE the cut and the word that follows from them is
@@ -1036,4 +1109,234 @@ test("nothing is drawn at all when no declared match is under way",
     // ABSENT, NOT EMPTY: an empty frame headed "Under way" reads as a
     // claim that nothing is, and this read did not say that.
     await expect(page.getByTestId("live-section")).toHaveCount(0);
+  });
+
+// ==================================================== YOUR EXIT LINES
+//
+// The operator's own pre-committed numbers, evaluated in the backend
+// and REPORTED here. What is at stake on this surface, and it is not
+// pixels:
+//
+//   - NOT ASKED IS NOT NOT-FIRED. The blended rates exist at four
+//     minutes a match and the minute-60 gate takes two of those away,
+//     so "could not be asked" is the ORDINARY state of this block — and
+//     a reader takes in a column, not a payload. A line that could not
+//     be asked draws its own sentence and NO verdict word, because a
+//     blank in that column reads as "it held".
+//   - THIS SIDE COMPUTES NO LINE. Every reading, every threshold and
+//     every verdict word is a string the payload carried.
+//   - PLAIN INK. A line firing is the operator's own number being
+//     reached, not a verdict about the match, so it is not on the
+//     traffic light.
+
+test("the lines are drawn under the position, in the payload's own "
+  + "words", async ({ page }) => {
+    await open(page, STRIP);
+    const card = liveCard(page, 101);
+    const block = card.getByTestId("live-exit-lines");
+    await expect(block).toBeVisible();
+    await expect(card).toContainText("your exit lines");
+
+    const rows = card.getByTestId("live-exit-line");
+    await expect(rows).toHaveCount(3);
+
+    // THE FOUR COLUMNS, none of them assembled here.
+    const exposure = rows.filter({ has: page.locator("text=+8.0") });
+    await expect(exposure).toHaveAttribute("data-state", "fired");
+    await expect(exposure).toContainText("+8.0 vs frozen");
+    await expect(exposure).toContainText(">= your +6");
+    await expect(exposure).toContainText("FIRED");
+    await expect(rows.nth(1)).toContainText("35.8% equaliser in 15'");
+    await expect(rows.nth(1)).toContainText(">= your 30%");
+
+    // AND THE SENTENCE UNDER THEM IS THE BACKEND'S, verbatim.
+    await expect(card.getByTestId("live-exit-summary"))
+      .toHaveText("both fired · exiting now banks $38.50 and gives up "
+        + "$2.70");
+  });
+
+test("a line that could not be ASKED draws no verdict word at all",
+  async ({ page }) => {
+    await open(page, {
+      ...ENVELOPE,
+      matches: [liveMatch({
+        fixture_id: 303,
+        positions: [{
+          position: { outcome_key: "home_win", side: "home", size: "100",
+            entry_price: 0.46, entry_cost_dollars: "46.00",
+            entry_note: "sunk" },
+          exit_lines: EXIT_LINES_NONE_ASKED,
+        }],
+      })],
+    });
+    const card = liveCard(page, 303);
+    const rows = card.getByTestId("live-exit-line");
+    await expect(rows).toHaveCount(3);
+
+    // NOT ONE VERDICT WORD ON THE CARD. This is the assertion the whole
+    // block exists for: three lines nobody could ask must not render as
+    // three lines that held.
+    await expect(card.getByTestId("live-exit-verdict")).toHaveCount(0);
+    const said = await card.getByTestId("live-exit-lines").innerText();
+    expect(said).not.toContain("FIRED");
+    expect(said).not.toContain("not fired");
+
+    // Each row says WHY, in the gate's own words, and none is blank.
+    for (let i = 0; i < 3; i += 1) {
+      await expect(rows.nth(i)).toHaveAttribute("data-state", "not-asked");
+      expect((await rows.nth(i).innerText()).trim()).not.toBe("");
+    }
+    await expect(rows.nth(0)).toContainText("the operator's line opens "
+      + "at 60' and it is 45'");
+    await expect(rows.nth(1)).toContainText("the scoreline is level");
+    await expect(rows.nth(2)).toContainText("45' is not a horizon");
+    await expect(card.getByTestId("live-exit-summary"))
+      .toHaveText("none of your lines was asked on this tick");
+  });
+
+test("a fired line and a line that did not fire are told apart, and "
+  + "neither is on the traffic light", async ({ page }) => {
+    await open(page, {
+      ...ENVELOPE,
+      matches: [liveMatch({
+        fixture_id: 304,
+        positions: [{
+          position: { outcome_key: "home_win", side: "home", size: "100",
+            entry_price: 0.46, entry_cost_dollars: "46.00",
+            entry_note: "sunk" },
+          exit_lines: EXIT_LINES_BLOCKED,
+        }],
+      })],
+    });
+    const card = liveCard(page, 304);
+    const rows = card.getByTestId("live-exit-line");
+    await expect(rows.nth(0)).toHaveAttribute("data-state", "fired");
+    await expect(rows.nth(1)).toHaveAttribute("data-state", "not-fired");
+    await expect(rows.nth(2)).toHaveAttribute("data-state", "not-asked");
+    await expect(card.getByTestId("live-exit-verdict")).toHaveCount(2);
+
+    // THE CEILING BLOCKS AND THE POSITION CONTINUES — the backend's
+    // sentence, drawn whole.
+    await expect(card.getByTestId("live-exit-summary"))
+      .toContainText("BLOCKS this exit");
+    await expect(card.getByTestId("live-exit-summary"))
+      .toContainText("The position continues");
+
+    // PLAIN INK: no colour class from the verdict palette reaches these
+    // rows. The classes are read off the DOM rather than asserted as a
+    // screenshot, so a later restyle onto the traffic light fails here.
+    const classes = await card.getByTestId("live-exit-lines")
+      .evaluate((el) => Array.from(el.querySelectorAll("*"))
+        .map((n) => n.className).join(" "));
+    for (const hue of ["text-up", "text-warn", "text-neg", "text-accent",
+      "bg-up", "bg-warn", "bg-neg"]) {
+      expect(classes).not.toContain(hue);
+    }
+  });
+
+test("no exit line on any card names a moment to act", async ({ page }) => {
+  await open(page, {
+    ...ENVELOPE,
+    matches: [
+      liveMatch({ fixture_id: 305 }),
+      liveMatch({ fixture_id: 306, positions: [{
+        position: { outcome_key: "home_win", side: "home", size: "100",
+          entry_price: 0.46, entry_cost_dollars: "46.00",
+          entry_note: "sunk" },
+        exit_lines: EXIT_LINES_BLOCKED }] }),
+      liveMatch({ fixture_id: 307, positions: [{
+        position: { outcome_key: "home_win", side: "home", size: "100",
+          entry_price: 0.46, entry_cost_dollars: "46.00",
+          entry_note: "sunk" },
+        exit_lines: EXIT_LINES_NONE_ASKED }] }),
+    ],
+  });
+  const blocks = page.getByTestId("live-exit-lines");
+  const n = await blocks.count();
+  expect(n).toBe(3);                        // not a vacuous scan
+  for (let i = 0; i < n; i += 1) {
+    const said = (await blocks.nth(i).innerText()).toLowerCase();
+    expect(said.trim()).not.toBe("");
+    // SELL is an unattributed imperative and this block does not have
+    // one; the money travels and the word does not.
+    expect(said).not.toContain("sell");
+    for (const imperative of ["you should", "cash out", "sell now",
+      "buy now", "act now", "take profit", "we advise", "we recommend",
+      "get out", "close the position"]) {
+      expect(said).not.toContain(imperative);
+    }
+    // AND THE LINES ARE ATTRIBUTED TO HIM, on every card that has them.
+    expect(said).toContain("your");
+  }
+});
+
+test("the card computes no line of its own — the verdict comes off the "
+  + "payload and nowhere else", async ({ page }) => {
+    // A READING AND A VERDICT THAT DISAGREE, on purpose. The backend
+    // cannot emit this: +9.4 is over the operator's +6 and the gate
+    // would have fired. If this surface compared the two numbers itself
+    // it would overrule the payload here — and a pre-commitment
+    // evaluated in two places is a pre-commitment that can disagree
+    // with the ledger that records it.
+    const contradictory = {
+      version: "exit-lines-v1",
+      lines: [
+        { name: "exposure", asked: true, fired: false,
+          reads: "+9.4 vs frozen", against: ">= your +6" },
+        { name: "imminence", asked: true, fired: true,
+          reads: "11% equaliser in 15'", against: ">= your 30%" },
+        { name: "next_goal", asked: false, fired: null,
+          against: "< your 30%", code: "level_scoreline",
+          says: "not asked - the score is 1-0 and this line is asked "
+            + "at level scorelines only" },
+      ],
+      fired: ["imminence"],
+      summary: { says: "imminence fired", fired: ["imminence"],
+        blocked: false },
+    };
+    await open(page, {
+      ...ENVELOPE,
+      matches: [liveMatch({
+        fixture_id: 310,
+        positions: [{
+          position: { outcome_key: "home_win", side: "home", size: "100",
+            entry_price: 0.46, entry_cost_dollars: "46.00",
+            entry_note: "sunk" },
+          exit_lines: contradictory,
+        }],
+      })],
+    });
+    const rows = liveCard(page, 310).getByTestId("live-exit-line");
+    await expect(rows.nth(0)).toHaveAttribute("data-state", "not-fired");
+    await expect(rows.nth(0)).toContainText("not fired");
+    await expect(rows.nth(1)).toHaveAttribute("data-state", "fired");
+    await expect(rows.nth(1)).toContainText("FIRED");
+    // and the summary is the payload's, not one assembled from the rows
+    await expect(liveCard(page, 310).getByTestId("live-exit-summary"))
+      .toHaveText("imminence fired");
+  });
+
+test("a payload with no exit lines says so rather than drawing nothing",
+  async ({ page }) => {
+    await open(page, {
+      ...ENVELOPE,
+      matches: [liveMatch({
+        fixture_id: 308,
+        positions: [{
+          position: { outcome_key: "home_win", side: "home", size: "100",
+            entry_price: 0.46, entry_cost_dollars: "46.00",
+            entry_note: "sunk" },
+        }],
+      }),
+      liveMatch({ fixture_id: 309, positions: [] })],
+    });
+    // A HELD POSITION WHOSE PAYLOAD CARRIES NO BLOCK, and a match with
+    // nothing held: two different absences, two different sentences,
+    // neither of them a blank under a heading that promises lines.
+    await expect(liveCard(page, 308)
+      .getByTestId("live-exit-lines-absent"))
+      .toHaveText("this read carries no exit lines");
+    await expect(liveCard(page, 309)
+      .getByTestId("live-exit-lines-absent"))
+      .toContainText("nothing is held on this match");
   });
