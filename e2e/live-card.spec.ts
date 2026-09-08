@@ -548,6 +548,37 @@ test("the model's LIVE read is drawn beside the frozen one, never instead of it"
     await expect(card).toContainText("market");
   });
 
+test("the live row carries its OWN sentence, and it leaves with the row",
+  async ({ page }) => {
+    /* ONE LINE MAY NOT SPEAK FOR A BAR IT DOES NOT OWN. The caveat under
+       this block once read "not the stats above" — true while there were
+       two bars, false the day a third was added that reads exactly those
+       stats. Each row's words travel with the row now, so the eighty-six
+       minutes a match carries no measured horizon take the sentence away
+       with the bar it described. */
+    await open(page, { ...STRIP, matches: [withTriples(
+      [62, 21, 17], [55, 24, 21], {})] });
+    const card = page.getByTestId("live-card").first();
+    // no live row on this payload — and so no line for it
+    await expect(card.getByTestId("live-model-live-line")).toHaveCount(0);
+    await expect(card.getByTestId("live-caveat").first())
+      .not.toHaveText(/not the stats above/);
+
+    await open(page, { ...STRIP, matches: [liveMatch({
+      model_v_market: {
+        model: { home: 62, draw: 21, away: 17 },
+        market: { home: 55, draw: 24, away: 21 }, side: "home",
+      },
+      model_live: {
+        model_live: { home: 71, draw: 18, away: 11 },
+        line: "model · live adds this side's shots to the minute",
+      },
+    })] });
+    const c2 = page.getByTestId("live-card").first();
+    await expect(c2.getByTestId("live-model-live-line"))
+      .toHaveText(/adds this side's shots/);
+  });
+
 test("a live read the backend refused leaves the other two rows alone",
   async ({ page }) => {
     /* It refuses far more often than it draws — M1 fitted the
@@ -576,7 +607,7 @@ test("a payload with no caveat line still says what the model could not see",
        measured against the stats above them. */
     await open(page, { ...STRIP, matches: [withTriples([62, 21, 17], [55, 24, 21])] });
     await expect(page.getByTestId("live-caveat").first())
-      .toHaveText(/minute and score only/);
+      .toHaveText(/clock and the scoreline/);
   });
 
 test("a block the backend REFUSED draws no bar and no gap", async ({ page }) => {
@@ -698,11 +729,13 @@ test("the blocks this payload cannot fill REFUSE BY NAME — and a "
     await expect(card.getByTestId("live-price-bar")).toHaveCount(0);
     await expect(card.getByTestId("live-gap")).toHaveCount(0);
 
-    // THE CAVEAT IS NOT OPTIONAL. It is the literal truth of
-    // state_probabilities(minute, score, λ): the model never sees the
-    // four component reads drawn above it.
+    // THE CAVEAT IS NOT OPTIONAL. It says what the `model` bar is made
+    // of — state_probabilities on the frozen T-10 rates, which read the
+    // clock and the scoreline. It no longer denies the model saw the
+    // stats above, because `model · live` may be drawn beside it doing
+    // exactly that; each bar carries its own claim.
     await expect(card.getByTestId("live-caveat"))
-      .toHaveText(/minute and score only.*de-vigged book/);
+      .toHaveText(/clock and the scoreline.*de-vigged book/);
 
     // NO CARD COUNT IS ON THIS PAYLOAD, and the line says so rather
     // than disappearing — a missing card row reads as a match with no

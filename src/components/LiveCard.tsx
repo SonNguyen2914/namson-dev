@@ -675,8 +675,14 @@ type Triples = {
   caveatBasis?: string;
 };
 
-const CAVEAT = "model sees minute and score only, not the stats above · "
-  + "market is the de-vigged book";
+/* THE FALLBACK ONLY, and it may not deny what a sibling bar shows. It
+   used to read "not the stats above", which was true while this block
+   drew two bars and false the day `model · live` was added beside it —
+   a caveat speaking for a row it does not own. The backend's line is
+   preferred; this exists for a payload that carries none, where saying
+   nothing would be worse than saying less. */
+const CAVEAT = "model reads the clock and the scoreline · market is the "
+  + "de-vigged book";
 
 function triple(v: unknown): [number, number, number] | null {
   if (!v || typeof v !== "object") return null;
@@ -702,6 +708,9 @@ function triple(v: unknown): [number, number, number] | null {
  *  interpolates one for minute 47. */
 export function liveReadOf(m: WatchedMatch): {
   live: [number, number, number]; moved: [number, number, number] | null;
+  /** this row's OWN sentence, which travels with it — so the eighty-six
+   *  minutes a match has no measured horizon take the words away too */
+  line: string | null;
 } | null {
   const raw = (m as unknown as Record<string, unknown>).model_live;
   if (!raw || typeof raw !== "object") return null;
@@ -709,7 +718,8 @@ export function liveReadOf(m: WatchedMatch): {
   const live = triple(o.model_live);
   if (!live) return null;
   const moved = triple(o.moved_by);
-  return { live, moved: moved ?? null };
+  const line = typeof o.line === "string" && o.line.trim() ? o.line : null;
+  return { live, moved: moved ?? null, line };
 }
 
 export function triplesOf(m: WatchedMatch): Triples | null {
@@ -758,7 +768,15 @@ function ModelVMarket({ m, hc, ac }: {
            better against the price this engine calibrates on is
            unmeasured (price_baseline_unmeasured), so ranking them here
            would be this card deciding. */
-        <TripleBar label="model · live" v={live.live} hc={hc} ac={ac} />
+        <>
+          <TripleBar label="model · live" v={live.live} hc={hc} ac={ac} />
+          {live.line && (
+            <p data-testid="live-model-live-line"
+              className="mb-2 font-mono text-[9px] leading-relaxed text-ink-faint">
+              {live.line}
+            </p>
+          )}
+        </>
       )}
       <TripleBar label="market" v={t.market} hc={hc} ac={ac} dim />
       {/* THE SUBTRACTION OF THE TWO NUMBERS DIRECTLY ABOVE, on the side
