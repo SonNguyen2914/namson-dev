@@ -58,6 +58,17 @@
   --warn: #fbbf24;         /* watch / ripeness / tier notes */
   --skylive: #38bdf8;      /* experimental live-read panel */
   --neg: #f87171;          /* negative edge */
+
+  /* ONE THICKNESS FOR EVERY BAR ON THE LIVE CARD, FROM ONE TOKEN.
+     The stat bars were drawn thin and the price bars thick, because the
+     price bar has to be tall enough to hold the DRAW LABEL inside its
+     own segment — which made two heights on one card read as two
+     importances. The token is set by the taller requirement and every
+     bar takes it, so a stat bar cannot quietly become the thin one
+     again. THE FLOOR IS THAT LABEL: below about 10px the number has to
+     leave the segment, which is why this stops here rather than going
+     thinner. */
+  --bar-h: 10px;
 }
 
 @media (prefers-color-scheme: dark) {

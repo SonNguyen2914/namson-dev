@@ -69,6 +69,7 @@ import {
 } from "../../lib/pickerSort";
 import { Eyebrow } from "../../components/ui";
 import { ArchiveMenu } from "../../components/ArchiveMenu";
+import LiveSection from "../../components/LiveCard";
 import { LeagueColumn } from "../../components/PickerColumn";
 import {
   WatchDeclarationProvider, WatchPanel,
@@ -521,6 +522,27 @@ export default function PickerBoard() {
             </details>
           </section>
         )}
+
+        {/* --------------- the matches under way, in their own frame ---------------
+            ABOVE THE RANKED COLUMNS, because a match in play outranks
+            every judgement about one that has not kicked off — and in a
+            FRAME OF ITS OWN, saying on its own rule that nothing in it
+            is ranked. Dropped straight into the column flow it would be
+            read as the top of the board, which is the one thing it is
+            not.
+
+            IT IS INSIDE WatchDeclarationProvider FOR THE SAME REASON THE
+            STRIP IS: the watched-strip read is operator-gated and the
+            token is the one the watch panel already holds. Outside the
+            provider this section would be silently blank.
+
+            It is handed the board's OWN rows and league meta rather than
+            fetching a second copy: the flip's prematch face renders
+            PickerColumn.RowRead, the component the ranked columns
+            render, and it must be given the very row the column below is
+            drawing — a second fetch could hand the two surfaces two
+            different reads of one fixture. */}
+        <LiveSection rows={rows} leagues={leaguesMap} />
 
         {/* ---------------------------- the board ---------------------------- */}
         <section className="mt-8">

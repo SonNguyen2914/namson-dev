@@ -216,75 +216,31 @@ export function seasonDeparture(
   return null;
 }
 
-function RowCard({ row, rank, modeId, clubCount, colSrc }: {
-  row: BoardRow; rank: number; modeId: SortModeId; clubCount: number;
-  colSrc?: string | null;
+/** THE BOARD'S READ OF ONE FIXTURE — the matchup line and its anchor,
+ *  the rank dumbbell, Stage 1 and Stage 2 — LIFTED OUT OF RowCard
+ *  VERBATIM so a second surface can render THE SAME READ rather than a
+ *  hand-copied lookalike.
+ *
+ *  WHY IT EXISTS. The live card's flip shows the prematch read on its
+ *  back, and the first draft of that hand-rewrote this block in its own
+ *  CSS. The operator rejected exactly that: two layouts for one read is
+ *  how two surfaces begin disagreeing about one fixture, and the second
+ *  one drifts silently because nothing renders them side by side.
+ *
+ *  NOTHING WAS RESTYLED IN THE MOVE. Every element, class, attribute and
+ *  prop below is what RowCard held, in RowCard's order; the three values
+ *  it derives (`badge`, `anchor`, `alt`) are the same pure calls off the
+ *  same `row` and `modeId`. A component boundary adds no DOM, so
+ *  RowCard's output is unchanged — which e2e/picker.spec.ts and
+ *  e2e/picker-blend-cup.spec.ts prove, unedited, on every run. */
+export function RowRead({ row, modeId, clubCount }: {
+  row: BoardRow; modeId: SortModeId; clubCount: number;
 }) {
   const badge = homeBadge(row);
-  const w = row.weights;
-  const cross = row.cross_league === true;
   const anchor = anchorFor(row, modeId);
   const alt = seasonDisagreement(row);
-  const departure = seasonDeparture(row, colSrc, alt);
   return (
-    <article
-      data-testid="picker-row"
-      data-shape={row.shape}
-      data-league={row.league}
-      data-column={row.column ?? row.league}
-      data-event={row.event_id}
-      data-cross-league={cross ? "true" : "false"}
-      data-season-departure={departure ?? undefined}
-      className={`rounded-xl border p-4 transition-colors bg-gradient-to-b from-elev2/60 to-elev/40 ${
-        rank === 1
-          ? "border-accent/35 hover:border-accent/60"
-          : "border-line hover:border-line-strong"}`}
-    >
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span data-testid="row-rank"
-          className={`font-mono text-[11px] tabular-nums ${
-            rank === 1 ? "text-accent" : "text-ink-faint"}`}>
-          {String(rank).padStart(2, "0")}
-        </span>
-        {/* NO SEASON CHIP ON A ROW, AT ALL. The basis belongs to the
-            column header — `this szn · min 22 GP` — and to the fixture
-            count beside it; every club in a league is rated on the same
-            table, so a chip on a card repeats one sentence down the whole
-            column. Drawing it only on the rows that DEPART was worse than
-            either alternative: a chip appearing on some cards and not
-            others reads as a fact that varies fixture by fixture, which
-            is what it looked like on the board and is not what it means.
-            The departure is still DERIVED and still carried, as data on
-            the row rather than as ink on it (see data-season-departure),
-            so nothing about it is lost and a guard can still read it. */}
-        {/* THE COMPETITION, when it is not the column. A Leagues Cup tie
-            between two Liga MX clubs is drawn in the Liga MX column
-            because that table describes it completely — but it is still
-            a cup tie, and a card that let the reader assume "Liga MX
-            fixture" would be quietly wrong about what the price settles
-            on. This badge is the whole reason the fold is safe. */}
-        {row.column && row.column !== row.league && (
-          <span data-testid="competition-badge"
-            title={`${leagueLabel(row.league)} fixture, shown in the ${leagueLabel(row.column)} column because both clubs are rated on that table`}
-            className="rounded border border-accent/40 bg-accent/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-accent">
-            {leagueLabel(row.league)}
-          </span>
-        )}
-        {/* WHICH TABLE EACH CLUB WAS RATED ON. Only worth saying when
-            they differ — on a league column both sides are the column
-            itself, and repeating it would be noise. */}
-        {cross && row.rated_in && (
-          <span data-testid="rated-in"
-            title="each club is rated on its own domestic league's table — this cup has none of its own"
-            className="rounded border border-warn/40 bg-warn/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
-            {leagueLabel(row.rated_in.home)} v {leagueLabel(row.rated_in.away)}
-          </span>
-        )}
-        <span className="ml-auto font-mono text-[11px] tabular-nums text-ink-faint">
-          {fmtDate(row.kickoff, "short")}
-        </span>
-      </div>
-
+    <>
       {/* The fixture line is the way IN. A board of ranked matches you
           cannot open is a list of names — every dashboard already links
           this same id space. Wraps only the matchup, so the Stage-1/2
@@ -397,6 +353,78 @@ function RowCard({ row, rank, modeId, clubCount, colSrc }: {
           cross-league comparison, so the explanation belongs between
           them and the price. */}
       {row.gap_note && <GapNote note={row.gap_note} />}
+    </>
+  );
+}
+
+function RowCard({ row, rank, modeId, clubCount, colSrc }: {
+  row: BoardRow; rank: number; modeId: SortModeId; clubCount: number;
+  colSrc?: string | null;
+}) {
+  const w = row.weights;
+  const cross = row.cross_league === true;
+  const alt = seasonDisagreement(row);
+  const departure = seasonDeparture(row, colSrc, alt);
+  return (
+    <article
+      data-testid="picker-row"
+      data-shape={row.shape}
+      data-league={row.league}
+      data-column={row.column ?? row.league}
+      data-event={row.event_id}
+      data-cross-league={cross ? "true" : "false"}
+      data-season-departure={departure ?? undefined}
+      className={`rounded-xl border p-4 transition-colors bg-gradient-to-b from-elev2/60 to-elev/40 ${
+        rank === 1
+          ? "border-accent/35 hover:border-accent/60"
+          : "border-line hover:border-line-strong"}`}
+    >
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span data-testid="row-rank"
+          className={`font-mono text-[11px] tabular-nums ${
+            rank === 1 ? "text-accent" : "text-ink-faint"}`}>
+          {String(rank).padStart(2, "0")}
+        </span>
+        {/* NO SEASON CHIP ON A ROW, AT ALL. The basis belongs to the
+            column header — `this szn · min 22 GP` — and to the fixture
+            count beside it; every club in a league is rated on the same
+            table, so a chip on a card repeats one sentence down the whole
+            column. Drawing it only on the rows that DEPART was worse than
+            either alternative: a chip appearing on some cards and not
+            others reads as a fact that varies fixture by fixture, which
+            is what it looked like on the board and is not what it means.
+            The departure is still DERIVED and still carried, as data on
+            the row rather than as ink on it (see data-season-departure),
+            so nothing about it is lost and a guard can still read it. */}
+        {/* THE COMPETITION, when it is not the column. A Leagues Cup tie
+            between two Liga MX clubs is drawn in the Liga MX column
+            because that table describes it completely — but it is still
+            a cup tie, and a card that let the reader assume "Liga MX
+            fixture" would be quietly wrong about what the price settles
+            on. This badge is the whole reason the fold is safe. */}
+        {row.column && row.column !== row.league && (
+          <span data-testid="competition-badge"
+            title={`${leagueLabel(row.league)} fixture, shown in the ${leagueLabel(row.column)} column because both clubs are rated on that table`}
+            className="rounded border border-accent/40 bg-accent/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-accent">
+            {leagueLabel(row.league)}
+          </span>
+        )}
+        {/* WHICH TABLE EACH CLUB WAS RATED ON. Only worth saying when
+            they differ — on a league column both sides are the column
+            itself, and repeating it would be noise. */}
+        {cross && row.rated_in && (
+          <span data-testid="rated-in"
+            title="each club is rated on its own domestic league's table — this cup has none of its own"
+            className="rounded border border-warn/40 bg-warn/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
+            {leagueLabel(row.rated_in.home)} v {leagueLabel(row.rated_in.away)}
+          </span>
+        )}
+        <span className="ml-auto font-mono text-[11px] tabular-nums text-ink-faint">
+          {fmtDate(row.kickoff, "short")}
+        </span>
+      </div>
+
+      <RowRead row={row} modeId={modeId} clubCount={clubCount} />
 
       <div className="mt-3 border-t border-line pt-3">
         <KalshiCell quote={row.kalshi} />
