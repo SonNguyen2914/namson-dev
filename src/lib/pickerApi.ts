@@ -301,6 +301,47 @@ export const SEASON_BLEND_K = 10;
 export const pctThisSeason = (w: number | null | undefined) =>
   w == null ? "—" : `${Math.round(w * 100)}%`;
 
+/** THE SEASON BASIS AS ONE FACT PER LEAGUE, which is what it is. Every
+ *  club in a column blends on the same k, so the clubs differ only by
+ *  games played — "how much of this table is this season" is a LEAGUE
+ *  fact, said once in the header, not a chip repeated on every row.
+ *
+ *  A RANGE THAT COLLAPSES AT THE PRECISION IT IS PRINTED IN. The
+ *  endpoints are the least- and most-current club in the column, and
+ *  there is NO tolerance constant to tune: they collapse exactly when
+ *  they round to the same whole percent, so the span can never claim a
+ *  spread finer than the ink it is written in.
+ *
+ *  CUPS ARE EXCLUDED BY CONSTRUCTION. A cup's clubs are rated on their
+ *  DOMESTIC tables, so one percentage across that column would be an
+ *  average over several leagues — a number belonging to no table.
+ *
+ *  MISSING IS NEVER ZERO. A row without weights is not counted as 0%,
+ *  it is not counted at all; a column with none returns null so the
+ *  header stays silent rather than printing "0% this szn". */
+export function seasonSpan(
+  rows: readonly { weights?: BlendWeights | null }[],
+  kind?: "league" | "cup" | null,
+): { lo: number; hi: number; clubs: number } | null {
+  if (kind === "cup") return null;
+  const ws: number[] = [];
+  for (const r of rows) {
+    const w = r.weights;
+    if (!w) continue;
+    if (w.home != null) ws.push(w.home);
+    if (w.away != null) ws.push(w.away);
+  }
+  if (!ws.length) return null;
+  return { lo: Math.min(...ws), hi: Math.max(...ws), clubs: ws.length };
+}
+
+/** The span as the header says it: one percent when the endpoints round
+ *  together, `68–72%` when they do not. */
+export const seasonSpanLabel = (s: { lo: number; hi: number }) => {
+  const lo = pctThisSeason(s.lo), hi = pctThisSeason(s.hi);
+  return lo === hi ? lo : `${lo.replace("%", "")}\u2013${hi}`;
+};
+
 /** The board's own reading of a weight: at or above half, this season is
  *  the majority partner. Mirrors src/picker/tables.weight_src. */
 export const weightIsCurrent = (w: number | null | undefined) =>

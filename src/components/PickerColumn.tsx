@@ -27,10 +27,10 @@
 // to components/PickerRead.tsx so the tail renders THE SAME READ this
 // column does, rather than a hand-copied one free to drift from it.
 import Link from "next/link";
-import { useState } from "react";
 import { dayLabel, fmtDate, localDay } from "../lib/matchday";
 import {
-  BoardRefusal, BoardRow, LeagueMeta, homeBadge, leagueLabel, rowHref, seasonDisagreement,
+  BoardRefusal, BoardRow, LeagueMeta, SEASON_BLEND_K, homeBadge, leagueLabel,
+  rowHref, seasonDisagreement, seasonSpan, seasonSpanLabel,
 } from "../lib/pickerApi";
 import {
   ReviewLeagueMeta, ReviewRefusal, ReviewRow,
@@ -39,7 +39,7 @@ import {
   ColumnSort, DEFAULT_SORT, SortModeId, modeById, sortRows,
 } from "../lib/pickerSort";
 import {
-  GapNote, KalshiCell, RegTimeNote, SeasonWeight, TierGaps, WITHHELD,
+  GapNote, KalshiCell, RegTimeNote, TierGaps, WITHHELD,
   dec, sign,
 } from "./PickerRead";
 import { ReviewTail } from "./ReviewCard";
@@ -197,8 +197,12 @@ function FormStrip({ form, name, scope, cupScope, className = "" }: {
  *  folded into a league column can be rated on a different basis than
  *  the column it is drawn in.
  *
- *  Returns the reason, so the chip that survives can say why it is there
- *  rather than looking like the one that used to be on every card. */
+ *  NOTHING DRAWS ANY OF IT ANY MORE. The operator called it twice,
+ *  after seeing both renderings on the real board: no season chip on a
+ *  row, at all — the reasoning sits at the chip's old site in RowCard.
+ *  The derivation outlives the ink: the reason is returned and carried
+ *  as `data-season-departure`, so a guard reads it and an ordinary row
+ *  carries no such attribute. */
 export function seasonDeparture(
   row: BoardRow, colSrc?: string | null,
   alt?: { blended: number; current: number; delta: number } | null,
@@ -288,23 +292,27 @@ export function RowRead({ row, modeId, clubCount }: {
           </span>
         </span>
         <span className="flex-none text-right">
+          {/* THE COUNTERFACTUAL, CARRIED WITHOUT INK (2026-09-07). It used
+              to ride on the season chip; when the chip went it moved to
+              the figure it contradicts, as a warn-coloured asterisk. The
+              operator has now called the asterisk too, and the reasoning
+              for removing it is the same reasoning that removed the chip:
+              a mark on the number reads as a QUALIFIER on the number, and
+              this is not one — the board ranks on the blend and the blend
+              is what the figure says. So the ink goes and the fact stays.
+              It is an ATTRIBUTE on the anchor, which keeps three things:
+              the hover sentence for a reader who wants it, a handle for
+              the guard below, and an ordinary row that carries no such
+              attribute at all rather than one asserting agreement. */}
           <span data-testid="row-anchor"
+            {...(alt ? {
+              "data-season-alt": dec(alt.current),
+              "data-season-blend": dec(alt.blended),
+              title: `ON THIS SEASON ALONE the ${anchor.k} is ${dec(alt.current)}, not ${dec(alt.blended)} — the board ranks on the blend, and this says what the other cut would have concluded`,
+            } : {})}
             className={`block font-mono text-[20px] font-semibold leading-none tabular-nums ${
               anchor.v === WITHHELD ? "font-normal text-ink-faint" : "text-ink-hi"}`}>
             {anchor.v}
-            {/* THE COUNTERFACTUAL MARK, ON THE NUMBER IT IS ABOUT. It used
-                to ride on the season chip, and the chip is gone — but the
-                two are different claims and only one of them was the
-                league's. "Which season is this rating" is true of the
-                whole table and belongs to the column header. "This season
-                ALONE would have concluded the opposite" is true of THIS
-                fixture and of no other, so it moves to the figure it
-                contradicts rather than leaving with the badge. */}
-            {alt && (
-              <span data-testid="season-alt" data-alt={dec(alt.current)}
-                title={`ON THIS SEASON ALONE the ${anchor.k} is ${dec(alt.current)}, not ${dec(alt.blended)} — the board ranks on the blend, and this says what the other cut would have concluded`}
-                className="ml-1 align-top text-[11px] font-normal text-warn">*</span>
-            )}
           </span>
           <span className="mt-1 block font-mono text-[8.5px] uppercase tracking-[0.12em] text-ink-low">
             {anchor.k}
@@ -361,7 +369,6 @@ function RowCard({ row, rank, modeId, clubCount, colSrc }: {
   row: BoardRow; rank: number; modeId: SortModeId; clubCount: number;
   colSrc?: string | null;
 }) {
-  const w = row.weights;
   const cross = row.cross_league === true;
   const alt = seasonDisagreement(row);
   const departure = seasonDeparture(row, colSrc, alt);
@@ -507,6 +514,12 @@ export function LeagueColumn({
     storeNote: string | null;
   };
 }) {
+  /* THE SEASON BASIS, DERIVED ONCE FOR THE WHOLE COLUMN. Off the rows
+     this column actually holds, not off `meta` — a league whose payload
+     carries no weights gets no percentage rather than a manufactured
+     one, and a cup gets none by construction (see seasonSpan). */
+  const span = seasonSpan(rows, meta?.kind);
+
   // DAY-MAJOR (operator, 2026-09-01): the matchday is the board's
   // primary structure and each band's sort — the board default or that
   // day's override — ranks WITHIN the day. Rank badges restart per day,
@@ -532,7 +545,14 @@ export function LeagueColumn({
         ["--tracks" as string]: String(trackCount),
         ["--col" as string]: String(colIndex) }}
       className="min-w-0 scroll-mt-16 xl:grid xl:content-start xl:[grid-template-rows:subgrid] xl:[grid-template-columns:minmax(0,1fr)] xl:[grid-row:1/span_var(--tracks)] xl:[grid-column:var(--col)]">
-      <header className="self-start border-b border-line pb-3 xl:[grid-row:1]">
+      {/* THE HEADER FOLLOWS THE COLUMN (2026-09-07). Opaque ground, not a
+          translucent one: rows scrolling underneath a see-through header
+          is the same defect as a label that contradicts the numbers
+          beside it. `top-0` and not an offset — the page carries no fixed
+          bar for it to slide under; `scroll-mt-16` on the section still
+          owns where a jump-nav landing comes to rest. */}
+      <header data-testid="col-head"
+        className="sticky top-0 z-20 self-start border-b border-line bg-bs pb-3 pt-2 xl:[grid-row:1]">
         {/* the league's own light — a 2px rail, wayfinding only */}
         <div aria-hidden
           className="mb-2 h-[2px] rounded-full opacity-80 [background:var(--lg)]" />
@@ -541,17 +561,32 @@ export function LeagueColumn({
             {leagueLabel(slug)}
           </h3>
           {meta?.src === "prior" && (
-            <span
-              title={`rated on last season's final table — min ${meta.min_current_gp ?? "?"} GP this season`}
+            <span data-testid="col-season"
+              {...(span ? {
+                "data-season-lo": String(Math.round(span.lo * 100)),
+                "data-season-hi": String(Math.round(span.hi * 100)),
+                "data-season-clubs": String(span.clubs),
+              } : {})}
+              title={span
+                ? `only ${seasonSpanLabel(span)} of this table is THIS season, across ${span.clubs} club ratings in this column — which is WHY it is rated on last season's final table. The floor is ${meta.min_current_gp ?? "?"} GP.`
+                : `rated on last season's final table — min ${meta.min_current_gp ?? "?"} GP this season`}
               className="rounded border border-warn/40 bg-warn/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
-              prior szn
+              prior szn{span ? ` · ${seasonSpanLabel(span)} this szn` : ""}
             </span>
           )}
           {meta?.src === "current" && (
-            <span
-              title="rated on this season's table — every club has enough games played"
+            <span data-testid="col-season"
+              {...(span ? {
+                "data-season-lo": String(Math.round(span.lo * 100)),
+                "data-season-hi": String(Math.round(span.hi * 100)),
+                "data-season-clubs": String(span.clubs),
+              } : {})}
+              title={span
+                ? `${seasonSpanLabel(span)} of this table is THIS season, across ${span.clubs} club ratings in this column — the rest is last season's final table, blended on k=${meta.blend_k ?? SEASON_BLEND_K}. Every club here has at least ${meta.min_current_gp ?? "?"} games played.`
+                : "rated on this season's table — every club has enough games played"}
               className="rounded border border-accent/40 bg-accent/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-accent">
-              this szn · min {meta.min_current_gp ?? "—"} GP
+              {span ? `${seasonSpanLabel(span)} ` : ""}this szn · min{" "}
+              {meta.min_current_gp ?? "—"} GP
             </span>
           )}
           {meta?.kind === "cup" && (

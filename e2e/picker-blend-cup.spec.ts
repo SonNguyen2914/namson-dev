@@ -940,49 +940,194 @@ const seasonBoard = (gdg: number, currentGdg: number | null) => ({
              : { ppg_gap: null, gdg_gap: currentGdg, rank_gap: null } }],
 });
 
-test("a materially different current-season read is on the chip, with both numbers",
+test("the counterfactual is carried on the anchor, with both numbers, and no ink",
   async ({ page }) => {
-    /* THE MARK MOVED WITH THE FACT. It used to sit on the season chip;
-       the chip is gone from every row and the counterfactual is not —
-       "this season alone would have concluded the opposite" is true of
-       this fixture and of no other, so it now marks the figure it
-       contradicts. Both numbers are still on it. */
+    /* THE FACT OUTLIVED TWO RENDERINGS. It was a season chip, then a
+       warn asterisk on the anchor; the operator called both. What it
+       says has not changed, so it is still here — as an attribute, not
+       as a mark. These assertions are deliberately in two halves: the
+       first says the FACT is present, the second says the INK is not,
+       and neither can pass for the other. */
     await open(page, seasonBoard(0.67, 1.17));
     await expect(page.getByTestId("season-weight")).toHaveCount(0);
-    const mark = page.getByTestId("season-alt").first();
-    await expect(mark).toHaveAttribute("data-alt", "+1.17");
-    await expect(mark).toHaveAttribute("title", /ON THIS SEASON ALONE/);
-    await expect(mark).toHaveAttribute("title", /\+1\.17/);
-    await expect(mark).toHaveAttribute("title", /\+0\.67/);
-    // and it sits INSIDE the anchor, on the number it is about
-    await expect(page.getByTestId("row-anchor").first()
-      .getByTestId("season-alt")).toHaveCount(1);
-    await expect(page.getByTestId("season-alt")).toHaveCount(1);
+    const anchor = page.getByTestId("row-anchor").first();
+    await expect(anchor).toHaveAttribute("data-season-alt", "+1.17");
+    await expect(anchor).toHaveAttribute("data-season-blend", "+0.67");
+    await expect(anchor).toHaveAttribute("title", /ON THIS SEASON ALONE/);
+    await expect(anchor).toHaveAttribute("title", /\+1\.17/);
+    await expect(anchor).toHaveAttribute("title", /\+0\.67/);
+    // THE INK IS GONE. Not "the testid is gone" — the character. A row
+    // that regrows an asterisk under any other markup fails here.
+    await expect(page.getByTestId("season-alt")).toHaveCount(0);
+    await expect(anchor).toHaveText(/^\s*\+0\.67\s*$/);
   });
 
-test("a close agreement is NOT marked — showing both would be noise",
+test("a close agreement carries NO attribute — absent, not asserted as agreeing",
   async ({ page }) => {
     // 0.10 apart, under the 0.25 display threshold
     await open(page, seasonBoard(1.30, 1.40));
+    const anchor = page.getByTestId("row-anchor").first();
+    /* The ABSENCE is the claim, and it is read as an absence: null, not
+       an empty string and not a zero. A row that starts emitting
+       data-season-alt="" here would fail, which is the point — an empty
+       attribute would read to a guard as "measured, and agreeing". */
+    expect(await anchor.getAttribute("data-season-alt")).toBeNull();
     await expect(page.getByTestId("season-alt")).toHaveCount(0);
-    /* NOT MARKED, stated as the absence it is: no chip anywhere carries
-       a disagreement. Written against the attribute rather than against
-       `.first()`, because an agreeing row now draws no chip at all —
-       which is a stronger form of the same claim, and `.first()` would
-       fail for the right reason in a way that reads like the wrong one. */
-    await expect(page.locator('[data-testid="season-alt"]')).toHaveCount(0);
   });
 
-test("a SIGN flip is always marked, however small", async ({ page }) => {
+test("a SIGN flip is always carried, however small", async ({ page }) => {
   // 0.10 apart, but the two cuts disagree about who is better at all
   await open(page, seasonBoard(0.05, -0.05));
-  await expect(page.getByTestId("season-alt")).toHaveCount(1);
+  const anchor = page.getByTestId("row-anchor").first();
+  // dec() renders a TYPOGRAPHIC minus (U+2212), not a hyphen. Asserted
+  // as the code writes it — the point of the ESPN lesson.
+  await expect(anchor).toHaveAttribute("data-season-alt", "−0.05");
 });
 
-test("a row with no counterfactual is unmarked, not marked as agreeing",
+test("a row with no counterfactual carries nothing, not an agreement",
   async ({ page }) => {
     await open(page, seasonBoard(0.67, null));
+    const anchor = page.getByTestId("row-anchor").first();
+    expect(await anchor.getAttribute("data-season-alt")).toBeNull();
     await expect(page.getByTestId("season-alt")).toHaveCount(0);
+  });
+
+// ------------------------------------- the league's own season basis ----
+//
+// 2026-09-07, operator: "where is the % this szn for each league's
+// label?" — the chip was removed from every row on the grounds that the
+// basis is a LEAGUE fact said once, and then nothing said it. These
+// tests are that sentence.
+
+const MLS_ROW = {
+  ...EARLY, league: "mls", rated_in: { home: "mls", away: "mls" },
+  espn: "usa.1", event_id: "mls-span", competition_id: "mls-span",
+};
+
+/** A board whose MLS column holds exactly these club-weight pairs, and
+ *  nothing else — so the span the header prints is arithmetic on numbers
+ *  written here rather than on whatever the shared fixture happens to
+ *  carry. */
+const spanBoard = (ws: ([number, number] | null)[]) => ({
+  ...BOARD,
+  rows: ws.map((w, i) => ({
+    ...MLS_ROW, event_id: `span-${i}`, competition_id: `span-${i}`,
+    kickoff: inHours(3 + i),
+    weights: w === null ? null : weights(w[0], w[1]),
+  })),
+});
+
+const headOf = (page: import("@playwright/test").Page, league: string) =>
+  page.locator(`[data-testid="league-col"][data-league="${league}"]`)
+      .getByTestId("col-season");
+
+test("the league header says the season basis as a span over its clubs",
+  async ({ page }) => {
+    // 68.4% .. 72.1% -> 68–72%
+    await open(page, spanBoard([[0.684, 0.700], [0.712, 0.721]]));
+    const chip = headOf(page, "mls");
+    await expect(chip).toHaveAttribute("data-season-lo", "68");
+    await expect(chip).toHaveAttribute("data-season-hi", "72");
+    await expect(chip).toHaveAttribute("data-season-clubs", "4");
+    await expect(chip).toHaveText(/68\u201372% this szn · min 22 GP/);
+  });
+
+test("a span whose ends round together collapses to one number",
+  async ({ page }) => {
+    /* NO TOLERANCE CONSTANT. These differ by 0.5pp and print as one
+       number for exactly one reason: they round to the same whole
+       percent, which is the precision the chip is written in. A span can
+       never claim a spread finer than its own ink. */
+    await open(page, spanBoard([[0.701, 0.703], [0.699, 0.704]]));
+    const chip = headOf(page, "mls");
+    await expect(chip).toHaveText(/70% this szn/);
+    await expect(chip).not.toHaveText(/\u2013/);
+  });
+
+test("a prior-rated league says the percentage too — it is WHY it is prior",
+  async ({ page }) => {
+    /* The operator asked for the basis on EVERY league label. A prior
+       column is the one where the number explains the most: "12–18% this
+       szn" is the reason the table is last season's. */
+    await open(page);
+    const chip = headOf(page, "ligamx");
+    await expect(chip).toHaveText(/prior szn · 3[0-9]% this szn/);
+  });
+
+test("a cup column states no percentage — it would average across leagues",
+  async ({ page }) => {
+    /* A cup's clubs are rated on their DOMESTIC tables, so one percentage
+       over that column is a mean across several leagues, belonging to no
+       table. seasonSpan refuses it by KIND, not by a missing value. */
+    await open(page);
+    const chip = headOf(page, "leaguescup");
+    await expect(chip).toHaveText(/prior szn/);
+    await expect(chip).not.toHaveText(/%/);
+    expect(await chip.getAttribute("data-season-lo")).toBeNull();
+  });
+
+test("a column with no weights says nothing, and never 0%", async ({ page }) => {
+  await open(page, spanBoard([null]));
+  const chip = headOf(page, "mls");
+  // MISSING IS NEVER ZERO: the chip still states the basis and the GP
+  // floor, and simply carries no percentage it cannot compute.
+  await expect(chip).toHaveText(/this szn · min 22 GP/);
+  await expect(chip).not.toHaveText(/%/);
+  expect(await chip.getAttribute("data-season-lo")).toBeNull();
+});
+
+/* FOUR COLUMNS, DELIBERATELY. The shared fixture carries five leagues
+   into a grid declared `xl:grid-cols-4`, which collapses the four fixed
+   tracks to 0px — a real defect, filed separately, and not one this test
+   is about. Geometry is asserted on a board the grid can actually lay
+   out. */
+const FOUR = (() => {
+  const { leaguescup: _cup, ...rest } = LEAGUES;
+  void _cup;
+  return { ...BOARD, leagues: rest,
+           rows: [EARLY, MLS_ROW].map((r, i) => ({ ...r, kickoff: inHours(3 + i) })) };
+})();
+
+test("the league header follows the column when the rows scroll under it",
+  async ({ page }) => {
+    /* MEASURED AGAINST THE ALTERNATIVE, not against a hopeful bound. The
+       same page with `sticky` removed puts this header at y = −382 after
+       the same scroll; with it, y = 0. An earlier version of this test
+       asserted `y >= -1` after a fixed wheel delta and passed WITHOUT
+       stickiness, because that delta happened to land the travelling
+       header near the top — a guard that cannot fail is not a guard. */
+    await page.setViewportSize({ width: 1440, height: 520 });
+    await open(page, FOUR);
+    const col = page.locator('[data-testid="league-col"][data-league="mls"]');
+    const head = col.getByTestId("col-head");
+    await expect(head).toBeVisible();
+    await page.waitForTimeout(1200);            // let the live section settle
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(400);
+    const after = await head.boundingBox();
+    const colBox = await col.boundingBox();
+    expect(after).not.toBeNull(); expect(colBox).not.toBeNull();
+    // the column really did travel out of the top of the viewport
+    expect(colBox!.y).toBeLessThan(-100);
+    // and its header did not go with it — it is pinned at the top
+    expect(after!.y).toBeGreaterThanOrEqual(0);
+    expect(after!.y).toBeLessThanOrEqual(2);
+    // still on screen, which is the whole point
+    expect(colBox!.y + colBox!.height).toBeGreaterThan(after!.y);
+  });
+
+test("the sticky header is opaque — rows never show through it",
+  async ({ page }) => {
+    /* A translucent sticky header is the same defect as a label that
+       contradicts the numbers beside it: the reader sees two things at
+       once and believes the wrong one. */
+    await open(page, FOUR);
+    const bg = await page
+      .locator('[data-testid="league-col"][data-league="mls"]')
+      .getByTestId("col-head")
+      .evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(bg).not.toBe("rgba(0, 0, 0, 0)");
+    expect(bg).not.toMatch(/rgba\([^)]*,\s*0?\.\d+\)$/);
   });
 
 // ------------------------------------------------ the hollow read -----
