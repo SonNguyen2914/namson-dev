@@ -157,6 +157,34 @@ export function loadReviewSort(league: string): ReviewSort {
   }
 }
 
+/** IS THE FINISHED TAIL OPEN? Collapsed is the DEFAULT (operator,
+ *  2026-09-07): a column's forward story is what the board is for, and
+ *  the backward one was costing the whole height of the finished list on
+ *  every column before a reader had asked for it.
+ *
+ *  Its own key space, like the sort above: the two are independent
+ *  choices and sharing a key would couple them. Stored only when OPEN —
+ *  a stored `closed` is indistinguishable from the default and would
+ *  shadow a future change of it. Missing, unparsable or unreadable
+ *  storage all mean closed, which is the same answer a first-time reader
+ *  gets, so a private window and a cleared cache behave alike. */
+const openKey = (league: string) => `picker.reviewopen.${league}`;
+
+export function loadReviewOpen(league: string): boolean {
+  try {
+    return window.localStorage.getItem(openKey(league)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function saveReviewOpen(league: string, open: boolean): void {
+  try {
+    if (open) window.localStorage.setItem(openKey(league), "1");
+    else window.localStorage.removeItem(openKey(league));
+  } catch { /* convenience only — the toggle still works for this visit */ }
+}
+
 export function saveReviewSort(league: string, s: ReviewSort): void {
   try {
     if (isDefaultReviewSort(s)) {

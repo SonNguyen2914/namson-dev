@@ -51,7 +51,8 @@ import {
 } from "../lib/pickerReview";
 import {
   REVIEW_DEFAULT_SORT, REVIEW_SORT_MODES, ReviewSort, isDefaultReviewSort,
-  loadReviewSort, reviewModeById, saveReviewSort, sortReviewRows,
+  loadReviewOpen, loadReviewSort, reviewModeById, saveReviewOpen,
+  saveReviewSort, sortReviewRows,
 } from "../lib/pickerReviewSort";
 import {
   KalshiCell, SeasonWeight, TierGaps, dec, sign,
@@ -693,6 +694,12 @@ export function ReviewTail({
   storeNote: string | null;
 }) {
   const [sort, setSort] = useState<ReviewSort>(() => loadReviewSort(slug));
+  /* COLLAPSED UNTIL ASKED FOR (operator, 2026-09-07). The column's
+     forward story is what the board is for; the finished list was
+     spending the height of every past match under it before anyone had
+     asked to see one. Remembered per league, same as the sort. */
+  const [open, setOpen] = useState<boolean>(() => loadReviewOpen(slug));
+  const toggle = () => setOpen((o) => { saveReviewOpen(slug, !o); return !o; });
   const mode = reviewModeById(sort.mode)
     ?? reviewModeById(REVIEW_DEFAULT_SORT.mode)!;
   const sorted = sortReviewRows(rows, sort);
@@ -711,15 +718,29 @@ export function ReviewTail({
     <section data-testid="review-tail" data-league={slug}
       aria-label={`${leagueLabel(slug)} finished matches`}
       className="mt-8 border-t-2 border-dashed border-line-strong pt-4">
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <h4 className="font-mono text-[11px] uppercase tracking-[0.22em] text-ink-mid">
+      {/* THE HEADER IS THE CONTROL, and it keeps saying how much is behind
+          it while closed: "finished · 12 matches · last 7d" is the whole
+          point of a collapsed section — a reader must be able to decide
+          whether to open it without opening it. The count is therefore
+          NOT hidden with the body. */}
+      <button type="button" data-testid="review-toggle"
+        onClick={toggle} aria-expanded={open}
+        aria-controls={`review-body-${slug}`}
+        className="group flex w-full items-baseline gap-2 text-left">
+        <span aria-hidden
+          className={`font-mono text-[10px] text-ink-faint transition-transform ${
+            open ? "rotate-90" : ""}`}>▸</span>
+        <h4 className="font-mono text-[11px] uppercase tracking-[0.22em] text-ink-mid transition-colors group-hover:text-accent">
           finished
         </h4>
         <span data-testid="review-count"
           className="ml-auto font-mono text-[10px] uppercase tracking-[0.14em] tabular-nums text-ink-faint">
           {rows.length} match{rows.length === 1 ? "" : "es"} · last {back}d
         </span>
-      </div>
+      </button>
+
+      {open && (
+      <div id={`review-body-${slug}`} data-testid="review-body">
 
       {/* EVIDENCE PROVENANCE, not a scorecard. These three numbers say how
           many of the finished fixtures have a frozen read behind them, and
@@ -865,6 +886,8 @@ export function ReviewTail({
           className="mt-3 border-t border-line pt-3 font-mono text-[10px] leading-relaxed text-warn">
           {confirmNote}
         </p>
+      )}
+      </div>
       )}
     </section>
   );

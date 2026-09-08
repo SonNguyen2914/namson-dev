@@ -456,17 +456,59 @@ function RowCard({ row, rank, modeId, clubCount, colSrc }: {
   );
 }
 
-function RefusalRow({ r }: { r: BoardRefusal }) {
+/** A REFUSED FIXTURE, DRAWN WHERE IT KICKS OFF (operator, 2026-09-07).
+ *
+ *  These were collected into a block at the column's foot, under every
+ *  ranked match and above the finished tail — so a fixture kicking off on
+ *  Tuesday was drawn below one that finished last week, and a reader
+ *  scanning a matchday saw a complete-looking day that was missing a
+ *  match. A refusal is not an error and not a leftover: it is a fixture
+ *  that will be played at a known time and that this board declined to
+ *  RANK. It belongs on its own date.
+ *
+ *  IT IS NOT A ROW CARD AND MUST NOT PASS FOR ONE. No rank number, no
+ *  anchor figure, no dumbbell, a dashed border and the warn tone — every
+ *  cue that carries a ranking on this board is absent, because there is
+ *  no ranking. What it does carry is the two clubs, the club that could
+ *  not be rated, and the backend's own reason. */
+function RefusalCard({ r, dated = true }: {
+  r: BoardRefusal; dated?: boolean;
+}) {
   return (
-    <li data-testid="picker-refusal"
-      className="rounded-lg border border-line bg-elev/30 px-3 py-2.5">
-      <p className="text-sm text-ink-hi">
+    <div data-testid="picker-refusal" data-club={r.club}
+      data-dated={dated ? "1" : "0"}
+      className="rounded-[10px] border border-dashed border-warn/30 bg-warn/5 px-3 py-2.5">
+      <div className="flex items-baseline gap-2">
+        <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-warn">
+          refused
+        </span>
+        {r.kickoff && (
+          <span className="ml-auto font-mono text-[9.5px] tabular-nums text-ink-faint">
+            {fmtDate(r.kickoff)}
+          </span>
+        )}
+      </div>
+      <p className="mt-1.5 text-sm text-ink-hi">
         {r.home} <span className="text-ink-faint">vs</span> {r.away}
       </p>
-      <p className="mt-1 font-mono text-[11px] text-warn">
+      <p className="mt-1 font-mono text-[11px] leading-relaxed text-warn">
         {r.club} — {r.reason}
       </p>
-    </li>
+    </div>
+  );
+}
+
+/** Said once per column, where a reader first meets a refused card. */
+function RefusalWhy() {
+  return (
+    <p data-testid="refusal-why"
+      className="text-[11px] leading-relaxed text-ink-low">
+      A club with no row in the table in use — a promoted side, most
+      often — cannot be ranked against one that has a row, and its
+      lower-division numbers were measured as no help at all. The
+      picker refuses it by name instead of imputing a number, and the
+      fixture is listed here rather than quietly dropped.
+    </p>
   );
 }
 
@@ -531,8 +573,19 @@ export function LeagueColumn({
       sort,
       modeId: (modeById(sort.mode) ?? modeById(DEFAULT_SORT.mode)!).id,
       rows: sortRows(rows.filter((r) => localDay(r.kickoff) === k), sort),
+      // the day's refused fixtures, drawn after its ranked ones: they
+      // carry no rank, so they cannot be interleaved with numbers
+      refused: refusals.filter((r) => r.kickoff && localDay(r.kickoff) === k),
     };
   });
+  /* WHAT COULD NOT BE PLACED, AND WHY — never silently dropped. A
+     refusal with no kickoff, or with one outside the board's window, has
+     no band to sit in. It keeps a named block rather than disappearing,
+     and that block says which of the two it is. */
+  const placed = new Set(byDay.flatMap((d) => d.refused));
+  const undated = refusals.filter((r) => !placed.has(r));
+  // the first day that draws a refusal is where the reason is explained
+  const firstRefusalDay = byDay.find((d) => d.refused.length > 0)?.key ?? null;
   // the subgrid track plan, shared with the page: row 1 header, then
   // per day a label track + a content track, then refusals, then tail
   const trackCount = 2 * dayKeys.length + 3;
@@ -661,16 +714,17 @@ export function LeagueColumn({
           its own compact divider so a stacked layout still says the
           date. A day this league does not play leaves its track to the
           columns that do. */}
-      {byDay.map(({ key, rows: dayRows, modeId }, di) => {
-        if (dayRows.length === 0) {
+      {byDay.map(({ key, rows: dayRows, modeId, refused }, di) => {
+        if (dayRows.length === 0 && refused.length === 0) {
           // A REST DAY IS SAID, NOT LEFT BLANK (draft C, shipped): the
           // empty track gets a quiet cell naming the league's next
           // fixture, so a hole reads as schedule, not absence of data.
           // Only when the league plays elsewhere in the window — a fully
           // empty column keeps its own louder empty-state below — and
           // only at xl, where the aligned matrix exists.
-          if (rows.length === 0) return null;
-          const next = byDay.slice(di + 1).find((d) => d.rows.length > 0);
+          if (rows.length === 0 && refusals.length === 0) return null;
+          const next = byDay.slice(di + 1)
+            .find((d) => d.rows.length > 0 || d.refused.length > 0);
           return (
             <div key={key} data-testid="rest-day" data-day={key}
               style={{ ["--r" as string]: String(3 + 2 * di) }}
@@ -687,13 +741,13 @@ export function LeagueColumn({
           );
         }
         return (
-          <div key={key}
+          <div key={key} data-testid="day-track" data-day={key}
             style={{ ["--r" as string]: String(3 + 2 * di) }}
             className="mt-3 space-y-3 xl:mt-0 xl:self-start xl:pb-4 xl:[grid-row:var(--r)]">
             <div data-testid="day-divider"
               className="flex items-center gap-2 xl:hidden">
               <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-low">
-                {dayLabel(dayRows[0].kickoff)}
+                {dayLabel((dayRows[0] ?? refused[0]).kickoff!)}
               </span>
               <span aria-hidden className="h-px flex-1 bg-line" />
             </div>
@@ -702,10 +756,14 @@ export function LeagueColumn({
                 modeId={modeId} clubCount={meta?.clubs ?? 0}
                 colSrc={meta?.src} />
             ))}
+            {refused.map((r, i) => (
+              <RefusalCard key={`ref-${r.club}-${i}`} r={r} />
+            ))}
+            {key === firstRefusalDay && <RefusalWhy />}
           </div>
         );
       })}
-      {rows.length === 0 && !meta?.error && (
+      {rows.length === 0 && refusals.length === 0 && !meta?.error && (
         // an empty column SAYS SO — a failed league (above) is a different
         // fact and must not be dressed as a quiet weekend
         <div data-testid="col-empty"
@@ -717,25 +775,29 @@ export function LeagueColumn({
         </div>
       )}
 
-      {refusals.length > 0 && (
+      {undated.length > 0 && (
         <div data-testid="refusals"
           style={{ ["--r" as string]: String(2 + 2 * dayKeys.length) }}
           className="mt-4 self-start rounded-xl border border-warn/25 bg-warn/5 p-3 xl:mt-4 xl:[grid-row:var(--r)]">
           <Eyebrow tone="warn">
-            refused · {refusals.length} fixture{refusals.length === 1 ? "" : "s"}
+            refused · no date · {undated.length} fixture{undated.length === 1 ? "" : "s"}
           </Eyebrow>
-          <ul className="mt-2 space-y-2">
-            {refusals.map((r, i) => (
-              <RefusalRow key={`${r.club}-${i}`} r={r} />
-            ))}
-          </ul>
-          <p className="mt-2.5 text-[11px] leading-relaxed text-ink-low">
-            A club with no row in the table in use — a promoted side, most
-            often — cannot be ranked against one that has a row, and its
-            lower-division numbers were measured as no help at all. The
-            picker refuses it by name instead of imputing a number, and the
-            fixture is listed here rather than quietly dropped.
+          {/* THE ONLY REFUSALS LEFT DOWN HERE are the ones with nowhere
+              else to go: the payload carried no kickoff for them, or one
+              outside the board's window. Saying WHICH matters — a missing
+              kickoff is a gap in the feed, and neither is "we hid it". */}
+          <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-ink-low">
+            no kickoff on the payload, or a kickoff outside the next{" "}
+            {days} day{days === 1 ? "" : "s"} — so there is no matchday
+            band to draw these in. Every other refused fixture is on its
+            own date above.
           </p>
+          <div className="mt-2 space-y-2">
+            {undated.map((r, i) => (
+              <RefusalCard key={`${r.club}-${i}`} r={r} dated={false} />
+            ))}
+          </div>
+          <div className="mt-2.5"><RefusalWhy /></div>
         </div>
       )}
 

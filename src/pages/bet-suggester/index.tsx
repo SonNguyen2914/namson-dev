@@ -236,10 +236,23 @@ export default function PickerBoard() {
   // ordered union of day keys, computed here so every column lays its
   // groups on the SAME subgrid tracks — that is what aligns a date's
   // fixtures across all four leagues.
-  const dayKeys = [...new Set(rows.map((r) => localDay(r.kickoff)))]
+  //
+  // REFUSED FIXTURES ARE FIXTURES (operator, 2026-09-07). They used to be
+  // swept into a block at the column's foot, which put a match kicking
+  // off on Tuesday below one that finished last week. A refusal is a
+  // fixture we declined to RANK — it is still played, at a known time —
+  // so its day belongs in this union or its card has no band to sit in.
+  // A refusal with no kickoff still cannot be placed, and says so where
+  // the column draws it, rather than being dropped here.
+  const dated: { kickoff: string }[] = [
+    ...rows,
+    ...refusals.filter((r): r is typeof r & { kickoff: string } =>
+      Boolean(r.kickoff)),
+  ];
+  const dayKeys = [...new Set(dated.map((r) => localDay(r.kickoff)))]
     .filter(Boolean).sort();
   const dayLabelFor: Record<string, string> = {};
-  for (const r of rows) {
+  for (const r of dated) {
     const k = localDay(r.kickoff);
     if (k && !dayLabelFor[k]) dayLabelFor[k] = dayLabel(r.kickoff);
   }

@@ -1,4 +1,7 @@
 import { expect, test } from "@playwright/test";
+// the SAME day-key function the board groups by, so a test can never
+// disagree with the page about which band a kickoff belongs to
+import { localDay as localDayOf } from "../src/lib/matchday";
 
 // The picker board (/bet-suggester) and the archive dropdown.
 //
@@ -242,11 +245,39 @@ async function serveReview(page: import("@playwright/test").Page,
     r.fulfill(json(body, status)));
 }
 
+/* THE FINISHED TAIL IS COLLAPSED FOR A READER (2026-09-07, operator).
+   These specs were written against a tail that was always open and they
+   assert its contents — the cards, the sort, the provenance, the notes.
+   Seeding the per-league flag keeps every one of them asserting the same
+   thing about the same markup, rather than 30 assertions each growing a
+   click that is not what they are about.
+
+   The DEFAULT is not seeded away: "the tail is closed until asked for",
+   the toggle, and the fact that the count stays readable while closed
+   each have their own tests, which deliberately do NOT call this. */
+const TAIL_LEAGUES = ["mls", "epl", "laliga", "ligamx", "leaguescup"];
+
 async function open(page: import("@playwright/test").Page,
                     body: unknown = BOARD, status = 200,
                     reviewBody: unknown = REVIEW, reviewStatus = 200) {
   await serveBoard(page, body, status);
   await serveReview(page, reviewBody, reviewStatus);
+  await page.addInitScript((slugs: string[]) => {
+    for (const s of slugs) {
+      try { window.localStorage.setItem(`picker.reviewopen.${s}`, "1"); }
+      catch { /* a spec that disables storage still gets the default */ }
+    }
+  }, TAIL_LEAGUES);
+  await page.goto("/bet-suggester");
+}
+
+/** Navigate WITHOUT seeding the tail open — for the tests that are about
+ *  the collapsed default itself. */
+async function openShut(page: import("@playwright/test").Page,
+                        body: unknown = BOARD,
+                        reviewBody: unknown = REVIEW) {
+  await serveBoard(page, body, 200);
+  await serveReview(page, reviewBody, 200);
   await page.goto("/bet-suggester");
 }
 
@@ -400,18 +431,71 @@ test("prior-season rating is a banner, not a footnote", async ({ page }) => {
     .getByText("prior szn").first()).toBeVisible();
 });
 
-test("refused fixtures are listed at their column's foot with the club and the reason",
+test("a refused fixture is drawn on its OWN kickoff date, not swept to the foot",
   async ({ page }) => {
+    /* CHANGED 2026-09-07 (operator). These were collected into a block at
+       the column's foot, under every ranked match and directly above the
+       finished tail — so a fixture kicking off on Tuesday was drawn below
+       one that finished last week, and a reader scanning a matchday saw a
+       complete-looking day with a match missing from it.
+
+       A refusal is not an error and not a leftover: it is a fixture that
+       will be played, at a known time, which this board declined to RANK.
+       It now sits in its own matchday band. The foot block survives for
+       exactly one case — a refusal the payload gave no kickoff for — and
+       that case has its own test below. */
     await open(page);
-    const refusals = col(page, "epl").getByTestId("refusals");
-    await expect(refusals).toBeVisible();
-    await expect(page.getByTestId("picker-refusal")).toHaveCount(1);
-    await expect(refusals).toContainText("Promoted Rovers FC");
-    await expect(refusals)
+    const epl = col(page, "epl");
+    const card = epl.getByTestId("picker-refusal");
+    await expect(card).toHaveCount(1);
+    await expect(card).toHaveAttribute("data-dated", "1");
+    await expect(card).toContainText("Promoted Rovers FC");
+    await expect(card)
       .toContainText("no row in the prior-season top-flight table");
-    // and a sentence a human can read for WHY refusing is the behaviour
-    await expect(refusals.getByText(/refuses it by name instead of imputing/i))
-      .toBeVisible();
+    // it is INSIDE the matchday track for its own kickoff, beside the
+    // ranked fixtures of that day rather than under all of them
+    const day = localDayOf(REFUSAL.kickoff);
+    await expect(epl.locator(`[data-testid="day-track"][data-day="${day}"]`)
+      .getByTestId("picker-refusal")).toHaveCount(1);
+    // and nothing is left at the foot, because nothing was undatable
+    await expect(epl.getByTestId("refusals")).toHaveCount(0);
+    // the reason a refusal exists is still said, once, where it is met
+    await expect(epl.getByTestId("refusal-why")).toHaveCount(1);
+    await expect(epl.getByTestId("refusal-why"))
+      .toContainText(/refuses it by name instead of imputing/i);
+  });
+
+test("a refusal with NO kickoff keeps a named place, and says why it is there",
+  async ({ page }) => {
+    /* MISSING IS NEVER A DROP. Without a kickoff there is no band to draw
+       it in, so it keeps the foot block — and the block states which of
+       the two it is rather than looking like the old catch-all. */
+    const undated = { ...REFUSAL, kickoff: undefined };
+    await open(page, { ...BOARD, refusals: [undated] });
+    const epl = col(page, "epl");
+    await expect(epl.getByTestId("refusals")).toBeVisible();
+    await expect(epl.getByTestId("refusals")).toContainText("no date");
+    await expect(epl.getByTestId("refusals"))
+      .toContainText(/no kickoff on the payload/i);
+    const card = epl.getByTestId("picker-refusal");
+    await expect(card).toHaveCount(1);
+    await expect(card).toHaveAttribute("data-dated", "0");
+    await expect(card).toContainText("Promoted Rovers FC");
+  });
+
+test("a day whose ONLY fixture is refused still draws that day, not a rest day",
+  async ({ page }) => {
+    /* The band exists because the league PLAYS that day. Reading it as a
+       rest day would be the board asserting an absence it did not
+       measure — the fixture is there, it just is not ranked. */
+    await open(page, { ...BOARD, rows: [], refusals: [REFUSAL] });
+    const epl = col(page, "epl");
+    const day = localDayOf(REFUSAL.kickoff);
+    await expect(epl.locator(`[data-testid="day-track"][data-day="${day}"]`)
+      .getByTestId("picker-refusal")).toHaveCount(1);
+    await expect(epl.getByTestId("rest-day")).toHaveCount(0);
+    // and the column does not claim to be empty while holding a fixture
+    await expect(epl.getByTestId("col-empty")).toHaveCount(0);
   });
 
 test("a book with no live quote is a real state, and keeps its row",
@@ -470,16 +554,20 @@ test("nothing on the board reads as advice", async ({ page }) => {
   expect(body).toMatch(/no model runs on this page/i);
 });
 
-test("an empty window says so in every column, and refusals stay listed",
+test("an empty window says so in every column that IS empty, and keeps the refusal",
   async ({ page }) => {
     await open(page, { ...BOARD, rows: [], refusals: [REFUSAL] });
-    await expect(page.getByTestId("col-empty")).toHaveCount(4);
+    /* THREE, not four: the EPL column holds a refused fixture, and a
+       column with a fixture in it must not print "no fixtures". The
+       sentence was true of all four only while a refusal did not count
+       as something the column holds. */
+    await expect(page.getByTestId("col-empty")).toHaveCount(3);
+    await expect(col(page, "epl").getByTestId("col-empty")).toHaveCount(0);
     await expect(page.getByTestId("col-empty").first())
       .toContainText("in the next 7 days");
-    // the refusal is still listed at its column's foot — an empty board
-    // is not an excuse to drop the thing that was refused
+    // an empty board is not an excuse to drop the thing that was refused
     await expect(page.getByTestId("picker-refusal")).toHaveCount(1);
-    await expect(col(page, "epl").getByTestId("refusals"))
+    await expect(col(page, "epl").getByTestId("picker-refusal"))
       .toContainText("Promoted Rovers FC");
   });
 
@@ -1299,6 +1387,85 @@ const REVIEW_EXPECTED: Record<string, string[]> = {
   origin:    ["f-alfa", "f-delta", "f-bravo", "f-charlie", "f-echo"],
 };
 
+// ------------------------------- the finished tail is collapsed --------
+
+test("the finished tail is CLOSED until asked for, and says how much is behind it",
+  async ({ page }) => {
+    /* The operator's call: a column's forward story is what the board is
+       for, and the finished list was spending the height of every past
+       match under it before anyone had asked to see one.
+
+       The count is NOT hidden with the body, and that is the whole point
+       of a collapsed section — a reader has to be able to decide whether
+       to open it WITHOUT opening it. */
+    await openShut(page);
+    const mls = page.locator('[data-testid="review-tail"][data-league="mls"]');
+    await expect(mls).toBeVisible();
+    await expect(mls.getByTestId("review-toggle")).toBeVisible();
+    await expect(mls.getByTestId("review-toggle"))
+      .toHaveAttribute("aria-expanded", "false");
+    await expect(mls.getByTestId("review-count")).toBeVisible();
+    await expect(mls.getByTestId("review-count")).toContainText("last");
+    // and nothing behind it is drawn
+    await expect(mls.getByTestId("review-body")).toHaveCount(0);
+    await expect(mls.getByTestId("review-row")).toHaveCount(0);
+    await expect(mls.getByTestId("review-sort")).toHaveCount(0);
+  });
+
+test("the toggle opens the tail, and closing it puts the matches away again",
+  async ({ page }) => {
+    await openShut(page);
+    const mls = page.locator('[data-testid="review-tail"][data-league="mls"]');
+    await mls.getByTestId("review-toggle").click();
+    await expect(mls.getByTestId("review-toggle"))
+      .toHaveAttribute("aria-expanded", "true");
+    await expect(mls.getByTestId("review-row")).toHaveCount(3);
+    await mls.getByTestId("review-toggle").click();
+    await expect(mls.getByTestId("review-row")).toHaveCount(0);
+  });
+
+test("one column's tail opens alone — the others stay shut",
+  async ({ page }) => {
+    /* Per league, like the sort beside it: opening MLS's history is not a
+       statement about the Premier League's. */
+    await openShut(page);
+    const mls = page.locator('[data-testid="review-tail"][data-league="mls"]');
+    await mls.getByTestId("review-toggle").click();
+    await expect(mls.getByTestId("review-row").first()).toBeVisible();
+    for (const other of ["epl", "laliga", "ligamx"]) {
+      await expect(page.locator(`[data-testid="review-tail"][data-league="${other}"]`)
+        .getByTestId("review-body")).toHaveCount(0);
+    }
+  });
+
+test("an opened tail is still open on the next visit", async ({ page }) => {
+  await openShut(page);
+  const sel = '[data-testid="review-tail"][data-league="mls"]';
+  await page.locator(sel).getByTestId("review-toggle").click();
+  await expect(page.locator(sel).getByTestId("review-row")).toHaveCount(3);
+  await page.reload();
+  await expect(page.locator(sel).getByTestId("review-toggle"))
+    .toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator(sel).getByTestId("review-row")).toHaveCount(3);
+});
+
+test("with storage unavailable the tail still opens — it just does not remember",
+  async ({ page }) => {
+    /* MISSING IS NEVER A BROKEN CONTROL. A private window, cleared site
+       data or a browser blocking storage must not cost the toggle. */
+    await page.addInitScript(() => {
+      Object.defineProperty(window, "localStorage", {
+        get() { throw new Error("storage disabled"); },
+      });
+    });
+    await openShut(page);
+    const mls = page.locator('[data-testid="review-tail"][data-league="mls"]');
+    await expect(mls.getByTestId("review-toggle"))
+      .toHaveAttribute("aria-expanded", "false");
+    await mls.getByTestId("review-toggle").click();
+    await expect(mls.getByTestId("review-row")).toHaveCount(3);
+  });
+
 const tail = (page: import("@playwright/test").Page, slug: string) =>
   page.locator(`[data-testid="review-tail"][data-league="${slug}"]`);
 
@@ -1708,6 +1875,15 @@ test("the finished window has its own control, separate from the board's",
       return r.fulfill(json(REVIEW));
     });
     await serveBoard(page);
+    // this test navigates itself rather than through open(), so it seeds
+    // the tail the same way — it is about the review WINDOW, not about
+    // the collapse
+    await page.addInitScript((slugs: string[]) => {
+      for (const sl of slugs) {
+        try { window.localStorage.setItem(`picker.reviewopen.${sl}`, "1"); }
+        catch { /* default is closed */ }
+      }
+    }, TAIL_LEAGUES);
     await page.goto("/bet-suggester");
     await expect(page.getByTestId("review-row").first()).toBeVisible();
     expect(asked, "the tail opens at 7 days, matching the forward window")
