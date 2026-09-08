@@ -326,30 +326,44 @@ test("every Leagues Cup card says the market settles on regulation time",
 
 test("the season share is a number on the row, not a binary badge",
   async ({ page }) => {
+    /* UPDATED 2026-09-07. The basis is a LEAGUE fact and the column
+       header states it, so an ordinary row no longer repeats it — the
+       chip is drawn only where the fixture DEPARTS from its column
+       (a side with no prior-season row, a frozen-weight control, or a
+       cut that disagrees). What this test pins is unchanged and is the
+       reason it exists: WHERE a chip is drawn it is a percentage with a
+       tone and both sides on its title, never a binary badge. It now
+       reads that off a departing row, and asserts the ordinary one
+       carries nothing at all. */
     await open(page);
     const early = col(page, "ligamx").getByTestId("picker-row").first();
-    const chip = early.getByTestId("season-weight");
-    await expect(chip).toHaveText("38% this szn");
-    // below half: last season still carries the rating, and the chip
-    // says so by its tone as well as its number
-    await expect(chip).toHaveAttribute("data-w", "0.375");
-    await expect(chip).toHaveClass(/text-warn/);
-    // both sides are on the chip's title, because the fixture's number
-    // is the LOWER of the two
-    await expect(chip).toHaveAttribute(
-      "title", /home 38% · away 38%.*GP\/\(GP\+10\)/);
-    // the pre-blend badge is gone wherever a weight exists — one claim,
-    // not two
+    await expect(early.getByTestId("season-weight")).toHaveCount(0);
     await expect(early.getByText("prior szn")).toHaveCount(0);
+    const chip = col(page, "epl").getByTestId("picker-row").first()
+      .getByTestId("season-weight");
+    await expect(chip).toHaveText("55% this szn");
+    // a number, with both sides and the formula on its title — the
+    // shape this test was written to hold
+    await expect(chip).toHaveAttribute("title", /GP\/\(GP\+10\)/);
+    await expect(chip).toHaveAttribute("data-w", /0\./);
+    // AND IT SAYS WHY IT SURVIVED, so a chip on a row can never be
+    // mistaken for the one that used to sit on every card
+    await expect(chip).toHaveAttribute(
+      "title", /no prior-season row is rated on this season alone/);
   });
 
 test("a late-season fixture reads as this season's, and a promoted side as its own basis",
   async ({ page }) => {
     await open(page);
+    /* The late-season fixture is its column's ORDINARY case — the MLS
+       header already says `this szn · min N GP` — so it carries no chip
+       at all now. The promoted side still does, because it is rated on a
+       different basis than the column it sits in, which is the whole
+       distinction this test is named for. */
     const late = col(page, "mls").getByTestId("picker-row").first();
-    const chip = late.getByTestId("season-weight");
-    await expect(chip).toHaveText("68% this szn");   // the LOWER side
-    await expect(chip).toHaveClass(/text-accent/);
+    await expect(late.getByTestId("season-weight")).toHaveCount(0);
+    // the header carries it once, for every row beneath it
+    await expect(col(page, "mls").getByText(/this szn · min/i)).toBeVisible();
     // a club with no last-season row at all is rated on this season
     // alone at 100% — a different basis, said out loud on the chip
     const solo = col(page, "epl").getByTestId("picker-row").first();
@@ -933,8 +947,13 @@ test("a close agreement is NOT marked — showing both would be noise",
     // 0.10 apart, under the 0.25 display threshold
     await open(page, seasonBoard(1.30, 1.40));
     await expect(page.getByTestId("season-alt")).toHaveCount(0);
-    await expect(page.getByTestId("season-weight").first())
-      .not.toHaveAttribute("data-alt", /.*/);
+    /* NOT MARKED, stated as the absence it is: no chip anywhere carries
+       a disagreement. Written against the attribute rather than against
+       `.first()`, because an agreeing row now draws no chip at all —
+       which is a stronger form of the same claim, and `.first()` would
+       fail for the right reason in a way that reads like the wrong one. */
+    await expect(page.locator('[data-testid="season-weight"][data-alt]'))
+      .toHaveCount(0);
   });
 
 test("a SIGN flip is always marked, however small", async ({ page }) => {

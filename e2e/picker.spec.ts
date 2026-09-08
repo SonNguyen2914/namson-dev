@@ -388,9 +388,16 @@ test("prior-season rating is a banner, not a footnote", async ({ page }) => {
   await expect(banner).toContainText("Premier League 1 GP");
   await expect(banner).toContainText("La Liga 2 GP");
   await expect(banner).toContainText("Liga MX 5 GP");
-  // and every row on a prior-season league carries the badge itself
+  /* A BANNER, NOT A FOOTNOTE — which is this test's own title, and the
+     line below used to contradict it. Every club in a league is rated on
+     the same table, so the basis belongs to the banner and the column
+     header; repeating it on all 29 cards said one sentence 29 times and
+     buried the rows where it genuinely differs. The row is now asserted
+     CLEAN, and the column header is asserted to carry it. */
   const top = page.getByTestId("picker-row").filter({ hasText: "Barcelona" });
-  await expect(top.getByText("prior szn")).toBeVisible();
+  await expect(top.getByText("prior szn")).toHaveCount(0);
+  await expect(page.locator('[data-testid="league-col"][data-league="laliga"]')
+    .getByText("prior szn").first()).toBeVisible();
 });
 
 test("refused fixtures are listed at their column's foot with the club and the reason",

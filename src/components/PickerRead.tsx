@@ -118,8 +118,13 @@ export function TierCell({ label, gap }: { label: string; gap: number }) {
  *  or above it. A side rated with NO prior row at all is called out,
  *  because 100% is not the top of the same scale — it is a different
  *  basis. */
-export function SeasonWeight({ w, alt }: {
+export function SeasonWeight({ w, alt, departure }: {
   w: BlendWeights;
+  /** Why this chip is drawn at all. The board states the season basis
+   *  once per league in the column header; a chip on a row means the row
+   *  DEPARTS from it, and the reason belongs in the same title as the
+   *  weights rather than in a second chip beside them. */
+  departure?: string | null;
   /** What this season ALONE concludes, when it differs materially. The
    *  chip already answers "how much of this rating is this season"; the
    *  natural place to answer "and what would this season alone say" is
@@ -137,6 +142,7 @@ export function SeasonWeight({ w, alt }: {
     + (soloSide
         ? " · a side with no prior-season row is rated on this season"
           + " alone and reported at 100%" : "")
+    + (departure ? ` · ${departure}` : "")
     + (alt
         ? ` · ON THIS SEASON ALONE the GD/g gap is ${dec(alt.current)},`
           + ` not ${dec(alt.blended)} — the board ranks on the blend, and`

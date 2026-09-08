@@ -176,13 +176,56 @@ function FormStrip({ form, name, scope, cupScope, className = "" }: {
 /** One match card. `rank` is the row's position under the column's
  *  CURRENT sort — the badge follows the reader's chosen order, it does
  *  not fossilise the default one. */
-function RowCard({ row, rank, modeId, clubCount }: {
+/** Does this row's season basis DEPART from its column's?
+ *
+ *  THE BASIS IS A LEAGUE FACT AND THE HEADER ALREADY STATES IT. Every
+ *  club in a league is rated on the same table, so `this szn · min 22
+ *  GP` (or `prior szn`) is true of the column, and a chip repeating it
+ *  on all 29 cards says one sentence 29 times — which reads as though it
+ *  varied between them, and buries the rows where it actually does.
+ *
+ *  It varies in exactly three ways, and each is a real fact about THIS
+ *  fixture rather than its league:
+ *    - a side with no prior-season row is rated on this season alone and
+ *      reported at 100%, so the blend is not the column's blend;
+ *    - a frozen-weight control row is not weighted by games played at
+ *      all;
+ *    - this season ALONE concludes something materially different from
+ *      the blend the board ranks on (or flips its sign) — the one case
+ *      where the reader needs to know which cut they are reading.
+ *  A row whose `src` differs from its column's is the fourth: a cup tie
+ *  folded into a league column can be rated on a different basis than
+ *  the column it is drawn in.
+ *
+ *  Returns the reason, so the chip that survives can say why it is there
+ *  rather than looking like the one that used to be on every card. */
+export function seasonDeparture(
+  row: BoardRow, colSrc?: string | null,
+  alt?: { blended: number; current: number; delta: number } | null,
+): string | null {
+  const w = row.weights;
+  if (!w) {
+    return row.src && colSrc && row.src !== colSrc
+      ? `rated on ${row.src === "prior" ? "last" : "this"} season, unlike this column`
+      : null;
+  }
+  if (alt) return "this season alone concludes differently — see the title";
+  if (w.constant != null) return "frozen-weight control, not weighted by games played";
+  if (w.basis.home === "current_only" || w.basis.away === "current_only")
+    return "a side has no prior-season row and is rated on this season alone";
+  return null;
+}
+
+function RowCard({ row, rank, modeId, clubCount, colSrc }: {
   row: BoardRow; rank: number; modeId: SortModeId; clubCount: number;
+  colSrc?: string | null;
 }) {
   const badge = homeBadge(row);
   const w = row.weights;
   const cross = row.cross_league === true;
   const anchor = anchorFor(row, modeId);
+  const alt = seasonDisagreement(row);
+  const departure = seasonDeparture(row, colSrc, alt);
   return (
     <article
       data-testid="picker-row"
@@ -202,18 +245,26 @@ function RowCard({ row, rank, modeId, clubCount }: {
             rank === 1 ? "text-accent" : "text-ink-faint"}`}>
           {String(rank).padStart(2, "0")}
         </span>
-        {/* THE WEIGHT, NOT A BADGE. The board blends both seasons per
-            club, so "which season" is a percentage. The old binary badge
-            is the FALLBACK for a row that carries no weight — a read
-            reconstructed through the legacy switch — and never a second
-            claim standing beside the number. */}
-        {w ? <SeasonWeight w={w} alt={seasonDisagreement(row)} /> : row.src === "prior" && (
-          <span
-            title="rated on last season's final table — this season has too few games played"
-            className="rounded border border-warn/40 bg-warn/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
-            prior szn
-          </span>
-        )}
+        {/* THE WEIGHT, NOT A BADGE — AND ONLY WHERE IT DEPARTS. The board
+            blends both seasons per club, so "which season" is a
+            percentage. That percentage is the column's for every
+            ordinary row, and the column header already prints it, so the
+            chip is drawn only when this fixture is NOT the ordinary case
+            (see seasonDeparture). The reason rides on the title, so a
+            chip that survives says why it is there rather than looking
+            like the one that used to sit on every card.
+            The binary badge remains the FALLBACK for a row carrying no
+            weight — a read reconstructed through the legacy switch — and
+            it too is drawn only when it disagrees with its column. */}
+        {departure && (w
+          ? <SeasonWeight w={w} alt={alt} departure={departure} />
+          : (
+            <span
+              title={`rated on last season's final table — ${departure}`}
+              className="rounded border border-warn/40 bg-warn/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
+              prior szn
+            </span>
+          ))}
         {/* THE COMPETITION, when it is not the column. A Leagues Cup tie
             between two Liga MX clubs is drawn in the Liga MX column
             because that table describes it completely — but it is still
@@ -555,7 +606,8 @@ export function LeagueColumn({
             </div>
             {dayRows.map((r, i) => (
               <RowCard key={`${r.league}-${r.event_id}`} row={r} rank={i + 1}
-                modeId={modeId} clubCount={meta?.clubs ?? 0} />
+                modeId={modeId} clubCount={meta?.clubs ?? 0}
+                colSrc={meta?.src} />
             ))}
           </div>
         );
