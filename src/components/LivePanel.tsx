@@ -136,21 +136,53 @@ export default function LivePanel({ matchId, liveLevers }: {
         );
         return;
       }
-      setScoreH(s.current_home ?? 0);
-      setScoreA(s.current_away ?? 0);
+      // MISSING IS NEVER ZERO — AND A PREDICTION RUNS ON THESE NUMBERS.
+      // `?? 0` and `Number(x) || 0` turned a field the feed did not send
+      // into a measured 0-0 with no red cards, and the panel then ran a
+      // real live prediction against it. Every field on LiveStateFetch
+      // except `available`, `match_id` and `budget` is optional, so
+      // absence is a shape the feed genuinely produces. A field it did
+      // not carry is now LEFT as the operator set it and named on the
+      // message, so every number below is either the feed's or the
+      // operator's and never this file's default.
+      const filled: string[] = [];
+      const notCarried: string[] = [];
+      if (s.current_home != null && s.current_away != null) {
+        setScoreH(s.current_home);
+        setScoreA(s.current_away);
+        filled.push(`${s.current_home}-${s.current_away}`);
+      } else {
+        notCarried.push("score");
+      }
       if (s.minutes_elapsed != null) {
         const m = Math.round(s.minutes_elapsed);
         setMinute(m);
         setPhaseId(phaseForMinute(m));
+        filled.push(`${m}'`);
+      } else {
+        notCarried.push("minute");
       }
-      // feed now reports COUNTS (legacy responses may still send booleans)
-      setRedH(Math.min(3, Number(s.red_home) || 0));
-      setRedA(Math.min(3, Number(s.red_away) || 0));
+      // feed now reports COUNTS (legacy responses may still send
+      // booleans, which Number() converts exactly: false->0, true->1)
+      if (s.red_home != null && s.red_away != null) {
+        setRedH(Math.min(3, Number(s.red_home)));
+        setRedA(Math.min(3, Number(s.red_away)));
+        filled.push(`reds ${Number(s.red_home)}-${Number(s.red_away)}`);
+      } else {
+        notCarried.push("red cards");
+      }
       setSavedAt(new Date().toISOString());
       const fin = s.is_finished ? " (match finished)" : "";
+      const gap = notCarried.length
+        ? ` · the feed did not carry ${notCarried.join(", ")} — ${
+            notCarried.length === 1 ? "that field is" : "those fields are"
+          } left as you set ${notCarried.length === 1 ? "it" : "them"}, not zeroed`
+        : "";
       setAutoMsg(
-        `Filled from live feed: ${s.current_home}-${s.current_away}, ${
-          s.minutes_elapsed ?? "?"}'${fin} · ${s.budget.remaining} feed calls left today · saved locally`
+        (filled.length
+          ? `Filled from live feed: ${filled.join(", ")}${fin}`
+          : `The live feed answered but carried none of the state${fin}`)
+        + `${gap} · ${s.budget.remaining} feed calls left today · saved locally`
       );
     } catch {
       setAutoMsg("Couldn't reach the live feed — enter the state manually.");

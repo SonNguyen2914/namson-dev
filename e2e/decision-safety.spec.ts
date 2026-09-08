@@ -27,6 +27,20 @@ test("match hub shows the model as shadow, never as advice",
     // Choose a fixture that currently HAS a book and a model run, and
     // say so plainly when none exists rather than failing on the
     // weather. The invariants below are unchanged.
+    //
+    // THE DEADLINE IS A BUDGET, NOT AN ASSERTION (2026-09-07). Finding
+    // that fixture costs one schedule read plus UP TO TWELVE full match
+    // payloads, one after another, from the live backend — measured at
+    // 1.35s each against an idle one, so the search alone is bounded at
+    // ~18s before a single pixel is asked for, and the page load and
+    // six assertions come after it. The suite's 45s default is sized
+    // for the hermetic majority, and this test kept failing it on the
+    // arithmetic of its own scan rather than on anything about the app:
+    // a timeout reported as a decision-safety failure. `test.slow()`
+    // triples the budget for THIS test alone. The scan stays bounded at
+    // twelve, not one assertion below is relaxed, and a backend that is
+    // actually wedged still fails here.
+    test.slow();
     const sched = await request.get("/api/mls/schedule?days=7");
     const fixtures: { id: string }[] =
       sched.ok() ? ((await sched.json()).fixtures ?? []) : [];

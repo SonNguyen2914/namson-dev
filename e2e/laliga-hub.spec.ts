@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test";
 
-// La Liga hub — hermetic, recorded-shape payloads (no backend). The
-// three assertions that matter are decision-safety invariants:
+// La Liga hub — recorded-shape payloads: every /api/laliga read this
+// surface makes is answered from this file, and a tripwire in serve()
+// enforces that rather than trusting it (see the note there for the
+// one class of live read that remains, and why). The three assertions
+// that matter are decision-safety invariants:
 //
 //  1. PRESEASON standings arrive as tables=[] + preseason=true (the
 //     backend suppresses ESPN's real 20-row all-zero payload). The
@@ -38,7 +41,63 @@ const MARKETS = {
 const DARK_ODDS = { odds: [], shadow: true, model_dark: true,
                     real_money_signals: false };
 
+// THE SIXTH READ (added 2026-09-07). LaligaDashboard fetches six URLs
+// in ONE `Promise.all`, and this file recorded five: `/api/laliga/
+// status` went to the real backend on every test in this describe.
+// Because the six are awaited together, that one unmocked read gated
+// the whole render — the hub sat at "loading fixtures…" and "State
+// unavailable" with all five recorded payloads in hand — so under
+// suite contention the assertions below timed out on a read they were
+// written not to depend on. Worse while it passed: the "dark" tests
+// were reading PRODUCTION's La Liga approval state, so an approval
+// landing on prod would have flipped a recorded-world assertion.
+const DARK_STATUS = {
+  model_version: "laliga-2026-v0",
+  model_dark: true,
+  model_dark_note: "No odds render until an approval is earned through "
+    + "the evaluation ladder on real 2026-27 results.",
+  counts: { blockers: [] },
+};
+
+/** Serve the recorded La Liga world, and REFUSE any La Liga read it
+ *  did not record.
+ *
+ *  The header of this file claims "no backend". For the surface under
+ *  test that was an intention, not a construction: a laliga fetch
+ *  nobody thought to record simply left for the live backend, and the
+ *  reader of this file could not tell. The tripwire is registered
+ *  FIRST so every specific route below overrides it (Playwright
+ *  matches routes in reverse registration order), which makes an
+ *  unrecorded read fail fast and by name instead of hanging a
+ *  Promise.all on the internet.
+ *
+ *  SCOPED TO /api/laliga/ ON PURPOSE, and the scope is a finding, not
+ *  an oversight: measured 2026-09-07, loading `?league=laliga` also
+ *  fires five MLS reads (scoreboard, markets, odds, schedule,
+ *  standings) because the carousel mounts the MLS pane on the way
+ *  through to the deep-linked one. They are real live reads and they
+ *  are NOT this spec's subject — MlsDashboard is a different component
+ *  with its own Promise.all, so its latency cannot gate the La Liga
+ *  render the way `/api/laliga/status` did. They are left alone rather
+ *  than recorded because recording them would put a second hub's empty
+ *  states on the page, and two assertions here — "no <table> exists"
+ *  and "no element reads exactly `standings unavailable`" — are about
+ *  the WHOLE page and would then be answered by the wrong pane.
+ *
+ *  Returns the La Liga paths that escaped, so a test can assert. */
 async function serve(page: import("@playwright/test").Page) {
+  const escaped: string[] = [];
+  await page.route("**/api/laliga/**", (r) => {
+    escaped.push(new URL(r.request().url()).pathname);
+    return r.fulfill({ status: 599, contentType: "application/json",
+      body: JSON.stringify({ error: "unrecorded read", detail:
+        "this spec answers the La Liga surface from its own recorded "
+        + "payloads: every /api/laliga read it depends on must be "
+        + "written here, and this one was not" }) });
+  });
+  await page.route("**/api/laliga/status", (r) =>
+    r.fulfill({ status: 200, contentType: "application/json",
+                body: JSON.stringify(DARK_STATUS) }));
   await page.route("**/api/laliga/scoreboard", (r) =>
     r.fulfill({ status: 200, contentType: "application/json",
                 body: JSON.stringify(SCOREBOARD) }));
@@ -54,9 +113,26 @@ async function serve(page: import("@playwright/test").Page) {
   await page.route("**/api/laliga/odds", (r) =>
     r.fulfill({ status: 200, contentType: "application/json",
                 body: JSON.stringify(DARK_ODDS) }));
+  return escaped;
 }
 
 test.describe("La Liga hub", () => {
+  test("every La Liga read this page makes is one this file recorded",
+    async ({ page }) => {
+      // THE COUNTERWEIGHT to the tripwire above: it must be watching a
+      // page that really reads, or "nothing escaped" would also be
+      // true of a page that fetched nothing at all. So a recorded
+      // fixture has to be on screen before the escape list is read,
+      // and this test is what makes the file's header a construction
+      // rather than a sentence.
+      const escaped = await serve(page);
+      await page.goto("/bet-suggester?league=laliga");
+      await expect(page.getByText("Alavés").first()).toBeVisible();
+      expect(escaped, "these La Liga reads left for the live backend — "
+        + "record them here, or this spec is only hermetic on a good day")
+        .toEqual([]);
+    });
+
   test("preseason standings show the explicit reason, never a zero table",
     async ({ page }) => {
       await serve(page);

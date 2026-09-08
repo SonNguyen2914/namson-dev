@@ -1762,6 +1762,20 @@ test("the picker proxy forwards review too — unmocked on purpose",
     // file mocks in the BROWSER, so src/pages/api/picker/[...path].ts is
     // never exercised by them, and a route missing from the allowlist
     // would 404 on prod behind a green suite.
+    //
+    // THE DEADLINE IS A BUDGET, NOT AN ASSERTION (2026-09-07). This is
+    // one request, but it is the most expensive route on the surface:
+    // /api/picker/review rebuilds a pre-kickoff read per finished
+    // fixture across the window, measured at 9.1s COLD against an idle
+    // backend (0.19s once its cache is warm, which in this suite it
+    // usually is not — every other picker test answers `review` in the
+    // browser, so nothing here warms it). A 45s default sized for the
+    // hermetic majority left that one read four cold attempts of
+    // headroom, and it lost. `test.slow()` triples the budget for THIS
+    // test alone; the assertion is untouched and a proxy that refuses
+    // the route still fails instantly, because a refusal is authored
+    // before any backend is contacted.
+    test.slow();
     const r = await request.get("/api/picker/review?back=7");
     expect(await r.text(), "review rejected by the proxy allowlist")
       .not.toContain("unknown picker route");

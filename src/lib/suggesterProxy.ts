@@ -165,9 +165,11 @@ export async function proxy(
 // /openapi.json. `proxyAllowlistDrift()` below takes that document and
 // returns the difference in BOTH directions, so a guard can assert on
 // what the backend actually serves instead of on four hand-typed pairs
-// (the shape e2e/proxy-allowlists.spec.ts's FORWARDED array still has,
-// and which is why this drift survived an audit that named three
-// others).
+// — the shape that is why this drift survived an audit that named
+// three others. WIRED 2026-09-07 by e2e/proxy-allowlists.spec.ts
+// ("every allowlist agrees with the backend's own route table, both
+// ways"); until then the function was written and uncalled, and this
+// list was still only ever compared to a copy of itself.
 export const LEAGUE_PROXY_ALLOWED: Record<string, readonly string[]> = {
   mls: ["scoreboard", "schedule", "standings", "markets", "odds",
         "approval"],
@@ -363,48 +365,30 @@ export const OPENAPI_PROBE_VALUES: Record<string, string> = {
   key: "leagues-cup",
 };
 
-/** THE GUARD THAT IS WRITTEN AND NOT WIRED — registered, because an
+/** GUARDS THIS FILE HAS WRITTEN AND NOT WIRED — registered, because an
  *  unrun guard is prose and this file has already said what prose is
- *  worth.
+ *  worth. Empty is the correct state; a name parked here is a hole with
+ *  a closing condition, not a shrug.
  *
- *  `proxyAllowlistDrift` below takes the backend's own /openapi.json
- *  and returns the difference in both directions. NOTHING CALLS IT.
- *  Checked 2026-09-07 by grep over src/ and e2e/: its only mentions are
- *  its own definition and the comments around it. The register above it
- *  is likewise read by nobody. So the drift it exists to catch is still
- *  caught by hand — e2e/proxy-allowlists.spec.ts holds a FORWARDED
- *  array of four typed pairs, which is the shape this file's own
- *  comment names as the reason the Liga MX hole survived an audit that
- *  found three others.
- *
- *  This is recorded rather than quietly left because the round that
- *  wrote the function does not own e2e/, and a hole with a name and a
- *  closing condition is the only honest state for a thing one owner
- *  cannot finish. The check FAILS BOTH WAYS once it exists, which is
- *  what makes it converge. */
+ *  RETIRED 2026-09-07 — `allowlist_drift_unwired`. It recorded that
+ *  `proxyAllowlistDrift` and LEAGUE_PROXY_WITHHELD had no caller, so
+ *  the allowlists were checked only against typed pairs in
+ *  e2e/proxy-allowlists.spec.ts — one claim checked against a copy of
+ *  itself — and every drift named in this file (comp/match,
+ *  ligamx/markets/discovery, laliga/approval, comp/tournament,
+ *  friendlies/coverage) had been found by a person reading two lists
+ *  rather than by a test. Its closing condition was that the spec fetch
+ *  the backend's /openapi.json and assert, for every key of
+ *  LEAGUE_PROXY_ALLOWED derived with Object.keys, that
+ *  proxyAllowlistDrift returns unforwarded, unserved and staleWithheld
+ *  all empty, failing loudly rather than skipping when the document
+ *  cannot be read. That test now exists ("every allowlist agrees with
+ *  the backend's own route table, both ways"), and the same spec pins
+ *  the retirement both ways: the record may not still stand, and the
+ *  register may not be emptied of records that still carry a hole. */
 export const PROXY_GUARDS_OPEN: Record<string, {
   finding: string; closes_when: string;
-}> = {
-  allowlist_drift_unwired: {
-    finding:
-      "proxyAllowlistDrift() and LEAGUE_PROXY_WITHHELD have no caller. "
-      + "The allowlists are still checked against four hand-typed pairs "
-      + "in e2e/proxy-allowlists.spec.ts — one claim checked against a "
-      + "copy of itself. Every drift this file records (comp/match, "
-      + "ligamx/markets/discovery, laliga/approval, comp/tournament, "
-      + "friendlies/coverage) was found by a person reading two lists, "
-      + "never by a test.",
-    closes_when:
-      "e2e/proxy-allowlists.spec.ts fetches "
-      + "`${SUGGESTER_BACKEND_URL}/openapi.json`, and for EVERY key of "
-      + "LEAGUE_PROXY_ALLOWED — derived with Object.keys, never typed — "
-      + "asserts proxyAllowlistDrift(prefix, doc.paths) returns "
-      + "unforwarded, unserved and staleWithheld all empty, failing "
-      + "loudly (not skipping) if the document cannot be fetched or "
-      + "parses to no /api/ paths. The FORWARDED array is then deleted "
-      + "and this record retired.",
-  },
-};
+}> = {};
 
 /** True when `segs` is a route this prefix's proxy forwards. */
 export function leagueRouteAllowed(prefix: string, segs: string): boolean {

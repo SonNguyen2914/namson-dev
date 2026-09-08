@@ -887,3 +887,47 @@ test("la liga: two healthy model-state reads print no failure line, and the "
     await expect(page.locator("body")).toContainText("needs-results");
     await expect(page.locator("body")).toContainText("xg join is thin");
   });
+
+// ======================================================================
+// THE FEED'S ABSENT FIELDS ARE NOT ZEROS (2026-09-06 audit, fixed
+// 2026-09-07)
+//
+// LivePanel.autoFill filled the operator's live-state form with
+// `s.current_home ?? 0`, `s.current_away ?? 0` and
+// `Math.min(3, Number(s.red_home) || 0)`. Every one of those fields is
+// OPTIONAL on LiveStateFetch, so a feed response that carried no score
+// produced a measured 0-0 with no red cards — and the panel then ran a
+// real live prediction against it. This is the plane's oldest trap on
+// the one surface where the operator cannot see the payload behind the
+// number.
+// ======================================================================
+
+const LIVE_PANEL = readFileSync(
+  join(SRC, "components", "LivePanel.tsx"), "utf8");
+
+test("LivePanel never coerces an absent feed field into a number",
+  async () => {
+    // The three literals that shipped the defect. A source guard rather
+    // than a DOM one because the defect is the DEFAULT — a rendered 0 is
+    // indistinguishable from a real 0, which is the whole problem, so
+    // the only place it can be caught is where the 0 is invented.
+    for (const bad of ["current_home ?? 0", "current_away ?? 0",
+                       "Number(s.red_home) || 0",
+                       "Number(s.red_away) || 0"]) {
+      expect(LIVE_PANEL, `LivePanel invents a zero: ${bad}`)
+        .not.toContain(bad);
+    }
+    // NON-VACUITY: the fields are still read, so the guard is watching
+    // live code and not a deleted block.
+    expect(LIVE_PANEL).toContain("s.current_home");
+    expect(LIVE_PANEL).toContain("s.red_home");
+  });
+
+test("LivePanel says which fields the feed did not carry", async () => {
+    // A field left alone silently is the same blank as a field zeroed
+    // silently: the operator cannot tell the panel skipped it. The
+    // absence is named on the message the fill writes.
+    expect(LIVE_PANEL).toContain("notCarried");
+    expect(LIVE_PANEL).toContain("did not carry");
+    expect(LIVE_PANEL).toContain("not zeroed");
+  });
