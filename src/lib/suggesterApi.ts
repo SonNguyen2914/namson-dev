@@ -1214,12 +1214,26 @@ async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
       + "read, not an empty result",
       raw.slice(0, 400));
   }
-  if (body === null || body === undefined) {
+  if (body === null || body === undefined || typeof body !== "object") {
     // A 200 CARRYING `null` IS NOT AN EMPTY PAYLOAD. Returned as T it
     // reaches every caller as the shape that means "there is nothing".
+    //
+    // AND NEITHER IS A JSON SCALAR (2026-09-07). This guarded `null` and
+    // `undefined` only, while both sibling readers in this same file —
+    // `fetchWatchedStrip` and `wlJson` — go on to refuse
+    // `typeof body !== "object"`. So a 200 whose body was `0`, `false`,
+    // `"error"` or a bare number was cast straight to T, and every
+    // caller reads T as a record: `body.matches`, `body.rows`,
+    // `body.suggestions` on a number are all `undefined`, which renders
+    // as the EMPTY STATE — an answer we could not read, shown as a
+    // measured nothing. Every endpoint below is typed as an object or an
+    // array (`typeof [] === "object"`, so arrays still pass), and none
+    // of them may legitimately answer a scalar.
     throw new ApiBodyError(res.status,
-      `the read answered ${res.status} with a null body — there is no `
-      + "payload here, and a caller must not read that as an empty one",
+      `the read answered ${res.status} with `
+      + `${body === undefined ? "no body" : JSON.stringify(body)} where a `
+      + "payload was expected — there is nothing here a caller may read "
+      + "as an empty result",
       raw.slice(0, 400));
   }
   return body as T;

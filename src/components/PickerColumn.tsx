@@ -234,6 +234,7 @@ function RowCard({ row, rank, modeId, clubCount, colSrc }: {
       data-column={row.column ?? row.league}
       data-event={row.event_id}
       data-cross-league={cross ? "true" : "false"}
+      data-season-departure={departure ?? undefined}
       className={`rounded-xl border p-4 transition-colors bg-gradient-to-b from-elev2/60 to-elev/40 ${
         rank === 1
           ? "border-accent/35 hover:border-accent/60"
@@ -245,26 +246,17 @@ function RowCard({ row, rank, modeId, clubCount, colSrc }: {
             rank === 1 ? "text-accent" : "text-ink-faint"}`}>
           {String(rank).padStart(2, "0")}
         </span>
-        {/* THE WEIGHT, NOT A BADGE — AND ONLY WHERE IT DEPARTS. The board
-            blends both seasons per club, so "which season" is a
-            percentage. That percentage is the column's for every
-            ordinary row, and the column header already prints it, so the
-            chip is drawn only when this fixture is NOT the ordinary case
-            (see seasonDeparture). The reason rides on the title, so a
-            chip that survives says why it is there rather than looking
-            like the one that used to sit on every card.
-            The binary badge remains the FALLBACK for a row carrying no
-            weight — a read reconstructed through the legacy switch — and
-            it too is drawn only when it disagrees with its column. */}
-        {departure && (w
-          ? <SeasonWeight w={w} alt={alt} departure={departure} />
-          : (
-            <span
-              title={`rated on last season's final table — ${departure}`}
-              className="rounded border border-warn/40 bg-warn/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
-              prior szn
-            </span>
-          ))}
+        {/* NO SEASON CHIP ON A ROW, AT ALL. The basis belongs to the
+            column header — `this szn · min 22 GP` — and to the fixture
+            count beside it; every club in a league is rated on the same
+            table, so a chip on a card repeats one sentence down the whole
+            column. Drawing it only on the rows that DEPART was worse than
+            either alternative: a chip appearing on some cards and not
+            others reads as a fact that varies fixture by fixture, which
+            is what it looked like on the board and is not what it means.
+            The departure is still DERIVED and still carried, as data on
+            the row rather than as ink on it (see data-season-departure),
+            so nothing about it is lost and a guard can still read it. */}
         {/* THE COMPETITION, when it is not the column. A Leagues Cup tie
             between two Liga MX clubs is drawn in the Liga MX column
             because that table describes it completely — but it is still
@@ -344,6 +336,19 @@ function RowCard({ row, rank, modeId, clubCount, colSrc }: {
             className={`block font-mono text-[20px] font-semibold leading-none tabular-nums ${
               anchor.v === WITHHELD ? "font-normal text-ink-faint" : "text-ink-hi"}`}>
             {anchor.v}
+            {/* THE COUNTERFACTUAL MARK, ON THE NUMBER IT IS ABOUT. It used
+                to ride on the season chip, and the chip is gone — but the
+                two are different claims and only one of them was the
+                league's. "Which season is this rating" is true of the
+                whole table and belongs to the column header. "This season
+                ALONE would have concluded the opposite" is true of THIS
+                fixture and of no other, so it moves to the figure it
+                contradicts rather than leaving with the badge. */}
+            {alt && (
+              <span data-testid="season-alt" data-alt={dec(alt.current)}
+                title={`ON THIS SEASON ALONE the ${anchor.k} is ${dec(alt.current)}, not ${dec(alt.blended)} — the board ranks on the blend, and this says what the other cut would have concluded`}
+                className="ml-1 align-top text-[11px] font-normal text-warn">*</span>
+            )}
           </span>
           <span className="mt-1 block font-mono text-[8.5px] uppercase tracking-[0.12em] text-ink-low">
             {anchor.k}

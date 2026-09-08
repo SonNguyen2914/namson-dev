@@ -335,21 +335,28 @@ test("the season share is a number on the row, not a binary badge",
        tone and both sides on its title, never a binary badge. It now
        reads that off a departing row, and asserts the ordinary one
        carries nothing at all. */
+    /* UPDATED AGAIN 2026-09-07, and this is the operator's call after
+       seeing it on the board: NO row carries a season chip. Drawing it
+       only on departing rows made it appear on some cards and not
+       others, which reads as a fact that varies fixture by fixture —
+       and it does not; the basis belongs to the table the whole column
+       is rated on. What this test holds now is that no row anywhere
+       draws one, and that the departure is still derived and still
+       carried as data, so removing the ink did not remove the fact. */
     await open(page);
-    const early = col(page, "ligamx").getByTestId("picker-row").first();
-    await expect(early.getByTestId("season-weight")).toHaveCount(0);
-    await expect(early.getByText("prior szn")).toHaveCount(0);
-    const chip = col(page, "epl").getByTestId("picker-row").first()
-      .getByTestId("season-weight");
-    await expect(chip).toHaveText("55% this szn");
-    // a number, with both sides and the formula on its title — the
-    // shape this test was written to hold
-    await expect(chip).toHaveAttribute("title", /GP\/\(GP\+10\)/);
-    await expect(chip).toHaveAttribute("data-w", /0\./);
-    // AND IT SAYS WHY IT SURVIVED, so a chip on a row can never be
-    // mistaken for the one that used to sit on every card
-    await expect(chip).toHaveAttribute(
-      "title", /no prior-season row is rated on this season alone/);
+    for (const league of ["ligamx", "epl", "mls", "laliga"]) {
+      const rows = col(page, league).getByTestId("picker-row");
+      await expect(rows.getByTestId("season-weight")).toHaveCount(0);
+      await expect(rows.getByText("prior szn")).toHaveCount(0);
+    }
+    // the fact survives the ink: the departing EPL row still says so
+    await expect(col(page, "epl").getByTestId("picker-row").first())
+      .toHaveAttribute("data-season-departure",
+        /no prior-season row and is rated on this season alone/);
+    // and an ordinary row carries no departure at all — non-vacuity,
+    // because an attribute present on every row would prove nothing
+    await expect(col(page, "ligamx").getByTestId("picker-row").first())
+      .not.toHaveAttribute("data-season-departure", /./);
   });
 
 test("a late-season fixture reads as this season's, and a promoted side as its own basis",
@@ -364,12 +371,14 @@ test("a late-season fixture reads as this season's, and a promoted side as its o
     await expect(late.getByTestId("season-weight")).toHaveCount(0);
     // the header carries it once, for every row beneath it
     await expect(col(page, "mls").getByText(/this szn · min/i)).toBeVisible();
+    await expect(late).not.toHaveAttribute("data-season-departure", /./);
     // a club with no last-season row at all is rated on this season
-    // alone at 100% — a different basis, said out loud on the chip
+    // alone — a different basis from its column, carried as data on the
+    // row now that no card draws a season badge
     const solo = col(page, "epl").getByTestId("picker-row").first();
-    await expect(solo.getByTestId("season-weight")).toHaveText("55% this szn");
-    await expect(solo.getByTestId("season-weight")).toHaveAttribute(
-      "title", /no prior-season row is rated on this season alone/);
+    await expect(solo.getByTestId("season-weight")).toHaveCount(0);
+    await expect(solo).toHaveAttribute("data-season-departure",
+      /no prior-season row and is rated on this season alone/);
   });
 
 test("the banner explains the blend rather than a threshold", async ({ page }) => {
@@ -933,12 +942,21 @@ const seasonBoard = (gdg: number, currentGdg: number | null) => ({
 
 test("a materially different current-season read is on the chip, with both numbers",
   async ({ page }) => {
+    /* THE MARK MOVED WITH THE FACT. It used to sit on the season chip;
+       the chip is gone from every row and the counterfactual is not —
+       "this season alone would have concluded the opposite" is true of
+       this fixture and of no other, so it now marks the figure it
+       contradicts. Both numbers are still on it. */
     await open(page, seasonBoard(0.67, 1.17));
-    const chip = page.getByTestId("season-weight").first();
-    await expect(chip).toHaveAttribute("data-alt", "+1.17");
-    await expect(chip).toHaveAttribute("title", /ON THIS SEASON ALONE/);
-    await expect(chip).toHaveAttribute("title", /\+1\.17/);
-    await expect(chip).toHaveAttribute("title", /\+0\.67/);
+    await expect(page.getByTestId("season-weight")).toHaveCount(0);
+    const mark = page.getByTestId("season-alt").first();
+    await expect(mark).toHaveAttribute("data-alt", "+1.17");
+    await expect(mark).toHaveAttribute("title", /ON THIS SEASON ALONE/);
+    await expect(mark).toHaveAttribute("title", /\+1\.17/);
+    await expect(mark).toHaveAttribute("title", /\+0\.67/);
+    // and it sits INSIDE the anchor, on the number it is about
+    await expect(page.getByTestId("row-anchor").first()
+      .getByTestId("season-alt")).toHaveCount(1);
     await expect(page.getByTestId("season-alt")).toHaveCount(1);
   });
 
@@ -952,8 +970,7 @@ test("a close agreement is NOT marked — showing both would be noise",
        `.first()`, because an agreeing row now draws no chip at all —
        which is a stronger form of the same claim, and `.first()` would
        fail for the right reason in a way that reads like the wrong one. */
-    await expect(page.locator('[data-testid="season-weight"][data-alt]'))
-      .toHaveCount(0);
+    await expect(page.locator('[data-testid="season-alt"]')).toHaveCount(0);
   });
 
 test("a SIGN flip is always marked, however small", async ({ page }) => {
