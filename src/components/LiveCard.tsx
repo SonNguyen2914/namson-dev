@@ -45,7 +45,10 @@
 //
 //   HAS IT   the tape age (derived from `state.captured_at` against the
 //            envelope's `generated_at`), the score and the minute, the
-//            four live-read components per side, the held position.
+//            four live-read components per side, the held position, and
+//            — since 2026-09-07 — one MATCH STATE per side (`states`,
+//            backend card.live_states), which refuses by name on a row
+//            without possession or without shot counts.
 //   HAS IT NOT  crests and club colours (no provider on this plane sends
 //            either — see lib/teamColors.clubColors); yellow and red
 //            CARD COUNTS; a tilt / momentum / events-per-minute figure;
@@ -68,8 +71,8 @@ import {
 import { fmtDate } from "../lib/matchday";
 import { BoardRow, LeagueMeta, leagueLabel } from "../lib/pickerApi";
 import {
-  LiveReadComponentPayload, WatchedMatch, WatchedPosition,
-  WatchedStripResponse, api,
+  LiveReadComponentPayload, MatchSideState, MatchStates, WatchedMatch,
+  WatchedPosition, WatchedStripResponse, api,
 } from "../lib/suggesterApi";
 import { clubColors } from "../lib/teamColors";
 import { RowRead, hueOf } from "./PickerColumn";
@@ -497,6 +500,103 @@ function StatsBlock({ m, hc, ac }: {
   );
 }
 
+// ---------------------------------------------------------------------
+// THE STATE ROW — one word per side, INSIDE the flip.
+//
+// WHY IT SITS HERE AND NOT IN A BLOCK OF ITS OWN. The two axes it is
+// cut from are two of the bars directly above it: possession and shots.
+// The live-stats block is the only part of this card that turns, and it
+// turns to the PREMATCH read — so a state row outside the flip would
+// leave the word on screen with the numbers that justify it gone. A
+// label whose evidence has flipped away is the thing this placement
+// avoids. It also gives the two faces a matching shape: the live face
+// ends on a state word, the prematch face already ends on a tier shape
+// (CLEAN / SPLIT / HOLLOW), each in its own face's vocabulary.
+//
+// PLAIN INK, NO EXCEPTIONS. Gold is the brand colour and up/warn/neg is
+// the traffic light for verdicts. A state is a DESCRIPTION of the row —
+// neither a brand mark nor a verdict — so it borrows neither, and the
+// club colours stay on the bars where they carry the split.
+//
+// AND THE CARD COMPUTES NOTHING. Every word, every share and every
+// refusal comes off `states` (backend card.live_states); this file has
+// no cut point, no threshold and no arithmetic, so the strip and the
+// card cannot draw the line in two places. Read defensively all the
+// same — a type is a claim about the build, not about the wire.
+// ---------------------------------------------------------------------
+
+const STATE_ABSENT =
+  "no state — the row carries no possession, and a side with two of "
+  + "the three inputs has none. Missing is never an even match.";
+
+function statesOf(m: WatchedMatch) {
+  const raw = (m as unknown as Record<string, unknown>).states;
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as MatchStates;
+  const side = (s: MatchSideState | undefined) =>
+    (s && typeof s.state === "string" && s.state.trim() !== ""
+      ? { word: s.state,
+          sub: typeof s.cell_words === "string" ? s.cell_words : "",
+          note: typeof s.note === "string" ? s.note : undefined }
+      : null);
+  const home = side(o.home), away = side(o.away);
+  // BOTH OR NEITHER. The six states are a PAIR by construction — the
+  // same cut read from two ends — so one word beside an empty slot
+  // would be a claim the payload never makes.
+  if (home && away) return { home, away, conventions: o.conventions };
+  return { refused: typeof o.refused === "string" && o.refused !== ""
+    ? o.refused : typeof o.unavailable === "string" ? o.unavailable : "" };
+}
+
+function StateRow({ m }: { m: WatchedMatch }) {
+  const got = statesOf(m);
+  if (!got) return null;
+  if (!got.home || !got.away) {
+    return (
+      <div data-testid="live-state" data-state="absent"
+        className="mt-2.5 border-t border-dashed border-line-strong pt-2.5">
+        <p data-testid="live-state-absent" data-absence="routine"
+          title={got.refused || undefined}
+          className="font-mono text-[10px] leading-relaxed text-ink-low">
+          {STATE_ABSENT}
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div data-testid="live-state"
+      data-home={got.home.word} data-away={got.away.word}
+      className="mt-2.5 grid grid-cols-[1fr_auto_1fr] items-start gap-2 border-t border-dashed border-line-strong pt-2.5">
+      <div>
+        <div data-testid="live-state-home" title={got.home.note}
+          className="font-mono text-[12px] font-semibold leading-tight tracking-[0.08em] text-ink-hi">
+          {got.home.word}
+        </div>
+        {got.home.sub !== "" && (
+          <div className="mt-[3px] font-mono text-[9px] leading-snug tracking-[0.03em] text-ink-faint">
+            {got.home.sub}
+          </div>
+        )}
+      </div>
+      <span title={got.conventions}
+        className="pt-[3px] font-mono text-[8px] uppercase leading-none tracking-[0.17em] text-ink-faint">
+        state
+      </span>
+      <div className="text-right">
+        <div data-testid="live-state-away" title={got.away.note}
+          className="font-mono text-[12px] font-semibold leading-tight tracking-[0.08em] text-ink-hi">
+          {got.away.word}
+        </div>
+        {got.away.sub !== "" && (
+          <div className="mt-[3px] font-mono text-[9px] leading-snug tracking-[0.03em] text-ink-faint">
+            {got.away.sub}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** DYNAMICS — the windowed read, and the number that is NOT here.
  *
  *  The four components are exponentially decayed with a published
@@ -850,6 +950,9 @@ export function LiveCard({ m, generatedAt, row, clubCount }: {
                 prematch ⤺
               </button>} />
             <StatsBlock m={m} hc={colours.home} ac={colours.away} />
+            {/* INSIDE THE FLIP, directly under the bars it is derived
+                from — see the block comment above StateRow. */}
+            <StateRow m={m} />
           </div>
           <div inert={!flipped} aria-hidden={!flipped}
             data-testid="live-face-prematch"

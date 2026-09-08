@@ -1079,6 +1079,65 @@ export interface WatchedMatch {
    *  object). Naming the key without claiming its shape is the honest
    *  half. */
   shared_exit_book?: unknown;
+  /** THE SIX MATCH STATES, one word per side (card.live_states).
+   *
+   *  ALWAYS PRESENT AND OFTEN A REFUSAL. The block is emitted on every
+   *  match — a row without possession, without shot counts, or with
+   *  both sides on zero has NO state and says which input it wanted,
+   *  because MISSING IS NEVER AN EVEN MATCH. So `home` / `away` are
+   *  optional and `refused` is not an error path: it is the ordinary
+   *  early-match shape, and the card draws it rather than falling back
+   *  to a plausible word.
+   *
+   *  THE SHAPE IS RECORDED OFF THE EMITTER, unlike `shared_exit_book`
+   *  above — the two landed in one change, so claiming the shape here
+   *  is a statement about code that exists rather than a plausible
+   *  guess at someone else's payload. Every field is still read
+   *  defensively at the point of use: a type is a claim about the
+   *  build, not about the wire. */
+  states?: MatchStates;
+}
+
+/** One side's word, the cell that fired it, and the shares it was cut
+ *  from. `cell_words` is the sub-line the card prints — DERIVED in the
+ *  backend from the same cell, so the word and its justification
+ *  cannot be assembled twice and come to disagree. */
+export interface MatchSideState {
+  state: string;
+  cell?: { ball?: string; chances?: string; score?: string | null;
+           score_decides?: boolean };
+  cell_words?: string;
+  shares?: { ball?: number; chances?: number };
+  note?: string;
+  conventions?: string;
+}
+
+export interface MatchStates {
+  home?: MatchSideState;
+  away?: MatchSideState;
+  /** the whole block, refused BY NAME — position.REFUSAL_CODES */
+  refused?: string;
+  refusal_codes?: string[];
+  /** card.STATE_MISSING_IS_NEVER_EVEN, on the refusal */
+  basis?: string;
+  counts?: { possession?: { home: number | null; away: number | null };
+             shots?: { home: number | null; away: number | null } };
+  cut?: { has_at_or_above?: number; against_at_or_below?: number;
+          same_cut_both_axes?: string };
+  vocabulary?: string[];
+  axes?: string;
+  chances_basis?: string;
+  score_basis?: string;
+  contest_basis?: string;
+  /** card.STATE_CUTS_ARE_CONVENTIONS — the cut points are DECLARED
+   *  conventions and not fitted thresholds, and the sentence says
+   *  which of the two axes could have been measured and which could
+   *  not. It rides on the card as a title, never as a claim of its
+   *  own. */
+  conventions?: string;
+  shows_not_decides?: string;
+  /** card._layer's fault isolation, when the emitter itself broke */
+  unavailable?: string;
 }
 
 export interface WatchedStripResponse {

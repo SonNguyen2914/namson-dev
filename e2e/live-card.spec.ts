@@ -158,6 +158,105 @@ function side(name: string, mult = 1) {
   };
 }
 
+// ------------------------------------------------- the match states
+//
+// `states`, off api/main.py's match block (backend card.live_states).
+// EVERY KEY BELOW IS THE ONE THE BACKEND EMITS, and the words are its
+// words — the shares, the cell, the derived `cell_words` sub-line and
+// the NOT-VALIDATED sentence. A fixture written in this file's own
+// vocabulary would certify a reader that cannot read the real payload,
+// which is how twelve green tests once certified a venue bug.
+const CONVENTIONS =
+  "EXPLORATORY — NOT VALIDATED: the share>=0.6 / share<=0.4 cut is a "
+  + "DECLARED CONVENTION and not a fitted threshold. Nothing was "
+  + "preregistered, no holdout was held out, and no measured edge is "
+  + "attached to any of these six words. AND THE TWO AXES ARE NOT "
+  + "EQUALLY UNFITTABLE: the CHANCES cut COULD be fitted, because M1's "
+  + "panel carries shot volume at four horizons and measured it; the "
+  + "BALL cut could NOT, because possession is not in that corpus at "
+  + "all. The words describe THIS row; they forecast nothing.";
+
+const MISSING_IS_NEVER_EVEN =
+  "MISSING IS NEVER AN EVEN MATCH. A row without possession or without "
+  + "shots for BOTH sides has NO state — not CONTEST, which would claim "
+  + "the two sides are level, and not a zero share, which would claim "
+  + "one of them has done nothing.";
+
+function sideState(state: string, cellWords: string,
+                   shares: [number, number],
+                   cell: Record<string, unknown>) {
+  return {
+    state,
+    cell,
+    cell_words: cellWords,
+    shares: { ball: shares[0], chances: shares[1] },
+    note: `the row reads ${cellWords}. ${CONVENTIONS}`,
+    conventions: CONVENTIONS,
+  };
+}
+
+/** The four pairings, each recorded off the emitter. */
+const STATES = {
+  // possession 58.4/41.6 with 15 shots to 6: the ball is INSIDE the cut
+  // and the chances are not, so neither side has an edge on both axes.
+  contest: {
+    home: sideState("CONTEST", "ball even · chances", [0.584, 0.7143],
+      { ball: "even", chances: "has", score: "ahead", score_decides: false }),
+    away: sideState("CONTEST", "ball even · no chances", [0.416, 0.2857],
+      { ball: "even", chances: "against", score: "behind",
+        score_decides: false }),
+  },
+  siege: {
+    home: sideState("SIEGE", "ball · chances", [0.71, 0.75],
+      { ball: "has", chances: "has", score: "ahead", score_decides: false }),
+    away: sideState("PINNED", "no ball · no chances · behind", [0.29, 0.25],
+      { ball: "against", chances: "against", score: "behind",
+        score_decides: true }),
+  },
+  blunt: {
+    home: sideState("BLUNT", "ball · no chances", [0.68, 0.3571],
+      { ball: "has", chances: "against", score: "behind",
+        score_decides: false }),
+    away: sideState("COUNTER", "no ball · chances", [0.32, 0.6429],
+      { ball: "against", chances: "has", score: "ahead",
+        score_decides: false }),
+  },
+  // THE PARKED BUS: the same two shares as PINNED, and the score is the
+  // only thing between them.
+  lowBlock: {
+    home: sideState("LOW BLOCK", "no ball · no chances · ahead",
+      [0.34, 0.2667],
+      { ball: "against", chances: "against", score: "ahead",
+        score_decides: true }),
+    away: sideState("SIEGE", "ball · chances", [0.66, 0.7333],
+      { ball: "has", chances: "has", score: "behind", score_decides: false }),
+  },
+};
+
+function states(pair: { home: unknown; away: unknown }) {
+  return {
+    ...pair,
+    counts: { possession: { home: 58.4, away: 41.6 },
+              shots: { home: 15, away: 6 } },
+    cut: { has_at_or_above: 0.6, against_at_or_below: 0.4 },
+    vocabulary: ["BLUNT", "CONTEST", "COUNTER", "LOW BLOCK", "PINNED",
+                 "SIEGE"],
+    conventions: CONVENTIONS,
+    shows_not_decides:
+      "A STATE IS A DESCRIPTION OF THIS ROW AND FORECASTS NOTHING.",
+  };
+}
+
+/** The early-match tape: a scoreline and almost nothing else. NO state,
+ *  the names of both absent inputs, and never CONTEST. */
+const STATES_ABSENT = {
+  refused: "no_possession: the tape carries no possession and no shot "
+    + "counts for one or both sides, so neither side has a state. "
+    + MISSING_IS_NEVER_EVEN,
+  refusal_codes: ["no_possession", "no_shot_evidence"],
+  basis: MISSING_IS_NEVER_EVEN,
+};
+
 const COVERAGE = {
   monitored: true, complete_history: true,
   history: "declared before kickoff",
@@ -196,6 +295,11 @@ function liveMatch(over: Record<string, unknown> = {}) {
       certainty_premium: { applies: true, sell: { bid_cents: 77 } },
       exit_is_obtainable: { obtainable: true },
     }],
+    // The bars above read 58.4/41.6 on possession, so the ball axis
+    // sits INSIDE the cut and the word that follows from them is
+    // CONTEST. The default card's state agrees with the default card's
+    // bars, which is the whole reason the row lives beside them.
+    states: states(STATES.contest),
     ...over,
   };
 }
@@ -223,6 +327,7 @@ const TAPE_FAILED = {
           sides: {},
           words: "no component read has been persisted for this fixture" },
   positions: [],
+  states: STATES_ABSENT,
 };
 
 const ENVELOPE = {
@@ -605,6 +710,158 @@ test("the blocks this payload cannot fill REFUSE BY NAME — and a "
     await expect(card.getByTestId("live-cards-absent"))
       .toHaveAttribute("data-absence", "routine");
   });
+
+// =========================================== the six match states
+
+test("both sides get a word, and it is the one the bars above support",
+  async ({ page }) => {
+    await open(page, STRIP);
+    const card = liveCard(page, 101);
+    const row = card.getByTestId("live-state");
+    await expect(row).toBeVisible();
+    // The default card's possession bar reads 58.4 / 41.6 — inside the
+    // cut on the ball axis — so the word that follows from it is
+    // CONTEST on BOTH sides. The card renders what the payload says
+    // and computes nothing.
+    await expect(card.getByTestId("live-state-home")).toHaveText("CONTEST");
+    await expect(card.getByTestId("live-state-away")).toHaveText("CONTEST");
+    // AND THE CELL THAT FIRED IT, under each word.
+    await expect(row).toContainText("ball even · chances");
+    await expect(row).toContainText("ball even · no chances");
+    await expect(row).toContainText("state");
+  });
+
+test("every pairing the backend can send is drawn, per side, in the "
+  + "payload's own words", async ({ page }) => {
+  const cards = [
+    { id: 301, pair: STATES.siege, want: ["SIEGE", "PINNED"] },
+    { id: 302, pair: STATES.blunt, want: ["BLUNT", "COUNTER"] },
+    { id: 303, pair: STATES.lowBlock, want: ["LOW BLOCK", "SIEGE"] },
+  ];
+  await open(page, {
+    ...ENVELOPE,
+    matches: cards.map((c) => liveMatch({
+      fixture_id: c.id, states: states(c.pair),
+    })),
+  });
+  for (const c of cards) {
+    const card = liveCard(page, c.id);
+    await expect(card.getByTestId("live-state-home")).toHaveText(c.want[0]);
+    await expect(card.getByTestId("live-state-away")).toHaveText(c.want[1]);
+  }
+  // THE PARKED BUS HAS ITS OWN WORD. It used to wear the same one as an
+  // end-to-end game, which is the defect this set was built to close.
+  await expect(liveCard(page, 303).getByTestId("live-state"))
+    .toContainText("no ball · no chances · ahead");
+});
+
+test("a row the backend could not read carries NO state, and says "
+  + "missing is never an even match", async ({ page }) => {
+  await open(page, { ...ENVELOPE, matches: [TAPE_FAILED] });
+  const card = liveCard(page, 606);
+  const absent = card.getByTestId("live-state-absent");
+  await expect(absent).toBeVisible();
+  await expect(absent).toContainText("Missing is never an even match");
+  await expect(absent).toHaveAttribute("data-absence", "routine");
+  // NEVER CONTEST, and never one word beside an empty slot: the six are
+  // a PAIR by construction, so half of one is a claim the payload never
+  // made.
+  await expect(card.getByTestId("live-state-home")).toHaveCount(0);
+  await expect(card.getByTestId("live-state-away")).toHaveCount(0);
+  await expect(card.getByTestId("live-state")).not.toContainText("CONTEST");
+});
+
+test("the state turns WITH the bars it is derived from", async ({ page }) => {
+  // A label whose evidence has flipped away is the thing this placement
+  // exists to avoid: the two axes are two of the bars in the block that
+  // turns, so the word has to turn with them.
+  await open(page, STRIP);
+  const card = liveCard(page, 101);
+  await expect(card.getByTestId("live-state")).toBeVisible();
+  await card.getByTestId("live-flip").click();
+  await expect(card).toHaveAttribute("data-flipped", "true");
+  await expect(card.getByTestId("live-state")).not.toBeVisible();
+  await card.getByTestId("live-unflip").click();
+  await expect(card.getByTestId("live-state")).toBeVisible();
+});
+
+test("a state is plain ink — no accent, no traffic light", async ({ page }) => {
+  // Gold is the brand mark and up/warn/neg is the verdict palette. A
+  // state is a description of the row and borrows neither, so the six
+  // words must all render in the SAME colour whatever they say.
+  await open(page, {
+    ...ENVELOPE,
+    matches: [liveMatch({ fixture_id: 401, states: states(STATES.siege) }),
+              liveMatch({ fixture_id: 402, states: states(STATES.blunt) }),
+              liveMatch({ fixture_id: 403,
+                          states: states(STATES.lowBlock) })],
+  });
+  const inks = new Set<string>();
+  for (const id of [401, 402, 403]) {
+    for (const which of ["live-state-home", "live-state-away"]) {
+      inks.add(await liveCard(page, id).getByTestId(which)
+        .evaluate((el) => getComputedStyle(el).color));
+    }
+  }
+  expect(inks.size).toBe(1);
+  // and that one ink is the card's high ink, not the accent or a light
+  const ink = [...inks][0];
+  const accent = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue("--accent")
+      .trim());
+  const hi = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue("--ink-hi")
+      .trim());
+  expect(ink).not.toBe(accent);
+  expect(ink.replace(/\s/g, "")).toBe(
+    `rgb(${parseInt(hi.slice(1, 3), 16)},${parseInt(hi.slice(3, 5), 16)},${
+      parseInt(hi.slice(5, 7), 16)})`);
+});
+
+test("the card computes no state of its own — the word comes off the "
+  + "payload and nowhere else", async ({ page }) => {
+  // THE SAME BARS, A DIFFERENT WORD. If this surface derived the state
+  // from the bars it would overrule the payload here; it does not, and
+  // the point of that is a cut point that cannot be drawn in two
+  // places.
+  await open(page, {
+    ...ENVELOPE,
+    matches: [liveMatch({ fixture_id: 501, states: states(STATES.siege) })],
+  });
+  await expect(liveCard(page, 501).getByTestId("live-state-home"))
+    .toHaveText("SIEGE");
+  // and a payload with no states block at all draws no row rather than
+  // inventing one
+  await open(page, {
+    ...ENVELOPE,
+    matches: [liveMatch({ fixture_id: 502, states: undefined })],
+  });
+  await expect(liveCard(page, 502).getByTestId("live-state"))
+    .toHaveCount(0);
+});
+
+test("no state on any card names a moment to act", async ({ page }) => {
+  await open(page, {
+    ...ENVELOPE,
+    matches: [liveMatch({ fixture_id: 601, states: states(STATES.siege) }),
+              liveMatch({ fixture_id: 602, states: states(STATES.blunt) }),
+              liveMatch({ fixture_id: 603,
+                          states: states(STATES.lowBlock) }),
+              TAPE_FAILED],
+  });
+  const rows = page.getByTestId("live-state");
+  const n = await rows.count();
+  expect(n).toBe(4);                       // not a vacuous scan
+  for (let i = 0; i < n; i += 1) {
+    const said = (await rows.nth(i).innerText()).toLowerCase();
+    expect(said.trim()).not.toBe("");
+    for (const imperative of ["you should", "cash out", "sell now",
+      "buy now", "act now", "take profit", "we advise", "we recommend",
+      "back the", "lay the", "get out"]) {
+      expect(said).not.toContain(imperative);
+    }
+  }
+});
 
 test("a dismissal is a refusal that had to be MADE, and takes the band",
   async ({ page }) => {
