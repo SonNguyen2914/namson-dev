@@ -265,6 +265,15 @@ html {
 
 /* ---------------- app chrome (top bar, skeletons, scroll) -------- */
 /* sticky glass top bar */
+/* THE BAR'S HEIGHT IS ONE FACT (2026-09-07). Anything else on a page
+   that sticks must park BELOW this bar, not at 0, or the bar's z-50
+   hides it — which is exactly what a league header at `top-0` did. The
+   number is h-12 (3rem) PLUS the border-bottom below, because the border
+   is on screen too: parking at 3rem leaves the header one pixel under
+   the bar, which is how this was first shipped. Read it from here rather
+   than retyping it; e2e asserts the two agree. */
+:root { --topbar-h: calc(3rem + 1px); }
+
 .topbar {
   position: sticky;
   top: 0;

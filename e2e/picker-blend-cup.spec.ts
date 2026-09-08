@@ -1109,11 +1109,191 @@ test("the league header follows the column when the rows scroll under it",
     expect(after).not.toBeNull(); expect(colBox).not.toBeNull();
     // the column really did travel out of the top of the viewport
     expect(colBox!.y).toBeLessThan(-100);
-    // and its header did not go with it — it is pinned at the top
-    expect(after!.y).toBeGreaterThanOrEqual(0);
-    expect(after!.y).toBeLessThanOrEqual(2);
+    // and its header did not go with it — it is pinned just under the
+    // top bar, whose height it reads rather than a number typed here
+    const barH = await page.evaluate(() => {
+      const b = document.querySelector(".topbar");
+      return b ? b.getBoundingClientRect().height : 0;
+    });
+    expect(barH).toBeGreaterThan(0);
+    expect(after!.y).toBeGreaterThanOrEqual(barH - 1);
+    expect(after!.y).toBeLessThanOrEqual(barH + 1);
     // still on screen, which is the whole point
     expect(colBox!.y + colBox!.height).toBeGreaterThan(after!.y);
+  });
+
+test("every league column gets a real track, whatever the payload names",
+  async ({ page }) => {
+    /* THE BOARD IS NOT FOUR LEAGUES. It is four fixed ones plus whatever
+       the payload names — this fixture's fifth column is the Leagues Cup,
+       and the operator's board carries it. A count typed as 4 put that
+       fifth column on an implicit track, which took the whole width and
+       left the four 1fr tracks with none: measured
+       `0px 0px 0px 0px 1304px`, four columns of zero width, rows
+       overflowing, and `1 / -1` no longer covering the board because -1
+       is the end of the EXPLICIT grid.
+
+       556 tests passed over that for as long as none of them asserted
+       geometry. This one does, and it is the whole reason it exists. */
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await open(page);
+    const cols = page.locator('[data-testid="league-col"]');
+    await expect(cols).toHaveCount(5);
+    const n = await cols.count();
+    for (let i = 0; i < n; i++) {
+      const box = await cols.nth(i).boundingBox();
+      expect(box, `column ${i} has no box`).not.toBeNull();
+      expect(box!.width,
+        `column ${i} (${await cols.nth(i).getAttribute("data-league")}) collapsed`)
+        .toBeGreaterThan(150);
+    }
+    // every track the same size — no column is quietly the odd one out
+    const widths = await cols.evaluateAll((els) =>
+      els.map((e) => Math.round(e.getBoundingClientRect().width)));
+    expect(new Set(widths).size).toBe(1);
+    // and the full-width band really does span the whole board
+    const band = await page.getByTestId("day-band").first().boundingBox();
+    const wrap = await cols.first().evaluate((el) =>
+      el.parentElement!.getBoundingClientRect().width);
+    expect(band!.width).toBeGreaterThan(wrap - 2);
+  });
+
+/* A board with rows in EVERY column, so every league header carries a
+   full-length basis chip. The shared BOARD leaves epl/laliga empty,
+   which makes their chips short — and a short chip is exactly the case
+   that does NOT reproduce the operator's 2026-09-07 report, where
+   PREMIER LEAGUE pushed its fixture count onto a second row while MLS
+   beside it did not. */
+const FULL = (() => {
+  // The operator's own board, 2026-09-07: MLS 29 fixtures on
+  // `69–71% THIS SZN · MIN 22 GP`, PREMIER LEAGUE 6 on
+  // `PRIOR SZN · 23% THIS SZN`, LA LIGA 6 on `29–33%`, LIGA MX 8 on
+  // `38–41%`. Both halves matter — the chip's LENGTH and the count's —
+  // because what wrapped was the count, and it wrapped on the columns
+  // whose league NAME was long. A fixture with one row per league says
+  // "1 fixture" and never reproduces it.
+  const mk = (league: string, espn: string, n: number,
+              w: [number, number]) =>
+    Array.from({ length: n }, (_, i) => ({
+      ...(league === "mls" ? MLS_ROW : EARLY),
+      league, rated_in: { home: league, away: league }, espn,
+      event_id: `${league}-${i}`, competition_id: `${league}-${i}`,
+      kickoff: inHours(3 + (i % 6)), weights: weights(w[0], w[1]),
+    }));
+  return { ...BOARD, rows: [
+    ...mk("mls", "usa.1", 29, [0.69, 0.71]),
+    ...mk("epl", "eng.1", 6, [0.23, 0.23]),
+    ...mk("laliga", "esp.1", 6, [0.29, 0.33]),
+    ...mk("ligamx", "mex.1", 8, [0.38, 0.41]),
+  ] };
+})();
+
+test("the board lays out with content in it, at every width",
+  async ({ page }) => {
+    /* THE SAME GEOMETRY SWEEP AS e2e/layout-audit.spec.ts, but on a board
+       that HAS rows — which is where all three of the week's layout
+       defects actually lived. The unmocked route renders chrome and a
+       near-empty board, so it could never have caught a column collapse
+       driven by the number of leagues in the payload. */
+    const findings: string[] = [];
+    for (const [name, body] of [["five", BOARD], ["four", FULL]] as const)
+    for (const w of [390, 768, 1100, 1440, 1600, 1920]) {
+      await page.setViewportSize({ width: w, height: 900 });
+      await open(page, body);
+      await page.waitForTimeout(400);
+      void name;
+      const r = await page.evaluate((vw) => {
+        const out: string[] = [];
+        if (document.documentElement.scrollWidth > vw + 1) {
+          out.push(`H-OVERFLOW ${document.documentElement.scrollWidth} > ${vw}`);
+        }
+        const bar = document.querySelector(".topbar") as HTMLElement | null;
+        const barH = bar ? bar.getBoundingClientRect().height : 0;
+        document.querySelectorAll('[data-testid="league-col"]').forEach((c) => {
+          const el = c as HTMLElement;
+          const lg = el.getAttribute("data-league");
+          const box = el.getBoundingClientRect();
+          if (box.width < 120) out.push(`COLUMN-COLLAPSED ${lg} w=${Math.round(box.width)}`);
+          const head = el.querySelector('[data-testid="col-head"]') as HTMLElement;
+          const top = parseFloat(getComputedStyle(head).top);
+          if (!Number.isNaN(top) && top < barH - 0.5) {
+            out.push(`HEAD-UNDER-BAR ${lg} top=${top} bar=${Math.round(barH)}`);
+          }
+          // the name and the count share one row, on every league
+          const name = el.querySelector("h3") as HTMLElement;
+          const cnt = el.querySelector('[data-testid="col-count"]') as HTMLElement;
+          if (name && cnt) {
+            const nb = name.getBoundingClientRect(), cb = cnt.getBoundingClientRect();
+            const overlap = Math.min(nb.bottom, cb.bottom) - Math.max(nb.top, cb.top);
+            if (overlap <= 0) out.push(`HEAD-WRAPPED ${lg} name@${Math.round(nb.top)} count@${Math.round(cb.top)}`);
+          }
+          // a row card must not spill out of its own column
+          el.querySelectorAll("article").forEach((a) => {
+            const ab = (a as HTMLElement).getBoundingClientRect();
+            if (ab.width > box.width + 2) {
+              out.push(`ROW-OVERFLOWS-COLUMN ${lg} row=${Math.round(ab.width)} col=${Math.round(box.width)}`);
+            }
+          });
+        });
+        return out;
+      }, w);
+      [...new Set(r)].forEach((f) => findings.push(`[${name}] @${w} ${f}`));
+    }
+    expect(findings, "board layout findings:\n" + findings.join("\n"))
+      .toEqual([]);
+  });
+
+test("a long league name truncates — it never pushes the fixture count off the row",
+  async ({ page }) => {
+    /* THE INVARIANT UNDER STRESS, because the operator's own case would
+       not reproduce here. On his board PREMIER LEAGUE pushed `6 FIXTURES`
+       onto a second row while MLS beside it did not; mirrored fixture,
+       same widths, same chip strings, and it stays on one row in
+       Chromium — almost certainly because Archivo does not load in this
+       runner, so every name measures narrower than it does on his screen.
+       A geometry assertion I cannot make fail is not evidence, so this
+       asserts the same invariant with a name long enough that ANY font
+       reaches the edge: the name truncates, the count does not move.
+
+       `leagueLabel` falls through to the raw slug for an unknown league,
+       which is how a name this long gets onto a real header — and is
+       also what a newly added competition looks like before anyone adds
+       its label. This FAILS on the old single-row flex-wrap header. */
+    const LONG = "a-competition-with-an-extremely-long-name-nobody-shortened";
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await open(page, {
+      ...BOARD,
+      leagues: { ...LEAGUES, [LONG]: {
+        src: "current", min_current_gp: 22, clubs: 30, kind: "league",
+        blend_k: 10, blend_constant_w: null } },
+      rows: [{ ...MLS_ROW, league: LONG, column: LONG,
+               rated_in: { home: LONG, away: LONG },
+               event_id: "long-1", competition_id: "long-1" }],
+    });
+    const col = page.locator(`[data-testid="league-col"][data-league="${LONG}"]`);
+    await expect(col).toHaveCount(1);
+    // the column exists before the board has finished laying out; read
+    // boxes only once it has settled, or this measures a mid-render frame
+    await expect(col.getByTestId("col-count")).toBeVisible();
+    await page.waitForTimeout(400);
+    const name = col.locator("h3");
+    const count = col.getByTestId("col-count");
+    const nb = (await name.boundingBox())!;
+    const cb = (await count.boundingBox())!;
+    expect(nb).not.toBeNull(); expect(cb).not.toBeNull();
+    /* Playwright's boundingBox is {x,y,width,height} — there is no
+       `top`/`bottom` on it, and reading them yields NaN, which compares
+       false against every bound and reads exactly like a real failure.
+       Derived here instead. */
+    const overlap = Math.min(nb.y + nb.height, cb.y + cb.height)
+                  - Math.max(nb.y, cb.y);
+    // one row: their boxes overlap vertically
+    expect(overlap, `name@${nb.y} count@${cb.y}`).toBeGreaterThan(0);
+    // the count is whole, not squeezed
+    expect(cb.width).toBeGreaterThan(40);
+    // and the NAME is what gave way
+    expect(await name.evaluate((el) => el.scrollWidth > el.clientWidth + 1))
+      .toBe(true);
   });
 
 test("the sticky header is opaque — rows never show through it",

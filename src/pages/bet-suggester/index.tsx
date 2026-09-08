@@ -599,7 +599,25 @@ export default function PickerBoard() {
                   label items below (placed by explicit grid-row, so DOM
                   order keeps mobile sane); under xl each column carries
                   its own compact divider instead. */}
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4 xl:gap-y-2">
+              {/* THE TRACK COUNT FOLLOWS THE DATA (2026-09-07). It was
+                  typed as `xl:grid-cols-4` while `columnSlugs` is four
+                  FIXED leagues plus whatever else the payload names — a
+                  Leagues Cup column, a cross-league column, the next
+                  competition. The moment a fifth appeared, its explicit
+                  `grid-column: 5` landed on an IMPLICIT track, that track
+                  sized itself to the full-width band labels, and the four
+                  1fr tracks were left with no free space: measured
+                  `0px 0px 0px 0px 1304px` at 1440, four columns of zero
+                  width with their rows overflowing. `1 / -1` had stopped
+                  covering the whole board too, since -1 is the end of the
+                  EXPLICIT grid and the fifth column was outside it.
+                  This is the same hazard the colIndex prop documents,
+                  one layer out: there, auto placement invented implicit
+                  columns; here, a typed count did. A count derived from
+                  the same list that places the columns cannot disagree
+                  with it. */}
+              <div style={{ ["--cols" as string]: String(columnSlugs.length) }}
+                className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:gap-y-2 xl:[grid-template-columns:repeat(var(--cols),minmax(0,1fr))]">
                 {columnSlugs.map((slug, ci) => (
                   <LeagueColumn key={slug} slug={slug} days={days}
                     dayKeys={dayKeys} sortFor={sortFor}

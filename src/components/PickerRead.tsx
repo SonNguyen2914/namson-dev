@@ -345,20 +345,32 @@ export function TierGaps({ read }: { read: ReadLike }) {
             </span>
           ))}
         </span>
-        <button data-testid="tier-read" aria-expanded={open}
-          aria-label="how to read this shape"
-          onClick={(e) => {
-            e.preventDefault(); e.stopPropagation(); setOpen((o) => !o);
-          }}
-          className={`ml-auto inline-flex h-[15px] w-[15px] items-center justify-center rounded-full border font-mono text-[9px] transition-colors ${
-            open ? "border-accent/60 text-accent"
-              : "border-line-strong text-ink-low hover:border-accent/40 hover:text-accent"}`}>
-          i
-        </button>
-      </div>
-      {open && (
+        {/* THE POPOVER HANGS OFF THE BUTTON, NOT OFF THE ROW (2026-09-07).
+            It was `absolute top-6` on the whole TierGaps block, which is
+            24px below the block's top — fine while the row above it fits
+            on one line. The row is `flex-wrap`, so in a narrow column it
+            does not: the `i` button drops to a second line, lands INSIDE
+            the popover's own box, and the popover then intercepts the
+            click that would close it. Open, and no way out but another
+            row. It never showed up because the only narrow-column board
+            in the suite had its columns collapsed to 0px, so nothing was
+            ever laid out at a width that wrapped this row.
+            Anchored to the trigger, the panel is always directly under
+            the thing that opened it, whatever the row does. */}
+        <span className="relative ml-auto inline-flex">
+          <button data-testid="tier-read" aria-expanded={open}
+            aria-label="how to read this shape"
+            onClick={(e) => {
+              e.preventDefault(); e.stopPropagation(); setOpen((o) => !o);
+            }}
+            className={`inline-flex h-[15px] w-[15px] items-center justify-center rounded-full border font-mono text-[9px] transition-colors ${
+              open ? "border-accent/60 text-accent"
+                : "border-line-strong text-ink-low hover:border-accent/40 hover:text-accent"}`}>
+            i
+          </button>
+          {open && (
         <div data-testid="shape-read"
-          className="absolute right-0 top-6 z-10 w-64 rounded-lg border border-line-strong bg-elev2 p-3 text-[11px] leading-relaxed text-ink-mid shadow-xl">
+          className="absolute right-0 top-[calc(100%+7px)] z-10 w-64 rounded-lg border border-line-strong bg-elev2 p-3 text-[11px] leading-relaxed text-ink-mid shadow-xl">
           <p>{shapeRead(read)}</p>
           <div className="mt-2 space-y-0.5 border-t border-line pt-2 font-mono text-[10px]">
             {dims.map(([label, gap, tiers]) => (
@@ -377,7 +389,9 @@ export function TierGaps({ read }: { read: ReadLike }) {
             Tiers are within-league quintiles; annotation, never a veto.
           </p>
         </div>
-      )}
+          )}
+        </span>
+      </div>
     </div>
   );
 }

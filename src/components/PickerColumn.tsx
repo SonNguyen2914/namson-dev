@@ -548,18 +548,47 @@ export function LeagueColumn({
       {/* THE HEADER FOLLOWS THE COLUMN (2026-09-07). Opaque ground, not a
           translucent one: rows scrolling underneath a see-through header
           is the same defect as a label that contradicts the numbers
-          beside it. `top-0` and not an offset — the page carries no fixed
-          bar for it to slide under; `scroll-mt-16` on the section still
-          owns where a jump-nav landing comes to rest. */}
+          beside it.
+
+          IT PARKS UNDER THE TOP BAR, NOT BEHIND IT. `.topbar` is
+          `sticky; top:0; z-index:50` and `h-12` (globals.css), so a
+          league header at `top-0` slides beneath it and is hidden by the
+          one element guaranteed to be there — which is what the first
+          version of this did, on a comment claiming the page had no
+          fixed bar. It has one; the bar is in components/chrome.tsx, not
+          on the page. `--topbar-h` is that bar's own declared height —
+          h-12 PLUS its 1px border, because `top-12` alone still left this
+          a pixel underneath — and z-20 keeps this under the bar and over
+          the rows. `scroll-mt-16` on the section still owns where a
+          jump-nav landing comes to rest. */}
       <header data-testid="col-head"
-        className="sticky top-0 z-20 self-start border-b border-line bg-bs pb-3 pt-2 xl:[grid-row:1]">
+        className="sticky top-[var(--topbar-h)] z-20 self-start border-b border-line bg-bs pb-3 pt-2 xl:[grid-row:1]">
         {/* the league's own light — a 2px rail, wayfinding only */}
         <div aria-hidden
           className="mb-2 h-[2px] rounded-full opacity-80 [background:var(--lg)]" />
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <h3 className="text-base font-bold uppercase tracking-[0.03em] text-ink-hi [font-family:var(--font-archivo)] [font-stretch:106%]">
+        {/* TWO LINES, DECIDED HERE RATHER THAN BY THE WIDTH. One
+            flex-wrap row put the name, the basis chip and the fixture
+            count in a queue, so whether the count wrapped depended on how
+            long the league's NAME was: MLS kept it on line one and
+            PREMIER LEAGUE pushed it to line two, in adjacent columns of
+            the same board. A layout that reads as a difference between
+            two leagues, and is not one.
+
+            So the name and the count are one row that cannot wrap — the
+            name truncates instead — and the basis chips take the row
+            below. Every column now has the same shape whatever it is
+            called, which also survives the narrower tracks a fifth
+            competition brings. */}
+        <div className="flex items-baseline gap-x-2">
+          <h3 className="min-w-0 flex-1 truncate text-base font-bold uppercase tracking-[0.03em] text-ink-hi [font-family:var(--font-archivo)] [font-stretch:106%]">
             {leagueLabel(slug)}
           </h3>
+          <span data-testid="col-count"
+            className="flex-none font-mono text-[10px] uppercase tracking-[0.14em] tabular-nums text-ink-faint">
+            {rows.length} fixture{rows.length === 1 ? "" : "s"}
+          </span>
+        </div>
+        <div className="mt-1.5 flex flex-wrap items-baseline gap-1 empty:mt-0">
           {meta?.src === "prior" && (
             <span data-testid="col-season"
               {...(span ? {
@@ -597,10 +626,6 @@ export function LeagueColumn({
               {(meta.rated_on ?? []).map(leagueLabel).join(" + ")}
             </span>
           )}
-          <span data-testid="col-count"
-            className="ml-auto font-mono text-[10px] uppercase tracking-[0.14em] tabular-nums text-ink-faint">
-            {rows.length} fixture{rows.length === 1 ? "" : "s"}
-          </span>
         </div>
 
         {meta?.error && (
