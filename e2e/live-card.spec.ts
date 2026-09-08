@@ -380,19 +380,66 @@ test("the prematch face is the RANKED BOARD'S OWN CARD, not a second "
 
 // ============================================ the draw label, MEASURED
 
-/** A model/market pair on the match block. No recorded response off this
- *  route carries one — the block refuses on the real board — so the
- *  bars, and the measurement that places their draw label, are exercised
- *  against a payload that does. */
-function withTriples(model: number[], market: number[]) {
+/** A model/market pair on the match block, as the route now emits it
+ *  (card.live_model_v_market): the in-play engine's triple for this
+ *  state beside the de-vigged live ask book. Wired 2026-09-07 — before
+ *  that no recorded response carried one and this block refused on every
+ *  card in production. */
+function withTriples(model: number[], market: number[],
+                     extra: Record<string, unknown> = {}) {
   return liveMatch({
     model_v_market: {
       model: { home: model[0], draw: model[1], away: model[2] },
       market: { home: market[0], draw: market[1], away: market[2] },
       side: "home",
+      ...extra,
     },
   });
 }
+
+test("the caveat under the bars is the BACKEND's sentence, not one typed here",
+  async ({ page }) => {
+    /* It was hard-coded in this component, which meant the day the
+       engine's inputs changed the disclaimer would still describe the
+       old ones — and a caveat that UNDER-claims what the model saw is
+       worse than no caveat at all. The module that HAS the fact now
+       writes the line; the long form rides on the title for a reader who
+       wants the whole of it. */
+    await open(page, { ...STRIP, matches: [withTriples([62, 21, 17], [55, 24, 21], {
+      caveat: "model reads five numbers · market is the de-vigged ask book",
+      caveat_basis: "the engine reads minute, both scores and two frozen "
+        + "rates, and NOT a measured edge",
+    })] });
+    const cav = page.getByTestId("live-caveat").first();
+    await expect(cav).toHaveText(/model reads five numbers/);
+    await expect(cav).toHaveAttribute("title", /NOT a measured edge/);
+  });
+
+test("a payload with no caveat line still says what the model could not see",
+  async ({ page }) => {
+    /* THE FALLBACK IS NOT AN EMPTY LINE. Of the three possible states —
+       the backend's sentence, this component's older one, and silence —
+       silence is the only one that lets a reader take the bars as
+       measured against the stats above them. */
+    await open(page, { ...STRIP, matches: [withTriples([62, 21, 17], [55, 24, 21])] });
+    await expect(page.getByTestId("live-caveat").first())
+      .toHaveText(/minute and score only/);
+  });
+
+test("a block the backend REFUSED draws no bar and no gap", async ({ page }) => {
+    /* The route emits a named refusal for a state the engine claimed no
+       triple for, a failed market read, or a partial book. Half a
+       comparison must not reach the screen: one bar beside an empty one
+       reads as a gap of the whole bar. */
+    await open(page, { ...STRIP, matches: [liveMatch({
+      model_v_market: {
+        refused: "the in-play engine claimed no triple for this state",
+      },
+    })] });
+    const card = page.getByTestId("live-card").first();
+    await expect(card.getByTestId("live-model-absent")).toBeVisible();
+    await expect(card.getByTestId("live-gap")).toHaveCount(0);
+  });
 
 test("a draw wide enough for its own label keeps it INSIDE the segment; "
   + "one that is not takes a chip — decided by measuring, not by a "

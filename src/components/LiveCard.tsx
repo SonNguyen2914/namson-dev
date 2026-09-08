@@ -536,26 +536,32 @@ function DynamicsBlock({ m }: { m: WatchedMatch }) {
 
 /** MODEL V MARKET.
  *
- *  THE TRIPLES ARE NOT ON THIS PAYLOAD, and this block says so rather
- *  than drawing halves of a comparison. `model_v_market` is the key it
- *  reads, declared here as the shape it needs; every recorded response
- *  off this route today carries nothing of the sort, so on the real
- *  board this block refuses on every card. It is READ DEFENSIVELY off
- *  the match rather than typed into `WatchedMatch`, because writing a
- *  plausible field into the contract is how a TS type stops matching
- *  what the backend sends.
+ *  WIRED 2026-09-07. This block used to refuse on every card in
+ *  production: it read a `model_v_market` key and the watched-strip
+ *  route sent none, so the surface drew a named absence forever. The
+ *  route now carries `card.live_model_v_market` — the in-play engine's
+ *  triple for this state beside the de-vigged live ask book — and the
+ *  bars are drawn from it. It is still READ DEFENSIVELY off the match
+ *  rather than typed into `WatchedMatch`: the block is emitted per
+ *  match and can refuse, and a required field would make a refusal a
+ *  type error instead of the sentence it is.
  *
- *  THE CAVEAT IS NOT OPTIONAL AND IS NOT A FOOTNOTE. It is the literal
+ *  THE CAVEAT IS THE BACKEND'S SENTENCE NOW, not one typed here. It was
+ *  hard-coded, which meant the day the engine's inputs changed this
+ *  disclaimer would still describe the old ones — and a caveat that
+ *  UNDER-claims what the model saw is worse than no caveat. The literal
  *  truth of `src/live/inplay.py state_probabilities(minute, score_home,
- *  score_away, lam_h, lam_a)`: the model sees the clock and the
- *  scoreline and NOTHING ELSE — not one of the four component reads
- *  drawn above it. A reader who takes those bars as the model's inputs
- *  has been told something false by the layout, so the block states what
- *  each bar is made of every time it is drawn. */
+ *  score_away, lam_h, lam_a)` is that the model sees the clock and the
+ *  scoreline and NOTHING ELSE — not one of the reads drawn above it —
+ *  and that fact belongs to the module that has it. The constant below
+ *  survives only as the fallback for a payload that carries no line,
+ *  where saying nothing would be the worst of the three. */
 type Triples = {
   model: [number, number, number];
   market: [number, number, number];
   side: "home" | "draw" | "away";
+  caveat: string;
+  caveatBasis?: string;
 };
 
 const CAVEAT = "model sees minute and score only, not the stats above · "
@@ -584,7 +590,11 @@ export function triplesOf(m: WatchedMatch): Triples | null {
   if (!model || !market) return null;
   const s = o.side;
   const side = s === "home" || s === "draw" || s === "away" ? s : "home";
-  return { model, market, side };
+  const caveat = typeof o.caveat === "string" && o.caveat.trim()
+    ? o.caveat : CAVEAT;
+  const caveatBasis = typeof o.caveat_basis === "string"
+    ? o.caveat_basis : undefined;
+  return { model, market, side, caveat, caveatBasis };
 }
 
 function ModelVMarket({ m, hc, ac }: {
@@ -622,9 +632,9 @@ function ModelVMarket({ m, hc, ac }: {
           {d > 0 ? "+" : ""}{d} on {t.side}
         </b>
       </div>
-      <p data-testid="live-caveat"
+      <p data-testid="live-caveat" title={t.caveatBasis}
         className="mt-1 font-mono text-[9px] leading-relaxed text-ink-faint">
-        {CAVEAT}
+        {t.caveat}
       </p>
     </>
   );
