@@ -243,7 +243,7 @@ export const LEAGUE_PROXY_ALLOWED: Record<string, readonly string[]> = {
  *  `/api/comp` can never reach a NON-optional catch-all, so this proxy
  *  could not forward it whatever the list said. */
 export const COMP_KEY = "[a-z][a-z-]{1,20}";
-export const COMP_RESOURCES = ["fixtures", "markets", "status",
+export const COMP_RESOURCES = ["fixtures", "markets", "ratings", "status",
                                "tournament"] as const;
 
 /** Per prefix, the id-bearing routes the allowlist cannot spell out.
