@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { SYNC_PREVIEW_OPEN } from "../src/components/WatchDeclaration";
+import {
+  closingConditionsLabel, SYNC_PREVIEW_OPEN, SYNC_PREVIEW_RETIRED,
+  syncPreviewHolesClosed,
+} from "../src/components/WatchDeclaration";
 
 // SELECTING MATCHES TO WATCH, from the picker board (B0c, 2026-09-06).
 //
@@ -113,11 +116,69 @@ const STATE = {
     policy_code: "tape_shows_play", reason: null,
   }],
   open_positions_not_monitored: [4321],
+  // THE ROWS A SWEEP WROTE BEFORE THE BACKEND STOPPED SWEEPING
+  // (watchlist.state, added with A_POSITION_IS_NOT_A_DECLARATION). In
+  // the log, on the payload, and in no declared set — the "only" list
+  // is the one the 37-row incident was about.
+  mechanically_added_fixture_ids: [4321],
+  mechanically_added_count: 1,
+  mechanically_added_only_fixture_ids: [4321],
   log: [],
   log_total: 12,
   log_truncated: false,
   log_truncation: null,
   registries: { actions: {}, sources: {}, policy_codes: {}, phases: {} },
+};
+
+// WHAT `sync-positions` NOW ANSWERS — recorded off
+// src/live/watchlist.py `held_positions_view`, which is the whole route
+// (api/main.py live_admin_watchlist_sync). It WRITES NOTHING: the held
+// set is derived from the journal on every read and stored in no row.
+//
+// THREE KEYS THE OLD FIXTURE CARRIED ARE GONE, and their absence is the
+// point rather than an omission: `declared`, `already_declared` and
+// `actor` named rows a sweep had just written. The backend dropped them
+// on 2026-09-06 so that a reader prints its own "not on the payload"
+// instead of reading a `[]` as "nothing new was declared", and
+// tests/test_watchlist.py::test_the_held_route_reports_and_writes_nothing
+// asserts none of them is on the body.
+//
+// The per-fixture `policy` sentences and the tape-refusal buckets
+// (`competition_not_taped` / `fixture_not_taped`, derived in the backend
+// from live_watch.TAPE_UNREACHABLE) are the emitter's own.
+const HELD = {
+  checked: 3,
+  writes_nothing: true,
+  held_fixture_ids: [4101, 4102, 4321],
+  held: [
+    { fixture_id: 4101, competition_slug: "epl-2026", monitored: true,
+      declarable: true, policy_code: "already_declared",
+      policy: "already_declared: a standing declaration already covers "
+        + "this fixture. Nothing was written. It is a statement about "
+        + "the record, not a refusal — `held_positions_view` says it of "
+        + "a held fixture somebody had already declared" },
+    { fixture_id: 4102, competition_slug: "epl-2026", monitored: false,
+      declarable: true, policy_code: "not_watched",
+      policy: "not_watched: nothing to un-declare: no standing "
+        + "declaration covers this fixture" },
+    { fixture_id: 4321, competition_slug: "epl-2026", monitored: false,
+      declarable: true, policy_code: "not_watched",
+      policy: "not_watched: nothing to un-declare: no standing "
+        + "declaration covers this fixture" },
+  ],
+  declared_of_the_held: [4101],
+  open_positions_not_monitored: [4102, 4321],
+  unknown_fixture: [],
+  competition_not_taped: [],
+  fixture_not_taped: [],
+  generated_at: new Date().toISOString(),
+  version: "watchlist-v1",
+  a_position_is_not_a_declaration:
+    "A POSITION YOU HOLD IS NOT A MATCH YOU CHOSE TO WATCH. This record "
+    + "answers one question — which fixtures did a HUMAN declare, before "
+    + "the evidence — and its whole worth is that somebody declared each "
+    + "entry. A sweep that follows the journal's rows declares nothing; "
+    + "it reports.",
 };
 
 // The resolver's own sentence for a reference with no fixture row.
@@ -213,12 +274,7 @@ async function serve(page: import("@playwright/test").Page, opts: {
     r.fulfill(json(opts.resolved ?? RESOLVED, opts.resolveStatus ?? 200)));
   await page.route("**/api/bet-suggester/live-watchlist/sync-positions", (r) => {
     seen.syncCalls += 1;
-    return r.fulfill(json(opts.sync ?? {
-      checked: 3, declared: [4102], already_declared: [4101],
-      unknown_fixture: [], open_positions_not_monitored: [4321],
-      actor: "sync:open_positions", generated_at: new Date().toISOString(),
-      version: "watchlist-v1",
-    }, opts.syncStatus ?? 200));
+    return r.fulfill(json(opts.sync ?? HELD, opts.syncStatus ?? 200));
   });
   return seen;
 }
@@ -400,21 +456,36 @@ test("a refused removal renders the backend's words verbatim and is not an error
       .toHaveCount(0);
   });
 
-// -------------------------------------------------- watch what I hold
+// -------------------------------------------------- what am I holding
 //
-// THE BUTTON THAT WROTE 37 PERMANENT RECORDS ON ONE CLICK. Pressing
-// "watch everything I hold" used to POST sync-positions straight from
-// its onClick, and the only place a count ever appeared was the result
-// line afterwards. What it writes cannot be taken back: the record is
-// append-only and a removal after kickoff is REFUSED by design. Son
-// pressed it, did not expect that, and said so. So the press ARMS a
-// confirmation and writes nothing, and these tests hold the press and
-// the write apart at the WIRE — `seen.syncCalls` is the only witness
-// that counts, because a confirmation that renders while the request is
-// already gone would satisfy every DOM assertion in this file.
+// THE BUTTON THAT WROTE 37 PERMANENT RECORDS ON ONE CLICK, AND THE
+// ROUTE BEHIND IT THAT NOW WRITES NONE.
+//
+// Pressing "watch everything I hold" used to POST sync-positions
+// straight from its onClick, and the only place a count ever appeared
+// was the result line afterwards. What it wrote could not be taken
+// back: the record is append-only and a removal after kickoff is
+// REFUSED by design. Son pressed it, did not expect that, and said so.
+// So the press ARMED a step that said what was about to be written.
+//
+// THE BACKEND THEN STOPPED WRITING (2026-09-06, api/main.py
+// live_admin_watchlist_sync + watchlist.held_positions_view: a position
+// you hold is not a match you chose to watch). The route derives the
+// held set from the journal on every read, persists nothing, answers
+// `writes_nothing: true`, and carries no `declared` / `already_declared`
+// / `actor` at all — the backend dropped those three deliberately so a
+// reader cannot read a `[]` as "nothing new was declared".
+//
+// WHICH LEFT THE STEP WARNING ABOUT A WRITE THAT NO LONGER HAPPENS
+// (fixed 2026-09-09). These tests now hold TWO things: that the press
+// still reaches the wire only from inside the step — `seen.syncCalls`
+// is the only witness that counts, because a panel that renders while
+// the request is already gone would satisfy every DOM assertion in this
+// file — and that not one sentence in it claims a write.
 
-test("pressing watch-everything-I-hold WRITES NOTHING — it arms a "
-   + "confirmation that says what and how many first", async ({ page }) => {
+test("pressing what-am-I-holding ASKS NOTHING — it opens a step that "
+   + "says what the read is for, and how many this panel can already "
+   + "count", async ({ page }) => {
     const seen = await serve(page);
     await page.goto("/bet-suggester");
     await arm(page);
@@ -429,18 +500,101 @@ test("pressing watch-everything-I-hold WRITES NOTHING — it arms a "
     await page.waitForTimeout(500);
     expect(seen.syncCalls).toBe(0);
 
-    // WHAT it is about to declare — the source, and that it is not the
-    // board and not what you looked at.
+    // WHAT it is about to ask for — the journal's open positions, and
+    // that it is not the board and not what you looked at.
     await expect(c.getByTestId("watch-sync-what"))
       .toContainText("open position");
     await expect(c.getByTestId("watch-sync-what"))
-      .toContainText("open_position");
-    // THAT IT CANNOT BE TAKEN BACK, in the words of the rule that owns
-    // it — before the write, not after.
-    const irr = c.getByTestId("watch-sync-irreversible");
-    await expect(irr).toContainText("APPEND-ONLY");
-    await expect(irr).toContainText(/removal is refused/i);
-    await expect(irr).toContainText(/once a match has started/i);
+      .toContainText(/not the fixtures on the board/i);
+    // …AND THAT IT APPENDS NOTHING, in the words of the rule that owns
+    // it, before the press rather than after.
+    const nw = c.getByTestId("watch-sync-writes-nothing");
+    await expect(nw).toContainText("It appends nothing");
+    await expect(nw).toContainText("A_POSITION_IS_NOT_A_DECLARATION");
+    await expect(nw).toContainText("writes_nothing");
+  });
+
+// THE WARNING THAT WAS FALSE ABOUT A MONEY-ADJACENT PRESS.
+//
+// The step told the operator that pressing this declared every held
+// fixture into an append-only record and that the declaration could not
+// be revoked once a match started. The backend stopped writing on
+// 2026-09-06, so from that day the consent being asked for was consent
+// to an action that is not the one behind the control.
+//
+// THE ASSERTION IS OVER THE WHOLE STEP AND EVERY CONTROL IN IT, NOT
+// OVER THE ONE PARAGRAPH THAT CARRIED IT — a hand-typed subset stays
+// green while the omitted case drifts, and this warning lived in five
+// places at once (a heading, two paragraphs, a button label and an
+// accessible name). Nothing inside the step, and nothing on the control
+// that opens it, may claim a write.
+test("not one sentence in the step claims this press writes anything",
+  async ({ page }) => {
+    await serve(page);
+    await page.goto("/bet-suggester");
+    await arm(page);
+
+    // the control that OPENS it — label and accessible name both
+    const opener = page.getByTestId("watch-sync");
+    for (const words of [await opener.innerText(),
+                         (await opener.getAttribute("aria-label")) ?? ""]) {
+      expect(words, "the opener must not name a write")
+        .not.toMatch(/declar|permanent|cannot be undone|append/i);
+    }
+
+    await opener.click();
+    const c = page.getByTestId("watch-sync-confirm");
+    await expect(c).toBeVisible();
+
+    // …AND EVERY AFFIRMATIVE CLAIM OF A WRITE, over the whole block.
+    // The ban is on the CLAIM, not on the vocabulary: "declared"
+    // survives in one honest reading — the count of what a HUMAN
+    // declared, which is a fact about the existing set and not about
+    // this press — so each pattern below is a sentence that can only
+    // mean this press writes.
+    const whole = await c.innerText();
+    for (const claim of [
+      /this writes/i, /will declare/i, /declare them/i,
+      /cannot be undone/i, /cannot be taken back/i,
+      /permanent record/i, /nothing has been written yet/i,
+    ]) {
+      expect(whole, `the step still claims a write: ${claim}`)
+        .not.toMatch(claim);
+    }
+    // the heading says what the press ASKS FOR, not what it writes
+    await expect(c.locator("#watch-sync-confirm-h"))
+      .toHaveText(/asks what your journal holds/i);
+
+    // THE APPEND-ONLY RULE IS REAL AND IT IS NAMED — it governs the
+    // declared set and the per-match controls on the board. What made
+    // the old copy false was attaching it to THIS press. So it may
+    // appear exactly where it is scoped away, and nowhere else in the
+    // step: a sentence that mentions it without the boundary is the
+    // defect coming back.
+    const scoped = c.getByTestId("watch-sync-writes-nothing");
+    await expect(scoped).toContainText("ONCE_STARTED_IT_STAYS");
+    await expect(scoped).toContainText("not what this control touches");
+    const elsewhere = whole.replace(await scoped.innerText(), "");
+    for (const rule of [/append-only/i, /once a match has started/i,
+                        /removal is refused/i]) {
+      expect(elsewhere,
+        `the append-only rule is stated outside the paragraph that `
+        + `scopes it away from this press: ${rule}`).not.toMatch(rule);
+    }
+
+    // the two controls say what they do, and neither says "declare"
+    await expect(c.getByTestId("watch-sync-go")).toHaveText(/ask what i hold/i);
+    await expect(c.getByTestId("watch-sync-cancel"))
+      .toHaveText(/ask nothing/i);
+  });
+
+test("the step counts what this panel can already read, and cancelling "
+   + "asks nothing either", async ({ page }) => {
+    const seen = await serve(page);
+    await page.goto("/bet-suggester");
+    await arm(page);
+    await page.getByTestId("watch-sync").click();
+    const c = page.getByTestId("watch-sync-confirm");
 
     // HOW MANY — every count is DERIVED from the served state payload,
     // never a number typed into this assertion.
@@ -451,7 +605,6 @@ test("pressing watch-everything-I-hold WRITES NOTHING — it arms a "
       String(STATE.monitored_fixture_ids.length));
     await expect(counts).toContainText(String(STATE.declared_ever_count));
 
-    // and cancelling writes nothing either
     await c.getByTestId("watch-sync-cancel").click();
     await expect(page.getByTestId("watch-sync-confirm")).toHaveCount(0);
     await page.waitForTimeout(300);
@@ -486,68 +639,168 @@ test("with the set unread the confirmation says it can count nothing — "
     await expect(c.getByTestId("watch-sync-counts")).toHaveCount(0);
     await expect(c.getByTestId("watch-sync-uncounted"))
       .toContainText("no count at all");
-    // and the irreversibility is stated whether or not anything counted
-    await expect(c.getByTestId("watch-sync-irreversible"))
-      .toContainText("APPEND-ONLY");
+    // and what the press does is stated whether or not anything counted
+    await expect(c.getByTestId("watch-sync-writes-nothing"))
+      .toContainText("It appends nothing");
   });
 
-// THE REGISTER, GUARDED BOTH WAYS. The exact number of rows the sweep
-// appends is not on any payload this panel reads, so it is a REGISTERED
-// hole rather than a number this surface invents. The guard fails if a
-// record stops being printed, and it fails the day the payload starts
-// carrying the key that closes one while the record still stands.
-test("every registered pre-write hole is printed on the confirmation, "
-   + "with its closing condition", async ({ page }) => {
+// ------------------------------------------------------- THE REGISTER
+//
+// A REGISTERED HOLE IS A NUMBER THIS PANEL CANNOT SHOW BEFORE A PRESS,
+// WRITTEN DOWN RATHER THAN INVENTED. Two directions are guarded: a
+// record in the register must be drawn, and a record whose closing
+// condition has been MET must not still be standing.
+//
+// AND THE DETECTOR IS THE HALF THAT WAS BROKEN. `closes_when` on the
+// one record here read "the watchlist state payload carries
+// `open_position_fixture_ids` (or the sync route grows a dry-run that
+// returns its own `checked`/`declared` without writing)" — TWO
+// branches. The detector read ONE hand-picked key off ONE payload
+// (`closed_by_state_key`), and that key names a field
+// `watchlist.state()` does not carry and never has. So branch 2 could
+// be satisfied — as it was, on 2026-09-06, and more completely than it
+// asked for, since the route stopped writing altogether — and neither
+// the surface nor this file could notice. A two-branch condition with a
+// one-branch detector is this repo's hand-typed-subset lesson in a new
+// place, and the fix is the same one: derive the check from what the
+// record declares.
+//
+// WHAT THIS FILE CANNOT COVER TODAY, SAID RATHER THAN IMPLIED. The open
+// register is EMPTY (its one record retired 2026-09-09), so the two DOM
+// paths that draw a record — the row and the stale banner — have
+// nothing to draw and are asserted absent rather than exercised. The
+// detector and the label they are built from are guarded directly
+// below, against synthetic registers, which is what keeps them honest
+// until a record is registered again.
+
+test("the open register is drawn exactly, and nothing is drawn from an "
+   + "empty one", async ({ page }) => {
     await serve(page);
     await page.goto("/bet-suggester");
     await arm(page);
     await page.getByTestId("watch-sync").click();
     const c = page.getByTestId("watch-sync-confirm");
     const keys = Object.keys(SYNC_PREVIEW_OPEN);
-    expect(keys.length).toBeGreaterThan(0);
     await expect(c.getByTestId("watch-sync-open")).toHaveCount(keys.length);
     for (const k of keys) {
       const row = c.locator(`[data-testid="watch-sync-open"][data-key="${k}"]`);
       await expect(row).toContainText(SYNC_PREVIEW_OPEN[k].finding);
       // THE FINDING IS PROSE, THE CLOSING CONDITION IS A BINDING. The
-      // finding is operator-facing — it names the number this panel
-      // cannot show before a permanent record is written — and it is
-      // read as text. The `closes_when` is bookkeeping about this
-      // repo's unfinished business and does not belong in an
-      // operator's confirmation, so the row carries the key it closes
-      // on rather than the paragraph. This is not a weaker guard: a
-      // record that loses its closing condition, or a row that stops
-      // carrying it, still fails here.
+      // finding is operator-facing and is read as text. The
+      // `closes_when` is bookkeeping about this repo's unfinished
+      // business and does not belong in front of an operator, so the
+      // row carries the conditions it closes on as data — EVERY branch
+      // of them, which is what the count attribute pins.
       expect(SYNC_PREVIEW_OPEN[k].closes_when.length,
         `${k} must declare what closes it`).toBeGreaterThan(0);
-      await expect(row).toHaveAttribute("data-closes-when-key",
-        SYNC_PREVIEW_OPEN[k].closed_by_state_key);
+      expect(SYNC_PREVIEW_OPEN[k].closed_by.length,
+        `${k} must declare closed_by, not only prose`).toBeGreaterThan(0);
+      await expect(row).toHaveAttribute("data-closes-when",
+        closingConditionsLabel(SYNC_PREVIEW_OPEN[k]));
+      await expect(row).toHaveAttribute("data-closes-when-branches",
+        String(SYNC_PREVIEW_OPEN[k].closed_by.length));
     }
-    // nothing is stale on a payload that closes nothing
+    // nothing is stale on payloads that close nothing
     await expect(c.getByTestId("watch-sync-open-stale")).toHaveCount(0);
   });
 
-test("a registered hole whose closing key ARRIVES on the payload is "
-   + "named as stale rather than left reading as current",
-  async ({ page }) => {
-    // The other direction of the same guard. The day the watchlist
-    // payload carries `open_position_fixture_ids`, the record above is
-    // closed and must be retired; until it is, the surface says so.
-    const closing = SYNC_PREVIEW_OPEN
-      .exact_write_count_unreadable.closed_by_state_key;
-    await serve(page, { state: { ...STATE, [closing]: [4101, 4321] } });
-    await page.goto("/bet-suggester");
-    await arm(page);
-    await page.getByTestId("watch-sync").click();
-    const stale = page.getByTestId("watch-sync-confirm")
-      .getByTestId("watch-sync-open-stale");
-    await expect(stale).toBeVisible();
-    await expect(stale).toContainText(closing);
-    await expect(stale).toContainText("exact_write_count_unreadable");
+// --- the detector, over both payloads and every branch ----------------
+
+/** A payload pair carrying exactly the keys ONE branch names, and
+ *  nothing else. Built from the branch itself, so a branch this file
+ *  has never seen is still checked the moment it is registered. */
+function onlyBranch(b: { payload: "state" | "held"; keys: string[] }) {
+  const carrier = Object.fromEntries(b.keys.map((k) => [k, []]));
+  return b.payload === "state"
+    ? { state: carrier as never, held: null }
+    : { state: null, held: carrier as never };
+}
+
+test("EVERY branch of a registered hole can close it — not only the first",
+  () => {
+    // THE BUG, DIRECTLY. Walked over both registers, so this covers the
+    // records that stand and the records that retired; a third branch
+    // added to any of them is checked without an edit here.
+    const all = { ...SYNC_PREVIEW_OPEN, ...SYNC_PREVIEW_RETIRED };
+    const names = Object.keys(all);
+    expect(names.length,
+      "there is nothing to check — both registers are empty")
+      .toBeGreaterThan(0);
+    let multi = 0;
+    for (const k of names) {
+      const rec = all[k];
+      expect(rec.closed_by.length, `${k} declares no closing condition`)
+        .toBeGreaterThan(0);
+      if (rec.closed_by.length > 1) multi += 1;
+      for (const b of rec.closed_by) {
+        expect(b.keys.length, `${k}: a branch with no keys closes on nothing`)
+          .toBeGreaterThan(0);
+        expect(syncPreviewHolesClosed(onlyBranch(b), { [k]: rec }),
+          `${k}: the branch ${b.payload}:${b.keys.join("+")} cannot close it`)
+          .toContain(k);
+        // …AND IT IS THE NAMED PAYLOAD THAT CLOSES IT. The same keys on
+        // the OTHER answer must not: "the state payload carries X" and
+        // "the held view carries X" are different facts, and a detector
+        // that cannot tell them apart is the one being replaced.
+        const other = b.payload === "state" ? "held" : "state";
+        expect(syncPreviewHolesClosed(
+          onlyBranch({ payload: other, keys: b.keys }), { [k]: rec }),
+          `${k}: keys on ${other} must not close a ${b.payload} branch`)
+          .toEqual([]);
+      }
+    }
+    // and at least one record really does declare more than one branch,
+    // so the loop above is not passing over a register of singletons
+    expect(multi,
+      "no registered record declares two branches — this guard would "
+      + "pass on the very shape it exists to catch").toBeGreaterThan(0);
   });
 
-test("watch everything I hold writes only from the confirmation, and "
-   + "reports what it did in its own numbers", async ({ page }) => {
+test("a record is only retired once its condition is actually met, and "
+   + "an unread payload closes nothing", () => {
+    // RETIREMENT IS EARNED, NOT ASSERTED. Every retired record is run
+    // through the same detector against the payloads this panel really
+    // reads: retire one early and this goes red rather than shipping.
+    const retired = Object.keys(SYNC_PREVIEW_RETIRED);
+    expect(retired.length).toBeGreaterThan(0);
+    const closed = syncPreviewHolesClosed(
+      { state: STATE as never, held: HELD as never }, SYNC_PREVIEW_RETIRED);
+    for (const k of retired) {
+      expect(SYNC_PREVIEW_RETIRED[k].retired_on,
+        `${k} must be retired BY DATE`).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(SYNC_PREVIEW_RETIRED[k].retired_because.length,
+        `${k} must say what closed it`).toBeGreaterThan(0);
+      // the sentence is KEPT, never deleted
+      expect(SYNC_PREVIEW_RETIRED[k].finding.length).toBeGreaterThan(0);
+      expect(closed, `${k} was retired on a condition that is NOT met`)
+        .toContain(k);
+    }
+    // MISSING IS NOT SATISFIED. With no answers in hand nothing closes:
+    // `undefined` on a payload nobody has read is not evidence that a
+    // key is absent from it.
+    expect(syncPreviewHolesClosed({ state: null, held: null },
+                                  SYNC_PREVIEW_RETIRED)).toEqual([]);
+    expect(syncPreviewHolesClosed({}, SYNC_PREVIEW_RETIRED)).toEqual([]);
+  });
+
+test("the closing-condition label names every branch, not the first",
+  () => {
+    // What the DOM attribute and the stale banner are both built from.
+    const two = {
+      finding: "f", closes_when: "w",
+      closed_by: [
+        { payload: "state" as const, keys: ["a"] },
+        { payload: "held" as const, keys: ["b", "c"] },
+      ],
+    };
+    const label = closingConditionsLabel(two);
+    expect(label).toContain("state:a");
+    expect(label).toContain("held:b+c");
+    expect(label.split(" | ")).toHaveLength(two.closed_by.length);
+  });
+
+test("what am I holding reaches the wire only from the step, and reports "
+   + "the answer in the answer's own numbers", async ({ page }) => {
     const seen = await serve(page);
     await page.goto("/bet-suggester");
     await arm(page);
@@ -556,17 +809,43 @@ test("watch everything I hold writes only from the confirmation, and "
       .getByTestId("watch-sync-go").click();
     await expect(page.getByTestId("watch-sync-result")).toBeVisible();
     expect(seen.syncCalls).toBe(1);
-    // the confirmation closes once it has fired: a standing "this
-    // writes a permanent record" beside a result that says it already
-    // did is two claims about one press
+    // the step closes once it has fired: "this asks what your journal
+    // holds — nothing has been asked yet" standing beside the answer is
+    // two claims about one press
     await expect(page.getByTestId("watch-sync-confirm")).toHaveCount(0);
     const out = page.getByTestId("watch-sync-result");
-    await expect(out).toContainText("checked 3");
-    await expect(out).toContainText("declared 1");
-    await expect(out).toContainText("already declared 1");
-    // a position on a match nobody is watching is NAMED, never silently
-    // re-added
-    await expect(out).toContainText("held but undeclared 4321");
+    // DERIVED FROM THE SERVED ANSWER, never a number typed here
+    await expect(out).toContainText(`held ${HELD.checked}`);
+    await expect(out).toContainText(
+      `declared of those ${HELD.declared_of_the_held.length}`);
+    // a position on a match nobody declared is NAMED — the ordinary
+    // case now, and a report rather than a disagreement
+    await expect(out).toContainText(
+      `held and undeclared ${HELD.open_positions_not_monitored.join(", ")}`);
+    // …and the route's OWN word for what it did, not this file's
+    await expect(out.getByTestId("watch-sync-wrote"))
+      .toHaveAttribute("data-writes-nothing", "true");
+    await expect(out).not.toContainText(/already declared/i);
+  });
+
+test("an answer that does not carry writes_nothing does not read as "
+   + "'wrote nothing'", async ({ page }) => {
+    // MISSING IS NEVER ZERO, on the one field that says whether a
+    // permanent record was made. A body without it is an answer that
+    // did not say — never a promise that nothing was written.
+    const quiet: Record<string, unknown> = { ...HELD };
+    delete quiet.writes_nothing;
+    await serve(page, { sync: quiet });
+    await page.goto("/bet-suggester");
+    await arm(page);
+    await page.getByTestId("watch-sync").click();
+    await page.getByTestId("watch-sync-confirm")
+      .getByTestId("watch-sync-go").click();
+    const wrote = page.getByTestId("watch-sync-result")
+      .getByTestId("watch-sync-wrote");
+    await expect(wrote).toHaveAttribute("data-writes-nothing", "absent");
+    await expect(wrote).toContainText("not on the payload");
+    await expect(wrote).not.toContainText("wrote nothing");
   });
 
 // ------------------------------------------------- the plane is dormant

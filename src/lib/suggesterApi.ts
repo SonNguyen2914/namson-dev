@@ -1706,6 +1706,17 @@ export interface WatchlistState {
     policy_code: string; reason: string | null;
   }[];
   open_positions_not_monitored: number[];
+  /** THE ROWS A SWEEP WROTE BEFORE THE BACKEND STOPPED SWEEPING. Still
+   *  in the log, still on the payload, and in no declared set: a
+   *  mechanical add is not a declaration
+   *  (watchlist.A_POSITION_IS_NOT_A_DECLARATION). The "only" list is
+   *  the one the 37-row incident was about — fixtures whose ONLY
+   *  watchlist rows are mechanical. Optional because a payload that
+   *  predates the split carries neither, and an absent list must read
+   *  as "not on the payload" rather than as none. */
+  mechanically_added_fixture_ids?: number[];
+  mechanically_added_count?: number;
+  mechanically_added_only_fixture_ids?: number[];
   log_total: number;
   log_truncated: boolean;
   log_truncation: string | null;
@@ -1720,17 +1731,70 @@ export interface WatchlistState {
   [standing: string]: unknown;
 }
 
-export interface WatchlistSyncResult {
-  checked: number;
-  declared: number[];
-  already_declared: number[];
-  unknown_fixture: number[];
-  open_positions_not_monitored: number[];
-  actor: string;
-  generated_at: string;
-  version: string;
+/** WHAT THE JOURNAL HOLDS — the answer `sync-positions` now gives.
+ *
+ *  RENAMED FROM `WatchlistSyncResult` (2026-09-09). The route stopped
+ *  writing on backend 2026-09-06 (api/main.py
+ *  live_admin_watchlist_sync, src/live/watchlist.held_positions_view):
+ *  it derives the held set from the journal on every read and stores it
+ *  in no row. A type called "sync result" for a read is the same claim
+ *  the confirmation copy was making one file over.
+ *
+ *  THREE FIELDS ARE GONE AND THEY ARE NAMED RATHER THAN DELETED IN
+ *  SILENCE (retired 2026-09-09):
+ *
+ *    `declared`          the fixtures the sweep had just written. There
+ *                        is no sweep and there is no write. The route's
+ *                        nearest field is `declared_of_the_held`, which
+ *                        is a different fact — which HELD fixtures a
+ *                        human had already declared, counted on read.
+ *    `already_declared`  the same shape, the same reason. Both were
+ *                        dropped by the backend deliberately, so a
+ *                        reader prints its own absence wording instead
+ *                        of reading a `[]` as "nothing new was
+ *                        declared" (tests/test_watchlist.py
+ *                        test_the_held_route_reports_and_writes_nothing
+ *                        asserts neither key is on the body).
+ *    `actor`             `sync:open_positions`, the source the written
+ *                        rows carried. Nothing is written, so nothing
+ *                        has an actor. `watchlist.declare` has no
+ *                        `source` parameter left to write one with
+ *                        (A_POSITION_IS_NOT_A_DECLARATION).
+ *
+ *  Every field below is recorded off held_positions_view's own return.
+ *  Optional where the payload may legitimately omit it — a dormant
+ *  plane answers with `dormant`/`detail`/`version` and nothing else —
+ *  so no reader can treat an absent key as a measured zero. */
+export interface WatchlistHeldView {
+  /** how many held fixtures the read walked. NOT a write count: this
+   *  route appends nothing, and `writes_nothing` beside it is the
+   *  payload's own word for that. */
+  checked?: number;
+  /** the route's own assertion that it wrote nothing. Read from the
+   *  payload rather than asserted by the frontend — its absence is
+   *  "the answer did not say", never "it wrote something". */
+  writes_nothing?: boolean;
+  held_fixture_ids?: number[];
+  /** one entry per held fixture: whether a human declared it, and
+   *  whether it could be declared at all, each by a registry name */
+  held?: {
+    fixture_id: number;
+    competition_slug?: string | null;
+    monitored: boolean;
+    declarable?: boolean;
+    policy_code?: string;
+    policy?: string;
+  }[];
+  /** held AND declared by a human — counted on read, written nowhere */
+  declared_of_the_held?: number[];
+  unknown_fixture?: number[];
+  open_positions_not_monitored?: number[];
+  generated_at?: string;
+  version?: string;
   dormant?: boolean;
   detail?: string;
+  /** the tape-refusal buckets are DERIVED in the backend from
+   *  live_watch.TAPE_UNREACHABLE, so their names are not spelled here */
   [standing: string]: unknown;
 }
 
@@ -1821,10 +1885,19 @@ export const watchlistApi = {
       .then((r) => wlJson<WatchlistDeclareResponse>(r));
   },
 
-  /** "Watch everything I hold." Idempotent, removes nothing, and names
-   *  its own source — it follows the journal's rows, not a preference. */
+  /** WHAT THE JOURNAL HOLDS. A READ, and the whole route is one
+   *  (api/main.py live_admin_watchlist_sync, backend 2026-09-06): it
+   *  derives the held set from the journal and persists nothing, so
+   *  there is no dry-run flag to pass — this is the only mode.
+   *
+   *  THE PATH AND THE METHOD ARE THE BACKEND'S CHOICE, NOT A CLAIM
+   *  ABOUT WRITING. `sync-positions` is kept because the caller lived
+   *  in a file the route does not own, and POST is served beside GET
+   *  for the same reason; the frontend proxy at
+   *  pages/api/bet-suggester/live-watchlist/sync-positions.ts is
+   *  POST-only, which is what fixes the verb here. */
   syncPositions: (token: string) =>
     fetch(`${wlBase}/sync-positions`,
       { method: "POST", headers: wlHeaders(token) })
-      .then((r) => wlJson<WatchlistSyncResult>(r)),
+      .then((r) => wlJson<WatchlistHeldView>(r)),
 };
