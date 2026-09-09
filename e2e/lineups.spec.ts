@@ -24,6 +24,22 @@ test.describe("MLS match page — team news", () => {
         "backend has no lineup section (older deploy)");
 
       await page.goto(`/bet-suggester/mls/${EVENT}`);
+      // WAIT FOR THE PAGE TO HAVE ITS DATA BEFORE READING AN ABSENCE.
+      //
+      // `TeamNews` returns null until the match payload carries a lineup
+      // block, so "the section is not here" is only a finding once the
+      // page has actually fetched. This asserted straight after `goto`
+      // and raced the fetch on a flat 15s: it passed everywhere in
+      // isolation, passed in CI for weeks, and began failing there the
+      // day the suite grew from 607 tests to 616 — the margin went, not
+      // the behaviour. Re-running the identical commit failed identically,
+      // so it is not random; it is a race this test always had and only
+      // recently started losing.
+      //
+      // This does not weaken the claim. If the section is absent once the
+      // page has settled, the assertion still fails — which is the thing
+      // worth knowing.
+      await page.waitForLoadState("networkidle");
       const section = page.getByText(/team news/i).first();
       await expect(section).toBeVisible();
 
