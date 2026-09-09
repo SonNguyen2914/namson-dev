@@ -523,14 +523,41 @@ type Box = { x: number; y: number; width: number; height: number };
  *  and therefore the rank order the badges print. */
 async function cardBoxes(cards: ReturnType<typeof col>, expected: number) {
   await expect(cards.getByTestId("picker-row")).toHaveCount(expected);
-  const boxes: Box[] = [];
-  for (let i = 0; i < expected; i++) {
-    const b = await cards.getByTestId("picker-row").nth(i).boundingBox();
-    expect(b, `card ${i} has no box at all — it is not being laid out`)
-      .not.toBeNull();
-    boxes.push(b!);
+  // A LAYOUT READ MUST WAIT FOR THE LAYOUT.
+  //
+  // `boundingBox()` reports whatever is laid out at the instant it runs,
+  // and a viewport resize is NOT synchronous with reflow — so a
+  // measurement taken straight after one can faithfully describe the
+  // PREVIOUS width's grid. Run alone, the reflow always won the race and
+  // every one of these tests passed; in the 607-test suite it lost, and
+  // the board "laid 3 tracks across at 1440px" where it lays 6. A wrong
+  // number is worse than a timeout here: it reads as a real layout bug.
+  //
+  // Settled means TWO CONSECUTIVE READS AGREE, which holds for any cause
+  // of reflow — a resize, a font landing, an image — rather than for one
+  // guessed delay that a slower machine invalidates.
+  const read = async () => {
+    const out: Box[] = [];
+    for (let i = 0; i < expected; i++) {
+      const b = await cards.getByTestId("picker-row").nth(i).boundingBox();
+      expect(b, `card ${i} has no box at all — it is not being laid out`)
+        .not.toBeNull();
+      out.push(b!);
+    }
+    return out;
+  };
+  const shape = (bs: Box[]) => bs
+    .map((b) => `${Math.round(b.x)},${Math.round(b.y)},${Math.round(b.width)}`)
+    .join("|");
+  let prev = await read();
+  for (let i = 0; i < 25; i++) {
+    const next = await read();
+    if (shape(next) === shape(prev)) return next;
+    prev = next;
   }
-  return boxes;
+  throw new Error(
+    "the grid never stopped moving — 25 consecutive reads disagreed, so "
+    + "no measurement here would describe a real layout");
 }
 
 /** The cards sharing the band's FIRST row — the measured column count.
