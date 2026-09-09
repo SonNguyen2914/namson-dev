@@ -520,8 +520,20 @@ test("the link to it sits in the TOP-LEFT of every page that carries the "
       "/bet-suggester/leagues-cup",
       "/bet-suggester/comp/ucl",
     ];
+    /* `domcontentloaded`, NOT `load`, and the distinction is the whole
+       reason this went red on CI while passing locally. The claim here
+       is about the CHROME — a link that ships with the shell of every
+       page. Waiting for `load` waits for every image and deferred asset
+       on the route as well, so `/bet-suggester/bots` (the twelve-bot
+       leaderboard) blew the 45s budget on a slower runner and the test
+       failed for page weight, which is a thing it does not test.
+
+       The link is in the server-rendered header, so it is present at
+       DOM-ready; `toHaveCount` auto-waits from there if hydration is
+       still in flight. */
+    test.setTimeout(90_000);
     for (const r of routes) {
-      await page.goto(r);
+      await page.goto(r, { waitUntil: "domcontentloaded" });
       const link = page.getByTestId("field-link");
       await expect(link, `no field link on ${r}`).toHaveCount(1);
       await expect(link).toHaveAttribute("href", "/bet-suggester/ratings");
