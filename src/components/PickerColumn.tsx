@@ -27,6 +27,7 @@
 // to components/PickerRead.tsx so the tail renders THE SAME READ this
 // column does, rather than a hand-copied one free to drift from it.
 import Link from "next/link";
+import { useId, useState } from "react";
 import { dayLabel, fmtDate, localDay } from "../lib/matchday";
 import {
   BoardRefusal, BoardRow, LeagueMeta, SEASON_BLEND_K, homeBadge, leagueLabel,
@@ -269,8 +270,12 @@ export function seasonDeparture(
  *  same `row` and `modeId`. A component boundary adds no DOM, so
  *  RowCard's output is unchanged — which e2e/picker.spec.ts and
  *  e2e/picker-blend-cup.spec.ts prove, unedited, on every run. */
-export function RowRead({ row, modeId, clubCount, dense = false }: {
+export function RowRead({ row, modeId, clubCount, dense = false, hoisted }: {
   row: BoardRow; modeId: SortModeId; clubCount: number;
+  /** what this row's COLUMN header already states — see columnNotes. A
+   *  note whose text the header carries is not drawn again down here.
+   *  Absent off the board (LiveCard), where there is no header. */
+  hoisted?: ColumnNoteSet;
   /** THIS CARD IS IN A NARROW TRACK — see DENSE_GRID below.
    *
    *  A dense board lays up to six matches across the width one column
@@ -459,20 +464,30 @@ export function RowRead({ row, modeId, clubCount, dense = false }: {
         <TierGaps read={row} dense={dense} />
       </div>
 
-      {/* A WITHHELD GAP SAYS WHY, on the card, in the backend's own
-          words. The tiers above it are the part that survives a
-          cross-league comparison, so the explanation belongs between
-          them and the price. */}
-      {row.gap_note && <GapNote note={row.gap_note} />}
+      {/* A WITHHELD GAP SAYS WHY, in the backend's own words — HERE only
+          when the column header is not already saying it (see
+          columnNotes). On a UCL matchday every card carried the same
+          ~90-word paragraph, which on a six-abreast board was most of
+          the ink on the page; the column now says it once and this
+          renders nothing. The `n/a` values above are untouched — what
+          moved is the EXPLANATION, never the refusal.
+          Off the board — LiveCard's prematch flip renders this component
+          with no `hoisted` at all — there is no column header to hoist
+          to, so the note stays exactly where it was. */}
+      {row.gap_note && row.gap_note !== hoisted?.gap
+        && <GapNote note={row.gap_note} />}
     </>
   );
 }
 
-function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false }: {
+function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
+                  hoisted }: {
   row: BoardRow; rank: number; modeId: SortModeId; clubCount: number;
   colSrc?: string | null;
   /** in a narrow dense-grid track — see RowRead's own `dense` note */
   dense?: boolean;
+  /** the notes this column's header already states — see columnNotes */
+  hoisted?: ColumnNoteSet;
 }) {
   const cross = row.cross_league === true;
   const alt = seasonDisagreement(row);
@@ -568,15 +583,21 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false }: {
       </div>
 
       <RowRead row={row} modeId={modeId} clubCount={clubCount}
-        dense={dense} />
+        dense={dense} hoisted={hoisted} />
 
       <div className="mt-3 border-t border-line pt-3">
         <KalshiCell quote={row.kalshi} />
-        {/* WHAT THAT PRICE ACTUALLY SETTLES ON. Directly under the
-            quote, because it is a fact about the quote: a Leagues Cup
-            leg pays on 90 minutes, so "54¢" is not the price of going
-            through. */}
-        {row.reg_time_note && <RegTimeNote note={row.reg_time_note} />}
+        {/* WHAT THAT PRICE ACTUALLY SETTLES ON — the settlement rule of
+            a whole competition, so on a cup column it is identical on
+            every card and the header carries it instead (columnNotes).
+            It survives HERE for the row the header cannot speak for: a
+            cup tie FOLDED INTO A LEAGUE COLUMN, where the Liga MX
+            header must not claim a regulation-time rule that is true of
+            one of its ten cards. That row is exactly the case the
+            operator's rule leaves on the card — a fact about THIS
+            fixture, not about the column. */}
+        {row.reg_time_note && row.reg_time_note !== hoisted?.regTime
+          && <RegTimeNote note={row.reg_time_note} />}
         {/* B0c — DECLARING THIS MATCH WATCHED (docs/HOLD-EXIT-DESIGN.md).
             Under the price rather than beside the kickoff, because the
             control needs the card's full width to print the backend's
@@ -684,6 +705,215 @@ function RefusalWhy() {
   );
 }
 
+/** WHAT A COLUMN'S NOTES ARE, AS OPPOSED TO A CARD'S (operator,
+ *  2026-09-09 — the THIRD time this rule has been given).
+ *
+ *  THE RULE, in his words about the season share on 2026-09-08: "remove
+ *  them from both the live card and prematch card, only mention it once
+ *  with the league name". Generalised:
+ *
+ *      A fact about the whole COLUMN belongs in the column header,
+ *      once. Only a fact about THIS FIXTURE belongs on the card.
+ *
+ *  THE TWO STRINGS THAT BREAK IT. Both are constants of a CUP SPEC in
+ *  the backend (src/picker/tables.py, `CupSpec.cross_note` and
+ *  `.reg_time_note`) — not derived from the fixture at all — so every
+ *  card of that competition was redrawing the identical paragraph:
+ *
+ *    `gap_note`       ~90 words, on every cross-league row. UEFA's
+ *                     league-phase draw forbids two clubs of one
+ *                     association from meeting, so on the Champions
+ *                     League board that is EVERY row; laid six abreast
+ *                     it was most of the ink on the matchday.
+ *    `reg_time_note`  the competition's settlement rule, on every row
+ *                     of that competition.
+ *
+ *  WHAT MAKES A NOTE THE COLUMN'S. Two conditions, and the second is
+ *  the one that keeps the header honest:
+ *
+ *   1. THE COLUMN'S OWN ROWS AGREE ON IT. One distinct string, or the
+ *      header would state one competition's rule over another's.
+ *   2. IT COMES FROM THIS COLUMN'S OWN COMPETITION. `row.league !==
+ *      slug` is a fixture FOLDED IN from elsewhere — a Leagues Cup tie
+ *      between two Liga MX clubs is drawn in the Liga MX column because
+ *      that table describes it completely, and it still settles on 90
+ *      minutes when nothing else in that column does. Hoisting that
+ *      would put a false sentence over ten cards to save ink on one. A
+ *      folded row's note is a fact about THAT FIXTURE and stays where
+ *      the operator's rule says it belongs: on its card.
+ *
+ *  PARTIAL COVERAGE STILL HOISTS, and that is deliberate for the only
+ *  case that produces it. `gap_note` rides the cross-league rows of a
+ *  mixed cup column; the note is not about those fixtures, it is the
+ *  column's RATING POLICY — why a comparison between two tables is
+ *  refused. Which rows it bit is already unmistakable on the cards
+ *  themselves: they are the ones reading `n/a` where a number goes,
+ *  beside a `rated-in` chip naming two different leagues. The refusal
+ *  stays on the card; only the explanation moves. */
+export interface ColumnNoteSet {
+  /** why Stage-1 gaps are withheld in this column, or null */
+  gap: string | null;
+  /** what this column's prices settle on, when not the match, or null */
+  regTime: string | null;
+}
+
+export function columnNotes(slug: string, rows: BoardRow[]): ColumnNoteSet {
+  const agreed = (pick: (r: BoardRow) => string | null | undefined) => {
+    let only: string | null = null;
+    for (const r of rows) {
+      if (r.league !== slug) continue;   // folded in — it speaks for itself
+      const s = pick(r);
+      if (!s) continue;
+      if (only == null) only = s;
+      else if (only !== s) return null;  // they disagree — leave it per row
+    }
+    return only;
+  };
+  return {
+    gap: agreed((r) => r.gap_note),
+    regTime: agreed((r) => r.reg_time_note),
+  };
+}
+
+/** THE COLUMN'S NOTES, BEHIND ONE CIRCLE IN THE HEADER'S CHIP ROW.
+ *
+ *  ONE CIRCLE, NOT TWO, and the reason is what a second one would look
+ *  like: two identical unlabelled `i` glyphs a few pixels apart, in a
+ *  row that already carries up to four chips and is 196px wide at the
+ *  board's narrowest track. A reader would have to open both to find
+ *  out which is which, which costs more than reading two headed
+ *  paragraphs in one panel. So the panel is sectioned instead — each
+ *  note under its own heading, in the backend's own words — and a
+ *  column carrying only one of them draws only that section. A column
+ *  carrying NEITHER draws no circle at all, so the affordance is never
+ *  an empty promise.
+ *
+ *  HOVER IS NOT ENOUGH ON ITS OWN. There is no hover on a phone and
+ *  none from a keyboard, and this is the sentence that stops an `n/a`
+ *  reading as missing data rather than as a refused comparison — the
+ *  board's whole discipline rests on it, so hover-only would make it
+ *  UNREACHABLE rather than tidy. It opens on hover, on focus and on
+ *  tap; Escape closes it; the button carries a real accessible name
+ *  naming what is inside. Same treatment `tier-read` already has, plus
+ *  the two openings a pointer does not provide.
+ *
+ *  WHERE IT ANCHORS. The panel is positioned against THE CHIP ROW, not
+ *  against the button — the same fix `TierGaps`'s `dense` mode carries,
+ *  for the same two reasons. The chip row is exactly one column wide,
+ *  so `left-0` + `w-[min(21rem,100%)]` starts at the column's left edge
+ *  and is at most the column wide, at every track in the ladder; and
+ *  `html { overflow-x: clip }` (globals.css) means an overhang would be
+ *  CLIPPED, not scrollable, so "it fits" has to be structural rather
+ *  than arithmetic on a breakpoint. Anchored to the 16px BUTTON instead,
+ *  `100%` is 26px — measured, first try — and a fixed width would hang
+ *  off whichever edge the wrapped trigger happened to land near. And the
+ *  row does wrap: `top-full` is below the whole row, which the trigger
+ *  cannot be inside, so it can never swallow the click that closes it
+ *  (the 2026-09-07 bug in TierGaps).
+ *
+ *  AND IT LEADS THE ROW, rather than trailing it on `ml-auto`. Two
+ *  widths have to work: this column full-width on /bet-suggester/ucl,
+ *  and ~230px on the six-column landing board. Trailing, the trigger
+ *  was pushed onto a line of its own and sat 500px from the chips it
+ *  belongs to — and a left-anchored panel would then open nowhere near
+ *  the thing that opened it. First in the row, the trigger is beside
+ *  the season chip at every width (which is where the operator asked
+ *  for it: "put it ontop with the 'prior szn' label") and the panel
+ *  always drops directly beneath it.
+ *
+ *  IT IS AN AFFORDANCE, NOT AN ALERT. Neutral line and ink at rest,
+ *  accent only on hover/focus/open — the same gold `tier-read` uses to
+ *  mean "this opens", which is brand, never a verdict. The traffic
+ *  light stays on the numbers. */
+function ColumnNotes({ notes }: { notes: ColumnNoteSet }) {
+  const panelId = useId();
+  const [pinned, setPinned] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  if (!notes.gap && !notes.regTime) return null;
+  const open = pinned || hovered || focused;
+  const shut = () => { setPinned(false); setHovered(false); setFocused(false); };
+  const label = notes.gap && notes.regTime
+    ? "why this column withholds gaps, and what its prices settle on"
+    : notes.gap
+      ? "why this column withholds gaps"
+      : "what this column's prices settle on";
+  return (
+    // NOT `relative`, deliberately — the positioning context is THE CHIP
+    // ROW, which is exactly one column wide, so the panel's `100%` is
+    // the column and never this 16px button (measured at 26px wide the
+    // first time, which is TierGaps's dense bug in a new place).
+    <span className="inline-flex"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onKeyDown={(e) => { if (e.key === "Escape") shut(); }}>
+      <button type="button" data-testid="col-notes-open"
+        aria-expanded={open} aria-label={label}
+        aria-describedby={open ? panelId : undefined}
+        data-notes={[notes.gap && "gap", notes.regTime && "reg-time"]
+          .filter(Boolean).join("+")}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onClick={(e) => {
+          e.preventDefault(); e.stopPropagation();
+          // The click is authoritative: tapping a second time closes a
+          // panel a hover is still holding open, which is the only way
+          // out on a touch screen.
+          setPinned((p) => !p); setHovered(false); setFocused(false);
+        }}
+        // NOT `font-mono`, and that is legibility rather than taste: the
+        // mono lowercase i carries a serif at both ends, so at 10px in a
+        // 16px circle it reads as a FIGURE ONE — checked on the rendered
+        // board, beside a chip whose every glyph really is mono. The
+        // sans i is a dot over a bare stem and cannot be misread. He
+        // asked for "the letter i in the middle"; this is that letter.
+        className={`inline-flex h-[16px] w-[16px] items-center justify-center self-center rounded-full border text-[11px] font-semibold leading-none transition-colors ${
+          open ? "border-accent/60 text-accent"
+            : "border-line-strong text-ink-low hover:border-accent/40 hover:text-accent"}`}>
+        i
+      </button>
+      {open && (
+        <div data-testid="col-notes" id={panelId} role="note"
+          // A CAP AND A SCROLLBAR, because these are the backend's own
+          // paragraphs and they are LONG — ~1,200 characters with both
+          // sections, which in a 230px column is 900px of panel. Left
+          // uncapped it runs off the bottom of the viewport, and the way
+          // out would be to scroll the PAGE, which drags the sticky
+          // header the panel is anchored to. The overflow lives inside
+          // the panel instead; the pointer stays within the hover
+          // container while scrolling it, so reading cannot close it.
+          className="absolute left-0 top-[calc(100%+7px)] z-30 max-h-[min(70vh,40rem)] w-[min(30rem,100%)] overflow-y-auto rounded-lg border border-line-strong bg-elev2 p-3 text-left text-[11px] leading-relaxed text-ink-mid shadow-xl">
+          {notes.gap && (
+            <div>
+              <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
+                gaps withheld in this column
+              </p>
+              {/* THE BACKEND'S OWN WORDS, verbatim — not summarised and
+                  not truncated. Same data-testid it carried on the card,
+                  because the claim under guard ("the board says WHY a
+                  gap is withheld") is unchanged; only its address is. */}
+              <p data-testid="gap-note" className="mt-1">{notes.gap}</p>
+            </div>
+          )}
+          {notes.gap && notes.regTime && (
+            <hr className="my-2.5 border-line" />
+          )}
+          {notes.regTime && (
+            <div>
+              <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-skylive">
+                what the price settles on
+              </p>
+              <p data-testid="reg-time-note" className="mt-1">
+                {notes.regTime}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+    </span>
+  );
+}
+
 /** WHAT THE NUMBER IN A COLUMN HEADER COUNTS (operator, 2026-09-08).
  *
  *  THE COMPLAINT. "LEAGUES CUP · 0 FIXTURES", with no chips beside it
@@ -788,6 +1018,14 @@ export function LeagueColumn({
      carries no weights gets no percentage rather than a manufactured
      one, and a cup gets none by construction (see seasonSpan). */
   const span = seasonSpan(rows, meta?.kind);
+
+  /* THE COLUMN'S CAVEATS, DERIVED ONCE — see columnNotes. Off the rows,
+     like the season basis above it: a note is this column's only when
+     this column's own competition emits it and its rows agree. What
+     comes back is handed BOTH to the header (which draws it, once) and
+     to every card (which then draws nothing), so the two can never
+     disagree about who is saying it. */
+  const notes = columnNotes(slug, rows);
 
   // DAY-MAJOR (operator, 2026-09-01): the matchday is the board's
   // primary structure and each band's sort — the board default or that
@@ -932,7 +1170,16 @@ export function LeagueColumn({
             {columnCountLabel(rows.length, finished)}
           </span>
         </div>
-        <div className="mt-1.5 flex flex-wrap items-baseline gap-1 empty:mt-0">
+        {/* `relative` so the column-notes panel below hangs off THE CHIP
+            ROW — one column wide, whatever the board's track count — and
+            not off its own 16px trigger. See ColumnNotes. */}
+        <div className="relative mt-1.5 flex flex-wrap items-baseline gap-1 empty:mt-0">
+          {/* THE COLUMN'S CAVEATS, ONCE, AT THE HEAD OF THE CHIP ROW —
+              "put it ontop with the 'prior szn' label" (operator). It
+              leads rather than trails so the trigger is beside the
+              season chip at every track width and the panel opens
+              directly under it; see ColumnNotes. */}
+          <ColumnNotes notes={notes} />
           {/* WHY THIS COLUMN HAS NO CHIPS — said, rather than left as a
               gap (operator, 2026-09-08). Every other column carries a
               season chip and, for a cup, a "rated on" chip; this one
@@ -1090,7 +1337,7 @@ export function LeagueColumn({
             {dayRows.map((r, i) => (
               <RowCard key={`${r.league}-${r.event_id}`} row={r} rank={i + 1}
                 modeId={modeId} clubCount={meta?.clubs ?? 0}
-                colSrc={meta?.src} dense={dense} />
+                colSrc={meta?.src} dense={dense} hoisted={notes} />
             ))}
             {refused.map((r, i) => (
               <RefusalCard key={`ref-${r.club}-${i}`} r={r} />

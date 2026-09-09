@@ -286,9 +286,14 @@ test("a cross-league cup fixture withholds its gaps, says why, and keeps its tie
     await expect(cross).toContainText(/rank\s*n\/a/);
     await expect(cross).not.toContainText("+0.00");
     await expect(cross).not.toContainText("0.00");
-    // …and the card says why, in the backend's own words
-    await expect(cross.getByTestId("gap-note"))
-      .toContainText("2.0 ppg in MLS is not 2.0 ppg in Liga MX");
+    // …and THE BOARD says why, in the backend's own words. From
+    // 2026-09-09 that is the column header rather than this card: the
+    // note is a CupSpec constant about the column's rating basis, so a
+    // card carrying it redrew one paragraph per row. WHAT THIS TEST
+    // GUARDS IS UNCHANGED — the board still states why a gap is
+    // withheld, in the backend's exact words — only its address moved,
+    // and the `n/a` values asserted just above are untouched.
+    await expect(cross.getByTestId("gap-note")).toHaveCount(0);
     // which table each club came from, since they differ
     await expect(cross.getByTestId("rated-in"))
       .toHaveText("MLS v Liga MX");
@@ -302,6 +307,11 @@ test("a cross-league cup fixture withholds its gaps, says why, and keeps its tie
     await cross.getByTestId("tier-read").click();
     await expect(cross.getByTestId("shape-read"))
       .toContainText("T2 v T1 −1");
+    // the note's new home, opened from the column header
+    const cupCol = col(page, "leaguescup");
+    await cupCol.getByTestId("col-notes-open").click();
+    await expect(cupCol.getByTestId("col-notes").getByTestId("gap-note"))
+      .toContainText("2.0 ppg in MLS is not 2.0 ppg in Liga MX");
   });
 
 test("a league row never claims a cross-league caveat it does not have",
@@ -312,26 +322,80 @@ test("a league row never claims a cross-league caveat it does not have",
       await expect(c.getByTestId("gap-note")).toHaveCount(0);
       await expect(c.getByTestId("rated-in")).toHaveCount(0);
       await expect(c.getByTestId("reg-time-note")).toHaveCount(0);
+      // …and no affordance offering either of them, which is the same
+      // claim one level up: a league column has no caveat to hide.
+      await expect(c.getByTestId("col-notes-open")).toHaveCount(0);
     }
   });
 
 // ------------------------------------------ the regulation-time note ---
 
-test("every Leagues Cup card says the market settles on regulation time",
+test("the Leagues Cup column says ONCE what its market settles on",
   async ({ page }) => {
+    // MOVED FROM THE CARDS (operator, 2026-09-09 — the third time he has
+    // given this rule): "a fact about the whole COLUMN belongs in the
+    // column header, once. Only a fact about THIS FIXTURE belongs on the
+    // card." `reg_time_note` is a CupSpec constant, identical on every
+    // row of the competition, so three cards carried one paragraph three
+    // times. The load-bearing fact — REGULATION TIME ONLY, in the
+    // backend's own words, not summarised — is still on the board.
     await open(page);
     const cup = col(page, "leaguescup");
-    const notes = cup.getByTestId("reg-time-note");
-    await expect(notes).toHaveCount(3);          // every card, not one
-    for (let i = 0; i < 3; i++) {
-      await expect(notes.nth(i)).toContainText(/regulation time only/i);
-      await expect(notes.nth(i)).toContainText(/90 minutes/i);
-      await expect(notes.nth(i)).toContainText(/penalties/i);
-    }
-    // and it sits with the price, because it is a fact about the price
+    await expect(cup.getByTestId("picker-row")).toHaveCount(3);
+    await expect(cup.getByTestId("reg-time-note")).toHaveCount(0);
+
+    const trigger = cup.getByTestId("col-notes-open");
+    await expect(trigger).toHaveCount(1);        // one circle, not three
+    await expect(trigger).toHaveAttribute("data-notes", "gap+reg-time");
+    await expect(cup.getByTestId("col-notes")).toHaveCount(0);
+
+    await trigger.click();
+    const note = cup.getByTestId("col-notes").getByTestId("reg-time-note");
+    await expect(note).toContainText(/regulation time only/i);
+    await expect(note).toContainText(/90 minutes/i);
+    await expect(note).toContainText(/penalties/i);
+    // the price is still on every card; only its explanation moved
     const toluca = cup.getByTestId("picker-row").filter({ hasText: "Toluca" });
     await expect(toluca).toContainText("ask 54¢");
-    await expect(toluca.getByTestId("reg-time-note")).toBeVisible();
+  });
+
+test("the column note opens on hover, on focus and on tap, and Escape shuts it",
+  async ({ page }) => {
+    // HOVER IS NOT ENOUGH ON ITS OWN. There is no hover on a phone and
+    // none from a keyboard, and this is the sentence that stops an `n/a`
+    // reading as missing data rather than as a refused comparison — so
+    // hover-only would make it unreachable rather than tidy.
+    await open(page);
+    const cup = col(page, "leaguescup");
+    const trigger = cup.getByTestId("col-notes-open");
+    const panel = cup.getByTestId("col-notes");
+
+    // a real accessible name, naming what is behind the circle
+    await expect(trigger).toHaveAccessibleName(
+      "why this column withholds gaps, and what its prices settle on");
+    await expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    await trigger.hover();
+    await expect(panel).toBeVisible();
+    await expect(trigger).toHaveAttribute("aria-expanded", "true");
+    // move the pointer off it and it closes again
+    await cup.getByTestId("col-count").hover();
+    await expect(panel).toHaveCount(0);
+
+    // KEYBOARD: focus alone opens it, Escape shuts it
+    await trigger.focus();
+    await expect(panel).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(panel).toHaveCount(0);
+
+    // TAP: a click opens it and stays open with the pointer elsewhere,
+    // and a second click is the way out on a touch screen
+    await trigger.click();
+    await expect(panel).toBeVisible();
+    await cup.getByTestId("col-count").hover();
+    await expect(panel).toBeVisible();
+    await trigger.click();
+    await expect(panel).toHaveCount(0);
   });
 
 // ----------------------------------------------------- the weights ----
@@ -824,6 +888,32 @@ test("a folded cup card in a league column still opens the cup's page",
     await expect(row).toHaveAttribute("data-league", "leaguescup");
     await expect(wayIn(row)).toHaveAttribute(
       "href", "/bet-suggester/comp/leagues-cup");
+  });
+
+test("a folded cup card keeps its OWN settlement note — the league header "
+   + "must not claim it for the column", async ({ page }) => {
+    // THE CLAUSE THAT KEEPS A HOISTED NOTE HONEST (2026-09-09). Moving a
+    // note to the column header is only true when the note is the
+    // COLUMN'S. `reg_time_note` belongs to a COMPETITION, and a Leagues
+    // Cup tie between two Liga MX clubs is drawn in the LIGA MX column
+    // because that table describes it completely — so hoisting it there
+    // would print "the price is 90 minutes, not the tie" over cards that
+    // settle outright, a false sentence over ten rows to save ink on
+    // one. `columnNotes` skips every row whose league is not the
+    // column's, and this is that skip: the fact is about THIS FIXTURE,
+    // so it stays on THIS FIXTURE's card — the operator's rule read from
+    // its other side.
+    await open(page, FOLDED_BOARD);
+    const mx = col(page, "ligamx");
+    await expect(mx.getByTestId("picker-row")).toHaveCount(2);
+    await expect(mx.getByTestId("picker-row").first())
+      .toHaveAttribute("data-league", "leaguescup");
+    // no header affordance — this column has no note of its own to give
+    await expect(mx.getByTestId("col-notes-open")).toHaveCount(0);
+    // and the note is still on each folded card, in the backend's words
+    await expect(mx.getByTestId("reg-time-note")).toHaveCount(2);
+    await expect(mx.getByTestId("reg-time-note").first())
+      .toContainText(/regulation time only/i);
   });
 
 test("a league card keeps its hub link", async ({ page }) => {

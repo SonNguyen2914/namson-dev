@@ -328,6 +328,105 @@ test("the four league columns are untouched by it", async ({ page }) => {
       .toHaveCount(0);
   });
 
+// ---------------- 7. THE COLUMN'S CAVEAT, SAID ONCE (2026-09-09) -------
+//
+// THE OPERATOR, ON A SCREENSHOT OF THIS COLUMN: "remove this warning in
+// each UCL match card, it is so annoying and repetitive, put it ontop
+// with the 'prior szn' label and hide it inside the circle with the
+// letter 'i' in the middle, only show the message when the mouse hover
+// on in."
+//
+// THE THIRD TIME HE HAS GIVEN THIS RULE, after the season share on
+// 2026-09-08. The general form:
+//
+//     A fact about the whole COLUMN belongs in the column header,
+//     once. Only a fact about THIS FIXTURE belongs on the card.
+//
+// `gap_note` is `CupSpec.cross_note` — a backend CONSTANT, not derived
+// from the fixture — and UEFA's league-phase draw forbids two clubs of
+// one association from meeting, so it was ~90 identical words on every
+// card of a matchday laid six abreast.
+//
+// WHAT MUST NOT MOVE WITH IT. The `n/a` values stay on the card: this
+// board is moving the EXPLANATION, never the refusal. And the note is
+// still the backend's own words, rendered whole.
+
+test("the Champions League column states its withheld gaps ONCE, in the "
+   + "header, and no card repeats it", async ({ page }) => {
+    await openUcl(page, GRID_BOARD);
+    const ucl = col(page, "ucl");
+    await expect(ucl.getByTestId("picker-row")).toHaveCount(GRID_ROWS.length);
+
+    // eight cross-league cards, and not one paragraph among them
+    await expect(ucl.getByTestId("gap-note")).toHaveCount(0);
+    // the refusal itself is untouched — this is the whole point
+    const first = ucl.getByTestId("picker-row").first();
+    await expect(first).toContainText(/GD\/g\s*n\/a/);
+    await expect(first).toContainText(/ppg\s*n\/a/);
+    await expect(first).toContainText(/rank\s*n\/a/);
+
+    // ONE circle, in the header's chip row beside the season basis
+    const trigger = ucl.getByTestId("col-notes-open");
+    await expect(trigger).toHaveCount(1);
+    await expect(ucl.getByTestId("col-head")
+      .getByTestId("col-notes-open")).toHaveCount(1);
+    // this payload carries no regulation-time note, so the panel must
+    // not offer a section for one — an affordance never promises a note
+    // the column does not have
+    await expect(trigger).toHaveAttribute("data-notes", "gap");
+
+    // and the words are the backend's, whole
+    await trigger.click();
+    const panel = ucl.getByTestId("col-notes");
+    await expect(panel.getByTestId("gap-note")).toHaveText(CROSS_NOTE);
+    await expect(panel.getByTestId("reg-time-note")).toHaveCount(0);
+  });
+
+test("the note's panel opens inside its own column at the narrowest track",
+  async ({ page }) => {
+    // The header chip row is ONE COLUMN wide on the six-column landing
+    // board, and `html { overflow-x: clip }` (globals.css) means a panel
+    // reaching past the page's left edge is CLIPPED, not scrollable —
+    // the exact bug that produced TierGaps's `dense` mode. Anchoring to
+    // the chip row rather than to the 16px button is what makes this fit
+    // by construction instead of by arithmetic on a breakpoint.
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await open(page);
+    const ucl = col(page, "ucl");
+    const trigger = ucl.getByTestId("col-notes-open");
+    await trigger.click();
+    const panel = ucl.getByTestId("col-notes");
+    await expect(panel).toBeVisible();
+    // A LAYOUT READ MUST WAIT FOR THE LAYOUT — boundingBox() does not
+    // auto-wait and a viewport resize is not synchronous with reflow, so
+    // read until two consecutive reads agree (cardBoxes' rule, one box).
+    const settled = async (l: typeof panel) => {
+      const read = async () => {
+        const b = await l.boundingBox();
+        expect(b, "the panel has no box at all").not.toBeNull();
+        return b!;
+      };
+      let prev = await read();
+      for (let i = 0; i < 25; i++) {
+        const next = await read();
+        if (Math.round(next.x) === Math.round(prev.x)
+            && Math.round(next.width) === Math.round(prev.width)) return next;
+        prev = next;
+      }
+      throw new Error("the panel never stopped moving");
+    };
+    const colBox = await settled(ucl);
+    const box = await settled(panel);
+    expect(box.x, "the panel starts inside the page").toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(1280);
+    // …and inside its OWN column, so it can never reach into a neighbour
+    expect(box.x).toBeGreaterThanOrEqual(colBox.x - 0.5);
+    expect(box.x + box.width)
+      .toBeLessThanOrEqual(colBox.x + colBox.width + 0.5);
+    // still readable: a panel squeezed to nothing is its own defect
+    expect(box.width).toBeGreaterThan(150);
+  });
+
 // ------------------------------------- 5. keyed by slug, not by kind ---
 
 test("the Leagues Cup is a cup with a cross-league row too, and keeps the "
