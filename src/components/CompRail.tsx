@@ -68,9 +68,20 @@ export type LiveCompetition = {
    still work. UCL stays: its league phase opened 2026-09-08 and it has
    eighteen matches in this window — leaving the picker BOARD on
    2026-09-09 changed which page ranks it, not whether it is being
-   played. */
+   played.
+
+   AND THE CHIP POINTS AT THE VIEWER, NOT AT `/bet-suggester/ucl`
+   (2026-09-09). That path is the BOARD narrowed to one column
+   (`only={["ucl"]}`), served by `/api/picker/board`, which takes `days`
+   and `date` and no `leagues`. So the moment the operator took the
+   Champions League off the board the page behind this chip held ZERO
+   rows — a live link to an empty shell, verified on namson.dev. His
+   sentence was "we have it in its own cup page is enough", and the cup
+   page is the competition viewer: it reads `src.competitions.VIEWERS`,
+   is untouched by `BOARD_COLUMNS`, and answers today with 12 upcoming,
+   7 carrying a strength read and 12 tradeable on Kalshi. */
 export const LIVE_COMPETITIONS: readonly LiveCompetition[] = [
-  { key: "ucl", href: "/bet-suggester/ucl", label: "UCL",
+  { key: "ucl", href: "/bet-suggester/comp/ucl", label: "UCL",
     hue: "--lg-ucl" },
 ];
 

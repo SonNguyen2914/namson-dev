@@ -20,12 +20,24 @@ import { expect, test } from "@playwright/test";
 const RETIRED = ["ecl", "uel", "brasileirao", "argentina", "usl"];
 // The one that is LIVE keeps a chip on the board's rail: UCL's league
 // phase opened on 2026-09-08.
-// KEY -> THE HREF ITS RAIL CHIP ACTUALLY POINTS AT. Not `/comp/<key>`:
-// on 2026-09-08 the Champions League got a picker BOARD of its own
-// (`/bet-suggester/ucl`, the landing page's own component narrowed to one
-// column) and its chip was repointed there.
+// KEY -> THE HREF ITS RAIL CHIP ACTUALLY POINTS AT.
+//
+// AND IT IS `/comp/<key>` AGAIN (2026-09-09). On 2026-09-08 the
+// Champions League got a picker BOARD of its own — `/bet-suggester/ucl`,
+// the landing page's own component narrowed to one column — and the chip
+// was repointed there. On 2026-09-09 the operator took the competition
+// off the board: "remove UCL from the landing page, we have it in its
+// own cup page is enough."
+//
+// That narrowed board is served by `/api/picker/board`, which takes
+// `days` and `date` and NO `leagues`, so it draws whatever
+// `BOARD_COLUMNS` declares and nothing else. The moment the declaration
+// dropped `ucl` the page behind the chip held zero rows — verified live
+// on namson.dev. The competition VIEWER reads `src.competitions.VIEWERS`
+// and `BOARD_COLUMNS` cannot empty it, so that is where the chip points
+// and this is the assertion that keeps it there.
 const KEPT_CHIPS: [string, string][] = [
-  ["ucl", "/bet-suggester/ucl"],
+  ["ucl", "/bet-suggester/comp/ucl"],
 ];
 // KEPT, BUT FILED. ASEAN FINISHED (0 upcoming, 28 played) and moved into
 // the Archive dropdown at the top-left on 2026-08-30, with WC26. THE

@@ -126,8 +126,17 @@ async function open(
   await page.goto(where);
 }
 
+// THE VIEWER, NOT THE NARROWED BOARD (2026-09-09). `/bet-suggester/ucl`
+// is the board with `only={["ucl"]}`, and `/api/picker/board` takes no
+// `leagues` — so once the operator took the competition off the board
+// that page held zero rows and this chip linked to an empty shell. The
+// cup page is the competition viewer, which `BOARD_COLUMNS` cannot
+// empty. Asserted here so the chip cannot drift back onto a surface the
+// board declaration controls.
+const CHIP_HREF = "/bet-suggester/comp/ucl";
+
 const chip = (page: import("@playwright/test").Page) =>
-  page.locator('a[href="/bet-suggester/ucl"]').first();
+  page.locator(`a[href="${CHIP_HREF}"]`).first();
 
 /** The chip, once the read behind it has had its chance. Every
  *  unlit assertion goes through this: `data-soon` starts at "unknown"
