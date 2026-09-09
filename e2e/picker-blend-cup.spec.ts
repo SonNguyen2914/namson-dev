@@ -264,16 +264,28 @@ test("a cross-league cup fixture withholds its gaps, says why, and keeps its tie
       .filter({ hasText: "Tigres UANL" });
     await expect(cross).toHaveAttribute("data-cross-league", "true");
     // the three Stage-1 numbers read n/a — NOT "0.00", which is a
-    // measured level and a completely different finding
-    // 2026-09-01 card: the active sort metric renders as the right-hand
-    // ANCHOR (value over label), the rest on the data line — the
-    // withheld gaps must read n/a in BOTH places, which is the same
-    // assertion this test always made, against the new layout.
-    await expect(cross.getByTestId("row-anchor")).toHaveText("n/a");
-    await expect(cross).toContainText(/GD\/g gap/);
+    // measured level and a completely different finding.
+    //
+    // 2026-09-08 (operator, backend docs/DECISION-ucl-board-sort): the
+    // ANCHOR on a cross-league row is the TIER gap, so it is the one
+    // figure here that is NOT n/a. This test used to assert the anchor
+    // read n/a too, and that was right while GD/g was the only fallback
+    // — but a board where every anchor is withheld reads as broken
+    // rather than as honest, and the tier gap is a real measured
+    // comparison two different tables genuinely support.
+    //
+    // WHAT THIS TEST GUARDS IS UNCHANGED: the three withheld gaps still
+    // read n/a wherever they are drawn, and none of them is a zero. The
+    // anchor moved to a number that was always measured; it did not
+    // start rendering a withheld one.
+    await expect(cross.getByTestId("row-anchor"))
+      .toHaveAttribute("data-anchor", "tier_ovr");
+    await expect(cross.getByTestId("row-anchor")).toHaveText("−1");
+    await expect(cross).toContainText(/GD\/g\s*n\/a/);
     await expect(cross).toContainText(/ppg\s*n\/a/);
     await expect(cross).toContainText(/rank\s*n\/a/);
     await expect(cross).not.toContainText("+0.00");
+    await expect(cross).not.toContainText("0.00");
     // …and the card says why, in the backend's own words
     await expect(cross.getByTestId("gap-note"))
       .toContainText("2.0 ppg in MLS is not 2.0 ppg in Liga MX");

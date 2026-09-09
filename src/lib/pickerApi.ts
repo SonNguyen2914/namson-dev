@@ -177,6 +177,14 @@ export interface LeagueMeta {
   kind?: "league" | "cup";
   /** for a cup: the league slugs its clubs were rated on */
   rated_on?: string[];
+  /** for a cup where a member league DID NOT BUILD: the members that
+   *  actually carry the column, and why the others did not. Both are
+   *  ABSENT — not empty — on a healthy column, so "this competition has
+   *  no clubs from that league" stays distinguishable from "that
+   *  league's table failed to load". `rated_on` remains the spec and
+   *  never shrinks; these two say what the spec got. */
+  rated_on_built?: string[];
+  member_errors?: Record<string, string>;
   /** for a cup whose market does not settle the match outright */
   reg_time_note?: string | null;
   /** the blend's shrinkage constant, as the backend ran it */
@@ -208,6 +216,19 @@ export const LEAGUE_LABEL: Record<string, string> = {
   mls: "MLS",
   ligamx: "Liga MX",
   leaguescup: "Leagues Cup",
+  // The Champions League and the five domestic tables its entrants are
+  // rated in (2026-09-08). Those five serve no page of their own — they
+  // exist so a UCL club has a real ppg, GD/g, rank and tier — but their
+  // names are still printed, on the cup column's "rated on" chip and
+  // wherever a row says which table it was rated in. Without an entry
+  // here `leagueLabel` falls through to the slug, and the chip would
+  // read "bundesliga + seriea + ligue1".
+  bundesliga: "Bundesliga",
+  seriea: "Serie A",
+  ligue1: "Ligue 1",
+  eredivisie: "Eredivisie",
+  primeiraliga: "Primeira Liga",
+  ucl: "Champions League",
 };
 
 /** THE BADGE BESIDE THE FAVOURITE, and what it is allowed to claim.
@@ -274,6 +295,10 @@ export const leagueLabel = (slug: string) => LEAGUE_LABEL[slug] ?? slug;
  *  Cup card on the landing page failed on 2026-09-03. */
 export const CUP_COMP_KEY: Record<string, string> = {
   leaguescup: "leagues-cup",
+  // The Champions League joined the board on 2026-09-08. Its cards would
+  // otherwise fall through to the hub pattern and land on the 404 — the
+  // failure this map was written for, one competition later.
+  ucl: "ucl",
 };
 
 export const rowHref = (row: { league: string; event_id: string }) => {

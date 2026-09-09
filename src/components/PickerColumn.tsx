@@ -36,7 +36,8 @@ import {
   ReviewLeagueMeta, ReviewRefusal, ReviewRow,
 } from "../lib/pickerReview";
 import {
-  ColumnSort, DEFAULT_SORT, SortModeId, modeById, sortRows,
+  COLUMN_DEFAULT_SORT, ColumnSort, DEFAULT_SORT, SortModeId, columnSort,
+  isDefaultSort, modeById, sortRows,
 } from "../lib/pickerSort";
 import {
   GapNote, KalshiCell, RegTimeNote, TierGaps, WITHHELD,
@@ -62,11 +63,32 @@ export const hueOf = (slug: string) => LEAGUE_HUE[slug] ?? "var(--lg-cup)";
  *  one number. Sorting by kickoff keeps GD/g (a time is not a
  *  magnitude); a missing quote says "no quote", a withheld gap says the
  *  board's own word for it. */
-function anchorFor(row: BoardRow, modeId: SortModeId): { v: string; k: string } {
+type AnchorId = Exclude<SortModeId, "kickoff" | "shape">;
+
+function anchorFor(row: BoardRow, modeId: SortModeId):
+  { v: string; k: string; id: AnchorId } {
   // a time is not a magnitude, and neither is a shape — the shape is
-  // already on the card as its coloured chip, so both keys keep GD/g as
-  // the anchor number
-  const id = modeId === "kickoff" || modeId === "shape" ? "gdg" : modeId;
+  // already on the card as its coloured chip, so both keys fall back to
+  // a measured gap for the anchor number.
+  //
+  // WHICH GAP FOLLOWS THE ROW (operator, 2026-09-08). GD/g is the
+  // board's anchor and it is WITHHELD on a cross-league row, because
+  // 2.0 ppg in one league is not 2.0 ppg in another and the backend
+  // refuses the subtraction. On the four league columns that null is
+  // rare and informative. On the UCL column it would be EVERY CARD, and
+  // a surface where every anchor is withheld reads as broken rather
+  // than as honest. The tier gap is the comparison two different tables
+  // genuinely support, so a cross-league row anchors on it — and a
+  // same-league UCL fixture, two English clubs drawn together, keeps
+  // GD/g like any other. Derived from `cross_league` per row rather
+  // than from the competition, for the same reason the backend derives
+  // the withholding that way.
+  const fallback: AnchorId = row.cross_league ? "tier_ovr" : "gdg";
+  const id = modeId === "kickoff" || modeId === "shape" ? fallback : modeId;
+  return { ...anchorValue(row, id), id };
+}
+
+function anchorValue(row: BoardRow, id: AnchorId): { v: string; k: string } {
   switch (id) {
     case "gdg": return { v: dec(row.gdg_gap), k: "GD/g gap" };
     case "ppg": return { v: dec(row.ppg_gap), k: "ppg gap" };
@@ -304,7 +326,7 @@ export function RowRead({ row, modeId, clubCount }: {
               the hover sentence for a reader who wants it, a handle for
               the guard below, and an ordinary row that carries no such
               attribute at all rather than one asserting agreement. */}
-          <span data-testid="row-anchor"
+          <span data-testid="row-anchor" data-anchor={anchor.id}
             {...(alt ? {
               "data-season-alt": dec(alt.current),
               "data-season-blend": dec(alt.blended),
@@ -329,7 +351,7 @@ export function RowRead({ row, modeId, clubCount }: {
         <span className="text-ink-faint">
           #{row.ranks.fav} v #{row.ranks.opp}
         </span>
-        {modeId !== "gdg" && modeId !== "kickoff" && (
+        {anchor.id !== "gdg" && (
           <span className="text-ink-low">
             GD/g <span className="text-ink-mid">{dec(row.gdg_gap)}</span>
           </span>
@@ -527,8 +549,12 @@ export function LeagueColumn({
    *  band tracks — the whole point of day-major alignment. */
   dayKeys: string[];
   /** each matchday's resolved sort — the board default or that day's
-   *  override. Sorting lives on the PAGE since the C ship (2026-09-01);
-   *  this column just applies what it is handed, per band. */
+   *  override. Sorting lives on the PAGE since the C ship (2026-09-01),
+   *  and this column applies what it is handed, per band — with ONE
+   *  documented exception: a column in `COLUMN_DEFAULT_SORT` runs its
+   *  own default WHILE what it is handed is still the board's untouched
+   *  default, and says so in its header. The moment a sort is chosen,
+   *  here or on a band, this column obeys it like every other. */
   sortFor: (dayKey: string) => ColumnSort;
   /** matchday labels, for the rest-day ghosts' "next" line */
   dayLabels: Record<string, string>;
@@ -567,7 +593,7 @@ export function LeagueColumn({
   // day's override — ranks WITHIN the day. Rank badges restart per day,
   // so 01 always means "this day's best under its sort".
   const byDay = dayKeys.map((k) => {
-    const sort = sortFor(k);
+    const sort = columnSort(slug, sortFor(k));
     return {
       key: k,
       sort,
@@ -586,6 +612,20 @@ export function LeagueColumn({
   const undated = refusals.filter((r) => !placed.has(r));
   // the first day that draws a refusal is where the reason is explained
   const firstRefusalDay = byDay.find((d) => d.refused.length > 0)?.key ?? null;
+  /* IS THIS COLUMN ON ITS OWN SORT RIGHT NOW? `columnSort` substitutes
+     exactly while the control it was handed is untouched, so the same
+     test answers it here — one rule, asked twice, rather than two rules
+     that can disagree. Said on the surface because a column ordered
+     differently from its neighbours reads as a defect to anyone who
+     does not know why. */
+  const ownSort = COLUMN_DEFAULT_SORT[slug];
+  const runsOwnSort = Boolean(ownSort)
+    && dayKeys.some((k) => isDefaultSort(sortFor(k)));
+
+  // a cup member league that did not build. ABSENT, not empty, when
+  // every member built — so this block cannot draw a reassuring "0".
+  const memberErrors = Object.entries(meta?.member_errors ?? {});
+
   // the subgrid track plan, shared with the page: row 1 header, then
   // per day a label track + a content track, then refusals, then tail
   const trackCount = 2 * dayKeys.length + 3;
@@ -679,6 +719,13 @@ export function LeagueColumn({
               {(meta.rated_on ?? []).map(leagueLabel).join(" + ")}
             </span>
           )}
+          {runsOwnSort && ownSort && (
+            <span data-testid="col-own-sort" data-mode={ownSort.mode}
+              title={`Nearly every fixture in this column pairs two different domestic leagues, and the board refuses to subtract one league's table from another's — 2.0 ppg in one league is not 2.0 ppg in another. What survives a change of scale is the tier, and ${ownSort.mode} is derived from the tier gaps. Choose any sort above and this column follows the board like the others.`}
+              className="rounded border border-line-strong px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-low">
+              sorted on {ownSort.mode} · this column
+            </span>
+          )}
         </div>
 
         {meta?.error && (
@@ -693,6 +740,29 @@ export function LeagueColumn({
             </p>
           </div>
         )}
+        {memberErrors.length > 0 && (
+          <div data-testid="col-member-errors"
+            className="mt-2 rounded-md border border-warn/30 bg-warn/5 px-2.5 py-2">
+            <p className="font-mono text-[11px] leading-relaxed text-warn">
+              {memberErrors.length} of {(meta?.rated_on ?? []).length} member
+              tables did not load — rated on{" "}
+              {(meta?.rated_on_built ?? []).map(leagueLabel).join(" + ")
+                || "no member league"}
+            </p>
+            <ul className="mt-1 space-y-0.5">
+              {memberErrors.map(([lg, err]) => (
+                <li key={lg} className="font-mono text-[10.5px] text-ink-low">
+                  {leagueLabel(lg)} — {err}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1 text-[11px] leading-relaxed text-ink-low">
+              Clubs rated in those leagues have no table to stand on, so
+              their fixtures are refused by name below rather than rated on
+              a guess. This costs those clubs, not the column.
+            </p>
+          </div>
+        )}
         {meta?.kalshi_error && (
           <p data-testid="col-kalshi-error"
             className="mt-2 font-mono text-[11px] leading-relaxed text-warn">
@@ -703,7 +773,10 @@ export function LeagueColumn({
 
         {/* Sorting moved to the PAGE with the C ship (2026-09-01): one
             board default in the command bar, a per-day override on each
-            matchday band. This column applies what it is handed. */}
+            matchday band. This column applies what it is handed, except
+            while the control is untouched and this column has a default
+            of its own — the `col-own-sort` chip above names that case,
+            and `columnSort` is where the rule lives. */}
 
       </header>
 

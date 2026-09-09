@@ -144,6 +144,42 @@ export const modeById = (id: string): SortMode | undefined =>
 export const isDefaultSort = (s: ColumnSort): boolean =>
   s.mode === DEFAULT_SORT.mode && s.dir === DEFAULT_SORT.dir;
 
+/** COLUMNS WHOSE DEFAULT SORT IS NOT THE BOARD'S (operator, 2026-09-08;
+ *  backend docs/DECISION-ucl-board-sort-2026-09-08.md).
+ *
+ *  The four league columns rank a fixture by the gap between two clubs
+ *  on ONE table, and inside a matchday `kickoff` is the honest default.
+ *  A UCL fixture almost never has that gap: nearly every match pairs two
+ *  different domestic leagues, and the backend withholds `ppg_gap`,
+ *  `gdg_gap` and `rank_gap` outright when the scales differ, because 2.0
+ *  ppg in one league is not 2.0 ppg in another.
+ *
+ *  What survives a change of scale is the TIER — a within-league
+ *  quintile means "best fifth of its own league" in every league, which
+ *  is the one comparison two different tables genuinely support — and
+ *  `shape`, which is derived from the three tier gaps. So that is what
+ *  this column ranks on.
+ *
+ *  KEYED BY SLUG, NOT BY `meta.kind`: this is not a fact about cups. The
+ *  Leagues Cup draws on two members of one continent and keeps the
+ *  board default; a future cup would have to earn its own entry here. */
+export const COLUMN_DEFAULT_SORT: Readonly<Record<string, ColumnSort>> = {
+  ucl: { mode: "shape", dir: "desc" },
+};
+
+/** The sort a column actually runs under, given what the page handed it.
+ *
+ *  ONE CONTROL STAYS AUTHORITATIVE. A column's own default applies only
+ *  while the board's control is untouched. The moment the operator picks
+ *  a sort — board-wide, or as an override on one matchday band — every
+ *  column obeys it, this one included, because a control that silently
+ *  did not apply to part of the board would be worse than a column that
+ *  starts somewhere else. */
+export function columnSort(slug: string, handed: ColumnSort): ColumnSort {
+  const own = COLUMN_DEFAULT_SORT[slug];
+  return own && isDefaultSort(handed) ? own : handed;
+}
+
 /** The board's own tiebreak order, null-safe: a row with no measured
  *  GD/g gap falls to the back of it rather than to the front, which is
  *  what `NaN` from an arithmetic comparison would have done. */
