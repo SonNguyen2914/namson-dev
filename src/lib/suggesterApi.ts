@@ -656,7 +656,22 @@ export interface LiveReadState {
   read_version: string;
   half_life_seconds: number;
   observed_from_kickoff: boolean;
-  baseline_is_not_built: string;
+  /** live_read.BASELINE_IS_JOINED — WHAT THE COMPONENT BESIDE IT IS
+   *  COMPARED AGAINST. A component is a rate; the question that makes
+   *  it mean anything is whether a side is doing more than a trailing
+   *  side normally does at this scoreline and this minute, and since
+   *  backend `6a3771d` (2026-09-08) the payload carries the answer:
+   *  M1's state-path rate table, read at run time and never re-fitted,
+   *  with its own bounds on the same sentence.
+   *
+   *  IT WAS `baseline_is_not_built` UNTIL THAT COMMIT, and the key went
+   *  with the claim rather than outliving it — a key asserting the
+   *  baseline is NOT built, on a payload that carries one, is the
+   *  winner-first score string one plane over: a stored word drifting
+   *  from the numbers printed beside it (AGENTS.md §3).
+   *  `../backend/tests/test_live_read.py` asserts the old name is
+   *  ABSENT, so the two cannot both be right. */
+  baseline_is_joined: string;
   refusal_code?: string;
   refusal?: string;
 }
@@ -1139,6 +1154,81 @@ export interface MatchStates {
   /** card._layer's fault isolation, when the emitter itself broke */
   unavailable?: string;
 }
+
+/** One side, as a surface draws it: the word, the sub-line the backend
+ *  derived from the same cell, and the note that travels with it. */
+export interface MatchStateWord {
+  word: string;
+  sub: string;
+  note?: string;
+}
+
+/** What a surface may say about `states`, and nothing more.
+ *
+ *  BOTH WORDS, OR NEITHER, OR A NAMED ABSENCE — never one word beside
+ *  an empty slot, which is a claim the payload never makes. `broke` is
+ *  card._layer's fault isolation (the emitter itself failed) and is a
+ *  DIFFERENT fact from `refused` (the row carries no possession, or no
+ *  shot counts): "we could not look" and "there is nothing there" are
+ *  not the same sentence, and this plane has folded them once already. */
+export interface MatchStatesRead {
+  home?: MatchStateWord | null;
+  away?: MatchStateWord | null;
+  conventions?: string;
+  /** the emitter broke — card._layer's `unavailable`, verbatim */
+  broke: string;
+  /** the block's own refusal, in the backend's words */
+  refused: string;
+}
+
+/** READ `states` ONCE, FOR EVERY SURFACE THAT DRAWS IT.
+ *
+ *  Two surfaces draw this one block — the live card on the board and
+ *  the suggestion card on a match hub — and each of them reading the
+ *  payload in its own words is how one of them quietly stops meaning
+ *  what the other does. `tilt_label` is the cautionary tale: it was
+ *  replaced by `states` in backend `c3044d1` and only one of the two
+ *  readers moved, so the other kept a permanently dead chip AND named
+ *  `states` on screen as a key it had no shape for.
+ *
+ *  DEFENSIVE BY DESIGN. It takes `unknown`, because a type is a claim
+ *  about the build and not about the wire. `null` means the key is not
+ *  on this payload at all, which is not the same as a block that
+ *  refused — a caller draws nothing for the first and a named absence
+ *  for the second. Nothing here computes a share, a cut or a word:
+ *  every one of them is card.live_states'. */
+export function readMatchStates(raw: unknown): MatchStatesRead | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as MatchStates;
+  const side = (s: MatchSideState | undefined): MatchStateWord | null =>
+    (s && typeof s.state === "string" && s.state.trim() !== ""
+      ? { word: s.state,
+          sub: typeof s.cell_words === "string" ? s.cell_words : "",
+          note: typeof s.note === "string" ? s.note : undefined }
+      : null);
+  const home = side(o.home), away = side(o.away);
+  // BOTH OR NEITHER. The six states are a PAIR by construction — the
+  // same cut read from two ends — so one word beside an empty slot
+  // would be a claim the payload never makes.
+  if (home && away) {
+    return { home, away, conventions: o.conventions, broke: "", refused: "" };
+  }
+  // A READ THAT FAILED IS NOT A ROW WITHOUT POSSESSION. `unavailable`
+  // is card._layer's fault isolation — the emitter itself broke — and
+  // rendering the possession sentence over it would state a CAUSE
+  // nobody observed.
+  return {
+    broke: typeof o.unavailable === "string" ? o.unavailable : "",
+    refused: typeof o.refused === "string" ? o.refused : "",
+  };
+}
+
+/** The sentence for a row that HAS no state, when the payload sent no
+ *  words of its own. card.STATE_MISSING_IS_NEVER_EVEN's claim, kept
+ *  short enough to sit in a card: missing is never an even match. */
+export const STATE_ABSENT_WORDS =
+  "no state — the row carries no possession, and a side with two of "
+  + "the three inputs has none. Missing is never an even match.";
 
 export interface WatchedStripResponse {
   version: string;

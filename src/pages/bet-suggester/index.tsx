@@ -103,9 +103,19 @@ const etDate = (d: string) =>
  *  dumbbells, the refusal blocks, the live strip — is reached by both
  *  routes because it is literally the same code.
  *
- *  `only` narrows the COLUMN SET and nothing else. The payload is the
- *  same board payload; rows outside the named columns simply have no
- *  column to sit in. */
+ *  `only` names the COLUMN SET. The payload is the same board payload;
+ *  rows outside the named columns simply have no column to sit in.
+ *
+ *  AND EVERY REGION THAT DESCRIBES THE BOARD IS NARROWED WITH IT
+ *  (2026-09-08). It used to narrow the columns and nothing else, which
+ *  left two regions above them still speaking for the whole board: the
+ *  live strip drew every match under way anywhere, and the season
+ *  banner counted leagues that have no column here — "1 OF 4 LEAGUES ·
+ *  Liga MX 6 GP" on a board with no Liga MX in it. A frame that
+ *  describes something the page does not show is the same defect as a
+ *  number that describes a payload the page did not read. Both are
+ *  derived from `columnSlugs`, never from a slug, so the next narrowed
+ *  board is right without an edit here. */
 export default function PickerBoard({ only, pageTitle, backTo }: {
   only?: readonly string[];
   pageTitle?: string;
@@ -216,12 +226,6 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   const rows = board?.rows ?? [];
   const refusals = board?.refusals ?? [];
   const leaguesMap = board?.leagues ?? {};
-  // Cup columns are excluded from the season-basis count on purpose: a
-  // knockout has no season table of its own to be rated on, and folding
-  // it into "N of M leagues" would make that sentence untrue.
-  const leagues = Object.entries(leaguesMap).filter(
-    ([, m]) => m.kind !== "cup");
-  const priorLeagues = leagues.filter(([, m]) => m.src === "prior");
 
   const finished = review?.finished ?? [];
   const finishedRefusals = review?.refusals ?? [];
@@ -297,6 +301,30 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   // own empty state ("no fixtures in this window") is an answer, and a
   // page that rendered nothing at all would read as broken instead.
   const columnSlugs = only ? [...only] : allColumnSlugs;
+  /* THE COLUMN SET, WHEN IT IS NARROWER THAN THE BOARD. On the full
+     board `columnSlugs` already holds every slug the payload serves, so
+     there is nothing for a region above the columns to be narrower
+     than; `only` is the one signal that says otherwise, and it is a SET
+     rather than a slug so the next narrowed board inherits this for
+     free. */
+  const narrowedTo = only ? columnSlugs : null;
+
+  /* THE SEASON BANNER DESCRIBES THIS BOARD'S COLUMNS, NOT THE PAYLOAD'S
+     (2026-09-08). It counted every league in `board.leagues` regardless
+     of which of them got a column, so /bet-suggester/ucl printed
+     "1 OF 4 LEAGUES · Liga MX 6 GP" on a board with no Liga MX column —
+     a caveat about numbers that are nowhere on the page. It is derived
+     from `columnSlugs` now, which is a no-op on the full board (every
+     key of `leagues` is in `allColumnSlugs` by construction) and the
+     whole point on a narrowed one.
+     Cup columns stay excluded from the count for the older reason: a
+     knockout has no season table of its own to be rated on, and folding
+     it into "N of M leagues" would make that sentence untrue. A board
+     narrowed to a cup therefore has NO league column to caveat, and the
+     banner is correctly absent rather than borrowed from elsewhere. */
+  const leagues = Object.entries(leaguesMap).filter(
+    ([slug, m]) => m.kind !== "cup" && columnSlugs.includes(slug));
+  const priorLeagues = leagues.filter(([, m]) => m.src === "prior");
 
   /* WHAT THE PAGE SAYS IT RANKS BY MUST BE WHAT IT RANKS BY.
      The board's framing names the TABLE GAP, and on the four league
@@ -612,7 +640,8 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             render, and it must be given the very row the column below is
             drawing — a second fetch could hand the two surfaces two
             different reads of one fixture. */}
-        <LiveSection rows={rows} leagues={leaguesMap} />
+        <LiveSection rows={rows} leagues={leaguesMap}
+          columns={narrowedTo} />
 
         {/* ---------------------------- the board ---------------------------- */}
         <section className="mt-8">

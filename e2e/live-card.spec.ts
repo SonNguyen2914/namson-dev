@@ -109,6 +109,41 @@ const NO_COMPOSITE =
   "NO COMPOSITE BEFORE M1: the weights have not been fitted, and a "
   + "number made out of these four would be a claim.";
 
+// live_read.BASELINE_IS_JOINED, VERBATIM off the emitter.
+//
+// It rode here as `baseline_is_not_built`, carrying a sentence saying
+// the baseline "is not built", until 2026-09-08. Backend `6a3771d`
+// renamed the key WITH the claim — the join exists now, M1's state-path
+// rate table read at run time — and ../backend/tests/test_live_read.py
+// asserts the old name is ABSENT from the payload. A fixture asserting
+// the opposite of the emitter is the venue-bug shape: green tests
+// certifying a reader that cannot read the real thing.
+const BASELINE_IS_JOINED = "A COMPONENT IS A NUMBER, NOT A FINDING — AND SINCE "
+  + "2026-09-08 IT CARRIES THE COMPARISON THAT LETS IT BECOME "
+  + "ONE. The question that matters is whether a side is doing "
+  + "MORE THAN A TRAILING SIDE NORMALLY DOES at this scoreline "
+  + "and this minute — a trailing side always shoots more, that "
+  + "is what trailing is. M1's state-path rate table answers it: "
+  + "120 cells, lead(-2..2) x favourite x venue x minute bucket, "
+  + "pooled prior 30, published by the 2026-09-07 re-run and READ "
+  + "HERE AT RUN TIME from "
+  + "results.<variant>.m<m>.state_path_rate_table by way of "
+  + "design.state_path_key_order. Nothing is re-fitted, nothing "
+  + "is interpolated, no cell is chosen locally, and a cell the "
+  + "archive refused under its own exposure floor stays refused "
+  + "by that name rather than being filled in from a neighbour. "
+  + "THE GAIN IS BOUNDED AND THE BOUNDS ARE ON THIS SAME PAYLOAD: "
+  + "the table was fitted against corpus Elo plus prior shot form "
+  + "and never against the T-10 price "
+  + "(price_baseline_unmeasured), the favourite coordinate this "
+  + "plane can fix is price-native where M1's was Elo-native, and "
+  + "the read beside the cell is a decaying rate across every "
+  + "state its minutes crossed while the cell is one state's "
+  + "average. 'Four on target in fifteen minutes' is now a "
+  + "measurement of this match beside what the corpus ran in the "
+  + "same cell; it is not yet a finding, and no arithmetic "
+  + "between the two is done here.";
+
 function component(key: string, value: number | null, unit: string,
                    kind: string) {
   const valueKey = `${key}_${kind === "level" ? "percent" : "per_90"}`;
@@ -141,8 +176,7 @@ function side(name: string, mult = 1) {
       conditionable: true,
       read_version: "live-read-components-v1",
       half_life_seconds: 600.0, observed_from_kickoff: true,
-      baseline_is_not_built:
-        "the baseline this read owes a comparison to is not built",
+      baseline_is_joined: BASELINE_IS_JOINED,
     },
     components: {
       shot_read: component("shot_read", 14.2 * mult,
@@ -1007,6 +1041,143 @@ test("a dismissal is a refusal that had to be MADE, and takes the band",
     await expect(band).toContainText("a red card has been seen");
     await expect(liveCard(page, 202)
       .getByTestId("live-cards-absent")).toHaveCount(0);
+  });
+
+test("a dismissal on a fixture with NO HELD POSITION is drawn too — it "
+  + "arrives on the match, not on a holding", async ({ page }) => {
+    // THE BRANCH THAT WAS DEAD FROM THE DAY IT WAS WRITTEN. This card
+    // looked for `dismissal` in `state.refusals`, and api/main.py
+    // hand-classifies that code into WATCHED_STRIP_STATE_CODES_ELSEWHERE
+    // precisely because it does NOT ride on the state block — "it voids
+    // nothing on the state block, which reports what the tape says
+    // rather than conditioning on it". So the only two sites this file
+    // could actually reach were both INSIDE a position, and a red card
+    // on a match nobody holds went undrawn while the file header said
+    // it takes the bordered band.
+    //
+    // It arrives on `model_live`: card.live_informed_read refuses the
+    // blended read under `dismissal` when B3 withdrew a side's lambdas,
+    // and that block is per MATCH. The words below are B3's own,
+    // carried verbatim by the emitter rather than restated.
+    const dismissed = liveMatch({
+      fixture_id: 203,
+      positions: [],                         // nothing is held here
+      model_live: {
+        refusal_code: "dismissal",
+        refused: "dismissal: a dismissal is on this fixture's tape (1 "
+          + "seen), and the blended rates were fitted on eleven-a-side "
+          + "play — they do not describe ten men, so the read is "
+          + "WITHDRAWN rather than solved on the half that survived",
+      },
+    });
+    await open(page, { ...ENVELOPE, matches: [dismissed] });
+    const card = liveCard(page, 203);
+    const band = card.getByTestId("live-dismissal");
+    await expect(band).toHaveAttribute("data-absence", "refused");
+    await expect(band).toContainText("do not describe ten men");
+    // and the routine "no card count on this read" line is NOT what a
+    // witnessed sending-off gets
+    await expect(card.getByTestId("live-cards-absent")).toHaveCount(0);
+  });
+
+// ================================================== THE HAZARD LINE
+//
+// RECORDED OFF entry_map.py's OWN `_composed()` and `_refuse()`, called
+// on a first-goal-timing cell — not written here. The two shapes are
+// the whole point of the test: BOTH are non-null values of `reached`,
+// which is what made a presence check on that key meaningless.
+
+const REACHED_REFUSED = {
+  refusal_code: "thin_cell_floor",
+  refused: "thin_cell_floor: scoreless_fav_decay/clean_11v11/heavy/60 "
+    + "is not a cell in the artifact",
+};
+
+const REACHED_MEASURED = {
+  state: "an opener by either side at or before 60'",
+  p_first_goal_percent: 55.0,
+  p_first_goal_wilson_band_percent: [53.6, 56.4],
+  n: 4992,
+  k: 2746,
+  composed_from: ["1-15", "16-30", "31-45", "46-60"],
+  source_cell: "first_goal_timing/clean_11v11/bands/heavy/bins",
+  partition: "every match in the cell falls in exactly one bin; k sums "
+    + "to n",
+  either_side: "by either side — the partition is by MINUTE, not by "
+    + "scorer",
+  by_side: { refusal_code: "thin_cell_floor",
+    refused: "thin_cell_floor: no grid measures WHICH SIDE scores the "
+      + "opener" },
+};
+
+/** A position whose entry map's FIRST branch refused and whose second
+ *  carries a real rate — the order that produced the false line. */
+function withBranches(branches: Record<string, unknown>) {
+  return liveMatch({
+    fixture_id: 303,
+    positions: [{
+      position: { outcome_key: "home_win", side: "home", size: "100",
+        entry_price: 0.46, entry_cost_dollars: "46.00",
+        entry_note: "sunk" },
+      entry_map: { version: "entry-map-v1", branches },
+    }],
+  });
+}
+
+test("the hazard line reads the MEASURED branch, not the first one with "
+  + "a `reached` key", async ({ page }) => {
+    // EVERY branch in entry_map.py sets `reached` — `_composed()`
+    // returns the composed tail OR a refusal dict, and both are
+    // non-null — so `find(b => b.reached != null)` could only ever
+    // return the first branch. When that one was refused and a later
+    // one carried a rate, the card printed "no measured hazard on this
+    // read": a missing number rendered as a measured absence, which is
+    // the one direction this surface must never fail in.
+    await open(page, { ...ENVELOPE, matches: [withBranches({
+      scoreless_at_60: { state: "still 0-0 at 60'",
+                         reached: REACHED_REFUSED },
+      favourite_opens: { state: "the favourite opens",
+                         reached: REACHED_MEASURED },
+    })] });
+    const card = liveCard(page, 303);
+    const line = card.getByTestId("live-hazard");
+    await expect(line).toBeVisible();
+    // the rate, its band and its denominator, all off the SAME cell
+    await expect(line).toContainText("55.0%");
+    await expect(line).toContainText("[53.6, 56.4]");
+    await expect(line).toContainText("n=4,992");
+    await expect(line).toContainText("an opener by either side");
+    // ...and the false sentence is nowhere on the card
+    await expect(card.getByTestId("live-hazard-absent")).toHaveCount(0);
+  });
+
+test("with every branch refused the line says so IN THE ARTIFACT'S OWN "
+  + "WORDS, and never that nothing was measured", async ({ page }) => {
+    await open(page, { ...ENVELOPE, matches: [withBranches({
+      scoreless_at_60: { state: "still 0-0 at 60'",
+                         reached: REACHED_REFUSED },
+      favourite_opens: { state: "the favourite opens",
+                         reached: { ...REACHED_REFUSED } },
+    })] });
+    const card = liveCard(page, 303);
+    const absent = card.getByTestId("live-hazard-absent");
+    await expect(absent).toBeVisible();
+    // WHY, by the registry name the corpus refused under — a reader
+    // who is told only "no measured hazard" learns nothing about
+    // whether a cell existed
+    await expect(absent).toHaveAttribute("data-code", "refused");
+    await expect(absent).toContainText("thin_cell_floor");
+    await expect(absent).toContainText("is not a cell in the artifact");
+    await expect(card.getByTestId("live-hazard")).toHaveCount(0);
+  });
+
+test("with nothing held the hazard line says THAT, rather than that a "
+  + "measurement came back empty", async ({ page }) => {
+    await open(page, { ...ENVELOPE,
+      matches: [liveMatch({ fixture_id: 304, positions: [] })] });
+    const absent = liveCard(page, 304).getByTestId("live-hazard-absent");
+    await expect(absent).toHaveAttribute("data-code", "nothing-held");
+    await expect(absent).toContainText("nothing is held on this match");
   });
 
 // ============================================== the section's own rules

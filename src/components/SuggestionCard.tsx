@@ -45,12 +45,17 @@
 //
 // Beneath that bar sits live_now.state: the counts the collector SAW
 // (possession, shots, on target, corners, cards, the favourite's share
-// of the threat, an exploratory tilt label). Observation, not model
-// output, and labelled so on screen. Every field of it is optional — a
+// of the threat, and — since backend c3044d1 — one MATCH STATE per side,
+// which replaced the exploratory tilt label that was computed on the
+// favourite alone). Observation, not model output, and labelled so on
+// screen. Every field of it is optional — a
 // stat that is not on the payload renders "—", never 0, and no bar is
 // drawn from a number that is missing. A live_now with no state renders
 // exactly what it rendered before this readout existed.
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  MatchStates, STATE_ABSENT_WORDS, readMatchStates,
+} from "../lib/suggesterApi";
 import { Eyebrow, Reveal } from "./ui";
 
 /* ---------- payload types (mirrors backend src/live/card.py) ---------- */
@@ -200,25 +205,34 @@ type LiveState = {
   // proved only that the frontend agreed with itself. A recorded
   // payload has to be recorded.
   threat?: Threat | null;
-  // An EXPLORATORY split of the state, not a measured pattern — it
-  // renders with its note, never as a settled finding.
+  // THE SIX MATCH STATES, ONE WORD PER SIDE (backend card.live_states).
   //
-  // ALWAYS AN OBJECT from the backend (card.py `_tilt`): `{label, note}`
-  // or `{refused}` — never a bare string, and there is no `tilt_note`
-  // sibling. This file typed it as a string until 2026-08-21 and
-  // rendered it straight into JSX, so React threw #31 ("objects are not
-  // valid as a React child") and the WHOLE CARD blanked to a
-  // client-side exception on EVERY in-play fixture — `_tilt` has no
-  // string-returning branch at all. The canned e2e payloads had been
-  // hand-written in the string shape, so a green suite proved nothing
-  // about the shape the backend actually sends. That is the lesson, not
-  // the typo: a recorded payload has to be recorded.
+  // IT REPLACED `tilt_label` IN BACKEND `c3044d1` AND THIS FILE DID NOT
+  // MOVE WITH IT. `_live_state` has emitted `states` — and no
+  // `tilt_label`, no `tilt_note` — since 2026-09-07, so two things were
+  // true of every in-play card at once: the tilt chip could never draw
+  // (its key is gone from the wire), and `states`, which IS on the
+  // payload, was NAMED ON SCREEN by the unaccounted-key namer below as
+  // a key this surface had no recorded shape for. An amber warning on
+  // every live card, for a block the sibling surface (components/
+  // LiveCard.tsx) had already been drawing correctly for a day.
   //
-  // The bare string stays accepted below only so an older recorded
-  // payload still renders. Nothing emits it.
-  tilt_label?: TiltLabel | "SIEGE" | "STERILE_POSSESSION" | "CONTEST"
-    | null;
-  tilt_note?: string;
+  // The label it replaces was one word for the MATCH, computed on the
+  // favourite, so an opponent holding 85% of the chances printed
+  // "neither side is tilting the chances". `states` is per side and
+  // needs no favourite at all: a share below the cut names the OTHER
+  // side by construction.
+  //
+  // ALWAYS PRESENT AND OFTEN A REFUSAL. A row without possession,
+  // without shot counts, or with both sides reading zero has NO state
+  // and says which input it wanted — MISSING IS NEVER AN EVEN MATCH —
+  // so `home`/`away` are optional and a refusal is the ordinary
+  // early-match shape rather than an error path. The shape and the
+  // reader are lib/suggesterApi's, SHARED with the live card, because
+  // two surfaces reading one payload in their own words is exactly how
+  // this key came to be drawn on one of them and warned about on the
+  // other.
+  states?: MatchStates;
   // THE WINDOWED READ, DECLARED AND NOT DRAWN. Typed opaquely on
   // purpose: this file has no recorded shape for it, and drawing a
   // block against a shape nobody recorded is how a surface certifies a
@@ -239,11 +253,8 @@ type LiveState = {
  *  above, at the level where `window` was found hiding. */
 export const LIVE_STATE_DECLARED_KEYS: readonly string[] = [
   "possession", "shots", "on_target", "corners", "cards", "threat",
-  "tilt_label", "tilt_note", "window", "basis",
+  "states", "window", "basis",
 ];
-
-type TiltLabel = { label?: "SIEGE" | "STERILE_POSSESSION" | "CONTEST";
-  note?: string; refused?: string; unavailable?: string };
 
 // The favourite's SHARE of shots + on-target + corners on this row, so
 // the number belongs to a SIDE and `fav` is printed beside it — a bare
@@ -1855,20 +1866,17 @@ function LiveStateBlock({ st }: { st: LiveState }) {
   const threat = st.threat;
   const threatRefusal = threat ? refusalOf(threat) : null;
   const threatTilt = threat && isNum(threat.tilt) ? threat.tilt : undefined;
-  // the tilt arrives as `{label, note}` or `{refused}`; the label and
-  // the note are pulled OUT of it, and neither the object nor a bare
-  // string ever reaches JSX as a child
-  const tilt = st.tilt_label;
-  const tiltObj = tilt != null && typeof tilt === "object" ? tilt : null;
-  const tiltRefusal = tiltObj ? refusalOf(tiltObj) : null;
-  const tiltLabel = tiltObj
-    ? tiltObj.label : (typeof tilt === "string" ? tilt : undefined);
-  const tiltNote = tiltObj?.note ?? st.tilt_note;
+  // THE STATE PAIR, READ BY THE SHARED READER and never by this file's
+  // own spelling of the payload. Every word, every sub-line and every
+  // refusal is card.live_states'; nothing here has a cut point, a
+  // threshold or any arithmetic, so this card and the live card cannot
+  // draw the line in two places. Read defensively all the same — a type
+  // is a claim about the build, not about the wire.
+  const states = readMatchStates(st.states);
 
   const rows = [
     hasKey(st, "possession"), ...STAT_ROWS.map((r) => hasKey(st, r.key)),
-    cards != null, hasKey(st, "threat"),
-    st.tilt_label != null, st.tilt_note != null,
+    cards != null, hasKey(st, "threat"), hasKey(st, "states"),
   ];
   // nothing on the sub-block = nothing rendered; the live block stays
   // exactly what it was before this readout existed
@@ -2030,36 +2038,61 @@ function LiveStateBlock({ st }: { st: LiveState }) {
         </p>
       )}
 
-      {(st.tilt_label != null || st.tilt_note != null) && (
-        <div data-testid="live-tilt" className="pt-0.5">
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">
-              tilt · exploratory
-            </span>
-            {/* the LABEL only — never the object that carries it. A raw
-                object here is React #31 and a blank card. */}
-            {tiltLabel && (
-              <span data-testid="tilt-chip" title={tiltNote}
-                className="rounded-md border border-line px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-mid">
-                {tiltLabel}
-              </span>
-            )}
-          </div>
-          {/* a refused tilt renders the collector's own sentence, in the
-              same note every other refused block uses — no chip, and no
-              invented label standing in for one that was declined */}
-          {tiltRefusal ? <div className="mt-1">
-            <RefusalNote text={tiltRefusal} />
-          </div> : (
-            /* the note sits WITH the label, not only in a tooltip: a
-               chip whose caveat is hidden reads as a settled split, and
-               this one is not measured */
-            <p className="mt-1 font-mono text-[9px] leading-relaxed text-ink-faint">
-              {tiltNote ?? "no note travelled with this label on the "
-                + "payload — nothing is measured behind it here"}
+      {/* THE MATCH STATE, ONE WORD PER SIDE — the block that replaced
+          the exploratory tilt label (backend c3044d1), drawn here the
+          way components/LiveCard.tsx draws it, off the same reader.
+          BOTH WORDS OR NEITHER: the six states are a PAIR by
+          construction, the same cut read from two ends, so one word
+          beside an empty slot would be a claim the payload never makes.
+          PLAIN INK, NO EXCEPTIONS. Gold is the brand colour and
+          up/warn/neg is the traffic light for verdicts; a state is a
+          DESCRIPTION of the row and borrows neither. */}
+      {states && (
+        (!states.home || !states.away) ? (
+          /* A READ THAT FAILED IS NOT A ROW WITHOUT POSSESSION.
+             `unavailable` is card._layer's fault isolation — the
+             emitter itself broke — and printing the possession sentence
+             over it would state a CAUSE nobody observed. */
+          <div data-testid="live-states"
+            data-state={states.broke ? "unavailable" : "absent"}
+            className="pt-0.5">
+            <p data-testid="live-states-absent"
+              className="font-mono text-[9px] leading-relaxed text-ink-faint">
+              {states.broke || states.refused || STATE_ABSENT_WORDS}
             </p>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div data-testid="live-states"
+            data-home={states.home.word} data-away={states.away.word}
+            className="grid grid-cols-[1fr_auto_1fr] items-start gap-2 pt-0.5">
+            <div>
+              <div data-testid="live-states-home" title={states.home.note}
+                className="font-mono text-[11px] font-semibold leading-tight tracking-[0.08em] text-ink-hi">
+                {states.home.word}
+              </div>
+              {states.home.sub !== "" && (
+                <div className="mt-[3px] font-mono text-[9px] leading-snug tracking-[0.03em] text-ink-faint">
+                  {states.home.sub}
+                </div>
+              )}
+            </div>
+            <span title={states.conventions}
+              className="pt-[2px] font-mono text-[8px] uppercase leading-none tracking-[0.17em] text-ink-faint">
+              state
+            </span>
+            <div className="text-right">
+              <div data-testid="live-states-away" title={states.away.note}
+                className="font-mono text-[11px] font-semibold leading-tight tracking-[0.08em] text-ink-hi">
+                {states.away.word}
+              </div>
+              {states.away.sub !== "" && (
+                <div className="mt-[3px] font-mono text-[9px] leading-snug tracking-[0.03em] text-ink-faint">
+                  {states.away.sub}
+                </div>
+              )}
+            </div>
+          </div>
+        )
       )}
     </div>
   );

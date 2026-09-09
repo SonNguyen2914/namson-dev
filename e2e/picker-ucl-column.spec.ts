@@ -803,3 +803,180 @@ test("the shape popover opens inside the page, not off its left edge",
     // still readable: a panel squeezed to nothing is its own defect
     expect(box.width).toBeGreaterThan(150);
   });
+
+// ------------------- what a NARROWED board is allowed to say ----------
+//
+// `only` names the COLUMN SET, and until 2026-09-08 it narrowed the
+// columns and nothing else — so two regions ABOVE the columns went on
+// describing the whole board:
+//
+//   the live strip   drew every match under way anywhere, under a
+//                    heading that reads as "the matches under way HERE";
+//   the season banner  counted every league in the payload, so this
+//                    board printed "1 OF 4 LEAGUES · Liga MX 6 GP" with
+//                    no Liga MX column anywhere on it.
+//
+// Both are the same defect as a number that describes a payload the page
+// did not read: a frame stating something the page does not show.
+//
+// The strip fixture is the watched-strip route's own match block, cut to
+// the keys the section reads. Two matches, joined to two DIFFERENT
+// columns by `espn_event_id` — which is the only join this page makes
+// and therefore the only thing that can name a live match's column.
+
+const STRIP_ENVELOPE = {
+  version: "watched-strip-v1",
+  generated_at: "2026-12-15T09:20:12Z",
+  monitored_by_source: { manual: [101, 102] },
+  open_positions_not_monitored: [],
+  refusal_codes: {}, policy_codes: {},
+};
+
+const stripCoverage = {
+  monitored: true, complete_history: true,
+  no_history_is_not_quiet:
+    "NO HISTORY IS NOT A QUIET MATCH: a decaying read that starts at "
+    + "zero at minute 63 is arithmetically indistinguishable from a "
+    + "side that had done nothing for an hour.",
+};
+
+function liveOn(fixtureId: number, eventId: string,
+                home: string, away: string) {
+  return {
+    fixture_id: fixtureId, competition_slug: "ucl-2026",
+    home, away, espn_event_id: eventId,
+    state: { in_play: true, minute: 63, score_home: 1, score_away: 0,
+             clock_display: "63'", match_state: "in", refusals: [],
+             captured_at: "2026-12-15T09:20:00Z" },
+    coverage: stripCoverage,
+    read: { version: "live-read-v1", fixture_id: fixtureId,
+            monitored: true, coverage: stripCoverage,
+            components_registry: {}, kinds: {}, sides: {},
+            words: "no component read has been persisted for this "
+              + "fixture" },
+    positions: [],
+  };
+}
+
+/** One match in the Champions League column, one in the EPL column. */
+const TWO_COLUMNS_LIVE = {
+  ...STRIP_ENVELOPE,
+  matches: [
+    liveOn(101, "ucl-clean", "Real Madrid", "Feyenoord"),
+    liveOn(102, "epl-row", "Hull City", "Manchester City"),
+  ],
+};
+
+async function openBoard(page: import("@playwright/test").Page,
+                         route: string, strip: unknown = TWO_COLUMNS_LIVE,
+                         body: unknown = BOARD) {
+  await page.route("**/api/picker/board**", (r) => r.fulfill(json(body)));
+  await page.route("**/api/picker/review**", (r) =>
+    r.fulfill(json(EMPTY_REVIEW)));
+  await page.route("**/api/bet-suggester/watched-strip**", (r) =>
+    r.fulfill(json(strip)));
+  await page.goto(route);
+  await page.getByTestId("live-section").waitFor({ timeout: 15_000 });
+}
+
+/** A live card BY FIXTURE, scoped to the live section — the watched
+ *  strip renders on the same page and stamps `data-fixture` on its own
+ *  rows, so a bare attribute selector resolves to two elements. */
+const liveCard = (page: import("@playwright/test").Page, id: number) =>
+  page.locator(`[data-testid="live-card"][data-fixture="${id}"]`);
+
+test("the FULL board draws both live matches — the control", async ({ page }) => {
+  // Without this the narrowing test below passes against a section that
+  // draws nothing at all, which is a different bug wearing the same
+  // green tick.
+  await openBoard(page, "/bet-suggester");
+  await expect(page.getByTestId("live-card")).toHaveCount(2);
+  await expect(liveCard(page, 101)).toBeVisible();
+  await expect(liveCard(page, 102)).toBeVisible();
+});
+
+test("the narrowed board's live strip draws only ITS OWN column's "
+  + "matches", async ({ page }) => {
+  await openBoard(page, "/bet-suggester/ucl");
+  // the board really is narrowed to one column
+  await expect(page.getByTestId("league-col")).toHaveCount(1);
+  await expect(col(page, "ucl")).toBeVisible();
+  // ...and so is the section above it
+  await expect(liveCard(page, 101)).toBeVisible();
+  await expect(liveCard(page, 102)).toHaveCount(0);
+  await expect(page.getByTestId("live-card")).toHaveCount(1);
+  // DERIVED, NOT SPELLED: every card drawn sits in a column this page
+  // actually draws, and joins a row that column actually holds. A
+  // hand-listed pair of ids would pass on a section that happened to
+  // keep the right one for the wrong reason. `evaluateAll` does NOT
+  // auto-wait, so both reads follow a settled count.
+  const cards = page.getByTestId("live-card");
+  await expect(cards).toHaveCount(1);
+  const drawn = await cards.evaluateAll((els) => els.map((e) => ({
+    column: e.getAttribute("data-column"),
+    event: e.getAttribute("data-event"),
+  })));
+  const columns = await page.getByTestId("league-col")
+    .evaluateAll((els) => els.map((e) => e.getAttribute("data-league")));
+  const columnEvents = await col(page, "ucl").getByTestId("picker-row")
+    .evaluateAll((els) => els.map((e) => e.getAttribute("data-event")));
+  for (const d of drawn) {
+    expect(columns, `a live card sits in column ${d.column}, which is `
+      + `not on this board`).toContain(d.column);
+    expect(columnEvents).toContain(d.event);
+  }
+});
+
+test("a live match this board cannot place is NAMED, not dropped",
+  async ({ page }) => {
+    // The join is the only thing that can name a match's column, so a
+    // match that joined no row has no column this page can state. It is
+    // not drawn — that would claim it belongs here — and it is not
+    // silently dropped either, because the section would then read as
+    // the complete list of what is under way.
+    await openBoard(page, "/bet-suggester/ucl", {
+      ...STRIP_ENVELOPE,
+      matches: [liveOn(101, "ucl-clean", "Real Madrid", "Feyenoord"),
+                liveOn(909, "not-on-this-board", "Someone", "Else")],
+    });
+    await expect(page.getByTestId("live-card")).toHaveCount(1);
+    const said = page.getByTestId("live-unplaceable");
+    await expect(said).toBeVisible();
+    await expect(said).toHaveAttribute("data-count", "1");
+    await expect(said).toContainText("cannot place in a column");
+    // and the FULL board still draws it, which is what the line says
+    await openBoard(page, "/bet-suggester", {
+      ...STRIP_ENVELOPE,
+      matches: [liveOn(101, "ucl-clean", "Real Madrid", "Feyenoord"),
+                liveOn(909, "not-on-this-board", "Someone", "Else")],
+    });
+    await expect(page.getByTestId("live-card")).toHaveCount(2);
+    await expect(page.getByTestId("live-unplaceable")).toHaveCount(0);
+  });
+
+test("the season banner names only leagues that HAVE a column here",
+  async ({ page }) => {
+    // THE SCREENSHOT THAT REPORTED THIS: "1 OF 4 LEAGUES · Liga MX 6 GP"
+    // on a board with no Liga MX column. The banner is a caveat about
+    // the numbers on the page, so a league that is not on the page has
+    // no caveat to make here.
+    await openBoard(page, "/bet-suggester");
+    const banner = page.getByTestId("prior-banner");
+    await expect(banner).toBeVisible();
+    await expect(banner).toContainText("Liga MX 6 GP");
+    await expect(banner).toContainText("1 of 4 leagues");
+    // THE INVARIANT, not the instance: every league the banner names is
+    // drawn as a column on the page it is caveating.
+    const cols = await page.getByTestId("league-col")
+      .evaluateAll((els) => els.map((e) => e.getAttribute("data-league")));
+    expect(cols).toContain("ligamx");
+
+    // ...and on the narrowed board there is no league column to caveat,
+    // so there is no banner — rather than one describing three leagues
+    // and a Liga MX that is nowhere in sight.
+    await openBoard(page, "/bet-suggester/ucl");
+    await expect(page.getByTestId("league-col")).toHaveCount(1);
+    await expect(page.getByTestId("prior-banner")).toHaveCount(0);
+    await expect(page.getByText("Liga MX 6 GP")).toHaveCount(0);
+    await expect(page.getByText(/of 4 leagues/)).toHaveCount(0);
+  });

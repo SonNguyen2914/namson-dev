@@ -3,6 +3,12 @@ import { test, expect } from "@playwright/test";
 const ROUTES = [
   "/", "/bet-suggester", "/bet-suggester/leagues", "/bet-suggester/bots",
   "/bet-suggester/hunter", "/bet-suggester/wc26", "/bet-suggester/friendlies",
+  // ADDED 2026-09-08, and it was missing from the day it shipped. The
+  // Champions League board is the one route that lays a matchday ACROSS
+  // the band — six ~196px tracks, the narrowest card this board has
+  // ever drawn — so it is the route this sweep has the most to say
+  // about, and it was the only board route no geometry test walked.
+  "/bet-suggester/ucl",
 ];
 const WIDTHS = [390, 768, 1100, 1440, 1920];
 
@@ -26,7 +32,7 @@ const WIDTHS = [390, 768, 1100, 1440, 1920];
  * as its own sentence in the failure. */
 test("no route scrolls sideways, hides a sticky header, or cuts text",
   async ({ page }) => {
-  // this sweep walks 7 routes x 5 widths against a live backend; the
+  // this sweep walks 8 routes x 5 widths against a live backend; the
   // default per-test budget is not sized for that
   test.setTimeout(180_000);
   const findings: string[] = [];
@@ -35,7 +41,7 @@ test("no route scrolls sideways, hides a sticky header, or cuts text",
     for (const w of WIDTHS) {
       await page.setViewportSize({ width: w, height: 900 });
       /* A ROUTE THAT WILL NOT LOAD IS NOT A LAYOUT DEFECT, and this
-         sweep must not go red for one. These seven routes are walked
+         sweep must not go red for one. These eight routes are walked
          UNMOCKED — that is the point, it is the real chrome — so they
          reach a live backend, and on 2026-09-08 a slow
          /bet-suggester/friendlies ate the whole test's budget and this

@@ -2007,6 +2007,41 @@ function component(key: string, value: number | null, unit: string,
   };
 }
 
+// live_read.BASELINE_IS_JOINED, VERBATIM off the emitter.
+//
+// It rode here as `baseline_is_not_built`, carrying a sentence saying
+// the baseline "is not built", until 2026-09-08. Backend `6a3771d`
+// renamed the key WITH the claim — the join exists now, M1's state-path
+// rate table read at run time — and ../backend/tests/test_live_read.py
+// asserts the old name is ABSENT from the payload. A fixture asserting
+// the opposite of the emitter is the venue-bug shape: green tests
+// certifying a reader that cannot read the real thing.
+const BASELINE_IS_JOINED = "A COMPONENT IS A NUMBER, NOT A FINDING — AND SINCE "
+  + "2026-09-08 IT CARRIES THE COMPARISON THAT LETS IT BECOME "
+  + "ONE. The question that matters is whether a side is doing "
+  + "MORE THAN A TRAILING SIDE NORMALLY DOES at this scoreline "
+  + "and this minute — a trailing side always shoots more, that "
+  + "is what trailing is. M1's state-path rate table answers it: "
+  + "120 cells, lead(-2..2) x favourite x venue x minute bucket, "
+  + "pooled prior 30, published by the 2026-09-07 re-run and READ "
+  + "HERE AT RUN TIME from "
+  + "results.<variant>.m<m>.state_path_rate_table by way of "
+  + "design.state_path_key_order. Nothing is re-fitted, nothing "
+  + "is interpolated, no cell is chosen locally, and a cell the "
+  + "archive refused under its own exposure floor stays refused "
+  + "by that name rather than being filled in from a neighbour. "
+  + "THE GAIN IS BOUNDED AND THE BOUNDS ARE ON THIS SAME PAYLOAD: "
+  + "the table was fitted against corpus Elo plus prior shot form "
+  + "and never against the T-10 price "
+  + "(price_baseline_unmeasured), the favourite coordinate this "
+  + "plane can fix is price-native where M1's was Elo-native, and "
+  + "the read beside the cell is a decaying rate across every "
+  + "state its minutes crossed while the cell is one state's "
+  + "average. 'Four on target in fifteen minutes' is now a "
+  + "measurement of this match beside what the corpus ran in the "
+  + "same cell; it is not yet a finding, and no arithmetic "
+  + "between the two is done here.";
+
 function side(name: string, over: Record<string, unknown> = {}) {
   return {
     side: name,
@@ -2022,8 +2057,7 @@ function side(name: string, over: Record<string, unknown> = {}) {
       conditionable: true,
       read_version: "live-read-components-v1",
       half_life_seconds: 600.0, observed_from_kickoff: true,
-      baseline_is_not_built:
-        "the baseline this read owes a comparison to is not built",
+      baseline_is_joined: BASELINE_IS_JOINED,
     },
     components: {
       shot_read: component("shot_read", 14.2, "shots per 90 match-minutes", "rate"),
@@ -2200,7 +2234,7 @@ const BEHIND = {
           goal_difference: 0, score_state: "level", conditionable: true,
           read_version: "live-read-components-v1",
           half_life_seconds: 600.0, observed_from_kickoff: false,
-          baseline_is_not_built: "the baseline is not built",
+          baseline_is_joined: BASELINE_IS_JOINED,
         },
         components: {
           shot_read: component("shot_read", 9.4,
@@ -2223,7 +2257,7 @@ const BEHIND = {
           goal_difference: 0, score_state: "level", conditionable: false,
           read_version: "live-read-components-v1",
           half_life_seconds: 600.0, observed_from_kickoff: false,
-          baseline_is_not_built: "the baseline is not built",
+          baseline_is_joined: BASELINE_IS_JOINED,
           refusal_code: "no_minute",
           refusal: "no_minute: no minute was on the tape at this tick, "
             + "so this row cannot be placed in a minute-conditioned cell",

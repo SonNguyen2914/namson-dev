@@ -71,8 +71,8 @@ import {
 import { fmtDate } from "../lib/matchday";
 import { BoardRow, LeagueMeta, leagueLabel } from "../lib/pickerApi";
 import {
-  LiveReadComponentPayload, MatchSideState, MatchStates, WatchedMatch,
-  WatchedPosition, WatchedStripResponse, api,
+  LiveReadComponentPayload, STATE_ABSENT_WORDS, WatchedMatch,
+  WatchedPosition, WatchedStripResponse, api, readMatchStates,
 } from "../lib/suggesterApi";
 import { clubColors } from "../lib/teamColors";
 import { RowRead, hueOf } from "./PickerColumn";
@@ -234,11 +234,17 @@ function Rule({ label, control }: { label: string; control?: React.ReactNode }) 
 /** A ROUTINE ABSENCE — a market that was never listed, a figure this
  *  payload has never carried. The board writes `no kalshi event` in
  *  plain faint ink for exactly this, because it is a normal night. */
-function Quiet({ children, testid }: {
+function Quiet({ children, testid, code }: {
   children: React.ReactNode; testid?: string;
+  /** WHICH absence this is, when one slot can hold more than one. A
+   *  line that says nothing was measured and a line that says the
+   *  corpus REFUSED to quote a cell are different findings wearing the
+   *  same faint ink, and a reader — or a test — must be able to tell
+   *  them apart without parsing the sentence. */
+  code?: string;
 }) {
   return (
-    <p data-testid={testid} data-absence="routine"
+    <p data-testid={testid} data-absence="routine" data-code={code}
       className="mt-1 font-mono text-[10.5px] leading-snug text-ink-faint">
       {children}
     </p>
@@ -443,11 +449,37 @@ const STAT_ROWS: { key: string; label: string }[] = [
 
 /** Has a DISMISSAL been witnessed on this match? Found by the registry
  *  code, at every site that can carry it — never by reading a count,
- *  because no count of red cards is on this payload at all. */
+ *  because no count of red cards is on this payload at all.
+ *
+ *  AND `state.refusals` IS NOT ONE OF THOSE SITES. This function looked
+ *  there first until 2026-09-08 and the branch was dead from the day it
+ *  was written: `dismissal` is in api/main.py's
+ *  WATCHED_STRIP_STATE_CODES_ELSEWHERE, hand-classified OFF the state
+ *  block on purpose — "it voids nothing on the state block, which
+ *  reports what the tape says rather than conditioning on it. It rides
+ *  on every block it voids." So the state block can never carry it, and
+ *  a dismissal on a fixture with NO HELD POSITION was drawn nowhere
+ *  while this file's header claimed it takes the bordered band.
+ *
+ *  WHERE IT ACTUALLY ARRIVES, in the order the payload nests them:
+ *
+ *    match.model_live         card.live_informed_read refuses the whole
+ *                             blended read under `dismissal` when B3
+ *                             withdrew a side's lambdas — "lambdas
+ *                             fitted on eleven-a-side play do not
+ *                             describe ten men". THIS IS THE ONE THAT
+ *                             NEEDS NO POSITION, which is exactly the
+ *                             case that was going undrawn.
+ *    position.red_card_void   position.evaluate()'s own fold.
+ *    position.entry_map.red_card
+ *                             the minute-0 map's, over the whole tape. */
 function dismissal(m: WatchedMatch): string | null {
-  const st = (m.state?.refusals ?? [])
-    .find((r) => r?.code === "dismissal");
-  if (st) return st.refused;
+  const ml = (m as unknown as Record<string, unknown>).model_live;
+  if (ml && typeof ml === "object") {
+    const o = ml as { refusal_code?: unknown; refused?: unknown };
+    if (o.refusal_code === "dismissal" && typeof o.refused === "string"
+        && o.refused.trim() !== "") return o.refused;
+  }
   for (const p of m.positions ?? []) {
     const rv = p.red_card_void as { refused?: string } | undefined;
     if (rv?.refused) return rv.refused;
@@ -525,37 +557,14 @@ function StatsBlock({ m, hc, ac }: {
 // same — a type is a claim about the build, not about the wire.
 // ---------------------------------------------------------------------
 
-const STATE_ABSENT =
-  "no state — the row carries no possession, and a side with two of "
-  + "the three inputs has none. Missing is never an even match.";
-
+// THE READER IS SHARED, and it is shared for the reason this block
+// exists at all: `states` replaced `tilt_label` (backend c3044d1) and
+// only ONE of the two surfaces drawing it moved, so the other spent its
+// life naming `states` on screen as a key it had no shape for while its
+// chip could never draw. lib/suggesterApi.readMatchStates is now the one
+// place either surface may learn what this payload says.
 function statesOf(m: WatchedMatch) {
-  const raw = (m as unknown as Record<string, unknown>).states;
-  if (!raw || typeof raw !== "object") return null;
-  const o = raw as MatchStates;
-  const side = (s: MatchSideState | undefined) =>
-    (s && typeof s.state === "string" && s.state.trim() !== ""
-      ? { word: s.state,
-          sub: typeof s.cell_words === "string" ? s.cell_words : "",
-          note: typeof s.note === "string" ? s.note : undefined }
-      : null);
-  const home = side(o.home), away = side(o.away);
-  // BOTH OR NEITHER. The six states are a PAIR by construction — the
-  // same cut read from two ends — so one word beside an empty slot
-  // would be a claim the payload never makes.
-  if (home && away) {
-    return { home, away, conventions: o.conventions, broke: "" };
-  }
-  // A READ THAT FAILED IS NOT A ROW WITHOUT POSSESSION. `unavailable`
-  // is card._layer's fault isolation — the emitter itself broke — and
-  // rendering the possession sentence over it would state a CAUSE
-  // nobody observed. "We could not look" and "there is nothing there"
-  // are different claims, and this surface has been burnt by folding
-  // them once already (the fail-closed `in_play: false`).
-  return {
-    broke: typeof o.unavailable === "string" ? o.unavailable : "",
-    refused: typeof o.refused === "string" ? o.refused : "",
-  };
+  return readMatchStates((m as unknown as Record<string, unknown>).states);
 }
 
 function StateRow({ m }: { m: WatchedMatch }) {
@@ -569,7 +578,7 @@ function StateRow({ m }: { m: WatchedMatch }) {
         <p data-testid="live-state-absent" data-absence="routine"
           title={got.broke || got.refused || undefined}
           className="font-mono text-[10px] leading-relaxed text-ink-low">
-          {got.broke || STATE_ABSENT}
+          {got.broke || STATE_ABSENT_WORDS}
         </p>
       </div>
     );
@@ -803,14 +812,42 @@ function ModelVMarket({ m, hc, ac }: {
  *  line says when it was measured. There is no live, currently
  *  conditioned hazard on this payload and none is invented. */
 function HazardLine({ p }: { p: WatchedPosition | undefined }) {
-  const branch = p?.entry_map?.branches
-    ? Object.values(p.entry_map.branches).find((b) => b?.reached != null)
-    : undefined;
-  const r = branch?.reached;
-  if (!r || r.p_first_goal_percent == null) {
+  const all = p?.entry_map?.branches
+    ? Object.values(p.entry_map.branches) : [];
+  const reached = all.map((b) => b?.reached);
+  // MEASURED, NOT MERELY PRESENT (2026-09-08). EVERY branch in
+  // entry_map.py sets `reached` — `_composed()` returns either the
+  // composed tail or a `_refuse()` DICT, and both are non-null — so
+  // `find(b => b.reached != null)` could only ever return the FIRST
+  // branch. A card whose first branch was refused under
+  // `thin_cell_floor` while a later one carried a real rate printed
+  // "no measured hazard on this read", which is false, and false in the
+  // one direction this card must never fail in: a missing number read
+  // as a measured absence.
+  const r = reached.find(
+    (x): x is NonNullable<typeof x> & { p_first_goal_percent: number } =>
+      x != null && typeof x.p_first_goal_percent === "number"
+      && Number.isFinite(x.p_first_goal_percent));
+  if (!r) {
+    // NOTHING MEASURED IS NOT ONE FACT. The corpus refusing to quote a
+    // cell says so BY NAME and those words are the finding; a position
+    // with no map, and no position at all, are two further different
+    // absences. Each says which it is rather than sharing one sentence.
+    const refused = reached.find(
+      (x) => typeof x?.refused === "string" && x.refused.trim() !== "");
     return (
-      <Quiet testid="live-hazard-absent">
-        no measured hazard on this read
+      <Quiet testid="live-hazard-absent"
+        code={refused ? "refused" : all.length > 0 ? "unmeasured"
+          : p ? "no-map" : "nothing-held"}>
+        {refused?.refused
+          ?? (all.length > 0
+            ? "the entry map carries branches and not one of them says "
+              + "what it measured or why it could not"
+            : p
+              ? "no entry map was drawn for this position, so nothing "
+                + "was measured at purchase"
+              : "nothing is held on this match, so no entry map was "
+                + "drawn and no hazard was measured at purchase")}
       </Quiet>
     );
   }
@@ -1033,6 +1070,13 @@ export function LiveCard({ m, generatedAt, row, clubCount }: {
   return (
     <article data-testid="live-card"
       data-fixture={m.fixture_id}
+      /* WHICH COLUMN THIS CARD WAS PLACED IN, off the board row it
+         joined — empty when the join found none, which is "this page
+         cannot say" and not a column. It is the same value the hue is
+         taken from, so a card cannot be coloured as one column's and
+         attributed to another's. */
+      data-column={slug}
+      data-event={row?.event_id ?? ""}
       data-tape={tapeVerdictOf(m)}
       data-flipped={flipped ? "true" : "false"}
       style={{ ["--lg" as string]: hueOf(slug) }}
@@ -1199,9 +1243,33 @@ function byKickoff(rows: Map<string, BoardRow>) {
   };
 }
 
-export default function LiveSection({ rows, leagues }: {
+/** WHICH COLUMN A LIVE MATCH BELONGS TO, by the ONE join this section
+ *  already makes: the board row on `espn_event_id`, and that row's own
+ *  `column ?? league`. `null` where the join found no row — which is
+ *  "this page cannot say", never "it is not this column's". */
+export function columnOf(m: WatchedMatch,
+                         rows: Map<string, BoardRow>): string | null {
+  const r = m.espn_event_id ? rows.get(m.espn_event_id) : undefined;
+  return r ? (r.column ?? r.league) : null;
+}
+
+export default function LiveSection({ rows, leagues, columns }: {
   rows: BoardRow[];
   leagues: Record<string, LeagueMeta>;
+  /** THE COLUMN SET THIS BOARD IS NARROWED TO, or undefined on the full
+   *  board where there is nothing to be narrower than.
+   *
+   *  `/bet-suggester/ucl` renders the same component with the column set
+   *  cut to one, and until 2026-09-08 `only` narrowed the COLUMNS and
+   *  nothing else — so this section, sitting above them, went on drawing
+   *  every live match anywhere. A Liga MX match under way appeared on a
+   *  board with no Liga MX column, under a heading that reads as "the
+   *  matches under way HERE".
+   *
+   *  IT IS THE COLUMN SET AND NOT A SLUG. Nothing here knows what `ucl`
+   *  is; the next narrowed board is correct without an edit to this
+   *  file. */
+  columns?: readonly string[] | null;
 }) {
   const token = useWatchToken();
   const [data, setData] = useState<WatchedStripResponse | null>(null);
@@ -1247,13 +1315,31 @@ export default function LiveSection({ rows, leagues }: {
     return m;
   }, [rows]);
 
-  const live = useMemo(() => {
-    const all = Array.isArray(data?.matches) ? data!.matches : [];
-    return all.filter(isLiveish).sort(byKickoff(byEvent));
+  const all = useMemo(() => {
+    const got = Array.isArray(data?.matches) ? data!.matches : [];
+    return got.filter(isLiveish).sort(byKickoff(byEvent));
   }, [data, byEvent]);
 
-  // NOTHING HAS BEEN READ YET is not a statement about the slate.
-  if (!asked || live.length === 0) return null;
+  // NARROWED WITH THE BOARD, AND THE ONES IT CANNOT PLACE ARE COUNTED.
+  // A match is this board's when the board row it joined sits in one of
+  // these columns. A match that joined NO row has no column this page
+  // can name — so it is neither drawn (which would claim it belongs
+  // here) nor silently dropped (which would make the section read as a
+  // complete list when it is not). It is said, below, by count.
+  const { live, unplaceable } = useMemo(() => {
+    if (!columns) return { live: all, unplaceable: 0 };
+    const want = new Set(columns);
+    const mine = all.filter(
+      (m) => { const c = columnOf(m, byEvent); return c != null && want.has(c); });
+    const lost = all.filter((m) => columnOf(m, byEvent) == null).length;
+    return { live: mine, unplaceable: lost };
+  }, [all, columns, byEvent]);
+
+  // NOTHING HAS BEEN READ YET is not a statement about the slate. And a
+  // narrowed board with nothing of its own live draws no frame — but it
+  // must not swallow a match it could not place, so that one case keeps
+  // the section open to say so.
+  if (!asked || (live.length === 0 && unplaceable === 0)) return null;
 
   const pages = Math.max(1, Math.ceil(live.length / LIVE_PAGE_SIZE));
   const at = Math.min(page, pages - 1);
@@ -1271,6 +1357,23 @@ export default function LiveSection({ rows, leagues }: {
           nothing here is ranked · page order is kickoff
         </p>
       </div>
+      {/* A MATCH THIS BOARD COULD NOT PLACE IS SAID, NOT DROPPED. On a
+          narrowed board the column comes off the board row a match
+          joined; a match that joined none has no column this page can
+          name, and dropping it would leave a section that reads as the
+          complete list of what is under way. Named by count, with the
+          route that does show it. */}
+      {unplaceable > 0 && (
+        <p data-testid="live-unplaceable" data-count={unplaceable}
+          className="mb-3 rounded-md border border-warn/40 bg-warn/5 px-2.5 py-1.5 font-mono text-[10px] leading-relaxed text-warn">
+          {unplaceable} match{unplaceable === 1 ? " is" : "es are"} under
+          way that this board cannot place in a column — {unplaceable === 1
+            ? "it joined" : "they joined"} no row on this board, so
+          whether {unplaceable === 1 ? "it belongs" : "they belong"} here
+          is unknown rather than answered. The full board at
+          /bet-suggester draws every declared match.
+        </p>
+      )}
       {pages > 1 && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 font-mono text-[10.5px] text-ink-faint">
           <span data-testid="live-range">
