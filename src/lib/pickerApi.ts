@@ -319,6 +319,16 @@ export const LEAGUE_LABEL: Record<string, string> = {
   // name rather than rated on a guess.
   superlig: "Süper Lig",
   eliteserien: "Eliteserien",
+  // The four ESPN carries no league for at all, added 2026-09-09 from
+  // API-Football so the last Champions League entrants could be rated.
+  // They shipped WITHOUT these entries and the column's "rated on" chip
+  // printed raw slugs at the operator — "CZECHLIGA + UKRPREMIER +
+  // SLOVAKSUPERLIGA + AZERPREMYER". Names taken from the backend
+  // registry's own `display`, not invented here.
+  czechliga: "Czech Liga",
+  ukrpremier: "Ukrainian Premier League",
+  slovaksuperliga: "Slovak Super Liga",
+  azerpremyer: "Premyer Liqa",
   ucl: "Champions League",
 };
 
