@@ -7,6 +7,53 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { ReactNode, useEffect, useState } from "react";
 
+/** THE FIELD, FROM THE TOP-LEFT OF EVERY PAGE THAT CARRIES THE NAV.
+ *
+ *  "create a stat page on the web, put in on the left upper side of the
+ *   web for me to check rankings and tier rankings anytime i need"
+ *                                            (operator, 2026-09-09)
+ *
+ *  "ANYTIME I NEED" IS WHY IT LIVES IN THE BAR ITSELF rather than in
+ *  each page's `left` slot. Eleven surfaces render `TopBar` and only
+ *  five pass `left` at all; a link handed in per page would be on those
+ *  five and missing from the match pages, the market page and the 404 —
+ *  and the one it would be missing from first is whichever page ships
+ *  next. It is one piece of chrome, in one place, on every page by
+ *  construction.
+ *
+ *  IT SITS BESIDE THE ARCHIVE, NOT INSTEAD OF IT. The standing rule for
+ *  this corner is that it holds wayfinding OUT (`back`) or wayfinding
+ *  DOWN (the archive dropdown), never both — and this is neither: it is
+ *  a FIXED DESTINATION, the same one from everywhere, which is exactly
+ *  the property that earns it 30px in the corner. It is also the
+ *  narrowest thing in the bar (a glyph, with its three letters hidden
+ *  below sm) so it cannot squeeze the chip rail on a phone.
+ *
+ *  IT NAMES A PAGE AND NOTHING ELSE. No count, no state, no glow —
+ *  nothing about it changes with the data, so it can never become a
+ *  signal about what is worth looking at. */
+function FieldLink() {
+  const router = useRouter();
+  const here = router.pathname === "/bet-suggester/ratings";
+  return (
+    <Link href="/bet-suggester/ratings" data-testid="field-link"
+      aria-label="the field — rankings and tier rankings"
+      aria-current={here ? "page" : undefined}
+      className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] transition-colors sm:px-2 ${
+        here
+          ? "border-accent/50 bg-accent/10 text-accent"
+          : "border-line text-ink-low hover:border-line-strong hover:text-ink-hi"}`}>
+      {/* three ascending bars — a ranked field, at 9px */}
+      <svg aria-hidden viewBox="0 0 9 9" className="h-[9px] w-[9px]">
+        <rect x="0" y="5.5" width="2" height="3.5" fill="currentColor" />
+        <rect x="3.5" y="3" width="2" height="6" fill="currentColor" />
+        <rect x="7" y="0.5" width="2" height="8.5" fill="currentColor" />
+      </svg>
+      <span className="hidden sm:inline">field</span>
+    </Link>
+  );
+}
+
 export function TopBar({ back, left, title, children }: {
   back?: { href: string; label: string };
   // Far-left slot, ahead of the back link. The archive dropdown lives
@@ -19,7 +66,8 @@ export function TopBar({ back, left, title, children }: {
 }) {
   return (
     <header className="topbar">
-      <div className="mx-auto flex h-12 max-w-5xl items-center gap-4 px-5">
+      <div className="mx-auto flex h-12 max-w-5xl items-center gap-2 px-5 sm:gap-4">
+        <FieldLink />
         {left}
         {back && (
           <Link href={back.href} aria-label={back.label}

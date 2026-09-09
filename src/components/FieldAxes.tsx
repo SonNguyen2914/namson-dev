@@ -20,47 +20,16 @@
 // NOTHING HERE IS A RECOMMENDATION. The ordering says where to look.
 
 import { useState } from "react";
+import { AXIS_ORDER, Axis, Ratings } from "../lib/fieldApi";
 
-export interface AxisRow {
-  rank: number;
-  club: string;
-  league: string | null;
-  value: number;
-  half_width_95: number;
-  interval: [number, number];
-  tier: number;
-  tier_set: number[];
-  straddles: boolean;
-  below_floor: boolean;
-  rate: number | null;
-  floor_note: string | null;
-}
+/* THE SHAPE OF A FIELD IS NOT THIS COMPONENT'S PROPERTY. It moved to
+   lib/fieldApi.ts on 2026-09-09, when a board card began reading the
+   same payload: two surfaces sharing one shape must not have one of them
+   importing it from the other's renderer. Re-exported so every existing
+   importer keeps working unchanged. */
+export type { Axis, AxisRow, Ratings } from "../lib/fieldApi";
 
-export interface Axis {
-  axis: string;
-  label: string;
-  bands: number;
-  distinguishable_levels: number;
-  unit: string;
-  why_this_many_bands: string;
-  cuts: number[];
-  span: [number, number];
-  rows: AxisRow[];
-  straddling: number;
-  placed: number;
-}
-
-export interface Ratings {
-  competition: string;
-  passes: string;
-  axes: Record<string, Axis> | null;
-  below_floor_clubs?: string[];
-  below_floor_note?: string;
-  axes_disagree_note?: string;
-  why_not?: string;
-}
-
-const ORDER = ["ovr", "atk", "def"];
+const ORDER: readonly string[] = AXIS_ORDER;
 
 const LEAGUE_LABEL: Record<string, string> = {
   epl: "Premier League", "la-liga": "La Liga", bundesliga: "Bundesliga",

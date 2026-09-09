@@ -322,6 +322,53 @@ export interface Board {
   leagues: Record<string, LeagueMeta>;
   rows: BoardRow[];
   refusals: BoardRefusal[];
+  /** THE ANSWER TO A QUESTION, NOT A DECLARATION.
+   *
+   *  Present exactly when the caller named competitions with `?leagues=`
+   *  (backend fc9bc55, 2026-09-09); it lists what was ASKED FOR. Absent
+   *  on the declared board, and that absence is the sentence "this is
+   *  what the board declares".
+   *
+   *  Nothing may read a payload carrying this as the board's column set
+   *  — see `declarationOf`, which is the one place that decision is
+   *  made. */
+  narrowed_to?: string[] | null;
+}
+
+/** THE BOARD'S DECLARATION, OR THE ADMISSION THAT THIS PAYLOAD IS NOT IT.
+ *
+ *  `Object.keys(board.leagues)` is the operator's `BOARD_COLUMNS` — but
+ *  ONLY on a payload nobody narrowed. Ask for the Champions League by
+ *  name and the very same key set comes back holding `ucl`, and reading
+ *  that as the declaration is how a competition climbs back onto the
+ *  landing page. It is exactly the confusion that took the board from
+ *  six columns to eleven in production, and that walked a FINISHED
+ *  Leagues Cup back on after it had been removed.
+ *
+ *  So a narrowed payload answers `null` — NOT an empty array, which
+ *  would read as "the board declares nothing" and is a different claim.
+ *  `null` is "this payload was never asked that question".
+ *
+ *  ONE DOOR, and it is this function: `boardColumns` is fed from here,
+ *  and a narrowed payload can therefore never reach it. */
+export function declarationOf(board: Board): string[] | null {
+  return board.narrowed_to == null ? Object.keys(board.leagues) : null;
+}
+
+/** DID THE BOARD ANSWER THE QUESTION WE ASKED IT?
+ *
+ *  True only when `narrowed_to` covers every slug asked for. A server
+ *  that does not know the parameter — a deploy behind the frontend, a
+ *  proxy that drops the query — answers 200 with its DECLARED board,
+ *  which carries rows for other competitions and none for this one.
+ *  Drawing that as "this competition has no fixtures" is the same
+ *  failed-read-rendered-as-zero the whole surface is built against, so
+ *  the ask is VERIFIED rather than assumed. */
+export function askHonoured(
+  board: Board, asked: readonly string[],
+): boolean {
+  const got = board.narrowed_to;
+  return Array.isArray(got) && asked.every((s) => got.includes(s));
 }
 
 /** Display names for the four league slugs the picker covers. An unknown
@@ -550,10 +597,27 @@ export const weightIsCurrent = (w: number | null | undefined) =>
 export const WIDE_SPREAD_C = 3;    // spread > 3c
 export const THIN_ASK_SIZE = 100;  // ask size < 100
 
-export async function fetchBoard(days: number, signal?: AbortSignal): Promise<Board> {
+/** THE BOARD, OPTIONALLY ASKED FOR COMPETITIONS BY NAME.
+ *
+ *  `leagues` is the ASK and it is optional in the strongest sense: when
+ *  it is absent the request URL is the string it has always been, so the
+ *  landing page's read is byte-identical to before and shares the
+ *  backend's untouched 90s cache slot. The parameter is sent ONLY by a
+ *  narrowed route, and `askHonoured` checks the answer came back
+ *  narrowed — asking is not the same as being answered.
+ *
+ *  ASKING IS NOT DECLARING. Naming `ucl` here does not put the Champions
+ *  League on the landing page and cannot: the landing page never passes
+ *  this argument, and `declarationOf` refuses to read a narrowed payload
+ *  as a column set even if it did. */
+export async function fetchBoard(
+  days: number, signal?: AbortSignal, leagues?: readonly string[],
+): Promise<Board> {
+  const ask = leagues && leagues.length > 0
+    ? `&leagues=${encodeURIComponent(leagues.join(","))}` : "";
   let r: Response;
   try {
-    r = await fetch(`/api/picker/board?days=${days}`, { signal });
+    r = await fetch(`/api/picker/board?days=${days}${ask}`, { signal });
   } catch (e) {
     // An abort is the caller's own cancellation — rethrow it untouched so
     // the caller's signal guard can screen it. Anything else is the

@@ -53,12 +53,14 @@
 //     the deployment, not a coincidence, and it belongs at the top of the
 //     page rather than being inferred card by card.
 import Head from "next/head";
+import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
+import { FieldRead, fetchRatings } from "../../lib/fieldApi";
 import { TZ, dayLabel, localDay } from "../../lib/matchday";
 import {
   Board, CUP_COMP_KEY, SEASON_BLEND_K, THIN_ASK_SIZE, WIDE_SPREAD_C,
-  boardColumns, fetchBoard, leagueLabel,
+  askHonoured, boardColumns, declarationOf, fetchBoard, leagueLabel,
 } from "../../lib/pickerApi";
 import {
   DEFAULT_BACK, REVIEW_WINDOWS, Review, fetchReview,
@@ -133,6 +135,11 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   // window. A dead review must not blank the board, and a slow one must
   // not hold the board's first paint.
   const [back, setBack] = useState(DEFAULT_BACK);
+  /* And so does the cross-league field, per column that has one. Keyed
+     by COLUMN SLUG rather than held as one object, because a board can
+     draw two cups at once and each has its own field, its own request
+     and its own way of failing. */
+  const [fields, setFields] = useState<Record<string, FieldRead>>({});
   // SORT LIVES ON THE MATCHDAY (2026-09-01, draft C shipped): one board
   // default, remembered on this device, plus per-day overrides that are
   // session-only — a remembered "Saturday" override would silently
@@ -174,10 +181,30 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, deepLink]);
 
+  /* A NARROWED ROUTE ASKS FOR ITS COLUMNS BY NAME (backend fc9bc55,
+     2026-09-09). `/bet-suggester/ucl` used to render whatever the
+     DECLARED board happened to hold and filter it down to one slug —
+     which worked exactly as long as the Champions League WAS a declared
+     column, and drew an empty page the day it stopped being one.
+     `?leagues=ucl` is the door the backend opened for precisely that:
+     `OFF_BOARD_BY_DECISION` says of each competition it holds that the
+     spec stays and the board still builds it "for anyone who asks for
+     it by name".
+
+     THE LANDING PAGE PASSES NOTHING HERE, and that is what keeps the
+     Champions League off it: `only` is undefined on `/bet-suggester`,
+     so the request URL, the backend's cache key and the payload are all
+     the strings they have always been, and the answer carries no
+     `narrowed_to` to be mistaken for a declaration.
+
+     Joined to a stable string so the callback's identity — and with it
+     the fetch — does not change on every render. */
+  const ask = only ? [...only].join(",") : "";
   const load = useCallback(async (signal: AbortSignal) => {
     setLoading(true);
     try {
-      const b = await fetchBoard(days, signal);
+      const b = await fetchBoard(days, signal,
+                                 ask === "" ? undefined : ask.split(","));
       if (signal.aborted) return;
       setBoard(b);
       setError("");
@@ -188,7 +215,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
     } finally {
       if (!signal.aborted) setLoading(false);
     }
-  }, [days]);
+  }, [days, ask]);
 
   useEffect(() => {
     if (deepLink !== null) return;        // redirecting; do not fetch
@@ -224,6 +251,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
     const t = setTimeout(() => { void loadReview(ac.signal); }, 0);
     return () => { clearTimeout(t); ac.abort(); };
   }, [loadReview, nonce, deepLink]);
+
 
   const rows = board?.rows ?? [];
   const refusals = board?.refusals ?? [];
@@ -314,22 +342,35 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      with the declaration inside `boardColumns`, so a slug it names and
      the board does not is simply not drawn. It orders; it never
      admits. */
-  const declaredColumns = board ? Object.keys(leaguesMap) : [];
+  /* AND A NARROWED PAYLOAD IS NOT A DECLARATION AT ALL. `declarationOf`
+     returns null for one, which is neither "these are the columns" nor
+     "there are no columns" — it is "this payload was never asked". Since
+     2026-09-09 the two are trivially confusable: ask the board for the
+     Champions League by name and `leagues` comes back holding exactly
+     the slug you asked about, in the same shape the declaration has. */
+  const declaration = board ? declarationOf(board) : null;
+  const declaredColumns = declaration ?? [];
   /* NARROWED, NOT FILTERED DOWNSTREAM. A single-column route keeps the
      column it names even when the payload declares nothing for it —
-     rendering nothing at all would read as broken, and `undeclared`
-     below says what actually happened instead of letting the column's
-     own empty state claim a fixture count nobody measured. */
+     rendering nothing at all would read as broken, and the blocks below
+     say what actually happened instead of letting the column's own empty
+     state claim a fixture count nobody measured. */
   const columnSlugs = only ? [...only] : boardColumns(declaredColumns);
-  /* A NARROWED BOARD ASKING FOR A COLUMN THE BOARD NO LONGER DECLARES.
-     Not hypothetical: /bet-suggester/ucl is this page with
-     `only={["ucl"]}`, and the Champions League left `BOARD_COLUMNS` on
-     2026-09-09. Named here so the page can SAY the board carries no
-     column for it — "0 fixtures" over a competition playing eighteen
-     matches this week is the reading this tree exists to refuse.
+  /* DID THE BOARD ANSWER THE QUESTION THIS ROUTE ASKED IT? null while
+     nothing has landed — an unanswered ask and an unmade one are not the
+     same fact, and only a payload can tell them apart. */
+  const answered = board && only ? askHonoured(board, only) : null;
+  /* A NARROWED BOARD WHOSE ASK WENT UNANSWERED, over a competition the
+     board does not declare. Not hypothetical twice over: the Champions
+     League left `BOARD_COLUMNS` on 2026-09-09, and a backend deployed
+     before fc9bc55 ignores `?leagues=` and answers with its DECLARED
+     board — four columns of other people's fixtures and none of these.
+     Named here so the page can SAY the board served no ranking for it:
+     "0 fixtures" over a competition playing eighteen matches this week
+     is the reading this tree exists to refuse.
      Empty while the board is still loading or after it failed: nothing
      is undeclared by a payload that never landed. */
-  const undeclared = board && only
+  const undeclared = board && only && answered === false
     ? only.filter((s) => !declaredColumns.includes(s))
     : [];
   /* THE COLUMN SET, WHEN IT IS NARROWER THAN THE BOARD. On the full
@@ -339,6 +380,64 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      rather than a slug so the next narrowed board inherits this for
      free. */
   const narrowedTo = only ? columnSlugs : null;
+
+  /* ── THE CROSS-LEAGUE FIELD, PER COLUMN THAT HAS ONE ────────────────
+
+     WHICH COLUMNS HAVE ONE, and why it is not a hard-coded "ucl". The
+     field exists to rate the entrants of a competition whose clubs come
+     from tables that cannot be compared to each other — so it is asked
+     of the columns the board itself calls a CUP, and only of those with
+     a page to ask (`CUP_COMP_KEY`). A league column needs none: its own
+     table already rates every club in it on one scale, which is the
+     whole premise of the four columns.
+
+     A 404 IS AN ANSWER, and it is the right one for a cup nobody has
+     measured a field for. It lands in `error`, the column header names
+     it, and no card draws a field block — which is a different outcome
+     from a card silently omitting one.
+
+     ON ITS OWN STATE AND ITS OWN REQUEST, like the finished tail beside
+     it: a dead field must not blank the board, and a slow one must not
+     hold the board's first paint. */
+  const fieldSlugs = columnSlugs
+    .filter((s) => leaguesMap[s]?.kind === "cup" && CUP_COMP_KEY[s]);
+  const fieldKey = fieldSlugs.join(",");
+  useEffect(() => {
+    if (deepLink !== null || fieldKey === "") return;
+    const ac = new AbortController();
+    const slugs = fieldKey.split(",");
+    /* async, not called sync in the effect body, so every setState
+       inside lands in a callback rather than cascading a render — the
+       same idiom the board's own load already uses two effects up. */
+    const t = setTimeout(() => {
+      setFields((prev) => {
+        const next = { ...prev };
+        for (const s of slugs) {
+          if (!next[s]) next[s] = { data: null, error: null, loading: true };
+        }
+        return next;
+      });
+      for (const slug of slugs) {
+        void fetchRatings(CUP_COMP_KEY[slug], ac.signal)
+          .then((d) => {
+            if (ac.signal.aborted) return;
+            setFields((p) => ({ ...p, [slug]: { data: d, error: null,
+                                                loading: false } }));
+          })
+          .catch((e) => {
+            if (ac.signal.aborted) return;
+            /* NAMED, NEVER SWALLOWED. The one thing this must not do is
+               set `data: null, error: null`, which is the shape of "not
+               measured" and would draw the same nothing as a competition
+               that genuinely has no field. */
+            setFields((p) => ({ ...p, [slug]: {
+              data: null, loading: false,
+              error: e instanceof Error ? e.message : String(e) } }));
+          });
+      }
+    }, 0);
+    return () => { clearTimeout(t); ac.abort(); };
+  }, [fieldKey, nonce, deepLink]);
 
   /* THE SEASON BANNER DESCRIBES THIS BOARD'S COLUMNS, NOT THE PAYLOAD'S
      (2026-09-08). It counted every league in `board.leagues` regardless
@@ -756,6 +855,37 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   It names the competition's own page rather than
                   leaving the reader at a dead end: leaving the board is
                   not leaving the site. */}
+              {/* THE FULL BOARD, HANDED A PAYLOAD THAT IS NOT A
+                  DECLARATION. `declarationOf` returns null for a
+                  narrowed payload, and this page then draws NO columns
+                  — the safe direction, because the unsafe one is
+                  reading an answer to somebody's question as the
+                  operator's column set, which is how the board went
+                  from six columns to eleven in production.
+                  Unreachable through the UI: this route passes no
+                  `only` and therefore asks for nothing. But a blank
+                  where four columns belong is exactly the shape this
+                  surface refuses to leave unexplained, so the state is
+                  NAMED rather than silently empty — if a proxy, a cache
+                  or a future caller ever puts a narrowed payload here,
+                  the page says what it got instead of looking broken. */}
+              {!only && board && declaration === null && (
+                <div data-testid="board-not-a-declaration"
+                  className="mb-5 rounded-xl border border-live/30 bg-live/5 p-4">
+                  <Eyebrow tone="live">this payload is an answer, not the board</Eyebrow>
+                  <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ink-mid">
+                    The board answered with a NARROWED payload — a reply to
+                    a request for named competitions — and a narrowed reply
+                    cannot say which columns the board declares. No column
+                    is drawn from it, because the alternative is showing a
+                    competition nobody put on this board.
+                  </p>
+                  <button onClick={() => setNonce((n) => n + 1)}
+                    className="mt-3 rounded-md border border-line px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low transition-colors hover:border-line-strong hover:text-ink-hi">
+                    ask again
+                  </button>
+                </div>
+              )}
               {undeclared.length > 0 && (
                 <div data-testid="board-undeclared"
                   data-slugs={undeclared.join(",")}
@@ -777,6 +907,43 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                     ) : null)}
                   </p>
                 </div>
+              )}
+              {/* ASKED FOR BY NAME — AND THAT IS NOT THE SAME AS BEING
+                  ON THE BOARD. This page got its rows because it named
+                  the competition in the request, which is the door
+                  `OFF_BOARD_BY_DECISION` describes and nothing wider.
+                  Saying so is not pedantry: the payload's `leagues` key
+                  set now holds the slug that was asked about, in exactly
+                  the shape a declaration has, and the board has twice
+                  grown by that confusion — six columns to eleven in
+                  production, and a finished Leagues Cup walking back on
+                  after being removed. The reader is told which of the
+                  two they are looking at, on the surface where the
+                  distinction is invisible.
+                  Derived from `narrowed_to`, so the sentence is the
+                  BACKEND's answer rather than this page's assumption:
+                  it appears only where the ask was actually honoured. */}
+              {answered === true && (
+                <p data-testid="board-narrowed"
+                  data-narrowed-to={(board?.narrowed_to ?? []).join(",")}
+                  className="mb-5 border-l-2 border-line-strong pl-3.5 text-[12.5px] leading-relaxed text-ink-low">
+                  {/* EXPLICIT `{" "}` ON BOTH SIDES OF THE NAME. The
+                      space after an interpolation at the end of a line
+                      is eaten by the JSX transform, and it shipped as
+                      "Champions Leagueby name" — caught against the live
+                      backend, not by reading the source, which is where
+                      it looks correct. */}
+                  This board was ASKED for{" "}
+                  {columnSlugs.map(leagueLabel).join(" · ")}{" "}
+                  by name. It is
+                  not the picker board&rsquo;s declared column set, and
+                  nothing here puts the competition back on{" "}
+                  <Link href="/bet-suggester"
+                    className="text-ink-mid underline decoration-line-strong underline-offset-2 hover:text-accent">
+                    the board
+                  </Link>
+                  {" "}— the same ranking, built on request.
+                </p>
               )}
               {/* On a phone the four columns stack — these chips are the
                   way to a league without scrolling through the ones above
@@ -842,7 +1009,8 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                       meta: reviewLeagues[slug],
                       back, loading: reviewLoading, error: reviewError,
                       storeNote,
-                    }} />
+                    }}
+                    field={fields[slug]} />
                 ))}
                 {dayKeys.map((k, i) => i % 2 === 0 ? null : (
                   <div key={`tint-${k}`} aria-hidden

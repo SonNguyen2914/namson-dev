@@ -28,6 +28,10 @@
 // column does, rather than a hand-copied one free to drift from it.
 import Link from "next/link";
 import { useId, useState } from "react";
+import {
+  AXIS_ORDER, Axis, AxisRow, CrossLeg, FieldRead, Ratings, fixtureField,
+  tierSet,
+} from "../lib/fieldApi";
 import { dayLabel, fmtDate, localDay } from "../lib/matchday";
 import {
   BoardRefusal, BoardRow, LeagueMeta, RatePair, SEASON_BLEND_K, homeBadge,
@@ -554,14 +558,161 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted }: {
   );
 }
 
+/** ONE CLUB'S BAND SET, with the floor dagger when it carries one.
+ *
+ *  MODULE SCOPE, not a closure inside the card. A component defined
+ *  during render is a NEW component type on every render, so React
+ *  unmounts and remounts its whole subtree each time the card redraws —
+ *  and the lint rule that says so ("Cannot create components during
+ *  render") is the one that caught it here. */
+function FieldTier({ r, side }: { r: AxisRow; side: "fav" | "opp" }) {
+  const set = tierSet(r);
+  return (
+    <span data-testid="field-tier" data-side={side} data-club={r.club}
+      data-tier-set={r.tier_set.join(",")}
+      data-below-floor={r.below_floor ? "true" : "false"}
+      className="text-ink-mid">
+      {/* NO FALLBACK NUMBER. An empty set is a club the payload placed in
+          no band at all; printing `r.tier` there would invent exactly the
+          placement this whole block exists to refuse. */}
+      {set ?? "no band"}
+      {r.below_floor && (
+        <sup data-testid="field-floor-mark" title={r.floor_note || ""}
+          className="ml-0.5 cursor-help text-[8px] font-normal text-ink-faint">
+          †
+        </sup>
+      )}
+    </span>
+  );
+}
+
+/** ONE DIRECTED LEG: somebody's attack against somebody else's defence.
+ *  The pip names who is attacking — ● the favourite, ○ the opponent —
+ *  the same two marks the matchup and the rank dumbbell already use. */
+function FieldLeg({ leg, side }: { leg: CrossLeg; side: "fav" | "opp" }) {
+  return (
+    <span data-testid="field-leg" data-side={side}
+      data-attacker={leg.attacker} data-defender={leg.defender}
+      className="flex flex-wrap items-baseline gap-x-1.5">
+      <span aria-hidden className={`h-[5px] w-[5px] flex-none translate-y-[-1px] rounded-full ${
+        side === "fav" ? "bg-ink-mid" : "border border-ink-low bg-bs"}`} />
+      <span className="text-ink-faint">atk</span>
+      <FieldTier r={leg.attack} side={side} />
+      <span aria-hidden className="text-ink-faint">→</span>
+      <span className="text-ink-faint">def</span>
+      <FieldTier r={leg.defence} side={side === "fav" ? "opp" : "fav"} />
+      {/* THE RATES BEHIND THE BANDS, when both ends carry one. They are
+          per-game figures on one cross-league scale — the numbers the
+          bands were cut from — so a reader can see how far inside its
+          band each end sits. Nothing is drawn unless BOTH are measured:
+          one rate alone is half a pair, and half a pair invites the
+          subtraction the scales do not support. */}
+      {leg.attack.rate != null && leg.defence.rate != null && (
+        <span className="text-ink-faint">
+          {leg.attack.rate.toFixed(2)}
+          <span className="px-0.5">v</span>
+          {leg.defence.rate.toFixed(2)}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** THE TWO CLUBS' STANDING IN THE CROSS-LEAGUE FIELD, WITH THE AXES
+ *  CROSSED (operator, 2026-09-09).
+ *
+ *  WHY CROSSED. In a match the favourite's attack faces the opponent's
+ *  DEFENCE. Drawing attack beside attack and defence beside defence puts
+ *  two clubs next to each other, which is not a matchup — it is two
+ *  separate facts printed adjacently and left to the reader to pair
+ *  wrongly. So each line here is a directed leg, and the pip says who is
+ *  attacking: ● the favourite, ○ the opponent, the same two marks the
+ *  matchup and the rank dumbbell above already use for those two clubs.
+ *  Mirrors the backend's `cross_league_axes.crossed()`.
+ *
+ *  A TIER IS A SET, NEVER A BARE NUMBER. `tier_set` is every band the
+ *  club's 95% interval touches, and it is printed whole — "2·3" — at
+ *  every width, including a set of one, because a set of one is still
+ *  what the measurement returned. On the defence axis almost every club
+ *  in this field straddles a cut and on attack most do, so a card
+ *  reading "ATK 2" would assert a placement the evidence refuses. That
+ *  is the `OVR 1v1` defect exactly: two clubs the measurement could not
+ *  separate, printed as level.
+ *
+ *  THE OVERALL AXIS IS THE ONE PAIR DRAWN SIDE BY SIDE, and that is not
+ *  an inconsistency: it is a single ladder both clubs stand on, so
+ *  "where each sits on it" is a real comparison. Attack and defence are
+ *  two different measurements and only cross.
+ *
+ *  BELOW THE FLOOR IS MARKED SUBTLY — a dagger carrying the backend's
+ *  own reason on hover, exactly as the field page marks it. His words:
+ *  "make sure to mark those 11 somehow for me to know their data were
+ *  refused at first. Subtlely."
+ *
+ *  WHAT THIS DOES NOT SAY, ANYWHERE: what any of it is worth. No leg is
+ *  called an advantage, no pair is called a mismatch, nothing is
+ *  summed, and the two legs are drawn in a fixed order rather than
+ *  sorted so that neither can read as the stronger one. It shows; it
+ *  does not decide.
+ *
+ *  AND WHAT IT REFUSES TO DRAW. A club this field does not hold is
+ *  NAMED, not left as a gap — "a club we do not hold is not a club with
+ *  no attack" is the backend's own reason for returning None on such a
+ *  leg, and a blank row here would be that same claim made silently. A
+ *  read that FAILED is not this component's to report: it is one fetch
+ *  for the whole column, so it is one sentence in the column header
+ *  rather than the same sentence on eighteen cards. */
+function FieldCross({ row, field, dense }: {
+  row: BoardRow; field?: FieldRead; dense: boolean;
+}) {
+  // "not yet" is the one state a blank space actually describes; a
+  // failed read is named by the column header, and an unmeasured
+  // competition has no field for this card to stand in.
+  if (!field || field.error || !field.data?.axes) return null;
+  const fx = fixtureField(field.data, row.favourite, row.opponent);
+  if (!fx) return null;
+
+  return (
+    <div data-testid="field-cross"
+      data-missing={fx.missing.length > 0 ? fx.missing.join(",") : undefined}
+      className={`mt-3 flex flex-col gap-y-1 border-t border-line pt-2.5 font-mono text-[10px] tabular-nums ${
+        dense ? "gap-x-3" : "gap-x-4"}`}>
+      <span className="flex flex-wrap items-baseline gap-x-1.5">
+        <span className="text-ink-faint">ovr</span>
+        {fx.ovr.fav ? <FieldTier r={fx.ovr.fav} side="fav" />
+                    : <span className="text-ink-faint">—</span>}
+        <span className="text-ink-faint">v</span>
+        {fx.ovr.opp ? <FieldTier r={fx.ovr.opp} side="opp" />
+                    : <span className="text-ink-faint">—</span>}
+      </span>
+      {fx.favAttacking && <FieldLeg leg={fx.favAttacking} side="fav" />}
+      {fx.oppAttacking && <FieldLeg leg={fx.oppAttacking} side="opp" />}
+      {/* NAMED, NOT BLANK. The legs above are simply absent for a club
+          the field does not hold, and an absence with nothing beside it
+          is indistinguishable from a club rated at nothing. */}
+      {fx.missing.length > 0 && (
+        <span data-testid="field-missing"
+          className="text-[9.5px] leading-snug text-ink-faint">
+          {fx.missing.join(" · ")} {fx.missing.length > 1 ? "are" : "is"} not
+          in this field — no rating was measured for{" "}
+          {fx.missing.length > 1 ? "them" : "it"}, which is not a rating of
+          zero.
+        </span>
+      )}
+    </div>
+  );
+}
+
 function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
-                  hoisted }: {
+                  hoisted, field }: {
   row: BoardRow; rank: number; modeId: SortModeId; clubCount: number;
   colSrc?: string | null;
   /** in a narrow dense-grid track — see RowRead's own `dense` note */
   dense?: boolean;
   /** the notes this column's header already states — see columnNotes */
   hoisted?: ColumnNoteSet;
+  /** the column's cross-league field, if it has one — see FieldCross */
+  field?: FieldRead;
 }) {
   const cross = row.cross_league === true;
   const alt = seasonDisagreement(row);
@@ -658,6 +809,14 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
 
       <RowRead row={row} modeId={modeId} clubCount={clubCount}
         dense={dense} hoisted={hoisted} />
+
+      {/* THE FIELD, CROSSED — under the table read and above the price.
+          That order is the card's argument: what the two tables say,
+          then where the two clubs stand in the one field that spans
+          those tables, then what the book is charging. The field is the
+          only read on this card that survives a change of league, which
+          is why it sits closest to the fixture rather than at the foot. */}
+      <FieldCross row={row} field={field} dense={dense} />
 
       <div className="mt-3 border-t border-line pt-3">
         <KalshiCell quote={row.kalshi} />
@@ -829,9 +988,65 @@ export interface ColumnNoteSet {
   gap: string | null;
   /** what this column's prices settle on, when not the match, or null */
   regTime: string | null;
+  /** HOW TO READ THE FIELD BLOCK ON EVERY CARD — what a tier SET is,
+   *  why the axes cross, and what a dagger means. Null when this column
+   *  has no field, so the affordance is never an empty promise. */
+  field: string | null;
+  /** THE FIELD READ FAILED, IN THE READ'S OWN WORDS. A separate key
+   *  from `field` because they are opposite facts and must never be
+   *  folded: one explains a block that is on every card, the other says
+   *  why there is no such block anywhere in this column. */
+  fieldError: string | null;
 }
 
-export function columnNotes(slug: string, rows: BoardRow[]): ColumnNoteSet {
+/** WHAT A TIER SET IS AND WHAT THE DAGGER MEANS, SAID ONCE PER COLUMN.
+ *
+ *  The operator's rule, now given four separate times: a fact about the
+ *  whole column goes in the column header, once — the season share
+ *  (2026-09-08), the cross-league warning (2026-09-09), the fit-block
+ *  method note, and this. Every card in a column with a field carries
+ *  the same three conventions; repeating them per card is the ~90-word
+ *  paragraph that was most of the ink on a six-abreast matchday.
+ *
+ *  THE COUNTS ARE THE PAYLOAD'S OWN, never typed here. "33 of 36
+ *  straddle a cut" is a measurement that moves whenever the field is
+ *  refitted, and a number frozen in this file would go on asserting the
+ *  old fit forever — the exact shape of a hand-typed subset staying
+ *  green while the thing it describes drifts. Both the count and the
+ *  total are read off the axis the sentence is about. */
+function fieldNoteFor(data: Ratings | null | undefined): string | null {
+  const axes = data?.axes;
+  if (!axes) return null;
+  const parts: string[] = [
+    "A TIER IS A SET, NOT A PLACE. Each club carries a 95% interval, and "
+    + "the bands printed beside it are every band that interval touches — "
+    + "“2·3” means the evidence does not separate the two. "
+    + "A single band is a set of one, not a stronger claim.",
+  ];
+  const straddle = AXIS_ORDER
+    .map((k) => axes[k])
+    .filter((a): a is Axis => Boolean(a))
+    .map((a) => `${a.label} ${a.straddling} of ${a.rows.length}`);
+  if (straddle.length > 0) {
+    parts.push(
+      "How many clubs this field cannot place in one band, per axis: "
+      + straddle.join(", ") + ". That is why the sets are drawn whole.");
+  }
+  parts.push(
+    "THE AXES CROSS. In a fixture the favourite’s attack faces the "
+    + "opponent’s DEFENCE, so each line reads atk → def one way "
+    + "and then the other. ● is the favourite, ○ the opponent. "
+    + "The overall axis is the one pair drawn side by side, because it is "
+    + "a single ladder both clubs stand on.");
+  if (data?.below_floor_note) {
+    parts.push("† " + data.below_floor_note);
+  }
+  return parts.join("\n\n");
+}
+
+export function columnNotes(
+  slug: string, rows: BoardRow[], field?: FieldRead,
+): ColumnNoteSet {
   const agreed = (pick: (r: BoardRow) => string | null | undefined) => {
     let only: string | null = null;
     for (const r of rows) {
@@ -846,6 +1061,14 @@ export function columnNotes(slug: string, rows: BoardRow[]): ColumnNoteSet {
   return {
     gap: agreed((r) => r.gap_note),
     regTime: agreed((r) => r.reg_time_note),
+    field: fieldNoteFor(field?.data),
+    /* THE FAILURE IS THE COLUMN'S, because the request is. One fetch
+       serves every card here, so one failure is one sentence — and it
+       must be A SENTENCE. A field that could not be read draws no block
+       on any card, and a card with no block is indistinguishable from a
+       fixture whose clubs simply are not rated. Naming it here is what
+       keeps those two apart. */
+    fieldError: field?.error ?? null,
   };
 }
 
@@ -904,14 +1127,54 @@ function ColumnNotes({ notes }: { notes: ColumnNoteSet }) {
   const [pinned, setPinned] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
-  if (!notes.gap && !notes.regTime) return null;
+  /* ONE LIST, AND EVERYTHING ABOUT THE PANEL IS ASKED OF IT: whether
+     there is a circle at all, what the circle's accessible name says,
+     and what the panel draws. Three answers that used to be three
+     hand-maintained expressions over the same two booleans — which is
+     exactly how a column ends up with an affordance that opens onto
+     nothing, or an accessible name that does not mention the note a
+     reader opened it for. */
+  /* `says` NAMES THE COLUMN; `andSays` REFERS BACK TO IT. An accessible
+     name listing several sections has ONE antecedent and should use it
+     once — "why this column withholds gaps, and what ITS prices settle
+     on", which is the phrasing this button has always had and which
+     e2e/picker-blend-cup.spec.ts pins. A section read on its own still
+     names the column, because on its own there is nothing to refer back
+     to. Deriving the continuation by rewriting "this column's" to "its"
+     would be a text substitution standing in for a decision; each
+     section says both, in its own words. */
+  const sections = ([
+    { id: "gap-note", body: notes.gap, tone: "text-warn",
+      head: "gaps withheld in this column",
+      says: "why this column withholds gaps",
+      andSays: null },
+    { id: "reg-time-note", body: notes.regTime, tone: "text-skylive",
+      head: "what the price settles on",
+      says: "what this column's prices settle on",
+      andSays: "what its prices settle on" },
+    /* THE FAILURE ABOVE THE CONVENTION. If the field could not be read
+       there is no field block on any card, so "how to read the field
+       block" would be instructions for something that is not there. The
+       two are mutually exclusive by construction — `fieldNoteFor`
+       answers null without data, and `fieldError` is null with it — and
+       the order here is what a reader meets first if that ever stops
+       being true. */
+    { id: "field-error-note", body: notes.fieldError, tone: "text-live",
+      head: "the field could not be read",
+      says: "why this column shows no field",
+      andSays: "why it shows no field" },
+    { id: "field-note", body: notes.field, tone: "text-accent",
+      head: "how to read the field on each card",
+      says: "how to read the field on each card",
+      andSays: null },
+  ] as const).filter(
+    (s): s is typeof s & { body: string } => Boolean(s.body));
+  if (sections.length === 0) return null;
   const open = pinned || hovered || focused;
   const shut = () => { setPinned(false); setHovered(false); setFocused(false); };
-  const label = notes.gap && notes.regTime
-    ? "why this column withholds gaps, and what its prices settle on"
-    : notes.gap
-      ? "why this column withholds gaps"
-      : "what this column's prices settle on";
+  const label = sections
+    .map((s, i) => (i > 0 && s.andSays ? s.andSays : s.says))
+    .join(", and ");
   return (
     // NOT `relative`, deliberately — the positioning context is THE CHIP
     // ROW, which is exactly one column wide, so the panel's `100%` is
@@ -924,8 +1187,10 @@ function ColumnNotes({ notes }: { notes: ColumnNoteSet }) {
       <button type="button" data-testid="col-notes-open"
         aria-expanded={open} aria-label={label}
         aria-describedby={open ? panelId : undefined}
-        data-notes={[notes.gap && "gap", notes.regTime && "reg-time"]
-          .filter(Boolean).join("+")}
+        /* DERIVED FROM THE SAME LIST THE PANEL DRAWS, so this cannot
+           name a section the panel omits or miss one it draws — the
+           handle a guard reads and the ink a reader sees are one fact. */
+        data-notes={sections.map((s) => s.id.replace(/-note$/, "")).join("+")}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         onClick={(e) => {
@@ -957,31 +1222,32 @@ function ColumnNotes({ notes }: { notes: ColumnNoteSet }) {
           // the panel instead; the pointer stays within the hover
           // container while scrolling it, so reading cannot close it.
           className="absolute left-0 top-[calc(100%+7px)] z-30 max-h-[min(70vh,40rem)] w-[min(30rem,100%)] overflow-y-auto rounded-lg border border-line-strong bg-elev2 p-3 text-left text-[11px] leading-relaxed text-ink-mid shadow-xl">
-          {notes.gap && (
-            <div>
-              <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
-                gaps withheld in this column
+          {/* THE SECTIONS ARE DERIVED FROM THE NOTE SET, not written out
+              with a divider between each hand-chosen pair. With two of
+              them a `notes.gap && notes.regTime` rule for the rule
+              worked; at four it is six such rules, and the one nobody
+              writes is the one that ships a panel with a hairline above
+              nothing. The list below is the ONLY place a note's heading
+              and ink live, so a note added to `ColumnNoteSet` and left
+              out of it draws nothing at all rather than drawing wrong. */}
+          {sections.map((s, i) => (
+            <div key={s.id}>
+              {i > 0 && <hr className="my-2.5 border-line" />}
+              <p className={`font-mono text-[9px] uppercase tracking-[0.14em] ${s.tone}`}>
+                {s.head}
               </p>
-              {/* THE BACKEND'S OWN WORDS, verbatim — not summarised and
-                  not truncated. Same data-testid it carried on the card,
-                  because the claim under guard ("the board says WHY a
-                  gap is withheld") is unchanged; only its address is. */}
-              <p data-testid="gap-note" className="mt-1">{notes.gap}</p>
+              {/* THE SOURCE'S OWN WORDS, verbatim — not summarised and
+                  not truncated. Each keeps the data-testid it carried at
+                  its old address, because the claim under guard is
+                  unchanged; only where it is said moved.
+                  `whitespace-pre-line` so a multi-paragraph note keeps
+                  its paragraphs: the field note is three of them, and run
+                  together they are a wall. */}
+              <p data-testid={s.id} className="mt-1 whitespace-pre-line">
+                {s.body}
+              </p>
             </div>
-          )}
-          {notes.gap && notes.regTime && (
-            <hr className="my-2.5 border-line" />
-          )}
-          {notes.regTime && (
-            <div>
-              <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-skylive">
-                what the price settles on
-              </p>
-              <p data-testid="reg-time-note" className="mt-1">
-                {notes.regTime}
-              </p>
-            </div>
-          )}
+          ))}
         </div>
       )}
     </span>
@@ -1040,7 +1306,7 @@ export function columnCountLabel(
 
 export function LeagueColumn({
   slug, meta, rows, refusals, days, dayKeys, sortFor, dayLabels, colIndex,
-  review, dense = false,
+  review, dense = false, field,
 }: {
   slug: string;
   /** absent when the payload never mentioned this league at all */
@@ -1094,6 +1360,14 @@ export function LeagueColumn({
     error: string;
     storeNote: string | null;
   };
+  /** THE COMPETITION'S CROSS-LEAGUE FIELD — one read for the whole
+   *  column, drawn on every card (see FieldCross) and, when it FAILED,
+   *  named once in the header rather than eighteen times below it.
+   *  Absent for a competition nobody has measured a field for, which is
+   *  every league column today: the field exists to rate the entrants of
+   *  a cup whose clubs come from tables that cannot be compared, and a
+   *  league column's own table already does that job. */
+  field?: FieldRead;
 }) {
   /* THE SEASON BASIS, DERIVED ONCE FOR THE WHOLE COLUMN. Off the rows
      this column actually holds, not off `meta` — a league whose payload
@@ -1106,8 +1380,12 @@ export function LeagueColumn({
      this column's own competition emits it and its rows agree. What
      comes back is handed BOTH to the header (which draws it, once) and
      to every card (which then draws nothing), so the two can never
-     disagree about who is saying it. */
-  const notes = columnNotes(slug, rows);
+     disagree about who is saying it.
+     The FIELD's two notes come from the same call for the same reason:
+     how to read a tier set is true of every card in this column, and a
+     field that failed to load is true of the column rather than of any
+     fixture in it. */
+  const notes = columnNotes(slug, rows, field);
 
   // DAY-MAJOR (operator, 2026-09-01): the matchday is the board's
   // primary structure and each band's sort — the board default or that
@@ -1428,7 +1706,8 @@ export function LeagueColumn({
             {dayRows.map((r, i) => (
               <RowCard key={`${r.league}-${r.event_id}`} row={r} rank={i + 1}
                 modeId={modeId} clubCount={meta?.clubs ?? 0}
-                colSrc={meta?.src} dense={dense} hoisted={notes} />
+                colSrc={meta?.src} dense={dense} hoisted={notes}
+                field={field} />
             ))}
             {refused.map((r, i) => (
               <RefusalCard key={`ref-${r.club}-${i}`} r={r} />
