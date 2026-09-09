@@ -94,7 +94,7 @@
 // verdict, which is why the cost of certainty below is rendered in plain
 // ink: colouring "it is free to take certainty" green would be this
 // surface making the recommendation the whole stage refuses to make.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   CertaintyPremium, EntryMap, EntryMapBranch, LiveReadComponentPayload,
   LiveReadSide, PartialExit, PartialExitFraction, PartialExitRealises,
@@ -1613,6 +1613,13 @@ function faceProse(m: WatchedMatch): string[] {
              p.entry_map?.a_map_not_a_verdict, p.entry_map?.no_response_window,
              p.entry_map?.not_a_signal, p.entry_map?.match_now?.witness,
              p.entry_map?.match_now?.note);
+    // THE CLEAN-VARIANT REFUSAL IS SAID ONCE, IN THE MAP'S HEADER,
+    // behind the circled `i`. Without this line the prose walk sweeps
+    // it into the card's disclosure as well — it is a ~1,500-character
+    // string on fourteen nodes of the map, far over NOTE_MIN_CHARS —
+    // and one fact would be told twice on one card, which is the whole
+    // reason that disclosure excludes what the face already says.
+    if (p.entry_map) out.push(variantExceptionWords(p.entry_map));
   }
   return out.filter((x): x is string => typeof x === "string" && x !== "");
 }
@@ -2506,6 +2513,143 @@ function mapRefusalsDrawn(map: EntryMap): { where: string; code: string }[] {
   return out;
 }
 
+// --- the grid that refuses the clean variant --------------------------
+//
+// ONE FACT ABOUT THE WHOLE MAP, DRAWN ONCE, IN THE HEADER.
+//
+// Four of the map's five grids read the clean variant (`clean_11v11`,
+// eleven-a-side throughout). The first-goal grid reads `all`, and the
+// backend explains why in ~1,500 characters: that grid's clean filter's
+// WINDOW END IS THE AXIS IT BINS, so its seven bins are conditioned on
+// seven different events and a map that SUMS bins cannot use them
+// (entry_map.FIRST_GOAL_TIMING_CLEAN_REFUSED).
+//
+// EVERY "reaching this state" FIGURE ON THIS MAP IS SUMMED OUT OF THAT
+// GRID, which is why this belongs to the surface rather than to a row.
+// The payload carries the sentence in fourteen places — on the timing
+// panel, on each of its seven bin rows, on each branch's composed tail,
+// and once on the grids block — because a row is what an operator reads
+// and a number lifted out on its own must carry its provenance. That is
+// a rule about the PAYLOAD. Printing it fourteen times is the "remove
+// this warning in each match card, it is so annoying and repetitive"
+// complaint, verbatim, and the answer he asked for then is the answer
+// here: put it at the top beside the basis label, behind a circled `i`,
+// and show the words on hover.
+//
+// THE FIGURES ARE UNTOUCHED. This moves the EXPLANATION to where a
+// whole-surface fact belongs. Nothing about which numbers are drawn, or
+// what they say, changes — and each drawn tail still carries its own
+// variant as DATA (`data-variant`), so a guard can prove the header
+// speaks for every figure under it without a word of prose on the row.
+
+/** Every grid whose variant differs from the map's headline one, read
+ *  off the payload's own per-grid table. DERIVED, never a grid named in
+ *  this file: a second deviating grid is drawn the day the backend
+ *  registers one, and a map where nothing deviates draws nothing. */
+export function variantDeviations(g: EntryMap["grids"]):
+    { grid: string; variant: string }[] {
+  const headline = g?.variant;
+  const table = g?.variant_by_grid;
+  if (!headline || !table) return [];
+  return Object.keys(table).sort()
+    .filter((name) => table[name] !== headline)
+    .map((name) => ({ grid: name, variant: table[name] }));
+}
+
+/** The exception's own words, from wherever the payload put them.
+ *
+ *  THE GRIDS BLOCK FIRST, then any composed tail that carries one —
+ *  they are the same string by construction (both read
+ *  entry_map.FIRST_GOAL_TIMING_CLEAN_REFUSED), and taking the branch as
+ *  a fallback means a payload that carries the reason only where the
+ *  figures are still shows it. Returns null when NO copy is on the
+ *  payload, which is a different fact from there being no exception and
+ *  is drawn as one. */
+export function variantExceptionWords(map: EntryMap): string | null {
+  const onGrids = map.grids?.variant_exception;
+  if (typeof onGrids === "string" && onGrids.trim() !== "") return onGrids;
+  for (const b of Object.values(map.branches ?? {})) {
+    const w = b?.reached?.clean_variant_refused;
+    if (typeof w === "string" && w.trim() !== "") return w;
+  }
+  return null;
+}
+
+/** The circled `i` and its note — the pattern PickerColumn's
+ *  `ColumnNotes` already carries, for the same reason and with the same
+ *  openings.
+ *
+ *  HOVER IS NOT ENOUGH ON ITS OWN. There is no hover on a phone and
+ *  none from a keyboard, and this is the sentence that stops the
+ *  first-goal figures being read on the same basis as the map's other
+ *  four grids. It opens on hover, on focus and on tap; Escape closes
+ *  it; the button carries a real accessible name that says what is
+ *  inside. The click is authoritative, which is the only way to close a
+ *  panel a hover is holding open on a touch screen.
+ *
+ *  IT IS AN AFFORDANCE, NOT AN ALERT. Neutral line and ink at rest,
+ *  accent only when it opens — gold is brand here, never a verdict, and
+ *  the traffic light stays on the numbers. */
+function VariantNote({ words, deviations }: {
+  words: string;
+  deviations: { grid: string; variant: string }[];
+}) {
+  const panelId = useId();
+  const [pinned, setPinned] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const open = pinned || hovered || focused;
+  const shut = () => { setPinned(false); setHovered(false); setFocused(false); };
+  return (
+    <span className="inline-flex"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onKeyDown={(e) => { if (e.key === "Escape") shut(); }}>
+      <button type="button" data-testid="watched-map-variant-open"
+        aria-expanded={open}
+        aria-label={`why ${deviations.map((d) => d.grid).join(" and ")} `
+          + "does not read this map's clean variant"}
+        aria-describedby={open ? panelId : undefined}
+        data-grids={deviations.map((d) => d.grid).join("+")}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onClick={(e) => {
+          e.preventDefault(); e.stopPropagation();
+          setPinned((p) => !p); setHovered(false); setFocused(false);
+        }}
+        // NOT `font-mono`: the mono lowercase i carries a serif at both
+        // ends and reads as a FIGURE ONE at this size inside a 16px
+        // circle. The sans i is a dot over a bare stem. Same reasoning,
+        // and the same glyph, as PickerColumn's ColumnNotes.
+        className={`inline-flex h-[16px] w-[16px] items-center justify-center self-center rounded-full border text-[11px] font-semibold leading-none transition-colors ${
+          open ? "border-accent/60 text-accent"
+            : "border-line-strong text-ink-low hover:border-accent/40 hover:text-accent"}`}>
+        i
+      </button>
+      {open && (
+        // A CAP AND A SCROLLBAR: this is the backend's own paragraph and
+        // it is ~1,500 characters. Uncapped it runs off the bottom of
+        // the viewport and the way out would be to scroll the page,
+        // which drags what the panel is anchored to. The overflow lives
+        // inside the panel instead, and the pointer stays within the
+        // hover container while scrolling it, so reading cannot close
+        // it.
+        <div data-testid="watched-map-variant-note" id={panelId} role="note"
+          className="absolute left-0 top-[calc(100%+7px)] z-30 max-h-[min(70vh,40rem)] w-[min(34rem,100%)] overflow-y-auto rounded-lg border border-line-strong bg-elev2 p-3 text-left font-sans text-[11px] normal-case leading-relaxed tracking-normal text-ink-mid shadow-xl">
+          <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+            {deviations.map((d) => `${d.grid} · ${d.variant}`).join(" — ")}
+          </p>
+          {/* THE BACKEND'S OWN WORDS, whole — not summarised and not
+              truncated. It is the only place on this card they appear. */}
+          <p data-testid="watched-map-variant-words" className="mt-1">
+            {words}
+          </p>
+        </div>
+      )}
+    </span>
+  );
+}
+
 function MapBranch({ name, b }: { name: string; b: EntryMapBranch }) {
   const q = quantityNumbers(b.your_contract?.quantity as
     Record<string, unknown> | undefined);
@@ -2535,7 +2679,13 @@ function MapBranch({ name, b }: { name: string; b: EntryMapBranch }) {
       )}
 
       {b.reached && (
+        // `data-variant` IS DATA, NOT PROSE. The tail carries the grid
+        // variant it was summed out of; the operator reads that fact
+        // ONCE, in the header, and a guard reads it here to prove the
+        // header speaks for every figure drawn under it. Nothing is
+        // printed on the row.
         <p data-testid="watched-map-reached"
+          data-variant={b.reached.variant ?? ""}
           className="mt-1 font-mono text-[11px] leading-relaxed text-ink-mid">
           {b.reached.p_first_goal_percent != null ? (
             <>
@@ -2687,6 +2837,10 @@ function MapBlock({ map }: { map: EntryMap | undefined }) {
   // ONE CATEGORY RULE, QUOTED ONCE — the payload writes the same
   // sentence on every quantity that carries one.
   const categoryRule = mapCategoryRule(map);
+  // THE GRID THAT REFUSES THE CLEAN VARIANT — read once, drawn once, in
+  // the header. See the block above MapBranch.
+  const deviations = variantDeviations(map.grids);
+  const exceptionWords = variantExceptionWords(map);
 
   return (
     <div data-testid="watched-entry-map" data-started={String(started)}
@@ -2729,9 +2883,48 @@ function MapBlock({ map }: { map: EntryMap | undefined }) {
         )}
       </p>
 
+      {/* THE BASIS OF THE WHOLE MAP, AND ITS ONE EXCEPTION, ONCE.
+          `relative` because the note below anchors to THIS LINE rather
+          than to the 16px button: the line is exactly the block's width,
+          so `left-0` + `w-[min(34rem,100%)]` starts at its left edge and
+          is at most the block wide at every width the strip is drawn at.
+          Anchored to the button, `100%` would be 16px and a fixed width
+          would hang off whichever edge it landed near — the bug
+          PickerColumn's TierGaps was fixed for. */}
       {map.grids && (
-        <p className="mt-1 font-mono text-[10px] text-ink-faint">
-          {map.grids.variant} · floor n ≥ {map.grids.min_n_floor}
+        <p className="relative mt-1 flex flex-wrap items-center gap-x-2 font-mono text-[10px] text-ink-faint">
+          <span>
+            {map.grids.variant} · floor n ≥ {map.grids.min_n_floor}
+            {deviations.length > 0 ? " ·" : ""}
+          </span>
+          {deviations.length > 0 && (
+            <>
+              {/* WHICH GRID DEVIATES AND TO WHAT — derived from the
+                  payload's per-grid table, so a second one appears the
+                  day the backend registers it. The FIGURES are
+                  untouched; this is the label that stops them being
+                  read on the same basis as the other four. */}
+              <span data-testid="watched-map-variant-exception"
+                data-grids={deviations.map((d) => d.grid).join("+")}
+                data-variants={deviations.map((d) => d.variant).join("+")}
+                className="text-ink-low">
+                {deviations.map((d) => `${d.grid}: ${d.variant}`).join(" · ")}
+              </span>
+              {/* THE REASON IS BEHIND THE CIRCLE, NOT BESIDE IT. The
+                  payload carries it on fourteen nodes; an operator gets
+                  it once, on demand. A payload that names the deviation
+                  and carries NO reason says that instead — an absent
+                  explanation is not an absent exception. */}
+              {exceptionWords ? (
+                <VariantNote words={exceptionWords} deviations={deviations} />
+              ) : (
+                <span data-testid="watched-map-variant-unexplained"
+                  className="text-warn">
+                  no reason on this payload
+                </span>
+              )}
+            </>
+          )}
         </p>
       )}
 

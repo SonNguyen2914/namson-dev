@@ -948,6 +948,15 @@ export interface EntryMapReached {
   composed_from?: string[];
   source_cell?: string;
   either_side?: string;
+  /** WHICH GRID VARIANT THIS TAIL WAS SUMMED OUT OF (entry_map
+   *  `_composed`). Four of the map's five grids read `clean_11v11`; the
+   *  first-goal grid reads `all` and says why in the sentence beside
+   *  it, because that grid's clean filter's window end IS the axis it
+   *  bins. The pair rides on EVERY figure derived from the cell — the
+   *  panel, each of its rows, and each branch's composed tail — so a
+   *  number lifted out on its own still carries its provenance. */
+  variant?: string;
+  clean_variant_refused?: string;
   /** no grid splits the opener by scorer — refused, never imputed */
   by_side?: { refusal_code?: string; refused?: string };
   refusal_code?: string;
@@ -996,7 +1005,16 @@ export interface EntryMap {
   drawn_from: string;
   fixture?: { id: number; competition_slug?: string };
   position?: Record<string, unknown>;
-  grids?: { variant?: string; min_n_floor?: number; floor_rule?: string };
+  /** `variant` is the HAZARD variant, true of four of the five grids.
+   *  `variant_by_grid` is the authoritative per-grid answer — derived in
+   *  the backend from its own registry, because the fifth deviates —
+   *  and `variant_exception` is that grid's reason in full. Optional:
+   *  a payload recorded before 2026-09-09 carries only `variant`, and
+   *  an absent table must read as "this answer did not say" rather than
+   *  as "every grid reads the headline". */
+  grids?: { variant?: string; min_n_floor?: number; floor_rule?: string;
+            variant_by_grid?: Record<string, string>;
+            variant_exception?: string };
   favourite?: { fav_side?: string; fav_p?: number; band?: string;
                 source?: string; read_from?: string;
                 refusal_code?: string; refused?: string };

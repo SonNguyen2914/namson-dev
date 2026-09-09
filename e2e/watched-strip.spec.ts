@@ -207,11 +207,20 @@ const CERTAINTY_IS_ASYMMETRIC =
 //     renders them;
 //   - on the map: `timing` (the branch's own `reached` carries the bins
 //     it is composed from), `from_here`, `lead_hazard_by_window`,
-//     `payload_wall`, and the long per-quantity `category_rule` on all
-//     but the first — the map's OWN refusal tally is kept intact, which
-//     is why it counts more refusals than this surface draws, and the
-//     strip prints both numbers rather than passing the visible ones off
-//     as all of them.
+//     `then_the_favourite_opens`, `partition`, `payload_wall`, and the
+//     long per-quantity `category_rule` on all but the first — the
+//     map's OWN refusal tally is kept intact, which is why it counts
+//     more refusals than this surface draws, and the strip prints both
+//     numbers rather than passing the visible ones off as all of them.
+//
+// RE-RECORDED 2026-09-09 for the first-goal grid's refused clean
+// variant (backend 595c31b). That grid now serves `all` rather than
+// clean_11v11, so every composed tail's p / band / n / k and its
+// `source_cell` MOVED, and each carries `variant` + the reason. The
+// numbers below are the emitter's on the committed artifact, not the
+// old ones with two keys bolted on: a fixture that kept clean_11v11's
+// figures under an `all` label would be the exact fold this surface
+// exists against.
 //
 // Long prose that occurs more than once is hoisted into a const and
 // referenced; the VALUE each key receives is byte-identical to what the
@@ -1321,6 +1330,42 @@ const REC_PE_TINY = {
     common_case: A_THIN_OR_ABSENT
   };
 
+// THE ONE GRID WHOSE CLEAN FILTER IS ITS OWN AXIS
+// (entry_map.FIRST_GOAL_TIMING_CLEAN_REFUSED, 2026-09-09). The map's
+// first-goal figures are grids-v1's `all`; its other four grids read
+// clean_11v11. The emitter hangs this same string on FOURTEEN nodes —
+// the timing panel, each of its seven bin rows, each branch's composed
+// tail, and once on the grids block — so a figure lifted out on its own
+// still carries its provenance. Hoisted here for the same reason the
+// other long prose is: the VALUE each key receives is byte-identical to
+// what the emitter produced.
+const CLEAN_VARIANT_REFUSED =
+  "CLEAN VARIANT REFUSED FOR THIS GRID. The first-goal figures on "
+  + "this map are grids-v1's `all` — every fixture in the corpus — "
+  + "and the map's other four grids still read clean_11v11. "
+  + "first_goal_timing is the one grid whose clean filter's WINDOW "
+  + "END IS THE AXIS IT BINS: a fixture is kept if it was "
+  + "eleven-a-side through its first goal, so bin '1-15' is "
+  + "conditioned on no dismissal in about fifteen minutes and 'none' "
+  + "on no dismissal in ninety. Retention falls monotonically across "
+  + "the bins — 99.1% to 83.5% pooled, and a 12.9-20.7pp spread in "
+  + "EVERY gap band this map serves (measured 2026-09-09 against the "
+  + "shipped artifact) — so the clean sample is SHIFTED EARLY rather "
+  + "than rescaled. Seven bins conditioned on seven different events "
+  + "and normalised to sum to 100% are not a distribution, and a "
+  + "caveat could not repair it here, because this map SUMS BINS: the "
+  + "branch tails it prints are exactly the operation a 'read it as a "
+  + "conditional' note would license. Reweighting by the per-bin "
+  + "retention would rebuild the `all` counts that sit in the same "
+  + "file, as an estimator with no honest Wilson band standing where "
+  + "an exact number already is. And `all` is the question THIS map "
+  + "asks: it is drawn at MINUTE 0 and uses this grid only for how "
+  + "likely each state is to arise at all, before any dismissal is "
+  + "known — conditioning that on 'no red before the opener' would be "
+  + "conditioning on the future, which is OPEN-PROBLEMS #3's defect "
+  + "and not its fix. `all` is the larger sample in every band and "
+  + "clears the floor in all of them.";
+
 const REC_MAP_MIXED = {
     version: "entry-map-v1",
     charter: "IT SHOWS; IT DOES NOT DECIDE (src/live/position.py)",
@@ -1348,6 +1393,14 @@ const REC_MAP_MIXED = {
     },
     grids: {
       variant: "clean_11v11",
+      variant_by_grid: {
+        first_goal_timing: "all",
+        comeback_by_strength: "clean_11v11",
+        scoreless_fav_decay: "clean_11v11",
+        late_opener: "clean_11v11",
+        equalizer_hazard: "clean_11v11"
+      },
+      variant_exception: CLEAN_VARIANT_REFUSED,
       min_n_floor: 100,
       floor_rule: ONE_FLOOR_FOR_EVERY
     },
@@ -1391,18 +1444,20 @@ const REC_MAP_MIXED = {
         relation_to_you: "you score first",
         reached: {
           state: "an opener by either side at or before 30'",
-          p_first_goal_percent: 54.0,
+          p_first_goal_percent: 52.0,
           p_first_goal_wilson_band_percent: [
-            52.7,
-            55.2
+            50.7,
+            53.2
           ],
-          n: 5903,
-          k: 3185,
+          n: 6226,
+          k: 3235,
           composed_from: [
             "1-15",
             "16-30"
           ],
-          source_cell: "first_goal_timing/clean_11v11/bands/0-75/bins",
+          source_cell: "first_goal_timing/all/bands/0-75/bins",
+          variant: "all",
+          clean_variant_refused: CLEAN_VARIANT_REFUSED,
           either_side: "by either side \u2014 the partition is by MINUTE, not by scorer",
           by_side: {
             refusal_code: "thin_cell_floor",
@@ -1456,18 +1511,20 @@ const REC_MAP_MIXED = {
         relation_to_you: "they score first",
         reached: {
           state: "an opener by either side at or before 30'",
-          p_first_goal_percent: 54.0,
+          p_first_goal_percent: 52.0,
           p_first_goal_wilson_band_percent: [
-            52.7,
-            55.2
+            50.7,
+            53.2
           ],
-          n: 5903,
-          k: 3185,
+          n: 6226,
+          k: 3235,
           composed_from: [
             "1-15",
             "16-30"
           ],
-          source_cell: "first_goal_timing/clean_11v11/bands/0-75/bins",
+          source_cell: "first_goal_timing/all/bands/0-75/bins",
+          variant: "all",
+          clean_variant_refused: CLEAN_VARIANT_REFUSED,
           either_side: "by either side \u2014 the partition is by MINUTE, not by scorer",
           by_side: {
             refusal_code: "thin_cell_floor",
@@ -1527,20 +1584,22 @@ const REC_MAP_MIXED = {
         relation_to_you: "nobody has scored \u2014 neither side is ahead",
         reached: {
           state: "no goal by minute 45 (first goal after 45', or none)",
-          p_first_goal_percent: 29.3,
+          p_first_goal_percent: 31.2,
           p_first_goal_wilson_band_percent: [
-            28.2,
-            30.5
+            30.1,
+            32.4
           ],
-          n: 5903,
-          k: 1732,
+          n: 6226,
+          k: 1945,
           composed_from: [
             "46-60",
             "61-75",
             "76-90+",
             "none"
           ],
-          source_cell: "first_goal_timing/clean_11v11/bands/0-75/bins",
+          source_cell: "first_goal_timing/all/bands/0-75/bins",
+          variant: "all",
+          clean_variant_refused: CLEAN_VARIANT_REFUSED,
           either_side: "by either side \u2014 the partition is by MINUTE, not by scorer"
         },
         your_contract: {
@@ -1572,19 +1631,21 @@ const REC_MAP_MIXED = {
         relation_to_you: "nobody has scored \u2014 neither side is ahead",
         reached: {
           state: "no goal by minute 60 (first goal after 60', or none)",
-          p_first_goal_percent: 18.3,
+          p_first_goal_percent: 19.9,
           p_first_goal_wilson_band_percent: [
-            17.3,
-            19.3
+            18.9,
+            20.9
           ],
-          n: 5903,
-          k: 1081,
+          n: 6226,
+          k: 1238,
           composed_from: [
             "61-75",
             "76-90+",
             "none"
           ],
-          source_cell: "first_goal_timing/clean_11v11/bands/0-75/bins",
+          source_cell: "first_goal_timing/all/bands/0-75/bins",
+          variant: "all",
+          clean_variant_refused: CLEAN_VARIANT_REFUSED,
           either_side: "by either side \u2014 the partition is by MINUTE, not by scorer"
         },
         your_contract: {
@@ -3493,6 +3554,8 @@ const mapOf = (m: { positions: { entry_map?: unknown }[] }, i = 0) =>
     branches: Record<string, Record<string, unknown>>;
     refusals: { total: number };
     match_now: { started: boolean };
+    grids: { variant: string; variant_by_grid: Record<string, string>;
+             variant_exception: string };
   };
 
 test("a watched fixture that has not kicked off carries the minute-0 "
@@ -3593,6 +3656,161 @@ test("a win probability and a lower bound never share a bar",
     // and the wall's own sentence rides on the map
     await expect(map.getByTestId("watched-map-category-rule"))
       .toContainText("NOT THE SAME QUANTITY AND ARE NOT COMPARABLE");
+  });
+
+// ------------------- the grid that refuses the map's clean variant
+//
+// A FACT ABOUT THE WHOLE SURFACE, DRAWN ONCE, AT THE TOP.
+//
+// Four of the map's five grids read `clean_11v11`; first_goal_timing
+// reads `all` and the backend says why in ~1,500 characters
+// (entry_map.FIRST_GOAL_TIMING_CLEAN_REFUSED: that grid's clean
+// filter's window end IS the axis it bins). Every "reaching this state"
+// figure the strip prints is summed out of that grid, so an operator
+// reading them on the same basis as the other four is reading them
+// wrong — and until 2026-09-09 nothing on this surface said so.
+//
+// THE PAYLOAD CARRIES THE SENTENCE FOURTEEN TIMES ON PURPOSE, because a
+// row is what an operator reads and a number lifted out on its own must
+// carry its provenance. THAT IS A RULE ABOUT THE PAYLOAD. Printing it
+// fourteen times is "remove this warning in each match card, it is so
+// annoying and repetitive, put it ontop with the 'prior szn' label and
+// hide it inside the circle with the letter 'i' in the middle, only
+// show the message when the mouse hover on in" — the operator, on the
+// board, about this exact shape. So: once, in the header, behind the
+// circled `i`, on hover.
+
+test("the refused clean variant is stated ONCE, in the map header, and "
+   + "never on a row", async ({ page }) => {
+    await open(page, STRIP);
+    const map = position(page, 84).getByTestId("watched-entry-map");
+    const grids = mapOf(NOT_STARTED).grids;
+    // DERIVED FROM THE PAYLOAD'S OWN PER-GRID TABLE, so a second
+    // deviating grid is covered without an edit here.
+    const off = Object.keys(grids.variant_by_grid)
+      .filter((g) => grids.variant_by_grid[g] !== grids.variant).sort();
+    expect(off.length, "the fixture must carry a deviating grid or this "
+      + "guard proves nothing").toBeGreaterThan(0);
+
+    // ONE circle, in the header, naming the grids it speaks for
+    const trigger = map.getByTestId("watched-map-variant-open");
+    await expect(trigger).toHaveCount(1);
+    await expect(trigger).toHaveAttribute("data-grids", off.join("+"));
+    // and the deviation is LABELLED beside the basis line, not hidden
+    await expect(map.getByTestId("watched-map-variant-exception"))
+      .toHaveAttribute("data-grids", off.join("+"));
+
+    // THE WORDS ARE BEHIND IT — not on the card, not on a row, not
+    // fourteen times. Nothing of the paragraph is on screen until it is
+    // asked for.
+    await expect(map.getByTestId("watched-map-variant-note"))
+      .toHaveCount(0);
+    const opening = grids.variant_exception.slice(0, 60);
+    await expect(page.getByText(opening, { exact: false })).toHaveCount(0);
+
+    // …AND IT OPENS ON HOVER, which is what the operator asked for.
+    await trigger.hover();
+    const note = map.getByTestId("watched-map-variant-note");
+    await expect(note).toBeVisible();
+    // the backend's own words, WHOLE — not summarised, not truncated
+    await expect(note.getByTestId("watched-map-variant-words"))
+      .toHaveText(grids.variant_exception);
+    // ONCE on the whole page, however many nodes the payload hangs it on
+    await expect(page.getByText(opening, { exact: false })).toHaveCount(1);
+  });
+
+test("the header speaks for every figure drawn under it", async ({ page }) => {
+    await open(page, STRIP);
+    const map = position(page, 84).getByTestId("watched-entry-map");
+    const grids = mapOf(NOT_STARTED).grids;
+    const off = Object.keys(grids.variant_by_grid)
+      .filter((g) => grids.variant_by_grid[g] !== grids.variant)
+      .map((g) => grids.variant_by_grid[g]);
+    // EVERY drawn tail carries the variant it was summed out of, as
+    // DATA rather than prose. A tail on a variant the header does not
+    // name is a figure on an unannounced basis — which is the defect,
+    // pointing the other way.
+    const named = new Set([grids.variant, ...off]);
+    const rows = await map.getByTestId("watched-map-reached").all();
+    expect(rows.length).toBeGreaterThan(0);
+    let carried = 0;
+    for (const r of rows) {
+      const v = (await r.getAttribute("data-variant")) ?? "";
+      if (v === "") continue;             // a refused tail sums nothing
+      carried += 1;
+      expect(named, `a tail is drawn on '${v}', which the header does `
+        + "not name").toContain(v);
+    }
+    expect(carried, "no drawn tail carries a variant at all")
+      .toBeGreaterThan(0);
+  });
+
+test("the reason is not told twice — the header's words stay out of the "
+   + "card's disclosure", async ({ page }) => {
+    // The card's one disclosure collects payload prose by LENGTH, and
+    // this paragraph is ~1,500 characters on fourteen nodes. Without
+    // being declared as face-said it lands there too, and one fact is
+    // told twice on one card — which is the whole reason that
+    // disclosure excludes what the face already says.
+    await open(page, STRIP);
+    // the disclosure is ONE PER CARD, and the card is the match
+    const notes = match(page, NOT_STARTED.fixture_id)
+      .getByTestId("watched-card-notes");
+    const opening = mapOf(NOT_STARTED).grids.variant_exception.slice(0, 60);
+    await expect(notes).toHaveCount(1);
+    await expect(notes.getByText(opening, { exact: false })).toHaveCount(0);
+    // the disclosure IS collecting payload prose — so the absence above
+    // is an exclusion and not an empty block
+    await expect(notes.getByTestId("watched-note").first()).toBeVisible();
+  });
+
+test("a map that names a deviation and carries no reason says so, "
+   + "rather than drawing a circle over nothing", async ({ page }) => {
+    // MISSING IS NEVER ZERO. An absent explanation is not an absent
+    // exception: the figures are still on a basis the map's other grids
+    // do not share, and an affordance must never be an empty promise.
+    const thin = JSON.parse(JSON.stringify(STRIP));
+    const m = thin.matches.find(
+      (x: { fixture_id: number }) => x.fixture_id === NOT_STARTED.fixture_id)
+      .positions[0].entry_map;
+    delete m.grids.variant_exception;
+    for (const b of Object.values(m.branches) as Record<string, unknown>[]) {
+      const r = b.reached as Record<string, unknown> | undefined;
+      if (r) delete r.clean_variant_refused;
+    }
+    await open(page, thin);
+    const map = position(page, 84).getByTestId("watched-entry-map");
+    // the deviation is STILL named — that fact is on the payload
+    await expect(map.getByTestId("watched-map-variant-exception"))
+      .toBeVisible();
+    // …and the missing reason is named as missing, with no circle to press
+    await expect(map.getByTestId("watched-map-variant-open")).toHaveCount(0);
+    await expect(map.getByTestId("watched-map-variant-unexplained"))
+      .toContainText("no reason on this payload");
+  });
+
+test("a map whose grids all read one variant draws no exception at all",
+  async ({ page }) => {
+    // The affordance is never an empty promise in the other direction
+    // either: with nothing deviating there is no label and no circle.
+    const same = JSON.parse(JSON.stringify(STRIP));
+    const g = same.matches.find(
+      (x: { fixture_id: number }) => x.fixture_id === NOT_STARTED.fixture_id)
+      .positions[0].entry_map.grids;
+    for (const name of Object.keys(g.variant_by_grid)) {
+      g.variant_by_grid[name] = g.variant;
+    }
+    await open(page, same);
+    const map = position(page, 84).getByTestId("watched-entry-map");
+    await expect(map.getByTestId("watched-map-variant-exception"))
+      .toHaveCount(0);
+    await expect(map.getByTestId("watched-map-variant-open")).toHaveCount(0);
+    await expect(map.getByTestId("watched-map-variant-unexplained"))
+      .toHaveCount(0);
+    // THE FIGURES ARE UNTOUCHED — this moves an explanation, never a
+    // number.
+    await expect(map.getByTestId("watched-map-reached").first())
+      .toContainText("reaching this state:");
   });
 
 test("no expectation is priced off a lower bound", async ({ page }) => {
