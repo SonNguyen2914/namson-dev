@@ -39,20 +39,36 @@
 // WHAT THIS PAYLOAD ACTUALLY CARRIES, AND WHAT IT DOES NOT.
 //
 // The blocks below were designed against the draft and then measured
-// against the wire. Three of them have data and three do not, and the
-// three that do not REFUSE BY NAME rather than drawing a plausible
-// number:
+// against the wire. Some of them have data and some do not, and the ones
+// that do not REFUSE BY NAME rather than drawing a plausible number:
 //
 //   HAS IT   the tape age (derived from `state.captured_at` against the
 //            envelope's `generated_at`), the score and the minute, the
-//            four live-read components per side, the held position, and
-//            — since 2026-09-07 — one MATCH STATE per side (`states`,
+//            four live-read components per side, the held position;
+//            since 2026-09-07, one MATCH STATE per side (`states`,
 //            backend card.live_states), which refuses by name on a row
-//            without possession or without shot counts.
+//            without possession or without shot counts; and, wired the
+//            same day, the MODEL PROBABILITY TRIPLE beside the DE-VIGGED
+//            MARKET TRIPLE (`model_v_market`, backend
+//            card.live_model_v_market), plus the same engine solved on
+//            the rates the match has moved (`model_live`).
 //   HAS IT NOT  crests and club colours (no provider on this plane sends
 //            either — see lib/teamColors.clubColors); yellow and red
-//            CARD COUNTS; a tilt / momentum / events-per-minute figure;
-//            a model probability triple and a de-vigged market triple.
+//            CARD COUNTS; a tilt / momentum / events-per-minute figure.
+//
+// THIS LIST IS THE FILE'S SECOND CLAIM ABOUT ITSELF, and the first one
+// is the block that does the work. It said the two triples were absent
+// while MODEL V MARKET, six hundred lines below, said "WIRED 2026-09-07
+// … the bars are drawn from it": the header was simply not edited when
+// the wiring landed. Two sentences in one file saying opposite things is
+// a defect this repo has now shipped three times. When a block's data
+// arrives or goes, this list is part of the change.
+//
+// "HAS IT" IS NOT "ALWAYS DRAWS IT". The two triples are read
+// DEFENSIVELY off the match rather than typed onto `WatchedMatch`,
+// because the route emits them per match and a payload can carry
+// neither — that case is the named absence `live-model-absent`, not an
+// empty bar. Present on the wire, refusable on the row.
 //
 // A REFUSAL IS DRAWN, NEVER LEFT BLANK, and the two kinds are drawn
 // differently: a ROUTINE ABSENCE is a quiet faint line, the way the

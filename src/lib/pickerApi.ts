@@ -76,6 +76,80 @@ export interface KalshiQuote {
   flags: string[];
 }
 
+/** THE VENUE-AWARE FAVOURITE — what a rule the board does not act on
+ *  WOULD say, carried on every rated row so its disagreement with the
+ *  table is countable BEFORE anyone turns it on (backend
+ *  src/picker/stages.venue_verdict, 2026-09-03).
+ *
+ *  The rule is "the ground is worth more than THIS MUCH table gap": if
+ *  the side that is genuinely at home is not the table's favourite, and
+ *  the gap between them is smaller than a bar derived from the league's
+ *  own goals per game, the venue names the home side instead.
+ *
+ *  IT IS A UNION, NOT AN OPTIONAL BAG, because the backend emits two
+ *  genuinely different shapes and folding them into one would let a
+ *  reader ask a refusal for its threshold and get `undefined` — a
+ *  missing read wearing the clothes of a measured one.
+ *
+ *    refused: true   a NAMED refusal. `reason` is one of
+ *                    no_venue_class / venue_unknown /
+ *                    venue_class_unrecognised / no_gdg_gap /
+ *                    no_league_gpg / no_threshold. The six verdict
+ *                    sub-keys are ABSENT BY CONSTRUCTION, not null —
+ *                    e.g. every cross-league cup row refuses with
+ *                    `no_gdg_gap`, since the gap the venue would be
+ *                    weighed against was itself withheld.
+ *    refused: false  a verdict, naming the club, the inputs it used and
+ *                    which of the four rules produced it.
+ *
+ *  `agrees` is about the CLUBS — did the venue reach the same favourite
+ *  as the table. `flipped` is about THIS ROW — did the policy actually
+ *  move it, which requires the policy to be on. The two are different
+ *  questions and the row answers both. */
+export type VenueFavourite =
+  | {
+      refused: true;
+      reason: string;
+      policy: "on" | "off";
+      flipped: false;
+      /** present once the class was read; absent when it never was */
+      venue_class?: string;
+      home_side?: "home" | "away" | null;
+    }
+  | {
+      refused: false;
+      venue_class: string;
+      /** null on a class where nobody is home (NEUTRAL) */
+      home_side: "home" | "away" | null;
+      gdg_gap_abs: number;
+      threshold: number;
+      /** "derived" from the league's goals per game, or "override" */
+      threshold_source: string;
+      policy: "on" | "off";
+      favourite: string;
+      side: "home" | "away";
+      agrees: boolean;
+      /** no_home_side / favourite_already_at_home /
+       *  venue_outweighs_table_gap / table_gap_beats_venue */
+      reason: string;
+      flipped: boolean;
+    };
+
+/** THE ONE THING THIS ANNOTATION IS FOR: the rows where the venue rule
+ *  and the table name DIFFERENT clubs. Returns the verdict only when it
+ *  is a real disagreement — a refusal is not one, and neither is a
+ *  verdict that agrees.
+ *
+ *  A guard on the board reads this and an agreeing row carries no
+ *  attribute at all, the same contract `seasonDeparture` keeps: the
+ *  derivation outlives the ink, and an ordinary row asserts nothing. */
+export function venueDisagreement(row: BoardRow):
+    Extract<VenueFavourite, { refused: false }> | null {
+  const v = row.venue_favourite;
+  if (!v || v.refused !== false || v.agrees) return null;
+  return v;
+}
+
 export interface BoardRow {
   refused: false;
   /** WHICH COMPETITION this fixture is: a league slug or a cup slug. */
@@ -119,6 +193,17 @@ export interface BoardRow {
   venue_class?: { class: "DOMESTIC" | "NEUTRAL" | "TRUE_HOME"
                        | "OPPONENT_COUNTRY" | "UNKNOWN";
                   home_side: "home" | "away" | null } | null;
+  /** WHAT A VENUE-AWARE RULE WOULD SAY ABOUT THIS FIXTURE, and what
+   *  actually named the favourite above. Both ride EVERY rated row
+   *  (backend src/picker/stages.py, 2026-09-03); see VenueFavourite. */
+  venue_favourite?: VenueFavourite | null;
+  /** "rank" — the derived whole-league position named the favourite,
+   *  which is every row on the board today; "venue" — the venue rule
+   *  did, which happens only with PICKER_VENUE_FAVOURITE on. It is not
+   *  cosmetic: under "venue" every signed field on this row is oriented
+   *  to a side the table rates LOWER, so a negative rank_gap is the row
+   *  saying exactly that rather than a sign bug. */
+  fav_source?: "rank" | "venue";
   resolution: Record<string, string>;
   /** NULL on a cross-league cup fixture: the two clubs were rated in
    *  different competitions and their rates were never on one scale, so

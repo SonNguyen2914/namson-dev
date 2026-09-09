@@ -41,7 +41,25 @@
   --lg-epl: #a78bfa;
   --lg-laliga: #ff7a70;
   --lg-ligamx: #5fe0a0;
-  --lg-cup: #f5c542;       /* cross-league competitions stay brand-gold */
+  --lg-cup: #f5c542;       /* a cup with no light of its own — see below */
+  /* THE CHAMPIONS LEAGUE'S OWN LIGHT (2026-09-08). `--lg-cup` was the
+     fallback for EVERY competition outside the four leagues, which was
+     fine while one of them was on the board at a time and stopped being
+     fine the day the UCL and the Leagues Cup drew columns side by side:
+     one gold rail, one gold favourite pip and one gold dumbbell span
+     each, so the two cups became indistinguishable in exactly the ink
+     that exists to tell columns apart.
+
+     hsl(318 82% 70%), picked as the widest empty arc in this palette.
+     The four leagues sit at 198° / 255° / 4° / 150°; the traffic light
+     at 160° (up), 43° (warn), 0° (neg) and 5° (live); gold, the brand,
+     at 45°. 318° is 63° from its nearest neighbour (epl) — the same
+     separation mls and epl already carry — and its blue channel (204)
+     puts it clear of every red in the set. Same saturation/lightness
+     band as the other four, so it reads as one more broadcast light
+     rather than a status colour, which is the whole contract: league
+     hues are WAYFINDING, gold is BRAND, and neither is ever a verdict. */
+  --lg-ucl: #f174cc;
 
   /* the board's display voice (bundled via @fontsource-variable) */
   --font-archivo: "Archivo Variable", var(--font-geist-sans), ui-sans-serif,
@@ -102,6 +120,7 @@
   --color-lg-laliga: var(--lg-laliga);
   --color-lg-ligamx: var(--lg-ligamx);
   --color-lg-cup: var(--lg-cup);
+  --color-lg-ucl: var(--lg-ucl);
   --color-warn: var(--warn);
   --color-skylive: var(--skylive);
   --color-neg: var(--neg);

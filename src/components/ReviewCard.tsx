@@ -714,6 +714,13 @@ export function ReviewTail({
     saveReviewSort(slug, next);
   };
 
+  /* IS THE NUMBER OF FINISHED MATCHES KNOWN AT ALL? `rows.length` is 0
+     while the request is in flight, after it failed, and after THIS
+     league's own tail failed — for exactly the same reason it is 0 on a
+     league that genuinely played nothing. The three are different facts
+     and the header must not fold them together. */
+  const known = !loading && !error && !meta?.error;
+
   return (
     <section data-testid="review-tail" data-league={slug}
       aria-label={`${leagueLabel(slug)} finished matches`}
@@ -722,20 +729,49 @@ export function ReviewTail({
           it while closed: "finished · 12 matches · last 7d" is the whole
           point of a collapsed section — a reader must be able to decide
           whether to open it without opening it. The count is therefore
-          NOT hidden with the body. */}
+          NOT hidden with the body.
+
+          AND A LOADED CONTROL MUST NOT LOOK LIKE AN EMPTY ONE (operator,
+          2026-09-08). Every part of this row was drawn in the faintest
+          ink on the ladder, so "4 matches" and "0 matches" were the same
+          object at a glance — and on a column whose ONLY content is
+          behind this control, that made a column holding four matches
+          read as a broken empty one. `data-has` says which it is; the
+          ink follows it, and it goes no further than one step up the
+          gray ladder. A count is not a verdict and gets no colour.
+
+          NOR MAY IT COUNT A READ THAT DID NOT HAPPEN. Printing "0
+          matches" while the request is still out, or after it failed, is
+          a failed read rendered as a measured absence — on the one
+          control a reader uses to decide whether to look. Three states,
+          three words: a number, "reading", "not read". */}
       <button type="button" data-testid="review-toggle"
+        data-has={known ? (rows.length > 0 ? "matches" : "none") : "unread"}
         onClick={toggle} aria-expanded={open}
         aria-controls={`review-body-${slug}`}
+        title={!known
+          ? (loading
+              ? `still reading the last ${back} day${back === 1 ? "" : "s"} — how many finished is not known yet`
+              : `the last ${back} day${back === 1 ? "" : "s"} could not be read, so how many finished is not known — open this for the reason`)
+          : rows.length > 0
+            ? `${rows.length} match${rows.length === 1 ? "" : "es"} finished in the last ${back} day${back === 1 ? "" : "s"} — press to ${open ? "put them away" : "read them"}`
+            : `nothing finished in the last ${back} day${back === 1 ? "" : "s"}`}
         className="group flex w-full items-baseline gap-2 text-left">
         <span aria-hidden
-          className={`font-mono text-[10px] text-ink-faint transition-transform ${
+          className={`font-mono text-[10px] transition-transform ${
+            known && rows.length > 0 ? "text-ink-mid" : "text-ink-faint"} ${
             open ? "rotate-90" : ""}`}>▸</span>
-        <h4 className="font-mono text-[11px] uppercase tracking-[0.22em] text-ink-mid transition-colors group-hover:text-accent">
+        <h4 className={`font-mono text-[11px] uppercase tracking-[0.22em] transition-colors group-hover:text-accent ${
+          known && rows.length > 0 ? "text-ink-hi" : "text-ink-mid"}`}>
           finished
         </h4>
         <span data-testid="review-count"
-          className="ml-auto font-mono text-[10px] uppercase tracking-[0.14em] tabular-nums text-ink-faint">
-          {rows.length} match{rows.length === 1 ? "" : "es"} · last {back}d
+          className={`ml-auto font-mono text-[10px] uppercase tracking-[0.14em] tabular-nums ${
+            known && rows.length > 0 ? "text-ink-mid" : "text-ink-faint"}`}>
+          {known
+            ? `${rows.length} match${rows.length === 1 ? "" : "es"}`
+            : loading ? "reading" : "not read"}
+          {" · last "}{back}d
         </span>
       </button>
 

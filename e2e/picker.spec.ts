@@ -308,13 +308,24 @@ test("four league columns, fixed order, each header carrying its facts",
     expect(await cols.evaluateAll(
       (els) => els.map((e) => e.getAttribute("data-league"))))
       .toEqual(["mls", "epl", "laliga", "ligamx"]);
-    // MLS: current-season badge with its min GP, a zero count, and an
-    // in-window league with nothing to show SAYS SO rather than sitting
-    // blank
+    // MLS: current-season badge with its min GP, and an in-window league
+    // with nothing coming SAYS SO rather than sitting blank
     const mls = cols.nth(0);
     await expect(mls.getByRole("heading", { name: "MLS" })).toBeVisible();
     await expect(mls.getByText(/this szn · min 21 GP/)).toBeVisible();
-    await expect(mls.getByTestId("col-count")).toHaveText("0 fixtures");
+    /* THE COUNT COUNTS WHAT THE COLUMN HOLDS (operator, 2026-09-08).
+       This asserted "0 fixtures" while the review below it carries THREE
+       finished MLS matches — the exact reading that made a finished-only
+       Leagues Cup column look broken, and the rule the tree is built on:
+       missing is never zero, and neither is "nothing upcoming" when
+       three matches are sitting under it. `data-counts` says which of
+       the two the number is, so the header cannot mean the other one by
+       accident. The genuinely empty case still reads "0 fixtures" — see
+       e2e/nothing-ahead-is-not-nothing.spec.ts, which pins both on one
+       board. */
+    await expect(mls.getByTestId("col-count")).toHaveText("3 finished");
+    await expect(mls.getByTestId("col-count"))
+      .toHaveAttribute("data-counts", "finished");
     await expect(mls.getByTestId("col-empty"))
       .toContainText("No MLS fixtures in the next 7 days");
     // La Liga: prior-season badge in the header, and a true count

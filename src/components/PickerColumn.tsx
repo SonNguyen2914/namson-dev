@@ -30,7 +30,7 @@ import Link from "next/link";
 import { dayLabel, fmtDate, localDay } from "../lib/matchday";
 import {
   BoardRefusal, BoardRow, LeagueMeta, SEASON_BLEND_K, homeBadge, leagueLabel,
-  rowHref, seasonDisagreement, seasonSpan, seasonSpanLabel,
+  rowHref, seasonDisagreement, seasonSpan, seasonSpanLabel, venueDisagreement,
 } from "../lib/pickerApi";
 import {
   ReviewLeagueMeta, ReviewRefusal, ReviewRow,
@@ -52,9 +52,19 @@ import { Eyebrow } from "./ui";
 // hue — WAYFINDING ONLY: rails, the favourite's pip, the dumbbell span.
 // Data ink stays on the gray ladder; gold stays the brand and rank 01.
 // ---------------------------------------------------------------------
+//
+// A COMPETITION WITH TWO NEIGHBOURS NEEDS ITS OWN LIGHT (2026-09-08).
+// `--lg-cup` was the fallback for everything outside the four leagues,
+// which held only while at most one such column was drawn. With the
+// Champions League and the Leagues Cup side by side the fallback made
+// them the SAME gold — the rail, the favourite pip and the dumbbell span
+// all identical — so the one ink whose job is telling columns apart told
+// the reader nothing. The UCL is named here now; the fallback stays for
+// a competition nobody has picked a hue for yet, which is honest (an
+// unassigned column looks unassigned) rather than a collision.
 const LEAGUE_HUE: Record<string, string> = {
   mls: "var(--lg-mls)", epl: "var(--lg-epl)", laliga: "var(--lg-laliga)",
-  ligamx: "var(--lg-ligamx)",
+  ligamx: "var(--lg-ligamx)", ucl: "var(--lg-ucl)",
 };
 export const hueOf = (slug: string) => LEAGUE_HUE[slug] ?? "var(--lg-cup)";
 
@@ -280,6 +290,27 @@ export function RowRead({ row, modeId, clubCount, dense = false }: {
   const badge = homeBadge(row);
   const anchor = anchorFor(row, modeId);
   const alt = seasonDisagreement(row);
+  /* THE VENUE RULE'S DISAGREEMENT, ON THE BADGE THAT IS ABOUT THE VENUE
+     (2026-09-08). The backend has carried `venue_favourite` on every
+     rated row since 2026-09-03 so the disagreement is countable before
+     anyone acts on it; the frontend did not declare it, so it was
+     invisible everywhere and countable nowhere.
+     IT GETS NO INK OF ITS OWN, and that is the decision rather than an
+     omission: on the live board a quarter of the rows disagree, a chip
+     on a quarter of the cards would read as a second favourite, and
+     this rule is OFF — nothing on this row moved. So it rides the H/A/N
+     badge's own sentence, which is already the card's statement about
+     who is at home, and `data-venue-disagrees` on the card carries it
+     for a guard. The case that DOES change the row — the policy on, the
+     favourite named by the venue — is drawn, in RowCard. */
+  const vd = venueDisagreement(row);
+  const badgeTitle = badge && vd
+    ? `${badge.title}. A venue-aware rule the board does NOT act on would `
+      + `name ${vd.favourite} here instead: the gap between these two is `
+      + `${vd.gdg_gap_abs.toFixed(2)} GD/g, under its ${vd.threshold.toFixed(2)} `
+      + `bar. It is annotation, it is switched off, and nothing on this `
+      + `card is signed to it.`
+    : badge?.title;
   return (
     <>
       {/* The fixture line is the way IN. A board of ranked matches you
@@ -332,7 +363,7 @@ export function RowRead({ row, modeId, clubCount, dense = false }: {
                 className={`flex-none rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] ${
                   badge.text === "N"
                     ? "border-warn/40 text-warn" : "border-line text-ink-low"}`}
-                title={badge.title}>
+                title={badgeTitle}>
                 {badge.text}
               </span>
             )}
@@ -446,6 +477,19 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false }: {
   const cross = row.cross_league === true;
   const alt = seasonDisagreement(row);
   const departure = seasonDeparture(row, colSrc, alt);
+  /* WHICH RULE NAMED THE FAVOURITE THIS CARD IS SIGNED FROM. "rank" on
+     every row the board serves today, and the card says nothing — that
+     is the board's own rule and repeating it 108 times would be noise.
+     "venue" means the policy is ON and this row's favourite is a side
+     the table rates LOWER, which makes every signed number below —
+     the three gaps, the tier pairs, the shape — read from that side.
+     A card whose numbers all changed sign without a word for it would
+     contradict itself, so THAT case is drawn.
+     The disagreement while the policy is off is a different fact and
+     stays as data (see `venueDisagreement` and the badge's sentence):
+     nothing on this row moved, so nothing on it should say otherwise. */
+  const vd = venueDisagreement(row);
+  const flipped = row.fav_source === "venue";
   return (
     <article
       data-testid="picker-row"
@@ -455,6 +499,8 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false }: {
       data-event={row.event_id}
       data-cross-league={cross ? "true" : "false"}
       data-season-departure={departure ?? undefined}
+      data-fav-source={row.fav_source ?? undefined}
+      data-venue-disagrees={vd ? vd.favourite : undefined}
       className={`rounded-xl border transition-colors bg-gradient-to-b from-elev2/60 to-elev/40 ${
         dense ? "p-4 md:p-3" : "p-4"} ${
         rank === 1
@@ -500,6 +546,20 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false }: {
             title="each club is rated on its own domestic league's table — this cup has none of its own"
             className="rounded border border-warn/40 bg-warn/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
             {leagueLabel(row.rated_in.home)} v {leagueLabel(row.rated_in.away)}
+          </span>
+        )}
+        {/* THE FAVOURITE ON THIS CARD IS NOT THE TABLE'S. Only with
+            PICKER_VENUE_FAVOURITE on, which it is not on any board
+            served today — and exactly because it is not, the card would
+            otherwise ship a silent contradiction the first time it is:
+            every signed number below is read from the side the venue
+            named, so a rank_gap of −3 is the row stating that the
+            favourite is three places WORSE, not a sign bug. */}
+        {flipped && (
+          <span data-testid="fav-source-venue"
+            title={`The venue-aware rule named the favourite on this card, not the league table — ${row.favourite} is at home and the table gap between these two is under that rule's bar. Every signed figure below is read from ${row.favourite}'s side, so a negative gap here means the favourite is the lower-rated club. The rule is annotation the board has been switched to act on; it is not a measured edge.`}
+            className="rounded border border-warn/40 bg-warn/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
+            fav · venue rule
           </span>
         )}
         <span className="ml-auto font-mono text-[11px] tabular-nums text-ink-faint">
@@ -624,6 +684,48 @@ function RefusalWhy() {
   );
 }
 
+/** WHAT THE NUMBER IN A COLUMN HEADER COUNTS (operator, 2026-09-08).
+ *
+ *  THE COMPLAINT. "LEAGUES CUP · 0 FIXTURES", with no chips beside it
+ *  and four finished matches sitting under it. Every part of that is
+ *  produced by the board and the review being two payloads: the board
+ *  serves no Leagues Cup row and no Leagues Cup meta — the tournament is
+ *  over — while the review still carries its four finished ties, so the
+ *  column exists (deliberately: a league with finished matches and no
+ *  upcoming ones must not lose its column) and the header spoke only for
+ *  the half of the page that has nothing.
+ *
+ *  MISSING IS NEVER ZERO, and this is that rule on the surface. "0
+ *  fixtures" as the ONLY thing a column says, over four matches, invites
+ *  the one reading that is false — that there is nothing here.
+ *
+ *  SO THE COUNT COUNTS WHAT THE COLUMN HOLDS. With something upcoming it
+ *  is the upcoming count, unchanged and in the same words as every other
+ *  column. With NOTHING upcoming — no ranked row and no refused one —
+ *  and a finished list that has landed and is not empty, it is the
+ *  finished count, named as finished so the two can never be read alike.
+ *
+ *  AND IT NEVER SPEAKS FOR A READ THAT HAS NOT LANDED. The review is a
+ *  second request on its own clock: while it is in flight or after it
+ *  failed, the number of finished matches is UNKNOWN, and this says
+ *  nothing about it rather than reporting the zero it is currently
+ *  holding. That is the same rule one layer down.
+ *
+ *  WHAT IT DELIBERATELY DOES NOT SAY IS "nothing upcoming". That
+ *  sentence belongs to `col-empty` directly below, which already says it
+ *  in full words for whichever window is set, and which is what tells a
+ *  finished-only column apart from a live league having a quiet week.
+ *  Two elements, one fact each. */
+export function columnCountLabel(
+  upcoming: number,
+  finished: { known: boolean; n: number },
+): string {
+  if (upcoming === 0 && finished.known && finished.n > 0) {
+    return `${finished.n} finished`;
+  }
+  return `${upcoming} fixture${upcoming === 1 ? "" : "s"}`;
+}
+
 export function LeagueColumn({
   slug, meta, rows, refusals, days, dayKeys, sortFor, dayLabels, colIndex,
   review, dense = false,
@@ -721,6 +823,42 @@ export function LeagueColumn({
   const runsOwnSort = Boolean(ownSort)
     && dayKeys.some((k) => isDefaultSort(sortFor(k)));
 
+  /* ── THE FINISHED-ONLY COLUMN (operator, 2026-09-08) ──────────────
+     Three derivations, all off what this column was actually handed.
+
+     `nothingAhead` — no ranked row AND no refused one. A refusal is a
+     fixture too (2026-09-07), so a column holding one is not empty and
+     must not be described as though it were; this is deliberately the
+     same test `col-empty` below applies, so the header and the body can
+     never disagree about whether anything is coming.
+
+     `finishedKnown` — the review is a SECOND request with its own
+     clock and its own failure. In flight, failed, or failed for this
+     league alone, the finished count is unknown; `review.rows.length`
+     is 0 in all three, and reporting that as "0 finished" would be a
+     failed read rendered as a measured absence.
+
+     `boardSilent` — the board payload carried no entry for this
+     competition at all. That is why this column has no season chip and
+     no "cup · rated on" chip: there is no meta to draw them from, and
+     an unexplained gap where every neighbour has one is what made the
+     column read as broken. It is NAMED in the header now. */
+  const nothingAhead = rows.length === 0 && refusals.length === 0;
+  const finishedKnown = !review.loading && !review.error && !review.meta?.error;
+  const finished = { known: finishedKnown, n: review.rows.length };
+  const boardSilent = !meta;
+
+  /* ONE TAIL, PLACED IN ONE OF TWO TRACKS. Built here rather than twice
+     below: a second copy of this call is how two renderings of one
+     section begin disagreeing, and the placement is the only thing that
+     differs between them. */
+  const tail = (
+    <ReviewTail slug={slug} back={review.back}
+      rows={review.rows} refusals={review.refusals} meta={review.meta}
+      loading={review.loading} error={review.error}
+      storeNote={review.storeNote} />
+  );
+
   // a cup member league that did not build. ABSENT, not empty, when
   // every member built — so this block cannot draw a reassuring "0".
   const memberErrors = Object.entries(meta?.member_errors ?? {});
@@ -755,8 +893,13 @@ export function LeagueColumn({
           jump-nav landing comes to rest. */}
       <header data-testid="col-head"
         className="sticky top-[var(--topbar-h)] z-20 self-start border-b border-line bg-bs pb-3 pt-2 xl:[grid-row:1]">
-        {/* the league's own light — a 2px rail, wayfinding only */}
-        <div aria-hidden
+        {/* the league's own light — a 2px rail, wayfinding only. It is
+            addressable because it is where a hue COLLISION is visible:
+            two columns whose rails resolve to one colour is the defect
+            that made the UCL and the Leagues Cup indistinguishable, and
+            a guard has to read the painted ink rather than the token
+            name to catch a fallback landing twice. */}
+        <div aria-hidden data-testid="col-rail"
           className="mb-2 h-[2px] rounded-full opacity-80 [background:var(--lg)]" />
         {/* TWO LINES, DECIDED HERE RATHER THAN BY THE WIDTH. One
             flex-wrap row put the name, the basis chip and the fixture
@@ -775,12 +918,38 @@ export function LeagueColumn({
           <h3 className="min-w-0 flex-1 truncate text-base font-bold uppercase tracking-[0.03em] text-ink-hi [font-family:var(--font-archivo)] [font-stretch:106%]">
             {leagueLabel(slug)}
           </h3>
+          {/* THE COUNT COUNTS WHAT THIS COLUMN HOLDS — see
+              columnCountLabel. `data-counts` says which of the two it
+              is, so the header can never be read as the other one by a
+              guard or by a reader hovering it. */}
           <span data-testid="col-count"
+            data-counts={nothingAhead && finished.known && finished.n > 0
+              ? "finished" : "upcoming"}
+            title={nothingAhead && finished.known && finished.n > 0
+              ? `nothing upcoming in this column, and ${finished.n} match${finished.n === 1 ? "" : "es"} that already finished — they are under the dashed divider below`
+              : undefined}
             className="flex-none font-mono text-[10px] uppercase tracking-[0.14em] tabular-nums text-ink-faint">
-            {rows.length} fixture{rows.length === 1 ? "" : "s"}
+            {columnCountLabel(rows.length, finished)}
           </span>
         </div>
         <div className="mt-1.5 flex flex-wrap items-baseline gap-1 empty:mt-0">
+          {/* WHY THIS COLUMN HAS NO CHIPS — said, rather than left as a
+              gap (operator, 2026-09-08). Every other column carries a
+              season chip and, for a cup, a "rated on" chip; this one
+              carried none, because there is no `meta` to derive either
+              from. The board payload simply never mentions this
+              competition — the Leagues Cup is over, so it serves no
+              rows and no league entry for it, while the review still
+              carries its finished ties and keeps the column alive.
+              An unexplained blank where four neighbours have chips is
+              what a reader calls broken. This is that blank, named. */}
+          {boardSilent && (
+            <span data-testid="col-no-board-entry"
+              title="The board payload carried no entry for this competition at all — no season basis, no rating table, and so no upcoming fixtures to rank. That is the board saying NOTHING about it, which is not the same as the board measuring none. This column is here because the finished read, a separate request, still has matches in it."
+              className="rounded border border-line-strong px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-low">
+              no board entry
+            </span>
+          )}
           {meta?.src === "prior" && (
             <span data-testid="col-season"
               {...(span ? {
@@ -949,15 +1118,68 @@ export function LeagueColumn({
           </div>
         );
       })}
-      {rows.length === 0 && refusals.length === 0 && !meta?.error && (
-        // an empty column SAYS SO — a failed league (above) is a different
-        // fact and must not be dressed as a quiet weekend
-        <div data-testid="col-empty"
+      {/* ── A COLUMN WITH NOTHING AHEAD OF IT (operator, 2026-09-08) ──
+          The empty state AND the finished tail, together, in the FIRST
+          content track.
+
+          The tail's home is the last track, under every matchday and
+          every refusal, so a league's forward story finishes before its
+          backward one starts. With nothing ahead there is no forward
+          story: the last track is then a thousand pixels of nothing
+          below this box, and the tail was landing at the very foot of
+          the whole board — a faint two-line toggle under a screen of
+          void, which is exactly what "0 FIXTURES and an empty column"
+          looked like. "Last in the column" and "row 3" are the same
+          place when the rows above are empty, so the tail moves up to
+          meet the sentence that names it rather than the sentence
+          pointing a long way down.
+
+          ONE grid item, not two at the same row: explicitly placed
+          items may overlap, and `col-empty` and the tail would have
+          been drawn on top of each other. */}
+      {nothingAhead && (
+        <div data-slot="tail-track" data-at="head"
           style={{ ["--r" as string]: "3" }}
-          className="mt-3 self-start rounded-xl border border-line p-4 xl:mt-0 xl:[grid-row:var(--r)]">
-          <p className="text-sm text-ink-mid">
-            No {leagueLabel(slug)} fixtures in the next {days} day{days === 1 ? "" : "s"}.
-          </p>
+          className="mt-3 xl:mt-0 xl:self-start xl:[grid-row:var(--r)]">
+          {!meta?.error && (
+            // an empty column SAYS SO — a failed league (above) is a
+            // different fact and must not be dressed as a quiet weekend
+            <div data-testid="col-empty"
+              data-holds={finished.known && finished.n > 0
+                ? "finished" : "nothing"}
+              className="rounded-xl border border-line p-4">
+              <p className="text-sm text-ink-mid">
+                No {leagueLabel(slug)} fixtures in the next {days}{" "}
+                day{days === 1 ? "" : "s"}.
+              </p>
+              {/* AND THEN WHAT THIS COLUMN DOES HAVE. Two states share
+                  this box and they mean opposite things: a live league
+                  having a quiet week, which is the sentence above and
+                  nothing more, and a column whose entire content is the
+                  finished list under it. Said here, at the top, where
+                  the reader already is.
+                  `finished.known` gates it: while the review is in
+                  flight or after it failed there is no count to state,
+                  and this box claims nothing about a read that has not
+                  landed. */}
+              {finished.known && finished.n > 0 && (
+                <p data-testid="col-empty-finished"
+                  className="mt-2 text-sm leading-relaxed text-ink-low">
+                  <span className="text-ink-mid">
+                    {finished.n} finished in the last {review.back}{" "}
+                    day{review.back === 1 ? "" : "s"}
+                  </span>
+                  , directly below
+                  {boardSilent
+                    ? " — and that is the whole of this column: the board"
+                      + " carries no entry for this competition, so nothing"
+                      + " is coming."
+                    : "."}
+                </p>
+              )}
+            </div>
+          )}
+          {tail}
         </div>
       )}
 
@@ -993,15 +1215,16 @@ export function LeagueColumn({
       {/* ── the finished tail ──────────────────────────────────────────
           Last in the column, after the upcoming fixtures AND after the
           refusals that belong to them, so this league's forward story is
-          complete before the backward one starts. */}
-      <div className="xl:self-start xl:[grid-row:var(--r)]"
-        style={{ ["--r" as string]: String(3 + 2 * dayKeys.length) }}
-        data-slot="tail-track">
-        <ReviewTail slug={slug} back={review.back}
-          rows={review.rows} refusals={review.refusals} meta={review.meta}
-          loading={review.loading} error={review.error}
-          storeNote={review.storeNote} />
-      </div>
+          complete before the backward one starts. A column with nothing
+          ahead of it has already drawn this, up in the first track — see
+          above; it is ONE element either way, never two. */}
+      {!nothingAhead && (
+        <div className="xl:self-start xl:[grid-row:var(--r)]"
+          style={{ ["--r" as string]: String(3 + 2 * dayKeys.length) }}
+          data-slot="tail-track" data-at="foot">
+          {tail}
+        </div>
+      )}
     </section>
   );
 }
