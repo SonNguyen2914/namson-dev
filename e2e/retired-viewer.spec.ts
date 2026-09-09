@@ -37,7 +37,7 @@ const RETIRED = ["ecl", "uel", "brasileirao", "argentina", "usl"];
 // and `BOARD_COLUMNS` cannot empty it, so that is where the chip points
 // and this is the assertion that keeps it there.
 const KEPT_CHIPS: [string, string][] = [
-  ["ucl", "/bet-suggester/comp/ucl"],
+  ["ucl", "/bet-suggester/ucl"],
 ];
 // KEPT, BUT FILED. ASEAN FINISHED (0 upcoming, 28 played) and moved into
 // the Archive dropdown at the top-left on 2026-08-30, with WC26. THE

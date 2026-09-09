@@ -126,14 +126,30 @@ async function open(
   await page.goto(where);
 }
 
-// THE VIEWER, NOT THE NARROWED BOARD (2026-09-09). `/bet-suggester/ucl`
+// THE NARROWED BOARD, NOT THE VIEWER — and it moved twice in one day,
+// so both moves are written down.
+//
+// It pointed here originally. When the operator took the Champions
+// League off the board, `/api/picker/board` stopped serving its rows and
+// this page held ZERO, so the chip was moved to the competition viewer,
+// which `BOARD_COLUMNS` cannot empty. Then `?leagues=` (backend
+// fc9bc55) fixed the cause rather than the symptom: the board builds an
+// off-board competition for anyone who asks BY NAME, and this page draws
+// the operator's own match cards again.
+//
+// He then went looking for those cards, landed on the viewer, and said
+// "still look the same for me" — the viewer has the ranked field and no
+// cards. The chip names the page with the MATCHES; the ranked field has
+// its own top-left door, and the viewer stays in the Archive menu.
+//
+// (superseded 2026-09-09) THE VIEWER, NOT THE NARROWED BOARD: `/bet-suggester/ucl`
 // is the board with `only={["ucl"]}`, and `/api/picker/board` takes no
 // `leagues` — so once the operator took the competition off the board
 // that page held zero rows and this chip linked to an empty shell. The
 // cup page is the competition viewer, which `BOARD_COLUMNS` cannot
 // empty. Asserted here so the chip cannot drift back onto a surface the
 // board declaration controls.
-const CHIP_HREF = "/bet-suggester/comp/ucl";
+const CHIP_HREF = "/bet-suggester/ucl";
 
 const chip = (page: import("@playwright/test").Page) =>
   page.locator(`a[href="${CHIP_HREF}"]`).first();

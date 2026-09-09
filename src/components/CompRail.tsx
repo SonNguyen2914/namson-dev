@@ -70,18 +70,24 @@ export type LiveCompetition = {
    2026-09-09 changed which page ranks it, not whether it is being
    played.
 
-   AND THE CHIP POINTS AT THE VIEWER, NOT AT `/bet-suggester/ucl`
-   (2026-09-09). That path is the BOARD narrowed to one column
-   (`only={["ucl"]}`), served by `/api/picker/board`, which takes `days`
-   and `date` and no `leagues`. So the moment the operator took the
-   Champions League off the board the page behind this chip held ZERO
-   rows — a live link to an empty shell, verified on namson.dev. His
-   sentence was "we have it in its own cup page is enough", and the cup
-   page is the competition viewer: it reads `src.competitions.VIEWERS`,
-   is untouched by `BOARD_COLUMNS`, and answers today with 12 upcoming,
-   7 carrying a strength read and 12 tradeable on Kalshi. */
+   THE CHIP POINTED AT THE VIEWER FOR ONE DAY, and this records why it
+   came back. `/bet-suggester/ucl` is the BOARD narrowed to one column
+   (`only={["ucl"]}`). When the operator took the Champions League off
+   the board, `/api/picker/board` stopped serving its rows and that page
+   held ZERO — a live link to an empty shell — so the chip was moved to
+   the competition viewer, which `BOARD_COLUMNS` cannot empty.
+
+   `?leagues=` (backend fc9bc55) fixed the cause: the board builds a
+   competition that is off the board for anyone who asks for it BY NAME,
+   and the narrowed page draws the operator's own match cards again. He
+   went looking for them and landed on the viewer, which has the ranked
+   field but no cards: "still look the same for me."
+
+   So the chip names the page with the MATCHES on it. The ranked field
+   has its own door — `FieldLink`, top-left of every page — and the
+   market viewer stays reachable from the Archive menu. */
 export const LIVE_COMPETITIONS: readonly LiveCompetition[] = [
-  { key: "ucl", href: "/bet-suggester/comp/ucl", label: "UCL",
+  { key: "ucl", href: "/bet-suggester/ucl", label: "UCL",
     hue: "--lg-ucl" },
 ];
 
