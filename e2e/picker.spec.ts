@@ -1727,6 +1727,89 @@ test("every finished card shows both verdicts, never one merged tick",
       .toHaveAttribute("data-value", "no");
   });
 
+// --- THE METHOD NOTE IS THE TAIL'S, NOT THE CARD'S (2026-09-09) -------
+//
+// THE OPERATOR'S RULE, GIVEN THREE TIMES — the season share on
+// 2026-09-08, the Champions League cross-league warning on 2026-09-09,
+// and now this: a fact about the whole COLUMN belongs in the column
+// header, once; only a fact about THIS FIXTURE belongs on the card.
+// Commit 302f19a applied it to the board; this is the finished tail.
+//
+// "Two answers, never one…" describes why the fit block prints TWO
+// verdicts. That is the section's method, true of every row and about
+// none of them, and it was redrawn once per finished match five deep in
+// a narrow column, above the numbers it qualifies.
+//
+// WHAT MUST NOT MOVE WITH IT is asserted here too, because the pair is
+// the point: `confirm-note` still rides EVERY row. The comment on it
+// records a decision-safety decision — the exploratory label is not
+// negotiable — and that is a DIFFERENT rule which wins.
+
+test("the fit method is said once in the tail's header, never on a card",
+  async ({ page }) => {
+    await open(page);
+    const tail = page.locator('[data-testid="review-tail"][data-league="mls"]');
+
+    // not on any card, and not anywhere until asked for
+    await expect(page.getByText(/Two answers, never one/)).toHaveCount(0);
+    await expect(tail.getByTestId("fit-method-note")).toHaveCount(0);
+
+    // exactly one affordance for the whole tail
+    const open_ = tail.getByTestId("fit-method-open");
+    await expect(open_).toHaveCount(1);
+    await expect(open_).toHaveText("i");
+    await expect(open_).toHaveAttribute("aria-expanded", "false");
+
+    // hover reveals it, once, in the tail and not in a card
+    await open_.hover();
+    const note = tail.getByTestId("fit-method-note");
+    await expect(note).toBeVisible();
+    await expect(note).toContainText("Two answers, never one");
+    await expect(page.getByText(/Two answers, never one/)).toHaveCount(1);
+  });
+
+test("the method note answers the keyboard and Escape shuts it",
+  async ({ page }) => {
+    await open(page);
+    const tail = page.locator('[data-testid="review-tail"][data-league="mls"]');
+    const trigger = tail.getByTestId("fit-method-open");
+    await trigger.focus();
+    await expect(tail.getByTestId("fit-method-note")).toBeVisible();
+    await expect(trigger).toHaveAttribute("aria-expanded", "true");
+    await page.keyboard.press("Escape");
+    await expect(tail.getByTestId("fit-method-note")).toHaveCount(0);
+  });
+
+test("the panel is measured off the header row, not off its 16px circle",
+  async ({ page }) => {
+    await open(page);
+    const tail = page.locator('[data-testid="review-tail"][data-league="mls"]');
+    await tail.getByTestId("fit-method-open").hover();
+    const note = tail.getByTestId("fit-method-note");
+    await expect(note).toBeVisible();
+    // `boundingBox()` does NOT auto-wait — the visibility assertion above
+    // is what makes this read safe
+    const box = await note.boundingBox();
+    const row = await tail.boundingBox();
+    expect(box).not.toBeNull();
+    expect(row).not.toBeNull();
+    // wider than the trigger by a lot, and inside the page: a panel sized
+    // off the 16px button is unreachable under `html{overflow-x:clip}`
+    expect(box!.width).toBeGreaterThan(120);
+    expect(box!.x).toBeGreaterThanOrEqual(row!.x - 1);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(row!.x + row!.width + 1);
+  });
+
+test("the exploratory label still rides every finished row — a different "
+   + "rule, and it wins", async ({ page }) => {
+    await open(page);
+    await expect(page.getByTestId("review-row")).toHaveCount(5);
+    await expect(page.getByTestId("confirm-note")).toHaveCount(5);
+    for (const t of await page.getByTestId("confirm-note").allTextContents()) {
+      expect(t).toMatch(/NOT PREREGISTERED/);
+    }
+  });
+
 test("a dead plays feed costs the tape, not the match", async ({ page }) => {
   await open(page);
   const c = card(page, "401879295");

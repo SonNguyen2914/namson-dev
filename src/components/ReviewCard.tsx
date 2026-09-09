@@ -42,7 +42,7 @@
 // how many of the finished fixtures had a frozen read, how many had to be
 // rebuilt, how many have none — and they are printed against their own n.
 import Link from "next/link";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { fmtDate } from "../lib/matchday";
 import { leagueLabel } from "../lib/pickerApi";
 import {
@@ -635,10 +635,18 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
             value={fit.confirmed_at_20} yes="confirmed" no="did not confirm"
             reason={fit.confirm_reason} />
         </div>
-        <p className="mt-2 text-[11px] leading-relaxed text-ink-low">
-          Two answers, never one. The scoreboard and the tape can disagree,
-          and when they do that is the thing worth looking at.
-        </p>
+        {/* THE METHOD PARAGRAPH USED TO STAND HERE (moved 2026-09-09).
+            It said "Two answers, never one…" on EVERY finished row. That
+            is a fact about the fit block's METHOD — why this section
+            prints two verdicts rather than one — and not a fact about
+            this fixture, so by the operator's rule (commit 302f19a, "A
+            fact about the whole column is not a fact about a card") it
+            belongs to the tail, once. It is FIT_METHOD_NOTE now, behind
+            the `i` in the tail's header.
+
+            WHAT DID NOT MOVE: `confirm-note` below. The comment on it
+            records a decision-safety decision that the exploratory label
+            rides every row, and that rule is not this one. */}
         {/* The exploratory label rides on EVERY row — that is not
             negotiable, the rule was written after looking at three
             fixtures. What does not need to ride on every row is the whole
@@ -679,6 +687,78 @@ function ReviewRefusalRow({ r }: { r: ReviewRefusal }) {
  *  operator already looks, and keeping the finished matches there keeps a
  *  league's story continuous instead of sending him to a second page to
  *  find out how the first one turned out. */
+/** WHY THIS SECTION PRINTS TWO VERDICTS AND NOT ONE.
+ *
+ *  A fact about the fit block's METHOD, so it is the tail's and not a
+ *  card's — the operator's rule, given three times now (the season
+ *  share 2026-09-08, the Champions League cross-league warning
+ *  2026-09-09, and this). It stood on every finished row, five deep in
+ *  a narrow column, above the numbers it qualifies.
+ *
+ *  A LITERAL, unlike `confirm_note` at the foot, which is read off the
+ *  payload precisely because it states the backend's own rule. This one
+ *  states what THIS COMPONENT draws, so this component is its source. */
+const FIT_METHOD_NOTE =
+  "Two answers, never one. The scoreboard and the tape can disagree, "
+  + "and when they do that is the thing worth looking at.";
+
+/** The tail's method note, said once, behind the letter `i`.
+ *
+ *  MODELLED ON `ColumnNotes` in PickerColumn.tsx and deliberately the
+ *  same object: same 16px circle, same neutral-at-rest treatment with
+ *  the accent only on hover/focus/open, hover + focus + tap-to-pin,
+ *  Escape to shut. A reader who has learnt it on the board does not
+ *  learn it again here.
+ *
+ *  THE PANEL IS NOT ANCHORED TO THE BUTTON. Its positioning context is
+ *  the header ROW, which is the full width of the tail, so
+ *  `w-[min(30rem,100%)]` resolves against the section and never against
+ *  a 16px circle. That matters under `html { overflow-x: clip }`
+ *  (globals.css) — a panel sized off the trigger cannot be scrolled to
+ *  and cannot be seen. */
+function FitMethodNote() {
+  const panelId = useId();
+  const [pinned, setPinned] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const open = pinned || hovered || focused;
+  const shut = () => { setPinned(false); setHovered(false); setFocused(false); };
+  return (
+    <span className="inline-flex"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onKeyDown={(e) => { if (e.key === "Escape") shut(); }}>
+      <button type="button" data-testid="fit-method-open"
+        aria-expanded={open} aria-label="why this section prints two verdicts"
+        aria-describedby={open ? panelId : undefined}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onClick={(e) => {
+          // authoritative, so a second tap closes what hover is holding
+          // open — the only way out on a touch screen
+          e.preventDefault(); e.stopPropagation();
+          setPinned((v) => !v); setHovered(false); setFocused(false);
+        }}
+        // sans, not mono: the mono lowercase i is serifed at both ends
+        // and reads as a figure one at this size — see ColumnNotes
+        className={`inline-flex h-[16px] w-[16px] items-center justify-center self-center rounded-full border text-[11px] font-semibold leading-none transition-colors ${
+          open ? "border-accent/60 text-accent"
+            : "border-line-strong text-ink-low hover:border-accent/40 hover:text-accent"}`}>
+        i
+      </button>
+      {open && (
+        <div data-testid="fit-method-note" id={panelId} role="note"
+          className="absolute right-0 top-[calc(100%+7px)] z-30 w-[min(30rem,100%)] rounded-lg border border-line-strong bg-elev2 p-3 text-left text-[11px] leading-relaxed text-ink-mid shadow-xl">
+          <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+            how to read &ldquo;whether it fit&rdquo;
+          </p>
+          <p className="mt-1">{FIT_METHOD_NOTE}</p>
+        </div>
+      )}
+    </span>
+  );
+}
+
 export function ReviewTail({
   slug, rows, refusals, meta, back, loading, error, storeNote,
 }: {
@@ -745,6 +825,14 @@ export function ReviewTail({
           a failed read rendered as a measured absence — on the one
           control a reader uses to decide whether to look. Three states,
           three words: a number, "reading", "not read". */}
+      {/* THE HEADER IS A ROW, NOT JUST THE BUTTON (2026-09-09), and it
+          is `relative` on purpose: it is the positioning context the
+          method note's panel measures its `100%` against. Anchored to
+          the 16px circle instead, the panel would be 16px wide and
+          unreachable under `html { overflow-x: clip }`. A button cannot
+          nest inside a button either, so the affordance is a sibling of
+          the toggle rather than a child of it. */}
+      <div className="relative flex w-full items-baseline gap-2">
       <button type="button" data-testid="review-toggle"
         data-has={known ? (rows.length > 0 ? "matches" : "none") : "unread"}
         onClick={toggle} aria-expanded={open}
@@ -756,7 +844,7 @@ export function ReviewTail({
           : rows.length > 0
             ? `${rows.length} match${rows.length === 1 ? "" : "es"} finished in the last ${back} day${back === 1 ? "" : "s"} — press to ${open ? "put them away" : "read them"}`
             : `nothing finished in the last ${back} day${back === 1 ? "" : "s"}`}
-        className="group flex w-full items-baseline gap-2 text-left">
+        className="group flex flex-1 items-baseline gap-2 text-left">
         <span aria-hidden
           className={`font-mono text-[10px] transition-transform ${
             known && rows.length > 0 ? "text-ink-mid" : "text-ink-faint"} ${
@@ -774,6 +862,13 @@ export function ReviewTail({
           {" · last "}{back}d
         </span>
       </button>
+      {/* DRAWN WHEN THE CARDS IT DESCRIBES EXIST, and not otherwise: an
+          explainer for a "whether it fit" block that no row is drawing
+          explains nothing. It stays put whether the section is open or
+          shut, so it does not appear and disappear under the reader's
+          cursor as they toggle. */}
+      {rows.length > 0 && <FitMethodNote />}
+      </div>
 
       {open && (
       <div id={`review-body-${slug}`} data-testid="review-body">
