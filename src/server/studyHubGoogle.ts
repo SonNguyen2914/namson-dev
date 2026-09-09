@@ -147,10 +147,17 @@ export async function syncGoogleDrive(db: Database.Database) {
     connectorState.rootFolderId = rootFolderId;
     db.prepare("UPDATE connectors SET cursor_json=? WHERE id='google-drive'").run(JSON.stringify(connectorState));
   }
-  const courses = db.prepare("SELECT slug FROM courses ORDER BY title").all() as Array<{ slug: string }>;
+  const selectedCanvasIds = new Set(
+    (process.env.CANVAS_COURSE_IDS ?? "").split(",").map((value) => value.trim()).filter(Boolean),
+  );
+  const courses = db.prepare("SELECT slug, canvas_course_id FROM courses ORDER BY title").all() as Array<{
+    slug: string;
+    canvas_course_id: string | null;
+  }>;
   let seen = 0;
   let changed = 0;
   for (const item of courses) {
+    if (selectedCanvasIds.size > 0 && item.canvas_course_id && !selectedCanvasIds.has(item.canvas_course_id)) continue;
     const course = getCourseRow(db, item.slug);
     if (!course) continue;
     let folderId = course.drive_folder_id;

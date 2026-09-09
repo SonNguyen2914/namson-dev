@@ -316,6 +316,7 @@ test("Canvas sync ingests permitted course material without write requests", asy
   process.env.STUDY_HUB_DATABASE_PATH = ":memory:";
   process.env.CANVAS_BASE_URL = "https://canvas.test/";
   process.env.CANVAS_ACCESS_TOKEN = "read-only-test-token";
+  process.env.CANVAS_COURSE_IDS = "";
   const db = getStudyHubDatabase()!;
   const manifest: StudyHubManifest = {
     semester: "Fall 2026",

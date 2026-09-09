@@ -301,7 +301,15 @@ export async function syncCanvas(db: Database.Database): Promise<CanvasSyncResul
   for (const rawCourse of courses) {
     const course = asRecord(rawCourse);
     const canvasId = id(course.id);
-    if (!canvasId || (onlyIds.size > 0 && !onlyIds.has(canvasId))) continue;
+    if (!canvasId) continue;
+    if (onlyIds.size > 0 && !onlyIds.has(canvasId)) {
+      const existing = db.prepare("SELECT id FROM courses WHERE canvas_course_id=?").get(canvasId) as { id: string } | undefined;
+      if (existing) {
+        const missing = markMissingCanvasRecords(db, existing.id, canvasId, syncStartedAt);
+        changed += missing.sources + missing.events;
+      }
+      continue;
+    }
     if (course.access_restricted_by_date === true) continue;
     const term = asRecord(course.term);
     const row = findOrCreateCanvasCourse(db, {
