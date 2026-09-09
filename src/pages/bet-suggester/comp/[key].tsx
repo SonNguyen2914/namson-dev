@@ -21,6 +21,7 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
+import FieldAxes, { Ratings } from "../../../components/FieldAxes";
 
 import { ARCHIVE, ArchiveMenu } from "../../../components/ArchiveMenu";
 import { RouteProgress, TopBar } from "../../../components/chrome";
@@ -162,6 +163,14 @@ export default function CompViewer() {
   // transient failure should keep retrying, and a retired competition
   // polled every 60s forever is an outage that never resolves.
   const [gone, setGone] = useState<string | null>(null);
+  /* THE CROSS-LEAGUE FIELD. Its own request, deliberately: it is a
+     frozen artifact read and does not change on the 60s fixture poll,
+     so it is fetched once per key and never on the interval. */
+  const [rat, setRat] = useState<Ratings | null>(null);
+  /* A FAILED READ IS NOT AN ABSENT FIELD. Rendering nothing here would
+     say this competition has no cross-league rating, which is a claim
+     about the measurement rather than about the request. */
+  const [ratErr, setRatErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (!key) return;
@@ -209,6 +218,12 @@ export default function CompViewer() {
         });
     };
     load();
+    fetch(`/api/comp/${key}/ratings`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((j) => alive && setRat(j))
+      .catch((e) => alive && setRatErr(
+        typeof e === "number" ? `the field read answered ${e}`
+                              : "the field read did not answer"));
     poll.id = setInterval(load, 60000);
     return () => { alive = false; if (poll.id) clearInterval(poll.id); };
   }, [key, days]);
@@ -286,6 +301,13 @@ export default function CompViewer() {
             {d?.model?.instead}
           </p>
         </section>
+
+        {/* THE CROSS-LEAGUE FIELD, directly under the "no model" block
+            because it is what that block's `instead` sentence points at:
+            the competition has no rating of its own, and this is the
+            strength read used in its place. Above the fixtures, so a
+            reader meets the field before the individual ties. */}
+        <FieldAxes data={rat} error={ratErr} />
 
         {/* WC26-style tournament surface — groups, bracket, champion
             forecast. Mounts unconditionally; the backend's 404 is the
