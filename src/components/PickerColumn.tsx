@@ -30,8 +30,9 @@ import Link from "next/link";
 import { useId, useState } from "react";
 import { dayLabel, fmtDate, localDay } from "../lib/matchday";
 import {
-  BoardRefusal, BoardRow, LeagueMeta, SEASON_BLEND_K, homeBadge, leagueLabel,
-  rowHref, seasonDisagreement, seasonSpan, seasonSpanLabel, venueDisagreement,
+  BoardRefusal, BoardRow, LeagueMeta, RatePair, SEASON_BLEND_K, homeBadge,
+  leagueLabel, rowHref, seasonDisagreement, seasonSpan, seasonSpanLabel,
+  venueDisagreement,
 } from "../lib/pickerApi";
 import {
   ReviewLeagueMeta, ReviewRefusal, ReviewRow,
@@ -74,10 +75,10 @@ export const hueOf = (slug: string) => LEAGUE_HUE[slug] ?? "var(--lg-cup)";
  *  one number. Sorting by kickoff keeps GD/g (a time is not a
  *  magnitude); a missing quote says "no quote", a withheld gap says the
  *  board's own word for it. */
-type AnchorId = Exclude<SortModeId, "kickoff" | "shape">;
+type AnchorId = Exclude<SortModeId, "kickoff" | "shape"> | "own_gdg";
 
 function anchorFor(row: BoardRow, modeId: SortModeId):
-  { v: string; k: string; id: AnchorId } {
+  { v: string; k: string; k2?: string; basis?: string; id: AnchorId } {
   // a time is not a magnitude, and neither is a shape — the shape is
   // already on the card as its coloured chip, so both keys fall back to
   // a measured gap for the anchor number.
@@ -94,14 +95,46 @@ function anchorFor(row: BoardRow, modeId: SortModeId):
   // GD/g like any other. Derived from `cross_league` per row rather
   // than from the competition, for the same reason the backend derives
   // the withholding that way.
-  const fallback: AnchorId = row.cross_league ? "tier_ovr" : "gdg";
+  //
+  // AND THE TIER GAP WAS NOT A NUMBER EITHER (operator, 2026-09-09, on a
+  // screenshot of the Champions League column: "also calculate GD/g gap
+  // between teams and replace that big number of tier ovr" — after "there
+  // is no way Barcelona tiers are even to Rotterdam"). He is right, and
+  // the tier gap is not wrong so much as EMPTY here: a tier is a
+  // within-league quintile, both clubs are top-fifth at home, so the gap
+  // is 0 — on ten of the twelve rows of that matchday. An anchor that
+  // reads "+0" on ten cards ranks nothing.
+  //
+  // `own_gdg` IS THE NUMBER THAT REPLACES IT, and it is emphatically not
+  // the withheld `gdg_gap` recomputed on the client: the backend refuses
+  // that subtraction because the two clubs share no scale, and doing it
+  // here would hide the decision from every guard that watches it. It is
+  // the DIFFERENCE OF TWO OWN-LEAGUE MARGINS — Barcelona's +2.18 over La
+  // Liga against Feyenoord's +0.91 over the Eredivisie — which is a true
+  // sentence about two measured rates and a different claim from "1.27
+  // goals a game better". The row carries `basis` saying so in the
+  // backend's own words, and the label below says it in two lines.
+  //
+  // A ROW WITHOUT IT FALLS BACK EXACTLY AS BEFORE. `own_gdg` is optional
+  // on the type because a board built before 2026-09-09 has no such key,
+  // and this surface must never turn a missing field into a claim.
+  const own = row.own_gdg?.diff;
+  const fallback: AnchorId = !row.cross_league ? "gdg"
+    : own != null ? "own_gdg" : "tier_ovr";
   const id = modeId === "kickoff" || modeId === "shape" ? fallback : modeId;
   return { ...anchorValue(row, id), id };
 }
 
-function anchorValue(row: BoardRow, id: AnchorId): { v: string; k: string } {
+function anchorValue(row: BoardRow, id: AnchorId):
+  { v: string; k: string; k2?: string; basis?: string } {
   switch (id) {
     case "gdg": return { v: dec(row.gdg_gap), k: "GD/g gap" };
+    // TWO LINES, BOTH LOAD-BEARING. "own-league GD/g" is what each of
+    // the two numbers is; "differenced" is the only thing done to them.
+    // Neither line may be dropped to save a row of 8.5px type: "GD/g"
+    // alone is the withheld gap's name, and this is not that number.
+    case "own_gdg": return { v: dec(row.own_gdg?.diff), k: "own-league GD/g",
+                             k2: "differenced", basis: row.own_gdg?.basis };
     case "ppg": return { v: dec(row.ppg_gap), k: "ppg gap" };
     case "rank": return { v: sign(row.rank_gap), k: "rank gap" };
     case "tier_ovr": return { v: sign(row.tier_gaps.ovr), k: "tier · ovr" };
@@ -127,6 +160,35 @@ function anchorValue(row: BoardRow, id: AnchorId): { v: string; k: string } {
  *  pair sits — the picker's premise in one 9px instrument. A
  *  cross-league tie has no shared axis, so it gets no instrument, which
  *  is the same honesty as its withheld gaps. */
+/** THE TWO CLUBS' OWN RATES, BESIDE A GAP THAT IS WITHHELD — favourite
+ *  then opponent, the idiom the ranks pair beside it already uses.
+ *
+ *  WHAT THIS FIXES (operator, 2026-09-09). The Champions League card read
+ *  "GD/g n/a  ppg n/a  rank n/a" while the payload it was drawn from
+ *  carried Barcelona ppg 2.62 / GD/g 2.18 and Feyenoord 2.01 / 0.91.
+ *  Three `n/a`s over data the row already had is not honesty, it is a
+ *  blank — the refusal is of the SUBTRACTION, never of the measurements.
+ *
+ *  AND IT IS DRAWN BESIDE THE REFUSAL, NEVER OVER IT. The `n/a` stays
+ *  exactly where it was and keeps saying what it says: this adds what is
+ *  known, and a reader can still see that the gap itself was declined.
+ *  Nothing is drawn at all unless BOTH sides are measured — one club's
+ *  rate alone is half a pair, and half a pair invites the arithmetic
+ *  that produced the missing half. */
+function OwnRates({ gap, pair, metric }: {
+  gap: number | null; pair?: RatePair; metric: string;
+}) {
+  if (gap != null || !pair) return null;
+  const [f, o] = pair;
+  if (f == null || o == null) return null;   // missing is never zero
+  return (
+    <span data-testid="own-rates" data-metric={metric} className="text-ink-mid">
+      {" · "}{f.toFixed(2)} <span className="text-ink-faint">v</span>{" "}
+      {o.toFixed(2)}
+    </span>
+  );
+}
+
 function RankDumbbell({ row, clubCount }: { row: BoardRow; clubCount: number }) {
   if (row.cross_league) return null;
   const n = Math.max(clubCount, row.ranks.fav, row.ranks.opp, 2);
@@ -416,9 +478,19 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted }: {
               anchor.v === WITHHELD ? "font-normal text-ink-faint" : "text-ink-hi"}`}>
             {anchor.v}
           </span>
-          <span className={`mt-1 block font-mono text-[8.5px] uppercase tracking-[0.12em] text-ink-low${
-            dense ? " md:mt-0" : ""}`}>
+          {/* THE KEY, AND WHERE A SECOND LINE COMES FROM. Most anchors
+              name themselves in three words. `own_gdg` cannot: it is a
+              difference of two numbers measured on two different scales,
+              and a label reading "GD/g" would be the name of the gap the
+              backend REFUSES. So it says what the two numbers are and
+              what was done to them, on two lines, with the backend's own
+              basis sentence on hover. */}
+          <span data-testid="anchor-key"
+            title={anchor.basis || undefined}
+            className={`mt-1 block font-mono text-[8.5px] uppercase leading-[1.35] tracking-[0.12em] text-ink-low${
+              dense ? " md:mt-0" : ""}`}>
             {anchor.k}
+            {anchor.k2 && <span className="block">{anchor.k2}</span>}
           </span>
         </span>
       </Link>
@@ -440,11 +512,13 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted }: {
         {anchor.id !== "gdg" && (
           <span className="text-ink-low">
             GD/g <span className="text-ink-mid">{dec(row.gdg_gap)}</span>
+            <OwnRates gap={row.gdg_gap} pair={row.rates?.gdg} metric="gdg" />
           </span>
         )}
         {modeId !== "ppg" && (
           <span className="text-ink-low">
             ppg <span className="text-ink-mid">{dec(row.ppg_gap)}</span>
+            <OwnRates gap={row.ppg_gap} pair={row.rates?.ppg} metric="ppg" />
           </span>
         )}
         {modeId !== "rank" && (

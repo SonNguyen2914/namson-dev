@@ -798,14 +798,29 @@ test("ASEAN is reachable from the dropdown", async ({ page }) => {
   await expect(page).toHaveURL(/\/bet-suggester\/comp\/asean$/);
 });
 
-test("the Leagues Cup archive is reachable from the dropdown, and the "
-   + "live viewer it did NOT replace is still in the rail", async ({ page }) => {
+// FILED IN THE ARCHIVE, AND NOWHERE ELSE (2026-09-09).
+//
+// This test was written on 2026-09-09 with the opposite second half —
+// the archive item AND the rail chip, together — precisely so that
+// "archived" could not silently become "removed" while nobody was
+// looking. The operator then looked at the bar: a competition whose
+// final was played on 09-07 was still sitting in a rail whose entire
+// meaning is "these are live". So the chip goes and THE CLAIM STAYS,
+// pointed the other way round: reachable through the control that says
+// what it is, and absent from the one that would misdescribe it.
+//
+// The route it links is untouched, and neither is `/comp/leagues-cup`:
+// filing a competition retires nothing.
+test("the Leagues Cup archive is reachable from the dropdown, and is NOT "
+   + "also in the rail of live competitions", async ({ page }) => {
   await open(page);
-  // the rail chip is the live competition viewer and stays where it was
+  // NOT in the rail — under either href it has ever had. The chip
+  // pointed at the competition viewer, the archive item points at the
+  // bracket page, and an assertion against only one of them would pass
+  // with the other still in the bar.
   await expect(
-    page.locator('header.topbar nav a[href="/bet-suggester/comp/leagues-cup"]')
-      .first(),
-  ).toBeVisible();
+    page.locator('header.topbar nav a[href*="/leagues-cup"]'),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: /archive/i }).click();
   await page.getByRole("menuitem", { name: /Leagues Cup/ }).click();
   await expect(page).toHaveURL(/\/bet-suggester\/leagues-cup$/);

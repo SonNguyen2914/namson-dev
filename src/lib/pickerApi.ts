@@ -48,6 +48,13 @@ export type BlendBasis = "blend" | "current_only" | "prior_only";
 /** [favourite's tier, opponent's tier]; 1 = best fifth of the league. */
 export type TierPair = [number, number];
 
+/** [favourite's own rate, opponent's own rate] — each measured on the
+ *  scale of the league that club was rated in, which is why the pair
+ *  survives a fixture whose two clubs share no scale. Either side is
+ *  null when that club has no row in the table in use: MISSING IS NEVER
+ *  ZERO, and a 0.00 ppg would read as a side that lost every game. */
+export type RatePair = [number | null, number | null];
+
 export type Shape = "CLEAN" | "HOLLOW" | "SPLIT";
 
 /** How the three shapes ORDER, declared beside the type they order so
@@ -222,6 +229,31 @@ export interface BoardRow {
   rated_in?: { home: string; away: string };
   /** why the Stage-1 gaps are withheld, in the backend's own words */
   gap_note?: string | null;
+  /** EACH CLUB'S OWN MEASURED RATES, (favourite, opponent) — ppg, GF/g,
+   *  GA/g, GD/g on the scale of the league `rated_in` names. On EVERY
+   *  row, because a cup row and a league row are one contract.
+   *
+   *  These are what a cross-league card has INSTEAD OF gaps, and the
+   *  distinction is one word wide: a MEASURED RATE is reported, a
+   *  CROSS-SCALE SUBTRACTION is refused. The backend has carried them
+   *  since 2026-09-08 and this type did not declare them, so the card
+   *  went on printing `n/a` over ppg and GD/g figures that were already
+   *  in the payload. Either side may be null — a club with no row in
+   *  the table in use — and null is never drawn as 0.00. */
+  rates?: { ppg: RatePair; gf: RatePair; ga: RatePair; gdg: RatePair };
+  /** THE ONE COMPARISON TWO SCALES DO SUPPORT (backend 2026-09-09).
+   *  `rates.gdg` differenced: how much more one club outscores its own
+   *  league than the other does theirs.
+   *
+   *  IT IS NOT `gdg_gap` AND MUST NEVER BE DRAWN AS ONE. That gap says
+   *  one club is this many goals a game better than the other, needs
+   *  both clubs measured on one scale, and is null across leagues for
+   *  exactly that reason. This is a different sentence about the same
+   *  two numbers, so it has a different name and carries `basis` — the
+   *  backend's own words for what it is and what it is not — which the
+   *  card hangs on the anchor it replaces. `diff` is null when either
+   *  club's own GD/g is missing; missing is never zero. */
+  own_gdg?: { diff: number | null; basis: string } | null;
   /** what the market actually settles on, when that is not the match —
    *  the Leagues Cup legs are regulation time only */
   reg_time_note?: string | null;

@@ -312,8 +312,12 @@ export default function LeagueCarousel() {
             model. One shared page at /bet-suggester/comp/[key].
             ASEAN left this rail on 2026-08-30 — it FINISHED (0 upcoming,
             28 played), and it is in the Archive dropdown at the top-left
-            with WC26. Leagues Cup (semi-finals on 2026-09-03) and UCL
-            (league phase opens 2026-09-08) are live and stay here.
+            with WC26. THE LEAGUES CUP LEFT IT THE SAME WAY on 2026-09-09:
+            Toluca 2-0 Monterrey on 09-07 was its final, so it is filed in
+            that dropdown (commit cbc4ff8) and a finished competition does
+            not also sit in a rail of live ones. Its viewer route still
+            works and the Archive item still reaches it. UCL stays: its
+            league phase opened 2026-09-08.
             RETIRED 2026-08-24 by operator decision, and dropped from
             this rail entirely: Conference (ecl), Europa (uel),
             Brasileirão, Argentina, USL. The backend stopped collecting
@@ -322,13 +326,10 @@ export default function LeagueCarousel() {
             proxy deliberately exposes only fixtures/markets/status/
             tournament — whether to open journal to readers is an
             operator call, not a comment's. */}
-        {[["leagues-cup", "Leagues Cup"], ["ucl", "UCL"]].map(([k, label]) => (
-          <NavChip key={k} active={false}
-            href={k === "ucl" ? "/bet-suggester/ucl"
-                              : `/bet-suggester/comp/${k}`}>
-            {label}
-          </NavChip>
-        ))}
+        {([["ucl", "/bet-suggester/ucl", "UCL"]] as const)
+          .map(([k, href, label]) => (
+            <NavChip key={k} href={href} active={false}>{label}</NavChip>
+          ))}
       </TopBar>
 
       {fxOn && <LeagueFX key={fxKey} id={league.id} />}

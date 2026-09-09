@@ -78,13 +78,45 @@ const LEAGUES = {
          rated_on: UCL_MEMBERS, reg_time_note: null },
 };
 
-const row = (over: Record<string, unknown>) => ({
-  refused: false, fav_side: "home", resolution: {}, src: "current",
-  kalshi: null, reg_time_note: null,
-  gp_current: { home: 12, away: 12, min: 12 },
-  weights: weights(0.5455, 0.5455),
-  ...over,
-});
+// THE BACKEND'S OWN WORDS for what `own_gdg` is and what it is not
+// (src/picker/stages.py OWN_GDG_BASIS). The card hangs it on the anchor's
+// label, so the fixture carries the real sentence rather than a stand-in:
+// a payload that speaks a different language from the provider certifies
+// a renderer against a string the provider never sends.
+const OWN_GDG_BASIS =
+  "EACH CLUB'S OWN GD/g, DIFFERENCED — how much more one club outscores "
+  + "its own league than the other does theirs. It is NOT the withheld "
+  + "`gdg_gap`: 2.0 GD/g in the Eredivisie is not 2.0 GD/g in La Liga, so "
+  + "this sets two own-league margins side by side and never says one side "
+  + "is this many goals a game better than the other.";
+
+type Rates = { ppg: [number, number]; gf: [number, number];
+               ga: [number, number]; gdg: [number, number] };
+
+// Each club's OWN measured rates, (favourite, opponent) — the half of a
+// cross-league row that is NOT withheld. Real-scale, and on EVERY canned
+// row: the backend emits them on a league row too, and a fixture that
+// carried them only where a gap is missing would certify a card against a
+// contract the board does not have.
+const RATES: Rates = {
+  ppg: [2.50, 2.01], gf: [2.80, 2.24], ga: [0.75, 1.33], gdg: [2.05, 0.91],
+};
+
+// `own_gdg` DERIVED FROM `rates`, exactly as stages.own_gdg_block does —
+// so no canned row can carry a difference that contradicts the two
+// numbers printed beside it, and none has to be kept in step by hand.
+const row = (over: Record<string, unknown>) => {
+  const merged = {
+    refused: false, fav_side: "home", resolution: {}, src: "current",
+    kalshi: null, reg_time_note: null,
+    gp_current: { home: 12, away: 12, min: 12 },
+    weights: weights(0.5455, 0.5455),
+    rates: RATES,
+    ...over,
+  };
+  const [fav, opp] = (merged.rates as Rates).gdg;
+  return { ...merged, own_gdg: { diff: fav - opp, basis: OWN_GDG_BASIS } };
+};
 
 // ---- the UCL column: two cross-league ties and one all-English --------
 
@@ -109,6 +141,8 @@ const CROSS_HOLLOW = row({
   favourite: "Napoli", opponent: "Sporting CP",
   rated_in: { home: "seriea", away: "primeiraliga" },
   ranks: { fav: 3, opp: 2 },
+  rates: { ppg: [1.95, 1.90], gf: [2.10, 1.80], ga: [1.00, 0.78],
+           gdg: [1.10, 1.02] },
   tiers: { ovr: [2, 2], atk: [1, 3], def: [4, 2] },
   tier_gaps: { ovr: 0, atk: 2, def: -2 }, shape: "HOLLOW",
   event_id: "ucl-hollow", competition_id: "ucl-hollow",
@@ -124,6 +158,11 @@ const SAME_LEAGUE = row({
   favourite: "Arsenal", opponent: "Liverpool",
   ppg_gap: 0.42, gdg_gap: 0.81, rank_gap: 3,
   cross_league: false, gap_note: null,
+  // ONE TABLE, so these difference to the gaps above — the case that
+  // proves own_gdg is arithmetic on the printed rates and not a second
+  // opinion about them
+  rates: { ppg: [2.21, 1.79], gf: [2.30, 1.49], ga: [0.68, 0.68],
+           gdg: [1.62, 0.81] },
   rated_in: { home: "epl", away: "epl" },
   ranks: { fav: 1, opp: 4 },
   tiers: { ovr: [1, 1], atk: [1, 2], def: [1, 1] },
@@ -140,6 +179,8 @@ const LC_CROSS = row({
   cross_league: true, gap_note: CROSS_NOTE,
   rated_in: { home: "mls", away: "ligamx" },
   ranks: { fav: 5, opp: 3 },
+  rates: { ppg: [2.05, 1.88], gf: [1.95, 1.70], ga: [0.60, 0.65],
+           gdg: [1.35, 1.05] },
   tiers: { ovr: [2, 1], atk: [1, 2], def: [2, 3] },
   tier_gaps: { ovr: -1, atk: 1, def: 1 }, shape: "SPLIT",
   event_id: "lc-cross", competition_id: "lc-cross", kickoff: inHours(7),
@@ -152,6 +193,8 @@ const EPL_ROW = row({
   favourite: "Manchester City", opponent: "Hull City", fav_side: "away",
   ppg_gap: 1.2, gdg_gap: 1.1, rank_gap: 14,
   cross_league: false, gap_note: null,
+  rates: { ppg: [2.30, 1.10], gf: [2.40, 1.05], ga: [0.80, 0.55],
+           gdg: [1.60, 0.50] },
   rated_in: { home: "epl", away: "epl" },
   ranks: { fav: 2, opp: 16 },
   tiers: { ovr: [1, 4], atk: [1, 4], def: [1, 4] },
@@ -259,7 +302,25 @@ const orderOf = async (c: ReturnType<typeof col>, n: number) => {
 
 // ---------------------------------------------- 1. the anchor ----------
 
-test("a cross-league UCL row anchors on the tier gap, not on a withheld GD/g",
+// THE ANCHOR WAS THE TIER GAP UNTIL 2026-09-09, and it was measured —
+// which is why the first version of this test passed while the column
+// was unreadable. A tier is a WITHIN-LEAGUE quintile, and a Champions
+// League tie pairs two clubs who are usually both in the top fifth of
+// their own league, so the gap is 0: on the live matchday the operator
+// screenshotted, ten of twelve cards anchored on "+0". "There is no way
+// Barcelona tiers are even to Rotterdam" — they are not, and the tier
+// gap was never claiming they were; it was answering a question so
+// coarse that the answer is the same for nearly every tie.
+//
+// `own_gdg` REPLACES IT, and it is NOT the withheld `gdg_gap` computed
+// on the client. The backend refuses that subtraction because the two
+// clubs share no scale; this is the difference of two OWN-LEAGUE
+// margins, which is a true sentence about two measured rates. The label
+// must say so in its own words — "GD/g" alone is the name of the
+// refused gap, and a card that used that name for this number would be
+// making exactly the claim the backend declined.
+test("a cross-league UCL row anchors on the two clubs' own-league GD/g, "
+   + "differenced — not on a tier gap that is 0 on most of the column",
   async ({ page }) => {
     await open(page);
     const ucl = col(page, "ucl");
@@ -268,11 +329,99 @@ test("a cross-league UCL row anchors on the tier gap, not on a withheld GD/g",
     await expect(clean).toHaveAttribute("data-cross-league", "true");
 
     const anchor = clean.getByTestId("row-anchor");
+    await expect(anchor).toHaveAttribute("data-anchor", "own_gdg");
+    // DERIVED from the row's own rates, never typed: 2.05 over La Liga
+    // against 0.91 over the Eredivisie
+    const [fav, opp] = RATES.gdg;
+    await expect(anchor).toHaveText(`+${(fav - opp).toFixed(2)}`);
+
+    // the label names both halves — what the two numbers are, and the
+    // one thing done to them — and it never says "gap"
+    const key = clean.getByTestId("anchor-key");
+    await expect(key).toContainText("own-league GD/g");
+    await expect(key).toContainText("differenced");
+    expect(await key.textContent()).not.toContain("gap");
+    // and the backend's own basis rides it, so a reader who wonders
+    // what this is gets told what it is NOT
+    await expect(key).toHaveAttribute("title", OWN_GDG_BASIS);
+
+    // the tier gap it replaced is still on the card, in the Stage-2 row
+    // where it belongs — replaced as the ANCHOR, not deleted
+    await expect(clean).not.toContainText("tier · ovr");
+    await expect(clean.getByTestId("tier-cell")).toHaveCount(3);
+    await expect(clean.locator('[data-testid="tier-cell"][data-dim="overall"]'))
+      .toHaveAttribute("data-gap", "1");
+  });
+
+test("a cross-league row with no own-GD/g falls back exactly as before",
+  async ({ page }) => {
+    // MISSING IS NEVER ZERO, and it is never a fabricated anchor either.
+    // A board built before 2026-09-09 carries no `own_gdg` at all; this
+    // surface must fall back to what it drew then rather than render a
+    // number it does not have.
+    const stripped = {
+      ...BOARD,
+      rows: BOARD.rows.map((r) => {
+        const rest: Record<string, unknown> = { ...r };
+        delete rest.own_gdg;
+        return rest;
+      }),
+    };
+    await open(page, stripped);
+    const anchor = col(page, "ucl").getByTestId("picker-row")
+      .filter({ hasText: "Real Madrid" }).getByTestId("row-anchor");
     await expect(anchor).toHaveAttribute("data-anchor", "tier_ovr");
-    // and it is a MEASURED number, which is the whole point — the
-    // failure this replaces rendered the board's withheld glyph here
     await expect(anchor).toHaveText("+1");
-    await expect(clean).toContainText("tier · ovr");
+  });
+
+test("the withheld gaps keep saying so, and each club's OWN rate is drawn "
+   + "beside them", async ({ page }) => {
+    // THE REFUSAL AND THE MEASUREMENT ARE BOTH FACTS, and this asserts
+    // them together on one card. Before 2026-09-09 the strip read
+    // "GD/g n/a  ppg n/a" over a payload that already carried both
+    // clubs' ppg and GD/g — three n/a's standing for data the row had.
+    // Filling them in is not overwriting the refusal: delete the `n/a`
+    // and the first half of this fails; compute the gap from the pair
+    // and the second half does.
+    await open(page);
+    const clean = col(page, "ucl").getByTestId("picker-row")
+      .filter({ hasText: "Real Madrid" });
+    await expect(clean).toContainText(/GD\/g\s*n\/a/);
+    await expect(clean).toContainText(/ppg\s*n\/a/);
+    await expect(clean).toContainText(/rank\s*n\/a/);
+    for (const [metric, [fav, opp]] of
+         [["gdg", RATES.gdg], ["ppg", RATES.ppg]] as const) {
+      const own = clean.locator(`[data-metric="${metric}"]`);
+      await expect(own).toHaveCount(1);
+      // favourite first, opponent second — the order the ranks pair
+      // beside it already uses
+      await expect(own).toHaveText(
+        new RegExp(`${fav.toFixed(2)}\\s*v\\s*${opp.toFixed(2)}`));
+    }
+    // a MEASURED gap is not decorated with the pair: on a same-league
+    // row the gap is the content, and repeating its inputs is noise
+    const same = col(page, "ucl").getByTestId("picker-row")
+      .filter({ hasText: "Arsenal" });
+    await expect(same.locator("[data-metric]")).toHaveCount(0);
+  });
+
+test("a same-league row's own-GD/g difference IS its GD/g gap",
+  async ({ page }) => {
+    // ONE SCALE, so the two agree — and this is where a reader can see
+    // that they do. It is the same arithmetic on both kinds of row; only
+    // the CLAIM differs, and only because the scales do.
+    await open(page);
+    const same = col(page, "ucl").getByTestId("picker-row")
+      .filter({ hasText: "Arsenal" });
+    // `row()` takes its overrides untyped, so the gap is read back
+    // through a narrow view rather than retyped as a literal here
+    const sl = SAME_LEAGUE as unknown as { gdg_gap: number };
+    const [fav, opp] = SAME_LEAGUE.rates.gdg;
+    expect(fav - opp).toBeCloseTo(sl.gdg_gap, 6);
+    expect(SAME_LEAGUE.own_gdg.diff).toBeCloseTo(sl.gdg_gap, 6);
+    // and the card anchors on the gap itself, as it always did
+    await expect(same.getByTestId("row-anchor"))
+      .toHaveAttribute("data-anchor", "gdg");
   });
 
 test("a same-league UCL row keeps GD/g — the anchor follows the row",
@@ -437,9 +586,11 @@ test("the Leagues Cup is a cup with a cross-league row too, and keeps the "
     // its cross-league row therefore still anchors the way the board
     // does everywhere else — the anchor rule is per ROW and applies
     // here as well, which is why this is a sort assertion, not an
-    // anchor one
+    // anchor one. (It followed that rule from `tier_ovr` to `own_gdg`
+    // on 2026-09-09 without this test being about the change, which is
+    // the rule being per-row rather than per-competition, proven.)
     await expect(lc.getByTestId("picker-row").first()
-      .getByTestId("row-anchor")).toHaveAttribute("data-anchor", "tier_ovr");
+      .getByTestId("row-anchor")).toHaveAttribute("data-anchor", "own_gdg");
   });
 
 // ------------------------------------ 3. one control stays in charge ---

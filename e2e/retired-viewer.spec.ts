@@ -18,26 +18,36 @@ import { expect, test } from "@playwright/test";
 // `_comp_404` refusal, so this passes with no backend at all.
 
 const RETIRED = ["ecl", "uel", "brasileirao", "argentina", "usl"];
-// The two that are LIVE keep a chip on the board's rail: Leagues Cup is
-// at its semi-finals, UCL's league phase has not kicked off.
-// KEY -> THE HREF ITS RAIL CHIP ACTUALLY POINTS AT. These are not both
-// `/comp/<key>` any more: on 2026-09-08 the Champions League got a
-// picker BOARD of its own (`/bet-suggester/ucl`, the landing page's own
-// component narrowed to one column) and its chip was repointed there.
-// The Leagues Cup keeps the competition viewer, because no board route
-// was asked for it.
+// The one that is LIVE keeps a chip on the board's rail: UCL's league
+// phase opened on 2026-09-08.
+// KEY -> THE HREF ITS RAIL CHIP ACTUALLY POINTS AT. Not `/comp/<key>`:
+// on 2026-09-08 the Champions League got a picker BOARD of its own
+// (`/bet-suggester/ucl`, the landing page's own component narrowed to one
+// column) and its chip was repointed there.
 const KEPT_CHIPS: [string, string][] = [
   ["ucl", "/bet-suggester/ucl"],
-  ["leagues-cup", "/bet-suggester/comp/leagues-cup"],
 ];
-// ASEAN is kept too, but it FINISHED (0 upcoming, 28 played), so on
-// 2026-08-30 it moved into the Archive dropdown at the top-left, with
-// WC26. "Still reachable" is unchanged as a claim — it is reached
-// through the control that says what it is, instead of sitting in a rail
-// of live competitions. Retired and finished are different things and
-// this spec must not blur them: a retired competition is offered
-// nowhere, a finished one is filed.
-const KEPT_IN_ARCHIVE = ["asean"];
+// KEPT, BUT FILED. ASEAN FINISHED (0 upcoming, 28 played) and moved into
+// the Archive dropdown at the top-left on 2026-08-30, with WC26. THE
+// LEAGUES CUP JOINED THEM ON 2026-09-09 — Toluca 2-0 Monterrey on 09-07
+// was its final — and this is the assertion that changed shape with it:
+// it used to be in KEPT_CHIPS above, and it was put there deliberately so
+// that "archived" could not quietly become "removed". THAT CLAIM IS NOT
+// DROPPED, IT IS MOVED: reachability is still asserted, against the
+// control that says what the competition is instead of against a rail of
+// live ones. Retired and finished are different things and this spec must
+// not blur them: a retired competition is offered nowhere, a finished one
+// is filed.
+//
+// KEY -> ITS ARCHIVE HREF, because these are not both `/comp/<key>`
+// either. ASEAN points at the shared competition viewer; the Leagues Cup
+// has three seasons of bracket that viewer cannot draw, so it points at
+// its own archive page. Filing a competition never retired a route:
+// `/comp/leagues-cup` still answers, it is simply not offered in the rail.
+const KEPT_IN_ARCHIVE: [string, string][] = [
+  ["asean", "/bet-suggester/comp/asean"],
+  ["leagues-cup", "/bet-suggester/leagues-cup"],
+];
 
 const GONE_DETAIL =
   "UEFA Europa League was retired on 2026-08-24 by operator decision — " +
@@ -87,17 +97,24 @@ test("the board offers none of the five, and still offers the three",
     // must actually produce it — "it is in a menu somewhere" is not a
     // reachability claim
     await page.getByRole("button", { name: /archive/i }).click();
-    for (const k of KEPT_IN_ARCHIVE) {
+    for (const [k, href] of KEPT_IN_ARCHIVE) {
       await expect(
-        page.locator(`a[href="/bet-suggester/comp/${k}"]`).first(),
+        page.locator(`a[href="${href}"]`).first(),
         `${k} must still be reachable from the archive dropdown`,
       ).toBeVisible();
     }
-    // and it is NOT also sitting in the live rail
-    await expect(
-      page.getByRole("navigation")
-        .locator(`a[href="/bet-suggester/comp/asean"]`),
-    ).toHaveCount(0);
+    // and none of them is ALSO sitting in the live rail. Matched on the
+    // key rather than on the archive href: the Leagues Cup's rail chip
+    // pointed at `/comp/leagues-cup` while its archive item points at
+    // `/leagues-cup`, so an equality check on the second would have
+    // passed with the first still in the bar — which is exactly the
+    // state this assertion was added to end.
+    for (const [k] of KEPT_IN_ARCHIVE) {
+      await expect(
+        rail.locator(`a[href*="/${k}"]`),
+        `${k} is filed in the archive and must not also be in the rail`,
+      ).toHaveCount(0);
+    }
   });
 
 test("a bookmarked retired competition says it was retired, and stops asking",

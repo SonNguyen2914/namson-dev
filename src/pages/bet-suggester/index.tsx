@@ -376,14 +376,24 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
         <NavChip href="/bet-suggester/leagues" active={false}>Leagues</NavChip>
         <NavChip href="/bet-suggester/friendlies" active={false}>Friendlies</NavChip>
         {/* Live viewer competitions. ASEAN is not here: it finished, and
-            it sits in the Archive dropdown at the top-left with WC26. */}
-        {[["leagues-cup", "Leagues Cup"], ["ucl", "UCL"]].map(([k, label]) => (
-          <NavChip key={k} active={false}
-            href={k === "ucl" ? "/bet-suggester/ucl"
-                              : `/bet-suggester/comp/${k}`}>
-            {label}
-          </NavChip>
-        ))}
+            it sits in the Archive dropdown at the top-left with WC26.
+            NOR IS THE LEAGUES CUP, from 2026-09-09, for the same reason
+            and by the same test: Toluca 2-0 Monterrey on 09-07 was its
+            final, ESPN has 62 events for the season and every one of
+            them is in a final state, so it was FILED in that dropdown
+            (components/ArchiveMenu.tsx, commit cbc4ff8). It went on
+            sitting here as well, which is the rail claiming a finished
+            competition is live — the one thing this rail means. Its
+            viewer route is untouched and the Archive item reaches it:
+            filing a competition never retires a page.
+            THE HREF IS PART OF THE ENTRY. It used to be a ternary on the
+            key, which only ever had two answers because the rail only
+            ever had two chips; a per-entry href says the same thing
+            without a branch that goes dead the moment one is removed. */}
+        {([["ucl", "/bet-suggester/ucl", "UCL"]] as const)
+          .map(([k, href, label]) => (
+            <NavChip key={k} href={href} active={false}>{label}</NavChip>
+          ))}
       </TopBar>
 
       {/* B0c — SELECTING MATCHES TO WATCH. The provider holds the
