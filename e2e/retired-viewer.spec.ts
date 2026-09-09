@@ -20,7 +20,16 @@ import { expect, test } from "@playwright/test";
 const RETIRED = ["ecl", "uel", "brasileirao", "argentina", "usl"];
 // The two that are LIVE keep a chip on the board's rail: Leagues Cup is
 // at its semi-finals, UCL's league phase has not kicked off.
-const KEPT_CHIPS = ["ucl", "leagues-cup"];
+// KEY -> THE HREF ITS RAIL CHIP ACTUALLY POINTS AT. These are not both
+// `/comp/<key>` any more: on 2026-09-08 the Champions League got a
+// picker BOARD of its own (`/bet-suggester/ucl`, the landing page's own
+// component narrowed to one column) and its chip was repointed there.
+// The Leagues Cup keeps the competition viewer, because no board route
+// was asked for it.
+const KEPT_CHIPS: [string, string][] = [
+  ["ucl", "/bet-suggester/ucl"],
+  ["leagues-cup", "/bet-suggester/comp/leagues-cup"],
+];
 // ASEAN is kept too, but it FINISHED (0 upcoming, 28 played), so on
 // 2026-08-30 it moved into the Archive dropdown at the top-left, with
 // WC26. "Still reachable" is unchanged as a claim — it is reached
@@ -45,11 +54,34 @@ test("the board offers none of the five, and still offers the three",
         `${k} must not be linked from the board`,
       ).toHaveCount(0);
     }
-    for (const k of KEPT_CHIPS) {
+    // SCOPED TO THE RAIL, WHICH IS WHAT THIS TEST CLAIMS.
+    //
+    // It used to search the WHOLE PAGE for `a[href="/comp/<k>"]`, and
+    // that is how it went on passing after the ucl chip was repointed on
+    // 2026-09-08: every Champions League CARD on the board links to
+    // `/comp/ucl` through `pickerApi.rowHref`, so the selector kept
+    // finding one. The rail link was gone and the assertion could not
+    // see it. It failed in CI, where that day's live board happened to
+    // carry no UCL row — so the guard was reporting the presence of
+    // FIXTURES as the presence of NAVIGATION.
+    //
+    // The nav is the rail (`components/chrome.tsx` TopBar), so the
+    // locator lives there. A card link now proves nothing here, which is
+    // the point.
+    const rail = page.locator("header.topbar nav");
+    for (const [k, href] of KEPT_CHIPS) {
       await expect(
-        page.locator(`a[href="/bet-suggester/comp/${k}"]`).first(),
-        `${k} must still be reachable from the rail`,
+        rail.locator(`a[href="${href}"]`).first(),
+        `${k} must still be reachable from the rail, at ${href}`,
       ).toBeVisible();
+    }
+    // and the retired ones must not be in the rail either — the check
+    // above for the whole page stands, this adds the narrower claim
+    for (const k of RETIRED) {
+      await expect(
+        rail.locator(`a[href*="/comp/${k}"]`),
+        `${k} must not be in the rail`,
+      ).toHaveCount(0);
     }
     // the finished one is behind the archive control, and the control
     // must actually produce it — "it is in a menu somewhere" is not a
