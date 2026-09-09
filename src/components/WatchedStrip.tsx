@@ -101,10 +101,25 @@ import {
   WatchedMatch, WatchedPosition, WatchedStripResponse, WatchedStripRefusal,
   api, money,
 } from "../lib/suggesterApi";
+import { liveCompLabel } from "../lib/pickerApi";
 import { useWatchToken } from "./WatchDeclaration";
 import { Eyebrow } from "./ui";
 
-const POLL_MS = 15000; // matches the backend's 15s live tick, as LiveScoreboard does
+/** THERE IS NO 15s TICK, and this comment claimed one until 2026-09-09:
+ *  "matches the backend's 15s live tick". The state collector's own
+ *  interval is `config.LIVE_STATE_INTERVAL_SECONDS`, which is
+ *  `max(60, int(getenv(..., "120")))` — 120s by default and 60s at the
+ *  floor, so the claim was false under every value the env can take.
+ *  The tape cannot change between eight of these polls, and each one
+ *  re-runs an operator-gated read the backend itself describes as a
+ *  scan of the whole snapshot table; LiveCard.tsx polls the same route
+ *  on its own copy of this constant, so it is sixteen per tick.
+ *
+ *  THE NUMBER IS LEFT WHERE IT IS. Slowing the poll changes what the
+ *  operator sees the moment a goal lands, and no measurement of that
+ *  trade-off exists here — a comment corrected is not a cadence
+ *  decided. What is fixed is the false claim about why it is 15s. */
+const POLL_MS = 15000;
 
 /** League hue for WAYFINDING ONLY — a dot beside the slug, never a
  *  quantity. Keyed off the competition slug's league prefix; an
@@ -973,9 +988,25 @@ function inPlayStatesOf(data: WatchedStripResponse): string[] | null {
 // not read.
 function GateNotice({ r }: { r: WatchedStripRefusal }) {
   const gated = r.status === 401 || r.status === 403;
+  // A STATUS IS NOT AN AUTHOR. `unreachable` used to be "status is null
+  // OR 502", and 502 is the status THIS REPO'S PROXY returns for two
+  // opposite findings — `proxy_unreachable` (never reached) and
+  // `proxy_body_unreadable` (reached, answered, and only the body
+  // stream broke) — as well as any 502 a gateway in front of the
+  // backend relays through untouched. So a body whose own words are
+  // "THE BACKEND WAS REACHED: this is not `proxy_unreachable`" was
+  // printed under the headline "Nothing answered the read", between two
+  // sentences saying the opposite of it.
+  //
+  // The claim is made now only where something authored it: the proxy's
+  // own label, or nothing answering at all. A relayed 502 keeps its
+  // status and falls to `unexpected_status`, which prints what arrived
+  // and says no branch knows what it means — less specific than the old
+  // sentence and, unlike it, true.
   const kind = gated ? (r.sentToken ? "token_refused" : "needs_token")
     : r.status === 404 ? "no_route"
-    : r.status == null || r.status === 502 ? "unreachable"
+    : r.code === "proxy_body_unreadable" ? "body_unreadable"
+    : r.status == null || r.code === "proxy_unreachable" ? "unreachable"
     : "unexpected_status";
   const headline =
     kind === "needs_token"
@@ -986,6 +1017,8 @@ function GateNotice({ r }: { r: WatchedStripRefusal }) {
       ? "The read this section polls is not there."
     : kind === "unreachable"
       ? "Nothing answered the read."
+    : kind === "body_unreadable"
+      ? "The backend answered and the answer could not be read to the end."
     : "The read answered a status this section has no handling for.";
   const next =
     kind === "needs_token"
@@ -1002,6 +1035,11 @@ function GateNotice({ r }: { r: WatchedStripRefusal }) {
       ? "The read did not get past the proxy to a backend that could "
         + "answer it, so nothing about the declared set was learned on "
         + "this poll — this is not a refusal and not an empty watchlist."
+    : kind === "body_unreadable"
+      ? "The backend was REACHED — this is not an unreachable proxy, not "
+        + "a refusal and not an empty watchlist. The declared set may "
+        + "well have been counted; the count did not arrive intact, so "
+        + "nothing here says what it was."
       : "No branch of this section knows what that status means, so it "
         + "is printed as it arrived rather than sorted into one of the "
         + "reasons above.";
@@ -1136,8 +1174,18 @@ function MatchBlock({ m, registry, policyCodes, inPlayStates, stateTaped }: {
       <h3 id={hid} className="text-[15px] font-medium text-ink-hi">
         {m.home} <span className="text-ink-faint">v</span> {m.away}
       </h3>
-      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
-        {m.competition_slug}
+      {/* THE COMPETITION, LABELLED. This printed the raw live-plane
+          slug — `mls-2026`, `liga-mx-2026` — on the identity line of
+          every row until 2026-09-09: an internal key on the operator's
+          own ledger. `liveCompLabel` normalises it back to the one
+          label table this repo has and returns the slug UNCHANGED when
+          it still names nothing, because inventing a competition name
+          is worse than showing the key. The guard is a shape test on
+          what is rendered, so a competition nobody has labelled arrives
+          as a red test rather than as a slug on his screen. */}
+      <span data-testid="watched-comp"
+        className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
+        {liveCompLabel(m.competition_slug)}
       </span>
     </>
   );
@@ -1878,6 +1926,7 @@ function Ledger({ p }: { p: WatchedPosition }) {
 function Branches({ p }: { p: WatchedPosition }) {
   const bv = p.branch_view;
   const hold = bv?.hold?.conditioned_grid ?? bv?.hold?.engine_read;
+  const holdQ = quantityNumbers(hold?.quantity);
   const sell = bv?.sell;
   return (
     <div data-testid="watched-branches"
@@ -1915,19 +1964,40 @@ function Branches({ p }: { p: WatchedPosition }) {
                 </li>
               ))}
             </ul>
-            {hold.quantity?.n != null && (
-              <p className="mt-1 font-mono text-[10px] text-ink-faint">
-                n={hold.quantity.n.toLocaleString()}
-                {/* A BOOLEAN OVER AN EMPTY SET IS NOT A FACT, and the
-                    correct version of this check was already one
-                    function over. `band.every(x => x != null)` is TRUE
-                    for `[]`, so a band array with nothing in it drew
-                    " · band []" — a band rendered for a quantity that
-                    has none. `bandText` (the map's reader) requires two
-                    endpoints and neither of them null; it is the reader
-                    both places use now, so the two cannot disagree
-                    about what a band is. */}
-                {bandText(hold.quantity.band ?? null)}
+            {/* THE QUANTITY IS READ THROUGH ITS OWN `quantity_key` —
+                `quantityNumbers`, the map's reader, ONE function for
+                both places.
+
+                IT WAS NOT, AND THE BAND HAS NEVER DRAWN (fixed
+                2026-09-09). This block spelled its own key names, `n`
+                and `band`, under a comment claiming `bandText` was "the
+                reader both places use now, so the two cannot disagree
+                about what a band is". They disagreed about the only
+                thing that matters — WHICH KEY. `position
+                .WinProbability.as_payload()` writes the interval under
+                `<quantity_key>_wilson_band_percent`, NAMED FOR ITS
+                CATEGORY on purpose so a lower bound's band and an
+                estimate's band can never be lined up and subtracted,
+                and there is no `band` key on the wire at all. So
+                `hold.quantity.band` was `undefined` on every real
+                payload, `bandText` took its early return, and the strip
+                printed a bare `n=2,800` beside the hold expectation —
+                the one figure the 2026-09-02 card was reported for —
+                with its interval silently absent. The e2e fixture had
+                invented `band` (and `kind`), so the guard was green
+                against a shape that never arrives: the recorded
+                fixtures-speak-the-provider's-language failure again. */}
+            {holdQ?.n != null && (
+              <p data-testid="watched-hold-n"
+                data-band={bandText(holdQ.band) === "" ? "none" : "drawn"}
+                className="mt-1 font-mono text-[10px] text-ink-faint">
+                n={holdQ.n.toLocaleString()}
+                {/* A BOOLEAN OVER AN EMPTY SET IS NOT A FACT.
+                    `band.every(x => x != null)` is TRUE for `[]`, so a
+                    band array with nothing in it drew " · band []" — a
+                    band rendered for a quantity that has none.
+                    `bandText` requires two endpoints and neither null. */}
+                {bandText(holdQ.band)}
               </p>
             )}
           </>

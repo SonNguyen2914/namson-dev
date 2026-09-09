@@ -1519,12 +1519,28 @@ export const api = {
  *  when it sent none — an absent sentence is not an invented one), and
  *  `sentToken` records whether this client actually had a token to
  *  send. The surface needs all three to keep "you have typed no token"
- *  apart from "the token you typed was refused". */
+ *  apart from "the token you typed was refused".
+ *
+ *  AND `code`: THE `error` FIELD, WHICH THIS LAYER USED TO THROW AWAY.
+ *  pages/api/bet-suggester/watched-strip.ts authors two answers of its
+ *  own and labels them — `proxy_unreachable` when the backend was never
+ *  reached, `proxy_body_unreadable` when it ANSWERED and only the body
+ *  stream broke — and it returns 502 for both. The surface keyed off
+ *  the status alone, so the second rendered as "Nothing answered the
+ *  read … The read did not get past the proxy", printed directly above
+ *  that same body's own words: "THE BACKEND WAS REACHED: this is not
+ *  `proxy_unreachable`". The proxy's comment predicted the defect
+ *  exactly — "producing one for a backend that answered would put a
+ *  false sentence on the surface" — and then produced one. The label is
+ *  carried now so the status is no longer the only thing to sort on.
+ *  Empty when the body named no code, which is not a code of its own. */
 export class WatchedStripRefusal extends Error {
   readonly status: number | null;
   readonly said: string;
   readonly sentToken: boolean;
-  constructor(status: number | null, said: string, sentToken: boolean) {
+  readonly code: string;
+  constructor(status: number | null, said: string, sentToken: boolean,
+              code = "") {
     super(said || (status == null
       ? "the watched-strip read got no answer at all"
       : `the watched-strip read answered ${status}`));
@@ -1532,6 +1548,7 @@ export class WatchedStripRefusal extends Error {
     this.status = status;
     this.said = said;
     this.sentToken = sentToken;
+    this.code = code;
   }
 }
 
@@ -1573,7 +1590,13 @@ async function fetchWatchedStrip(token: string):
     const said = typeof b?.detail === "string" ? b.detail
       : typeof b?.error === "string" ? b.error
       : parsed ? "" : raw.trim().slice(0, 400);
-    throw new WatchedStripRefusal(res.status, said, sent);
+    // THE LABEL AS WELL AS THE SENTENCE. `error` is a CODE on the
+    // answers this repo's own proxy authors; on a backend refusal it is
+    // usually absent, and where it is the only string it is already the
+    // sentence above. Carried either way — the surface decides what a
+    // code means, and this layer does not paraphrase.
+    const code = typeof b?.error === "string" ? b.error : "";
+    throw new WatchedStripRefusal(res.status, said, sent, code);
   }
   // A 200 IS NOT A PAYLOAD. Until 2026-09-07 an unparseable body left
   // `body` at its initialiser and this line returned `null` typed as

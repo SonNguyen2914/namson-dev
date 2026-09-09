@@ -465,6 +465,33 @@ export function seasonDisagreement(row: BoardRow):
 
 export const leagueLabel = (slug: string) => LEAGUE_LABEL[slug] ?? slug;
 
+/** THE LIVE PLANE SPELLS ITS COMPETITIONS DIFFERENTLY, and until
+ *  2026-09-09 both live surfaces printed that spelling at the operator.
+ *
+ *  The picker's slug is a bare league key (`mls`, `laliga`). The live
+ *  plane's is a SEASONED, HYPHENATED one — `mls-2026`, `la-liga-2026`,
+ *  `liga-mx-2026`, `leagues-cup-2026` (backend src/live/competitions.py)
+ *  — and the watched-strip match block carries that slug and no display
+ *  name at all. So `WatchedStrip` printed `mls-2026` on the identity
+ *  line of EVERY row, and `LiveCard` printed it on any card whose
+ *  fixture had left the board, which is the ordinary case for a match
+ *  in play: the picker board is pre-kickoff by design.
+ *
+ *  DERIVED, NOT A SECOND TABLE. A live slug is normalised back to a
+ *  picker key — drop a trailing four-digit season, drop the separators
+ *  — and looked up in the ONE label table this repo already has. All
+ *  five of today's live slugs land on an entry that way, and the next
+ *  one that follows the same convention needs no edit here. A slug that
+ *  still names nothing is returned UNCHANGED: a wrong name is worse
+ *  than a visible key, and the guard in e2e/live-surface-audit.spec.ts
+ *  fails on the shape rather than on a list, so a new competition
+ *  arrives as a red test and not as a slug on his screen. */
+export const liveCompLabel = (slug: string) => {
+  if (LEAGUE_LABEL[slug]) return LEAGUE_LABEL[slug];
+  const key = slug.replace(/-(?:19|20)\d{2}$/, "").replace(/[-_.]/g, "");
+  return LEAGUE_LABEL[key] ?? slug;
+};
+
 /** Where a card goes when opened. The four leagues have a match hub at
  *  /bet-suggester/<slug>/<event_id>; a cup does not — there is no hub
  *  page for `leaguescup` and the backend serves no per-match route for

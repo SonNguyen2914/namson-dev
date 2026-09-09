@@ -85,7 +85,9 @@ import {
   useCallback, useEffect, useMemo, useRef, useState,
 } from "react";
 import { fmtDate } from "../lib/matchday";
-import { BoardRow, LeagueMeta, leagueLabel } from "../lib/pickerApi";
+import {
+  BoardRow, LeagueMeta, leagueLabel, liveCompLabel,
+} from "../lib/pickerApi";
 import {
   LiveReadComponentPayload, STATE_ABSENT_WORDS, WatchedMatch,
   WatchedPosition, WatchedStripResponse, api, readMatchStates,
@@ -96,7 +98,15 @@ import { KalshiCell } from "./PickerRead";
 import { useWatchToken } from "./WatchDeclaration";
 import { tapeVerdictOf } from "./WatchedStrip";
 
-const POLL_MS = 15000; // the backend's own 15s live tick, as the strip does
+/** THE STRIP'S OWN CONSTANT, and the claim beside it was false. This
+ *  read "the backend's own 15s live tick, as the strip does" until
+ *  2026-09-09; there is no 15s tick. `config.LIVE_STATE_INTERVAL_SECONDS`
+ *  is `max(60, int(getenv(..., "120")))`, so the collector writes a
+ *  state-tape row every 120s by default and no faster than every 60s
+ *  under any env value. See the same note over WatchedStrip's copy: the
+ *  cadence is left alone because slowing it changes what he sees when a
+ *  goal lands, and nothing here has measured that. */
+const POLL_MS = 15000;
 
 /** FOUR ACROSS, TWO ROWS, AND THEN A SECOND PAGE. Four because the
  *  ranked board below is four columns and a live grid on a different
@@ -1021,10 +1031,15 @@ function ExitLines({ p }: { p: WatchedPosition | undefined }) {
 function PositionBlock({ p }: { p: WatchedPosition | undefined }) {
   if (!p) {
     return (
+      // THE LABEL IS IN THE RULE ABOVE, AND ONLY THERE. This row used
+      // to carry its own `position` label directly under `Rule
+      // label="position"`, so the word printed twice, one line apart,
+      // on every card with nothing held — which is most of them.
+      // Labelled `held` now, the way the held branch's own first row is.
       <div data-testid="live-position" data-held="false"
         className="flex justify-between font-mono text-[11.5px] leading-relaxed tabular-nums text-ink-mid">
-        <span className="text-ink-faint">position</span>
-        <b className="font-medium text-ink-hi">none held</b>
+        <span className="text-ink-faint">held</span>
+        <b className="font-medium text-ink-hi">none</b>
       </div>
     );
   }
@@ -1074,13 +1089,21 @@ export function LiveCard({ m, generatedAt, row, clubCount }: {
   const colours = clubColors(m.home, m.away);
   const tape = tapeWords(m, generatedAt);
   const st = m.state;
-  const held = (m.positions ?? [])[0];
+  const positions = m.positions ?? [];
+  const held = positions[0];
   const score = st?.score_home != null && st?.score_away != null
     ? `${st.score_home}–${st.score_away}` : "—";
   const minute = st?.clock_display && st.clock_display !== ""
     ? st.clock_display
     : st?.minute != null ? `${st.minute}'` : "no minute";
-  const comp = row ? leagueLabel(row.league) : m.competition_slug;
+  /* THE COMPETITION, LABELLED ON BOTH BRANCHES. The board row's league
+     is a picker slug; the payload's own `competition_slug` is the LIVE
+     plane's (`mls-2026`), and until 2026-09-09 the second branch printed
+     it raw. That branch is not the rare one — the board is pre-kickoff
+     by design, so a match in play has usually left it, which is exactly
+     the case that got the internal key. */
+  const comp = row ? leagueLabel(row.league)
+    : liveCompLabel(m.competition_slug);
   const slug = row ? (row.column ?? row.league) : "";
 
   return (
@@ -1215,6 +1238,27 @@ export function LiveCard({ m, generatedAt, row, clubCount }: {
       <div className="mt-auto">
         <Rule label="position" />
         <PositionBlock p={held} />
+        {/* A SECOND POSITION ON THIS MATCH IS SAID, NOT DROPPED.
+            `positions` is a LIST and this card draws `positions[0]` —
+            the hazard above, the figures here and the exit lines below
+            are all that one position's. Every other position on the
+            fixture was rendered NOWHERE on this card while the watched
+            strip on the same page drew all of them, so one page showed
+            two different answers to "what am I holding on this match",
+            and the smaller of the two was the one beside the live
+            score. Named by count with the outcome drawn, so the reader
+            can tell which of them these figures belong to. NOT a second
+            block: a card is not the ledger, and the strip already is
+            one. */}
+        {positions.length > 1 && (
+          <Quiet testid="live-position-more" code="not-the-only-one">
+            {positions.length} positions are open on this match. The
+            figures on this card — hazard, position and exit lines — are
+            the one drawn above{held?.position?.outcome_key
+              ? ` (${held.position.outcome_key})` : ""} and no other.
+            The watched strip on this page draws every one of them.
+          </Quiet>
+        )}
         {/* 7 — THE OPERATOR'S OWN LINES, under the position they are
             about. The heading says YOUR because the numbers are his and
             were fixed before the position existed; this card evaluates

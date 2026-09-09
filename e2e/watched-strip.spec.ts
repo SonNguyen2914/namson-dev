@@ -2198,7 +2198,30 @@ const AHEAD = {
           label: "hold to settlement, conditioned grid cell",
           source: "grids-v2 equalizer_hazard, favourite arm",
           expectation_dollars: "77.70", expectation_cents: 7770.0,
-          quantity: { kind: "win_probability", n: 2800, band: [76.1, 79.2] },
+          // RECORDED OFF `position.WinProbability.as_payload()`, not
+          // written here. It rode as `{ kind, n, band }` until
+          // 2026-09-09 — two invented key names — and the reader under
+          // test spelled those same two, so the fixture and the reader
+          // agreed with each other and neither agreed with the wire:
+          // the band never drew in production and this file's own
+          // NON-VACUITY assertion passed anyway. The emitter names the
+          // category under `quantity`, declares where its number lives
+          // in `quantity_key`, and names the interval FOR that
+          // category — `<quantity_key>_wilson_band_percent` — so a
+          // lower bound's band and an estimate's band can never be
+          // lined up under one key. The map's own
+          // `your_contract.quantity` fixture above was recorded
+          // correctly all along, so this file carried both
+          // vocabularies for one emitter.
+          quantity: {
+            quantity: "win_probability",
+            answers: "does this contract settle YES",
+            quantity_key: "p_win",
+            p_win: 0.777, p_win_percent: 77.7,
+            n: 2800,
+            p_win_wilson_band_percent: [76.1, 79.2],
+            source_cell: "grids-v2 equalizer_hazard, favourite arm",
+          },
           branches: [
             { outcome: "settles YES — $1.00 a contract", probability: 0.777,
               percent: 77.7, dollars: "100.00", cents: 10000.0 },
@@ -5341,20 +5364,63 @@ test("an EMPTY band array is not a band — one reader for both places "
     // empty printed " · band []" beside its n. The map's own reader,
     // `bandText`, has required two non-null endpoints since it was
     // written; the branch view used its own check and got it wrong.
+    //
+    // AND IT EMPTIED THE WRONG KEY UNTIL 2026-09-09. The mutation below
+    // has to hit the key the EMITTER writes —
+    // `<quantity_key>_wilson_band_percent` — because that is the one
+    // the reader now reads. Emptying an invented `band` proved nothing
+    // in either direction: the reader read `band` too, so the pair
+    // agreed while the production surface drew no interval at all. The
+    // key is DERIVED from the fixture's own `quantity_key`, so a
+    // renamed category cannot leave this test emptying a key nothing
+    // fills.
     const bv = AHEAD.positions[0].branch_view as Record<string, unknown>;
     const hold = bv.hold as Record<string, unknown>;
     const grid = hold.conditioned_grid as Record<string, unknown>;
     const q = grid.quantity as Record<string, unknown>;
+    const bandKey = `${q.quantity_key as string}_wilson_band_percent`;
+    expect(q[bandKey], "the recorded fixture carries no band under the "
+      + "key the emitter names — this test would empty a key nothing "
+      + "fills and pass vacuously").toBeDefined();
     const empty = { ...AHEAD, positions: [{ ...AHEAD.positions[0],
       branch_view: { ...bv, hold: { ...hold, conditioned_grid: {
-        ...grid, quantity: { ...q, band: [] } } } } }] };
+        ...grid, quantity: { ...q, [bandKey]: [] } } } } }] };
     await open(page, { ...EMPTY, matches: [empty],
                        monitored_by_source: { manual: [101] } });
     const held = match(page, 101).getByTestId("watched-branches");
     await expect(held).toContainText("n=");
     await expect(held).not.toContainText("band []");
+    await expect(match(page, 101).getByTestId("watched-hold-n"))
+      .toHaveAttribute("data-band", "none");
     // NON-VACUITY: a real band still draws, from the same reader.
     await open(page, STRIP);
     await expect(match(page, 101).getByTestId("watched-branches"))
       .toContainText("band [");
+    await expect(match(page, 101).getByTestId("watched-hold-n"))
+      .toHaveAttribute("data-band", "drawn");
+  });
+
+test("the hold branch's interval is read through the payload's own "
+   + "quantity_key, never a key spelled in the reader", async ({ page }) => {
+    // THE DEFECT THIS PINS. `Branches` spelled `hold.quantity.band`,
+    // which no emitter writes: `WinProbability.as_payload()` names the
+    // interval for its category, `p_win_wilson_band_percent`. So the
+    // strip printed `n=2,800` with no interval on the hold expectation
+    // — a missing measurement rendered as an absent one — while the
+    // suite stayed green because the fixture had invented the same key
+    // the reader spelled.
+    //
+    // THE ASSERTION IS DERIVED, not typed: the band drawn on screen is
+    // checked against the value under the fixture's OWN declared key.
+    // A reader that goes back to spelling `band` fails this even if a
+    // `band` key is re-added to the fixture beside the real one.
+    const bv = AHEAD.positions[0].branch_view as Record<string, unknown>;
+    const grid = (bv.hold as Record<string, unknown>)
+      .conditioned_grid as Record<string, unknown>;
+    const q = grid.quantity as Record<string, unknown>;
+    const band = q[`${q.quantity_key as string}_wilson_band_percent`] as
+      number[];
+    await open(page, STRIP);
+    await expect(match(page, 101).getByTestId("watched-hold-n"))
+      .toContainText(`band [${band[0]}, ${band[1]}]`);
   });
