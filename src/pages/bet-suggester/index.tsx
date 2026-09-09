@@ -311,6 +311,19 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      the ranking-key clause differs here; the three sentences saying no
      model runs, nothing is a recommendation, and you are the one who
      picks are carried verbatim in both. */
+  /* ONE COLUMN IS A DIFFERENT LAYOUT PROBLEM, NOT A NARROWER ONE
+     (operator, 2026-09-08). Four columns get their density from sitting
+     side by side; a board narrowed to one was drawing a single tall
+     stack of 1,400px-wide cards — ~18 fixtures in a Champions League
+     matchday, each one a screen of its own holding 200px of ink. So the
+     sole column lays each matchday's matches ACROSS the band instead,
+     up to six abreast (components/PickerColumn.tsx, DENSE_GRID).
+
+     DERIVED FROM THE SAME `soleColumn` THE FRAMING AND THE RANKING KEY
+     ALREADY USE, deliberately, rather than from `slug === "ucl"`: the
+     Champions League is only the first board narrowed this way, the
+     next one gets it without an edit here, and a multi-league board
+     cannot acquire it by accident. */
   const soleColumn = columnSlugs.length === 1 ? columnSlugs[0] : null;
   const soleOwnSort = soleColumn ? COLUMN_DEFAULT_SORT[soleColumn] : undefined;
 
@@ -675,12 +688,22 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   columns; here, a typed count did. A count derived from
                   the same list that places the columns cannot disagree
                   with it. */}
+              {/* A SOLE COLUMN TAKES THE WHOLE WIDTH AT EVERY BREAKPOINT.
+                  `md:grid-cols-2` is how four league columns pair up on a
+                  tablet, and it was being applied to a board with ONE
+                  column too — which put that column in the left half and
+                  left the right half of the page empty from 768 to 1279,
+                  the exact widths where the dense grid inside it most
+                  needs the room. The explicit xl template already said
+                  `repeat(1, 1fr)`, so this only ever misfired below xl. */}
               <div style={{ ["--cols" as string]: String(columnSlugs.length) }}
-                className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:gap-y-2 xl:[grid-template-columns:repeat(var(--cols),minmax(0,1fr))]">
+                className={`grid grid-cols-1 gap-6 xl:gap-y-2 xl:[grid-template-columns:repeat(var(--cols),minmax(0,1fr))] ${
+                  soleColumn ? "" : "md:grid-cols-2"}`}>
                 {columnSlugs.map((slug, ci) => (
                   <LeagueColumn key={slug} slug={slug} days={days}
                     dayKeys={dayKeys} sortFor={sortFor}
                     dayLabels={dayLabelFor} colIndex={ci + 1}
+                    dense={Boolean(soleColumn)}
                     meta={leaguesMap[slug]}
                     rows={rows.filter((r) => colOf(r) === slug)}
                     refusals={refusals.filter((r) => colOf(r) === slug)}

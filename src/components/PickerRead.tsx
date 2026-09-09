@@ -301,7 +301,19 @@ export function ShapeChip({ read }: { read: ReadLike }) {
  *  popover is the same shapeRead(), word for word — it just stops
  *  costing 70px on every card. Shared by the board card and the
  *  finished tail, so both surfaces converge together. */
-export function TierGaps({ read }: { read: ReadLike }) {
+export function TierGaps({ read, dense = false }: {
+  read: ReadLike;
+  /** the card sits in a narrow dense-grid track (PickerColumn.DENSE_GRID)
+   *  — ONLY the popover cares. `w-64` anchored to the button's right edge
+   *  is a 256px panel hanging off a ~200px card, so in the board's
+   *  leftmost column it reaches past the page's own left edge; and
+   *  `html { overflow-x: clip }` (globals.css) means that does not
+   *  scroll, it CLIPS. Dense, the panel is anchored to the tier block
+   *  instead and spans exactly the card's content width, so it fits
+   *  inside every column by construction rather than by arithmetic on a
+   *  breakpoint. */
+  dense?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const dims = [
     ["overall", read.tier_gaps.ovr, read.tiers.ovr],
@@ -357,7 +369,13 @@ export function TierGaps({ read }: { read: ReadLike }) {
             ever laid out at a width that wrapped this row.
             Anchored to the trigger, the panel is always directly under
             the thing that opened it, whatever the row does. */}
-        <span className="relative ml-auto inline-flex">
+        {/* NOT `relative` when dense: dropping the positioning context
+            here hands it to the tier block above, which is exactly one
+            card wide. The button still owns the vertical anchor in the
+            wide case (2026-09-07 — a wrapped button used to land inside
+            its own popover); dense, `top-full` is BELOW the whole block,
+            which the button cannot be inside either. */}
+        <span className={`ml-auto inline-flex${dense ? "" : " relative"}`}>
           <button data-testid="tier-read" aria-expanded={open}
             aria-label="how to read this shape"
             onClick={(e) => {
@@ -370,7 +388,8 @@ export function TierGaps({ read }: { read: ReadLike }) {
           </button>
           {open && (
         <div data-testid="shape-read"
-          className="absolute right-0 top-[calc(100%+7px)] z-10 w-64 rounded-lg border border-line-strong bg-elev2 p-3 text-[11px] leading-relaxed text-ink-mid shadow-xl">
+          className={`absolute top-[calc(100%+7px)] z-10 rounded-lg border border-line-strong bg-elev2 p-3 text-[11px] leading-relaxed text-ink-mid shadow-xl ${
+            dense ? "inset-x-0" : "right-0 w-64"}`}>
           <p>{shapeRead(read)}</p>
           <div className="mt-2 space-y-0.5 border-t border-line pt-2 font-mono text-[10px]">
             {dims.map(([label, gap, tiers]) => (
@@ -412,9 +431,16 @@ export function KalshiCell({ quote }: { quote: KalshiQuote | null | undefined })
   }
   if (k.ask_c == null) {
     return (
+      // A ticker is one unbroken 22-character token and the only string
+      // on this card with no space in it to wrap at, so it is the one
+      // that can outgrow a narrow track. `anywhere` lets it break rather
+      // than run off the card's edge — everywhere, since a ticker
+      // reaching past its box was never right on any board.
       <span className="font-mono text-[11px] text-ink-faint">
         listed · no quote ·{" "}
-        <span className="text-ink-faint/70">{k.event_ticker}</span>
+        <span className="text-ink-faint/70 [overflow-wrap:anywhere]">
+          {k.event_ticker}
+        </span>
       </span>
     );
   }

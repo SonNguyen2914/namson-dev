@@ -259,8 +259,23 @@ export function seasonDeparture(
  *  same `row` and `modeId`. A component boundary adds no DOM, so
  *  RowCard's output is unchanged — which e2e/picker.spec.ts and
  *  e2e/picker-blend-cup.spec.ts prove, unedited, on every run. */
-export function RowRead({ row, modeId, clubCount }: {
+export function RowRead({ row, modeId, clubCount, dense = false }: {
   row: BoardRow; modeId: SortModeId; clubCount: number;
+  /** THIS CARD IS IN A NARROW TRACK — see DENSE_GRID below.
+   *
+   *  A dense board lays up to six matches across the width one column
+   *  used to have, so from `md` up the card is ~200px wide instead of the
+   *  ~330px every element here was drawn against. Everything this flag
+   *  switches is a REFLOW, never a cut: the anchor drops under the
+   *  matchup instead of competing with it for the same line, club names
+   *  WRAP instead of truncating to three letters, and the inter-item gaps
+   *  tighten. Nothing is removed and no type shrinks — a narrow card says
+   *  everything a wide one says, taller.
+   *
+   *  DEFAULT FALSE, AND THAT MATTERS. The multi-league board and the live
+   *  card's flip (components/LiveCard.tsx) both render this component
+   *  without the flag, so their output is what it was. */
+  dense?: boolean;
 }) {
   const badge = homeBadge(row);
   const anchor = anchorFor(row, modeId);
@@ -279,13 +294,36 @@ export function RowRead({ row, modeId, clubCount }: {
       <Link
         href={rowHref(row)}
         aria-label={`open ${row.favourite} versus ${row.opponent}`}
-        className="mt-2.5 flex items-start gap-3 rounded-md outline-none transition-colors hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bs">
+        className={`mt-2.5 flex items-start gap-3 rounded-md outline-none transition-colors hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bs${
+          // THE ANCHOR STOPS COMPETING WITH THE NAMES FOR ONE LINE. Side
+          // by side in a ~200px track the figure takes ~60px of it and
+          // "Manchester City" is left with room for "Man…". Stacked, the
+          // names get the whole width and the figure keeps its 20px.
+          dense ? " md:flex-col md:items-stretch md:gap-1" : ""}`}>
         <span className="min-w-0 flex-1">
-          <span className="flex min-w-0 items-center gap-2">
+          {/* THE FORM STRIP DROPS TO ITS OWN LINE BEFORE THE NAME BREAKS.
+              A cup strip is 5 cells plus the word "cup" — ~70px of a
+              ~170px track — and beside a name it left "Manchester City"
+              with room for "Manchest". Flex line-breaking measures each
+              item at its max-content, so the strip wraps below exactly
+              when the whole name will not sit next to it, and the name
+              then gets the line to itself. `ml-auto` keeps it at the
+              right edge on whichever line it lands on. */}
+          <span className={`flex min-w-0 items-center gap-2${
+            dense ? " md:flex-wrap" : ""}`}>
             <span aria-hidden
               className="h-2 w-2 flex-none rounded-full [background:var(--lg)]" />
             <span
-              className="truncate text-[15.5px] font-semibold text-ink-hi [font-family:var(--font-archivo)] [font-stretch:95%]"
+              className={`text-[15.5px] font-semibold text-ink-hi [font-family:var(--font-archivo)] [font-stretch:95%] ${
+                // A CLUB NAME WRAPS RATHER THAN TRUNCATING IN A NARROW
+                // TRACK. `truncate` is the right answer at 330px, where
+                // it fires on the two longest names in Europe; at 200px
+                // it fires on most of them, and a board of "Bayer Le…"
+                // is a board you cannot read. `anywhere` rather than
+                // `break-word` so the span's min-content contribution is
+                // zero and a long name can never push the row wider than
+                // its track.
+                dense ? "min-w-0 [overflow-wrap:anywhere]" : "truncate"}`}
               title={`${row.favourite} v ${row.opponent}`}>
               {row.favourite}
             </span>
@@ -302,10 +340,12 @@ export function RowRead({ row, modeId, clubCount }: {
               scope={row.form?.scope} cupScope={row.form?.scope_is_cup}
               className="ml-auto pl-2" />
           </span>
-          <span className="mt-0.5 flex min-w-0 items-center gap-2">
+          <span className={`mt-0.5 flex min-w-0 items-center gap-2${
+            dense ? " md:flex-wrap" : ""}`}>
             <span aria-hidden
               className="h-[7px] w-[7px] flex-none rounded-full border border-ink-low bg-bs" />
-            <span className="truncate text-[12.5px] text-ink-low [font-family:var(--font-archivo)] [font-stretch:96%]">
+            <span className={`text-[12.5px] text-ink-low [font-family:var(--font-archivo)] [font-stretch:96%] ${
+              dense ? "min-w-0 [overflow-wrap:anywhere]" : "truncate"}`}>
               <span className="text-ink-faint">vs </span>{row.opponent}
             </span>
             <FormStrip form={row.form?.opp} name={row.opponent}
@@ -313,7 +353,11 @@ export function RowRead({ row, modeId, clubCount }: {
               className="ml-auto pl-2" />
           </span>
         </span>
-        <span className="flex-none text-right">
+        <span className={`flex-none text-right${
+          // Stacked (dense, md+) the figure and its key sit on ONE line
+          // at the matchup's right edge, rather than costing two. The
+          // key is still directly beside the number it names.
+          dense ? " md:flex md:items-baseline md:justify-end md:gap-2" : ""}`}>
           {/* THE COUNTERFACTUAL, CARRIED WITHOUT INK (2026-09-07). It used
               to ride on the season chip; when the chip went it moved to
               the figure it contradicts, as a warn-coloured asterisk. The
@@ -336,7 +380,8 @@ export function RowRead({ row, modeId, clubCount }: {
               anchor.v === WITHHELD ? "font-normal text-ink-faint" : "text-ink-hi"}`}>
             {anchor.v}
           </span>
-          <span className="mt-1 block font-mono text-[8.5px] uppercase tracking-[0.12em] text-ink-low">
+          <span className={`mt-1 block font-mono text-[8.5px] uppercase tracking-[0.12em] text-ink-low${
+            dense ? " md:mt-0" : ""}`}>
             {anchor.k}
           </span>
         </span>
@@ -347,7 +392,12 @@ export function RowRead({ row, modeId, clubCount }: {
       {/* Stage 1 — the ranking inputs, favourite-signed. The metric the
           anchor already shows is not repeated down here; the ranks pair
           names what the dumbbell draws. */}
-      <div className="mt-2.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-[10.5px] tabular-nums">
+      {/* ALREADY flex-wrap, and that is what makes it survive: the five
+          items reflow onto two or three lines in a narrow track rather
+          than running off the edge. Only the gap tightens, so more of
+          them fit per line. */}
+      <div className={`mt-2.5 flex flex-wrap items-baseline gap-y-1 font-mono text-[10.5px] tabular-nums ${
+        dense ? "gap-x-4 md:gap-x-2.5" : "gap-x-4"}`}>
         <span className="text-ink-faint">
           #{row.ranks.fav} v #{row.ranks.opp}
         </span>
@@ -375,7 +425,7 @@ export function RowRead({ row, modeId, clubCount }: {
           with the finished tail (components/PickerRead.tsx), so a read
           below the divider is THE SAME READ as one above it. */}
       <div className="mt-3">
-        <TierGaps read={row} />
+        <TierGaps read={row} dense={dense} />
       </div>
 
       {/* A WITHHELD GAP SAYS WHY, on the card, in the backend's own
@@ -387,9 +437,11 @@ export function RowRead({ row, modeId, clubCount }: {
   );
 }
 
-function RowCard({ row, rank, modeId, clubCount, colSrc }: {
+function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false }: {
   row: BoardRow; rank: number; modeId: SortModeId; clubCount: number;
   colSrc?: string | null;
+  /** in a narrow dense-grid track — see RowRead's own `dense` note */
+  dense?: boolean;
 }) {
   const cross = row.cross_league === true;
   const alt = seasonDisagreement(row);
@@ -403,12 +455,14 @@ function RowCard({ row, rank, modeId, clubCount, colSrc }: {
       data-event={row.event_id}
       data-cross-league={cross ? "true" : "false"}
       data-season-departure={departure ?? undefined}
-      className={`rounded-xl border p-4 transition-colors bg-gradient-to-b from-elev2/60 to-elev/40 ${
+      className={`rounded-xl border transition-colors bg-gradient-to-b from-elev2/60 to-elev/40 ${
+        dense ? "p-4 md:p-3" : "p-4"} ${
         rank === 1
           ? "border-accent/35 hover:border-accent/60"
           : "border-line hover:border-line-strong"}`}
     >
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <div className={`flex flex-wrap items-baseline gap-y-1 ${
+        dense ? "gap-x-3 md:gap-x-2" : "gap-x-3"}`}>
         <span data-testid="row-rank"
           className={`font-mono text-[11px] tabular-nums ${
             rank === 1 ? "text-accent" : "text-ink-faint"}`}>
@@ -453,7 +507,8 @@ function RowCard({ row, rank, modeId, clubCount, colSrc }: {
         </span>
       </div>
 
-      <RowRead row={row} modeId={modeId} clubCount={clubCount} />
+      <RowRead row={row} modeId={modeId} clubCount={clubCount}
+        dense={dense} />
 
       <div className="mt-3 border-t border-line pt-3">
         <KalshiCell quote={row.kalshi} />
@@ -520,6 +575,41 @@ function RefusalCard({ r, dated = true }: {
   );
 }
 
+/** THE MATCHES OF ONE MATCHDAY, LAID ACROSS THE BAND (operator,
+ *  2026-09-08).
+ *
+ *  A board narrowed to ONE column — /bet-suggester/ucl — was drawing one
+ *  tall stack of full-width cards: a Champions League matchday is ~18
+ *  fixtures, so the reader got 18 screens of 1,400px-wide card holding
+ *  200px of ink. The landing board's density comes from laying columns
+ *  side by side; a single-column board has to find it inside the band.
+ *
+ *  DAY BANDS REMAIN THE VERTICAL STRUCTURE. This changes what happens
+ *  INSIDE one band's content track and nothing else: the band is still a
+ *  subgrid row, the date is still drawn once above it, and rank badges
+ *  still restart at 01 per day. Grid flow is row-major and the DOM order
+ *  is the sorted order, so 01 is still the top-left card and the ladder
+ *  still reads left-to-right.
+ *
+ *  THE LADDER IS PICKED FROM WHAT A CARD NEEDS, NOT FROM A ROUND NUMBER.
+ *  The board's `main` is `max-w-[96rem] px-5`, so at each step the track
+ *  works out at:
+ *
+ *      <sm   1 col   350px at 390   — a phone gets the card whole
+ *      sm    2 cols  294px at 640
+ *      md    3 cols  235px at 768
+ *      lg    4 cols  237px at 1024
+ *      xl    6 cols  196px at 1280, 223px at 1440, 239px at 1536+
+ *
+ *  Six is the operator's number and xl is the first breakpoint that can
+ *  hold six tracks over 190px. Two and three are NOT dense enough to
+ *  need the narrow card, which is why the reflow in RowRead turns on at
+ *  `md` — the same width where this grid first goes past two columns.
+ *  Standard Tailwind breakpoints throughout, like every other grid in
+ *  this app; no arbitrary widths. */
+const DENSE_GRID = "grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 "
+  + "lg:grid-cols-4 xl:grid-cols-6";
+
 /** Said once per column, where a reader first meets a refused card. */
 function RefusalWhy() {
   return (
@@ -536,7 +626,7 @@ function RefusalWhy() {
 
 export function LeagueColumn({
   slug, meta, rows, refusals, days, dayKeys, sortFor, dayLabels, colIndex,
-  review,
+  review, dense = false,
 }: {
   slug: string;
   /** absent when the payload never mentioned this league at all */
@@ -567,6 +657,15 @@ export function LeagueColumn({
    *  2026-09-01). Explicitly placed items may overlap; that is the
    *  contract the whole band layout stands on. */
   colIndex: number;
+  /** THIS COLUMN HAS THE BOARD TO ITSELF, so each matchday band lays its
+   *  matches ACROSS the width instead of stacking them (see DENSE_GRID).
+   *
+   *  The page derives it from the same `columnSlugs.length === 1` that
+   *  already decides the board's framing and its ranking key — NOT from
+   *  `slug === "ucl"`. The Champions League is simply the first board
+   *  narrowed to one column; the next one gets this for free, and a
+   *  multi-league board can never acquire it by accident. */
+  dense?: boolean;
   /** the finished tail's slice of this league. A SEPARATE payload on a
    *  separate fetch: the board is a 90s sweep of what is coming, the
    *  review is a long-cached read of matches that cannot change again.
@@ -813,6 +912,22 @@ export function LeagueColumn({
             </div>
           );
         }
+        // The day's cards, in the day's sorted order. RANK IS ASSIGNED
+        // HERE, before the layout sees them, so it is the same number in
+        // a stack and in a grid: 01 is this day's best under its sort,
+        // and grid flow being row-major keeps it top-left.
+        const cards = (
+          <>
+            {dayRows.map((r, i) => (
+              <RowCard key={`${r.league}-${r.event_id}`} row={r} rank={i + 1}
+                modeId={modeId} clubCount={meta?.clubs ?? 0}
+                colSrc={meta?.src} dense={dense} />
+            ))}
+            {refused.map((r, i) => (
+              <RefusalCard key={`ref-${r.club}-${i}`} r={r} />
+            ))}
+          </>
+        );
         return (
           <div key={key} data-testid="day-track" data-day={key}
             style={{ ["--r" as string]: String(3 + 2 * di) }}
@@ -824,14 +939,12 @@ export function LeagueColumn({
               </span>
               <span aria-hidden className="h-px flex-1 bg-line" />
             </div>
-            {dayRows.map((r, i) => (
-              <RowCard key={`${r.league}-${r.event_id}`} row={r} rank={i + 1}
-                modeId={modeId} clubCount={meta?.clubs ?? 0}
-                colSrc={meta?.src} />
-            ))}
-            {refused.map((r, i) => (
-              <RefusalCard key={`ref-${r.club}-${i}`} r={r} />
-            ))}
+            {/* The divider above and the reason below stay OUTSIDE the
+                grid, full width: a date and a paragraph of explanation
+                are not matches and must not take a match's track. */}
+            {dense
+              ? <div data-testid="day-grid" className={DENSE_GRID}>{cards}</div>
+              : cards}
             {key === firstRefusalDay && <RefusalWhy />}
           </div>
         );
@@ -865,7 +978,10 @@ export function LeagueColumn({
             band to draw these in. Every other refused fixture is on its
             own date above.
           </p>
-          <div className="mt-2 space-y-2">
+          {/* Undated refusals lay across the same tracks the matchdays
+              use when the board is dense — a block of them stacked full
+              width under a six-up grid reads as a different surface. */}
+          <div className={dense ? `mt-2 ${DENSE_GRID}` : "mt-2 space-y-2"}>
             {undated.map((r, i) => (
               <RefusalCard key={`${r.club}-${i}`} r={r} dated={false} />
             ))}
