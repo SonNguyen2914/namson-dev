@@ -27,6 +27,7 @@ import LaligaDashboard from "../../components/LaligaDashboard";
 import LigamxDashboard from "../../components/LigamxDashboard";
 import { Eyebrow, Reveal } from "../../components/ui";
 import { ArchiveMenu } from "../../components/ArchiveMenu";
+import { CompRail } from "../../components/CompRail";
 import { NavChip, RouteProgress, Toaster, TopBar } from "../../components/chrome";
 
 // Wordmark-adjacent faces: Exo 2 heavy italic for MLS's slanted crest
@@ -309,15 +310,13 @@ export default function LeagueCarousel() {
             place in the league carousel. */}
         <NavChip href="/bet-suggester/friendlies" active={false}>Friendlies</NavChip>
         {/* Viewer competitions: fixtures + Kalshi + strength read, no
-            model. One shared page at /bet-suggester/comp/[key].
-            ASEAN left this rail on 2026-08-30 — it FINISHED (0 upcoming,
-            28 played), and it is in the Archive dropdown at the top-left
-            with WC26. THE LEAGUES CUP LEFT IT THE SAME WAY on 2026-09-09:
-            Toluca 2-0 Monterrey on 09-07 was its final, so it is filed in
-            that dropdown (commit cbc4ff8) and a finished competition does
-            not also sit in a rail of live ones. Its viewer route still
-            works and the Archive item still reaches it. UCL stays: its
-            league phase opened 2026-09-08.
+            model — and, since 2026-09-09, a chip that glows when the
+            competition plays today or tomorrow.
+            THE RAIL ITSELF MOVED to components/CompRail.tsx, where the
+            entries, the reasoning for each and the glow live once. It
+            was the same literal here and on the board, which is how a
+            rail acquires two behaviours; the record of who left it and
+            why went with it.
             RETIRED 2026-08-24 by operator decision, and dropped from
             this rail entirely: Conference (ecl), Europa (uel),
             Brasileirão, Argentina, USL. The backend stopped collecting
@@ -326,10 +325,7 @@ export default function LeagueCarousel() {
             proxy deliberately exposes only fixtures/markets/status/
             tournament — whether to open journal to readers is an
             operator call, not a comment's. */}
-        {([["ucl", "/bet-suggester/ucl", "UCL"]] as const)
-          .map(([k, href, label]) => (
-            <NavChip key={k} href={href} active={false}>{label}</NavChip>
-          ))}
+        <CompRail />
       </TopBar>
 
       {fxOn && <LeagueFX key={fxKey} id={league.id} />}

@@ -58,7 +58,13 @@ export function TopBar({ back, left, title, children }: {
           // within itself on phones — a rigid rail forced the whole page
           // wider than the viewport, horizontal-scrolling the entire app.
           // On mobile the title is hidden, so the rail gets the full width.
-          <nav className="no-scrollbar ml-auto flex min-w-0 items-center gap-1.5 overflow-x-auto">
+          // py-2 -my-2: HEADROOM FOR A GLOW, at no cost to the layout.
+          // `overflow-x: auto` forces overflow-y to `auto` too, so this
+          // nav is a clipping box the exact height of a chip — a lit
+          // chip's outer bloom was being sliced off top and bottom with
+          // 0px to spare. The negative margin gives the padding back, so
+          // the rail sits precisely where it did.
+          <nav className="no-scrollbar -my-2 ml-auto flex min-w-0 items-center gap-1.5 overflow-x-auto py-2">
             {children}
           </nav>
         )}
@@ -67,25 +73,85 @@ export function TopBar({ back, left, title, children }: {
   );
 }
 
-export function NavChip({ href, onClick, active, children }: {
+export function NavChip({ href, onClick, active, soon, children }: {
   href?: string;
   onClick?: () => void;
   active?: boolean;
+  /* SOMETHING IS ON, AND WHEN — never whether to act on it.
+   *
+   *  THREE STATES, NAMED, and the third is the reason this is not a
+   *  boolean. "soon" is a read that landed and counted a fixture in the
+   *  window; "none" is a read that landed and counted none; "unknown" is
+   *  a read that did not land — in flight, refused, or a payload that
+   *  was not a fixture list. Only "soon" glows, and "none" and "unknown"
+   *  are BOTH an ordinary chip on screen, because an ordinary chip
+   *  asserts nothing and that is the right ink for both.
+   *
+   *  THEY ARE STILL TOLD APART IN THE MARKUP. `data-soon` carries the
+   *  state verbatim — the same discipline as `data-counts` on a column
+   *  header, and for the same reason: on screen the two absences look
+   *  alike, so nothing else could ever catch a failed read being folded
+   *  into a measured "nothing on". MISSING IS NEVER ZERO needs somewhere
+   *  to be observable, and this is it.
+   *
+   *  `hue` is a CSS custom property NAME, so the chip is lit in the
+   *  competition's own wayfinding light rather than in a colour typed
+   *  here — league hues say WHICH, the traffic light says GOOD or BAD,
+   *  and this is emphatically the first kind. `note` is the words: it
+   *  names a day and nothing else, and it is written into the
+   *  accessible name rather than left to the colour. */
+  soon?: { state: "soon" | "none" | "unknown"; hue?: string; note?: string };
   children: ReactNode;
 }) {
+  const lit = soon?.state === "soon";
   const cls = "whitespace-nowrap rounded-md border px-2 py-1 sm:px-2.5 " +
     "font-mono text-[10px] uppercase tracking-[0.14em] transition-colors " +
-    (active
-      ? "border-accent/50 bg-accent/10 text-accent"
-      : "border-line text-ink-low hover:border-line-strong hover:text-ink-hi");
+    (lit
+      // the glow wins over the resting style but NOT over `active`: a
+      // chip for the page you are on is still the chip for the page you
+      // are on, and two emphases fighting is neither
+      ? (active
+          ? "border-accent/50 bg-accent/10 text-accent"
+          : "chip-soon")
+      : active
+        ? "border-accent/50 bg-accent/10 text-accent"
+        : "border-line text-ink-low hover:border-line-strong hover:text-ink-hi");
+  const style = lit && soon?.hue
+    ? { ["--chip-hue" as string]: `var(${soon.hue})` }
+    : undefined;
+  const body = (
+    <>
+      {lit && (
+        <i aria-hidden
+          className="chip-soon-dot mr-1.5 inline-block h-1.5 w-1.5 rounded-full align-[0.08em]" />
+      )}
+      {children}
+      {/* THE FACT, IN WORDS, FOR ANYONE THE HUE NEVER REACHES. A glow is
+          colour and colour alone; a screen reader, a high-contrast
+          display and a printout all lose it. This is not decoration
+          duplicated — it is the only copy of the fact that survives
+          everywhere, and it is deliberately a day and not an
+          instruction.
+          ONLY THE LIT STATE SPEAKS. "none" and "unknown" add no words,
+          because the one thing neither may say is that nothing is on:
+          one has not been measured and the other is not worth a
+          sentence. */}
+      {lit && soon?.note && <span className="sr-only"> — {soon.note}</span>}
+    </>
+  );
   // Link, not <a>: a plain anchor made every chip hop a full document
   // load — the one navigation in the app that skipped the client router
   // (and RouteProgress). The legacy ?league= mapping that hard loads
   // used to pick up from next.config.ts lives client-side too (the
   // board's own deep-link guard), so nothing depends on the reload.
+  const attrs = {
+    className: cls, style,
+    ...(soon ? { "data-soon": soon.state } : {}),
+    ...(lit && soon?.note ? { title: soon.note } : {}),
+  };
   return onClick
-    ? <button onClick={onClick} className={cls}>{children}</button>
-    : <Link href={href ?? "#"} className={cls}>{children}</Link>;
+    ? <button onClick={onClick} {...attrs}>{body}</button>
+    : <Link href={href ?? "#"} {...attrs}>{body}</Link>;
 }
 
 // Which of the given section ids is currently in view — drives the active

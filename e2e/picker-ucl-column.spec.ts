@@ -1342,3 +1342,101 @@ test("the season banner names only leagues that HAVE a column here",
     await expect(page.getByText("Liga MX 6 GP")).toHaveCount(0);
     await expect(page.getByText(/of 4 leagues/)).toHaveCount(0);
   });
+
+// ══ THE BOARD TOOK THIS COMPETITION OFF, AND THE PAGE SAYS SO ═════════
+//
+// "remove UCL from the landing page, we have it in its own cup page is
+// enough" (operator, 2026-09-09). The backend answers that by dropping
+// `ucl` from `tables.BOARD_COLUMNS`, and /api/picker/board then carries
+// no UCL row, no UCL refusal and no UCL entry in `leagues`.
+//
+// THIS PAGE STILL EXISTS. It is /bet-suggester with `only={["ucl"]}`, so
+// it names its own column and gets one whether or not the board declares
+// it — deliberately, because rendering nothing at all reads as broken.
+// What it must NOT do is let that column speak as though the board had
+// looked: "0 FIXTURES · No Champions League fixtures in the next 7 days"
+// over a week holding eighteen of them is a measured absence invented
+// out of a question nobody asked, which is the one sentence this whole
+// surface is built to refuse.
+//
+// So: the count says NOT RANKED, the box says the board carries no
+// column for it, and the page points at the competition's own viewer.
+// Missing is never zero, on the last surface where it could still have
+// been.
+
+/** The same board, with the Champions League removed from it exactly the
+ *  way `BOARD_COLUMNS` removes one: no rows, no refusals, no entry in
+ *  `leagues`. Built by SUBTRACTION from the fixture above rather than
+ *  typed out, so it cannot drift from the payload the rest of this file
+ *  asserts against. */
+const BOARD_WITHOUT_UCL = (() => {
+  const leagues: Record<string, unknown> = { ...LEAGUES };
+  delete leagues.ucl;
+  return {
+    ...BOARD,
+    leagues,
+    rows: BOARD.rows.filter((r) => {
+      const x = r as { column?: string; league?: string };
+      return (x.column ?? x.league) !== "ucl";
+    }),
+  };
+})();
+
+test("with the competition off the board, the narrowed page reports NO RANKING — never zero fixtures",
+  async ({ page }) => {
+    await openUcl(page, BOARD_WITHOUT_UCL);
+    const ucl = col(page, "ucl");
+    // the page still renders, and still renders THIS column: a blank
+    // screen is not an answer
+    await expect(ucl).toHaveCount(1);
+    await expect(ucl.getByTestId("picker-row")).toHaveCount(0);
+
+    /* THE COUNT DOES NOT COUNT. "0 fixtures" here would be a number
+       measured over a window the board never looked at. */
+    const count = ucl.getByTestId("col-count");
+    await expect(count).toHaveText("not ranked");
+    await expect(count).toHaveAttribute("data-counts", "unasked");
+    await expect(count).not.toHaveText(/fixtures/);
+
+    /* NOR DOES THE EMPTY BOX. The measured sentence — "No X fixtures in
+       the next N days" — belongs to a column the board ranked and found
+       nothing in, and it must not appear on one it never ranked. */
+    const empty = ucl.getByTestId("col-empty");
+    await expect(empty).toHaveAttribute("data-holds", "unasked");
+    await expect(empty).toContainText("carries no column for");
+    await expect(empty).toContainText("not a count");
+    await expect(empty).not.toContainText("in the next 7 days");
+
+    // and the chip that says why there are no chips
+    await expect(ucl.getByTestId("col-no-board-entry")).toHaveCount(1);
+  });
+
+test("and it names the page the competition DOES have — removing a column is not deleting a competition",
+  async ({ page }) => {
+    await openUcl(page, BOARD_WITHOUT_UCL);
+    const note = page.getByTestId("board-undeclared");
+    await expect(note).toBeVisible();
+    await expect(note).toHaveAttribute("data-slugs", "ucl");
+    // the competition's DISPLAY NAME, not its slug — the reader never
+    // sees a raw key on this surface (e2e/no-raw-slug-reaches-the-reader)
+    await expect(note).toContainText("Champions League");
+    await expect(note).not.toContainText("ucl");
+    // a way out, rather than a dead end: `CUP_COMP_KEY` still maps the
+    // competition to its viewer, and that viewer still serves it
+    await expect(note.locator('a[href="/bet-suggester/comp/ucl"]'))
+      .toHaveCount(1);
+  });
+
+test("a DECLARED narrowed column says none of that — the control",
+  async ({ page }) => {
+    /* Without this the two tests above would pass against a page that
+       said "not ranked" over every narrowed board, which is the same
+       defect pointing the other way. This is the board this file spends
+       its whole length asserting against: `ucl` declared, rows served. */
+    await openUcl(page);
+    await expect(page.getByTestId("board-undeclared")).toHaveCount(0);
+    await expect(col(page, "ucl").getByTestId("col-no-board-entry"))
+      .toHaveCount(0);
+    await expect(col(page, "ucl").getByTestId("col-count"))
+      .not.toHaveText("not ranked");
+  });

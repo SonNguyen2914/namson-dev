@@ -1023,10 +1023,18 @@ function ColumnNotes({ notes }: { notes: ColumnNoteSet }) {
 export function columnCountLabel(
   upcoming: number,
   finished: { known: boolean; n: number },
+  /** the board payload declared no column for this competition, so it
+   *  ranked none of its fixtures and there is no count to print. Added
+   *  2026-09-09: "0 FIXTURES" over a competition the board was never
+   *  asked about is a measured zero invented out of a question nobody
+   *  put — the same defect one layer up from "0 fixtures" over four
+   *  finished ties, and the reason this function exists at all. */
+  boardSilent = false,
 ): string {
   if (upcoming === 0 && finished.known && finished.n > 0) {
     return `${finished.n} finished`;
   }
+  if (upcoming === 0 && boardSilent) return "not ranked";
   return `${upcoming} fixture${upcoming === 1 ? "" : "s"}`;
 }
 
@@ -1231,17 +1239,20 @@ export function LeagueColumn({
             {leagueLabel(slug)}
           </h3>
           {/* THE COUNT COUNTS WHAT THIS COLUMN HOLDS — see
-              columnCountLabel. `data-counts` says which of the two it
-              is, so the header can never be read as the other one by a
-              guard or by a reader hovering it. */}
+              columnCountLabel. `data-counts` says WHICH of the three it
+              is, so the header can never be read as one of the others
+              by a guard or by a reader hovering it. */}
           <span data-testid="col-count"
             data-counts={nothingAhead && finished.known && finished.n > 0
-              ? "finished" : "upcoming"}
+              ? "finished"
+              : nothingAhead && boardSilent ? "unasked" : "upcoming"}
             title={nothingAhead && finished.known && finished.n > 0
               ? `nothing upcoming in this column, and ${finished.n} match${finished.n === 1 ? "" : "es"} that already finished — they are under the dashed divider below`
+              : nothingAhead && boardSilent
+              ? "the board payload declared no column for this competition, so it ranked none of its fixtures — this is the absence of a ranking, not a count of zero matches"
               : undefined}
             className="flex-none font-mono text-[10px] uppercase tracking-[0.14em] tabular-nums text-ink-faint">
-            {columnCountLabel(rows.length, finished)}
+            {columnCountLabel(rows.length, finished, boardSilent)}
           </span>
         </div>
         {/* `relative` so the column-notes panel below hangs off THE CHIP
@@ -1257,16 +1268,22 @@ export function LeagueColumn({
           {/* WHY THIS COLUMN HAS NO CHIPS — said, rather than left as a
               gap (operator, 2026-09-08). Every other column carries a
               season chip and, for a cup, a "rated on" chip; this one
-              carried none, because there is no `meta` to derive either
-              from. The board payload simply never mentions this
-              competition — the Leagues Cup is over, so it serves no
-              rows and no league entry for it, while the review still
-              carries its finished ties and keeps the column alive.
+              carries none, because there is no `meta` to derive either
+              from — the board payload never mentions this competition.
               An unexplained blank where four neighbours have chips is
-              what a reader calls broken. This is that blank, named. */}
+              what a reader calls broken. This is that blank, named.
+
+              WHEN IT CAN STILL HAPPEN, since 2026-09-09. The full board
+              draws exactly the columns the payload DECLARES, so on that
+              route this chip is unreachable by construction. It survives
+              for the narrowed routes — /bet-suggester/ucl names its
+              column itself — and it is the honest answer there: the
+              competition left BOARD_COLUMNS, the board ranks none of its
+              fixtures, and the page says so instead of printing a zero
+              nobody measured. */}
           {boardSilent && (
             <span data-testid="col-no-board-entry"
-              title="The board payload carried no entry for this competition at all — no season basis, no rating table, and so no upcoming fixtures to rank. That is the board saying NOTHING about it, which is not the same as the board measuring none. This column is here because the finished read, a separate request, still has matches in it."
+              title="The board payload carried no entry for this competition at all — no season basis, no rating table, and so no ranking of its fixtures. That is the board saying NOTHING about it, which is not the same as the board measuring none."
               className="rounded border border-line-strong px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-low">
               no board entry
             </span>
@@ -1467,11 +1484,26 @@ export function LeagueColumn({
             // different fact and must not be dressed as a quiet weekend
             <div data-testid="col-empty"
               data-holds={finished.known && finished.n > 0
-                ? "finished" : "nothing"}
+                ? "finished" : boardSilent ? "unasked" : "nothing"}
               className="rounded-xl border border-line p-4">
+              {/* MISSING IS NEVER ZERO, AND THIS IS WHERE IT WOULD HAVE
+                  BEEN (2026-09-09). "No X fixtures in the next 7 days"
+                  is a MEASURED absence — the board looked over that
+                  window and found none. When the board payload never
+                  declared this competition, nothing was measured over
+                  any window: there is no ranking, no rating table and
+                  no fixture list here to be empty. Printing the
+                  measured sentence anyway is how /bet-suggester/ucl
+                  would have said "no Champions League fixtures in the
+                  next 7 days" over a week holding eighteen of them, the
+                  moment the competition left BOARD_COLUMNS. */}
               <p className="text-sm text-ink-mid">
-                No {leagueLabel(slug)} fixtures in the next {days}{" "}
-                day{days === 1 ? "" : "s"}.
+                {boardSilent
+                  ? `The board carries no column for ${leagueLabel(slug)},`
+                    + " so it ranked none of its fixtures. This is not a"
+                    + " count of them."
+                  : `No ${leagueLabel(slug)} fixtures in the next ${days} `
+                    + `day${days === 1 ? "" : "s"}.`}
               </p>
               {/* AND THEN WHAT THIS COLUMN DOES HAVE. Two states share
                   this box and they mean opposite things: a live league
@@ -1492,9 +1524,9 @@ export function LeagueColumn({
                   </span>
                   , directly below
                   {boardSilent
-                    ? " — and that is the whole of this column: the board"
-                      + " carries no entry for this competition, so nothing"
-                      + " is coming."
+                    ? " — and that is the whole of what the board has to"
+                      + " say here, because it carries no column for this"
+                      + " competition at all."
                     : "."}
                 </p>
               )}

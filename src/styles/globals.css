@@ -314,6 +314,61 @@ html {
   backdrop-filter: blur(14px) saturate(1.2);
 }
 
+/* ── A NAV CHIP THAT SAYS "SOON" ─────────────────────────────────────
+   The top-bar chip for a competition with a fixture TODAY OR TOMORROW,
+   lit in that competition's own light (`--chip-hue`, set inline from
+   the same --lg-* token its column and its cards already use).
+
+   IT IS WAYFINDING, AND IT IS ONLY ALLOWED TO BE. League hues exist to
+   say WHICH competition; the traffic light (--up / --warn / --neg) says
+   whether something is good or bad; gold (--accent) is the brand. "A
+   match is on tomorrow" is a fact about the calendar, not a judgement
+   about a price, so it borrows none of them: no gold, no green, no
+   amber, no red. A chip glowing in --warn would be telling the operator
+   a fixture is a warning — a verdict this surface does not hold.
+
+   STATIC, ON PURPOSE. A pulse reads as urgency ("hurry"), which is the
+   one thing the label beside it is careful never to say, and it is also
+   what prefers-reduced-motion exists to spare people. There is no
+   animation here to reduce, which is why this rule has no reduced-motion
+   branch: a border, a tint and a soft ring, the same for everyone.
+
+   FORCED COLOURS. In high-contrast mode every custom colour above is
+   discarded, so the glow would vanish silently and the chip would look
+   like its neighbours. The outline carries the distinction in the one
+   property that survives — and the chip writes the day out in words for
+   assistive tech anyway (see components/CompRail.tsx), because a fact
+   carried only by a hue is a fact some readers never get. */
+.chip-soon {
+  border-color: color-mix(in srgb, var(--chip-hue) 60%, transparent);
+  background: color-mix(in srgb, var(--chip-hue) 12%, transparent);
+  color: var(--chip-hue);
+  /* INSET FIRST, AND THAT ORDER IS THE FIX. The chip rail is
+     `overflow-x: auto`, which forces overflow-y to `auto` as well and
+     makes the nav a clipping box exactly one chip tall — measured
+     2026-09-09 at 0px of headroom above and below. An outer-only glow
+     was therefore cut off on every side that mattered, worst on the last
+     chip in the rail, and the emphasis the operator asked for existed
+     only in the stylesheet. The inner light cannot be clipped by
+     anything, ever; the outer bloom is a bonus that the small headroom
+     added to the rail is enough for. */
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--chip-hue) 28%, transparent),
+    inset 0 0 10px -3px color-mix(in srgb, var(--chip-hue) 85%, transparent),
+    0 0 9px -3px color-mix(in srgb, var(--chip-hue) 60%, transparent);
+}
+.chip-soon:hover {
+  border-color: color-mix(in srgb, var(--chip-hue) 80%, transparent);
+  background: color-mix(in srgb, var(--chip-hue) 18%, transparent);
+}
+.chip-soon-dot {
+  background: var(--chip-hue);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--chip-hue) 70%, transparent);
+}
+@media (forced-colors: active) {
+  .chip-soon { outline: 2px solid currentColor; outline-offset: 1px; }
+}
+
 /* anchored sections land below the sticky bar */
 section[id], div[id] {
   scroll-margin-top: 84px;

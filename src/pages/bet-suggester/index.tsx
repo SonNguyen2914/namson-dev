@@ -57,8 +57,8 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 import { TZ, dayLabel, localDay } from "../../lib/matchday";
 import {
-  Board, PICKER_LEAGUE_ORDER, SEASON_BLEND_K, THIN_ASK_SIZE,
-  WIDE_SPREAD_C, fetchBoard, leagueLabel,
+  Board, CUP_COMP_KEY, SEASON_BLEND_K, THIN_ASK_SIZE, WIDE_SPREAD_C,
+  boardColumns, fetchBoard, leagueLabel,
 } from "../../lib/pickerApi";
 import {
   DEFAULT_BACK, REVIEW_WINDOWS, Review, fetchReview,
@@ -70,6 +70,7 @@ import {
 } from "../../lib/pickerSort";
 import { Eyebrow } from "../../components/ui";
 import { ArchiveMenu } from "../../components/ArchiveMenu";
+import { CompRail } from "../../components/CompRail";
 import LiveSection from "../../components/LiveCard";
 import { LeagueColumn } from "../../components/PickerColumn";
 import {
@@ -283,25 +284,54 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   const boardMode = modeById(boardSort.mode) ?? modeById(DEFAULT_SORT.mode)!;
   const boardNullNote = nullNoteFor(boardMode, rows);
 
-  const allColumnSlugs = [
-    ...PICKER_LEAGUE_ORDER,
-    ...[...new Set([
-      ...Object.keys(leaguesMap),
-      ...rows.map(colOf),
-      ...refusals.map(colOf),
-      // the review payload too: a league that has finished matches but no
-      // upcoming ones must not lose its column, or the operator loses the
-      // matches he came back to look at
-      ...Object.keys(reviewLeagues),
-      ...finished.map(colOf),
-      ...finishedRefusals.map(colOf),
-    ])].filter((s) => !PICKER_LEAGUE_ORDER.includes(s)),
-  ];
-  // NARROWED, NOT FILTERED DOWNSTREAM. A single-column route keeps its
-  // column even when the payload carries no row for it — the column's
-  // own empty state ("no fixtures in this window") is an answer, and a
-  // page that rendered nothing at all would read as broken instead.
-  const columnSlugs = only ? [...only] : allColumnSlugs;
+  /* ── THE COLUMN SET IS THE BOARD'S DECLARATION (operator,
+     2026-09-09) ──────────────────────────────────────────────────────
+
+     ONE INPUT: `board.leagues`, which is the backend's
+     `tables.BOARD_COLUMNS` — a hand-written list the operator edits,
+     and the only way a competition joins or leaves his board. The
+     ordering lives in `boardColumns`; the MEMBERSHIP is not ours.
+
+     WHAT THIS REPLACED, and why it had to go. The set used to be four
+     hard-coded leagues UNIONED with six more sources — the payload's
+     `leagues`, every row's column, every refusal's column, the review
+     payload's `leagues`, every finished row and every finished refusal.
+     Seven doors into one set. The day the backend took the finished
+     Leagues Cup off the board, the last three walked it straight back
+     on: no upcoming rows, no league entry, a column anyway, drawn off
+     its own finished matches. "REMOVE IT FROM THE BOARD" had been
+     answered by the backend and overruled here.
+
+     A LEAGUE WITH NOTHING AHEAD STILL KEEPS ITS COLUMN, which was the
+     good reason those doors were opened and is not lost by closing
+     them: `BOARD_COLUMNS` declares MLS whether or not MLS has a fixture
+     this week, so a quiet league is a declared column with an empty
+     forward half and its finished tail underneath — exactly as before.
+     What can no longer happen is a column for a competition the board
+     never declared at all.
+
+     AND `PICKER_COLUMN_ORDER` CANNOT ADD ONE EITHER. It is intersected
+     with the declaration inside `boardColumns`, so a slug it names and
+     the board does not is simply not drawn. It orders; it never
+     admits. */
+  const declaredColumns = board ? Object.keys(leaguesMap) : [];
+  /* NARROWED, NOT FILTERED DOWNSTREAM. A single-column route keeps the
+     column it names even when the payload declares nothing for it —
+     rendering nothing at all would read as broken, and `undeclared`
+     below says what actually happened instead of letting the column's
+     own empty state claim a fixture count nobody measured. */
+  const columnSlugs = only ? [...only] : boardColumns(declaredColumns);
+  /* A NARROWED BOARD ASKING FOR A COLUMN THE BOARD NO LONGER DECLARES.
+     Not hypothetical: /bet-suggester/ucl is this page with
+     `only={["ucl"]}`, and the Champions League left `BOARD_COLUMNS` on
+     2026-09-09. Named here so the page can SAY the board carries no
+     column for it — "0 fixtures" over a competition playing eighteen
+     matches this week is the reading this tree exists to refuse.
+     Empty while the board is still loading or after it failed: nothing
+     is undeclared by a payload that never landed. */
+  const undeclared = board && only
+    ? only.filter((s) => !declaredColumns.includes(s))
+    : [];
   /* THE COLUMN SET, WHEN IT IS NARROWER THAN THE BOARD. On the full
      board `columnSlugs` already holds every slug the payload serves, so
      there is nothing for a region above the columns to be narrower
@@ -315,9 +345,9 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      of which of them got a column, so /bet-suggester/ucl printed
      "1 OF 4 LEAGUES · Liga MX 6 GP" on a board with no Liga MX column —
      a caveat about numbers that are nowhere on the page. It is derived
-     from `columnSlugs` now, which is a no-op on the full board (every
-     key of `leagues` is in `allColumnSlugs` by construction) and the
-     whole point on a narrowed one.
+     from `columnSlugs` now, which is a no-op on the full board (that
+     set IS the keys of `leagues`, since 2026-09-09) and the whole point
+     on a narrowed one.
      Cup columns stay excluded from the count for the older reason: a
      knockout has no season table of its own to be rated on, and folding
      it into "N of M leagues" would make that sentence untrue. A board
@@ -399,25 +429,16 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
         title={pageTitle ? pageTitle.toLowerCase() : "picker board"}>
         <NavChip href="/bet-suggester/leagues" active={false}>Leagues</NavChip>
         <NavChip href="/bet-suggester/friendlies" active={false}>Friendlies</NavChip>
-        {/* Live viewer competitions. ASEAN is not here: it finished, and
-            it sits in the Archive dropdown at the top-left with WC26.
-            NOR IS THE LEAGUES CUP, from 2026-09-09, for the same reason
-            and by the same test: Toluca 2-0 Monterrey on 09-07 was its
-            final, ESPN has 62 events for the season and every one of
-            them is in a final state, so it was FILED in that dropdown
-            (components/ArchiveMenu.tsx, commit cbc4ff8). It went on
-            sitting here as well, which is the rail claiming a finished
-            competition is live — the one thing this rail means. Its
-            viewer route is untouched and the Archive item reaches it:
-            filing a competition never retires a page.
-            THE HREF IS PART OF THE ENTRY. It used to be a ternary on the
-            key, which only ever had two answers because the rail only
-            ever had two chips; a per-entry href says the same thing
-            without a branch that goes dead the moment one is removed. */}
-        {([["ucl", "/bet-suggester/ucl", "UCL"]] as const)
-          .map(([k, href, label]) => (
-            <NavChip key={k} href={href} active={false}>{label}</NavChip>
-          ))}
+        {/* Live viewer competitions, and — since 2026-09-09 — WHEN each
+            of them next plays: the chip glows for a fixture today or
+            tomorrow. The rail moved to components/CompRail.tsx because
+            it was two identical literals, here and on
+            /bet-suggester/leagues, and a glow added to one of them would
+            have left the other with a chip that could not.
+            THE RAIL IS NOT THE BOARD'S COLUMN SET. The Champions League
+            left BOARD_COLUMNS on 2026-09-09 and kept this chip: removing
+            a column is not deleting a competition. */}
+        <CompRail />
       </TopBar>
 
       {/* B0c — SELECTING MATCHES TO WATCH. The provider holds the
@@ -696,9 +717,15 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
           </div>
 
           {loading ? (
+            /* A SHAPE, NOT A COLUMN SET. These blocks are placeholders
+               for a payload that has not landed, so their number is a
+               layout choice and asserts nothing: it used to be a `.map`
+               over the four hard-coded leagues, which read as the board
+               naming its columns before it had been told what they are.
+               Whatever the board declares replaces them wholesale. */
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-              {PICKER_LEAGUE_ORDER.map((s) => (
-                <SkeletonRows key={s} rows={3} height="h-40" />
+              {[0, 1, 2, 3].map((i) => (
+                <SkeletonRows key={i} rows={3} height="h-40" />
               ))}
             </div>
           ) : error ? (
@@ -717,6 +744,40 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             </div>
           ) : (
             <>
+              {/* THE BOARD DOES NOT CARRY THIS COMPETITION, SAID OUT
+                  LOUD. A page narrowed to a column the board's own
+                  `leagues` never declares has no rows to draw and no
+                  meta to describe them with — and the column below it
+                  would otherwise report "0 fixtures in the next 7 days"
+                  over a competition that is playing this week. That is
+                  a measured absence claimed off a payload that was
+                  never asked the question, which is the one sentence
+                  this whole surface is built to refuse.
+                  It names the competition's own page rather than
+                  leaving the reader at a dead end: leaving the board is
+                  not leaving the site. */}
+              {undeclared.length > 0 && (
+                <div data-testid="board-undeclared"
+                  data-slugs={undeclared.join(",")}
+                  className="mb-5 rounded-xl border border-line-strong bg-elev p-4">
+                  <Eyebrow>not a board column</Eyebrow>
+                  <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ink-mid">
+                    The picker board carries no column for{" "}
+                    {undeclared.map(leagueLabel).join(" · ")}, so it
+                    served no ranking for it and nothing below is a count
+                    of its fixtures. The competition is still played and
+                    still has a page — the board simply does not rank it.
+                  </p>
+                  <p className="mt-2 flex flex-wrap gap-3">
+                    {undeclared.map((s) => CUP_COMP_KEY[s] ? (
+                      <a key={s} href={`/bet-suggester/comp/${CUP_COMP_KEY[s]}`}
+                        className="rounded-md border border-line px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low transition-colors hover:border-line-strong hover:text-ink-hi">
+                        {leagueLabel(s)} fixtures &amp; prices →
+                      </a>
+                    ) : null)}
+                  </p>
+                </div>
+              )}
               {/* On a phone the four columns stack — these chips are the
                   way to a league without scrolling through the ones above
                   it. Hidden from md up, where the grid says it itself. */}

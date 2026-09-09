@@ -441,10 +441,51 @@ export const rowHref = (row: { league: string; event_id: string }) => {
     : `/bet-suggester/${row.league}/${row.event_id}`;
 };
 
-/** The board's fixed column order. A slug the payload serves that is not
- *  in this list still gets a column, appended after these four — a new
- *  league arriving in the registry must not disappear from the board. */
-export const PICKER_LEAGUE_ORDER = ["mls", "epl", "laliga", "ligamx"];
+/** THE READING ORDER OF THE COLUMNS THE BOARD DECLARES. It ORDERS; it
+ *  never ADMITS.
+ *
+ *  Every slug here is drawn only if the board's own `leagues` map named
+ *  it, and a declared slug this list has never heard of is appended
+ *  rather than dropped — so this file cannot add a column and cannot
+ *  lose one. That distinction is the whole of `boardColumns` below and
+ *  the reason this constant survives at all: the operator reads the
+ *  board left to right in this order every day, and which competitions
+ *  are on it is a different question from what order they sit in. */
+export const PICKER_COLUMN_ORDER = ["mls", "epl", "laliga", "ligamx"];
+
+/** THE COLUMN SET IS THE BOARD'S DECLARATION, AND NOTHING ELSE.
+ *
+ *  `declared` is `Object.keys(board.leagues)` — the backend's
+ *  `tables.BOARD_COLUMNS`, which is a hand-written list the operator
+ *  edits and the only way a competition joins his board. This function
+ *  is the ONE door: it reorders that set and returns it.
+ *
+ *  IT HAS BEEN THE OTHER WAY TWICE, AND BOTH TIMES A COMPETITION
+ *  APPEARED THAT NOBODY HAD ASKED FOR.
+ *    - The column set was once DERIVED from the registries and grew
+ *      from six to eleven in production without a decision.
+ *    - Then this page built its own set from four fixed leagues UNIONED
+ *      with the board's leagues, the rows' columns, the refusals'
+ *      columns, the review payload's leagues, the finished rows and the
+ *      finished refusals — seven doors — and the FINISHED Leagues Cup
+ *      walked back onto the board through the last three the day the
+ *      backend took it off.
+ *
+ *  So there is one input. A competition the board does not declare
+ *  cannot be conjured by a row, a refusal, a finished match or a
+ *  hard-coded league list, because none of them is read here.
+ *
+ *  WHAT THIS DOES NOT DO is decide what happens to rows in a column
+ *  that no longer exists. They are not drawn — the board serves none —
+ *  and the competition keeps its own page. Removing a column is not
+ *  deleting a competition. */
+export function boardColumns(declared: readonly string[]): string[] {
+  const seen = new Set(declared);
+  return [
+    ...PICKER_COLUMN_ORDER.filter((s) => seen.has(s)),
+    ...declared.filter((s) => !PICKER_COLUMN_ORDER.includes(s)),
+  ];
+}
 
 /** The blend's shrinkage constant: w_current = GP/(GP+k). At GP = k a
  *  club is rated half on each season, so k is also the games-played

@@ -57,6 +57,45 @@ export function dayLabel(iso: string) {
   });
 }
 
+/** THE DAY AFTER A DAY KEY, as calendar arithmetic and nothing else.
+ *
+ *  Deliberately NOT `now + 24h` put back through `dayKeyOf`. LA observes
+ *  DST, so one day a year is 25 hours long and 24 hours after 00:30 that
+ *  morning is 23:30 on the SAME day — "tomorrow" would quietly mean
+ *  "today" for the small hours of one November morning, and skip a day
+ *  in March. The key is already a calendar date, so its successor is a
+ *  calendar question: `Date.UTC` is used here purely as a civil-calendar
+ *  adder (it rolls month and year ends for free), never as a zone.
+ *
+ *  "" for anything that is not a YYYY-MM-DD key: a caller with no day
+ *  cannot be handed a next one, and inventing a date from a string we do
+ *  not recognise is worse than refusing. */
+export function nextDayKey(key: string) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+  if (!m) return "";
+  const t = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3] + 1));
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${t.getUTCFullYear()}-${p(t.getUTCMonth() + 1)}-${p(t.getUTCDate())}`;
+}
+
+/** THE TWO DAYS A FIXTURE CAN BE "SOON" ON, in the board's own terms:
+ *  [today, the next day] as local-day keys, taken from ONE instant so
+ *  the pair cannot be read a millisecond apart across a midnight.
+ *
+ *  The board buckets every matchday with `localDay`, so anything asking
+ *  "is this today?" has to ask it the same way — a second notion of
+ *  today drifts from the day bands the reader is looking at, which is
+ *  the whole reason `TZ` is fixed at the top of this file.
+ *
+ *  `now` is a parameter so a test can name the instant instead of racing
+ *  the clock, and so a caller can read the wall clock inside an effect
+ *  rather than during render: a render-time `new Date()` makes the
+ *  server's first paint and the browser's rehydration disagree. */
+export function soonDayKeys(now: Date = new Date()): [string, string] {
+  const today = dayKeyOf(now);
+  return [today, nextDayKey(today)];
+}
+
 export function groupByDay<T extends { id: string; date: string }>(
   fixtures: T[],
 ) {
