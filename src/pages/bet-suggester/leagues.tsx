@@ -323,7 +323,9 @@ export default function LeagueCarousel() {
             tournament — whether to open journal to readers is an
             operator call, not a comment's. */}
         {[["leagues-cup", "Leagues Cup"], ["ucl", "UCL"]].map(([k, label]) => (
-          <NavChip key={k} href={`/bet-suggester/comp/${k}`} active={false}>
+          <NavChip key={k} active={false}
+            href={k === "ucl" ? "/bet-suggester/ucl"
+                              : `/bet-suggester/comp/${k}`}>
             {label}
           </NavChip>
         ))}

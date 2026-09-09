@@ -228,6 +228,12 @@ export const LEAGUE_LABEL: Record<string, string> = {
   ligue1: "Ligue 1",
   eredivisie: "Eredivisie",
   primeiraliga: "Primeira Liga",
+  // Added 2026-09-08 with the Champions League's last two rateable
+  // member tables. ESPN carries no Czech, Ukrainian, Slovak or
+  // Azerbaijani league at all, so those four entrants stay refused by
+  // name rather than rated on a guess.
+  superlig: "Süper Lig",
+  eliteserien: "Eliteserien",
   ucl: "Champions League",
 };
 

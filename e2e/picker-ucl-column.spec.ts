@@ -357,3 +357,78 @@ test("every cup column the board serves opens somewhere that exists",
       }
     }
   });
+
+// ------------------------------- the UCL board route --------------------
+
+// THE PAGE IS THE BOARD, NOT A PAGE THAT RESEMBLES IT. The operator
+// asked for "the exact layout of the landing page, for UCL only", so
+// /bet-suggester/ucl renders the SAME component with its column set
+// narrowed. These assert the identity holds — a copy would pass the
+// first of them and start failing the rest as the two drifted.
+
+test("the UCL route draws the board's own furniture, with one column",
+  async ({ page }) => {
+    await page.route("**/api/picker/board**", (r) => r.fulfill(json(BOARD)));
+    await page.route("**/api/picker/review**", (r) =>
+      r.fulfill(json(EMPTY_REVIEW)));
+    await page.goto("/bet-suggester/ucl");
+
+    // one column, and it is the Champions League
+    const cols = page.getByTestId("league-col");
+    await expect(cols).toHaveCount(1);
+    await expect(cols).toHaveAttribute("data-league", "ucl");
+
+    // the landing page's own instruments, present here because it IS
+    // the landing page: the board sort control, the matchday bands, the
+    // ranked rows, and the refusal block with its reason
+    await expect(page.getByTestId("col-sort")).toHaveCount(1);
+    await expect(page.getByTestId("day-band").first()).toBeAttached();
+    await expect(page.getByTestId("picker-row")).toHaveCount(3);
+    await expect(page.getByTestId("row-anchor").first()).toBeVisible();
+  });
+
+test("the four league columns are absent from it, not merely empty",
+  async ({ page }) => {
+    await page.route("**/api/picker/board**", (r) => r.fulfill(json(BOARD)));
+    await page.route("**/api/picker/review**", (r) =>
+      r.fulfill(json(EMPTY_REVIEW)));
+    await page.goto("/bet-suggester/ucl");
+    for (const slug of ["mls", "epl", "laliga", "ligamx", "leaguescup"]) {
+      await expect(col(page, slug)).toHaveCount(0);
+    }
+  });
+
+test("the framing names the sort this board actually runs, and keeps every "
+   + "charter sentence", async ({ page }) => {
+    await page.route("**/api/picker/board**", (r) => r.fulfill(json(BOARD)));
+    await page.route("**/api/picker/review**", (r) =>
+      r.fulfill(json(EMPTY_REVIEW)));
+    await page.goto("/bet-suggester/ucl");
+    const intro = page.getByTestId("board-framing");
+    // NOT the table gap — this board withholds it on nearly every row,
+    // and a page that named it would be printing the one number it
+    // refuses
+    await expect(intro).toContainText(/ranked by shape/i);
+    await expect(intro).not.toContainText(/how far apart the two clubs sit/i);
+    // the three decision-safety sentences are carried verbatim, exactly
+    // as on the default board
+    await expect(intro).toContainText(/no model runs on this page/i);
+    await expect(intro)
+      .toContainText(/no number below is a probability or an edge of ours/i);
+    await expect(intro).toContainText(/nothing here is a recommendation/i);
+    await expect(intro).toContainText(/you are the one who picks/i);
+  });
+
+test("the default board is UNCHANGED by any of this", async ({ page }) => {
+    await open(page);
+    // WAIT FOR A COLUMN BEFORE COUNTING. `count()` does not auto-wait,
+    // and the framing paragraph is drawn before the board payload
+    // resolves — so a bare count here reads 0 and reports a missing
+    // board rather than a slow one.
+    await expect(page.getByTestId("league-col").first()).toBeAttached();
+    // its framing still names the table gap, its columns are still many
+    await expect(page.getByTestId("board-framing"))
+      .toContainText(/how far apart the two clubs sit/i);
+    expect(await page.getByTestId("league-col").count())
+      .toBeGreaterThan(1);
+  });

@@ -64,8 +64,8 @@ import {
   DEFAULT_BACK, REVIEW_WINDOWS, Review, fetchReview,
 } from "../../lib/pickerReview";
 import {
-  ColumnSort, DEFAULT_SORT, SORT_MODES, isDefaultSort, loadBoardSort,
-  modeById, nullNoteFor, saveBoardSort,
+  COLUMN_DEFAULT_SORT, ColumnSort, DEFAULT_SORT, SORT_MODES, isDefaultSort,
+  loadBoardSort, modeById, nullNoteFor, saveBoardSort,
 } from "../../lib/pickerSort";
 import { Eyebrow } from "../../components/ui";
 import { ArchiveMenu } from "../../components/ArchiveMenu";
@@ -92,7 +92,25 @@ const DEFAULT_DAYS = 7;
 const etDate = (d: string) =>
   /^\d{8}$/.test(d) ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}` : d;
 
-export default function PickerBoard() {
+/** THE BOARD, OPTIONALLY NARROWED TO ONE COLUMN.
+ *
+ *  `/bet-suggester` renders every column. `/bet-suggester/ucl` renders
+ *  the SAME COMPONENT with `only={["ucl"]}` — not a copy of it, which is
+ *  the whole point: the operator asked for "the exact layout of the
+ *  landing page, for UCL only", and a second page that merely resembled
+ *  this one would start resembling it less on the first change made to
+ *  either. Everything below — the day bands, the sort control, the rank
+ *  dumbbells, the refusal blocks, the live strip — is reached by both
+ *  routes because it is literally the same code.
+ *
+ *  `only` narrows the COLUMN SET and nothing else. The payload is the
+ *  same board payload; rows outside the named columns simply have no
+ *  column to sit in. */
+export default function PickerBoard({ only, pageTitle, backTo }: {
+  only?: readonly string[];
+  pageTitle?: string;
+  backTo?: { href: string; label: string };
+} = {}) {
   const router = useRouter();
   const [days, setDays] = useState(DEFAULT_DAYS);
   const [board, setBoard] = useState<Board | null>(null);
@@ -260,7 +278,7 @@ export default function PickerBoard() {
   const boardMode = modeById(boardSort.mode) ?? modeById(DEFAULT_SORT.mode)!;
   const boardNullNote = nullNoteFor(boardMode, rows);
 
-  const columnSlugs = [
+  const allColumnSlugs = [
     ...PICKER_LEAGUE_ORDER,
     ...[...new Set([
       ...Object.keys(leaguesMap),
@@ -274,11 +292,32 @@ export default function PickerBoard() {
       ...finishedRefusals.map(colOf),
     ])].filter((s) => !PICKER_LEAGUE_ORDER.includes(s)),
   ];
+  // NARROWED, NOT FILTERED DOWNSTREAM. A single-column route keeps its
+  // column even when the payload carries no row for it — the column's
+  // own empty state ("no fixtures in this window") is an answer, and a
+  // page that rendered nothing at all would read as broken instead.
+  const columnSlugs = only ? [...only] : allColumnSlugs;
+
+  /* WHAT THE PAGE SAYS IT RANKS BY MUST BE WHAT IT RANKS BY.
+     The board's framing names the TABLE GAP, and on the four league
+     columns that is exactly right. A single-column board whose column
+     ranks on shape — the Champions League, where nearly every tie pairs
+     two different domestic tables and the gap between them is withheld
+     by construction — would be printing the one number it refuses.
+     Derived from the same rule the column's own chip uses, so the two
+     can never disagree.
+     THE DEFAULT BOARD'S WORDING IS UNTOUCHED: its five phrases are a
+     decision-safety invariant pinned by e2e/picker-prose.spec.ts. Only
+     the ranking-key clause differs here; the three sentences saying no
+     model runs, nothing is a recommendation, and you are the one who
+     picks are carried verbatim in both. */
+  const soleColumn = columnSlugs.length === 1 ? columnSlugs[0] : null;
+  const soleOwnSort = soleColumn ? COLUMN_DEFAULT_SORT[soleColumn] : undefined;
 
   if (deepLink !== null) {
     return (
       <div className="min-h-screen bg-bs font-sans text-ink-mid">
-        <Head><title>Picker board · namson.dev</title></Head>
+        <Head><title>{pageTitle ?? "Picker board"} · namson.dev</title></Head>
         <RouteProgress />
         <main className="mx-auto max-w-5xl px-5 pt-24">
           <Eyebrow>opening the league carousel…</Eyebrow>
@@ -289,15 +328,18 @@ export default function PickerBoard() {
 
   return (
     <div className="min-h-screen bg-bs font-sans text-ink-mid">
-      <Head><title>Picker board · namson.dev</title></Head>
+      <Head><title>{pageTitle ?? "Picker board"} · namson.dev</title></Head>
       <RouteProgress />
-      <TopBar left={<ArchiveMenu />} title="picker board">
+      <TopBar left={backTo ? undefined : <ArchiveMenu />} back={backTo}
+        title={pageTitle ? pageTitle.toLowerCase() : "picker board"}>
         <NavChip href="/bet-suggester/leagues" active={false}>Leagues</NavChip>
         <NavChip href="/bet-suggester/friendlies" active={false}>Friendlies</NavChip>
         {/* Live viewer competitions. ASEAN is not here: it finished, and
             it sits in the Archive dropdown at the top-left with WC26. */}
         {[["leagues-cup", "Leagues Cup"], ["ucl", "UCL"]].map(([k, label]) => (
-          <NavChip key={k} href={`/bet-suggester/comp/${k}`} active={false}>
+          <NavChip key={k} active={false}
+            href={k === "ucl" ? "/bet-suggester/ucl"
+                              : `/bet-suggester/comp/${k}`}>
             {label}
           </NavChip>
         ))}
@@ -349,8 +391,10 @@ export default function PickerBoard() {
               e2e/picker.spec.ts pins all four phrases. */}
           <p data-testid="board-framing"
             className="mt-2 max-w-3xl text-[13px] leading-relaxed text-ink-low">
-            Ranked by how far apart the two clubs sit in their own
-            league&apos;s table. No model runs on this page, no number below
+            {soleOwnSort
+              ? `Ranked by ${soleOwnSort.mode} — nearly every tie here pairs two different domestic tables, and the gap between them is withheld.`
+              : "Ranked by how far apart the two clubs sit in their own league's table."}
+            {" "}No model runs on this page, no number below
             is a probability or an edge of ours, and nothing here is a
             recommendation — the ranking says where to look, and you are the
             one who picks.
@@ -561,10 +605,12 @@ export default function PickerBoard() {
         <section className="mt-8">
           <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2 border-t border-line pt-6">
             <h2 className="text-lg font-medium text-ink-hi">
-              Ranked by table gap
+              {soleOwnSort ? "Ranked by shape" : "Ranked by table gap"}
             </h2>
             <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
-              matchday bands · |GD/g gap| descending within each day · no cut-off
+              {soleOwnSort
+                ? "matchday bands · clean before split before hollow · no cut-off"
+                : "matchday bands · |GD/g gap| descending within each day · no cut-off"}
             </p>
           </div>
 
