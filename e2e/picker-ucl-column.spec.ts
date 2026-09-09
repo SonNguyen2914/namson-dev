@@ -477,6 +477,72 @@ test("the four league columns are untouched by it", async ({ page }) => {
       .toHaveCount(0);
   });
 
+// ------ 2b. THE TIEBREAK INSIDE A SHAPE BUCKET (2026-09-09) ------------
+//
+// `shape` sorts into THREE buckets, and its own comment promises that
+// ties then "fall to the board's own |GD/g| tiebreak, which is exactly
+// the order wanted inside a bucket". That tiebreak read `gdg_gap` — the
+// value this board WITHHOLDS on every cross-league row. So on the one
+// column made of cross-league rows the promise was empty: the comparator
+// returned 0 for every pair and each bucket kept the server's arrival
+// order. On the live board that put the largest own-league difference
+// (+1.32, Sabah FK v Manchester United) ELEVENTH of twelve.
+//
+// The fallback is `own_gdg` — the number the card now prints as its
+// anchor — so the column is ordered by the same figure it displays.
+//
+// THE THIRD ROW IS THE POINT. It carries a MEASURED `gdg_gap` of 0.10,
+// smaller than either own_gdg here, and it still sorts first: the two
+// keys are never raced against each other, because one is a gap inside a
+// single league's scale and the other spans two. A row that offers the
+// measured gap outranks one that does not, whatever the magnitudes.
+
+const TB_NARROW = row({
+  ...CROSS_CLEAN,
+  home: "Club Brugge", away: "Celtic",
+  favourite: "Club Brugge", opponent: "Celtic",
+  rates: { ppg: [1.80, 1.70], gf: [1.60, 1.50], ga: [0.40, 0.55],
+           gdg: [1.20, 0.95] },                     // own_gdg = +0.25
+  event_id: "ucl-tb-narrow", competition_id: "ucl-tb-narrow",
+});
+
+const TB_WIDE = row({
+  ...CROSS_CLEAN,
+  home: "Barcelona", away: "Feyenoord",
+  favourite: "Barcelona", opponent: "Feyenoord",
+  rates: RATES,                                     // own_gdg = +1.14
+  event_id: "ucl-tb-wide", competition_id: "ucl-tb-wide",
+});
+
+const TB_MEASURED = row({
+  ...CROSS_CLEAN,
+  home: "Arsenal", away: "Newcastle United",
+  favourite: "Arsenal", opponent: "Newcastle United",
+  ppg_gap: 0.05, gdg_gap: 0.10, rank_gap: 1,
+  cross_league: false, gap_note: null,
+  rated_in: { home: "epl", away: "epl" },
+  rates: { ppg: [2.10, 2.05], gf: [2.00, 1.90], ga: [0.70, 0.80],
+           gdg: [1.30, 1.10] },                     // own_gdg = +0.20
+  event_id: "ucl-tb-measured", competition_id: "ucl-tb-measured",
+});
+
+// ARRIVAL ORDER CONTRADICTS THE WANTED ORDER on purpose: under the old
+// comparator these three fell through to it and this assertion reads
+// ["ucl-tb-measured", "ucl-tb-narrow", "ucl-tb-wide"].
+const TIEBREAK_BOARD = {
+  ...BOARD,
+  rows: [TB_NARROW, TB_WIDE, TB_MEASURED],
+};
+
+test("inside one shape bucket the withheld-gap rows fall to own_gdg, "
+   + "and a measured gap still outranks a withheld one", async ({ page }) => {
+    await open(page, TIEBREAK_BOARD);
+    const ucl = col(page, "ucl");
+    // all three are CLEAN, so `shape` separates none of them
+    expect(await orderOf(ucl, 3))
+      .toEqual(["ucl-tb-measured", "ucl-tb-wide", "ucl-tb-narrow"]);
+  });
+
 // ---------------- 7. THE COLUMN'S CAVEAT, SAID ONCE (2026-09-09) -------
 //
 // THE OPERATOR, ON A SCREENSHOT OF THIS COLUMN: "remove this warning in

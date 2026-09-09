@@ -182,14 +182,35 @@ export function columnSort(slug: string, handed: ColumnSort): ColumnSort {
 
 /** The board's own tiebreak order, null-safe: a row with no measured
  *  GD/g gap falls to the back of it rather than to the front, which is
- *  what `NaN` from an arithmetic comparison would have done. */
+ *  what `NaN` from an arithmetic comparison would have done.
+ *
+ *  WHEN NEITHER ROW CARRIES THE MEASURED GAP, FALL TO `own_gdg`
+ *  (2026-09-09). `gdg_gap` is withheld on EVERY cross-league row by
+ *  design, so on the Champions League column this comparator returned 0
+ *  for every pair and the tiebreak decided nothing. The `shape` mode's
+ *  own comment promises that ties "fall to the board's own |GD/g|
+ *  tiebreak, which is exactly the order wanted inside a bucket" — and
+ *  that promise was empty on the one column that needed it: two shape
+ *  buckets of six, each left in the server's arrival order, with the
+ *  largest own-league difference (+1.32) sitting eleventh of twelve.
+ *
+ *  THE TWO KEYS ARE NEVER COMPARED AGAINST EACH OTHER. `gdg_gap` is a
+ *  gap measured inside ONE league's scale; `own_gdg` is each club's own
+ *  league GD/g differenced ACROSS two, which is why the board publishes
+ *  one and withholds the other. So the fallback fires only when NEITHER
+ *  side offers the measured gap, and a row that does offer it still
+ *  outranks one that does not — every branch that could put the two
+ *  numbers on the same axis is unreachable rather than merely unused. */
 const defaultOrder = (a: BoardRow, b: BoardRow) => {
   const va = magnitude(a.gdg_gap), vb = magnitude(b.gdg_gap);
-  if (va == null || vb == null) {
-    if (va == null && vb == null) return 0;
-    return va == null ? 1 : -1;
-  }
-  return vb - va;
+  if (va != null && vb != null) return vb - va;
+  if (va != null) return -1;
+  if (vb != null) return 1;
+  const oa = magnitude(a.own_gdg?.diff), ob = magnitude(b.own_gdg?.diff);
+  if (oa != null && ob != null) return ob - oa;
+  if (oa != null) return -1;
+  if (ob != null) return 1;
+  return 0;
 };
 
 /** THE ordering primitive — reorder, NEVER filter. Output length always
