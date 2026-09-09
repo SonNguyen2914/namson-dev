@@ -477,6 +477,52 @@ test("the four league columns are untouched by it", async ({ page }) => {
       .toHaveCount(0);
   });
 
+// ------ 2c. THE HEADING NAMES THE SORT THAT IS RUNNING (2026-09-09) ----
+//
+// The line under "Ranked by …" read "|GD/g gap| descending within each
+// day" on every multi-column board, and it was WRONG TWICE OVER.
+//
+// It was keyed on whether the board was narrowed to ONE column, so the
+// operator's own sort control could not move it: picking any mode left
+// the sentence unchanged. And it was wrong even untouched — DEFAULT_SORT
+// is `kickoff asc` and |GD/g gap| is only the TIEBREAK in `defaultOrder`,
+// so the line named the tiebreak as though it were the ordering. On this
+// board it named it for the Champions League column too, which runs
+// `shape` and has no GD/g gap to sort on at all.
+//
+// It is now asked of `columnSort` — the same call the columns make — so
+// a column whose key changes changes this sentence with it.
+
+test("the rank heading names the sort actually running, and says so when "
+   + "the columns differ", async ({ page }) => {
+    await open(page);
+    const head = page.getByTestId("board-rank-heading");
+    const note = page.getByTestId("board-order-note");
+
+    // UNTOUCHED CONTROL: the league column runs kickoff, the UCL column
+    // runs shape. No single key is true of the board, and it says so
+    // rather than picking one column's and stating it as everyone's.
+    await expect(head).toHaveText(/each column.s own key/i);
+    await expect(note).toContainText(/except where a column names its own/i);
+    // the false claim specifically
+    await expect(note).not.toContainText(/GD\/g gap/i);
+
+    // PICK A MODE: every column obeys it (columnSort's rule), so one key
+    // IS true of the board again — and the sentence names that one.
+    await page.getByTestId("col-sort").selectOption("ppg");
+    await expect(head).toHaveText(/ranked by ppg gap/i);
+    await expect(note).toContainText(/\|ppg gap\| descending within each day/i);
+  });
+
+test("a board narrowed to the UCL column names shape, not the tiebreak",
+  async ({ page }) => {
+    await openUcl(page);
+    await expect(page.getByTestId("board-rank-heading"))
+      .toHaveText(/ranked by shape/i);
+    await expect(page.getByTestId("board-order-note"))
+      .toContainText(/clean before split before hollow/i);
+  });
+
 // ------ 2b. THE TIEBREAK INSIDE A SHAPE BUCKET (2026-09-09) ------------
 //
 // `shape` sorts into THREE buckets, and its own comment promises that

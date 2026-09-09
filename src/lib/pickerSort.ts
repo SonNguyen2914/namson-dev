@@ -41,6 +41,11 @@ export interface SortMode {
   label: string;
   /** the direction the mode opens in; the toggle flips it */
   defaultDir: SortDir;
+  /** HOW THIS MODE'S ORDERING READS IN PROSE, for the board's standfirst.
+   *  Optional — a mode without one reads as "<label> descending". It lives
+   *  HERE, beside the key it describes, so a mode added to this table
+   *  cannot become a mode the standfirst has no words for. */
+  orderNote?: (dir: SortDir) => string;
   /** the sort key. null = "this row has no value here" — sorts last. */
   value: (r: BoardRow) => number | null;
   /** shown beside the control while this key is active */
@@ -70,7 +75,8 @@ const GAP_NULL_NOTE = "no measured gap (cross-league) sorts last";
 export const SORT_MODES: SortMode[] = [
   { id: "gdg", label: "GD/g gap", defaultDir: "desc",
     value: (r) => magnitude(r.gdg_gap), nullNote: GAP_NULL_NOTE,
-    nullNoteOnlyWhenPresent: true },
+    nullNoteOnlyWhenPresent: true,
+    orderNote: (d) => `|GD/g gap| ${d === "desc" ? "descending" : "ascending"}` },
   { id: "kickoff", label: "kickoff", defaultDir: "asc",
     value: (r) => {
       const t = Date.parse(r.kickoff);
@@ -78,10 +84,12 @@ export const SORT_MODES: SortMode[] = [
     } },
   { id: "ppg", label: "ppg gap", defaultDir: "desc",
     value: (r) => magnitude(r.ppg_gap), nullNote: GAP_NULL_NOTE,
-    nullNoteOnlyWhenPresent: true },
+    nullNoteOnlyWhenPresent: true,
+    orderNote: (d) => `|ppg gap| ${d === "desc" ? "descending" : "ascending"}` },
   { id: "rank", label: "rank gap", defaultDir: "desc",
     value: (r) => magnitude(r.rank_gap), nullNote: GAP_NULL_NOTE,
-    nullNoteOnlyWhenPresent: true },
+    nullNoteOnlyWhenPresent: true,
+    orderNote: (d) => `|rank gap| ${d === "desc" ? "descending" : "ascending"}` },
   { id: "tier_ovr", label: "overall tier gap", defaultDir: "desc",
     value: (r) => r.tier_gaps.ovr },
   { id: "tier_atk", label: "attack tier gap", defaultDir: "desc",
@@ -110,6 +118,9 @@ export const SORT_MODES: SortMode[] = [
   // `Shape` type it orders, so a value added to one is a value the
   // other is missing rather than a value that quietly sorts last.
   { id: "shape", label: "shape", defaultDir: "desc",
+    orderNote: (d) => d === "desc"
+      ? "clean before split before hollow"
+      : "hollow before split before clean",
     value: (r) => SHAPE_ORDER[r.shape] ?? null,
     nullNote: "a shape this board does not recognise sorts last",
     nullNoteOnlyWhenPresent: true },
@@ -175,6 +186,25 @@ export const COLUMN_DEFAULT_SORT: Readonly<Record<string, ColumnSort>> = {
  *  column obeys it, this one included, because a control that silently
  *  did not apply to part of the board would be worse than a column that
  *  starts somewhere else. */
+/** WHAT AN ORDERING READS AS, in the board's own words.
+ *
+ *  THE STANDFIRST USED TO BE HAND-TYPED AND SAID THE WRONG THING
+ *  (2026-09-09). It read "|GD/g gap| descending within each day" on every
+ *  multi-column board — but `DEFAULT_SORT` is `kickoff asc` and |GD/g gap|
+ *  is only the TIEBREAK in `defaultOrder` below, so the line named the
+ *  tiebreak as though it were the ordering. It also could not see the
+ *  operator's own sort control at all: it was keyed on whether the board
+ *  was narrowed to one column, so picking any mode left it unchanged.
+ *
+ *  Deriving it from the mode the board is actually running means a new
+ *  mode arrives with its own words instead of inheriting someone else's. */
+export function orderPhrase(sort: ColumnSort): string {
+  const m = modeById(sort.mode) ?? modeById(DEFAULT_SORT.mode)!;
+  return m.orderNote
+    ? m.orderNote(sort.dir)
+    : `${m.label} ${sort.dir === "desc" ? "descending" : "ascending"}`;
+}
+
 export function columnSort(slug: string, handed: ColumnSort): ColumnSort {
   const own = COLUMN_DEFAULT_SORT[slug];
   return own && isDefaultSort(handed) ? own : handed;

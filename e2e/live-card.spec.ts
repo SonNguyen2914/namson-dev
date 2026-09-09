@@ -1257,8 +1257,12 @@ test("the live section is ABOVE the ranked board and outside it",
     await open(page, STRIP);
     const order = await page.evaluate(() => {
       const live = document.querySelector('[data-testid="live-section"]');
-      const board = Array.from(document.querySelectorAll("h2"))
-        .find((h) => h.textContent?.includes("Ranked by table gap"));
+      // LOCATED BY TESTID, NOT BY COPY (2026-09-09). This test is about
+      // DOM ORDER; it used to find the board by the words "Ranked by
+      // table gap", so it broke when that heading started naming the
+      // sort actually running instead of a fixed phrase — a test failing
+      // for a reason it does not test.
+      const board = document.querySelector('[data-testid="board-rank-heading"]');
       if (!live || !board) return null;
       return {
         before: !!(live.compareDocumentPosition(board)

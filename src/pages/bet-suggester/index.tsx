@@ -64,8 +64,9 @@ import {
   DEFAULT_BACK, REVIEW_WINDOWS, Review, fetchReview,
 } from "../../lib/pickerReview";
 import {
-  COLUMN_DEFAULT_SORT, ColumnSort, DEFAULT_SORT, SORT_MODES, isDefaultSort,
-  loadBoardSort, modeById, nullNoteFor, saveBoardSort,
+  COLUMN_DEFAULT_SORT, ColumnSort, DEFAULT_SORT, SORT_MODES, columnSort,
+  isDefaultSort, loadBoardSort, modeById, nullNoteFor, orderPhrase,
+  saveBoardSort,
 } from "../../lib/pickerSort";
 import { Eyebrow } from "../../components/ui";
 import { ArchiveMenu } from "../../components/ArchiveMenu";
@@ -354,6 +355,29 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      cannot acquire it by accident. */
   const soleColumn = columnSlugs.length === 1 ? columnSlugs[0] : null;
   const soleOwnSort = soleColumn ? COLUMN_DEFAULT_SORT[soleColumn] : undefined;
+
+  /* WHAT THE BOARD IS ACTUALLY ORDERED BY — asked of the columns it is
+     drawing, not of how many there are.
+
+     THE HEADING BELOW USED TO BE KEYED ON `soleOwnSort` (2026-09-09), so
+     it could not see the sort control at all: picking any mode left it
+     reading "|GD/g gap| descending within each day". That was wrong twice
+     over. `DEFAULT_SORT` is `kickoff asc` and |GD/g gap| is only the
+     TIEBREAK in `defaultOrder`, so the line named the tiebreak as though
+     it were the ordering — on the four league columns as much as on the
+     Champions League one, which runs `shape` and has no GD/g gap to sort
+     on in the first place.
+
+     `columnSort` is THE authority on what a column runs, and it is the
+     same call the columns themselves make, so this cannot drift from
+     them: a column whose key changes changes this sentence with it. */
+  const runningSorts = columnSlugs.map((sl) => columnSort(sl, boardSort));
+  const oneRunningSort =
+    runningSorts.length > 0
+    && runningSorts.every((x) => x.mode === runningSorts[0].mode
+                              && x.dir === runningSorts[0].dir)
+      ? runningSorts[0]
+      : null;
 
   if (deepLink !== null) {
     return (
@@ -656,13 +680,18 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
         {/* ---------------------------- the board ---------------------------- */}
         <section className="mt-8">
           <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2 border-t border-line pt-6">
-            <h2 className="text-lg font-medium text-ink-hi">
-              {soleOwnSort ? "Ranked by shape" : "Ranked by table gap"}
+            <h2 data-testid="board-rank-heading"
+              className="text-lg font-medium text-ink-hi">
+              {oneRunningSort
+                ? `Ranked by ${(modeById(oneRunningSort.mode) ?? boardMode).label}`
+                : "Ranked by each column\u2019s own key"}
             </h2>
-            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
-              {soleOwnSort
-                ? "matchday bands · clean before split before hollow · no cut-off"
-                : "matchday bands · |GD/g gap| descending within each day · no cut-off"}
+            <p data-testid="board-order-note"
+              className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
+              {oneRunningSort
+                ? `matchday bands \u00b7 ${orderPhrase(oneRunningSort)} within each day \u00b7 no cut-off`
+                : `matchday bands \u00b7 ${orderPhrase(boardSort)} within each day, `
+                  + "except where a column names its own \u00b7 no cut-off"}
             </p>
           </div>
 
