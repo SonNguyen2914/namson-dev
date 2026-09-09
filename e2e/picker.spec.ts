@@ -735,8 +735,14 @@ test("the archive dropdown opens, holds the finished competitions, and closes",
       .toBeVisible();
     await expect(menu.getByRole("menuitem", { name: /ASEAN Championship/ }))
       .toBeVisible();
-    // live competitions are NOT filed as finished
-    await expect(menu.getByText(/Leagues Cup/)).toHaveCount(0);
+    // 2026-09-09: the Leagues Cup finished (Toluca 2-0 Monterrey,
+    // 2026-09-07) and is now filed. THE CLAIM THIS LINE CARRIED IS
+    // UNCHANGED — a live competition is not filed as finished — so it
+    // still names one, and the Champions League is the one that is
+    // actually live now (its league phase opened 2026-09-08).
+    await expect(menu.getByRole("menuitem", { name: /Leagues Cup/ }))
+      .toBeVisible();
+    await expect(menu.getByText(/Champions League/)).toHaveCount(0);
     await expect(menu.getByText(/UCL/)).toHaveCount(0);
 
     // an outside click closes it
@@ -779,6 +785,21 @@ test("ASEAN is reachable from the dropdown", async ({ page }) => {
   await page.getByRole("button", { name: /archive/i }).click();
   await page.getByRole("menuitem", { name: /ASEAN Championship/ }).click();
   await expect(page).toHaveURL(/\/bet-suggester\/comp\/asean$/);
+});
+
+test("the Leagues Cup archive is reachable from the dropdown, and the "
+   + "live viewer it did NOT replace is still in the rail", async ({ page }) => {
+  await open(page);
+  // the rail chip is the live competition viewer and stays where it was
+  await expect(
+    page.locator('header.topbar nav a[href="/bet-suggester/comp/leagues-cup"]')
+      .first(),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /archive/i }).click();
+  await page.getByRole("menuitem", { name: /Leagues Cup/ }).click();
+  await expect(page).toHaveURL(/\/bet-suggester\/leagues-cup$/);
+  await expect(page.getByRole("heading", { name: "Leagues Cup", level: 1 }))
+    .toBeVisible();
 });
 
 // ------------------------------------------------------ routes & links

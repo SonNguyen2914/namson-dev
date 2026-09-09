@@ -9,6 +9,15 @@ const ROUTES = [
   // ever drawn — so it is the route this sweep has the most to say
   // about, and it was the only board route no geometry test walked.
   "/bet-suggester/ucl",
+  // ADDED 2026-09-09 with the route, not after it — this list is the
+  // hand-typed subset the note above already confesses to, and the
+  // Champions League board sat outside it "from the day it shipped".
+  // The Leagues Cup archive is the densest page in the tree: 2024's
+  // knockout is 32 cards over five rounds plus a 45-row fixture table,
+  // and its first draft DID have two layout defects a text assertion
+  // could not see — club names truncated to initials at 1440, and the
+  // whole bracket invisible at 390 behind an IntersectionObserver.
+  "/bet-suggester/leagues-cup",
 ];
 const WIDTHS = [390, 768, 1100, 1440, 1920];
 
@@ -32,7 +41,7 @@ const WIDTHS = [390, 768, 1100, 1440, 1920];
  * as its own sentence in the failure. */
 test("no route scrolls sideways, hides a sticky header, or cuts text",
   async ({ page }) => {
-  // this sweep walks 8 routes x 5 widths against a live backend; the
+  // this sweep walks 9 routes x 5 widths against a live backend; the
   // default per-test budget is not sized for that
   test.setTimeout(180_000);
   const findings: string[] = [];

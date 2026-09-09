@@ -17,6 +17,21 @@
 // final and the other has not kicked off. Filing a live competition
 // under "finished" would be a claim about the world, made by a menu.
 //
+// 2026-09-09 — THE LEAGUES CUP PLAYED THOSE TWO MATCHES.
+// The semi-finals went on 2026-09-03, the third-place match on 09-06,
+// and the final on 09-07: Toluca 2-0 Monterrey. Re-checked the same way
+// the list was settled the first time, against ESPN's own scoreboard for
+// `concacaf.leagues.cup` rather than from memory — 62 events for season
+// 2026, every one of them in a final state, none after 09-07 — so it is
+// FINISHED and it is filed. That is the whole test this list applies,
+// and the answer changed because the world did.
+//
+// It goes to `/bet-suggester/leagues-cup`, its own archive page, and NOT
+// to `/bet-suggester/comp/leagues-cup` the way ASEAN points at its
+// viewer. Three seasons of bracket do not fit a fixtures-and-markets
+// viewer, and that viewer is still linked from the board's rail. Filing
+// the competition did not retire the route.
+//
 // The control itself is a real <button> with aria-expanded and a
 // role="menu" panel: Enter/Space open, Escape closes and returns focus,
 // arrows/Home/End move through the items, Tab and an outside click close
@@ -46,6 +61,12 @@ export const ARCHIVE: ArchiveEntry[] = [
     href: "/bet-suggester/comp/asean",
     label: "ASEAN Championship",
     meta: "complete · viewer",
+  },
+  {
+    key: "leagues-cup",
+    href: "/bet-suggester/leagues-cup",
+    label: "Leagues Cup",
+    meta: "complete · toluca",
   },
 ];
 
