@@ -18,11 +18,12 @@
 //  - A MISSING PRICE IS A FACT WITH A NAME. "no kalshi event" and
 //    "listed · no quote" are different failures and never collapse into
 //    one blank.
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
-  BlendWeights, KalshiQuote, Shape, TierPair, THIN_ASK_SIZE, WIDE_SPREAD_C,
-  pctThisSeason, weightIsCurrent,
+  BlendWeights, KalshiQuote, RowField, Shape, THIN_ASK_SIZE,
+  WIDE_SPREAD_C, pctThisSeason, weightIsCurrent,
 } from "../lib/pickerApi";
+import { AXIS_ORDER, tierSet } from "../lib/fieldApi";
 
 /** The word for a gap that was never measured. It is NOT "0", NOT "—"
  *  and NOT blank: a cross-league cup fixture has no ppg/GD-g/rank gap
@@ -42,7 +43,14 @@ export const dec = (n: number | null | undefined, places = 2) =>
   (n == null ? WITHHELD
    : (n < 0 ? "−" : "+") + Math.abs(n).toFixed(places));
 
-export const pair = (p: TierPair) => `T${p[0]} v T${p[1]}`;
+/** WHAT ONE AXIS'S TWO TIERS SAY, side by side. A member may be a
+ *  NUMBER (a league quintile) or the STRING form of a band set drawn
+ *  from the field — "2·3" — because those are the two things a tier is
+ *  on this board and both go in the same slot. `TierPair` satisfies it
+ *  unchanged, so nothing that renders a league read moved. */
+export type TierText = readonly [string | number, string | number];
+
+export const pair = (p: TierText) => `T${p[0]} v T${p[1]}`;
 
 /** The word for a signed tier gap, from the favourite's side. A gap of
  *  zero is LEVEL, not "small" — the distinction is the whole point of
@@ -55,7 +63,7 @@ export const gapWord = (v: number) =>
  *  it, and neither has to know about the other. */
 export interface ReadLike {
   shape: Shape;
-  tiers: { ovr: TierPair; atk: TierPair; def: TierPair };
+  tiers: { ovr: TierText; atk: TierText; def: TierText };
   tier_gaps: { ovr: number; atk: number; def: number };
 }
 
@@ -294,6 +302,234 @@ export function ShapeChip({ read }: { read: ReadLike }) {
   );
 }
 
+/** THE READ THE CARD ACTUALLY DRAWS, once the field has had its say.
+ *
+ *  THE OPERATOR'S RULE (2026-09-09): the Champions League card is the
+ *  landing page's card, with the DATA BEHIND IT substituted — never a
+ *  second design. So the substitution happens HERE, in one object, and
+ *  every mark below reads that object: the three cells, the shape chip,
+ *  the tier trio and the popover's sentence cannot disagree about one
+ *  fixture because there is only one read for them to disagree about.
+ *
+ *  WHAT COMES FROM THE FIELD. The tier TEXT — every band the club's 95%
+ *  interval touches, drawn whole, because "ovr 1v1" over Bayern and
+ *  Bodo/Glimt was the defect that started this: a within-league
+ *  quintile puts nearly every UCL entrant in its own league's top
+ *  fifth, so ten of twelve cards said the two clubs were level.
+ *
+ *  WHAT DOES NOT. The GAP and the SHAPE are the backend's, always:
+ *  `field.tier_gap` and `field.shape` when the block carries them, and
+ *  the row's own backend values when it does not. Differencing two band
+ *  sets here to colour a cell would be this surface deciding a verdict,
+ *  and the whole board is built the other way round — it shows. */
+function effectiveRead(read: ReadLike, field?: RowField | null): ReadLike {
+  if (!field) return read;
+  const text = (side: "fav" | "opp", k: typeof AXIS_ORDER[number]) => {
+    /* NO FALLBACK NUMBER. An empty set is a club the payload placed in
+       no band at all; printing its `tier` would invent exactly the
+       placement the set exists to refuse. */
+    const t = tierSet(field.axes[k][side]);
+    return t ?? "no band";
+  };
+  const gap = (k: typeof AXIS_ORDER[number]) =>
+    field.axes[k].tier_gap ?? read.tier_gaps[k];
+  return {
+    shape: field.shape ?? read.shape,
+    tiers: {
+      ovr: [text("fav", "ovr"), text("opp", "ovr")],
+      atk: [text("fav", "atk"), text("opp", "atk")],
+      def: [text("fav", "def"), text("opp", "def")],
+    },
+    tier_gaps: { ovr: gap("ovr"), atk: gap("atk"), def: gap("def") },
+  };
+}
+
+/** THE DAGGER ON A CLUB THE PLACEABILITY FLOOR REFUSED, carrying the
+ *  backend's own reason on hover.
+ *
+ *  "make sure to mark those 11 somehow for me to know their data were
+ *  refused at first. Subtlely." — the operator, 2026-09-09. Same mark,
+ *  same size and same hover sentence the field page uses, so one
+ *  convention covers both surfaces. It rides the tier trio because that
+ *  is where the band it qualifies is printed; the ranks panel therefore
+ *  carries none, which is not an omission — a second copy of a mark
+ *  eight pixels away says nothing the first did not. */
+function FloorMark({ note }: { note?: string | null }) {
+  return (
+    <sup data-testid="field-floor-mark" title={note || ""}
+      className="ml-0.5 cursor-help text-[8px] font-normal text-ink-faint">
+      †
+    </sup>
+  );
+}
+
+/** THE FIELD'S RANKS, PER AXIS, BEHIND ONE `i` (operator, 2026-09-09).
+ *
+ *  THE ONLY NEW THING ON THIS CARD. "make sure to use the exact design,
+ *  only with new 'i' added. Consistency is key." Everything else the
+ *  Champions League card draws is the board's own card drawing the
+ *  field's numbers instead of a league's; this is the single addition,
+ *  and it exists because three ranks cannot go on a card that already
+ *  says everything it says in one line each.
+ *
+ *  WHAT IS INSIDE IT, AND NOTHING ELSE. Three axis labels over three
+ *  rank pairs. No club names — the two names are the largest type on
+ *  the card, six lines above. No heading, because the panel is opened
+ *  from an `i` beside the trio it belongs to and a title would repeat
+ *  the trio's own labels. No daggers: the trio carries those, beside
+ *  the bands they qualify.
+ *
+ *  IT IS SHAPED LIKE THE TRIO, DELIBERATELY. The same cell — a 7.5px
+ *  label over a 10px mono value — in the same order, so the panel reads
+ *  as the trio's second row rather than as a new object, and its label
+ *  row lines up with the trio's label row exactly. That alignment is
+ *  structural, not arithmetic: the panel is pulled up by exactly its
+ *  own padding, so its first row starts at the top of the block the
+ *  trio's label row also starts at.
+ *
+ *  IT OPENS THREE WAYS AND CLOSES THREE WAYS, which is the treatment
+ *  `ColumnNotes` already carries: hover, keyboard focus, and a click
+ *  that PINS — there is no hover on a phone and none from a keyboard —
+ *  and Escape, a second click, or a click anywhere outside closes it.
+ *  Neutral line and ink at rest, accent only when it is open: it is an
+ *  affordance, not an alert, and the traffic light stays on the
+ *  numbers. */
+function FieldRanks({ field }: { field: RowField }) {
+  const panelId = useId();
+  const [pinned, setPinned] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const box = useRef<HTMLSpanElement>(null);
+  const open = pinned || hovered || focused;
+  const shut = () => { setPinned(false); setHovered(false); setFocused(false); };
+
+  /* CLICK-OUTSIDE, AND ONLY WHILE IT IS PINNED. A hovered panel closes
+     itself when the pointer leaves, so a listener for that state would
+     be a document-wide handler on every card of a six-abreast board
+     doing nothing. `pointerdown` rather than `click` so the panel is
+     gone before the card's own link takes the press. */
+  useEffect(() => {
+    if (!pinned) return;
+    const away = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node)) shut();
+    };
+    document.addEventListener("pointerdown", away, true);
+    return () => document.removeEventListener("pointerdown", away, true);
+  }, [pinned]);
+
+  const axes = AXIS_ORDER.map((k) => ({ k, a: field.axes[k] }));
+  const label = "the field's ranks on each axis — "
+    + axes.map(({ k, a }) => `${k} #${a.fav.rank} v #${a.opp.rank}`).join(", ")
+    + `, of ${field.size}`;
+
+  return (
+    /* NOT `relative`: the positioning context is the TRIO GROUP this
+       button is the second half of (see TierGaps), so the panel opens
+       against the trio rather than against a 15px circle. Two things
+       need it. The panel is 160-172px and this circle is 15, so hung
+       off the circle in a ~171px card it would start near that card's
+       right edge and finish well past it — "pushed to the card's right
+       edge" being the one placement the operator ruled out, and `html
+       { overflow-x: clip }` means the overhang would be CLIPPED rather
+       than scrollable. And its label row has to line up with the
+       TRIO's label row, which is a fact about where the trio is, not
+       about where the circle is. */
+    <span ref={box} className="inline-flex self-end"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onKeyDown={(e) => { if (e.key === "Escape") shut(); }}>
+      <button type="button" data-testid="field-ranks-open"
+        aria-expanded={open} aria-label={label}
+        aria-describedby={open ? panelId : undefined}
+        data-size={field.size}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onClick={(e) => {
+          e.preventDefault(); e.stopPropagation();
+          // the click is authoritative: a second tap closes a panel a
+          // hover is still holding open, which is the only way out on a
+          // touch screen
+          setPinned((v) => !v); setHovered(false); setFocused(false);
+        }}
+        /* `#`, NOT `i` (2026-09-10). The row already carries an `i`
+           — `tier-read`, six pixels away on a full row, whose panel
+           EXPLAINS the shape in prose. This one only prints numbers.
+           Two identical circles side by side is the thing ColumnNotes
+           argues against in its own header, and the operator asked for
+           "only with new 'i' added" before either of us knew the first
+           one was there. Same circle, same size, same states; the glyph
+           is what says which is the explainer and which is the data,
+           and `#` is the card's own idiom for a rank. NOT `font-mono`,
+           for the reason ColumnNotes gives: at this size the mono glyph
+           reads as part of the row of mono digits beside it rather than
+           as a control. */
+        /* `relative z-30` KEEPS THE TRIGGER ABOVE ITS OWN PANEL. The
+           panel is anchored to the TRIO and is wider than it, so at a
+           narrow track it reaches past this circle — and a panel over
+           its own trigger swallows the click that closes it, which is
+           the 2026-09-07 bug in the popover beside this one, found here
+           at 820px before it shipped. Above it, the circle stays lit,
+           stays clickable, and reads as the control that is holding the
+           panel open. */
+        className={`relative z-30 inline-flex h-[15px] w-[15px] items-center justify-center rounded-full border text-[10px] font-semibold leading-none transition-colors ${
+          // OPAQUE WHILE OPEN, and only then. The panel reaches past
+          // this circle in a narrow track (see z-30 above); on the
+          // panel's own ground the circle reads as the control holding
+          // it open rather than as a ring drawn over a digit.
+          open ? "border-accent/60 bg-elev2 text-accent"
+            : "border-line-strong text-ink-low hover:border-accent/40 hover:text-accent"}`}>
+        #
+      </button>
+      {open && (
+        <span data-testid="field-ranks" id={panelId} role="note"
+          /* `-mt-3` IS `p-3`, and that is the whole alignment rule: the
+             panel is pulled up by exactly its own top padding, so its
+             first row begins at the group's top edge — which `items-end`
+             makes the trio's label row. One number, said once, rather
+             than an offset tuned against a screenshot; `p-3` is the
+             padding the two neighbouring panels already use.
+             `left-0` is the TRIO's left edge, so the panel's three
+             labels land on the trio's three labels and the card reads
+             as the same three columns showing ranks instead of bands.
+             IT FITS AT EVERY TRACK, and that was measured rather than
+             assumed: 160-172px against the ~171px card the xl board
+             gives six abreast, drawn from the trio's own left edge, so
+             the panel's right edge lands 12-79px INSIDE the card at
+             every breakpoint from 400px up — and clear of its own
+             trigger, which sits further right still. */
+          className="absolute left-0 top-0 z-20 -mt-3 w-max rounded-lg border border-line-strong bg-elev2 p-3 shadow-xl">
+          {/* `flex`, NOT `inline-flex`. An inline-flex is an atomic
+              inline and sits on its parent's baseline, so the strut's
+              descender pushed this row 12px below the trio's — the
+              alignment quietly off by exactly one line's leading. A
+              block-level flex has no baseline to sit on. */}
+          <span className="flex items-end gap-2.5 font-mono text-[10px] tabular-nums text-ink-low">
+            {axes.map(({ k, a }) => (
+              <span key={k} data-rank-axis={k}
+                className="inline-flex flex-col items-center gap-[2px] leading-none">
+                <span className="text-[7.5px] uppercase tracking-[0.12em] text-ink-faint">
+                  {k}
+                </span>
+                {/* `#33v#7`, SET THE WAY THE TRIO SETS ITS OWN PAIR —
+                    `2·3v3·4`, no spaces around the v. The panel is the
+                    trio's second reading and sits directly on it, so a
+                    second idiom eight pixels away would read as a
+                    different kind of fact. It is also what makes the
+                    thing FIT: with spaces the panel is ~196px against a
+                    ~171px card six abreast, and it both left the card
+                    and covered its own trigger. */}
+                <span className="whitespace-nowrap">
+                  #{a.fav.rank}v#{a.opp.rank}
+                </span>
+              </span>
+            ))}
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
+
 /** The Stage-2 read, compact (2026-09-01): three cells + the shape
  *  word + the exact tier pairs on one line, with the plain-English
  *  sentence and the per-dimension detail one click away. Everything the
@@ -301,8 +537,17 @@ export function ShapeChip({ read }: { read: ReadLike }) {
  *  popover is the same shapeRead(), word for word — it just stops
  *  costing 70px on every card. Shared by the board card and the
  *  finished tail, so both surfaces converge together. */
-export function TierGaps({ read, dense = false }: {
+export function TierGaps({ read, dense = false, field }: {
   read: ReadLike;
+  /** WHERE THESE TWO CLUBS STAND IN THE COMPETITION'S OWN FIELD, when
+   *  somebody has measured one (pickerApi.RowField). It substitutes the
+   *  DATA and adds exactly one mark: the tier trio prints the field's
+   *  band sets instead of two league quintiles, the cells and the chip
+   *  take the field's gap and shape when the block carries them, and an
+   *  `i` beside the trio opens the field's three rank pairs.
+   *  Absent — every league column, and the finished tail — and this
+   *  component draws precisely what it drew before. */
+  field?: RowField | null;
   /** the card sits in a narrow dense-grid track (PickerColumn.DENSE_GRID)
    *  — ONLY the popover cares. `w-64` anchored to the button's right edge
    *  is a 256px panel hanging off a ~200px card, so in the board's
@@ -315,10 +560,15 @@ export function TierGaps({ read, dense = false }: {
   dense?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  /* ONE READ, DERIVED ONCE, AND EVERY MARK BELOW ASKS IT. Without a
+     field this IS `read`, by identity — see effectiveRead — so the four
+     league columns and the finished tail render byte for byte what they
+     rendered before. */
+  const r = effectiveRead(read, field);
   const dims = [
-    ["overall", read.tier_gaps.ovr, read.tiers.ovr],
-    ["attack", read.tier_gaps.atk, read.tiers.atk],
-    ["defence", read.tier_gaps.def, read.tiers.def],
+    ["overall", r.tier_gaps.ovr, r.tiers.ovr],
+    ["attack", r.tier_gaps.atk, r.tiers.atk],
+    ["defence", r.tier_gaps.def, r.tiers.def],
   ] as const;
   return (
     <div className="relative">
@@ -328,10 +578,30 @@ export function TierGaps({ read, dense = false }: {
             <TierCell key={label} label={label} gap={gap} />
           ))}
         </span>
-        <ShapeChip read={read} />
+        <ShapeChip read={r} />
+        {/* THE TRIO AND ITS `i`, AS ONE FLEX ITEM (2026-09-09). Two
+            reasons, and the first is not cosmetic: this row is
+            `flex-wrap`, so as separate items the circle wrapped onto
+            the line BELOW the trio in a narrow track and its panel then
+            opened over the trio from a line down, aligned with nothing.
+            Grouped, they wrap together and the panel's anchor is the
+            trio itself. The second is that the affordance means "the
+            same three axes, as ranks" — it belongs against the thing it
+            is about, not adrift in the row.
+            WITHOUT A FIELD THIS WRAPS THE TRIO ALONE, which is a flex
+            item of the same size holding the same child: the four
+            league columns and the finished tail lay out exactly as
+            before. */}
+        <span className="relative inline-flex items-end gap-2">
         <span
           className="inline-flex items-end gap-2.5 font-mono text-[10px] tabular-nums text-ink-low"
-          title="tier pairs, favourite v opponent — a name in its own colour is a unit that does not back the pick">
+          title={field
+            ? "tier bands in this competition's own field, favourite v"
+              + " opponent — every band the club's 95% interval touches,"
+              + " so a set of two is a placement the evidence refuses to"
+              + " narrow. A name in its own colour is a unit that does"
+              + " not back the pick."
+            : "tier pairs, favourite v opponent — a name in its own colour is a unit that does not back the pick"}>
           {/* A dissenting dimension's NAME lights in its own verdict tone.
               Same dissents() predicate the chip's cut uses, so the lit
               label always names what the shot severed and the two can
@@ -341,11 +611,13 @@ export function TierGaps({ read, dense = false }: {
               '[data-dim="overall"]' UNQUALIFIED by tier-cell, so a second
               data-dim on a wrapper would resolve to two elements and fail
               Playwright's strict mode. */}
-          {([["ovr", read.tier_gaps.ovr, read.tiers.ovr],
-             ["atk", read.tier_gaps.atk, read.tiers.atk],
-             ["def", read.tier_gaps.def, read.tiers.def]] as const)
-            .map(([lbl, gap, pr]) => (
+          {AXIS_ORDER.map((lbl) => {
+            const gap = r.tier_gaps[lbl], pr = r.tiers[lbl];
+            const side = field?.axes[lbl];
+            return (
             <span key={lbl} data-tier={lbl} data-dissent={dissents(gap)}
+              data-fav-set={side ? side.fav.tier_set.join(",") : undefined}
+              data-opp-set={side ? side.opp.tier_set.join(",") : undefined}
               className="inline-flex flex-col items-center gap-[2px] leading-none">
               <span className={`text-[7.5px] uppercase tracking-[0.12em] ${
                 gap > 0 ? "text-ink-faint"
@@ -353,9 +625,25 @@ export function TierGaps({ read, dense = false }: {
                     : "font-semibold text-neg"}`}>
                 {lbl}
               </span>
-              <span>{pr[0]}v{pr[1]}</span>
+              {/* THE DAGGERS RIDE THE BANDS THEY QUALIFY. A club the
+                  placeability floor refused on the first reading is
+                  marked here and nowhere else on the card — same mark,
+                  same hover sentence, as the field's own page. */}
+              <span className="whitespace-nowrap">
+                {pr[0]}{side?.fav.below_floor
+                  && <FloorMark note={side.fav.floor_note} />}v{pr[1]}
+                {side?.opp.below_floor
+                  && <FloorMark note={side.opp.floor_note} />}
+              </span>
             </span>
-          ))}
+            );
+          })}
+        </span>
+        {/* THE ONE ADDITION — the field's ranks, per axis. Immediately
+            after the trio it belongs to, inside its group, and only
+            when there is a field to open: an `i` over a competition
+            nobody has measured would be an empty promise. */}
+        {field && <FieldRanks field={field} />}
         </span>
         {/* THE POPOVER HANGS OFF THE BUTTON, NOT OFF THE ROW (2026-09-07).
             It was `absolute top-6` on the whole TierGaps block, which is
@@ -390,7 +678,7 @@ export function TierGaps({ read, dense = false }: {
         <div data-testid="shape-read"
           className={`absolute top-[calc(100%+7px)] z-10 rounded-lg border border-line-strong bg-elev2 p-3 text-[11px] leading-relaxed text-ink-mid shadow-xl ${
             dense ? "inset-x-0" : "right-0 w-64"}`}>
-          <p>{shapeRead(read)}</p>
+          <p>{shapeRead(r)}</p>
           <div className="mt-2 space-y-0.5 border-t border-line pt-2 font-mono text-[10px]">
             {dims.map(([label, gap, tiers]) => (
               <p key={label} className="flex justify-between gap-3">
@@ -404,8 +692,19 @@ export function TierGaps({ read, dense = false }: {
               </p>
             ))}
           </div>
+          {/* WHAT A TIER IS HERE — and it is not one sentence for both
+              boards. On a league column a tier is a within-league
+              quintile; on a column reading a FIELD it is a band of that
+              field, shared by every entrant, and a club's read is every
+              band its 95% interval touches. Saying "within-league
+              quintiles" over the field's bands would be this line
+              describing the read it replaced. Annotation either way. */}
           <p className="mt-2 border-t border-line pt-2 text-[10px] text-ink-low">
-            Tiers are within-league quintiles; annotation, never a veto.
+            {field
+              ? "Tiers are bands of this competition's own field, and a"
+                + " club's read is every band its 95% interval touches;"
+                + " annotation, never a veto."
+              : "Tiers are within-league quintiles; annotation, never a veto."}
           </p>
         </div>
           )}
