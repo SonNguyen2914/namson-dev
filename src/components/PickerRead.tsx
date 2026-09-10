@@ -423,17 +423,14 @@ function FieldRanks({ field }: { field: RowField }) {
     + `, of ${field.size}`;
 
   return (
-    /* NOT `relative`: the positioning context is the TRIO GROUP this
-       button is the second half of (see TierGaps), so the panel opens
-       against the trio rather than against a 15px circle. Two things
-       need it. The panel is 160-172px and this circle is 15, so hung
-       off the circle in a ~171px card it would start near that card's
-       right edge and finish well past it — "pushed to the card's right
-       edge" being the one placement the operator ruled out, and `html
-       { overflow-x: clip }` means the overhang would be CLIPPED rather
-       than scrollable. And its label row has to line up with the
-       TRIO's label row, which is a fact about where the trio is, not
-       about where the circle is. */
+    /* STILL NOT `relative`, and that is the property being preserved
+       rather than a leftover: this 15px circle must never be the box the
+       panel hangs off. A 136px panel hung off it in a ~211px card would
+       start near that card's right edge and finish well past it, and
+       `html { overflow-x: clip }` means the overhang would be CLIPPED
+       rather than scrollable. What changed on 2026-09-10 is WHICH wider
+       box it hangs off — the trio was, the tier block now is; see the
+       panel below. */
     <span ref={box} className="inline-flex self-end"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -482,22 +479,34 @@ function FieldRanks({ field }: { field: RowField }) {
       </button>
       {open && (
         <span data-testid="field-ranks" id={panelId} role="note"
-          /* `-mt-3` IS `p-3`, and that is the whole alignment rule: the
-             panel is pulled up by exactly its own top padding, so its
-             first row begins at the group's top edge — which `items-end`
-             makes the trio's label row. One number, said once, rather
-             than an offset tuned against a screenshot; `p-3` is the
-             padding the two neighbouring panels already use.
-             `left-0` is the TRIO's left edge, so the panel's three
-             labels land on the trio's three labels and the card reads
-             as the same three columns showing ranks instead of bands.
-             IT FITS AT EVERY TRACK, and that was measured rather than
-             assumed: 160-172px against the ~171px card the xl board
-             gives six abreast, drawn from the trio's own left edge, so
-             the panel's right edge lands 12-79px INSIDE the card at
-             every breakpoint from 400px up — and clear of its own
-             trigger, which sits further right still. */
-          className="absolute left-0 top-0 z-20 -mt-3 w-max rounded-lg border border-line-strong bg-elev2 p-3 shadow-xl">
+          /* ON THE CARD'S RIGHT-HAND SIDE, BELOW THE ROW IT READS
+             (operator, 2026-09-10: "the hover ranking must display on
+             the right hand").
+             It opened `left-0 top-0` on the TRIO — over the three tier
+             cells, and, measured at every step of the ladder, over its
+             own trigger as well: at 390px the panel spanned 143→279
+             with the circle at 245→260 underneath it. `z-30` on the
+             circle kept the CLICK working, which is why that shipped;
+             it does not make a panel drawn across the numbers it is a
+             second reading of a good place to put one.
+             `right-0` IS THE CARD'S OWN RIGHT EDGE, not the trio's:
+             the positioning context is TierGaps's block, which is one
+             card-content wide. So the panel can never leave the card on
+             the right, and `w-max max-w-full` keeps it from leaving on
+             the left — the 136px it measures against a 211px content
+             box has room to spare, and the cap holds even if a field of
+             three-digit ranks ever widens it.
+             `top-[calc(100%+7px)]` IS BELOW THE WHOLE BLOCK, and that is
+             the 2026-09-07 property kept in a stronger form. This row is
+             `flex-wrap`; a panel anchored inside it can be reached by a
+             wrapped trigger, which is exactly how the shape popover next
+             door came to swallow the click that closed it. Nothing that
+             is IN the block can be inside a box that starts below it, at
+             any width — the same reasoning, and the same offset, its
+             dense mode already uses. The trio's label row and the
+             panel's therefore no longer align, which was a real virtue
+             and is the price of the corner the operator asked for. */
+          className="absolute right-0 top-[calc(100%+7px)] z-20 w-max max-w-full rounded-lg border border-line-strong bg-elev2 p-3 shadow-xl">
           {/* `flex`, NOT `inline-flex`. An inline-flex is an atomic
               inline and sits on its parent's baseline, so the strut's
               descender pushed this row 12px below the trio's — the
@@ -575,20 +584,24 @@ export function TierGaps({ read, dense = false, field }: {
           ))}
         </span>
         <ShapeChip read={r} />
-        {/* THE TRIO AND ITS `i`, AS ONE FLEX ITEM (2026-09-09). Two
-            reasons, and the first is not cosmetic: this row is
-            `flex-wrap`, so as separate items the circle wrapped onto
-            the line BELOW the trio in a narrow track and its panel then
-            opened over the trio from a line down, aligned with nothing.
-            Grouped, they wrap together and the panel's anchor is the
-            trio itself. The second is that the affordance means "the
-            same three axes, as ranks" — it belongs against the thing it
-            is about, not adrift in the row.
+        {/* THE TRIO AND ITS `#`, AS ONE FLEX ITEM (2026-09-09). This row
+            is `flex-wrap`, so as separate items the circle wrapped onto
+            the line BELOW the trio in a narrow track and sat adrift in
+            the row; grouped, they wrap together. And the affordance
+            means "the same three axes, as ranks" — it belongs against
+            the thing it is about.
+            NO LONGER `relative` (2026-09-10). The group was the panel's
+            positioning context while the panel opened ON the trio;
+            it now opens on the CARD's right-hand edge, below this whole
+            block, so the context it needs is TierGaps's own `relative`
+            above. Dropping the class is layout-neutral — `relative` with
+            no offsets moves nothing — and leaving it would silently keep
+            the panel hanging off a box one trio wide.
             WITHOUT A FIELD THIS WRAPS THE TRIO ALONE, which is a flex
             item of the same size holding the same child: the four
             league columns and the finished tail lay out exactly as
             before. */}
-        <span className="relative inline-flex items-end gap-2">
+        <span className="inline-flex items-end gap-2">
         <span
           className="inline-flex items-end gap-2.5 font-mono text-[10px] tabular-nums text-ink-low"
           title={field

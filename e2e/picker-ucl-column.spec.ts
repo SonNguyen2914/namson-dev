@@ -255,6 +255,11 @@ const GRID_ROWS = GRID_TIES.map(([fav, opp], i) => row({
   // thing that was crowding the club name off its own line
   form: { fav: "WWDLW", opp: "LDWWL", scope: "UEFA Champions League",
           scope_is_cup: true },
+  // AND THE H BADGE, which sits BETWEEN the name and that strip. Without
+  // it the name row is one item short of what a real board draws, and
+  // the layout tests below would certify a row the site never renders:
+  // every rated row the backend serves carries a venue class.
+  venue_class: { class: "DOMESTIC", home_side: "home" },
   // a listed-but-unquoted market on one row: `event_ticker` is the only
   // string on the card with no space in it to wrap at
   ...(i === 2 ? {
@@ -1144,6 +1149,194 @@ test("a long club name is drawn WHOLE in a narrow track, not ellipsised",
       // of syllables
       expect(m!.lines, `${name} wrapped onto ${m!.lines} lines`)
         .toBeLessThanOrEqual(2);
+    }
+  });
+
+// ------------------------- the card's upper-right corner --------------
+//
+// Operator, 2026-09-10, on a live Champions League card: "fix this
+// design, the hover ranking must display on the right hand, and the
+// League gap number need to be on the upper right corner, move the form
+// closer to team names."
+//
+// The anchor used to sit inside the matchup link, to the right of the
+// two club-name rows — so it read as a fact about the NAMES. It is a
+// fact about the CARD, of the same kind as the rank badge and the
+// kickoff time; it now sits in a column of its own, top-aligned with
+// that chip row.
+//
+// THESE MEASURE, they do not read classes. The corner is a claim about
+// where the box lands at each step of the ladder, and the failure mode
+// is silent: a corner that fits at 1440 and squeezes the names into
+// syllables at 1024 passes every text assertion in this file.
+
+/** Where each part of one card's top region is, settled. */
+async function topRegion(card: ReturnType<typeof col>) {
+  const read = () => card.evaluate((el) => {
+    const q = (n: Element | null) => {
+      if (!n) return null;
+      const r = n.getBoundingClientRect();
+      return { l: r.left, r: r.right, t: r.top, b: r.bottom };
+    };
+    const cs = getComputedStyle(el as HTMLElement);
+    const cr = (el as HTMLElement).getBoundingClientRect();
+    // the FAVOURITE's name — the span whose whole text is the club, and
+    // the group (pip + name) it wraps with
+    const name = Array.from(el.querySelectorAll("span")).find(
+      (s) => (s.textContent ?? "").trim()
+        === (el.querySelector("a[href]")?.getAttribute("aria-label") ?? "")
+          .replace(/^open /, "").replace(/ versus .*$/, ""));
+    return {
+      content: { l: cr.left + parseFloat(cs.borderLeftWidth)
+                     + parseFloat(cs.paddingLeft),
+                 r: cr.right - parseFloat(cs.borderRightWidth)
+                     - parseFloat(cs.paddingRight) },
+      anchor: q(el.querySelector('[data-testid="row-anchor"]')),
+      block: q(el.querySelector('[data-testid="anchor-block"]')),
+      rank: q(el.querySelector('[data-testid="row-rank"]')),
+      name: q(name ?? null),
+      nameWhole: name
+        ? (name as HTMLElement).scrollWidth
+            <= (name as HTMLElement).clientWidth + 1
+        : null,
+      nameWidth: name ? (name as HTMLElement).getBoundingClientRect().width
+                      : null,
+    };
+  });
+  // A LAYOUT READ MUST WAIT FOR THE LAYOUT — see cardBoxes above.
+  let prev = await read();
+  for (let i = 0; i < 25; i++) {
+    const next = await read();
+    if (JSON.stringify(next) === JSON.stringify(prev)) return next;
+    prev = next;
+  }
+  throw new Error("the card never stopped moving");
+}
+
+test("the anchor figure sits in the card's upper-right corner, level with "
+   + "the rank badge, at every step of the ladder", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openUcl(page, GRID_BOARD);
+    const card = col(page, "ucl").getByTestId("picker-row").first();
+    await expect(card).toBeVisible();
+
+    for (const width of [390, 820, 1024, 1280, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      const g = await topRegion(card);
+      const at = `at ${width}px`;
+      expect(g.block, `${at}: the card draws no anchor block at all`)
+        .not.toBeNull();
+
+      // IN THE CORNER: flush with the card's content edge on the right…
+      expect(g.block!.r, `${at}: the anchor is at the card's right edge`)
+        .toBeCloseTo(g.content.r, 0);
+      // …and level with the chip row that carries the rank, not below
+      // the names. One device pixel: they are the two columns of one
+      // row, so this is an alignment and not an approximation.
+      expect(Math.abs(g.anchor!.t - g.rank!.t),
+        `${at}: the anchor's top is the rank badge's top`)
+        .toBeLessThanOrEqual(1);
+      // and it is BESIDE the names rather than over them
+      expect(g.block!.l, `${at}: the anchor clears the club name`)
+        .toBeGreaterThanOrEqual(g.name!.r - 0.5);
+      // it never leaves the card
+      expect(g.block!.l).toBeGreaterThanOrEqual(g.content.l);
+    }
+  });
+
+test("the club name is still drawn whole beside it, at the narrow end and "
+   + "at the wide one", async ({ page }) => {
+    /* THE COST OF THE CORNER, MEASURED RATHER THAN ASSUMED. The anchor
+       column takes 76px of the card's content width at every width, and
+       the narrowest track this board lays is ~237px at lg. `truncate`
+       is off on a dense card by design — a board of "Bayer Le…" is a
+       board you cannot read — so the way this fails is a name reflowed
+       into a column of syllables, which no text assertion can see. */
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openUcl(page, GRID_BOARD);
+    const card = col(page, "ucl").getByTestId("picker-row").first();
+    await expect(card).toBeVisible();
+
+    for (const width of [390, 820, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      const g = await topRegion(card);
+      const at = `at ${width}px`;
+      // NOT ELLIPSISED: there is nothing hidden to scroll to.
+      expect(g.nameWhole, `${at}: the name is clipped`).toBe(true);
+      // AND AT READING WIDTH. A name reflowed into a 2px box satisfies
+      // the line above and says nothing.
+      expect(g.nameWidth, `${at}: the name draws only ${
+        Math.round(g.nameWidth ?? 0)}px wide`).toBeGreaterThan(90);
+    }
+  });
+
+test("each form strip is drawn against the name it describes, not parked "
+   + "at the row's right edge", async ({ page }) => {
+    /* "move the form closer to team names" (operator, 2026-09-10). The
+       strips carried `ml-auto`, which parks them at the row's right
+       edge — on a wide card a strip of five 7px cells floating half a
+       card from the club whose form it is.
+       THE PROPERTY IS "NO VOID BEFORE IT", which covers both of the
+       layouts this row is allowed to take. On a line it shares, the
+       strip follows whatever precedes it — the name, or the H badge
+       between them — within one gap. On a line of its own, which is
+       what happens when the whole name will not sit beside it, it
+       starts at the row's own left edge, under the name. `ml-auto`
+       satisfies neither: it leaves exactly the void this measures. */
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openUcl(page, GRID_BOARD);
+    const card = col(page, "ucl").getByTestId("picker-row").first();
+    await expect(card).toBeVisible();
+    // the fixture draws the widest strip there is AND the badge that
+    // sits between it and the name — see GRID_ROWS
+    await expect(card.getByTestId("form-strip")).toHaveCount(2);
+    await expect(card.getByTestId("home-badge")).toHaveCount(1);
+
+    for (const width of [390, 820, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      const read = () => card.evaluate((el) => {
+        const out: { row: number; gap: number; fromLeft: number }[] = [];
+        const strips = el.querySelectorAll('[data-testid="form-strip"]');
+        strips.forEach((s, i) => {
+          const row = s.parentElement!;
+          const sb = s.getBoundingClientRect();
+          const rb = row.getBoundingClientRect();
+          // the siblings sharing this strip's LINE, to its left
+          const mid = sb.top + sb.height / 2;
+          let before = -Infinity;
+          for (const sib of Array.from(row.children)) {
+            if (sib === s) continue;
+            const b = sib.getBoundingClientRect();
+            const sameLine = mid > b.top - 4 && mid < b.bottom + 4;
+            if (sameLine && b.right <= sb.left + 0.5) {
+              before = Math.max(before, b.right);
+            }
+          }
+          out.push({ row: i,
+                     gap: before === -Infinity ? NaN : sb.left - before,
+                     fromLeft: sb.left - rb.left });
+        });
+        return out;
+      });
+      let prev = await read();
+      for (let i = 0; i < 25; i++) {
+        const next = await read();
+        if (JSON.stringify(next) === JSON.stringify(prev)) break;
+        prev = next;
+      }
+      for (const m of prev) {
+        const at = `at ${width}px, strip ${m.row}`;
+        if (Number.isNaN(m.gap)) {
+          // a line of its own: directly under the name, at the row's
+          // own left edge
+          expect(m.fromLeft, `${at}: on its own line, it starts left`)
+            .toBeLessThanOrEqual(0.5);
+        } else {
+          // sharing a line: one gap after whatever precedes it
+          expect(m.gap, `${at}: ${Math.round(m.gap)}px of void before it`)
+            .toBeLessThanOrEqual(12);
+        }
+      }
     }
   });
 

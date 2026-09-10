@@ -555,62 +555,105 @@ test("a click PINS it, and Escape or a click outside closes it",
     await expect(c.getByTestId("field-ranks")).toHaveCount(0);
   });
 
-test("the panel's label row aligns with the TRIO's label row, and it sits "
-   + "beside the `i` rather than off the card's edge", async ({ page }) => {
-    /* Two placements were rejected. Anchored to the 15px button, a
-       196px panel hangs off the card's right edge and `overflow-x: clip`
-       CLIPS it; right-anchored to the card — what the shape popover
-       does — it opens nowhere near what opened it. Anchored to the trio
-       it is beside the button, inside the card by construction, and its
-       three labels land on the trio's three labels. */
-    await page.setViewportSize({ width: 1280, height: 900 });
+test("the panel opens on the card's RIGHT-HAND SIDE, clear of the numbers "
+   + "it reads and clear of its own trigger, at every width",
+  async ({ page }) => {
+    /* THE PLACEMENT THE OPERATOR ASKED FOR, 2026-09-10: "the hover
+       ranking must display on the right hand".
+       WHAT IT REPLACES, measured before it moved: anchored `left-0
+       top-0` on the trio, the panel was drawn ACROSS the three tier
+       cells it is a second reading of — and across its own trigger.
+       At 390px it spanned 143→279 with the circle at 245→260
+       underneath it; at 1024px, 33→169 with the circle at 135→150.
+       `z-30` on the circle kept the click working, which is why that
+       shipped, and is not a reason to draw a panel over the numbers.
+       THIS TEST WAS THE ALIGNMENT ONE. It asserted that the panel's
+       label row landed on the trio's label row, to one device pixel —
+       a real virtue of hanging the panel on the trio, and the price of
+       the corner. It is replaced rather than loosened: the property
+       that survives is the one that was always load-bearing — the
+       trigger stays clickable — and it is now asserted at every step of
+       the ladder rather than at one width, because "on the right hand"
+       is a claim about all of them.
+       WHY THE WHOLE LADDER. `right-0` here means the TIER BLOCK's right
+       edge, which is one card-content wide; the card is 237px at lg and
+       350px on a phone, and the panel is a fixed ~136px. Only a
+       measurement can tell those apart. */
     await openBoard(page);
     const c = card(page, "ucl-1");
-    await c.getByTestId("field-ranks-open").click();
-    const geom = await c.evaluate((el) => {
+
+    /* A LAYOUT READ MUST WAIT FOR THE LAYOUT. `evaluate` reads the DOM
+       as it stands and a viewport resize is not synchronous with
+       reflow, so a read taken straight after one can faithfully
+       describe the PREVIOUS width. Settled means two consecutive reads
+       agree — the rule cardBoxes uses in picker-ucl-column.spec.ts. */
+    const read = () => c.evaluate((el) => {
       const panel = el.querySelector('[data-testid="field-ranks"]')!;
-      const label = panel.querySelector("[data-rank-axis] span")!;
-      const trioLabel = el.querySelector('[data-tier="ovr"] span')!;
       const trigger = el.querySelector('[data-testid="field-ranks-open"]')!;
       const box = (n: Element) => n.getBoundingClientRect();
-      const t = box(trigger);
+      const t = box(trigger), p = box(panel), cs = getComputedStyle(el);
+      const cr = box(el);
       /* WHAT THE POINTER WOULD ACTUALLY HIT at the circle's centre.
-         The geometry that matters is not "does the panel reach past the
-         trigger" — the trio's width varies with the band sets, so it
-         sometimes does — it is whether the CLICK still lands. */
+         The geometry that matters is not clearance in the abstract —
+         it is whether the CLICK still lands on the thing that closes
+         the panel. */
       const hit = document.elementFromPoint(t.left + t.width / 2,
                                             t.top + t.height / 2);
       return {
-        card: [box(el).left, box(el).right],
-        panel: [box(panel).left, box(panel).right],
+        // the card's CONTENT box: the panel is inside the padding, not
+        // merely inside the border
+        content: [cr.left + parseFloat(cs.borderLeftWidth)
+                    + parseFloat(cs.paddingLeft),
+                  cr.right - parseFloat(cs.borderRightWidth)
+                    - parseFloat(cs.paddingRight)],
+        panel: [p.left, p.right, p.top, p.bottom],
+        trigger: [t.left, t.right, t.top, t.bottom],
         hitIsTrigger: trigger === hit || trigger.contains(hit),
-        labelTop: box(label).top, trioLabelTop: box(trioLabel).top,
       };
     });
-    // the label rows are the same row — one device pixel of rounding,
-    // never a line of leading (12px was the inline-flex baseline bug)
-    expect(Math.abs(geom.labelTop - geom.trioLabelTop)).toBeLessThanOrEqual(1);
-    // it starts at the trio's own left edge, inside the card
-    expect(geom.panel[0]).toBeGreaterThanOrEqual(geom.card[0] - 0.5);
-    /* AND IT NEVER LEAVES THE CARD. This is the xl breakpoint, where
-       the board lays six matches across and the card is ~197px — the
-       narrowest track this panel is ever drawn in. `html { overflow-x:
-       clip }` means an overhang past the page would be CLIPPED rather
-       than scrolled to, and a reader would never learn a column had
-       been cut off; the card is the stricter bar, and the same one the
-       shape popover beside it is held to. */
-    expect(geom.panel[1]).toBeLessThanOrEqual(geom.card[1] + 0.5);
-    /* AND THE TRIGGER IS STILL THE THING UNDER THE POINTER. At 820px
-       it was not: the panel is anchored to the trio and, when the band
-       sets are short, is wider than it — so it covered the circle that
-       opened it and swallowed the click that closes it, which is the
-       2026-09-07 bug in the popover next door, found here before it
-       shipped. Asserted as a hit test rather than as clearance, because
-       the hit is the property; the clearance varies with the sets. */
-    expect(geom.hitIsTrigger).toBe(true);
-    // and the round trip really works: a second click closes it
-    await c.getByTestId("field-ranks-open").click();
-    await expect(c.getByTestId("field-ranks")).toHaveCount(0);
+    const settled = async () => {
+      let prev = await read();
+      for (let i = 0; i < 25; i++) {
+        const next = await read();
+        if (JSON.stringify(next) === JSON.stringify(prev)) return next;
+        prev = next;
+      }
+      throw new Error("the panel never stopped moving");
+    };
+
+    for (const width of [390, 820, 1024, 1280, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await c.getByTestId("field-ranks-open").click();
+      await expect(c.getByTestId("field-ranks")).toBeVisible();
+      const g = await settled();
+      const at = `at ${width}px`;
+
+      // ON THE RIGHT-HAND SIDE: the panel's right edge IS the card's
+      // content edge. Said as an equality, not as "inside the card" —
+      // a panel that drifted back over the trio would still be inside.
+      expect(g.panel[1], `${at}: the panel is right-aligned to the card`)
+        .toBeCloseTo(g.content[1], 0);
+      /* AND IT NEVER LEAVES THE CARD ON THE OTHER SIDE. `html {
+         overflow-x: clip }` (globals.css) means an overhang is CLIPPED
+         rather than scrolled to, so a reader would never learn the
+         panel had been cut off. */
+      expect(g.panel[0], `${at}: the panel starts inside the card`)
+        .toBeGreaterThanOrEqual(g.content[0] - 0.5);
+      // still readable: a panel squeezed to nothing is its own defect
+      expect(g.panel[1] - g.panel[0], `${at}: the panel is readable`)
+        .toBeGreaterThan(120);
+      /* CLEAR OF ITS OWN TRIGGER — the 2026-09-07 property, kept in a
+         stronger form. The panel starts BELOW the whole tier block, so
+         nothing that is in that block can be inside it, however the
+         `flex-wrap` row breaks at this width. */
+      expect(g.panel[2], `${at}: the panel opens below its trigger`)
+        .toBeGreaterThanOrEqual(g.trigger[3]);
+      expect(g.hitIsTrigger, `${at}: the trigger is still under the pointer`)
+        .toBe(true);
+      // and the round trip really works: a second click closes it
+      await c.getByTestId("field-ranks-open").click();
+      await expect(c.getByTestId("field-ranks")).toHaveCount(0);
+    }
   });
 
 test("no field, no `i` — the affordance is never an empty promise",
