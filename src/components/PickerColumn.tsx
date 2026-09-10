@@ -311,13 +311,25 @@ function FormStrip({ form, name, scope, cupScope, className = "" }: {
       {slots.map((c, i) => {
         const latest = i === FORM_SLOTS - 1 && c != null;
         return (
+          /* FIVE CELLS OF ONE SHAPE (2026-09-10). Two things made this
+             read as ragged rather than as a strip. An empty slot was
+             drawn as an OUTLINE while every result was a FILL, so at
+             7px the placeholders were a different object from the data
+             — and an outline in `line` is barely distinguishable from a
+             draw's `line-strong` fill anyway, which is the worst of
+             both. Empties are now a faint fill: same shape, same size,
+             plainly less. And the latest cell's ring carried
+             `ring-offset-1`, which draws the halo OUTSIDE the box and
+             made one cell in five 11px wide against its neighbours' 7 —
+             the bump the operator saw. Inset, the mark stays inside its
+             own footprint and every cell keeps its place in the row. */
           <i key={i} data-r={c ?? ""}
             className={`h-[7px] w-[7px] rounded-[1.5px] ${
-              c == null ? "border border-line"
+              c == null ? "bg-line"
               : c === "W" ? "bg-up/85"
               : c === "L" ? "bg-neg/75"
               : "bg-line-strong"}${
-              latest ? " ring-1 ring-ink-hi/70 ring-offset-1 ring-offset-bs" : ""}`} />
+              latest ? " ring-1 ring-inset ring-ink-hi/70" : ""}`} />
         );
       })}
       {/* Only a CUP scope gets a visible mark. A league row's form being
@@ -739,7 +751,7 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
         {cross && row.rated_in && (
           <span data-testid="rated-in"
             title="each club is rated on its own domestic league's table — this cup has none of its own"
-            className="rounded border border-warn/40 bg-warn/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
+            className="min-w-0 max-w-full truncate rounded border border-warn/40 bg-warn/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
             {leagueLabel(row.rated_in.home)} v {leagueLabel(row.rated_in.away)}
           </span>
         )}

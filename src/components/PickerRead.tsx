@@ -549,21 +549,17 @@ export function TierGaps({ read, dense = false, field }: {
    *  component draws precisely what it drew before. */
   field?: RowField | null;
   /** the card sits in a narrow dense-grid track (PickerColumn.DENSE_GRID)
-   *  — ONLY the popover cares. `w-64` anchored to the button's right edge
-   *  is a 256px panel hanging off a ~200px card, so in the board's
-   *  leftmost column it reaches past the page's own left edge; and
-   *  `html { overflow-x: clip }` (globals.css) means that does not
-   *  scroll, it CLIPS. Dense, the panel is anchored to the tier block
-   *  instead and spans exactly the card's content width, so it fits
-   *  inside every column by construction rather than by arithmetic on a
-   *  breakpoint. */
+   *  — the shape popover anchors to the tier block there rather than to
+   *  its trigger, so it spans the card's content width and cannot reach
+   *  past a narrow column's edge. Only reachable on a card with no
+   *  field; a field-rated card draws no popover at all. */
   dense?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
   /* ONE READ, DERIVED ONCE, AND EVERY MARK BELOW ASKS IT. Without a
      field this IS `read`, by identity — see effectiveRead — so the four
      league columns and the finished tail render byte for byte what they
      rendered before. */
+  const [open, setOpen] = useState(false);
   const r = effectiveRead(read, field);
   const dims = [
     ["overall", r.tier_gaps.ovr, r.tiers.ovr],
@@ -629,11 +625,30 @@ export function TierGaps({ read, dense = false, field }: {
                   placeability floor refused on the first reading is
                   marked here and nowhere else on the card — same mark,
                   same hover sentence, as the field's own page. */}
+              {/* THE MARK FIRES ON A WIDE INTERVAL, NOT ONLY ON A
+                  REFUSED LEAGUE (2026-09-10). The trio prints the POINT
+                  tier now, so the mark is the only thing left saying
+                  when that point is not a placement the evidence will
+                  stand behind — "if the +- is too big, put a subtle
+                  mark there and I will know", the operator.
+                  IT MATTERS MOST ON def AND atk. The field publishes 3
+                  bands there against 5 on overall, because those axes
+                  resolve ~2.4 distinguishable levels; the payload's own
+                  note for def reads "every one of the 36 straddles a
+                  cut, so the set is the read". Placed cleanly: 10 of 36
+                  on ovr, 3 on atk, 2 on def. A bare number on def would
+                  therefore assert, 34 times out of 36, exactly the
+                  placement the set exists to refuse. Below-floor keeps
+                  its own sentence; a straddle gets the plain one. */}
               <span className="whitespace-nowrap">
-                {pr[0]}{side?.fav.below_floor
-                  && <FloorMark note={side.fav.floor_note} />}v{pr[1]}
-                {side?.opp.below_floor
-                  && <FloorMark note={side.opp.floor_note} />}
+                {pr[0]}{side && (side.fav.below_floor || side.fav.straddles)
+                  && <FloorMark note={side.fav.below_floor
+                    ? side.fav.floor_note
+                    : `the 95% interval touches bands ${side.fav.tier_set.join("·")} — ${side.fav.tier} is where the estimate falls, not a band the evidence will narrow to`} />}v{pr[1]}
+                {side && (side.opp.below_floor || side.opp.straddles)
+                  && <FloorMark note={side.opp.below_floor
+                    ? side.opp.floor_note
+                    : `the 95% interval touches bands ${side.opp.tier_set.join("·")} — ${side.opp.tier} is where the estimate falls, not a band the evidence will narrow to`} />}
               </span>
             </span>
             );
@@ -645,6 +660,22 @@ export function TierGaps({ read, dense = false, field }: {
             nobody has measured would be an empty promise. */}
         {field && <FieldRanks field={field} />}
         </span>
+        {/* THE SHAPE POPOVER — ON A LEAGUE COLUMN ONLY (2026-09-10).
+            The operator: "keep the #, remove the i since it is
+            repetitive and outdated data formatting". Both halves of
+            that are true WHERE A FIELD IS READ: the `#` is already
+            there, six pixels away, so the `i` is a second identical
+            circle; and this panel prints the WITHIN-LEAGUE gaps, which
+            on a field-rated card is the reading the field replaced.
+            NEITHER IS TRUE ON A LEAGUE COLUMN. There is no `#` on those
+            cards — FieldRanks draws only when a field exists — so
+            nothing is repeated, and the tiers really ARE within-league
+            quintiles, so nothing is stale. Removing it there would take
+            the shape explainer off the landing board, which is the one
+            surface he protected outright: "only with new 'i' added.
+            Consistency is key."
+            So the condition is the field, not the page. */}
+        {!field && (<>
         {/* THE POPOVER HANGS OFF THE BUTTON, NOT OFF THE ROW (2026-09-07).
             It was `absolute top-6` on the whole TierGaps block, which is
             24px below the block's top — fine while the row above it fits
@@ -709,6 +740,7 @@ export function TierGaps({ read, dense = false, field }: {
         </div>
           )}
         </span>
+        </>)}
       </div>
     </div>
   );
