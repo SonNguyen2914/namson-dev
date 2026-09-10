@@ -104,8 +104,20 @@ export interface FieldRead {
  *  Returns null for an empty set rather than an empty string, so a
  *  caller cannot render "tier " with nothing after it — a club with no
  *  band is not a club in band zero. */
-export function tierSet(row: Pick<AxisRow, "tier_set">): string | null {
-  return row.tier_set.length > 0 ? row.tier_set.join("·") : null;
+/** ONE NUMBER, NOT THE SET (2026-09-10). This joined the whole
+ *  `tier_set` with "·", so a club whose interval touched four bands
+ *  printed "2·3·4·5" in a 10px trio — and the operator rejected exactly
+ *  that: "why ovr has 2.3.4 for sabah and not one concrete number?"
+ *
+ *  THE UNCERTAINTY IS NOT DROPPED, IT IS MOVED TO WHERE IT READS. The
+ *  point `tier` is where the estimate actually falls; the dagger beside
+ *  it (FloorMark) says the band is too wide to place in one tier and
+ *  carries the backend's own reason on hover. A number plus a mark is
+ *  legible at 10px in a four-across track; a four-element set is not.
+ *  `tier_set` stays on the payload and in the title attribute, so
+ *  nothing measured is lost and a guard can still read it. */
+export function tierSet(row: Pick<AxisRow, "tier" | "tier_set">): string | null {
+  return row.tier_set.length > 0 ? String(row.tier) : null;
 }
 
 /** Every club on one axis, by name. Built per call rather than cached:

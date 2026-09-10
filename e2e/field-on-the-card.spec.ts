@@ -140,6 +140,17 @@ const UNHELD = "Pafos";
  *  if the card ever drops one. */
 const AXIS_KEYS = Object.keys(AXES) as (keyof typeof AXES)[];
 
+/** The two field rows a given card reads on one axis — resolved the way
+ *  `fieldFor` resolves them (by club name, uncrossed), so this follows
+ *  the component rather than restating it. Defaults to card ucl-1,
+ *  Barcelona v Feyenoord: both held, both above the floor. */
+const FIELD_ROW = (axis: string, fav = "Barcelona", opp = "Feyenoord") => {
+  const rows = (AXES as Record<string, { rows: ReturnType<typeof axisRow>[] }>)
+    [axis].rows;
+  return { fav: rows.find((x) => x.club === fav)!,
+           opp: rows.find((x) => x.club === opp)! };
+};
+
 // ───────────────────────────────────────────── the board, as narrowed
 
 const meta = { src: "current", min_current_gp: 4, clubs: 36, kind: "cup",
@@ -280,8 +291,8 @@ test("and it STILL refuses a cross-league row with no field — the "
 
 // ─────────────────────────────────────────────── 3. a tier is a SET ──
 
-test("every band set in the tier trio is drawn WHOLE — never its first "
-   + "member alone", async ({ page }) => {
+test("the trio draws ONE number per side — the point tier, with the set "
+   + "kept as data and marked when it is wide", async ({ page }) => {
     await openBoard(page);
     const c = card(page, "ucl-1");
     /* THE COUNT IS DERIVED: three axes, and a card that quietly stopped
@@ -295,13 +306,42 @@ test("every band set in the tier trio is drawn WHOLE — never its first "
       opp: e.getAttribute("data-opp-set"),
       text: (e.textContent || "").replace(/†/g, "").trim(),
     })));
+    /* ONE NUMBER, AND IT IS THE POINT TIER — not the set joined, and
+       not the set's first member either. The operator rejected the
+       joined form outright ("why ovr has 2.3.4 for sabah and not one
+       concrete number?"), and the first-member shortcut is the `OVR
+       1v1` defect, so this pins the ONLY remaining correct answer: the
+       band the estimate actually falls in.
+       THE SET IS NOT DISCARDED, IT IS DEMOTED TO DATA. `data-fav-set`
+       and `data-opp-set` still carry it, so a reader — or this test —
+       can still see what the interval touched, and the mark below says
+       when that matters. */
     for (const t of drawn) {
-      const fav = (t.fav || "").split(","), opp = (t.opp || "").split(",");
-      // the payload's own sets, joined — not strings typed in this file
-      expect(t.text).toBe(`${t.axis}${fav.join("·")}v${opp.join("·")}`);
-      // and never a bare first member where the set has more than one:
-      // that is the `OVR 1v1` defect exactly
-      if (fav.length > 1) expect(t.text).not.toContain(`${t.axis}${fav[0]}v`);
+      const row = FIELD_ROW(t.axis!);
+      expect(t.text).toBe(`${t.axis}${row.fav.tier}v${row.opp.tier}`);
+      // the set survives as an attribute, whole
+      expect((t.fav || "").split(",")).toEqual(row.fav.tier_set.map(String));
+      expect((t.opp || "").split(",")).toEqual(row.opp.tier_set.map(String));
+    }
+  });
+
+test("a wide interval is MARKED, so one number never reads as a placement "
+   + "the evidence refused", async ({ page }) => {
+    /* The point tier alone would assert a band on the def axis 34 times
+       out of 36 — the payload's own note there reads "every one of the
+       36 straddles a cut, so the set is the read". The mark is what
+       keeps the number honest: "if the +- is too big, put a subtle mark
+       there and I will know" (operator). */
+    await openBoard(page);
+    const c = card(page, "ucl-1");
+    for (const axis of AXIS_KEYS) {
+      const row = FIELD_ROW(axis);
+      const cell = c.locator(`[data-tier="${axis}"]`);
+      const marks = await cell.locator("sup").count();
+      const owed = Number(row.fav.straddles || row.fav.below_floor)
+                 + Number(row.opp.straddles || row.opp.below_floor);
+      expect(marks, `${axis}: one mark per side whose band is not settled`)
+        .toBe(owed);
     }
   });
 
@@ -383,24 +423,55 @@ test("when the board serves its OWN field block, that block wins — and "
 
 // ───────────────────────────── 5. the eleven, marked subtly ──────────
 
-test("a club below the floor carries a dagger and its REASON on the tier "
-   + "trio; one above the floor carries neither", async ({ page }) => {
+test("the mark says THE BAND IS NOT SETTLED — a refused league keeps its "
+   + "own reason, a straddle gets the plain one, a settled side gets "
+   + "neither", async ({ page }) => {
+    /* WHAT THIS MARK MEANS WIDENED WITH THE TRIO (2026-09-10). While the
+       trio drew the whole set, the set WAS the caveat and this mark
+       carried only the placeability floor. The trio now draws one
+       number, so the mark is the only thing left saying when that
+       number is not a placement the evidence will stand behind:
+       "if the +- is too big, put a subtle mark there and I will know."
+       Below-floor still gets the backend's own sentence; a straddle
+       gets a plain one naming the bands its interval touched. */
     await openBoard(page);
-    const c = card(page, "ucl-2");   // Kairat Almaty is below the floor,
-                                     // and BOTH its clubs are held
-    const marks = c.getByTestId("field-floor-mark");
-    await expect(marks.first()).toBeVisible();
-    await expect(marks.first()).toHaveAttribute("title", FLOOR_NOTE);
-    // and it is a mark, not an alert: no colour of its own, no words
-    await expect(marks.first()).toHaveText("†");
-    // one per below-floor END of the three axes, and no more
-    await expect(marks).toHaveCount(AXIS_KEYS.length);
 
-    /* THE CONTROL. Every club on the other card cleared the floor, so
-       not one of its cells may carry the mark — otherwise "marked
-       subtly" would be satisfied by marking everyone. */
-    await expect(card(page, "ucl-1").getByTestId("field-floor-mark"))
-      .toHaveCount(0);
+    // Kairat Almaty is below the floor on every axis, and its reason is
+    // the backend's, not one written here.
+    const c2 = card(page, "ucl-2");
+    const marks2 = c2.getByTestId("field-floor-mark");
+    await expect(marks2.first()).toBeVisible();
+    await expect(marks2.first()).toHaveAttribute("title", FLOOR_NOTE);
+    // a mark, not an alert: one glyph, no colour of its own
+    await expect(marks2.first()).toHaveText("†");
+
+    /* THE COUNT IS DERIVED FROM THE FIXTURE, not typed: one per side
+       whose band is unsettled, on each axis. A card that started
+       marking everyone, or stopped marking anyone, fails here. */
+    const owed = (fav: string, opp: string) => AXIS_KEYS.reduce((n, a) => {
+      const r = FIELD_ROW(a, fav, opp);
+      return n + Number(r.fav.straddles || r.fav.below_floor)
+               + Number(r.opp.straddles || r.opp.below_floor);
+    }, 0);
+    await expect(marks2).toHaveCount(owed("Kairat Almaty", "Feyenoord"));
+
+    const c1 = card(page, "ucl-1");
+    await expect(c1.getByTestId("field-floor-mark"))
+      .toHaveCount(owed("Barcelona", "Feyenoord"));
+
+    /* THE CONTROL, and it has to be a SIDE rather than a card now.
+       Barcelona is a single band above the floor on the overall axis —
+       settled by both tests — so that side may carry no mark at all,
+       while Feyenoord beside it straddles and must. One cell, both
+       answers: this is what stops "mark it when unsure" degrading into
+       "mark everything". */
+    const ovr = FIELD_ROW("ovr");
+    expect(ovr.fav.tier_set.length, "fixture: Barcelona is one band").toBe(1);
+    expect(ovr.fav.below_floor).toBeFalsy();
+    expect(ovr.opp.tier_set.length, "fixture: Feyenoord straddles")
+      .toBeGreaterThan(1);
+    await expect(c1.locator('[data-tier="ovr"]')
+      .getByTestId("field-floor-mark")).toHaveCount(1);
   });
 
 // ─────────────────────────────────── 6. THE ONE ADDITION: the `i` ────
@@ -694,10 +765,24 @@ test("the Champions League card is the board's own card — every element "
     const c = card(page, "ucl-1");
     for (const id of ["row-rank", "row-anchor", "anchor-key", "rank-pair",
                       "rank-dumbbell", "form-strip", "tier-cell",
-                      "shape-chip", "tier-read", "watch-toggle"]) {
+                      "shape-chip", "watch-toggle"]) {
       await expect(c.getByTestId(id).first(),
                    `${id} is missing from the UCL card`).toBeAttached();
     }
+    /* `tier-read` IS THE ONE ELEMENT DELIBERATELY NOT HERE, and it is
+       the exception that has to be stated rather than quietly dropped
+       from the list above. The operator: "keep the #, remove the i
+       since it is repetitive and outdated data formatting."
+       On THIS card the `#` already opens the same three axes as ranks,
+       so the `i` is a second identical circle beside it, and its panel
+       reads the within-league gaps — the reading the field replaced.
+       Neither is true on a league column, where there is no `#` and the
+       tiers really are quintiles, so it stays there. The pair of
+       assertions below is the whole rule: absent where a field is read,
+       present where one is not. */
+    await expect(c.getByTestId("tier-read"),
+                 "the field card must not carry a second circle")
+      .toHaveCount(0);
     // the two club lines, the three tier cells, the three trio cells
     await expect(c.getByTestId("form-strip")).toHaveCount(2);
     await expect(c.getByTestId("tier-cell")).toHaveCount(3);
@@ -705,6 +790,19 @@ test("the Champions League card is the board's own card — every element "
     // the Kalshi line — this fixture has no event, which is one of its
     // three named states and never a blank
     await expect(c).toContainText("no kalshi event");
+  });
+
+test("and a card with NO field keeps the `i` — the landing board is not "
+   + "changed by any of this", async ({ page }) => {
+    /* THE OTHER HALF OF THE RULE, and the one that protects the surface
+       the operator ring-fenced: "only with new 'i' added. Consistency
+       is key." A league column reads no field, so it draws no `#`, and
+       the shape explainer is neither repetitive nor stale there. If the
+       removal above ever widens to every card, this is what fails. */
+    await openBoard(page, { competition: "ucl", axes: null, why_not: "x" });
+    const c = card(page, "ucl-1");
+    await expect(c.getByTestId("tier-read").first()).toBeAttached();
+    await expect(c.getByTestId("field-ranks-open")).toHaveCount(0);
   });
 
 // ───────────────────────── 10. the field's own page ──────────────────
