@@ -63,7 +63,8 @@ import {
   askHonoured, boardColumns, declarationOf, fetchBoard, leagueLabel,
 } from "../../lib/pickerApi";
 import {
-  DEFAULT_BACK, REVIEW_WINDOWS, Review, fetchReview,
+  DEFAULT_BACK, REVIEW_WINDOWS, Review, fetchReview, readHere,
+  reviewAskHonoured,
 } from "../../lib/pickerReview";
 import {
   COLUMN_DEFAULT_SORT, ColumnSort, DEFAULT_SORT, SORT_MODES, columnSort,
@@ -226,10 +227,24 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
     return () => { clearTimeout(t); ac.abort(); };
   }, [load, nonce, deepLink]);
 
+  /* THE FINISHED TAIL ASKS THE SAME QUESTION THE BOARD ABOVE IT DOES
+     (2026-09-10). It used to ask none: `fetchReview(back)` fetched the
+     DECLARED sweep on every route, so `/bet-suggester/ucl` drew its
+     upper half from `?leagues=ucl` and its finished tail from four
+     other competitions' matches. On the night six Champions League
+     ties finished, that endpoint served 54 finished fixtures — 28 MLS,
+     11 La Liga, 10 Premier League, 5 Liga MX — and not one of them was
+     a fixture this page is about.
+
+     `ask` is the SAME string the board fetch uses, so the two halves of
+     a narrowed page cannot come to be about different competitions;
+     and the landing page passes nothing here for the same reason it
+     passes nothing there. */
   const loadReview = useCallback(async (signal: AbortSignal) => {
     setReviewLoading(true);
     try {
-      const r = await fetchReview(back, signal);
+      const r = await fetchReview(back, signal,
+                                  ask === "" ? undefined : ask.split(","));
       if (signal.aborted) return;
       setReview(r);
       setReviewError("");
@@ -243,7 +258,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
     } finally {
       if (!signal.aborted) setReviewLoading(false);
     }
-  }, [back]);
+  }, [back, ask]);
 
   useEffect(() => {
     if (deepLink !== null) return;
@@ -393,6 +408,36 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      rather than a slug so the next narrowed board inherits this for
      free. */
   const narrowedTo = only ? columnSlugs : null;
+
+  /* ── THE FINISHED TAIL'S THREE STATES, DERIVED ONCE ────────────────
+
+     A tail may say "nothing finished in this window" ONLY when the
+     sweep actually covered its competition. Three facts, and the page
+     must never let one wear another's clothes:
+
+       1. ASKED, AND NONE FINISHED — `readHere` true, no error. A
+          measurement, and the tail says so.
+       2. NEVER ASKED — no key for this competition on the payload.
+          NOT zero. This is the failure the whole review surface is
+          built against: six Champions League ties finished and the
+          card read "No Champions League fixtures finished in the last
+          7 days", because the payload had no `ucl` key and the card
+          fell through every branch to its empty state.
+       3. ASKED AND THE READ FAILED — the whole request (`reviewError`)
+          or this competition's own scoreboard (`meta.error`), named in
+          the backend's own words.
+
+     `reviewAnswered` is the FOURTH fact that decides which of (2) and
+     (3) a missing key means, and it exists because a backend deployed
+     behind this frontend does not know `?leagues=`, drops it, and
+     answers 200 with its declared sweep. `readHere` alone already
+     refuses to draw that as zero — the safe direction, without this —
+     but a page that only refuses leaves the reader with an unexplained
+     blank, and an unexplained blank is what this surface refuses to
+     leave. null while nothing has landed: an unanswered ask and an
+     unmade one are not the same fact. */
+  const reviewAnswered = review && only
+    ? reviewAskHonoured(review, only) : null;
 
   /* ── THE CROSS-LEAGUE FIELD, PER COLUMN THAT HAS ONE ────────────────
 
@@ -1079,6 +1124,22 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                       refusals: finishedRefusals.filter((r) => colOf(r) === slug),
                       meta: reviewLeagues[slug],
                       back, loading: reviewLoading, error: reviewError,
+                      /* WAS THIS COMPETITION READ AT ALL? Off the
+                         payload's own record, never inferred from an
+                         empty row list. */
+                      read: readHere(review, slug),
+                      /* …and when it was not, why — if the page knows.
+                         It knows exactly one reason: it asked and the
+                         server did not answer the question. */
+                      unreadWhy: reviewAnswered === false
+                        ? "This page asked the review for "
+                          + `${leagueLabel(slug)} by name and the server `
+                          + "answered with the board's declared "
+                          + "competitions instead — it did not narrow the "
+                          + "sweep. That is a read that never covered this "
+                          + "competition, not a week in which nothing was "
+                          + "played."
+                        : null,
                       storeNote,
                     }}
                     field={fields[slug]} />

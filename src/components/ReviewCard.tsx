@@ -760,7 +760,8 @@ function FitMethodNote() {
 }
 
 export function ReviewTail({
-  slug, rows, refusals, meta, back, loading, error, storeNote,
+  slug, rows, refusals, meta, back, loading, error, read, unreadWhy,
+  storeNote,
 }: {
   slug: string;
   rows: ReviewRow[];
@@ -769,6 +770,10 @@ export function ReviewTail({
   back: number;
   loading: boolean;
   error: string;
+  /** DID THE SWEEP COVER THIS COMPETITION? See the three states below. */
+  read: boolean;
+  /** why it did not, when the page knows; null otherwise */
+  unreadWhy: string | null;
   /** set when NOTHING is being frozen anywhere — every read below is a
    *  rebuild, and that is a property of the deployment, not a coincidence */
   storeNote: string | null;
@@ -795,11 +800,22 @@ export function ReviewTail({
   };
 
   /* IS THE NUMBER OF FINISHED MATCHES KNOWN AT ALL? `rows.length` is 0
-     while the request is in flight, after it failed, and after THIS
-     league's own tail failed — for exactly the same reason it is 0 on a
-     league that genuinely played nothing. The three are different facts
-     and the header must not fold them together. */
-  const known = !loading && !error && !meta?.error;
+     while the request is in flight, after it failed, after THIS
+     league's own tail failed, AND WHEN THE SWEEP NEVER COVERED THIS
+     COMPETITION — for exactly the same reason it is 0 on a league that
+     genuinely played nothing. Four facts, one number, and the header
+     must not fold them together.
+
+     `read` WAS THE MISSING FOURTH (2026-09-10), and it is the one that
+     did damage. The other three were caught; a competition the payload
+     has no key for fell through every guard here, `known` came out
+     true, and the tail printed "0 matches" and "No Champions League
+     fixtures finished in the last 7 days" over six that were played.
+     `review_competitions()` in the backend records that same night and
+     rules on it: a competition this surface never read must never be
+     rendered as one it read and found empty. This is that rule, on the
+     surface that renders it. */
+  const known = !loading && !error && read && !meta?.error;
 
   return (
     <section data-testid="review-tail" data-league={slug}
@@ -834,13 +850,21 @@ export function ReviewTail({
           the toggle rather than a child of it. */}
       <div className="relative flex w-full items-baseline gap-2">
       <button type="button" data-testid="review-toggle"
-        data-has={known ? (rows.length > 0 ? "matches" : "none") : "unread"}
+        /* FOUR VALUES, NOT THREE. "unasked" is a competition this
+           sweep never covered and "unread" is one it tried and could
+           not — both are honestly "not read" to the eye, and neither
+           claims a zero, but they are different facts and a test that
+           cannot tell them apart cannot guard the difference. */
+        data-has={known ? (rows.length > 0 ? "matches" : "none")
+                        : !loading && !error && !read ? "unasked" : "unread"}
         onClick={toggle} aria-expanded={open}
         aria-controls={`review-body-${slug}`}
         title={!known
           ? (loading
               ? `still reading the last ${back} day${back === 1 ? "" : "s"} — how many finished is not known yet`
-              : `the last ${back} day${back === 1 ? "" : "s"} could not be read, so how many finished is not known — open this for the reason`)
+              : !error && !read
+                ? `the finished-matches read did not cover ${leagueLabel(slug)}, so how many finished is not known — open this for what that means`
+                : `the last ${back} day${back === 1 ? "" : "s"} could not be read, so how many finished is not known — open this for the reason`)
           : rows.length > 0
             ? `${rows.length} match${rows.length === 1 ? "" : "es"} finished in the last ${back} day${back === 1 ? "" : "s"} — press to ${open ? "put them away" : "read them"}`
             : `nothing finished in the last ${back} day${back === 1 ? "" : "s"}`}
@@ -947,6 +971,38 @@ export function ReviewTail({
             The finished matches could not be loaded. Nothing is being shown
             from an earlier request.
           </p>
+        </div>
+      ) : !read ? (
+        /* STATE 2 OF THREE, AND THE ONE WITH NO BRANCH UNTIL NOW.
+           The payload carries no key for this competition, so nothing
+           about its window was measured. It is NOT the empty state
+           below — that state is a finding ("we looked; none finished")
+           and this is the absence of one. Six Champions League ties
+           finished on the night the difference was drawn as the same
+           sentence.
+
+           WHY THE KEY IS THE RIGHT SIGNAL: `assemble_review` writes a
+           competition's meta BEFORE it fetches anything, so a
+           competition that was read and failed still has a key (and
+           lands in the branch below this one). A missing key means the
+           sweep never covered it, and means nothing else. */
+        <div data-testid="review-unasked"
+          className="mt-3 rounded-xl border border-dashed border-line-strong bg-elev p-4">
+          <Eyebrow>not read — not zero</Eyebrow>
+          <p className="mt-2 text-sm leading-relaxed text-ink-mid">
+            The finished-matches read did not cover {leagueLabel(slug)}.
+            No window was measured for this competition, so nothing here
+            says how many of its fixtures finished — least of all that
+            none did.
+          </p>
+          {/* The reason, WHEN THE PAGE HAS ONE. A blank where a reason
+              would go is honest; an invented reason is not. */}
+          {unreadWhy && (
+            <p data-testid="review-unasked-why"
+              className="mt-2 text-[11px] leading-relaxed text-ink-low">
+              {unreadWhy}
+            </p>
+          )}
         </div>
       ) : meta?.error ? (
         <div data-testid="review-league-error"
