@@ -284,12 +284,44 @@ async function open(page: import("@playwright/test").Page,
   await page.goto("/bet-suggester");
 }
 
-/** The same payload, on the board narrowed to the one column. */
+/** The same payload, on the board narrowed to the one column.
+ *
+ *  THE RATINGS READ IS MOCKED TOO, AND IT WAS NOT (2026-09-10). This
+ *  helper stubbed the board and the review and left the comp
+ *  ratings route to go wherever the environment pointed it — which is
+ *  PRODUCTION in the CI job, whose own name says it runs against the
+ *  live shadow backend. That did not matter while no column read a
+ *  field. The moment the live backend began serving one, the column
+ *  correctly gained a `field-note`, `data-notes` became `gap+field`
+ *  where this file asserts `gap`, and main went red on a change that
+ *  had touched none of it.
+ *
+ *  A SPEC THAT MOCKS ONE ENDPOINT AND LETS ANOTHER REACH PRODUCTION IS
+ *  NOT HERMETIC, it is hermetic-looking — and the failure it produces
+ *  points at whatever merged last rather than at the leak. `field`
+ *  defaults to a REFUSAL so the default board carries no field at all,
+ *  which is what every assertion in this file was written against; a
+ *  test that wants one passes it in. */
 async function openUcl(page: import("@playwright/test").Page,
-                       body: unknown = BOARD) {
+                       body: unknown = BOARD,
+                       field: { body: unknown; status: number } =
+                         /* A 200 SAYING THE COMPETITION IS UNMEASURED —
+                            not a 503. A failed read is a DIFFERENT fact
+                            and the column says so with its own
+                            `field-error` note, which is the refusal
+                            semantics working, not a mock detail. The
+                            default here must mean "there is no field",
+                            because that is the state every assertion in
+                            this file was written against. */
+                         { body: { competition: "ucl", axes: null,
+                                   why_not: "no field is fitted for this "
+                                     + "fixture's competition" },
+                           status: 200 }) {
   await page.route("**/api/picker/board**", (r) => r.fulfill(json(body)));
   await page.route("**/api/picker/review**", (r) =>
     r.fulfill(json(EMPTY_REVIEW)));
+  await page.route("**/api/comp/*/ratings", (r) =>
+    r.fulfill(json(field.body, field.status)));
   await page.goto("/bet-suggester/ucl");
 }
 
@@ -646,6 +678,38 @@ test("the Champions League column states its withheld gaps ONCE, in the "
     const panel = ucl.getByTestId("col-notes");
     await expect(panel.getByTestId("gap-note")).toHaveText(CROSS_NOTE);
     await expect(panel.getByTestId("reg-time-note")).toHaveCount(0);
+  });
+
+test("the notes attribute lists what the column HAS — a field adds its "
+   + "note, a failed field read adds a different one", async ({ page }) => {
+    /* THE ASSERTION ABOVE PINS `gap` AND THAT IS ONLY HALF A RULE. It
+       went red on main not because anything regressed but because the
+       spec let the comp ratings route reach PRODUCTION while mocking the
+       board — so when the live backend began serving a field, the
+       column correctly gained a `field-note` and `gap` became
+       `gap+field`. The behaviour was right; the test was leaky, and it
+       blamed whatever merged last.
+
+       Mocking the read fixes the leak. Pinning all three states is what
+       stops the next person reading `gap` as "this column may only ever
+       have one note". */
+    const AXES = { ovr: { axis: "ovr", label: "overall", bands: 5,
+                          distinguishable_levels: 6.12, unit: "elo",
+                          cuts: [], span: [0, 1], rows: [],
+                          straddling: 0, placed: 0 } };
+
+    // a MEASURED field: two notes, and the field's is one of them
+    await openUcl(page, GRID_BOARD,
+      { body: { competition: "ucl", axes: AXES }, status: 200 });
+    await expect(col(page, "ucl").getByTestId("col-notes-open"))
+      .toHaveAttribute("data-notes", /(^|\+)field($|\+)/);
+
+    // a FAILED read is a different fact and gets a different note —
+    // never folded into "there is no field"
+    await openUcl(page, GRID_BOARD,
+      { body: { detail: "the field read failed" }, status: 503 });
+    await expect(col(page, "ucl").getByTestId("col-notes-open"))
+      .toHaveAttribute("data-notes", /field-error/);
   });
 
 test("the note's panel opens inside its own column at the narrowest track",
