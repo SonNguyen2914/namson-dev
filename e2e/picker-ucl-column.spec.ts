@@ -944,17 +944,18 @@ test("the Champions League board lays a matchday ACROSS the band, not down "
     expect(boxes[1].y).toBeCloseTo(boxes[0].y, 0);
     expect(boxes[1].x).toBeGreaterThan(boxes[0].x + boxes[0].width - 1);
 
-    // and the band wraps within itself rather than growing a seventh
-    // track: six abreast, then the rest on a second row of the SAME band
+    // and the band wraps within itself rather than growing a fifth
+    // track: four abreast, then the rest on a second row of the SAME band
     const { count, xs } = firstRow(boxes);
-    expect(count).toBe(6);
-    expect(xs.size, "six tracks, six distinct x positions").toBe(6);
-    expect(boxes[6].y).toBeGreaterThan(boxes[0].y);
-    expect(boxes[6].x).toBeCloseTo(boxes[0].x, 0);
+    expect(count).toBe(4);
+    expect(xs.size, "four tracks, four distinct x positions").toBe(4);
+    expect(boxes[4].y).toBeGreaterThan(boxes[0].y);
+    expect(boxes[4].x).toBeCloseTo(boxes[0].x, 0);
 
-    // THE TRACKS ARE REAL, not six collapsed to nothing. Each is a
-    // sixth of the board's width, less the gaps.
-    for (const b of boxes) expect(b.width).toBeGreaterThan(150);
+    // THE TRACKS ARE REAL, not four collapsed to nothing. Each is a
+    // quarter of the board's width, less the gaps — so the floor is
+    // higher than it was at six.
+    for (const b of boxes) expect(b.width).toBeGreaterThan(240);
 
     // the band is still the vertical structure: one date, drawn once,
     // above every one of these cards
@@ -969,12 +970,14 @@ test("the Champions League board lays a matchday ACROSS the band, not down "
 
 test("the grid steps down as the viewport narrows, and never scrolls the "
    + "page sideways", async ({ page }) => {
-    // 1 / 2 / 3 / 4 / 6, on the project's own Tailwind breakpoints. The
-    // step is chosen by what a CARD needs, not by a round number: at each
-    // one the track lands between ~196px and ~350px, and six only appears
-    // at xl because that is the first width that can hold six of them.
+    // 1 / 2 / 3 / 4, on the project's own Tailwind breakpoints. The step
+    // is chosen by what a CARD needs, not by a round number. FOUR IS THE
+    // CEILING (2026-09-10, revised from six): the card now carries a
+    // dumbbell, a tier trio, a rank panel and a market line, and at a
+    // sixth of the band the fixture names wrap before any of it is read.
+    // Four is what the league columns hold, so the same card fits.
     const LADDER: [number, number][] = [
-      [1536, 6], [1440, 6], [1280, 6], [1024, 4], [768, 3], [640, 2],
+      [1536, 4], [1440, 4], [1280, 4], [1024, 4], [768, 3], [640, 2],
       [390, 1],
     ];
     await page.setViewportSize({ width: 1440, height: 900 });

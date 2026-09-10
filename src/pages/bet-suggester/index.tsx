@@ -475,7 +475,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      stack of 1,400px-wide cards — ~18 fixtures in a Champions League
      matchday, each one a screen of its own holding 200px of ink. So the
      sole column lays each matchday's matches ACROSS the band instead,
-     up to six abreast (components/PickerColumn.tsx, DENSE_GRID).
+     up to four abreast (components/PickerColumn.tsx, DENSE_GRID).
 
      DERIVED FROM THE SAME `soleColumn` THE FRAMING AND THE RANKING KEY
      ALREADY USE, deliberately, rather than from `slug === "ucl"`: the

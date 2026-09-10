@@ -415,7 +415,7 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
   hoisted?: ColumnNoteSet;
   /** THIS CARD IS IN A NARROW TRACK — see DENSE_GRID below.
    *
-   *  A dense board lays up to six matches across the width one column
+   *  A dense board lays up to four matches across the width one column
    *  used to have, so from `md` up the card is ~200px wide instead of the
    *  ~330px every element here was drawn against. Everything this flag
    *  switches is a REFLOW, never a cut: the anchor drops under the
@@ -862,14 +862,18 @@ function RefusalCard({ r, dated = true }: {
  *      lg    4 cols  237px at 1024
  *      xl    6 cols  196px at 1280, 223px at 1440, 239px at 1536+
  *
- *  Six is the operator's number and xl is the first breakpoint that can
- *  hold six tracks over 190px. Two and three are NOT dense enough to
- *  need the narrow card, which is why the reflow in RowRead turns on at
- *  `md` — the same width where this grid first goes past two columns.
- *  Standard Tailwind breakpoints throughout, like every other grid in
- *  this app; no arbitrary widths. */
+ *  FOUR IS THE OPERATOR'S NUMBER (2026-09-10, revised from six). Six
+ *  tracks over 190px fit at xl, but the card carries more ink than it
+ *  did when six was chosen — a dumbbell, a tier trio, a rank panel and
+ *  a market line — and at a sixth of the band the fixture names wrap
+ *  before any of it is read. Four holds the same card the league
+ *  columns hold. Two and three are NOT dense enough to need the narrow
+ *  card, which is why the reflow in RowRead turns on at `md` — the same
+ *  width where this grid first goes past two columns. Standard Tailwind
+ *  breakpoints throughout, like every other grid in this app; no
+ *  arbitrary widths. */
 const DENSE_GRID = "grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 "
-  + "lg:grid-cols-4 xl:grid-cols-6";
+  + "lg:grid-cols-4";
 
 /** Said once per column, where a reader first meets a refused card. */
 function RefusalWhy() {
@@ -903,7 +907,7 @@ function RefusalWhy() {
  *    `gap_note`       ~90 words, on every cross-league row. UEFA's
  *                     league-phase draw forbids two clubs of one
  *                     association from meeting, so on the Champions
- *                     League board that is EVERY row; laid six abreast
+ *                     League board that is EVERY row; laid four abreast
  *                     it was most of the ink on the matchday.
  *    `reg_time_note`  the competition's settlement rule, on every row
  *                     of that competition.
