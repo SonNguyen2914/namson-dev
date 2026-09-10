@@ -72,6 +72,67 @@ export const SHAPE_ORDER: Record<Shape, number> = {
   CLEAN: 2, SPLIT: 1, HOLLOW: 0,
 };
 
+/** ONE CLUB ON ONE AXIS OF THE FIELD — its place among the competition's
+ *  own entrants rather than among its league's.
+ *
+ *  `tier` is THE FIRST BAND OF `tier_set`, never the read on its own:
+ *  the set is every band this club's 95% interval touches, and a surface
+ *  printing the bare number asserts a placement the measurement refuses.
+ *  See lib/fieldApi.tierSet, which is the one place that is decided. */
+export interface FieldSide {
+  rank: number;
+  tier: number;
+  tier_set: number[];
+  straddles: boolean;
+  below_floor: boolean;
+  /** the backend's own reason the placeability floor refused this club
+   *  on the first reading — carried so the dagger that marks it can say
+   *  why, in those words */
+  floor_note?: string | null;
+}
+
+export interface FieldAxis {
+  fav: FieldSide;
+  opp: FieldSide;
+  /** THE BACKEND'S OWN SIGNED TIER GAP for this axis, favourite-signed.
+   *  Null means the block came from a source that does not carry one —
+   *  see fieldApi.fieldFor — and a null is never differenced into a gap
+   *  here. The frontend shows; it does not decide. */
+  tier_gap: number | null;
+}
+
+/** THE FIELD BLOCK ON A CROSS-LEAGUE RATED ROW (backend, 2026-09-09).
+ *
+ *  WHAT IT IS FOR. A Champions League tie has two clubs from two
+ *  different domestic tables, so the `ranks` and `tiers` below are two
+ *  facts about two different ladders: "AS Roma #2 v Fenerbahce #2" is
+ *  two league positions printed as though they were one comparison, and
+ *  ten of twelve league-phase cards read `1v1` on every axis because a
+ *  within-league quintile puts nearly every entrant in its own league's
+ *  top fifth. The FIELD is the competition's own N-club ladder, which
+ *  both clubs really do stand on, so `#7 v #33` is one sentence.
+ *
+ *  IT IS DATA, NOT A SECOND DESIGN. The card that draws it is the card
+ *  the board draws everywhere else; only the numbers behind the ranks
+ *  pair, the rank dumbbell, the tier trio and the shape chip change.
+ *
+ *  OPTIONAL, AND ABSENT IS NOT EMPTY. A board built before this key
+ *  exists carries none, and the card then draws exactly what it drew
+ *  before — league ranks and league tiers — rather than a field with
+ *  nothing in it. */
+export interface RowField {
+  competition?: string;
+  /** how many clubs the field holds — the N of the 1..N axis every rank
+   *  in this block is read on. Never assumed to be 36. */
+  size: number;
+  axes: { ovr: FieldAxis; atk: FieldAxis; def: FieldAxis };
+  /** CLEAN / SPLIT / HOLLOW as the BACKEND reads it on the field's own
+   *  tiers. Null when the block came from a source that does not carry
+   *  it, and the card then keeps the row's own backend shape — which is
+   *  still the backend's word. It is never recomputed here. */
+  shape?: Shape | null;
+}
+
 export interface KalshiQuote {
   event_ticker: string | null;
   ticker: string | null;
@@ -262,6 +323,11 @@ export interface BoardRow {
   tiers: { ovr: TierPair; atk: TierPair; def: TierPair };
   tier_gaps: { ovr: number; atk: number; def: number };
   shape: Shape;
+  /** WHERE THESE TWO CLUBS STAND IN THE COMPETITION'S OWN FIELD — see
+   *  RowField. Present only on a cross-league rated row of a competition
+   *  somebody has measured a field for; the card reads it in place of
+   *  the three keys above and degrades to them when it is absent. */
+  field?: RowField | null;
   event_id: string;
   competition_id: string;
   kickoff: string;
