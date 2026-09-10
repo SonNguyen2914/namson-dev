@@ -135,6 +135,11 @@ const RATINGS = {
 /** The one club the FIELD does not hold, on a fixture the BOARD does. */
 const UNHELD = "Pafos";
 
+/** The axes' reading order, taken from the fixture rather than typed
+ *  below it: a spec that spells out ["ovr","atk","def"] goes on passing
+ *  if the card ever drops one. */
+const AXIS_KEYS = Object.keys(AXES) as (keyof typeof AXES)[];
+
 // ───────────────────────────────────────────── the board, as narrowed
 
 const meta = { src: "current", min_current_gp: 4, clubs: 36, kind: "cup",
@@ -160,14 +165,24 @@ const row = (i: number, favourite: string, opponent: string) => ({
   tier_gaps: { ovr: 1, atk: 1, def: 1 },
   shape: "CLEAN", event_id: `ucl-${i}`, competition_id: `ucl-${i}`,
   kickoff: kickoff(i), espn: "uefa.champions", venue: null, venue_class: null,
-  kalshi: null, current_only: null, form: null,
+  kalshi: null, current_only: null,
+  /* THE FORM STRIPS ARE PART OF THE CARD the operator is holding this
+     page to, so the fixture carries them rather than leaving the one
+     element that could silently stop drawing untested. */
+  form: { fav: "WWDLW", opp: "LDWLL", scope: "ucl", scope_is_cup: true },
 });
 
 const BOARD = {
   generated_at: "2026-12-15T08:00:00Z", date: "20261215", days: 7,
   leagues: { ucl: meta },
+  /* THREE FIXTURES, THREE STATES OF THE FIELD, and they must stay
+     apart: both clubs held and above the floor; both held with one
+     REFUSED by the placeability floor; and one club the field does not
+     hold at all. Folding the last two into one row is what hid the
+     dagger behind the fallback the first time this was written. */
   rows: [row(1, "Barcelona", "Feyenoord"),
-         row(2, "Kairat Almaty", UNHELD)],
+         row(2, "Kairat Almaty", "Feyenoord"),
+         row(3, "Barcelona", UNHELD)],
   refusals: [], off_board: [], off_board_counts: {}, folded: {},
   narrowed_to: ["ucl"],
 };
@@ -190,87 +205,343 @@ async function openBoard(page: import("@playwright/test").Page,
 const card = (page: import("@playwright/test").Page, event: string) =>
   page.locator(`[data-testid="picker-row"][data-event="${event}"]`);
 
-// ─────────────────────────────────────────────── 1. a tier is a SET ──
+// ─────────────────────────────────────── 1. the ranks are the FIELD'S ─
 
-test("every band set on a card is drawn WHOLE — never its first member "
-   + "alone", async ({ page }) => {
+test("the ranks pair is read on the FIELD's ladder, of N — not on two "
+   + "domestic tables", async ({ page }) => {
+    /* THE COMPLAINT THIS ANSWERS, in the operator's own arithmetic:
+       "#7 v #33 = rank of 36". The board served `ranks: {fav: 1, opp: 4}`
+       for this fixture — Barcelona's place in La Liga and Feyenoord's in
+       the Eredivisie, two positions in two tables of different lengths,
+       printed as though they were one comparison. The field is a single
+       ladder both clubs stand on, so its ranks are the ones drawn.
+       READ OFF THE FIXTURE, never typed beside it. */
     await openBoard(page);
     const c = card(page, "ucl-1");
-    const tiers = c.getByTestId("field-tier");
-    /* THE COUNT IS DERIVED: overall draws both clubs, and each of the
-       two crossed legs draws an attack end and a defence end. A card
-       that quietly stopped drawing one of them would otherwise pass
-       every text assertion below. */
-    await expect(tiers).toHaveCount(2 + 2 * 2);
-    const drawn = await tiers.evaluateAll((els) => els.map((e) => ({
-      set: e.getAttribute("data-tier-set"),
-      text: (e.textContent || "").replace("†", "").trim(),
+    const r = BOARD.rows[0];
+    const fav = AXES.ovr.rows.find((x) => x.club === r.favourite)!;
+    const opp = AXES.ovr.rows.find((x) => x.club === r.opponent)!;
+    const pairEl = c.getByTestId("rank-pair");
+    await expect(pairEl).toHaveText(`#${fav.rank} v #${opp.rank}`);
+    await expect(pairEl).toHaveAttribute("data-basis", "field");
+    await expect(pairEl).toHaveAttribute("data-of",
+                                         String(AXES.ovr.rows.length));
+    // and it is emphatically NOT the league pair the payload also carries
+    await expect(pairEl).not.toHaveText(`#${r.ranks.fav} v #${r.ranks.opp}`);
+    // the card says which ladder it read, for a guard and for a reader
+    await expect(c).toHaveAttribute("data-field", RATINGS.competition);
+  });
+
+test("a card with no field keeps its LEAGUE ranks and says so — the "
+   + "control", async ({ page }) => {
+    await openBoard(page, { competition: "ucl", axes: null,
+                            why_not: "nobody has measured it" });
+    const c = card(page, "ucl-1");
+    const r = BOARD.rows[0];
+    await expect(c.getByTestId("rank-pair"))
+      .toHaveText(`#${r.ranks.fav} v #${r.ranks.opp}`);
+    await expect(c.getByTestId("rank-pair"))
+      .toHaveAttribute("data-basis", "league");
+    // and it does not claim a ladder it was not read on
+    expect(await c.getAttribute("data-field")).toBeNull();
+  });
+
+// ─────────────────────────── 2. the dumbbell's refusal, kept and named ─
+
+test("the rank dumbbell draws on the FIELD's 1..N axis — the instrument "
+   + "a cross-league tie could never have", async ({ page }) => {
+    /* `RankDumbbell` opened `if (row.cross_league) return null`, because
+       a cross-league tie has no shared axis and so gets no instrument.
+       Every UCL league-phase fixture is cross-league — UEFA's draw
+       forbids two clubs of one association from meeting — so as written
+       it drew nothing on this whole board. The refusal was never about
+       the word "cross-league": it was about there being no shared
+       ladder, and a measured field IS one. */
+    await openBoard(page);
+    const d = card(page, "ucl-1").getByTestId("rank-dumbbell");
+    await expect(d).toHaveCount(1);
+    await expect(d).toHaveAttribute("data-basis", "field");
+    await expect(d).toHaveAttribute("data-of", String(AXES.ovr.rows.length));
+    // the instrument and the number beside it read the same ladder, so
+    // they can never come from different tables
+    const pairEl = card(page, "ucl-1").getByTestId("rank-pair");
+    expect(await d.getAttribute("data-of"))
+      .toBe(await pairEl.getAttribute("data-of"));
+  });
+
+test("and it STILL refuses a cross-league row with no field — the "
+   + "judgement that was kept, not deleted", async ({ page }) => {
+    await openBoard(page, { competition: "ucl", axes: null,
+                            why_not: "nobody has measured it" });
+    for (const ev of BOARD.rows.map((r) => r.event_id)) {
+      await expect(card(page, ev).getByTestId("rank-dumbbell")).toHaveCount(0);
+    }
+  });
+
+// ─────────────────────────────────────────────── 3. a tier is a SET ──
+
+test("every band set in the tier trio is drawn WHOLE — never its first "
+   + "member alone", async ({ page }) => {
+    await openBoard(page);
+    const c = card(page, "ucl-1");
+    /* THE COUNT IS DERIVED: three axes, and a card that quietly stopped
+       drawing one of them would otherwise pass every text assertion
+       below. */
+    const cells = c.locator("[data-tier]");
+    await expect(cells).toHaveCount(AXIS_KEYS.length);
+    const drawn = await cells.evaluateAll((els) => els.map((e) => ({
+      axis: e.getAttribute("data-tier"),
+      fav: e.getAttribute("data-fav-set"),
+      opp: e.getAttribute("data-opp-set"),
+      text: (e.textContent || "").replace(/†/g, "").trim(),
     })));
     for (const t of drawn) {
-      const members = (t.set || "").split(",");
-      // the payload's own set, joined — not a string typed in this file
-      expect(t.text).toBe(members.join("·"));
-      // and never the bare first member when the set has more than one:
+      const fav = (t.fav || "").split(","), opp = (t.opp || "").split(",");
+      // the payload's own sets, joined — not strings typed in this file
+      expect(t.text).toBe(`${t.axis}${fav.join("·")}v${opp.join("·")}`);
+      // and never a bare first member where the set has more than one:
       // that is the `OVR 1v1` defect exactly
-      if (members.length > 1) expect(t.text).not.toBe(members[0]);
+      if (fav.length > 1) expect(t.text).not.toContain(`${t.axis}${fav[0]}v`);
     }
   });
 
 test("a set of ONE is still drawn as the set, not as a stronger claim",
   async ({ page }) => {
     /* The control for the test above. Barcelona is a single band on the
-       overall axis and on defence; if a "collapse a one-member set to a
-       number" shortcut ever appears it will look correct there and wrong
-       nowhere else. */
+       overall axis; if a "collapse a one-member set to a number"
+       shortcut ever appears it looks correct there and wrong nowhere
+       else. */
     await openBoard(page);
-    const single = card(page, "ucl-1").getByTestId("field-tier")
-      .filter({ hasNot: page.locator("sup") })
-      .and(page.locator('[data-tier-set="1"]'));
-    await expect(single.first()).toHaveText("1");
-  });
-
-// ────────────────────────────────────── 2. the axes cross ────────────
-
-test("the favourite's ATTACK is paired with the opponent's DEFENCE, and "
-   + "back the other way", async ({ page }) => {
-    await openBoard(page);
-    const legs = card(page, "ucl-1").getByTestId("field-leg");
-    await expect(legs).toHaveCount(2);
-    const pairs = await legs.evaluateAll((els) => els.map((e) => ({
-      side: e.getAttribute("data-side"),
-      attacker: e.getAttribute("data-attacker"),
-      defender: e.getAttribute("data-defender"),
-    })));
+    const ovr = card(page, "ucl-1").locator('[data-tier="ovr"]');
     const r = BOARD.rows[0];
-    expect(pairs).toEqual([
-      { side: "fav", attacker: r.favourite, defender: r.opponent },
-      { side: "opp", attacker: r.opponent, defender: r.favourite },
-    ]);
-    // and the ends really are read off the two DIFFERENT axes
-    const fav = legs.filter({ has: page.locator('[data-side="fav"]') }).first();
-    const sets = await fav.getByTestId("field-tier")
-      .evaluateAll((els) => els.map((e) => e.getAttribute("data-tier-set")));
-    expect(sets).toEqual([
-      AXES.atk.rows.find((x) => x.club === r.favourite)!.tier_set.join(","),
-      AXES.def.rows.find((x) => x.club === r.opponent)!.tier_set.join(","),
-    ]);
+    const fav = AXES.ovr.rows.find((x) => x.club === r.favourite)!;
+    expect(fav.tier_set.length).toBe(1);
+    await expect(ovr).toHaveAttribute("data-fav-set", String(fav.tier_set[0]));
+    await expect(ovr).toContainText(`${fav.tier_set[0]}v`);
   });
 
-test("attack is never paired with attack — the side-by-side read this "
-   + "replaces", async ({ page }) => {
+test("a card with no field keeps the LEAGUE quintile pair — the control",
+  async ({ page }) => {
+    await openBoard(page, { competition: "ucl", axes: null, why_not: "x" });
+    const c = card(page, "ucl-1");
+    const t = BOARD.rows[0].tiers;
+    await expect(c.locator('[data-tier="ovr"]'))
+      .toHaveText(`ovr${t.ovr[0]}v${t.ovr[1]}`);
+    // and it carries no field sets at all rather than empty ones
+    expect(await c.locator('[data-tier="ovr"]').getAttribute("data-fav-set"))
+      .toBeNull();
+  });
+
+// ─────────────────────── 4. the shape, and who is allowed to say it ──
+
+test("the CLEAN / SPLIT / HOLLOW chip is on every card, and it is the "
+   + "BACKEND's word", async ({ page }) => {
+    /* The operator noticed this chip missing from a draft and asked for
+       it back by name. It is also the one read on this card the frontend
+       may never compute: `field.shape` when the board's own block
+       carries one, the row's own shape until then — never a verdict
+       reached here. */
     await openBoard(page);
-    const legs = card(page, "ucl-1").getByTestId("field-leg");
-    const n = await legs.count();
-    for (let i = 0; i < n; i++) {
-      const leg = legs.nth(i);
-      // a leg's two ends are two different clubs, by construction
-      const a = await leg.getAttribute("data-attacker");
-      const d = await leg.getAttribute("data-defender");
-      expect(a).not.toBe(d);
+    for (const r of BOARD.rows) {
+      const chip = card(page, r.event_id).getByTestId("shape-chip");
+      await expect(chip).toBeVisible();
+      await expect(chip).toHaveText(r.shape);
     }
   });
 
-// ─────────────────────────────── 3. one fact, in the header, once ────
+test("when the board serves its OWN field block, that block wins — and "
+   + "its shape is drawn without being recomputed", async ({ page }) => {
+    /* THE CONTRACT WITH THE BACKEND. `row.field` is the block the board
+       itself will serve; the ratings endpoint is the same numbers under
+       a different roof. When both are present the row's own block is the
+       one drawn, so the day the backend ships it nothing in the frontend
+       changes — and its `shape` is drawn even when it CONTRADICTS the
+       row's, which is the only way to prove nothing here is deciding. */
+    const block = {
+      competition: "ucl", size: 36, shape: "CLEAN",
+      axes: Object.fromEntries(AXIS_KEYS.map((k) => [k, {
+        fav: { rank: 7, tier: 1, tier_set: [1], straddles: false,
+               below_floor: false, floor_note: null },
+        opp: { rank: 33, tier: 4, tier_set: [4], straddles: false,
+               below_floor: false, floor_note: null },
+        tier_gap: 3,
+      }])),
+    };
+    const board = { ...BOARD,
+      rows: [{ ...BOARD.rows[0], shape: "HOLLOW", field: block },
+             BOARD.rows[1]] };
+    await page.route("**/api/picker/board**", (r) => r.fulfill(json(board)));
+    await page.route("**/api/picker/review**", (r) => r.fulfill(json(review)));
+    await page.route("**/api/comp/*/ratings", (r) => r.fulfill(json(RATINGS)));
+    await page.goto("/bet-suggester/ucl");
+    const c = card(page, "ucl-1");
+    await expect(c.getByTestId("rank-pair")).toHaveText("#7 v #33");
+    // the block's shape, not the row's, and not the ratings join's
+    await expect(c.getByTestId("shape-chip")).toHaveText("CLEAN");
+    await expect(c.locator('[data-tier="ovr"]')).toHaveText("ovr1v4");
+  });
+
+// ───────────────────────────── 5. the eleven, marked subtly ──────────
+
+test("a club below the floor carries a dagger and its REASON on the tier "
+   + "trio; one above the floor carries neither", async ({ page }) => {
+    await openBoard(page);
+    const c = card(page, "ucl-2");   // Kairat Almaty is below the floor,
+                                     // and BOTH its clubs are held
+    const marks = c.getByTestId("field-floor-mark");
+    await expect(marks.first()).toBeVisible();
+    await expect(marks.first()).toHaveAttribute("title", FLOOR_NOTE);
+    // and it is a mark, not an alert: no colour of its own, no words
+    await expect(marks.first()).toHaveText("†");
+    // one per below-floor END of the three axes, and no more
+    await expect(marks).toHaveCount(AXIS_KEYS.length);
+
+    /* THE CONTROL. Every club on the other card cleared the floor, so
+       not one of its cells may carry the mark — otherwise "marked
+       subtly" would be satisfied by marking everyone. */
+    await expect(card(page, "ucl-1").getByTestId("field-floor-mark"))
+      .toHaveCount(0);
+  });
+
+// ─────────────────────────────────── 6. THE ONE ADDITION: the `i` ────
+
+test("an `i` beside the trio opens the field's three RANK pairs — and "
+   + "holds nothing else", async ({ page }) => {
+    /* "make sure to use the exact design, only with new 'i' added."
+       So this panel says the one thing the trio cannot: the same three
+       axes, as ranks. No club names — they are the largest type on the
+       card, six lines above. No heading, no caption. No daggers: the
+       trio carries those, beside the bands they qualify. */
+    await openBoard(page);
+    const c = card(page, "ucl-1");
+    const r = BOARD.rows[0];
+    await c.getByTestId("field-ranks-open").click();
+    const panel = c.getByTestId("field-ranks");
+    await expect(panel).toBeVisible();
+
+    const rows = await panel.locator("[data-rank-axis]")
+      .evaluateAll((els) => els.map((e) => ({
+        axis: e.getAttribute("data-rank-axis"),
+        text: (e.textContent || "").replace(/\s+/g, " ").trim(),
+      })));
+    expect(rows.map((x) => x.axis)).toEqual([...AXIS_KEYS]);
+    for (const x of rows) {
+      const ax = AXES[x.axis as keyof typeof AXES];
+      const fav = ax.rows.find((y) => y.club === r.favourite)!;
+      const opp = ax.rows.find((y) => y.club === r.opponent)!;
+      /* THE LABEL AND THE PAIR ARE TWO STACKED SPANS, so textContent
+         runs them together; the shape asserted is the axis's own name
+         over its own two ranks, read off the fixture. */
+      expect(x.text).toBe(`${x.axis}#${fav.rank}v#${opp.rank}`);
+    }
+    // ONLY that. No club name, no dagger, no heading anywhere inside.
+    const inside = (await panel.textContent()) || "";
+    expect(inside).not.toContain(r.favourite);
+    expect(inside).not.toContain(r.opponent);
+    expect(inside).not.toContain("†");
+    await expect(panel.getByTestId("field-floor-mark")).toHaveCount(0);
+  });
+
+test("it opens on hover and on keyboard focus as well as on click — the "
+   + "two openings a pointer does not provide", async ({ page }) => {
+    await openBoard(page);
+    const c = card(page, "ucl-1");
+    const trigger = c.getByTestId("field-ranks-open");
+    await expect(c.getByTestId("field-ranks")).toHaveCount(0);
+    await trigger.hover();
+    await expect(c.getByTestId("field-ranks")).toBeVisible();
+    // away again, and it closes: an unpinned panel follows the pointer
+    await c.getByTestId("row-anchor").hover();
+    await expect(c.getByTestId("field-ranks")).toHaveCount(0);
+    // there is no hover on a phone and none from a keyboard
+    await trigger.focus();
+    await expect(c.getByTestId("field-ranks")).toBeVisible();
+    await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  });
+
+test("a click PINS it, and Escape or a click outside closes it",
+  async ({ page }) => {
+    await openBoard(page);
+    const c = card(page, "ucl-1");
+    const trigger = c.getByTestId("field-ranks-open");
+    await trigger.click();
+    // pinned: the pointer moving away no longer closes it
+    await c.getByTestId("row-anchor").hover();
+    await expect(c.getByTestId("field-ranks")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(c.getByTestId("field-ranks")).toHaveCount(0);
+    // and a click anywhere outside closes it too
+    await trigger.click();
+    await expect(c.getByTestId("field-ranks")).toBeVisible();
+    await page.getByTestId("league-col").first().click({ position: { x: 4, y: 4 } });
+    await expect(c.getByTestId("field-ranks")).toHaveCount(0);
+  });
+
+test("the panel's label row aligns with the TRIO's label row, and it sits "
+   + "beside the `i` rather than off the card's edge", async ({ page }) => {
+    /* Two placements were rejected. Anchored to the 15px button, a
+       196px panel hangs off the card's right edge and `overflow-x: clip`
+       CLIPS it; right-anchored to the card — what the shape popover
+       does — it opens nowhere near what opened it. Anchored to the trio
+       it is beside the button, inside the card by construction, and its
+       three labels land on the trio's three labels. */
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await openBoard(page);
+    const c = card(page, "ucl-1");
+    await c.getByTestId("field-ranks-open").click();
+    const geom = await c.evaluate((el) => {
+      const panel = el.querySelector('[data-testid="field-ranks"]')!;
+      const label = panel.querySelector("[data-rank-axis] span")!;
+      const trioLabel = el.querySelector('[data-tier="ovr"] span')!;
+      const trigger = el.querySelector('[data-testid="field-ranks-open"]')!;
+      const box = (n: Element) => n.getBoundingClientRect();
+      const t = box(trigger);
+      /* WHAT THE POINTER WOULD ACTUALLY HIT at the circle's centre.
+         The geometry that matters is not "does the panel reach past the
+         trigger" — the trio's width varies with the band sets, so it
+         sometimes does — it is whether the CLICK still lands. */
+      const hit = document.elementFromPoint(t.left + t.width / 2,
+                                            t.top + t.height / 2);
+      return {
+        card: [box(el).left, box(el).right],
+        panel: [box(panel).left, box(panel).right],
+        hitIsTrigger: trigger === hit || trigger.contains(hit),
+        labelTop: box(label).top, trioLabelTop: box(trioLabel).top,
+      };
+    });
+    // the label rows are the same row — one device pixel of rounding,
+    // never a line of leading (12px was the inline-flex baseline bug)
+    expect(Math.abs(geom.labelTop - geom.trioLabelTop)).toBeLessThanOrEqual(1);
+    // it starts at the trio's own left edge, inside the card
+    expect(geom.panel[0]).toBeGreaterThanOrEqual(geom.card[0] - 0.5);
+    /* AND IT NEVER LEAVES THE CARD. This is the xl breakpoint, where
+       the board lays six matches across and the card is ~197px — the
+       narrowest track this panel is ever drawn in. `html { overflow-x:
+       clip }` means an overhang past the page would be CLIPPED rather
+       than scrolled to, and a reader would never learn a column had
+       been cut off; the card is the stricter bar, and the same one the
+       shape popover beside it is held to. */
+    expect(geom.panel[1]).toBeLessThanOrEqual(geom.card[1] + 0.5);
+    /* AND THE TRIGGER IS STILL THE THING UNDER THE POINTER. At 820px
+       it was not: the panel is anchored to the trio and, when the band
+       sets are short, is wider than it — so it covered the circle that
+       opened it and swallowed the click that closes it, which is the
+       2026-09-07 bug in the popover next door, found here before it
+       shipped. Asserted as a hit test rather than as clearance, because
+       the hit is the property; the clearance varies with the sets. */
+    expect(geom.hitIsTrigger).toBe(true);
+    // and the round trip really works: a second click closes it
+    await c.getByTestId("field-ranks-open").click();
+    await expect(c.getByTestId("field-ranks")).toHaveCount(0);
+  });
+
+test("no field, no `i` — the affordance is never an empty promise",
+  async ({ page }) => {
+    await openBoard(page, { competition: "ucl", axes: null, why_not: "x" });
+    await expect(page.getByTestId("field-ranks-open")).toHaveCount(0);
+  });
+
+// ─────────────────────────── 7. one fact, in the header, once ────────
 
 test("how to read a tier set is said ONCE for the whole column, and on no "
    + "card at all", async ({ page }) => {
@@ -281,7 +552,10 @@ test("how to read a tier set is said ONCE for the whole column, and on no "
     const note = page.getByTestId("field-note");
     await expect(note).toHaveCount(1);
     await expect(note).toContainText(/a tier is a set/i);
-    await expect(note).toContainText(/attack faces the opponent/i);
+    // and it describes the marks the card actually draws
+    await expect(note).toContainText(/ranks pair and the dumbbell/i);
+    await expect(note).toContainText(`1–${AXES.ovr.rows.length}`);
+    await expect(note).toContainText(/circled i opens/i);
     // the dagger's meaning travels with it, in the backend's own words
     await expect(note).toContainText(RATINGS.below_floor_note.slice(0, 60));
     // and NOT on the cards: eighteen copies of this is the ink the
@@ -329,35 +603,15 @@ test("the straddle counts in that note are the PAYLOAD's, not numbers "
       .toContainText(`defence ${AXES.def.straddling} of ${AXES.def.rows.length}`);
   });
 
-// ───────────────────────────── 4. the eleven, marked subtly ──────────
-
-test("a club below the floor carries a dagger and its REASON; one above "
-   + "the floor carries neither", async ({ page }) => {
-    await openBoard(page);
-    const c = card(page, "ucl-2");   // Kairat Almaty is below the floor
-    const marks = c.getByTestId("field-floor-mark");
-    await expect(marks.first()).toBeVisible();
-    await expect(marks.first()).toHaveAttribute("title", FLOOR_NOTE);
-    // and it is a mark, not an alert: no colour of its own, no words
-    await expect(marks.first()).toHaveText("†");
-
-    /* THE CONTROL. Every tier cell on the other card belongs to a club
-       the floor accepted, so not one of them may carry the mark —
-       otherwise "marked subtly" would be satisfied by marking everyone. */
-    const clean = card(page, "ucl-1");
-    await expect(clean.getByTestId("field-floor-mark")).toHaveCount(0);
-    const flags = await clean.getByTestId("field-tier")
-      .evaluateAll((els) => els.map((e) => e.getAttribute("data-below-floor")));
-    expect(flags.every((f) => f === "false")).toBe(true);
-  });
-
-// ─────────────────── 5. missing is never zero, in both its shapes ────
+// ─────────────────── 8. missing is never zero, in both its shapes ────
 
 test("a FAILED field read is named — once, for the column — and no card "
-   + "draws a field at all", async ({ page }) => {
+   + "claims a field at all", async ({ page }) => {
     await openBoard(page, null, 503);
     // not one card pretends to a reading
-    await expect(page.getByTestId("field-cross")).toHaveCount(0);
+    await expect(page.locator("[data-testid='picker-row'][data-field]"))
+      .toHaveCount(0);
+    await expect(page.getByTestId("field-ranks-open")).toHaveCount(0);
     /* AND THE COLUMN SAYS WHY, IN THE BACKEND'S OWN WORDS. A named
        failure tells the reader something "could not load" does not, so
        the `detail` the server sent is carried through rather than
@@ -367,10 +621,9 @@ test("a FAILED field read is named — once, for the column — and no card "
     const err = page.getByTestId("field-error-note");
     await expect(err).toHaveCount(1);
     await expect(err).toContainText("field unavailable");
-    /* AND IT DOES NOT ALSO EXPLAIN HOW TO READ A BLOCK THAT IS NOT
-       THERE. The two notes are opposite facts and must never both be
-       shown: instructions for a missing thing read as though the thing
-       were merely elsewhere on the page. */
+    /* AND IT DOES NOT ALSO EXPLAIN HOW TO READ SOMETHING NO CARD DID.
+       The two notes are opposite facts and must never both be shown:
+       instructions for a missing read tell the reader to look for it. */
     await expect(page.getByTestId("field-note")).toHaveCount(0);
   });
 
@@ -378,40 +631,44 @@ test("a healthy read draws no failure note — the control", async ({ page }) =>
     await openBoard(page);
     await page.getByTestId("col-notes-open").click();
     await expect(page.getByTestId("field-error-note")).toHaveCount(0);
-    await expect(page.getByTestId("field-cross"))
-      .toHaveCount(BOARD.rows.length);
+    /* EVERY ROW WHOSE CLUBS THE FIELD HOLDS, and only those: the third
+       fixture names a club it does not hold, so a count of `rows.length`
+       here would pass only while that fallback was broken. Derived from
+       the fixture, never typed. */
+    await expect(page.locator("[data-testid='picker-row'][data-field]"))
+      .toHaveCount(BOARD.rows.filter(
+        (r) => ![r.favourite, r.opponent].includes(UNHELD)).length);
   });
 
-test("a club the field does not hold is NAMED on its card, not left as a "
-   + "blank half of a pair", async ({ page }) => {
+test("a club the field does not hold leaves its card on the LEAGUE read "
+   + "whole, never half a pair", async ({ page }) => {
+    /* Half a rank pair — the one club the field holds, beside a blank —
+       invites the reader to supply the other half, which is the same
+       defect as drawing half a crossed leg. So the card falls back
+       entire: league ranks, league tiers, no `i`, and no claim to a
+       ladder it could not be read on. `rated-in` on the card already
+       names the two tables those numbers came from. */
     await openBoard(page);
-    const c = card(page, "ucl-2");
-    const missing = c.getByTestId("field-missing");
-    await expect(missing).toBeVisible();
-    await expect(missing).toContainText(UNHELD);
-    await expect(missing).toContainText(/not a rating of\s+zero/i);
-    // and no leg is drawn over the gap: half a leg invites the reader to
-    // supply the other half
-    await expect(c.getByTestId("field-leg")).toHaveCount(0);
-    // the club that IS held keeps its overall standing, which is a fact
-    // the field really does have
-    await expect(c.getByTestId("field-tier")).toHaveCount(1);
+    const c = card(page, "ucl-3");
+    const r = BOARD.rows[2];
+    expect(await c.getAttribute("data-field")).toBeNull();
+    await expect(c.getByTestId("rank-pair"))
+      .toHaveAttribute("data-basis", "league");
+    await expect(c.getByTestId("rank-pair"))
+      .toHaveText(`#${r.ranks.fav} v #${r.ranks.opp}`);
+    await expect(c.getByTestId("field-ranks-open")).toHaveCount(0);
+    // and the two tables it WAS read on are named, as they always were
+    await expect(c.getByTestId("rated-in")).toBeVisible();
   });
 
-test("and a fixture whose clubs are BOTH held names nobody — the control",
-  async ({ page }) => {
-    await openBoard(page);
-    await expect(card(page, "ucl-1").getByTestId("field-missing"))
-      .toHaveCount(0);
-  });
-
-test("a competition with no field measured draws no block and no failure",
-  async ({ page }) => {
+test("a competition with no field measured draws no failure and keeps "
+   + "every row", async ({ page }) => {
     /* The third state, and the one that must not be folded into either
        of the other two: the read LANDED and there is no field. */
     await openBoard(page, { competition: "ucl", display: "UEFA Champions League",
                             axes: null, why_not: "nobody has measured it" });
-    await expect(page.getByTestId("field-cross")).toHaveCount(0);
+    await expect(page.locator("[data-testid='picker-row'][data-field]"))
+      .toHaveCount(0);
     await expect(page.getByTestId("picker-row"))
       .toHaveCount(BOARD.rows.length);
     const opener = page.getByTestId("col-notes-open");
@@ -422,7 +679,36 @@ test("a competition with no field measured draws no block and no failure",
     }
   });
 
-// ───────────────────────────── 6. the field's own page ───────────────
+// ───────────────── 9. ONE CARD COMPONENT, TWO PAGES ──────────────────
+
+test("the Champions League card is the board's own card — every element "
+   + "the landing card draws is on it", async ({ page }) => {
+    /* "REUSE the landing page's own card component." The page renders
+       PickerBoard with its column set narrowed to one, so this is the
+       same `RowCard` the four league columns draw and there is no UCL
+       variant to drift from it. Asserted as the ELEMENT SET rather than
+       as an import, because an import is not what a reader sees: if a
+       fork ever appears, this is the test that finds the mark it
+       dropped. The operator has already caught one — the shape chip. */
+    await openBoard(page);
+    const c = card(page, "ucl-1");
+    for (const id of ["row-rank", "row-anchor", "anchor-key", "rank-pair",
+                      "rank-dumbbell", "form-strip", "tier-cell",
+                      "shape-chip", "tier-read", "watch-toggle"]) {
+      await expect(c.getByTestId(id).first(),
+                   `${id} is missing from the UCL card`).toBeAttached();
+    }
+    // the two club lines, the three tier cells, the three trio cells
+    await expect(c.getByTestId("form-strip")).toHaveCount(2);
+    await expect(c.getByTestId("tier-cell")).toHaveCount(3);
+    await expect(c.locator("[data-tier]")).toHaveCount(3);
+    // the Kalshi line — this fixture has no event, which is one of its
+    // three named states and never a blank
+    await expect(c).toContainText("no kalshi event");
+  });
+
+// ───────────────────────── 10. the field's own page ──────────────────
+
 
 test("the field has a page of its own, and it opens on the ranked field",
   async ({ page }) => {

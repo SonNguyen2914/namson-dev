@@ -29,14 +29,13 @@
 import Link from "next/link";
 import { useId, useState } from "react";
 import {
-  AXIS_ORDER, Axis, AxisRow, CrossLeg, FieldRead, Ratings, fixtureField,
-  tierSet,
+  AXIS_ORDER, Axis, FieldRead, Ratings, fieldFor,
 } from "../lib/fieldApi";
 import { dayLabel, fmtDate, localDay } from "../lib/matchday";
 import {
-  BoardRefusal, BoardRow, LeagueMeta, RatePair, SEASON_BLEND_K, homeBadge,
-  leagueLabel, rowHref, seasonDisagreement, seasonSpan, seasonSpanLabel,
-  venueDisagreement,
+  BoardRefusal, BoardRow, LeagueMeta, RatePair, RowField, SEASON_BLEND_K,
+  homeBadge, leagueLabel, rowHref, seasonDisagreement, seasonSpan,
+  seasonSpanLabel, venueDisagreement,
 } from "../lib/pickerApi";
 import {
   ReviewLeagueMeta, ReviewRefusal, ReviewRow,
@@ -158,12 +157,6 @@ function anchorValue(row: BoardRow, id: AnchorId):
   }
 }
 
-/** THE RANK DUMBBELL — both clubs on the real 1..N axis of the league
- *  they are rated in: ● favourite (league hue), ○ opponent. Position
- *  says how good the favourite is, the lit span says how far apart the
- *  pair sits — the picker's premise in one 9px instrument. A
- *  cross-league tie has no shared axis, so it gets no instrument, which
- *  is the same honesty as its withheld gaps. */
 /** THE TWO CLUBS' OWN RATES, BESIDE A GAP THAT IS WITHHELD — favourite
  *  then opponent, the idiom the ranks pair beside it already uses.
  *
@@ -193,15 +186,84 @@ function OwnRates({ gap, pair, metric }: {
   );
 }
 
-function RankDumbbell({ row, clubCount }: { row: BoardRow; clubCount: number }) {
-  if (row.cross_league) return null;
-  const n = Math.max(clubCount, row.ranks.fav, row.ranks.opp, 2);
+/** WHICH LADDER THIS CARD'S TWO RANKS ARE READ ON, and how many rungs
+ *  it has. Derived once per card and handed to BOTH the ranks pair and
+ *  the dumbbell, so the number a reader sees and the position the
+ *  instrument draws can never come from different tables.
+ *
+ *  `n` IS NULL WHEN THERE IS NO SHARED LADDER — a cross-league tie with
+ *  no field — and that null is the dumbbell's refusal, below. */
+function rankPair(row: BoardRow, field: RowField | null | undefined,
+                  clubCount: number): {
+  fav: number; opp: number; n: number | null; basis: "field" | "league";
+  title: string;
+} {
+  if (field) {
+    const fav = field.axes.ovr.fav.rank, opp = field.axes.ovr.opp.rank;
+    const n = Math.max(field.size, fav, opp, 2);
+    return { fav, opp, n, basis: "field",
+      title: `ranks in this competition's own field of ${n} — favourite `
+        + `#${fav}, opponent #${opp}. One ladder both clubs stand on, `
+        + "not two domestic tables read side by side." };
+  }
+  const fav = row.ranks.fav, opp = row.ranks.opp;
+  return {
+    fav, opp, basis: "league",
+    /* A CROSS-LEAGUE ROW HAS NO N, and the difference is the whole
+       point: these two numbers are positions in two different tables,
+       so there is no axis to place them on and the dumbbell draws
+       nothing. `rated_in` on the card already names the two tables. */
+    n: row.cross_league ? null : Math.max(clubCount, fav, opp, 2),
+    title: row.cross_league
+      ? `league positions in two DIFFERENT tables — favourite #${fav} in `
+        + "its own, opponent #" + opp + " in its own. They share no "
+        + "ladder, so this pair is two facts and not a comparison."
+      : `league ranks — favourite #${fav}, opponent #${opp}`,
+  };
+}
+
+/** THE RANK DUMBBELL — both clubs on the real 1..N axis they are BOTH
+ *  rated on: ● favourite (league hue), ○ opponent. Position says how
+ *  good the favourite is, the lit span says how far apart the pair
+ *  sits — the picker's premise in one 9px instrument.
+ *
+ *  THE REFUSAL, AND EXACTLY WHAT IT IS A REFUSAL OF (2026-09-09). This
+ *  opened `if (row.cross_league) return null`, on the reasoning that a
+ *  cross-league tie has no shared axis and so gets no instrument — the
+ *  same honesty as its withheld gaps. That reasoning is unchanged and
+ *  the refusal stays; what changed is that "cross-league" and "no
+ *  shared axis" turned out to be two different facts.
+ *
+ *  A LEAGUE PAIR IS NOT AN AXIS. Roma's 2nd in Serie A and Fenerbahce's
+ *  2nd in the Süper Lig are positions in two tables of different
+ *  lengths, cut from different fixtures, against different opposition.
+ *  Drawing both pips at the same spot would assert a level match nobody
+ *  measured — and the span between them, which is what this instrument
+ *  is FOR, would be the distance between two numbers that were never
+ *  subtracted.
+ *
+ *  A FIELD IS. When the competition has been measured as one field, its
+ *  1..N ordering is a single ladder built from one corpus, and both
+ *  clubs have a real place on it — so `#7 v #33 of 36` is one sentence
+ *  and the span between them is a measured distance. That is the ONLY
+ *  thing that unlocks the instrument here; every UCL league-phase
+ *  fixture is cross-league, so without it this drew nothing at all.
+ *
+ *  So the test is the shared ladder, asked as `ranks.n` — which
+ *  `rankPair` returns null for on a cross-league row with no field, and
+ *  which is therefore the old refusal stated in terms of the thing it
+ *  was always about. */
+function RankDumbbell({ ranks }: { ranks: ReturnType<typeof rankPair> }) {
+  const n = ranks.n;
+  if (n == null) return null;
   const pos = (k: number) => 2 + (96 * (k - 1)) / (n - 1);
-  const a = pos(row.ranks.fav), b = pos(row.ranks.opp);
+  const a = pos(ranks.fav), b = pos(ranks.opp);
   const lo = Math.min(a, b), w = Math.abs(b - a);
   return (
-    <span data-testid="rank-dumbbell" aria-hidden
-      title={`league ranks on the 1–${n} axis: favourite #${row.ranks.fav}, opponent #${row.ranks.opp}`}
+    <span data-testid="rank-dumbbell" aria-hidden data-basis={ranks.basis}
+      data-of={n}
+      title={`${ranks.basis === "field" ? "field" : "league"} ranks on the `
+        + `1–${n} axis: favourite #${ranks.fav}, opponent #${ranks.opp}`}
       className="relative mt-2 block h-[9px]">
       <span className="absolute left-0 right-0 top-[4px] h-px bg-line" />
       <span className="absolute top-[4px] h-px opacity-60 [background:var(--lg)]"
@@ -336,8 +398,17 @@ export function seasonDeparture(
  *  same `row` and `modeId`. A component boundary adds no DOM, so
  *  RowCard's output is unchanged — which e2e/picker.spec.ts and
  *  e2e/picker-blend-cup.spec.ts prove, unedited, on every run. */
-export function RowRead({ row, modeId, clubCount, dense = false, hoisted }: {
+export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
+                         field }: {
   row: BoardRow; modeId: SortModeId; clubCount: number;
+  /** WHERE THESE TWO CLUBS STAND IN THE COMPETITION'S OWN FIELD, when
+   *  one has been measured — see pickerApi.RowField and fieldApi.fieldFor.
+   *  It is a DATA substitution and adds one mark: the ranks pair, the
+   *  dumbbell's axis, the tier trio and the shape chip read the field
+   *  instead of two domestic tables, and an `i` beside the trio opens
+   *  the field's three rank pairs. Absent everywhere else, and the read
+   *  below is then what it has always been. */
+  field?: RowField | null;
   /** what this row's COLUMN header already states — see columnNotes. A
    *  note whose text the header carries is not drawn again down here.
    *  Absent off the board (LiveCard), where there is no header. */
@@ -361,6 +432,7 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted }: {
   const badge = homeBadge(row);
   const anchor = anchorFor(row, modeId);
   const alt = seasonDisagreement(row);
+  const ranks = rankPair(row, field, clubCount);
   /* THE VENUE RULE'S DISAGREEMENT, ON THE BADGE THAT IS ABOUT THE VENUE
      (2026-09-08). The backend has carried `venue_favourite` on every
      rated row since 2026-09-03 so the disagreement is countable before
@@ -499,7 +571,7 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted }: {
         </span>
       </Link>
 
-      <RankDumbbell row={row} clubCount={clubCount} />
+      <RankDumbbell ranks={ranks} />
 
       {/* Stage 1 — the ranking inputs, favourite-signed. The metric the
           anchor already shows is not repeated down here; the ranks pair
@@ -510,8 +582,21 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted }: {
           them fit per line. */}
       <div className={`mt-2.5 flex flex-wrap items-baseline gap-y-1 font-mono text-[10.5px] tabular-nums ${
         dense ? "gap-x-4 md:gap-x-2.5" : "gap-x-4"}`}>
-        <span className="text-ink-faint">
-          #{row.ranks.fav} v #{row.ranks.opp}
+        {/* THE RANKS PAIR, ON WHICHEVER LADDER IS REAL (operator,
+            2026-09-09). "#7 v #33 = rank of 36." On a league column
+            these are the two clubs' places in that league, which is one
+            ladder and a true comparison. On a cross-league tie they
+            were two places in two DIFFERENT tables — "AS Roma #2 v
+            Fenerbahce #2", which reads as a level match and is not a
+            comparison at all — so where the competition has a field of
+            its own, that field's ladder is the one both clubs really
+            stand on and its ranks are the ones drawn. Same element,
+            same ink, same slot; only the ladder changed, and the title
+            names which one it is. */}
+        <span data-testid="rank-pair"
+          data-basis={ranks.basis} data-of={ranks.n ?? undefined}
+          title={ranks.title} className="text-ink-faint">
+          #{ranks.fav} v #{ranks.opp}
         </span>
         {anchor.id !== "gdg" && (
           <span className="text-ink-low">
@@ -539,7 +624,7 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted }: {
           with the finished tail (components/PickerRead.tsx), so a read
           below the divider is THE SAME READ as one above it. */}
       <div className="mt-3">
-        <TierGaps read={row} dense={dense} />
+        <TierGaps read={row} dense={dense} field={field} />
       </div>
 
       {/* A WITHHELD GAP SAYS WHY, in the backend's own words — HERE only
@@ -558,151 +643,6 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted }: {
   );
 }
 
-/** ONE CLUB'S BAND SET, with the floor dagger when it carries one.
- *
- *  MODULE SCOPE, not a closure inside the card. A component defined
- *  during render is a NEW component type on every render, so React
- *  unmounts and remounts its whole subtree each time the card redraws —
- *  and the lint rule that says so ("Cannot create components during
- *  render") is the one that caught it here. */
-function FieldTier({ r, side }: { r: AxisRow; side: "fav" | "opp" }) {
-  const set = tierSet(r);
-  return (
-    <span data-testid="field-tier" data-side={side} data-club={r.club}
-      data-tier-set={r.tier_set.join(",")}
-      data-below-floor={r.below_floor ? "true" : "false"}
-      className="text-ink-mid">
-      {/* NO FALLBACK NUMBER. An empty set is a club the payload placed in
-          no band at all; printing `r.tier` there would invent exactly the
-          placement this whole block exists to refuse. */}
-      {set ?? "no band"}
-      {r.below_floor && (
-        <sup data-testid="field-floor-mark" title={r.floor_note || ""}
-          className="ml-0.5 cursor-help text-[8px] font-normal text-ink-faint">
-          †
-        </sup>
-      )}
-    </span>
-  );
-}
-
-/** ONE DIRECTED LEG: somebody's attack against somebody else's defence.
- *  The pip names who is attacking — ● the favourite, ○ the opponent —
- *  the same two marks the matchup and the rank dumbbell already use. */
-function FieldLeg({ leg, side }: { leg: CrossLeg; side: "fav" | "opp" }) {
-  return (
-    <span data-testid="field-leg" data-side={side}
-      data-attacker={leg.attacker} data-defender={leg.defender}
-      className="flex flex-wrap items-baseline gap-x-1.5">
-      <span aria-hidden className={`h-[5px] w-[5px] flex-none translate-y-[-1px] rounded-full ${
-        side === "fav" ? "bg-ink-mid" : "border border-ink-low bg-bs"}`} />
-      <span className="text-ink-faint">atk</span>
-      <FieldTier r={leg.attack} side={side} />
-      <span aria-hidden className="text-ink-faint">→</span>
-      <span className="text-ink-faint">def</span>
-      <FieldTier r={leg.defence} side={side === "fav" ? "opp" : "fav"} />
-      {/* THE RATES BEHIND THE BANDS, when both ends carry one. They are
-          per-game figures on one cross-league scale — the numbers the
-          bands were cut from — so a reader can see how far inside its
-          band each end sits. Nothing is drawn unless BOTH are measured:
-          one rate alone is half a pair, and half a pair invites the
-          subtraction the scales do not support. */}
-      {leg.attack.rate != null && leg.defence.rate != null && (
-        <span className="text-ink-faint">
-          {leg.attack.rate.toFixed(2)}
-          <span className="px-0.5">v</span>
-          {leg.defence.rate.toFixed(2)}
-        </span>
-      )}
-    </span>
-  );
-}
-
-/** THE TWO CLUBS' STANDING IN THE CROSS-LEAGUE FIELD, WITH THE AXES
- *  CROSSED (operator, 2026-09-09).
- *
- *  WHY CROSSED. In a match the favourite's attack faces the opponent's
- *  DEFENCE. Drawing attack beside attack and defence beside defence puts
- *  two clubs next to each other, which is not a matchup — it is two
- *  separate facts printed adjacently and left to the reader to pair
- *  wrongly. So each line here is a directed leg, and the pip says who is
- *  attacking: ● the favourite, ○ the opponent, the same two marks the
- *  matchup and the rank dumbbell above already use for those two clubs.
- *  Mirrors the backend's `cross_league_axes.crossed()`.
- *
- *  A TIER IS A SET, NEVER A BARE NUMBER. `tier_set` is every band the
- *  club's 95% interval touches, and it is printed whole — "2·3" — at
- *  every width, including a set of one, because a set of one is still
- *  what the measurement returned. On the defence axis almost every club
- *  in this field straddles a cut and on attack most do, so a card
- *  reading "ATK 2" would assert a placement the evidence refuses. That
- *  is the `OVR 1v1` defect exactly: two clubs the measurement could not
- *  separate, printed as level.
- *
- *  THE OVERALL AXIS IS THE ONE PAIR DRAWN SIDE BY SIDE, and that is not
- *  an inconsistency: it is a single ladder both clubs stand on, so
- *  "where each sits on it" is a real comparison. Attack and defence are
- *  two different measurements and only cross.
- *
- *  BELOW THE FLOOR IS MARKED SUBTLY — a dagger carrying the backend's
- *  own reason on hover, exactly as the field page marks it. His words:
- *  "make sure to mark those 11 somehow for me to know their data were
- *  refused at first. Subtlely."
- *
- *  WHAT THIS DOES NOT SAY, ANYWHERE: what any of it is worth. No leg is
- *  called an advantage, no pair is called a mismatch, nothing is
- *  summed, and the two legs are drawn in a fixed order rather than
- *  sorted so that neither can read as the stronger one. It shows; it
- *  does not decide.
- *
- *  AND WHAT IT REFUSES TO DRAW. A club this field does not hold is
- *  NAMED, not left as a gap — "a club we do not hold is not a club with
- *  no attack" is the backend's own reason for returning None on such a
- *  leg, and a blank row here would be that same claim made silently. A
- *  read that FAILED is not this component's to report: it is one fetch
- *  for the whole column, so it is one sentence in the column header
- *  rather than the same sentence on eighteen cards. */
-function FieldCross({ row, field, dense }: {
-  row: BoardRow; field?: FieldRead; dense: boolean;
-}) {
-  // "not yet" is the one state a blank space actually describes; a
-  // failed read is named by the column header, and an unmeasured
-  // competition has no field for this card to stand in.
-  if (!field || field.error || !field.data?.axes) return null;
-  const fx = fixtureField(field.data, row.favourite, row.opponent);
-  if (!fx) return null;
-
-  return (
-    <div data-testid="field-cross"
-      data-missing={fx.missing.length > 0 ? fx.missing.join(",") : undefined}
-      className={`mt-3 flex flex-col gap-y-1 border-t border-line pt-2.5 font-mono text-[10px] tabular-nums ${
-        dense ? "gap-x-3" : "gap-x-4"}`}>
-      <span className="flex flex-wrap items-baseline gap-x-1.5">
-        <span className="text-ink-faint">ovr</span>
-        {fx.ovr.fav ? <FieldTier r={fx.ovr.fav} side="fav" />
-                    : <span className="text-ink-faint">—</span>}
-        <span className="text-ink-faint">v</span>
-        {fx.ovr.opp ? <FieldTier r={fx.ovr.opp} side="opp" />
-                    : <span className="text-ink-faint">—</span>}
-      </span>
-      {fx.favAttacking && <FieldLeg leg={fx.favAttacking} side="fav" />}
-      {fx.oppAttacking && <FieldLeg leg={fx.oppAttacking} side="opp" />}
-      {/* NAMED, NOT BLANK. The legs above are simply absent for a club
-          the field does not hold, and an absence with nothing beside it
-          is indistinguishable from a club rated at nothing. */}
-      {fx.missing.length > 0 && (
-        <span data-testid="field-missing"
-          className="text-[9.5px] leading-snug text-ink-faint">
-          {fx.missing.join(" · ")} {fx.missing.length > 1 ? "are" : "is"} not
-          in this field — no rating was measured for{" "}
-          {fx.missing.length > 1 ? "them" : "it"}, which is not a rating of
-          zero.
-        </span>
-      )}
-    </div>
-  );
-}
-
 function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
                   hoisted, field }: {
   row: BoardRow; rank: number; modeId: SortModeId; clubCount: number;
@@ -711,10 +651,19 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
   dense?: boolean;
   /** the notes this column's header already states — see columnNotes */
   hoisted?: ColumnNoteSet;
-  /** the column's cross-league field, if it has one — see FieldCross */
+  /** THE COLUMN'S CROSS-LEAGUE FIELD — one read for the whole column.
+   *  The card does not draw it as a block of its own: it substitutes
+   *  the DATA behind marks the card already has (see fieldFor and
+   *  PickerRead.TierGaps). */
   field?: FieldRead;
 }) {
   const cross = row.cross_league === true;
+  /* THIS FIXTURE'S PLACE IN THAT FIELD, DERIVED ONCE PER CARD. Null for
+     every league column, for a competition nobody has measured, for a
+     read that failed, and for a fixture with a club the field does not
+     hold — and in every one of those the card draws its league read
+     whole, exactly as it did before this key existed. */
+  const fld = fieldFor(row, field?.error ? null : field?.data);
   const alt = seasonDisagreement(row);
   const departure = seasonDeparture(row, colSrc, alt);
   /* WHICH RULE NAMED THE FAVOURITE THIS CARD IS SIGNED FROM. "rank" on
@@ -741,6 +690,12 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
       data-season-departure={departure ?? undefined}
       data-fav-source={row.fav_source ?? undefined}
       data-venue-disagrees={vd ? vd.favourite : undefined}
+      /* WHICH LADDER THIS CARD'S RANKS AND TIERS ARE READ ON. A guard
+         reads it, and a card with no field carries no such attribute at
+         all rather than one asserting a league basis it shares with
+         every other card on the board. */
+      data-field={fld ? (fld.competition ?? "field") : undefined}
+      data-field-size={fld ? fld.size : undefined}
       className={`rounded-xl border transition-colors bg-gradient-to-b from-elev2/60 to-elev/40 ${
         dense ? "p-4 md:p-3" : "p-4"} ${
         rank === 1
@@ -808,15 +763,7 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
       </div>
 
       <RowRead row={row} modeId={modeId} clubCount={clubCount}
-        dense={dense} hoisted={hoisted} />
-
-      {/* THE FIELD, CROSSED — under the table read and above the price.
-          That order is the card's argument: what the two tables say,
-          then where the two clubs stand in the one field that spans
-          those tables, then what the book is charging. The field is the
-          only read on this card that survives a change of league, which
-          is why it sits closest to the fixture rather than at the foot. */}
-      <FieldCross row={row} field={field} dense={dense} />
+        dense={dense} hoisted={hoisted} field={fld} />
 
       <div className="mt-3 border-t border-line pt-3">
         <KalshiCell quote={row.kalshi} />
@@ -988,14 +935,14 @@ export interface ColumnNoteSet {
   gap: string | null;
   /** what this column's prices settle on, when not the match, or null */
   regTime: string | null;
-  /** HOW TO READ THE FIELD BLOCK ON EVERY CARD — what a tier SET is,
-   *  why the axes cross, and what a dagger means. Null when this column
-   *  has no field, so the affordance is never an empty promise. */
+  /** HOW TO READ THE FIELD ON EVERY CARD — what a tier SET is, which
+   *  marks the field is behind, and what a dagger means. Null when this
+   *  column has no field, so the affordance is never an empty promise. */
   field: string | null;
   /** THE FIELD READ FAILED, IN THE READ'S OWN WORDS. A separate key
    *  from `field` because they are opposite facts and must never be
-   *  folded: one explains a block that is on every card, the other says
-   *  why there is no such block anywhere in this column. */
+   *  folded: one explains a read every card in the column performs, the
+   *  other says why no card in it performs one. */
   fieldError: string | null;
 }
 
@@ -1032,12 +979,19 @@ function fieldNoteFor(data: Ratings | null | undefined): string | null {
       "How many clubs this field cannot place in one band, per axis: "
       + straddle.join(", ") + ". That is why the sets are drawn whole.");
   }
+  /* WHAT THE CARD ACTUALLY DRAWS, WHICH IS WHAT THIS PARAGRAPH HAS TO
+     DESCRIBE. It used to explain a block of crossed atk→def legs; that
+     block is gone (2026-09-09 — "use the exact design, only with new
+     ‘i’ added"), and instructions for ink that is not there read as
+     though the ink were merely elsewhere on the page. It now names the
+     three marks the field really does substitute, and the one
+     affordance that was added. */
   parts.push(
-    "THE AXES CROSS. In a fixture the favourite’s attack faces the "
-    + "opponent’s DEFENCE, so each line reads atk → def one way "
-    + "and then the other. ● is the favourite, ○ the opponent. "
-    + "The overall axis is the one pair drawn side by side, because it is "
-    + "a single ladder both clubs stand on.");
+    "WHERE THE FIELD SHOWS UP ON A CARD. The ranks pair and the dumbbell "
+    + "are read on this field’s own 1–" + (axes.ovr?.rows.length ?? 0)
+    + " ladder, not on two domestic tables; the ovr / atk / def trio "
+    + "prints this field’s bands; and the shape chip reads them. Beside "
+    + "the trio, the circled i opens the same three axes as RANKS.");
   if (data?.below_floor_note) {
     parts.push("† " + data.below_floor_note);
   }
@@ -1064,10 +1018,10 @@ export function columnNotes(
     field: fieldNoteFor(field?.data),
     /* THE FAILURE IS THE COLUMN'S, because the request is. One fetch
        serves every card here, so one failure is one sentence — and it
-       must be A SENTENCE. A field that could not be read draws no block
-       on any card, and a card with no block is indistinguishable from a
-       fixture whose clubs simply are not rated. Naming it here is what
-       keeps those two apart. */
+       must be A SENTENCE. A field that could not be read leaves every
+       card on its league ranks and league tiers, which is exactly what
+       a competition with no field measured looks like. Naming it here
+       is what keeps those two apart. */
     fieldError: field?.error ?? null,
   };
 }
@@ -1153,8 +1107,8 @@ function ColumnNotes({ notes }: { notes: ColumnNoteSet }) {
       says: "what this column's prices settle on",
       andSays: "what its prices settle on" },
     /* THE FAILURE ABOVE THE CONVENTION. If the field could not be read
-       there is no field block on any card, so "how to read the field
-       block" would be instructions for something that is not there. The
+       no card reads it, so "how to read the field on each card" would
+       be instructions for a read nothing on the page performed. The
        two are mutually exclusive by construction — `fieldNoteFor`
        answers null without data, and `fieldError` is null with it — and
        the order here is what a reader meets first if that ever stops
@@ -1361,8 +1315,9 @@ export function LeagueColumn({
     storeNote: string | null;
   };
   /** THE COMPETITION'S CROSS-LEAGUE FIELD — one read for the whole
-   *  column, drawn on every card (see FieldCross) and, when it FAILED,
-   *  named once in the header rather than eighteen times below it.
+   *  column, substituted into the ranks, tiers and shape of every card
+   *  in it (see fieldApi.fieldFor) and, when it FAILED, named once in
+   *  the header rather than eighteen times below it.
    *  Absent for a competition nobody has measured a field for, which is
    *  every league column today: the field exists to rate the entrants of
    *  a cup whose clubs come from tables that cannot be compared, and a
