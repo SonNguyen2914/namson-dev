@@ -644,15 +644,24 @@ export function TierGaps({ read, dense = false, field }: {
                   when that point is not a placement the evidence will
                   stand behind — "if the +- is too big, put a subtle
                   mark there and I will know", the operator.
-                  IT MATTERS MOST ON def AND atk. The field publishes 3
-                  bands there against 5 on overall, because those axes
-                  resolve ~2.4 distinguishable levels; the payload's own
-                  note for def reads "every one of the 36 straddles a
-                  cut, so the set is the read". Placed cleanly: 10 of 36
-                  on ovr, 3 on atk, 2 on def. A bare number on def would
-                  therefore assert, 34 times out of 36, exactly the
-                  placement the set exists to refuse. Below-floor keeps
-                  its own sentence; a straddle gets the plain one. */}
+                  IT MATTERS MOST ON def AND atk, AND MORE SO SINCE THE
+                  RECUT (2026-09-10). All three axes are cut into 5
+                  bands now — a DECLARATION, the operator's, taken with
+                  the measurement in front of him and not a fit to it.
+                  What the measurement licenses is 3 on attack and 3 on
+                  defence (2.41 and 2.33 distinguishable levels) against
+                  7 on overall, so two of the three axes are drawn finer
+                  than their own evidence supports. That is the trade
+                  and it lands here: the point tiers spread out, and on
+                  the same intervals almost nothing stays placed.
+                  Placed cleanly after the recut: 10 of 36 on ovr, 2 on
+                  atk, 0 on def — every one of the 36 defensive
+                  intervals now crosses a cut. So a bare number on def
+                  would assert, 36 times out of 36, exactly the
+                  placement the set exists to refuse, and the mark below
+                  fires on 36 of 36 there and 35 of 36 on atk.
+                  Below-floor keeps its own sentence; a straddle gets
+                  the plain one. */}
               <span className="whitespace-nowrap">
                 {pr[0]}{side && (side.fav.below_floor || side.fav.straddles)
                   && <FloorMark note={side.fav.below_floor

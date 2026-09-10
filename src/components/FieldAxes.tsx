@@ -17,6 +17,13 @@
 // honest form of the refusal: the row says the evidence did not place
 // this club, and says it in the same units as every other row.
 //
+// HOW MANY BANDS IS A DECLARATION, NOT A FINDING (2026-09-10). All
+// three axes are cut into five on the operator's instruction, and on
+// attack and defence that is finer than the measurement licenses. The
+// count and the licence are therefore drawn as two labelled figures
+// rather than as one line of small type — see `BandCount`, which is
+// where that whole argument lives.
+//
 // NOTHING HERE IS A RECOMMENDATION. The ordering says where to look.
 
 import { useState } from "react";
@@ -49,6 +56,132 @@ const RATE_LABEL: Record<string, string> = {
   atk: "scores/g", def: "concedes/g", ovr: "",
 };
 
+/** THE DECLARATION AND THE LICENCE, DRAWN AS THE TWO DIFFERENT THINGS
+ *  THEY ARE.
+ *
+ *  WHAT THIS REPLACED, AND WHY IT HAD TO GO. The line here used to read
+ *  `{bands} bands · {distinguishable_levels} distinguishable levels` —
+ *  one run of small type with a middot between two numbers, which puts
+ *  the measurement forward as though it were the reason for the count.
+ *  After the recut that sentence is not merely thin, it is false in the
+ *  reader's head: it renders as "5 bands · 2.41 distinguishable", and
+ *  attack is cut into five because the operator said so with the
+ *  measurement in front of him, while the measurement licenses three.
+ *  `band_count_note` exists on the payload precisely to refuse that
+ *  reading, and a page drawing the two numbers adjacent and unlabelled
+ *  would go on making it directly above the note denying it.
+ *
+ *  SO THEY ARE LABELLED AND KEPT APART: what was DECLARED, what the
+ *  measurement LICENSES, and — where the first is finer than the second
+ *  — the backend's own paragraph saying the gap is a decision. That note
+ *  is PRINTED, never paraphrased and never softened. The operator chose
+ *  this with the measurement in view; a shorter, gentler version written
+ *  here would be a component editorialising a decision it did not make,
+ *  and a component that trimmed the words would be deciding how much of
+ *  his reasoning the reader gets.
+ *
+ *  DIFFERING IS NOT OVERREACHING, and the two must not draw alike. `ovr`
+ *  declares five against a licence of SEVEN: the numbers differ, and
+ *  nothing on that axis may hint the cut outran its evidence. Only
+ *  `declared_above_licence` tints the licence warn and only the
+ *  backend's note appears — both of which are false on `ovr`, so the
+ *  axis that is finer than its evidence and the axis that is coarser
+ *  than its evidence are told apart at a glance.
+ *
+ *  A PAYLOAD FROM BEFORE THE RECUT ASSERTS NOTHING. With no declaration
+ *  keys there is no licence figure, no note, no flag on the DOM and not
+ *  even the word "declared": the count is drawn as the plain count it
+ *  was, because labelling a derivation "the operator's number" would be
+ *  inventing a decision nobody took. Missing is never false. */
+function BandCount({ a }: { a: Axis }) {
+  /* `bands` and `bands_declared` are the SAME number wherever both are
+     served; the fallback is for the older payload, where the count was
+     real but was not a declaration — hence `isDeclaration` gating the
+     word rather than the presence of a number gating it. */
+  const declared = a.bands_declared ?? a.bands;
+  const licensed = a.bands_licensed_by_the_measurement;
+  const isDeclaration = a.band_count_is_declared_not_derived === true;
+  const above = a.declared_above_licence;
+  const note = a.band_count_note;
+
+  const CAP = "font-mono text-[8.5px] uppercase tracking-[0.14em] "
+    + "text-ink-faint";
+  const NUM = "mt-1 font-mono text-[15px] leading-none tabular-nums";
+  const SUB = "mt-1.5 font-mono text-[9.5px] leading-relaxed text-ink-faint";
+  /* THE SPACE BETWEEN A NUMBER AND ITS UNIT IS A CHARACTER, NOT A
+     MARGIN. `ml-1` alone separates them on screen and nowhere
+     else — innerText, a copy-paste and a screen reader all read
+     "5bands" — so every use below writes a real space and this
+     class only sets the size. */
+  const UNIT = "text-[10px] text-ink-low";
+
+  return (
+    <div data-testid="band-count"
+      /* THE FLAG REACHES THE DOM ONLY IF THE PAYLOAD CARRIED IT. An
+         `undefined` renders no attribute at all, so a guard reading
+         this can never be handed "false" by a payload that never said
+         so — absent stays absent, and absent is not agreement. */
+      data-declared-above-licence={
+        above === undefined ? undefined : above ? "true" : "false"}
+      className="mb-3.5">
+      <div className="flex flex-wrap items-start gap-x-7 gap-y-3">
+        <div data-testid="band-declared" data-bands={declared}>
+          <p className={CAP}>{isDeclaration ? "declared" : "bands"}</p>
+          <p className={`${NUM} text-ink-hi`}>
+            {declared}{" "}<span className={UNIT}>bands</span>
+          </p>
+          {isDeclaration && (
+            <p className={SUB}>the operator&rsquo;s number, not a derivation</p>
+          )}
+        </div>
+
+        {/* THE MEASUREMENT, WHEREVER IT IS. On a payload that carries a
+            licence the levels belong under it, because the licence is
+            what those levels buy; on one that does not, they stand
+            alone rather than vanishing — dropping a figure the page
+            used to show would be its own quiet edit. */}
+        {licensed === undefined ? (
+          <div data-testid="band-levels">
+            <p className={CAP}>distinguishable levels</p>
+            <p className={`${NUM} text-ink-mid`}>
+              {a.distinguishable_levels.toFixed(2)}
+            </p>
+          </div>
+        ) : (
+          <div data-testid="band-licence" data-bands-licensed={licensed}
+            className={`border-l pl-3.5 ${
+              above ? "border-warn/45" : "border-line-strong"}`}>
+            <p className={CAP}>licensed by the measurement</p>
+            <p className={`${NUM} ${above ? "text-warn" : "text-ink-hi"}`}>
+              {licensed}{" "}<span className={UNIT}>bands</span>
+            </p>
+            <p className={SUB}>
+              {a.distinguishable_levels.toFixed(2)} distinguishable levels
+            </p>
+          </div>
+        )}
+
+        <div className="border-l border-line-strong pl-3.5">
+          <p className={CAP}>straddle a cut</p>
+          <p className={`${NUM} text-warn`}>
+            {a.straddling}{" "}
+            <span className={UNIT}>of {a.rows.length}</span>
+          </p>
+        </div>
+      </div>
+
+      {/* THE BACKEND'S WORDS, WHOLE. Rendered only when it sent them,
+          which is exactly when the declaration is above the licence. */}
+      {note && (
+        <p data-testid="band-count-note"
+          className="mt-3.5 max-w-3xl border-l-2 border-warn/50 bg-warn/5 py-2 pl-3.5 pr-3 text-[12px] leading-relaxed text-ink-mid">
+          {note}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function AxisTable({ a }: { a: Axis }) {
   // pad the track so an interval reaching the extreme still draws inside
   const [lo0, hi0] = a.span;
@@ -60,11 +193,7 @@ function AxisTable({ a }: { a: Axis }) {
 
   return (
     <div data-testid="axis-table" data-axis={a.axis}>
-      <p className="mb-3 font-mono text-[11px] leading-relaxed text-ink-low">
-        {a.bands} bands · {a.distinguishable_levels.toFixed(2)} distinguishable
-        levels · <span className="text-warn">{a.straddling}</span> of{" "}
-        {a.rows.length} straddle a cut
-      </p>
+      <BandCount a={a} />
       <p className="mb-4 max-w-2xl text-[12.5px] leading-relaxed text-ink-low">
         {a.why_this_many_bands}
       </p>
