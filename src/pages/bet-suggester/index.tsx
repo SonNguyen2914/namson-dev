@@ -373,6 +373,19 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   const undeclared = board && only && answered === false
     ? only.filter((s) => !declaredColumns.includes(s))
     : [];
+
+  /* WHAT LEFT THE BOARD, AND THE REASONS IT LEFT, DERIVED ONCE.
+     `off_board` is optional on the type because a board built before
+     2026-09-10 has no such key — and a page that turned a missing field
+     into "nothing left the board" would be asserting a measurement off
+     a payload that was never asked. Absent stays absent: the strip is
+     drawn only when there is something in it to draw. */
+  const offBoard = board?.off_board ?? [];
+  /* ONE SENTENCE PER CODE, IN THE BACKEND'S OWN WORDS. Two ties that
+     kicked off share a reason; printing it against each row would read
+     as two separate findings about two separate matches. */
+  const offWhy = [...new Set(offBoard.map((o) => o.why).filter(Boolean))];
+  const offCodes = [...new Set(offBoard.map((o) => o.code))].sort();
   /* THE COLUMN SET, WHEN IT IS NARROWER THAN THE BOARD. On the full
      board `columnSlugs` already holds every slug the payload serves, so
      there is nothing for a region above the columns to be narrower
@@ -884,6 +897,64 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                     className="mt-3 rounded-md border border-line px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low transition-colors hover:border-line-strong hover:text-ink-hi">
                     ask again
                   </button>
+                </div>
+              )}
+              {/* A FIXTURE THAT KICKED OFF LEFT THE BOARD, AND THE
+                  BOARD SAYS SO (2026-09-10).
+
+                  The picker is a PRE-KICKOFF surface by design: every
+                  number on a card is about a match that has not
+                  started, so the backend removes one that has. It has
+                  always said which, with a `code`, a count per code and
+                  a `why` in its own words — and nothing on this page
+                  read a byte of it. On the first Champions League
+                  matchday two ties kicked off at 16:45, the board went
+                  from six cards to four, and the page said nothing at
+                  all. The operator's words were "live matches
+                  disappeared", which is exactly right: they had.
+
+                  ABSENT-BY-DESIGN MUST NOT READ AS VANISHED. That is
+                  the sentence this codebase repeats everywhere else and
+                  did not honour on its own board. The removal is
+                  correct and stays; only the silence goes.
+
+                  THE BACKEND'S WORDS, NOT THIS FILE'S. `why` is
+                  printed rather than restated, so a reason that changes
+                  upstream cannot go on being described here in terms
+                  that stopped being true. */}
+              {offBoard.length > 0 && (
+                <div data-testid="board-off-board"
+                  data-codes={offCodes.join(",")}
+                  className="mb-5 rounded-xl border border-line-strong bg-elev p-4">
+                  <Eyebrow>left the board, and where they went</Eyebrow>
+                  <ul className="mt-2 space-y-2">
+                    {offBoard.map((o) => (
+                      <li key={o.event_id}
+                        data-testid="off-board-row" data-code={o.code}
+                        className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                        <span className="text-sm text-ink-hi">
+                          {o.home} <span className="text-ink-faint">v</span>{" "}
+                          {o.away}
+                        </span>
+                        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-warn">
+                          {o.code.replace(/_/g, " ")}
+                        </span>
+                        <span className="font-mono text-[10.5px] tabular-nums text-ink-faint">
+                          {o.kickoff}
+                        </span>
+                        {/* The reason, once per code rather than once
+                            per row: two ties that kicked off share one
+                            sentence, and printing it twice would read
+                            as two different findings. */}
+                      </li>
+                    ))}
+                  </ul>
+                  {offWhy.map((w) => (
+                    <p key={w}
+                      className="mt-2 max-w-3xl text-sm leading-relaxed text-ink-mid">
+                      {w}
+                    </p>
+                  ))}
                 </div>
               )}
               {undeclared.length > 0 && (

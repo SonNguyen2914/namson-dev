@@ -421,6 +421,38 @@ export interface Board {
    *  — see `declarationOf`, which is the one place that decision is
    *  made. */
   narrowed_to?: string[] | null;
+  /** THE FIXTURES THAT LEFT THE BOARD, AND WHY EACH ONE LEFT.
+   *
+   *  The picker is a PRE-KICKOFF board by design: every number on it is
+   *  about a match that has not started. So a fixture that kicks off is
+   *  removed — correctly — and the backend says so rather than dropping
+   *  it, giving each one a `code`, a `why` in its own words, and a
+   *  count per code beside it.
+   *
+   *  NOTHING READ ANY OF IT UNTIL 2026-09-10. Two Champions League ties
+   *  kicked off at 16:45 and the board went from six cards to four with
+   *  no word anywhere on the page, so to a reader watching those two
+   *  matches they had simply vanished. That is the failure this whole
+   *  codebase is built against — absent-by-design reading as
+   *  failed-to-build — happening on its own board, over a payload that
+   *  was already carrying the answer. */
+  off_board?: OffBoard[] | null;
+  off_board_counts?: Record<string, number> | null;
+}
+
+/** One fixture the board removed, in the backend's own words. */
+export interface OffBoard {
+  event_id: string;
+  competition_id: string;
+  kickoff: string;
+  home: string;
+  away: string;
+  /** the provider's state token, e.g. "in" */
+  state: string | null;
+  /** `kicked_off` | `finished` | `not_yet_kicked_off` |
+   *  `state_unrecognised` | `no_state` | `event_unreadable` */
+  code: string;
+  why: string;
 }
 
 /** THE BOARD'S DECLARATION, OR THE ADMISSION THAT THIS PAYLOAD IS NOT IT.
