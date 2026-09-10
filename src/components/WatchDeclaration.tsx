@@ -165,6 +165,28 @@ export function WatchDeclarationProvider({ eventIds, children }: {
   const [open, setOpen] = useState(false);
 
   const hasToken = token.trim().length > 0;
+  /* TYPING A TOKEN IS ONE LOGIN, NOT ONE PER KEYSTROKE (2026-09-10).
+   *
+   *  `hasToken` is true from the FIRST character, and the two reads
+   *  below depend on `token`. They deferred with `setTimeout(…, 0)`,
+   *  which is a microtask hop and not a delay — so every keystroke
+   *  aborted the previous request and issued a new one carrying a
+   *  longer PREFIX of the operator's token. A 40-character token was 40
+   *  authentication attempts, 39 of them with a wrong credential,
+   *  against a backend that is fail-closed and wired to Discord and
+   *  ntfy. The operator alerted himself 39 times to log in once, and
+   *  the alerting could not tell that from an attack.
+   *
+   *  AbortController did not save it: aborting is a CLIENT-side stop on
+   *  reading the answer, and the request has usually reached the server
+   *  before the next character lands.
+   *
+   *  So the timer becomes a real debounce. Every keystroke clears the
+   *  pending one; the read fires once, when typing stops. Paste — the
+   *  way a token actually arrives — is a single change event and so a
+   *  single request either way, which is the case this must not slow
+   *  down noticeably. */
+  const TOKEN_DEBOUNCE_MS = 600;
   const canAct = hasToken && actor.trim().length > 0;
   // One stable key for "which fixtures are on the board", and the list
   // itself recovered from it. The separator is US (U+001F) rather than a
@@ -199,7 +221,8 @@ export function WatchDeclarationProvider({ eventIds, children }: {
       return;
     }
     const ac = new AbortController();
-    const t = setTimeout(() => { void readState(ac.signal); }, 0);
+    const t = setTimeout(() => { void readState(ac.signal); },
+                         TOKEN_DEBOUNCE_MS);
     return () => { clearTimeout(t); ac.abort(); };
   }, [hasToken, readState]);
 
@@ -220,7 +243,7 @@ export function WatchDeclarationProvider({ eventIds, children }: {
           setResolveError(e instanceof Error ? e.message : String(e));
         }
       })();
-    }, 0);
+    }, TOKEN_DEBOUNCE_MS);
     return () => { clearTimeout(t); ac.abort(); };
   }, [hasToken, token, idsKey]);
 

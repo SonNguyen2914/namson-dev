@@ -965,3 +965,58 @@ test("a watchlist payload with NO source split says so, rather than "
     // and the counts that DID arrive are still counts
     await expect(page.getByTestId("watch-state")).toContainText("declared ever");
   });
+
+// ─────────────────── typing a token is ONE login, not forty ──────────
+
+test("typing the token by hand authenticates ONCE, with the whole token "
+   + "— never once per keystroke with a prefix", async ({ page }) => {
+    /* WHAT THIS EXISTS TO STOP (2026-09-10). `hasToken` is true from the
+       first character, and the two reads depend on `token`. They
+       deferred with `setTimeout(…, 0)` — a microtask hop, not a delay —
+       so every keystroke issued a fresh request carrying a longer
+       PREFIX of the operator's credential. A 40-character token was 40
+       authentications, 39 of them wrong, against a fail-closed backend
+       wired to Discord and ntfy. He alerted himself 39 times to log in
+       once, and the alerting could not tell that from an attack.
+
+       AbortController did not save it: abort is a client-side stop on
+       READING the answer, and the request has usually reached the
+       server before the next character lands. Only a real debounce
+       fixes it, so only the request count can test it. */
+    const seen = await serve(page);
+    await page.goto("/bet-suggester");
+    await expect(page.getByTestId("picker-row")).toHaveCount(3);
+
+    await page.getByTestId("watch-panel").locator("summary").click();
+    const secret = "operator-token-abcdefghijklmnop";
+    // pressSequentially, NOT fill: fill sets the value in one change and
+    // would pass on the broken build too. A person types.
+    await page.locator("#watch-token").pressSequentially(secret);
+
+    // one debounce window, then whatever was going to fire has fired
+    await expect
+      .poll(() => seen.stateTokens.length, { timeout: 5000 })
+      .toBeGreaterThan(0);
+    await page.waitForTimeout(1200);
+
+    expect(seen.stateTokens.length,
+      `typing ${secret.length} characters authenticated `
+      + `${seen.stateTokens.length} times`).toBe(1);
+    // and the one attempt carried the WHOLE credential, not a prefix
+    expect(seen.stateTokens[0]).toBe(secret);
+  });
+
+test("a pasted token is still exactly one authentication", async ({ page }) => {
+    /* The way a token actually arrives. This passed before the debounce
+       too — it is the control that says the fix did not buy the
+       keystroke case by breaking the paste case. */
+    const seen = await serve(page);
+    await page.goto("/bet-suggester");
+    await expect(page.getByTestId("picker-row")).toHaveCount(3);
+    await arm(page, "operator-token", "son");
+    await expect.poll(() => seen.stateTokens.length, { timeout: 5000 })
+      .toBeGreaterThan(0);
+    await page.waitForTimeout(1200);
+    expect(seen.stateTokens.length).toBe(1);
+    expect(seen.stateTokens[0]).toBe("operator-token");
+  });
