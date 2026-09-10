@@ -78,7 +78,8 @@ export const hueOf = (slug: string) => LEAGUE_HUE[slug] ?? "var(--lg-cup)";
  *  one number. Sorting by kickoff keeps GD/g (a time is not a
  *  magnitude); a missing quote says "no quote", a withheld gap says the
  *  board's own word for it. */
-type AnchorId = Exclude<SortModeId, "kickoff" | "shape"> | "own_gdg";
+type AnchorId = Exclude<SortModeId, "kickoff" | "shape">
+  | "own_gdg" | "league_gap";
 
 function anchorFor(row: BoardRow, modeId: SortModeId):
   { v: string; k: string; k2?: string; basis?: string; id: AnchorId } {
@@ -121,9 +122,22 @@ function anchorFor(row: BoardRow, modeId: SortModeId):
   // A ROW WITHOUT IT FALLS BACK EXACTLY AS BEFORE. `own_gdg` is optional
   // on the type because a board built before 2026-09-09 has no such key,
   // and this surface must never turn a missing field into a claim.
+  /* THE LEAGUE-MEETING GAP COMES FIRST ON A CROSS-LEAGUE ROW
+     (2026-09-10). `own_gdg` differenced two clubs' margins over two
+     different leagues, and the operator read the result on the card:
+     Manchester United v Sabah FK, the most lopsided tie on the board at
+     field ranks #7 v #33, printed −1.32, because Sabah dominate a weak
+     league and United do not dominate a strong one by as much. A
+     headline that inverts on the clearest fixture is not a headline.
+     `league_gap` answers a question the two clubs' own rates cannot: how
+     far apart are the two LEAGUES, in goals. It is measured, it is
+     absent rather than null when either league has no level, and it
+     keeps `own_gdg` behind it for rows the level table does not cover. */
   const own = row.own_gdg?.diff;
+  const lg = row.league_gap?.gd;
   const fallback: AnchorId = !row.cross_league ? "gdg"
-    : own != null ? "own_gdg" : "tier_ovr";
+    : lg != null ? "league_gap"
+      : own != null ? "own_gdg" : "tier_ovr";
   const id = modeId === "kickoff" || modeId === "shape" ? fallback : modeId;
   return { ...anchorValue(row, id), id };
 }
@@ -138,6 +152,18 @@ function anchorValue(row: BoardRow, id: AnchorId):
     // alone is the withheld gap's name, and this is not that number.
     case "own_gdg": return { v: dec(row.own_gdg?.diff), k: "own-league GD/g",
                              k2: "differenced", basis: row.own_gdg?.basis };
+    /* ONE LABEL LINE AND THEN THE TWO NUMBERS IT IS THE DIFFERENCE OF.
+       `own_gdg` needs its second line for a WORD, because "GD/g" alone
+       is the withheld gap's name and the label has to say what was done
+       to it. This one does not: "league gap · goals" names it, and the
+       more useful second line is the pair the figure came from — the
+       same "3.09 – 0.45" the operator settled on. */
+    case "league_gap": return {
+      v: dec(row.league_gap?.gd), k: "league gap · goals",
+      k2: row.league_gap
+        ? `${row.league_gap.gf.toFixed(2)} – ${row.league_gap.ga.toFixed(2)}`
+        : undefined,
+      basis: row.league_gap?.basis };
     case "ppg": return { v: dec(row.ppg_gap), k: "ppg gap" };
     case "rank": return { v: sign(row.rank_gap), k: "rank gap" };
     case "tier_ovr": return { v: sign(row.tier_gaps.ovr), k: "tier · ovr" };

@@ -55,6 +55,27 @@ export type TierPair = [number, number];
  *  ZERO, and a 0.00 ppg would read as a side that lost every game. */
 export type RatePair = [number | null, number | null];
 
+/** WHAT A LEAGUE-AVERAGE CLUB OF ONE LEAGUE SCORES AGAINST A
+ *  LEAGUE-AVERAGE CLUB OF THE OTHER, in goals (backend
+ *  src/picker/league_meeting.py, 2026-09-10).
+ *
+ *  IT IS A CLAIM ABOUT TWO LEAGUES AND NOT ABOUT THESE TWO CLUBS, which
+ *  is the whole reason it can be shown where `gdg_gap` is withheld: the
+ *  clubs share no scale, the leagues do. `gd` therefore does NOT always
+ *  agree in sign with the row — Como is the field favourite over RB
+ *  Leipzig while Serie A sits just under the Bundesliga, so this reads
+ *  −0.08 on a row the field signs the other way, and that disagreement
+ *  is the block being about what it says it is about.
+ *
+ *  ABSENT, NEVER NULL, when either league has no measured level. */
+export interface LeagueGap {
+  gd: number;
+  gf: number;
+  ga: number;
+  basis: string;
+  leagues: { fav: string; opp: string };
+}
+
 export type Shape = "CLEAN" | "HOLLOW" | "SPLIT";
 
 /** How the three shapes ORDER, declared beside the type they order so
@@ -328,6 +349,7 @@ export interface BoardRow {
    *  somebody has measured a field for; the card reads it in place of
    *  the three keys above and degrades to them when it is absent. */
   field?: RowField | null;
+  league_gap?: LeagueGap | null;
   event_id: string;
   competition_id: string;
   kickoff: string;
