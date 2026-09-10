@@ -16,10 +16,6 @@
 // against a market; these functions rearrange what it says and add
 // nothing.
 
-import type {
-  BoardRow, FieldSide, RowField,
-} from "./pickerApi";
-
 /** One club on one axis. */
 export interface AxisRow {
   rank: number;
@@ -116,65 +112,73 @@ function byClub(ratings: Ratings, axis: string): Map<string, AxisRow> {
   return new Map((a?.rows ?? []).map((r) => [r.club, r]));
 }
 
-/** THE FIXTURE'S FIELD BLOCK, FROM WHICHEVER SOURCE HAS IT.
- *
- *  ONE SHAPE, TWO SOURCES, AND THE BACKEND'S ALWAYS WINS. `row.field`
- *  is the block the board itself serves (pickerApi.RowField); the
- *  ratings payload is the SAME numbers, keyed by club, served by an
- *  endpoint that already existed. So a card written against this
- *  function reads the backend's block the day it lands and reads the
- *  field endpoint until then, with nothing in the component changing.
- *
- *  WHAT IT DOES NOT DERIVE. `tier_gap` and `shape` come back NULL from
- *  the ratings join, because that payload does not carry them and
- *  differencing two band sets here would be the frontend deciding
- *  something the backend deliberately decides. A null gap is not a gap
- *  of zero: the caller keeps the row's own backend values, which are
- *  still the backend's word. See PickerRead.TierGaps.
- *
- *  HALF A PAIR IS NOT A PAIR. A club this field does not hold gets no
- *  block at all rather than a block with one side in it — a rank
- *  standing alone beside a blank invites the reader to supply the
- *  missing half, which is the same defect as drawing half a leg. The
- *  card then falls back to its league read whole, and the `i` that
- *  opens the field's ranks is simply not drawn, so the affordance is
- *  never an empty promise.
- *
- *  Every axis is asked, not just the overall one: a club on the Elo
- *  axis and absent from the goals axes is a real shape — they are read
- *  from different measurements with their own floors. */
-export function fieldFor(
-  row: Pick<BoardRow, "favourite" | "opponent" | "field">,
-  ratings: Ratings | null | undefined,
-): RowField | null {
-  if (row.field) return row.field;
-  if (!ratings?.axes) return null;
+/** One directed leg of a fixture: somebody's attack against somebody
+ *  else's defence. */
+export interface CrossLeg {
+  attacker: string;
+  defender: string;
+  attack: AxisRow;
+  defence: AxisRow;
+}
 
-  const side = (axis: string, club: string): FieldSide | null => {
-    const r = byClub(ratings, axis).get(club);
-    if (!r) return null;
-    return {
-      rank: r.rank, tier: r.tier, tier_set: r.tier_set,
-      straddles: r.straddles, below_floor: r.below_floor,
-      floor_note: r.floor_note,
-    };
+export interface FixtureField {
+  /** the two clubs on the OVERALL axis — the one place side-by-side is
+   *  the right comparison, because it is a single ladder */
+  ovr: { fav: AxisRow | null; opp: AxisRow | null };
+  /** the favourite attacking: its attack against the opponent's DEFENCE */
+  favAttacking: CrossLeg | null;
+  /** and back the other way */
+  oppAttacking: CrossLeg | null;
+  /** the clubs this field does not hold, by name. A club we do not hold
+   *  is not a club with no attack, so it is NAMED rather than drawn as
+   *  a missing value — see the backend's own `crossed()`, which returns
+   *  None for such a leg for exactly this reason. */
+  missing: string[];
+}
+
+/** A FIXTURE'S STANDING IN THE FIELD, WITH THE AXES CROSSED.
+ *
+ *  In a match the favourite's attack faces the opponent's DEFENCE. A
+ *  card comparing attack to attack and defence to defence puts two
+ *  clubs side by side, which is not a matchup at all — this pairs them
+ *  the way the game does. Mirrors `cross_league_axes.crossed()`; the
+ *  ratings payload carries both sides, so the pairing is done where it
+ *  is drawn rather than fetched a second time per fixture.
+ *
+ *  A LEG IS NULL WHEN EITHER END IS ABSENT, and the absent club's name
+ *  goes in `missing`. Half a leg would invite the reader to supply the
+ *  other half.
+ *
+ *  Returns null when there is no field at all — an unmeasured
+ *  competition, or a read that has not landed. That is the caller's
+ *  cue to say which, not to draw a gap. */
+export function fixtureField(
+  ratings: Ratings | null, favourite: string, opponent: string,
+): FixtureField | null {
+  if (!ratings?.axes) return null;
+  const ovr = byClub(ratings, "ovr");
+  const atk = byClub(ratings, "atk");
+  const def = byClub(ratings, "def");
+
+  const leg = (a: string, d: string): CrossLeg | null => {
+    const attack = atk.get(a), defence = def.get(d);
+    if (!attack || !defence) return null;
+    return { attacker: a, defender: d, attack, defence };
   };
 
-  const axes = {} as RowField["axes"];
-  for (const k of AXIS_ORDER) {
-    const fav = side(k, row.favourite), opp = side(k, row.opponent);
-    if (!fav || !opp) return null;
-    axes[k] = { fav, opp, tier_gap: null };
-  }
-  /* THE N OF THE 1..N AXIS IS THE PAYLOAD'S OWN COUNT, never 36 typed
-     here: the field is refitted whenever a league is admitted or drops
-     out, and a total frozen in this file would go on drawing every
-     dumbbell against a ladder that no longer exists. */
+  /* WHICH CLUB THE FIELD DOES NOT HOLD, asked of every axis rather than
+     of one. A club present on the Elo axis and absent from the goals
+     axes is a real shape — the two are read from different measurements
+     with their own floors — and reporting it as present would leave a
+     leg silently undrawn with nothing saying why. */
+  const held = (c: string) => ovr.has(c) && atk.has(c) && def.has(c);
+  const missing = [favourite, opponent].filter((c) => !held(c));
+
   return {
-    competition: ratings.competition,
-    size: ratings.axes.ovr?.rows.length ?? 0,
-    axes,
-    shape: null,
+    ovr: { fav: ovr.get(favourite) ?? null, opp: ovr.get(opponent) ?? null },
+    favAttacking: leg(favourite, opponent),
+    oppAttacking: leg(opponent, favourite),
+    missing,
   };
 }
 
