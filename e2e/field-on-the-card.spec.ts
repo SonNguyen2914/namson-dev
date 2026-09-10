@@ -334,14 +334,21 @@ test("a wide interval is MARKED, so one number never reads as a placement "
        there and I will know" (operator). */
     await openBoard(page);
     const c = card(page, "ucl-1");
+    /* `toHaveCount`, NOT `await locator.count()`. `count()` reports
+       whatever is attached the instant it runs and does not retry, so a
+       marks-not-drawn-yet read is indistinguishable from a
+       marks-not-drawn one. Written with `count()` this passed here every
+       time and failed in CI on the ovr cell, expected 1 received 0 — the
+       repo's own auto-wait trap, and the reason a value assertion on
+       this surface has to go through `expect`. */
     for (const axis of AXIS_KEYS) {
       const row = FIELD_ROW(axis);
-      const cell = c.locator(`[data-tier="${axis}"]`);
-      const marks = await cell.locator("sup").count();
       const owed = Number(row.fav.straddles || row.fav.below_floor)
                  + Number(row.opp.straddles || row.opp.below_floor);
-      expect(marks, `${axis}: one mark per side whose band is not settled`)
-        .toBe(owed);
+      await expect(c.locator(`[data-tier="${axis}"]`)
+        .getByTestId("field-floor-mark"),
+        `${axis}: one mark per side whose band is not settled`)
+        .toHaveCount(owed);
     }
   });
 
