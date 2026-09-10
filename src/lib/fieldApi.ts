@@ -50,9 +50,58 @@ export interface AxisRow {
 export interface Axis {
   axis: string;
   label: string;
+  /** HOW MANY BANDS THE FIELD IS CUT INTO. Still served, still what
+   *  every existing reader draws, and equal to `bands_declared` on any
+   *  payload that carries one — so a surface that only wants the count
+   *  keeps reading this and nothing about it moved. */
   bands: number;
+
+  /* THE DECLARATION AND THE LICENCE ARE TWO DIFFERENT NUMBERS, and this
+     is where the type stops letting them be one (backend PR #122,
+     2026-09-10). `bands` used to BE `supported_bands(levels)`, so the
+     cut on the operator's page moved whenever the corpus moved. The
+     operator then declared five bands on all three axes with the
+     measurement in front of him, and attack and defence are above what
+     that measurement licenses. Both numbers now ride the payload under
+     names that cannot be mistaken for each other.
+
+     EVERY ONE OF THESE IS OPTIONAL, AND MISSING IS NEVER FALSE. A
+     payload served before #122 carries none of them. Defaulting the
+     flags to `false` here would make this file assert `declared_above
+     _licence: false` — agreement between two numbers, one of which the
+     payload does not even contain — off a read that measured nothing.
+     A renderer must therefore branch on `=== true` / `!== undefined`,
+     never on truthiness, and say nothing at all where the key is
+     absent. Same discipline as `tier_gap: null` in `fieldFor`: a fact
+     the backend did not send is not a fact this file may supply. */
+
+  /** THE OPERATOR'S NUMBER, derived from nothing. Changed only by him
+   *  saying so; a corpus that measures more levels tomorrow does not
+   *  touch it. Absent before #122, where the count was a derivation. */
+  bands_declared?: number;
+  /** WHAT THE EVIDENCE SEPARATES — `supported_bands(levels)`, still
+   *  measured on every read and no longer in charge of anything. This
+   *  is the number a reader must be able to tell the declaration FROM,
+   *  which is the whole reason it is published beside it. */
+  bands_licensed_by_the_measurement?: number;
+  /** the backend saying the count above is a decision, not a fit */
+  band_count_is_declared_not_derived?: boolean;
+  /** true where the declaration is FINER than the licence. Note the
+   *  asymmetry: `ovr` declares 5 against a licence of 7, so the two
+   *  differ while this stays false — differing and overreaching are not
+   *  the same fact and only the second one is a caution. */
+  declared_above_licence?: boolean;
+  /** THE BACKEND'S OWN WORDS FOR THE GAP, to be printed rather than
+   *  restated. It rides `declared_above_licence` exactly as
+   *  `floor_note` rides `below_floor`: a string when the flag is true,
+   *  `null` when it is false, and the key itself absent before #122.
+   *  Hence `string | null` AND optional — the three states are three
+   *  different facts and only the first one has anything to draw. */
+  band_count_note?: string | null;
   distinguishable_levels: number;
   unit: string;
+  /** composed by the backend from BOTH numbers, so a corpus edit moves
+   *  the sentence with it and cannot leave a stale claim standing */
   why_this_many_bands: string;
   cuts: number[];
   span: [number, number];
