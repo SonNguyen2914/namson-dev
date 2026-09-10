@@ -451,10 +451,18 @@ function FieldRanks({ field }: { field: RowField }) {
           // touch screen
           setPinned((v) => !v); setHovered(false); setFocused(false);
         }}
-        /* NOT `font-mono`, for the reason ColumnNotes gives at its own
-           circle: the mono lowercase i carries a serif at both ends and
-           at this size reads as a FIGURE ONE beside a row of mono
-           digits. The sans i is a dot over a bare stem. */
+        /* `#`, NOT `i` (2026-09-10). The row already carries an `i`
+           — `tier-read`, six pixels away on a full row, whose panel
+           EXPLAINS the shape in prose. This one only prints numbers.
+           Two identical circles side by side is the thing ColumnNotes
+           argues against in its own header, and the operator asked for
+           "only with new 'i' added" before either of us knew the first
+           one was there. Same circle, same size, same states; the glyph
+           is what says which is the explainer and which is the data,
+           and `#` is the card's own idiom for a rank. NOT `font-mono`,
+           for the reason ColumnNotes gives: at this size the mono glyph
+           reads as part of the row of mono digits beside it rather than
+           as a control. */
         /* `relative z-30` KEEPS THE TRIGGER ABOVE ITS OWN PANEL. The
            panel is anchored to the TRIO and is wider than it, so at a
            narrow track it reaches past this circle — and a panel over
@@ -470,7 +478,7 @@ function FieldRanks({ field }: { field: RowField }) {
           // it open rather than as a ring drawn over a digit.
           open ? "border-accent/60 bg-elev2 text-accent"
             : "border-line-strong text-ink-low hover:border-accent/40 hover:text-accent"}`}>
-        i
+        #
       </button>
       {open && (
         <span data-testid="field-ranks" id={panelId} role="note"
