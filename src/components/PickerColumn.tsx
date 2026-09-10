@@ -1464,6 +1464,16 @@ export function LeagueColumn({
     back: number;
     loading: boolean;
     error: string;
+    /** DID THE SWEEP COVER THIS COMPETITION AT ALL? False when the
+     *  payload carries no key for it — a read that never happened, and
+     *  never a measured zero. `lib/pickerReview.readHere` derives it
+     *  from the payload; nothing here infers it from an empty row
+     *  list, because an empty row list is what all three of the tail's
+     *  states look like from here. */
+    read: boolean;
+    /** …and why it was not read, when the page knows. Null otherwise:
+     *  a reason nobody established must not be printed as one. */
+    unreadWhy: string | null;
     storeNote: string | null;
   };
   /** THE COMPETITION'S CROSS-LEAGUE FIELD — one read for the whole
@@ -1549,7 +1559,15 @@ export function LeagueColumn({
      an unexplained gap where every neighbour has one is what made the
      column read as broken. It is NAMED in the header now. */
   const nothingAhead = rows.length === 0 && refusals.length === 0;
-  const finishedKnown = !review.loading && !review.error && !review.meta?.error;
+  /* `review.read` IS PART OF "KNOWN" (2026-09-10). Without it a
+     competition the sweep never covered reported a KNOWN zero here —
+     the header speaking, in the operator's own words, for a read that
+     did not happen. It is the same rule the three lines above already
+     apply to a request in flight and a request that failed; a request
+     that answered about somebody else is the third way to hold no
+     measurement, and it looked exactly like the two that were caught. */
+  const finishedKnown = !review.loading && !review.error && review.read
+    && !review.meta?.error;
   const finished = { known: finishedKnown, n: review.rows.length };
   const boardSilent = !meta;
 
@@ -1561,6 +1579,7 @@ export function LeagueColumn({
     <ReviewTail slug={slug} back={review.back}
       rows={review.rows} refusals={review.refusals} meta={review.meta}
       loading={review.loading} error={review.error}
+      read={review.read} unreadWhy={review.unreadWhy}
       storeNote={review.storeNote} />
   );
 

@@ -229,9 +229,86 @@ export interface Review {
   back: number;
   window: { from: string; to: string };
   store: StoreDescription;
+  /** THE COMPETITIONS THIS SWEEP ACTUALLY READ, one entry each.
+   *
+   *  A key is written for every competition the backend swept, BEFORE
+   *  it fetched anything — so a competition that was read and failed
+   *  still has one (carrying `error`), and a competition with NO KEY
+   *  AT ALL was never read. That is not a subtlety; it is the whole
+   *  difference between "nothing finished" and "we never looked", and
+   *  it is the only place the payload records it. See `readHere`. */
   leagues: Record<string, ReviewLeagueMeta>;
   finished: ReviewRow[];
   refusals: ReviewRefusal[];
+  /** PRESENT ONLY WHEN THE CALLER NARROWED THE SWEEP (backend PR #123,
+   *  2026-09-10); it lists what was ASKED FOR. Absent on the declared
+   *  review, and that absence is the sentence "this is what the board
+   *  declares".
+   *
+   *  It matters here for the same reason it matters on the board:
+   *  `leagues` is the shape a DECLARATION has, the landing page derives
+   *  per-column state from it, and a finished Leagues Cup once walked
+   *  back onto a board that had removed it through exactly this
+   *  payload. Nothing may read a narrowed key set as the operator's
+   *  columns. */
+  narrowed_to?: string[] | null;
+}
+
+/** DID THIS SWEEP READ THAT COMPETITION AT ALL?
+ *
+ *  The three states a finished tail must keep apart, and this function
+ *  separates the second from the first:
+ *
+ *    1. ASKED, AND NONE FINISHED — a key, `finished: 0`, no error. The
+ *       tail says "no fixtures finished in this window", which is a
+ *       measurement.
+ *    2. NEVER ASKED — no key. The tail must NOT say zero. Nothing was
+ *       measured, and rendering an unread competition as an empty one
+ *       is the defect `review_competitions()` was written against:
+ *       "No Champions League fixtures finished in the last 7 days" over
+ *       six that were played.
+ *    3. ASKED AND THE READ FAILED — a key carrying `error`, in the
+ *       backend's own words. Already distinguished by `meta.error`.
+ *
+ *  `meta === undefined` IS the payload's own record of (2), not an
+ *  inference: `assemble_review` writes each competition's meta before
+ *  it fetches, so the key survives every failure and is absent only
+ *  when the sweep never covered it. */
+export function readHere(review: Review | null, slug: string): boolean {
+  return !!review && Object.prototype.hasOwnProperty.call(review.leagues, slug);
+}
+
+/** THE REVIEW'S DECLARATION, OR THE ADMISSION THAT THIS PAYLOAD IS NOT
+ *  IT — the exact counterpart of `pickerApi.declarationOf`, and here for
+ *  the same reason.
+ *
+ *  Nothing derives the landing page's column set from this payload
+ *  today; that door was closed on 2026-09-08 after the review's keys
+ *  walked a removed Leagues Cup back onto the board. This function
+ *  exists so that if anything ever reads these keys as columns again,
+ *  it reads them through a check that can tell a narrowed answer from
+ *  the operator's declaration — rather than through `Object.keys`,
+ *  which cannot. `null` is "this payload was never asked that
+ *  question"; an empty array would be the different claim "it declares
+ *  nothing". */
+export function reviewDeclarationOf(review: Review): string[] | null {
+  return review.narrowed_to == null ? Object.keys(review.leagues) : null;
+}
+
+/** DID THE REVIEW ANSWER THE QUESTION WE ASKED IT?
+ *
+ *  True only when `narrowed_to` covers every slug asked for. A backend
+ *  deployed behind this frontend does not know the parameter, drops it,
+ *  and answers 200 with its DECLARED sweep — four other competitions'
+ *  finished matches and none of this one. `readHere` already refuses to
+ *  render that as zero; this names WHY, so the page can say the read
+ *  did not answer rather than leaving the reader to guess. Mirrors
+ *  `pickerApi.askHonoured` exactly. */
+export function reviewAskHonoured(
+  review: Review, asked: readonly string[],
+): boolean {
+  const got = review.narrowed_to;
+  return Array.isArray(got) && asked.every((s) => got.includes(s));
 }
 
 /** The back-window choices. The endpoint accepts 1..30 and 422s outside
@@ -256,10 +333,32 @@ export function isRead(s: PreKickoffState | null | undefined): s is PreKickoffRo
 export const pct = (v: number | null | undefined) =>
   v == null ? "—" : `${Math.round(v * 100)}%`;
 
-export async function fetchReview(back: number, signal?: AbortSignal): Promise<Review> {
+/** `leagues` ASKS FOR COMPETITIONS BY NAME, exactly as `fetchBoard`
+ *  does, and the two are deliberately the same shape: a page narrowed
+ *  to one competition asks BOTH endpoints the same question, or its
+ *  upper half is about the Champions League and its finished tail is
+ *  about somebody else's week.
+ *
+ *  OMITTING IT IS WHAT KEEPS A REMOVED COMPETITION OFF THE LANDING
+ *  PAGE. `/bet-suggester` passes nothing, so the request URL, the
+ *  backend's cache key and the payload are the strings they have always
+ *  been, and the answer carries no `narrowed_to` to be mistaken for a
+ *  declaration.
+ *
+ *  The query parameter needs no proxy allowlist change:
+ *  `pages/api/picker/[...path].ts` forwards `req.url`'s query string
+ *  verbatim and gates only on the PATH, which `picker: ["board",
+ *  "review"]` already allows. Confirmed by reading that handler, not
+ *  assumed — and pinned by the unmocked proxy test in
+ *  e2e/finished-is-asked-for.spec.ts. */
+export async function fetchReview(
+  back: number, signal?: AbortSignal, leagues?: readonly string[],
+): Promise<Review> {
+  const ask = leagues && leagues.length > 0
+    ? `&leagues=${encodeURIComponent(leagues.join(","))}` : "";
   let r: Response;
   try {
-    r = await fetch(`/api/picker/review?back=${back}`, { signal });
+    r = await fetch(`/api/picker/review?back=${back}${ask}`, { signal });
   } catch (e) {
     // Same rule as the board's fetch: an abort is the caller's own
     // cancellation and is rethrown untouched; anything else is the
