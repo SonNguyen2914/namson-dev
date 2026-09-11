@@ -57,6 +57,19 @@ export interface PreKickoffRow {
    *  under a design the picker did not have at kickoff is the one thing
    *  the reconstruction path exists to prevent. */
   weights?: BlendWeights | null;
+  /** WHICH RULE NAMED THE FAVOURITE THIS CAPTURE IS SIGNED FROM, and
+   *  the field it was named on when there was one.
+   *
+   *  All three are OPTIONAL because a capture frozen before they
+   *  existed carries none, and a reader that turned a missing
+   *  `fav_source` into "the current rule" would date a record it never
+   *  read. The current rule emits `"field"` with a `field` block on a
+   *  cross-league row; the superseded one emitted `"rank"` and carried
+   *  no field, which is how a pre-8dfa813 capture is recognised without
+   *  comparing timestamps to a deploy. */
+  cross_league?: boolean | null;
+  fav_source?: string | null;
+  field?: unknown;
   src: Src;
   ranks: { fav: number; opp: number };
   tiers: { ovr: TierPair; atk: TierPair; def: TierPair };
