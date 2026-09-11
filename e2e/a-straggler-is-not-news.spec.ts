@@ -1,5 +1,22 @@
 import { expect, test } from "@playwright/test";
 
+import {
+  WATCHED_STRIP_POLL_MS, WATCHED_STRIP_READ_CEILING_MS,
+} from "../src/lib/watchedStripFeed";
+
+// THE WAITS COME FROM THE CONSTANTS THEY ARE WAITING FOR (2026-09-11).
+//
+// These two tests were written with the ceiling typed into them — 40s
+// and 60s against a ceiling that was then 20s. The ceiling changed the
+// day a 1.09MB payload took 24s to build and every read was abandoned
+// four seconds before its answer arrived, and a hand-typed wait would
+// have turned that fix red for a reason that had nothing to do with the
+// behaviour under test. Derived here so the two can never disagree
+// again: a ceiling raised makes these WAIT longer, not FAIL.
+const CEILING_LANDS = WATCHED_STRIP_READ_CEILING_MS + 10_000;
+const SECOND_POLL_CEILING_LANDS =
+  WATCHED_STRIP_POLL_MS + WATCHED_STRIP_READ_CEILING_MS + 15_000;
+
 // THE LIVE SURFACE'S POLL — what it was found doing on 2026-09-11, and
 // the shape of each finding so a repeat cannot pass.
 //
@@ -165,16 +182,26 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 test("a response that left BEFORE the one already on screen never lands",
   async ({ page }) => {
-    // TWO POLLS, AND THE SLOW ONE IS THE OLD ONE. Poll 1 is held for
-    // 17s and answers with the 21:05:00 read; poll 2 goes out at 15s
-    // and answers 21:05:15 immediately. So the fresh read is on screen
-    // at ~15s and the straggler arrives at ~17s. Under the build before
-    // this one the screen went back to one-nil at that moment.
+    // THE PROPERTY, NOT THE MECHANISM THAT USED TO PRODUCE IT
+    // (rewritten 2026-09-11). This test used to hold poll 1 for 17s and
+    // let poll 2 go out at 15s and answer first, so the old read landed
+    // on top of the new one; the ordering guard is what discarded it.
+    // A scheduled tick no longer STARTS while a read is in flight —
+    // that is what now bounds accumulation, in place of a ceiling that
+    // could not be raised while it was doing that job — so two
+    // scheduled polls can no longer overlap and the old scenario cannot
+    // be built from them any more.
     //
-    // WITHIN THE CEILING ON PURPOSE. The read is abandoned at one
-    // period plus five seconds, so a 17s straggler is a response that
-    // genuinely ARRIVES and is genuinely DISCARDED — the ordering guard
-    // is what this measures, not the ceiling.
+    // WHAT IS ASSERTED IS THE THING THAT MATTERED: the screen never
+    // goes BACKWARDS. It survives the mechanism change because it was
+    // never about the mechanism — under the build that shipped the
+    // straggler defect it was red at every sample between 17s and 30s,
+    // and it stays honest under a build where the overlap is prevented
+    // rather than discarded. The remaining path to a genuine overlap is
+    // a FORCED read racing a scheduled one (`refreshWatchedStrip`,
+    // which the tape button calls and which is deliberately exempt from
+    // the no-stack rule); the ordering guard in `poll` still serves it,
+    // and test 8 below pins the no-stack half.
     test.setTimeout(90_000);
     await serve(page, (n) => (n === 1
       ? { body: OLD, delayMs: 17_000 }
@@ -187,10 +214,15 @@ test("a response that left BEFORE the one already on screen never lands",
     // the clock. This one always looks at the same wall time.
     const t0 = Date.now();
 
-    // The fresh read draws first, because the first one is still out.
+    // THE FIRST READ TO LAND IS THE ONE THAT DRAWS. It is the 17s one
+    // (the 21:05:00 read) now that the 15s tick is skipped rather than
+    // stacked, where it used to be the fast second poll. Either way the
+    // screen settles on a stamp and the rest of this test is that it
+    // never regresses from whatever that stamp is.
     await expect(section(page)).toHaveAttribute(
-      "data-generated-at", NEW.generated_at, { timeout: 30_000 });
-    await expect(scoreline(page)).toContainText("2–1");
+      "data-generated-at", /2026-09-11T21:05:/, { timeout: 30_000 });
+    const settled = await section(page).getAttribute("data-generated-at");
+    expect(settled, "the strip drew a read").toBeTruthy();
 
     // AND THEN THE STRAGGLER LANDS AND CHANGES NOTHING.
     //
@@ -217,11 +249,23 @@ test("a response that left BEFORE the one already on screen never lands",
     }
     expect(seen.length, "the window between the two polls was sampled")
       .toBeGreaterThan(5);
+    // NEVER OLDER THAN THE NEWEST IT HAS ALREADY SHOWN. Compared
+    // against a running high-water mark rather than one expected
+    // constant, because which read lands first is a property of the
+    // scheduling and this assertion is not about that: a screen that
+    // advances 21:05:00 -> 21:05:15 is correct, and one that goes back
+    // the other way is the defect, whichever of them arrives first.
+    let highest = settled ?? "";
     for (const s of seen) {
-      expect(s.stamp, `at ${s.at}s the screen went back to an older read`)
-        .toBe(NEW.generated_at);
-      expect(s.score, `at ${s.at}s the SCORE went backwards`)
-        .toContain("2–1");
+      expect(s.stamp, `at ${s.at}s the strip lost its stamp`).toBeTruthy();
+      // Lexicographic IS chronological on these: one UTC format, fixed
+      // width, zero-padded. Compared as strings rather than parsed,
+      // because a parse would quietly accept a stamp this surface can
+      // never be handed.
+      expect(s.stamp! >= highest,
+        `at ${s.at}s the screen went back to an older read `
+        + `(${s.stamp} after ${highest})`).toBe(true);
+      if (s.stamp! > highest) highest = s.stamp!;
     }
     // THE CLOCK THE STALE BANNER WOULD QUOTE WAS WALKED BACKWARDS TOO,
     // and a payload that never reached the screen must not have reached
@@ -238,11 +282,11 @@ test("a read that never answers is abandoned and DRAWN — a section that "
     // no strip and no notice of any kind for as long as the tab was
     // open — which is indistinguishable from "nothing is declared", the
     // one conclusion this surface exists against.
-    test.setTimeout(90_000);
+    test.setTimeout(CEILING_LANDS + 30_000);
     await serve(page, () => undefined);
     await page.goto("/bet-suggester");
     const gate = page.getByTestId("watched-strip-gate");
-    await expect(gate).toBeVisible({ timeout: 40_000 });
+    await expect(gate).toBeVisible({ timeout: CEILING_LANDS });
     // IT SAYS WHOSE SENTENCE THIS IS. Every other refusal on this
     // surface is quoted from the layer that produced it; nothing
     // produced this one, and the words say so rather than putting a
@@ -266,13 +310,13 @@ test("a hung poll AFTER a good one marks the figures as the earlier "
     // words. Poll 1 lands; poll 2 goes out at 15s and never comes back;
     // it is abandoned one period plus five seconds later, and THAT is
     // the failure that arms the banner.
-    test.setTimeout(120_000);
+    test.setTimeout(SECOND_POLL_CEILING_LANDS + 30_000);
     await serve(page, (n) => (n === 1 ? { body: NEW } : undefined));
     await page.goto("/bet-suggester");
     await expect(section(page)).toHaveAttribute(
       "data-generated-at", NEW.generated_at, { timeout: 30_000 });
     const stale = page.getByTestId("watched-stale");
-    await expect(stale).toBeVisible({ timeout: 60_000 });
+    await expect(stale).toBeVisible({ timeout: SECOND_POLL_CEILING_LANDS });
     await expect(stale).toHaveAttribute("data-since", NEW.generated_at);
     await expect(stale).toContainText(NEW.generated_at);
     await expect(page.getByTestId("watched-stale-why"))
@@ -388,4 +432,54 @@ test("the two surfaces that draw this read share ONE poll", async ({ page }) => 
     await expect(section(page))
       .toHaveAttribute("data-generated-at", NEW.generated_at);
     await expect(page.getByTestId("live-tape")).toBeVisible();
+  });
+
+// ============ 6. a read slower than the cadence still reaches the screen
+
+test("a read that outlasts the poll PERIOD is not abandoned — the "
+   + "outage of 2026-09-11", async ({ page }) => {
+    // THE OUTAGE, EXACTLY. The ceiling was `POLL_MS + 5s` = 20s, argued
+    // from "by the time a read has been out this long its successor's
+    // answer is already on screen". On 2026-09-11 the operator's
+    // declared set reached 27 matches, the payload reached 1.09MB and
+    // the backend took 24s — so the read was abandoned four seconds
+    // before its answer arrived, EVERY successor was abandoned the same
+    // way, and the strip rendered nothing at all on a board with 27
+    // declared matches. The assumption that a successor succeeds is the
+    // thing that failed.
+    //
+    // 25s is over the OLD ceiling and under the new one, so this test
+    // is red on the build that shipped the outage and green after.
+    test.setTimeout(SECOND_POLL_CEILING_LANDS + 30_000);
+    await serve(page, () => ({ body: NEW, delayMs: 25_000 }));
+    await page.goto("/bet-suggester");
+    // It lands, late, and it is the payload — not a gate, not a blank.
+    await expect(section(page)).toHaveAttribute(
+      "data-generated-at", NEW.generated_at,
+      { timeout: WATCHED_STRIP_READ_CEILING_MS });
+    await expect(scoreline(page)).toContainText("2");
+    // AND IT IS NOT MARKED STALE. Nothing failed: a slow answer that
+    // arrives is an answer, and calling it stale would be this surface
+    // inventing a fault the read did not have.
+    await expect(page.getByTestId("watched-stale")).toHaveCount(0);
+  });
+
+test("a scheduled poll does not stack on a read that is still coming",
+  async ({ page }) => {
+    // WHAT BOUNDS ACCUMULATION NOW. The ceiling used to do this job by
+    // killing anything older than a period, which is why raising it
+    // needed a replacement. With a 25s read on a 15s cadence, a timer
+    // that fires regardless opens a second request on top of the first
+    // and asks the backend to build the same megabyte twice.
+    test.setTimeout(SECOND_POLL_CEILING_LANDS + 30_000);
+    const hits = await serve(page, () => ({ body: NEW, delayMs: 25_000 }));
+    await page.goto("/bet-suggester");
+    await expect(section(page)).toHaveAttribute(
+      "data-generated-at", NEW.generated_at,
+      { timeout: WATCHED_STRIP_READ_CEILING_MS });
+    // One read was in flight across a 15s tick; the tick must have been
+    // skipped rather than stacked, so exactly one request was made.
+    expect(hits.strip,
+      "a scheduled tick opened a second read while the first was still "
+      + "in flight").toBe(1);
   });
