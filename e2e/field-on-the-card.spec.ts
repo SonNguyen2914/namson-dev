@@ -570,11 +570,11 @@ test("the panel opens on the card's RIGHT-HAND SIDE, clear of the numbers "
        THIS TEST WAS THE ALIGNMENT ONE. It asserted that the panel's
        label row landed on the trio's label row, to one device pixel —
        a real virtue of hanging the panel on the trio, and the price of
-       the corner. It is replaced rather than loosened: the property
-       that survives is the one that was always load-bearing — the
-       trigger stays clickable — and it is now asserted at every step of
-       the ladder rather than at one width, because "on the right hand"
-       is a claim about all of them.
+       opening on the right. It is replaced rather than loosened: the
+       property that survives is the one that was always load-bearing —
+       the trigger stays clickable — and it is now asserted at every step
+       of the ladder rather than at one width, because "on the right
+       hand" is a claim about all of them.
        WHY THE WHOLE LADDER. `right-0` here means the TIER BLOCK's right
        edge, which is one card-content wide; the card is 237px at lg and
        350px on a phone, and the panel is a fixed ~136px. Only a

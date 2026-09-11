@@ -27,7 +27,7 @@
 // to components/PickerRead.tsx so the tail renders THE SAME READ this
 // column does, rather than a hand-copied one free to drift from it.
 import Link from "next/link";
-import { ReactNode, useId, useState } from "react";
+import { useId, useState } from "react";
 import {
   AXIS_ORDER, Axis, FieldRead, Ratings, fieldFor,
 } from "../lib/fieldApi";
@@ -307,24 +307,27 @@ function RankDumbbell({ ranks }: { ranks: ReturnType<typeof rankPair> }) {
  *  match hubs' form chips: a draw is not a warning. Oldest→newest, so
  *  the rightmost cell is the latest result; the title spells it out. */
 const FORM_SLOTS = 5;
-function FormStrip({ form, name, scope, cupScope }: {
+function FormStrip({ form, name, scope, cupScope, className = "" }: {
   form?: string | null; name: string; scope?: string;
-  cupScope?: boolean;
+  cupScope?: boolean; className?: string;
 }) {
   if (!form) return null;
-  // FIXED WIDTH (2026-09-01): five slots always, empty ones drawn as
-  // faint placeholders, real results filling from the RIGHT so the
-  // newest result is the rightmost cell and a club with two games played
-  // draws the same object as one with five. The latest cell is ringed so
-  // "which is now" reads without counting.
+  // FIXED WIDTH, right-aligned (2026-09-01): five slots always, empty
+  // ones drawn as faint placeholders, real results filling from the
+  // RIGHT so the newest result is the rightmost cell and every strip on
+  // the board lines up to the same column edge no matter how many games
+  // a club has played. The latest cell is ringed so "which is now" reads
+  // without counting.
   //
-  // IT NO LONGER TAKES A `className` (2026-09-10). The only thing ever
-  // passed was `ml-auto pl-2`, which parked the strip at the row's right
-  // edge, half a card from the club whose form it is — "move the form
-  // closer to team names", the operator. The strip now sits where the
-  // row's own `gap-2` puts it, directly after the name and its badge,
-  // and the prop went with the class rather than staying as an open
-  // invitation to push it back out there.
+  // `className` IS HOW THE ROW PARKS IT AT THAT EDGE, and both callers
+  // pass the same `ml-auto pl-2`. RESTORED 2026-09-11: #48 read the
+  // margin as distance from the club and took it off, and the operator
+  // asked for the card it was on. The alignment is the reason it is
+  // there — a column of cards reads as one ladder of form only if every
+  // strip shares a right edge, and the name beside each of them is a
+  // different length. `ml-auto` absorbs only FREE space, so in a narrow
+  // track the strip still ends up hard against the name; that is the
+  // same class doing the same thing, not a second behaviour.
   const letters = form.slice(-FORM_SLOTS).split("");
   const pad = FORM_SLOTS - letters.length;
   const slots = [...Array(pad).fill(null), ...letters];
@@ -340,7 +343,7 @@ function FormStrip({ form, name, scope, cupScope }: {
         + `, oldest to newest: ${form.split("").join(" ")}`}
       title={`${name} — last ${form.length} in ${scope ?? "this competition"}`
         + `, oldest→newest: ${form} (rightmost is latest)`}
-      className="inline-flex flex-none items-center gap-[2px]">
+      className={`inline-flex flex-none items-center gap-[2px] ${className}`}>
       {slots.map((c, i) => {
         const latest = i === FORM_SLOTS - 1 && c != null;
         return (
@@ -444,22 +447,8 @@ export function seasonDeparture(
  *  RowCard's output is unchanged — which e2e/picker.spec.ts and
  *  e2e/picker-blend-cup.spec.ts prove, unedited, on every run. */
 export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
-                         field, header }: {
+                         field }: {
   row: BoardRow; modeId: SortModeId; clubCount: number;
-  /** THE CARD'S CHIP ROW — rank badge, competition chip, kickoff —
-   *  drawn INSIDE this component's left column rather than above it.
-   *
-   *  The anchor moved to the card's upper-right corner on 2026-09-10,
-   *  and it is top-aligned against the chip row and the club names
-   *  together. Those two are owned by different components: the chips
-   *  are RowCard's (they are facts about the card, not about the read),
-   *  the names are this one's. A two-column region spanning both has to
-   *  be written once, in one place, or the two halves lay out against
-   *  each other from two files.
-   *  ABSENT OFF THE BOARD. LiveCard's prematch flip renders this with
-   *  no chip row at all, and the region is then exactly what it was
-   *  before: names on the left, anchor top-right of them. */
-  header?: ReactNode;
   /** WHERE THESE TWO CLUBS STAND IN THE COMPETITION'S OWN FIELD, when
    *  one has been measured — see pickerApi.RowField and fieldApi.fieldFor.
    *  It is a DATA substitution and adds one mark: the ranks pair, the
@@ -477,17 +466,19 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
    *  A dense board lays up to four matches across the width one column
    *  used to have, so from `md` up the card is ~200px wide instead of the
    *  ~330px every element here was drawn against. Everything this flag
-   *  switches is a REFLOW, never a cut: club names WRAP instead of
-   *  truncating to three letters, the form strip drops under the name
-   *  it belongs to rather than shortening it, and the inter-item gaps
-   *  tighten. Nothing is removed and no type shrinks — a narrow card
-   *  says everything a wide one says, taller.
+   *  switches is a REFLOW, never a cut: the anchor drops under the
+   *  matchup instead of competing with it for the same line, club names
+   *  WRAP instead of truncating to three letters, the form strip drops
+   *  under the name it belongs to rather than shortening it, and the
+   *  inter-item gaps tighten. Nothing is removed and no type shrinks — a
+   *  narrow card says everything a wide one says, taller.
    *
-   *  THE ANCHOR IS NO LONGER ONE OF THEM (2026-09-10). It used to drop
-   *  under the matchup here, because side by side in a ~200px track the
-   *  figure and the names competed for one line. It now sits in the
-   *  card's upper-right corner at EVERY width — the operator's placement
-   *  — and keeps the names' width by being capped instead of stacked.
+   *  THE ANCHOR IS ONE OF THEM AGAIN (2026-09-11). #48 took it out of
+   *  the reflow by moving the figure to the card's corner at every
+   *  width; the operator asked for the earlier card back, so the figure
+   *  is beside the names in a wide track and stacked under them from
+   *  `md` up in a narrow one, which is how the names keep their width
+   *  here without any cap on the figure's column.
    *
    *  DEFAULT FALSE, AND THAT MATTERS. The multi-league board and the live
    *  card's flip (components/LiveCard.tsx) both render this component
@@ -521,109 +512,76 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
     : badge?.title;
   return (
     <>
-      {/* THE CARD'S TOP REGION, IN TWO COLUMNS (operator, 2026-09-10, on
-          a live Champions League card: "the League gap number need to be
-          on the upper right corner").
-          The anchor used to sit inside the link, to the right of the two
-          club-name rows, which read as though the figure belonged to the
-          names. It belongs to the CARD: it is the number this row is
-          ranked by, the same kind of fact as the rank badge and the
-          kickoff time it now sits level with.
-          A BASELINE ROW COULD NOT HOLD IT, which is why this is a
-          restructure rather than a reorder. The block is up to four
-          lines — the figure, its key, and for `league_gap` the pair the
-          figure is the difference of — so it cannot join the chip row;
-          it takes a column of its own beside BOTH the chip row and the
-          names, top-aligned with the first of them.
-          `header` IS WHAT MAKES THAT ONE COMPONENT'S JOB. The chip row
-          is RowCard's, the names are this component's, and the anchor
-          has to be top-aligned against the pair of them — so RowCard
-          hands its row down rather than this file's read being split
-          across two layouts that could disagree. Off the board
-          (LiveCard's prematch flip) there is no chip row, no `header`
-          arrives, and the region is what it always was: names left,
-          anchor right. */}
-      <div className={`flex items-start ${
-        // THE GAP TIGHTENS IN A NARROW TRACK, like every other gap on
-        // this card (see RowCard's chip row and Stage 1). 12px between
-        // the names and the corner is 5% of a 211px dense track, and it
-        // is 4px of the name's own line.
-        dense ? "gap-3 md:gap-2" : "gap-3"}${header ? "" : " mt-2.5"}`}>
-        <div className="min-w-0 flex-1">
-          {header}
-          {/* The fixture line is the way IN. A board of ranked matches you
-              cannot open is a list of names — every dashboard already links
-              this same id space. Wraps only the matchup, so the Stage-1/2
-              numbers below stay plain text — and, since 2026-09-10, so
-              does the anchor: it is a card-level figure now and its
-              corner is not part of the link's hit area. */}
-          {/* THE MATCHUP. Two team lines with the ● / ○ pips that also
-              mark the dumbbell's ends — the mapping teaches itself. */}
-          <Link
-            href={rowHref(row)}
-            aria-label={`open ${row.favourite} versus ${row.opponent}`}
-            className={`block rounded-md outline-none transition-colors hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bs${
-              header ? " mt-2.5" : ""}`}>
-          {/* THE FORM STRIP SITS BESIDE THE NAME IT DESCRIBES (operator,
-              2026-09-10: "move the form closer to team names"). It was
-              `ml-auto pl-2`, which parks it at the row's right edge — on
-              a wide card that is a strip of five 7px cells floating half
-              a card away from the club whose form it is.
-              THE WRAP IS UNCHANGED, and that is the point of dropping
-              `ml-auto` rather than of moving the element. An auto margin
-              only absorbs FREE space: it never took space from the name,
-              and removing it takes none back. Flex line-breaking still
-              measures each item at its max-content, so a cup strip —
-              5 cells plus the word "cup", ~70px of a ~170px track —
-              still drops onto its own line exactly when the whole name
-              will not sit next to it, and the name still gets the line
-              to itself rather than truncating to "Manchest". What
-              changed is only where it lands when there IS room: against
-              the name instead of against the card's edge. `pl-2` went
-              with it — the row's own `gap-2` is the space now, so the
-              strip no longer carries 8px of its own.
-              AND THE ROW WRAPS AT EVERY DENSE WIDTH, not from `md` up.
-              The wrap used to start at `md` because that is where the
-              grid first went past two columns and the card first got
-              narrow; the anchor's corner takes its 76px at EVERY width
-              now, so the single-column phone card is as tight as the
-              four-up one — measured, 228px of name row at 390 against
-              233 at 1440. Without the wrap there, the strip cannot drop
-              and the name is squeezed instead: `Manchester City` came
-              back 128px wide over two lines. Wrapping is the behaviour
-              this row was given for exactly that reason; it just had
-              the wrong breakpoint on it. */}
+      {/* The fixture line is the way IN. A board of ranked matches you
+          cannot open is a list of names — every dashboard already links
+          this same id space. Wraps only the matchup, so the Stage-1/2
+          numbers below stay plain text. */}
+      {/* THE MATCHUP + THE ANCHOR, BESIDE EACH OTHER (restored
+          2026-09-11). Two team lines with the ● / ○ pips that also mark
+          the dumbbell's ends — the mapping teaches itself — and the
+          active sort metric as a 20px right-anchored number beside them,
+          so the column scans as a ranked ladder without reading a word.
+          The whole block is the link in.
+          #48 HOISTED THE FIGURE OUT OF HERE, into a column of its own
+          level with the chip row, and the operator asked for this card
+          back: "this was so good and then recent fix ruin it"; "the date
+          is the most top right, then GD/g go under it". So the chip row
+          is a full-width row above this again — the kickoff at its right
+          end is the card's topmost, rightmost element — and the anchor is
+          UNDER that date rather than outboard of it. Both are flush with
+          the card's content edge, which is what makes them read as one
+          right-hand column instead of two competing corners.
+          NO WIDTH CAP IS NEEDED HERE, and that is why the cap went with
+          the corner rather than being kept for safety. #48's 76px bought
+          room for a block standing beside the chip row AND the names at
+          once; beside the names alone the figure is one 20px line with
+          its key under it, sized at max-content by `flex-none` — the
+          width this card was drawn against, and the width the dense
+          branch below stacks away entirely. */}
+      <Link
+        href={rowHref(row)}
+        aria-label={`open ${row.favourite} versus ${row.opponent}`}
+        className={`mt-2.5 flex items-start gap-3 rounded-md outline-none transition-colors hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bs${
+          // THE ANCHOR STOPS COMPETING WITH THE NAMES FOR ONE LINE. Side
+          // by side in a ~200px track the figure takes ~60px of it and
+          // "Manchester City" is left with room for "Man…". Stacked, the
+          // names get the whole width and the figure keeps its 20px.
+          dense ? " md:flex-col md:items-stretch md:gap-1" : ""}`}>
+        <span className="min-w-0 flex-1">
+          {/* THE FORM STRIP DROPS TO ITS OWN LINE BEFORE THE NAME BREAKS.
+              A cup strip is 5 cells plus the word "cup" — ~70px of a
+              ~170px track — and beside a name it left "Manchester City"
+              with room for "Manchest". Flex line-breaking measures each
+              item at its max-content, so the strip wraps below exactly
+              when the whole name will not sit next to it, and the name
+              then gets the line to itself. `ml-auto` keeps it at the
+              right edge on whichever line it lands on.
+              THE PIP AND THE NAME ARE TWO ITEMS AGAIN (2026-09-11). #48
+              grouped them because the corner left `Manchester City` too
+              little room to sit beside an 8px dot, and the line breaker
+              orphaned the dot onto a line of its own at 820 and 1024.
+              That was the corner's doing: the wrap only runs from `md`
+              up, where the anchor is stacked ABOVE the names and the row
+              has the whole card. Measured at 390 / 820 / 1024 / 1280 /
+              1440 in both tracks — the pip and the name share a line at
+              every one. */}
           <span className={`flex min-w-0 items-center gap-2${
-            dense ? " flex-wrap" : ""}`}>
-            {/* THE PIP AND THE NAME WRAP AS ONE ITEM, and this is what
-                the corner cost. With the anchor holding 76px of a 211px
-                dense track, `Manchester City` at its max-content no
-                longer fits beside the 8px pip — and to a flex line
-                breaker those were two items, so the PIP took the first
-                line by itself and the name started the second. A dot
-                alone on a line is not a layout, it is a defect that
-                measures as one. Grouped, the pair moves together and
-                the name shrinks INSIDE the group, wrapping to a second
-                line the way this card's dense mode has always preferred
-                to truncating. Measured at 390 / 820 / 1024 / 1280 /
-                1440; the widest step keeps the whole name on one line. */}
-            <span className="flex min-w-0 items-center gap-2">
-              <span aria-hidden
-                className="h-2 w-2 flex-none rounded-full [background:var(--lg)]" />
-              <span
-                className={`text-[15.5px] font-semibold text-ink-hi [font-family:var(--font-archivo)] [font-stretch:95%] ${
-                  // A CLUB NAME WRAPS RATHER THAN TRUNCATING IN A NARROW
-                  // TRACK. `truncate` is the right answer at 330px, where
-                  // it fires on the two longest names in Europe; at 200px
-                  // it fires on most of them, and a board of "Bayer Le…"
-                  // is a board you cannot read. `anywhere` rather than
-                  // `break-word` so the span's min-content contribution is
-                  // zero and a long name can never push the row wider than
-                  // its track.
-                  dense ? "min-w-0 [overflow-wrap:anywhere]" : "truncate"}`}
-                title={`${row.favourite} v ${row.opponent}`}>
-                {row.favourite}
-              </span>
+            dense ? " md:flex-wrap" : ""}`}>
+            <span aria-hidden
+              className="h-2 w-2 flex-none rounded-full [background:var(--lg)]" />
+            <span
+              className={`text-[15.5px] font-semibold text-ink-hi [font-family:var(--font-archivo)] [font-stretch:95%] ${
+                // A CLUB NAME WRAPS RATHER THAN TRUNCATING IN A NARROW
+                // TRACK. `truncate` is the right answer at 330px, where
+                // it fires on the two longest names in Europe; at 200px
+                // it fires on most of them, and a board of "Bayer Le…"
+                // is a board you cannot read. `anywhere` rather than
+                // `break-word` so the span's min-content contribution is
+                // zero and a long name can never push the row wider than
+                // its track.
+                dense ? "min-w-0 [overflow-wrap:anywhere]" : "truncate"}`}
+              title={`${row.favourite} v ${row.opponent}`}>
+              {row.favourite}
             </span>
             {badge && (
               <span data-testid="home-badge" data-venue={row.venue_class?.class}
@@ -635,41 +593,34 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
               </span>
             )}
             <FormStrip form={row.form?.fav} name={row.favourite}
-              scope={row.form?.scope} cupScope={row.form?.scope_is_cup} />
+              scope={row.form?.scope} cupScope={row.form?.scope_is_cup}
+              className="ml-auto pl-2" />
           </span>
           <span className={`mt-0.5 flex min-w-0 items-center gap-2${
-            dense ? " flex-wrap" : ""}`}>
-            {/* the opponent's pip and name, grouped for the same reason */}
-            <span className="flex min-w-0 items-center gap-2">
-              <span aria-hidden
-                className="h-[7px] w-[7px] flex-none rounded-full border border-ink-low bg-bs" />
-              <span className={`text-[12.5px] text-ink-low [font-family:var(--font-archivo)] [font-stretch:96%] ${
-                dense ? "min-w-0 [overflow-wrap:anywhere]" : "truncate"}`}>
-                <span className="text-ink-faint">vs </span>{row.opponent}
-              </span>
+            dense ? " md:flex-wrap" : ""}`}>
+            <span aria-hidden
+              className="h-[7px] w-[7px] flex-none rounded-full border border-ink-low bg-bs" />
+            <span className={`text-[12.5px] text-ink-low [font-family:var(--font-archivo)] [font-stretch:96%] ${
+              dense ? "min-w-0 [overflow-wrap:anywhere]" : "truncate"}`}>
+              <span className="text-ink-faint">vs </span>{row.opponent}
             </span>
             <FormStrip form={row.form?.opp} name={row.opponent}
-              scope={row.form?.scope} cupScope={row.form?.scope_is_cup} />
+              scope={row.form?.scope} cupScope={row.form?.scope_is_cup}
+              className="ml-auto pl-2" />
           </span>
-          </Link>
-        </div>
-        {/* THE ANCHOR, IN THE CORNER — and capped at 76px, which is the
-            one number this column needs.
-            THE FIGURE NEVER WRAPS: it is at most six glyphs of 20px
-            mono (12px each, so 72px) — `−12.34`, `+2.63`, `100¢`, `n/a`
-            — so the cap is above every figure the board can print and
-            the key wraps UNDER it instead of the number breaking. The
-            4px over that is all the slack there is: 80 was tried and
-            measured, and it cost `Manchester City` its line at 820px by
-            a fraction of a pixel.
-            AND THE NAMES KEEP THE REST. Uncapped, this column takes its
-            key's max-content — "LEAGUE GAP · GOALS" is 110px — which in
-            a 226px dense track would leave the club names ~100px and
-            reduce the biggest ink on the card to syllables. Capped, the
-            8.5px key spends the extra lines it needs and the 15.5px
-            names keep the width. */}
+        </span>
+        {/* THE ANCHOR, UNDER THE DATE. `text-right` on a `flex-none`
+            column is the whole placement: the figure and its key share
+            the matchup row's right edge, which is the card's content
+            edge, which is where the chip row above has already put the
+            kickoff. `data-testid` is a handle for the guards in
+            e2e/picker-ucl-column.spec.ts, not a style. */}
         <span data-testid="anchor-block"
-          className="max-w-[76px] flex-none text-right">
+          className={`flex-none text-right${
+          // Stacked (dense, md+) the figure and its key sit on ONE line
+          // at the matchup's right edge, rather than costing two. The
+          // key is still directly beside the number it names.
+          dense ? " md:flex md:items-baseline md:justify-end md:gap-2" : ""}`}>
           {/* THE COUNTERFACTUAL, CARRIED WITHOUT INK (2026-09-07). It used
               to ride on the season chip; when the chip went it moved to
               the figure it contradicts, as a warn-coloured asterisk. The
@@ -701,12 +652,13 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
               basis sentence on hover. */}
           <span data-testid="anchor-key"
             title={anchor.basis || undefined}
-            className="mt-1 block font-mono text-[8.5px] uppercase leading-[1.35] tracking-[0.12em] text-ink-low">
+            className={`mt-1 block font-mono text-[8.5px] uppercase leading-[1.35] tracking-[0.12em] text-ink-low${
+              dense ? " md:mt-0" : ""}`}>
             {anchor.k}
             {anchor.k2 && <span className="block">{anchor.k2}</span>}
           </span>
         </span>
-      </div>
+      </Link>
 
       <RankDumbbell ranks={ranks} />
 
@@ -839,79 +791,80 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
           ? "border-accent/35 hover:border-accent/60"
           : "border-line hover:border-line-strong"}`}
     >
-      {/* THE CHIP ROW IS HANDED DOWN, NOT DRAWN ABOVE (2026-09-10).
-          It used to sit here, above the read, with the anchor inside
-          the read's own link. The anchor is now the card's upper-right
-          corner and has to be top-aligned against this row AND the club
-          names under it — one two-column region spanning a boundary
-          that ran between two components. Passing the row down puts
-          that region in ONE place; drawing it here and reaching for the
-          corner from the other side would be two files laying out
-          against each other. Every chip below is untouched: same
-          elements, same classes, same order, same conditions. */}
+      {/* THE CHIP ROW, FULL WIDTH, ABOVE THE READ (restored
+          2026-09-11). The kickoff is its last item and `ml-auto`
+          puts it at the row's right end, so the date is the card's
+          topmost and rightmost ink — "the date is the most top
+          right, then GD/g go under it", the operator. #48 passed
+          this row DOWN into RowRead as a `header` prop so the anchor
+          could take a second column beside it; that put the figure
+          OUTBOARD of the date, which is the arrangement he rejected.
+          The prop is gone with it, so RowRead has one shape again and
+          LiveCard's prematch flip renders the same read this board
+          does. Every chip below is untouched: same elements, same
+          classes, same order, same conditions. */}
+      <div className={`flex flex-wrap items-baseline gap-y-1 ${
+        dense ? "gap-x-3 md:gap-x-2" : "gap-x-3"}`}>
+        <span data-testid="row-rank"
+          className={`font-mono text-[11px] tabular-nums ${
+            rank === 1 ? "text-accent" : "text-ink-faint"}`}>
+          {String(rank).padStart(2, "0")}
+        </span>
+        {/* NO SEASON CHIP ON A ROW, AT ALL. The basis belongs to the
+            column header — `this szn · min 22 GP` — and to the fixture
+            count beside it; every club in a league is rated on the same
+            table, so a chip on a card repeats one sentence down the whole
+            column. Drawing it only on the rows that DEPART was worse than
+            either alternative: a chip appearing on some cards and not
+            others reads as a fact that varies fixture by fixture, which
+            is what it looked like on the board and is not what it means.
+            The departure is still DERIVED and still carried, as data on
+            the row rather than as ink on it (see data-season-departure),
+            so nothing about it is lost and a guard can still read it. */}
+        {/* THE COMPETITION, when it is not the column. A Leagues Cup tie
+            between two Liga MX clubs is drawn in the Liga MX column
+            because that table describes it completely — but it is still
+            a cup tie, and a card that let the reader assume "Liga MX
+            fixture" would be quietly wrong about what the price settles
+            on. This badge is the whole reason the fold is safe. */}
+        {row.column && row.column !== row.league && (
+          <span data-testid="competition-badge"
+            title={`${leagueLabel(row.league)} fixture, shown in the ${leagueLabel(row.column)} column because both clubs are rated on that table`}
+            className="rounded border border-accent/40 bg-accent/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-accent">
+            {leagueLabel(row.league)}
+          </span>
+        )}
+        {/* WHICH TABLE EACH CLUB WAS RATED ON. Only worth saying when
+            they differ — on a league column both sides are the column
+            itself, and repeating it would be noise. */}
+        {cross && row.rated_in && (
+          <span data-testid="rated-in"
+            title="each club is rated on its own domestic league's table — this cup has none of its own"
+            className="min-w-0 max-w-full truncate rounded border border-warn/40 bg-warn/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
+            {leagueLabel(row.rated_in.home)} v {leagueLabel(row.rated_in.away)}
+          </span>
+        )}
+        {/* THE FAVOURITE ON THIS CARD IS NOT THE TABLE'S. Only with
+            PICKER_VENUE_FAVOURITE on, which it is not on any board
+            served today — and exactly because it is not, the card would
+            otherwise ship a silent contradiction the first time it is:
+            every signed number below is read from the side the venue
+            named, so a rank_gap of −3 is the row stating that the
+            favourite is three places WORSE, not a sign bug. */}
+        {flipped && (
+          <span data-testid="fav-source-venue"
+            title={`The venue-aware rule named the favourite on this card, not the league table — ${row.favourite} is at home and the table gap between these two is under that rule's bar. Every signed figure below is read from ${row.favourite}'s side, so a negative gap here means the favourite is the lower-rated club. The rule is annotation the board has been switched to act on; it is not a measured edge.`}
+            className="rounded border border-warn/40 bg-warn/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
+            fav · venue rule
+          </span>
+        )}
+        <span className="ml-auto font-mono text-[11px] tabular-nums text-ink-faint">
+          {fmtDate(row.kickoff, "short")}
+        </span>
+      </div>
+
       <RowRead row={row} modeId={modeId} clubCount={clubCount}
-        dense={dense} hoisted={hoisted} field={fld}
-        header={
-          <div className={`flex flex-wrap items-baseline gap-y-1 ${
-            dense ? "gap-x-3 md:gap-x-2" : "gap-x-3"}`}>
-            <span data-testid="row-rank"
-              className={`font-mono text-[11px] tabular-nums ${
-                rank === 1 ? "text-accent" : "text-ink-faint"}`}>
-              {String(rank).padStart(2, "0")}
-            </span>
-            {/* NO SEASON CHIP ON A ROW, AT ALL. The basis belongs to the
-                column header — `this szn · min 22 GP` — and to the fixture
-                count beside it; every club in a league is rated on the same
-                table, so a chip on a card repeats one sentence down the whole
-                column. Drawing it only on the rows that DEPART was worse than
-                either alternative: a chip appearing on some cards and not
-                others reads as a fact that varies fixture by fixture, which
-                is what it looked like on the board and is not what it means.
-                The departure is still DERIVED and still carried, as data on
-                the row rather than as ink on it (see data-season-departure),
-                so nothing about it is lost and a guard can still read it. */}
-            {/* THE COMPETITION, when it is not the column. A Leagues Cup tie
-                between two Liga MX clubs is drawn in the Liga MX column
-                because that table describes it completely — but it is still
-                a cup tie, and a card that let the reader assume "Liga MX
-                fixture" would be quietly wrong about what the price settles
-                on. This badge is the whole reason the fold is safe. */}
-            {row.column && row.column !== row.league && (
-              <span data-testid="competition-badge"
-                title={`${leagueLabel(row.league)} fixture, shown in the ${leagueLabel(row.column)} column because both clubs are rated on that table`}
-                className="rounded border border-accent/40 bg-accent/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-accent">
-                {leagueLabel(row.league)}
-              </span>
-            )}
-            {/* WHICH TABLE EACH CLUB WAS RATED ON. Only worth saying when
-                they differ — on a league column both sides are the column
-                itself, and repeating it would be noise. */}
-            {cross && row.rated_in && (
-              <span data-testid="rated-in"
-                title="each club is rated on its own domestic league's table — this cup has none of its own"
-                className="min-w-0 max-w-full truncate rounded border border-warn/40 bg-warn/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
-                {leagueLabel(row.rated_in.home)} v {leagueLabel(row.rated_in.away)}
-              </span>
-            )}
-            {/* THE FAVOURITE ON THIS CARD IS NOT THE TABLE'S. Only with
-                PICKER_VENUE_FAVOURITE on, which it is not on any board
-                served today — and exactly because it is not, the card would
-                otherwise ship a silent contradiction the first time it is:
-                every signed number below is read from the side the venue
-                named, so a rank_gap of −3 is the row stating that the
-                favourite is three places WORSE, not a sign bug. */}
-            {flipped && (
-              <span data-testid="fav-source-venue"
-                title={`The venue-aware rule named the favourite on this card, not the league table — ${row.favourite} is at home and the table gap between these two is under that rule's bar. Every signed figure below is read from ${row.favourite}'s side, so a negative gap here means the favourite is the lower-rated club. The rule is annotation the board has been switched to act on; it is not a measured edge.`}
-                className="rounded border border-warn/40 bg-warn/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
-                fav · venue rule
-              </span>
-            )}
-            <span className="ml-auto font-mono text-[11px] tabular-nums text-ink-faint">
-              {fmtDate(row.kickoff, "short")}
-            </span>
-          </div>
-        } />
+        dense={dense} hoisted={hoisted} field={fld} />
 
       <div className="mt-3 border-t border-line pt-3">
         <KalshiCell quote={row.kalshi} />
