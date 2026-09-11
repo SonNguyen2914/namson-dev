@@ -2972,15 +2972,130 @@ test("nothing declared, nothing rendered — absent, not empty",
     await expect(strip(page)).toHaveCount(0); // and it drew nothing
   });
 
-test("a dormant live plane renders nothing rather than a plausible "
-   + "empty set", async ({ page }) => {
-  const resp = await openSettled(page, { version: "watched-strip-v1",
-    dormant: true, detail: "the live plane is not configured", matches: [],
-    monitored_by_source: {}, open_positions_not_monitored: [],
-    refusal_codes: REFUSAL_CODES });
+// THIS GUARD USED TO PIN THE BLANK, AND THE BLANK WAS THE DEFECT.
+//
+// It read: "a dormant live plane renders nothing rather than a plausible
+// empty set", and asserted `toHaveCount(0)` on the whole section. Half
+// of that is right and is kept below — a dormant plane must not be
+// drawn as an empty watchlist. The other half was pinning the bug: the
+// backend answers `dormant: true` WITH ITS OWN SENTENCE under `detail`
+// precisely because a plane that is not configured and a board with
+// nothing declared are indistinguishable to a reader who is shown
+// neither, and `if (data.dormant) return null` threw away the sentence,
+// the finding, and every match on the payload. The component's own
+// registry recorded the first half of that and not the second, and the
+// second is the operator's reported symptom: "live matches disappeared".
+//
+// So the guard is REPLACED rather than deleted. What it pins now is
+// that the two cases are told apart, in words, and that nothing the
+// payload carried is deleted along the way.
+
+/** THE DORMANT ANSWER AS api/main.py BUILDS IT — `{**envelope,
+ *  dormant, detail, matches: [], ...}`, with the route's own sentence
+ *  verbatim. */
+const DORMANT_SAID = "the live plane is not configured, so no "
+  + "declaration can be read and no position can be priced";
+
+const DORMANT = {
+  version: "watched-strip-v1",
+  generated_at: "2026-09-04T12:00:00Z",
+  dormant: true, detail: DORMANT_SAID, matches: [],
+  monitored_by_source: {}, open_positions_not_monitored: [],
+  monitored_not_described: [],
+  refusal_codes: REFUSAL_CODES,
+};
+
+test("a dormant live plane says so IN ITS OWN WORDS, and is never drawn "
+   + "as a watchlist with nothing in it", async ({ page }) => {
+  const resp = await openSettled(page, DORMANT);
   expect(resp.status()).toBe(200);
-  await expect(strip(page)).toHaveCount(0);
+  // IT IS DRAWN. A blank here and a blank for "nothing is declared" are
+  // the same blank, which is the whole finding.
+  await expect(strip(page)).toBeVisible();
+  await expect(strip(page)).toHaveAttribute("data-dormant", "true");
+  const said = page.getByTestId("watched-dormant");
+  await expect(said).toBeVisible();
+  // THE BACKEND'S OWN SENTENCE, TRAVELLED. Asserted from the constant
+  // the fixture was built from, so this proves the words arrived rather
+  // than proving two copies of a string match.
+  await expect(said).toContainText(DORMANT_SAID);
+  // AND IT IS NOT AN EMPTY SET. The section must not claim a count it
+  // never made.
+  const text = (await strip(page).innerText()).toLowerCase();
+  for (const lie of ["no live matches", "nothing is live",
+                     "no match is live", "0 declared"]) {
+    expect(text, `a dormant plane must not claim "${lie}"`)
+      .not.toContain(lie);
+  }
 });
+
+test("a dormant answer does not delete the matches it arrived with",
+  async ({ page }) => {
+    // THE HALF THE RETIRED GUARD DID NOT COVER, and the half that is
+    // the operator's reported symptom. `return null` on `dormant` drops
+    // EVERY DECLARED MATCH FROM THE DOM, which breaks the invariant
+    // this whole surface is responsible for — every declared match is
+    // drawn. The shape is adversarial on today's backend, which sends
+    // `matches: []` with `dormant`, and that is the point: the rule is
+    // "nothing this payload carried is deleted", not "today's emitter
+    // happens not to carry any".
+    await open(page, { ...DORMANT, matches: STRIP.matches,
+                       monitored_by_source: STRIP.monitored_by_source });
+    await expect(strip(page)).toBeVisible();
+    await expect(page.getByTestId("watched-dormant")).toBeVisible();
+    await expect(page.getByTestId("watched-match"))
+      .toHaveCount(STRIP.matches.length);
+  });
+
+test("a dormant plane that sent no `detail` says the reason is absent "
+   + "rather than inventing one", async ({ page }) => {
+    await openSettled(page, omit(DORMANT, "detail"));
+    const said = page.getByTestId("watched-dormant");
+    await expect(said).toBeVisible();
+    await expect(said).toHaveAttribute("data-said", "false");
+    await expect(said).toContainText("carried no");
+    // AND NO SENTENCE IS BORROWED. The route's own words are not typed
+    // into the component as a fallback.
+    expect(await said.innerText()).not.toContain(DORMANT_SAID);
+  });
+
+// --------------------------- the contract, when it changes underneath
+
+test("a payload announcing a contract this surface was not built "
+   + "against says so, and keeps drawing", async ({ page }) => {
+    // `data.version` WAS READ NOWHERE AT ALL until 2026-09-11: a
+    // `watched-strip-v2` payload rendered as v1, silently, with every
+    // figure below taken out of it by key name against meanings v1
+    // gives those names. What the surface DOES about that is a
+    // decision, and it is written out beside the notice that makes it
+    // (WatchedStrip's `ContractNotice`): it draws what it can read and
+    // names the mismatch, because a section that vanishes on a version
+    // bump reads as "nothing is declared".
+    await open(page, { ...STRIP, version: "watched-strip-v2" });
+    const note = page.getByTestId("watched-contract");
+    await expect(note).toBeVisible();
+    await expect(note).toHaveAttribute("data-got", "watched-strip-v2");
+    await expect(note).toContainText("watched-strip-v1");
+    // IT KEEPS DRAWING. Every declared match is still on the page.
+    await expect(page.getByTestId("watched-match"))
+      .toHaveCount(STRIP.matches.length);
+  });
+
+test("a payload that names no contract at all is named too, and the "
+   + "contract this surface reads is not claimed for it", async ({ page }) => {
+    await open(page, omit(STRIP, "version"));
+    const note = page.getByTestId("watched-contract");
+    await expect(note).toBeVisible();
+    await expect(note).toHaveAttribute("data-got", "");
+    await expect(note).toContainText("names no contract version");
+  });
+
+test("the contract this surface reads draws NO notice — the notice is a "
+   + "finding, not furniture", async ({ page }) => {
+    await open(page, STRIP);
+    await expect(strip(page)).toBeVisible();
+    await expect(page.getByTestId("watched-contract")).toHaveCount(0);
+  });
 
 test("an open position on a fixture nobody declared renders even with no "
    + "live match — a census of nothing is the one thing absence may not "

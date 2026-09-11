@@ -1753,7 +1753,15 @@ export const api = {
   // blank space, which is how this strip spent its whole life invisible
   // in production. The status and the backend's own sentence ride on
   // the error so the surface can say WHICH of them it is looking at.
-  watchedStrip: (token?: string) => fetchWatchedStrip(token ?? ""),
+  //
+  // AND IT TAKES A SIGNAL. A read with no way to be called off is a
+  // read that can hang forever: measured 2026-09-11, three of four
+  // polls never answered and nothing on the page said they had not.
+  // The CEILING is the caller's to set — lib/watchedStripFeed.ts
+  // derives it from the poll cadence — and this layer only carries the
+  // signal through to `fetch`.
+  watchedStrip: (token?: string, signal?: AbortSignal) =>
+    fetchWatchedStrip(token ?? "", signal),
 };
 
 /** A watched-strip read that did not produce a payload.
@@ -1797,13 +1805,13 @@ export class WatchedStripRefusal extends Error {
   }
 }
 
-async function fetchWatchedStrip(token: string):
+async function fetchWatchedStrip(token: string, signal?: AbortSignal):
     Promise<WatchedStripResponse> {
   const sent = token !== "";
   let res: Response;
   try {
     res = await fetch(`${base}/watched-strip`,
-      { headers: sent ? { "x-admin-token": token } : {} });
+      { headers: sent ? { "x-admin-token": token } : {}, signal });
   } catch (err) {
     // Nothing answered. NOT folded into a status — an unreachable proxy
     // and a refusal are different findings and the surface says which
