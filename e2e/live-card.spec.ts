@@ -1,4 +1,9 @@
 import { expect, test } from "@playwright/test";
+// THE ABSENT-CLOCK WORDS ARE THE READER'S. Typing the sentence into
+// this file would let the surface and the guard drift apart and still
+// agree — a fixture speaking the reader's vocabulary instead of the
+// wire's is how twelve green tests once certified a venue bug.
+import { CLOCK_ABSENT_WORDS } from "../src/lib/suggesterApi";
 
 // THE LIVE SECTION — the cards for matches under way, above the ranked
 // board on /bet-suggester (components/LiveCard.tsx).
@@ -501,7 +506,10 @@ test("a tape that could not be read says so IN THE AGE SLOT, and is "
   // NEVER A ZERO. The score and the minute are withdrawn, not floored:
   // 0–0 at 0' is a claim about a match nobody could look at.
   await expect(card.getByTestId("live-score")).toHaveText("—");
-  await expect(card.getByTestId("live-minute")).toHaveText("no minute");
+  await expect(card.getByTestId("live-minute"))
+    .toHaveText(CLOCK_ABSENT_WORDS);
+  await expect(card.getByTestId("live-minute"))
+    .toHaveAttribute("data-source", "unstated");
 
   // NEVER AN EMPTY. `in_play` is FAIL-CLOSED false on a failed read, so
   // a section filtering on it alone would have deleted this card
@@ -512,6 +520,115 @@ test("a tape that could not be read says so IN THE AGE SLOT, and is "
   // And no stat bar is drawn off a read that did not happen.
   await expect(card.getByTestId("live-stat")).toHaveCount(0);
   await expect(card.getByTestId("live-stats-absent")).toBeVisible();
+});
+
+// ============================== a read that RAN and measured nothing
+//
+// THE LIVE FINDING, 2026-09-11. Fixture 994 arrived with
+// `read.words: null`, `read.sides` carrying BOTH sides and eight
+// components, every value null — and `states.counts` on the same
+// response carrying real shots and real possession. This card printed
+// "no component read has been persisted for this fixture", which is the
+// BACKEND's sentence for a completely different shape and which nothing
+// on that response supported. The read was persisted. The card asserted
+// the collector had written nothing.
+//
+// `anyRead` is the deeper half of it: false for "a read exists and
+// measured nothing" and false for "no read exists", so the branch could
+// not have told the two apart even with the right sentence in it.
+
+/** The 994 shape: both sides read, every component NULL, and the row's
+ *  own `basis` carrying live_read's reason — a watch declared mid-match
+ *  has no elapsed time behind its folds yet. */
+function nullRead(name: string) {
+  const s = side(name);
+  return { ...s,
+    observed_from_kickoff: false,
+    basis: "live-read-components-v1 half_life=600s match-clock | joined "
+      + "in_play PARTIAL | shot=0i/0s on_target=0i/0s corner=0i/0s "
+      + "possession=0i/0s | NULL: shot_read, on_target_read, "
+      + "corner_read, possession_read | no elapsed match time observed "
+      + "yet — NULL, not a zero",
+    components: Object.fromEntries(Object.entries(s.components).map(
+      ([k, c]) => [k, { ...c, [c.value_key]: null,
+                        observed_seconds: 0.0, observed_intervals: 0 }])),
+  };
+}
+
+const READ_RAN_EMPTY = { ...liveMatch(), fixture_id: 994,
+  read: { version: "live-read-v1", read_version: "live-read-components-v1",
+          fixture_id: 994, monitored: true, coverage: COVERAGE,
+          components_registry: {}, kinds: {},
+          // NO `words` KEY AT ALL — the backend sets it INSTEAD of
+          // sides, so a payload with sides has none. This is the shape
+          // the invented sentence used to fill in for.
+          sides: { away: nullRead("away"), home: nullRead("home") } } };
+
+test("a read that RAN and measured nothing is never reported as a read "
+   + "that was never persisted", async ({ page }) => {
+  await open(page, { ...ENVELOPE, matches: [READ_RAN_EMPTY],
+                     monitored_by_source: { manual: [994] } });
+  const absent = liveCard(page, 994).getByTestId("live-stats-absent");
+  await expect(absent).toBeVisible();
+
+  /* THE CLAIM THAT MAY NOT BE MADE. It is the backend's own sentence
+     for a fixture with no persisted read, and this response is not
+     that: it carries two sides and eight components. A surface that
+     types out another layer's sentence gets to say it over payloads
+     that layer would never have said it about. */
+  await expect(absent)
+    .not.toContainText("no component read has been persisted");
+
+  // WHAT IS DRAWN INSTEAD: the row's own basis, verbatim — the payload
+  // saying, in the emitter's words, that no match time has been
+  // observed under this watch yet.
+  await expect(absent).toContainText("no elapsed match time observed yet");
+  await expect(absent).toHaveAttribute("data-code", "basis");
+
+  /* AND THE TWO FACTS ARE SEPARABLE WITHOUT READING THE PROSE, which is
+     the half `anyRead` could not express: `data-sides` is how many
+     sides the read carried. Two here; zero on the failed-tape card
+     below, which IS the no-persisted-read case and says so in the
+     backend's words. */
+  await expect(absent).toHaveAttribute("data-sides", "2");
+
+  await open(page, { ...ENVELOPE, matches: [TAPE_FAILED] });
+  const none = liveCard(page, 606).getByTestId("live-stats-absent");
+  await expect(none).toHaveAttribute("data-sides", "0");
+  await expect(none).toHaveAttribute("data-code", "payload");
+  await expect(none).toContainText("no component read has been persisted");
+});
+
+test("the strip and the card draw ONE clock for one fixture — the same "
+   + "reader, off the same response", async ({ page }) => {
+  /* THE DEFECT, EXACTLY AS IT SHIPPED. Both surfaces mount on
+     /bet-suggester and both are fed by api.watchedStrip(). WatchedStrip
+     preferred `state.minute` with `clock_display` as its fallback;
+     LiveCard preferred `clock_display`. In stoppage time that is 45'
+     in the strip and 45'+5' on the card below it — the same match, two
+     clocks, one screen.
+
+     THE ASSERTION IS AGREEMENT, not a literal: it compares the two
+     surfaces against EACH OTHER and against the payload's own field, so
+     it goes red for either reader drifting rather than for the string
+     changing. */
+  const stoppage = { ...liveMatch(), state: { ...liveMatch().state,
+    minute: 45, clock_display: "45'+5'" } };
+  await open(page, { ...ENVELOPE, matches: [stoppage] });
+
+  const card = liveCard(page, 101).getByTestId("live-minute");
+  const strip = page.locator('[data-testid="watched-match"][data-fixture="101"]')
+    .getByTestId("watched-clock");
+  await expect(card).toHaveCount(1);
+  await expect(strip).toHaveCount(1);
+  await expect(card).toHaveText("45'+5'");
+  await expect(strip).toHaveText("45'+5'");
+  expect((await strip.innerText()).trim())
+    .toBe((await card.innerText()).trim());
+  // and both say WHICH field answered, so a future disagreement is a
+  // disagreement about the payload rather than about a sentence
+  await expect(card).toHaveAttribute("data-source", "clock_display");
+  await expect(strip).toHaveAttribute("data-source", "clock_display");
 });
 
 // ================================================== the flip, and what

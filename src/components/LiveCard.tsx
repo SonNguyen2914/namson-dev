@@ -90,7 +90,8 @@ import {
 } from "../lib/pickerApi";
 import {
   LiveReadComponentPayload, STATE_ABSENT_WORDS, WatchedMatch,
-  WatchedPosition, WatchedStripResponse, api, readMatchStates,
+  WatchedPosition, WatchedStripResponse, api, readMatchClock,
+  readMatchStates, readSilence,
 } from "../lib/suggesterApi";
 import { clubColors } from "../lib/teamColors";
 import { RowRead, hueOf } from "./PickerColumn";
@@ -260,8 +261,14 @@ function Rule({ label, control }: { label: string; control?: React.ReactNode }) 
 /** A ROUTINE ABSENCE — a market that was never listed, a figure this
  *  payload has never carried. The board writes `no kalshi event` in
  *  plain faint ink for exactly this, because it is a normal night. */
-function Quiet({ children, testid, code }: {
+function Quiet({ children, testid, code, sides }: {
   children: React.ReactNode; testid?: string;
+  /** HOW MANY SIDES THE READ CARRIED, when this slot is a read's own
+   *  silence. 0 is "nothing was persisted" and a positive number is "a
+   *  read ran and measured nothing" — two different facts that wore one
+   *  sentence here until 2026-09-11, and a guard must be able to tell
+   *  them apart without parsing the prose. Absent on every other use. */
+  sides?: number;
   /** WHICH absence this is, when one slot can hold more than one. A
    *  line that says nothing was measured and a line that says the
    *  corpus REFUSED to quote a cell are different findings wearing the
@@ -271,6 +278,7 @@ function Quiet({ children, testid, code }: {
 }) {
   return (
     <p data-testid={testid} data-absence="routine" data-code={code}
+      data-sides={sides}
       className="mt-1 font-mono text-[10.5px] leading-snug text-ink-faint">
       {children}
     </p>
@@ -518,8 +526,31 @@ function dismissal(m: WatchedMatch): string | null {
   return null;
 }
 
-function StatsBlock({ m, hc, ac }: {
+/** THE TWO SILENCES THIS BLOCK USED TO FOLD INTO ONE.
+ *
+ *  Until 2026-09-11 the absent case printed, in this file's own words,
+ *  "no component read has been persisted for this fixture" whenever
+ *  `read.words` was missing. That is the BACKEND's sentence for one
+ *  specific shape — a fixture with no persisted read at all — and this
+ *  card printed it over a different shape entirely. Live payload, same
+ *  morning: fixture 994 carried `read.words: null`, `read.sides` with
+ *  both sides and eight components, every value null, and
+ *  `states.counts` with real shots and possession beside them. The read
+ *  WAS persisted. The card asserted the collector had written nothing.
+ *
+ *  `anyRead` is the deeper half: it is false for "a read exists and
+ *  measured nothing" and false for "no read exists", so the branch
+ *  could not have told them apart even with the right sentence. The
+ *  shared reader answers out of the SIDES first (their registered
+ *  refusals, then the side's own `basis`) and only falls through to
+ *  `read.words` when there are no sides — and it reports `sides` so the
+ *  two facts are separable by a guard rather than by reading prose.
+ *
+ *  This is WatchedStrip.readAbsent's move, one surface over, and it is
+ *  now literally the same function. */
+function StatsBlock({ m, hc, ac, registry }: {
   m: WatchedMatch; hc: string; ac: string;
+  registry: Record<string, string>;
 }) {
   const sides = m.read?.sides ?? {};
   const home = sides.home?.components;
@@ -527,18 +558,18 @@ function StatsBlock({ m, hc, ac }: {
   const red = dismissal(m);
   const anyRead = STAT_ROWS.some(({ key }) =>
     valueOf(home?.[key]) != null || valueOf(away?.[key]) != null);
+  const silence = anyRead ? null : readSilence(m.read, registry);
   return (
     <>
-      {anyRead ? STAT_ROWS.map(({ key, label }) => (
+      {anyRead || !silence ? STAT_ROWS.map(({ key, label }) => (
         <SplitBar key={key} label={label}
           hv={valueOf(home?.[key])} av={valueOf(away?.[key])}
           unit={home?.[key]?.unit ?? away?.[key]?.unit ?? ""}
           hc={hc} ac={ac} />
       )) : (
-        <Quiet testid="live-stats-absent">
-          {typeof m.read?.words === "string" && m.read.words !== ""
-            ? m.read.words
-            : "no component read has been persisted for this fixture"}
+        <Quiet testid="live-stats-absent" code={silence.source}
+          sides={silence.sides}>
+          {silence.words}
         </Quiet>
       )}
       {/* NO CARD COUNT IS ON THIS PAYLOAD, so none is drawn and none is
@@ -1076,9 +1107,11 @@ function PositionBlock({ p }: { p: WatchedPosition | undefined }) {
 // THE CARD
 // ---------------------------------------------------------------------
 
-export function LiveCard({ m, generatedAt, row, clubCount }: {
+export function LiveCard({ m, generatedAt, row, clubCount, registry }: {
   m: WatchedMatch;
   generatedAt: string | undefined;
+  /** the response's own position.REFUSAL_CODES — never a set typed here */
+  registry: Record<string, string>;
   /** the ranked board's OWN row for this fixture, joined on
    *  `espn_event_id`; absent when the board no longer carries it (the
    *  board is upcoming fixtures, and a match in play has often left it) */
@@ -1093,9 +1126,11 @@ export function LiveCard({ m, generatedAt, row, clubCount }: {
   const held = positions[0];
   const score = st?.score_home != null && st?.score_away != null
     ? `${st.score_home}–${st.score_away}` : "—";
-  const minute = st?.clock_display && st.clock_display !== ""
-    ? st.clock_display
-    : st?.minute != null ? `${st.minute}'` : "no minute";
+  // THE SHARED CLOCK READER. This card had the RIGHT precedence and the
+  // strip above it had the opposite one, off the same
+  // api.watchedStrip() response — 45'+5' here over 45' there, one match,
+  // one screen (2026-09-11). Neither file spells the rule now.
+  const clock = readMatchClock(st);
   /* THE COMPETITION, LABELLED ON BOTH BRANCHES. The board row's league
      is a picker slug; the payload's own `competition_slug` is the LIVE
      plane's (`mls-2026`), and until 2026-09-09 the second branch printed
@@ -1156,7 +1191,9 @@ export function LiveCard({ m, generatedAt, row, clubCount }: {
               <i aria-hidden
                 className="h-[6px] w-[6px] flex-none rounded-full bg-live" />
             )}
-            <span data-testid="live-minute">{minute}</span>
+            <span data-testid="live-minute" data-source={clock.source}>
+              {clock.text}
+            </span>
           </div>
           <div data-testid="live-score"
             className="mt-px text-[23px] font-semibold tracking-[-0.02em] text-ink-hi">
@@ -1188,7 +1225,8 @@ export function LiveCard({ m, generatedAt, row, clubCount }: {
                 className="flex-none rounded-[5px] border border-line-strong px-[7px] py-[2px] font-mono text-[8px] uppercase tracking-[0.1em] text-ink-faint transition-colors hover:border-accent/50 hover:text-accent">
                 prematch ⤺
               </button>} />
-            <StatsBlock m={m} hc={colours.home} ac={colours.away} />
+            <StatsBlock m={m} hc={colours.home} ac={colours.away}
+              registry={registry} />
             {/* INSIDE THE FLIP, directly under the bars it is derived
                 from — see the block comment above StateRow. */}
             <StateRow m={m} />
@@ -1465,6 +1503,13 @@ export default function LiveSection({ rows, leagues, columns }: {
           return (
             <LiveCard key={m.fixture_id} m={m}
               generatedAt={data?.generated_at} row={row}
+              /* THE REGISTRY RIDES ON THE RESPONSE, and the card names
+                 a refusal out of it rather than out of a list spelled
+                 in this file — position.REFUSAL_CODES, verbatim, so a
+                 code adopted upstream names itself here the day it
+                 ships. An envelope that published none is an empty
+                 registry and NOT a licence to guess. */
+              registry={data?.refusal_codes ?? {}}
               clubCount={leagues[slug]?.clubs ?? 0} />
           );
         })}
