@@ -10,6 +10,11 @@ import {
   REQUIRED_LISTS, UNCODED_ABSENCE_KEYS,
   UNRENDERED_ENVELOPE_KEYS, UNRENDERED_PAYLOAD_KEYS,
 } from "../src/components/WatchedStrip";
+// THE ABSENT-CLOCK WORDS ARE THE READER'S, NOT THIS FILE'S. Typing the
+// sentence here would let the surface and the guard drift apart and
+// still agree — which is what a fixture speaking the reader's
+// vocabulary always does.
+import { CLOCK_ABSENT_WORDS } from "../src/lib/suggesterApi";
 
 /** A payload MINUS one key — the shape a route that stopped sending it
  *  produces. Written as a helper so the served object is the real thing
@@ -2068,6 +2073,21 @@ function component(key: string, value: number | null, unit: string,
   };
 }
 
+/** live_read._Fold.read(), VERBATIM: the note a component carries when
+ *  its denominator never moved. ONE wording shared by all four, which
+ *  is why `_basis` can dedupe it into a single sentence on the row.
+ *
+ *  THE FILE THAT READS THIS USED TO WRITE ITS OWN. Beside every null
+ *  component the strip printed "the provider did not send it, and
+ *  missing is never zero" — a CAUSE, and on the live payload of
+ *  2026-09-11 a false one: `states.counts` on the same response carried
+ *  shots 6/7 and possession 42.5/57.5 for the fixture whose eight
+ *  components were all null. The provider sent them. The reason was
+ *  this sentence, on `read.sides.*.basis`, and no surface drew it. */
+const NO_ELAPSED_TIME =
+  "no elapsed match time observed yet — NULL, not a zero; input absent "
+  + "on 12 tick(s)";
+
 // live_read.BASELINE_IS_JOINED, VERBATIM off the emitter.
 //
 // It rode here as `baseline_is_not_built`, carrying a sentence saying
@@ -2313,6 +2333,15 @@ const BEHIND = {
     sides: {
       home: side("home", {
         observed_from_kickoff: false,
+        // live_read._basis, in its own order: version and half-life,
+        // the join and its PARTIAL mark, the per-component window, the
+        // names whose value is NULL, then the deduped notes. This is
+        // where the reason for a null actually ships, and it is the
+        // string the surface now draws instead of one of its own.
+        basis: "live-read-components-v1 half_life=600s match-clock | "
+          + "joined in_play PARTIAL | shot=12i/1440s on_target=12i/1440s "
+          + "corner=0i/0s possession=12i/1440s | NULL: corner_read | "
+          + NO_ELAPSED_TIME + " | " + NO_HISTORY_IS_NOT_QUIET,
         state: {
           side: "home", minute: 81, score_home: 2, score_away: 2,
           goal_difference: 0, score_state: "level", conditionable: true,
@@ -2326,9 +2355,17 @@ const BEHIND = {
           on_target_read: component("on_target_read", 2.1,
             "shots on target per 90 match-minutes", "rate"),
           // MISSING IS NEVER ZERO: the provider omitted wonCorners on
-          // these ticks, so the column is NULL and the row says so.
+          // these ticks, so the column is NULL and the row says so —
+          // and the PAYLOAD says WHY, in `_Fold.read()`'s own words,
+          // with the observed window that produced it beside them. A
+          // fold that never accumulated reports 0i/0s, NOT the 12i/1440s
+          // its three siblings carry, which is the fixture speaking the
+          // emitter's language rather than the reader's.
           corner_read: component("corner_read", null,
-            "corners per 90 match-minutes", "rate"),
+            "corners per 90 match-minutes", "rate", {
+              observed_seconds: 0.0, observed_intervals: 0,
+              note: NO_ELAPSED_TIME,
+            }),
           possession_read: component("possession_read", 41.9,
             "percent of possession", "level",
             { possession_is_distrusted: POSSESSION_DISTRUSTED }),
@@ -3026,8 +3063,9 @@ test("possession carries the sentence that distrusts it, in the "
     await expect(caveat).toContainText("DISTRUSTS BY NAME");
   });
 
-test("a component the provider did not send reads as absent, never as "
-   + "zero", async ({ page }) => {
+test("a component with no number reads as absent, never as zero — and "
+   + "the reason drawn is the PAYLOAD'S, not this surface's",
+  async ({ page }) => {
   await open(page, STRIP);
   const home = match(page, 202)
     .locator('[data-testid="watched-read-side"][data-side="home"]');
@@ -3040,7 +3078,40 @@ test("a component the provider did not send reads as absent, never as "
   const row = home.locator('[data-component="corner_read"]');
   await expect(row).toHaveCount(1);
   await expect(row).not.toContainText("0.0");
-  await expect(row).toContainText("missing is never zero");
+
+  /* THE SENTENCE THIS REPLACED, AND WHY IT HAD TO GO. Until 2026-09-11
+     this assertion read `toContainText("missing is never zero")`, and
+     what it was pinning was the SECOND HALF of a sentence this file
+     wrote beside every null component: "the provider did not send it,
+     and missing is never zero". The second half is the project's rule
+     and stands. The FIRST half is a cause, and on the live payload that
+     morning it was false — `states.counts` on the same response carried
+     shots 6/7 and possession 42.5/57.5 for a fixture whose eight
+     components were all null, and the admin tape held 36 snapshots with
+     possession on 33 of them. A guard that asserts the true half of a
+     false sentence pins the false half too.
+
+     WHAT IS ASSERTED INSTEAD: that the words on screen are the ones the
+     PAYLOAD sent, byte for byte, and that the surface names which part
+     of the payload they came off. */
+  const why = home.getByTestId("watched-component-null-reason");
+  await expect(why).toHaveCount(1);
+  await expect(why).toHaveAttribute("data-source", "basis");
+  await expect(why).toContainText(NO_ELAPSED_TIME);
+  // it names WHICH component has no number, so the reason cannot be
+  // read as a fact about the three that do
+  await expect(why).toContainText("corner_read is null");
+  // and the cause this file used to invent is nowhere on the card
+  expect(await match(page, 202).innerText())
+    .not.toContain("the provider did not send it");
+  // THE EVIDENCE BEHIND EACH NUMBER, which also ships and was drawn
+  // nowhere: a rate over no observed time and one over twenty-four
+  // minutes are not the same evidence, and the fold that produced no
+  // number says 0i/0s rather than borrowing its siblings' window.
+  await expect(row.getByTestId("watched-component-window"))
+    .toHaveText(/0i\/0s/);
+  await expect(home.locator('[data-component="shot_read"]')
+    .getByTestId("watched-component-window")).toHaveText(/12i\/1440s/);
   // every component the payload served has a row of its own, keyed by
   // its own name — four values under one shared key is the composite
   // with the types filed off
@@ -3053,6 +3124,92 @@ test("a component the provider did not send reads as absent, never as "
     await expect(home.locator(`[data-component="${key}"]`)).toHaveCount(1);
   }
 });
+
+test("a refusal code this file has never heard of is named from the "
+   + "payload's OWN registry, and glossed with the registry's words",
+  async ({ page }) => {
+    /* THE RULE, AND WHY IT IS TESTED WITH A CODE THAT DOES NOT EXIST
+       HERE YET. Backend PR #125 adds `thin_observed_window` to
+       position.REFUSAL_CODES: live_read withholds a RATE until one
+       half-life of match time is behind it, because on a fold's first
+       usable interval one event IS the whole number (one shot over 30s
+       reads 180 per 90). It lands as a NULL component with a coded
+       sentence — exactly the cell that used to print "the provider did
+       not send it", which that refusal is not.
+
+       The strip must draw it WITHOUT AN EDIT the day it ships. So the
+       code is served only on this payload's own `refusal_codes`, and
+       the assertion below first proves this file's own registry const
+       does not carry it: if the surface can name it here, it named it
+       off the payload and nowhere else. */
+    const CODE = "thin_observed_window";
+    expect(REFUSAL_CODES, "this test proves a code is read off the "
+      + "PAYLOAD's registry. If the file's own const carries it, the "
+      + "surface could have learned it here and the test proves nothing")
+      .not.toHaveProperty(CODE);
+    const DEFINED = "a RATE was asked for before enough match time had "
+      + "passed under it. It is NULL with the observed window stated "
+      + "beside it, never a zero and never a silent absence";
+    const SAID = `${CODE}: 120s of match time is behind this rate and `
+      + "none is printed under 600s "
+      + "(live_read.MIN_RATE_OBSERVED_SECONDS, one half-life)";
+
+    /* TWO SHAPES, BOTH REAL. The fold writes the coded sentence into
+       the component's own `note`; `read_for_fixture` projects a generic
+       coverage note and the coded sentence survives on the ROW'S
+       `basis`, which is where the live payload actually carries it
+       (live_read.REGISTERED_HOLES['observed_window_is_prose_on_the_row']
+       is the backend's own record of why). A reader that only knew one
+       of the two would go blind the moment the other shipped. */
+    const gated = { ...AHEAD, read: { ...AHEAD.read, sides: {
+      home: side("home", {
+        components: { shot_read: component("shot_read", null,
+          "shots per 90 match-minutes", "rate", {
+            observed_seconds: 120.0, observed_intervals: 4,
+            note: SAID,
+          }) },
+      }),
+      away: side("away", {
+        basis: "live-read-components-v1 half_life=600s match-clock | "
+          + "joined pre_kickoff | shot=4i/120s | NULL: shot_read | "
+          + SAID,
+        components: { shot_read: component("shot_read", null,
+          "shots per 90 match-minutes", "rate", {
+            observed_seconds: null, observed_intervals: null,
+            note: "the evidence behind this number was counted at the "
+              + "tick and is on the row's basis",
+          }) },
+      }),
+    } } };
+    await open(page, { ...EMPTY, matches: [gated],
+                       refusal_codes: { ...REFUSAL_CODES, [CODE]: DEFINED },
+                       monitored_by_source: { manual: [101] } });
+
+    // ON THE COMPONENT'S OWN NOTE: the cell names the code, so a reader
+    // knows WHICH row the refusal belongs to.
+    const home = match(page, 101)
+      .locator('[data-testid="watched-read-side"][data-side="home"]');
+    await expect(home.getByTestId("watched-component-null"))
+      .toHaveAttribute("data-code", CODE);
+    const homeWhy = home.getByTestId("watched-component-null-reason");
+    await expect(homeWhy).toHaveAttribute("data-source", "refusal");
+    await expect(homeWhy).toContainText(SAID);
+    // AND GLOSSED WITH THE REGISTRY'S OWN DEFINITION — the name plus
+    // what the name means, neither of them written in this repo.
+    await expect(homeWhy).toContainText(DEFINED);
+
+    // ON THE ROW'S BASIS ONLY: the side still names it, and the cell
+    // does not — the payload attributed it to the row, not to the
+    // component, and the surface does not move it.
+    const away = match(page, 101)
+      .locator('[data-testid="watched-read-side"][data-side="away"]');
+    const awayWhy = away.getByTestId("watched-component-null-reason");
+    await expect(awayWhy).toHaveAttribute("data-source", "refusal");
+    await expect(awayWhy).toHaveAttribute("data-codes", CODE);
+    await expect(awayWhy).toContainText(SAID);
+    await expect(away.getByTestId("watched-component-null"))
+      .toHaveAttribute("data-code", "");
+  });
 
 test("a mid-way join says so, and says the tape before it does not exist",
   async ({ page }) => {
@@ -4066,6 +4223,90 @@ test("a score the tape did not carry is named, never rendered 0–0",
     // and the minute it could not read is words, not minute 0
     await expect(line).toContainText("HT");
     await expect(line).not.toContainText("0'");
+    // DRAWN FROM `clock_display`, and it says so. This fixture has
+    // `minute: null`, which is the ONLY case this test exercised until
+    // 2026-09-11 — see the test below for the case that shipped a bug.
+    await expect(match(page, 303).getByTestId("watched-clock"))
+      .toHaveAttribute("data-source", "clock_display");
+  });
+
+test("with BOTH a clock and a minute the provider's clock wins — the "
+   + "ordinary case, which is the one that was untested", async ({ page }) => {
+    /* THE GAP THIS CLOSES. The guard above pinned `minute: null`, so the
+       only branch it ever took was the fallback. The ORDINARY case —
+       both fields present, and disagreeing, which is every minute of
+       stoppage time in every match — was exercised by nothing, and the
+       strip shipped for months preferring `state.minute` while LiveCard
+       one section down preferred `clock_display`. On 2026-09-11 that
+       printed 45' in the strip over 45'+5' on the card, for one fixture,
+       off one response.
+
+       `clock_display` IS THE PROVIDER'S STRING; `minute` is what
+       patterns._minute PARSED out of it, and stoppage time exists only
+       in the first. Drawing the parse in front of the thing it was
+       parsed from is AGENTS.md §3 one plane over. */
+    const stoppage = { ...AHEAD, state: { ...AHEAD.state,
+      minute: 45, clock_display: "45'+5'" } };
+    await open(page, { ...EMPTY, matches: [stoppage],
+                       monitored_by_source: { manual: [101] } });
+    const clock = match(page, 101).getByTestId("watched-clock");
+    await expect(clock).toHaveText("45'+5'");
+    await expect(clock).toHaveAttribute("data-source", "clock_display");
+    // and the parse is NOT what is shown — a bare 45' here is the defect
+    expect((await clock.innerText()).trim()).not.toBe("45'");
+  });
+
+test("an EMPTY clock string is not a clock — the minute answers, and the "
+   + "surface says which field did", async ({ page }) => {
+    /* THE LIVE SHAPE THIS IS TAKEN FROM. Fixture 994 on 2026-09-11
+       carried `clock_display: ""` beside `minute: null` — the provider
+       sends an empty string at full time, not a null. An empty string
+       is falsy, so it must fall THROUGH to the minute rather than print
+       as a clock; a reader that tested `!= null` would have drawn an
+       empty span where the clock goes. */
+    const empty = { ...AHEAD, state: { ...AHEAD.state,
+      minute: 73.4, clock_display: "" } };
+    await open(page, { ...EMPTY, matches: [empty],
+                       monitored_by_source: { manual: [101] } });
+    const clock = match(page, 101).getByTestId("watched-clock");
+    // rounded, because a clock is not a decimal
+    await expect(clock).toHaveText("73'");
+    await expect(clock).toHaveAttribute("data-source", "minute");
+
+    // AND WITH NEITHER, THE ABSENCE IS NAMED — never minute 0, and
+    // never a blank span, which reads as a rendering failure.
+    const none = { ...AHEAD, state: { ...AHEAD.state,
+      minute: null, clock_display: null } };
+    await open(page, { ...EMPTY, matches: [none],
+                       monitored_by_source: { manual: [101] } });
+    const gone = match(page, 101).getByTestId("watched-clock");
+    await expect(gone).toHaveAttribute("data-source", "unstated");
+    await expect(gone).toHaveText(CLOCK_ABSENT_WORDS);
+    expect((await gone.innerText()).trim()).not.toBe("0'");
+  });
+
+test("the read's per-side row draws its conditioning minute through the "
+   + "SAME reader, and names it as a minute", async ({ page }) => {
+    /* THE THIRD RAW SITE. A LiveReadState carries a `minute` and no
+       `clock_display` — it is the coordinate the row was CONDITIONED
+       in, not the clock — and this block spelled `{st.minute}'` inline.
+       One more place free to drift from the other two. It reads through
+       the shared reader now, which on a state with no clock falls to
+       the minute by the same rule rather than by a second one, and the
+       source attribute is what makes the two checkable against each
+       other rather than merely different. */
+    await open(page, STRIP);
+    const home = match(page, 202)
+      .locator('[data-testid="watched-read-side"][data-side="home"]');
+    const clock = home.getByTestId("watched-read-clock");
+    await expect(clock).toHaveText("81'");
+    await expect(clock).toHaveAttribute("data-source", "minute");
+    // the AWAY side of the same read has NO minute (its state row
+    // refused `no_minute`), so nothing is drawn there — an absent
+    // coordinate is not minute 0 and not an empty slot either.
+    await expect(match(page, 202)
+      .locator('[data-testid="watched-read-side"][data-side="away"]')
+      .getByTestId("watched-read-clock")).toHaveCount(0);
   });
 
 test("nothing on the strip tells the operator what to do",

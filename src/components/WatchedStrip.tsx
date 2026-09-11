@@ -99,7 +99,7 @@ import {
   CertaintyPremium, EntryMap, EntryMapBranch, LiveReadComponentPayload,
   LiveReadSide, PartialExit, PartialExitFraction, PartialExitRealises,
   WatchedMatch, WatchedPosition, WatchedStripResponse, WatchedStripRefusal,
-  api, money,
+  api, componentRefusals, money, readMatchClock, readSilence, sideSilence,
 } from "../lib/suggesterApi";
 import { liveCompLabel } from "../lib/pickerApi";
 import { useWatchToken } from "./WatchDeclaration";
@@ -1133,7 +1133,14 @@ function MatchBlock({ m, registry, policyCodes, inPlayStates, stateTaped }: {
   // read is not minute 0. Both refuse by name below.
   const score = (st.score_home != null && st.score_away != null)
     ? `${st.score_home}–${st.score_away}` : null;
-  const minute = st.minute != null ? `${Math.round(st.minute)}'` : null;
+  // ONE CLOCK READER, SHARED WITH THE LIVE CARD. This file used to
+  // prefer `state.minute` and keep `clock_display` as a fallback, which
+  // is the OPPOSITE precedence to LiveCard's — and both are drawn on
+  // /bet-suggester off the same api.watchedStrip() response, so on
+  // 2026-09-11 the strip printed 45' over a card printing 45'+5' for one
+  // match. lib/suggesterApi.readMatchClock is now the only place either
+  // surface learns what the clock says.
+  const clock = readMatchClock(st);
   const cover = m.coverage;
   const positions = m.positions ?? [];
   const readSides = Object.keys(m.read?.sides ?? {});
@@ -1221,9 +1228,10 @@ function MatchBlock({ m, registry, policyCodes, inPlayStates, stateTaped }: {
             entirely if they were not. */}
         <CardNotes m={m} registry={registry} refusals={allRefusals}
           summary="what this line does not say · method · every refusal"
-          shown={[readAbsentWords(m), m.positions_note,
-                  possessionCaveat(m), ...faceProse(m)]}
-          lead={<LineReads m={m} />} />
+          shown={[readAbsentWords(m, registry), m.positions_note,
+                  possessionCaveat(m), ...faceReadProse(m, registry),
+                  ...faceProse(m)]}
+          lead={<LineReads m={m} registry={registry} />} />
         <UncodedAbsences m={m} registry={registry} />
       </article>
     );
@@ -1262,8 +1270,9 @@ function MatchBlock({ m, registry, policyCodes, inPlayStates, stateTaped }: {
           )}
           <span className="sr-only"> home–away, the tape row&apos;s own order</span>
           {" "}
-          <span className={st.in_play ? "text-live" : "text-ink-low"}>
-            {minute ?? (st.clock_display || "clock unreadable")}
+          <span data-testid="watched-clock" data-source={clock.source}
+            className={st.in_play ? "text-live" : "text-ink-low"}>
+            {clock.text}
           </span>
         </span>
       </header>
@@ -1327,7 +1336,7 @@ function MatchBlock({ m, registry, policyCodes, inPlayStates, stateTaped }: {
       </p>
 
       {/* 1 — THE STATE: the live read's components */}
-      <ReadBlock m={m} />
+      <ReadBlock m={m} registry={registry} />
 
       {/* 2..5 — per held position */}
       {/* NO POSITION, OR NO ANSWER — AND THEY ARE NOT THE SAME FACT.
@@ -1379,8 +1388,9 @@ function MatchBlock({ m, registry, policyCodes, inPlayStates, stateTaped }: {
           it above the match. */}
       <CardNotes m={m} registry={registry} refusals={allRefusals}
         policyCodes={policyCodes}
-        shown={[readAbsentWords(m), m.positions_note,
-                possessionCaveat(m), ...faceProse(m)]} />
+        shown={[readAbsentWords(m, registry), m.positions_note,
+                possessionCaveat(m), ...faceReadProse(m, registry),
+                ...faceProse(m)]} />
       <UncodedAbsences m={m} registry={registry} />
     </article>
   );
@@ -1557,8 +1567,10 @@ function CardNotes({ m, registry, refusals, policyCodes, summary,
  *  REGISTERED — UNCODED_ABSENCE_KEYS, below, with the condition that
  *  closes it — and until it closes, the payload's own sentence is
  *  drawn verbatim and nothing is inferred from it. */
-function LineReads({ m }: { m: WatchedMatch }) {
-  const read = readAbsent(m);
+function LineReads({ m, registry }: {
+  m: WatchedMatch; registry: Record<string, string>;
+}) {
+  const read = readAbsent(m, registry);
   const held = m.positions_note;
   return (
     <>
@@ -1600,23 +1612,98 @@ function LineReads({ m }: { m: WatchedMatch }) {
  *  supports, in the same ink and under the same testid as the
  *  backend's own. A read block with neither sides nor words is a
  *  payload that said nothing; that is what is said, and `source`
- *  is what a guard reads. */
-function readAbsent(m: WatchedMatch): {
-  words: string; source: "payload" | "unstated";
-} {
-  const w = m.read?.words;
-  if (typeof w === "string" && w.trim() !== "") {
-    return { words: w, source: "payload" };
-  }
-  return {
-    source: "unstated",
-    words: "This response carries no live read for this fixture and no "
-      + "words for its absence — neither a persisted read nor a reason "
-      + "there is none. Nothing here says the collector wrote nothing.",
+ *  is what a guard reads.
+ *
+ *  AND IT IS THE LIB'S READER NOW, NOT THIS FILE'S (2026-09-11).
+ *  LiveCard.tsx drew the same slot off the same response and still
+ *  wrote the collector sentence out by hand, so the two surfaces
+ *  disagreed about one fixture on one screen.
+ *  `lib/suggesterApi.readSilence` is the one place either of them may
+ *  learn why a read drew nothing — and it answers out of the SIDES
+ *  first, so a read that RAN and measured nothing can never be reported
+ *  as a read that was never persisted. */
+const readAbsent = (m: WatchedMatch, registry: Record<string, string>) =>
+  readSilence(m.read, registry);
+
+/** EVERY SENTENCE THIS MATCH STATES ANYWHERE BUT INSIDE ITS READ.
+ *
+ *  `live_read._basis` builds a row's basis by JOINING sentences with
+ *  " | ": the version and half-life, the join and its PARTIAL mark, the
+ *  per-component window, the names whose value is NULL, the deduped
+ *  component notes — and, when the watch began mid-match, watchlist's
+ *  standing NO_HISTORY_IS_NOT_QUIET paragraph. That last one is not
+ *  this null's reason: it rides under `coverage` in its own right, the
+ *  card's coverage line answers it, and the card's disclosure carries
+ *  the paragraph. Drawing the basis whole put it on one card twice, and
+ *  the card's own duplicate guard caught it.
+ *
+ *  SO THE OWNER KEEPS IT. A basis segment the payload ALSO states
+ *  outside this read belongs to the block that states it, and the read
+ *  leaves it there. DERIVED by walking the match — nothing is
+ *  hand-listed, so a second standing paragraph folded into `basis`
+ *  needs no edit here — and the read's own sides are excluded from the
+ *  walk by identity, because a component note that also appears in the
+ *  basis it was deduped into is ONE fact, not two. */
+function saidOutsideTheRead(m: WatchedMatch): Set<string> {
+  const out = new Set<string>();
+  const sides = m.read?.sides;
+  const walk = (node: unknown) => {
+    if (node === sides) return;
+    if (Array.isArray(node)) { node.forEach(walk); return; }
+    if (!isObj(node)) return;
+    for (const v of Object.values(node)) {
+      if (typeof v === "string") {
+        const t = v.trim();
+        if (t !== "") out.add(t);
+      } else walk(v);
+    }
   };
+  walk(m as unknown as Record<string, unknown>);
+  return out;
 }
 
-const readAbsentWords = (m: WatchedMatch): string => readAbsent(m).words;
+/** THE PAYLOAD'S REASON FOR ONE SIDE'S NULLS, as this card will draw
+ *  it: the shared reader's answer, with any basis segment that belongs
+ *  to another block left to that block. A refusal is already segment-
+ *  shaped and is never filtered — a registered code is nobody else's
+ *  sentence. */
+function readReasonFor(side: LiveReadSide | null | undefined,
+                       registry: Record<string, string>,
+                       elsewhere: Set<string>) {
+  const why = sideSilence(side, registry);
+  if (why.source !== "basis") return why;
+  const kept = why.words.split(" | ").map((x) => x.trim())
+    .filter((x) => x !== "" && !elsewhere.has(x));
+  // ALL OF IT SAID ELSEWHERE is not a licence to say nothing: the
+  // reason still belongs beside the number it is about, so the whole
+  // basis stands rather than collapsing to a blank.
+  return kept.length === 0 ? why : { ...why, words: kept.join(" | ") };
+}
+
+/** Every payload sentence the read block draws on the FACE — the joined
+ *  reason and each of its segments, so the card's one disclosure
+ *  excludes them by exact text rather than by substring. */
+function faceReadProse(m: WatchedMatch,
+                       registry: Record<string, string>): string[] {
+  const out: string[] = [];
+  const elsewhere = saidOutsideTheRead(m);
+  for (const side of Object.values(m.read?.sides ?? {})) {
+    if (!hasNullComponent(side)) continue;
+    const why = readReasonFor(side, registry, elsewhere);
+    out.push(why.words, ...why.words.split(" | ").map((x) => x.trim()));
+  }
+  return out.filter((x) => x !== "");
+}
+
+/** Does this side carry a component the payload sent no number for? */
+function hasNullComponent(side: LiveReadSide | null | undefined): boolean {
+  return Object.values(side?.components ?? {})
+    .some((c) => c && (c[c.value_key] as number | null) == null);
+}
+
+const readAbsentWords = (m: WatchedMatch,
+                         registry: Record<string, string>): string =>
+  readAbsent(m, registry).words;
 
 
 /** THE CAVEAT IS ONE FACT ABOUT ONE COMPONENT, NOT ONE PER SIDE. The
@@ -1682,11 +1769,13 @@ function possessionCaveat(m: WatchedMatch): string | null {
   return null;
 }
 
-function ReadBlock({ m }: { m: WatchedMatch }) {
+function ReadBlock({ m, registry }: {
+  m: WatchedMatch; registry: Record<string, string>;
+}) {
   const sides = m.read?.sides ?? {};
   const names = Object.keys(sides);
   if (names.length === 0) {
-    const absent = readAbsent(m);
+    const absent = readAbsent(m, registry);
     return (
       <p data-testid="watched-read-absent" data-source={absent.source}
         className="mt-3 rounded-lg border border-line bg-elev2 px-3 py-2 text-[12px] leading-relaxed text-warn">
@@ -1702,11 +1791,15 @@ function ReadBlock({ m }: { m: WatchedMatch }) {
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
   });
   const caveat = possessionCaveat(m);
+  // WALKED ONCE PER CARD, not once per side: it is a fact about the
+  // match payload and both sides ask it the same question.
+  const elsewhere = saidOutsideTheRead(m);
   return (
     <>
       <div data-testid="watched-read" className="mt-3 grid gap-3 sm:grid-cols-2">
         {names.map((side) => (
-          <ReadSideBlock key={side} side={sides[side]}
+          <ReadSideBlock key={side} side={sides[side]} registry={registry}
+            elsewhere={elsewhere}
             team={side === "home" ? m.home : side === "away" ? m.away : side} />
         ))}
       </div>
@@ -1723,9 +1816,25 @@ function ReadBlock({ m }: { m: WatchedMatch }) {
   );
 }
 
-function ReadSideBlock({ side, team }: { side: LiveReadSide; team: string }) {
+function ReadSideBlock({ side, team, registry, elsewhere }: {
+  side: LiveReadSide; team: string; registry: Record<string, string>;
+  /** every sentence this match states outside its read — a basis
+   *  segment in here is another block's and is left to it */
+  elsewhere: Set<string>;
+}) {
   const st = side.state;
   const comps = side.components ?? {};
+  const sideClock = readMatchClock(st);
+  // WHY ANY OF THESE IS NULL — READ, NEVER AUTHORED. Drawn once under
+  // the four rows rather than once per row: the payload states the
+  // cause per SIDE (live_read._basis dedupes the four components' notes
+  // into one sentence before it is ever persisted), so four copies here
+  // would be one fact told four times, which is the failure the card's
+  // note disclosure exists to stop.
+  const nulls = Object.values(comps)
+    .filter((c) => c && (c[c.value_key] as number | null) == null);
+  const why = nulls.length > 0
+    ? readReasonFor(side, registry, elsewhere) : null;
   return (
     <div data-testid="watched-read-side" data-side={side.side}
       className="rounded-lg border border-line bg-elev2 px-3 py-3">
@@ -1745,13 +1854,62 @@ function ReadSideBlock({ side, team }: { side: LiveReadSide; team: string }) {
               </span>
             </span>
           : <span className="text-warn">state not conditionable</span>}
-        {st?.minute != null && <span>{st.minute}&apos;</span>}
+        {/* THE SAME READER AS THE HEADER'S, and it answers a different
+            question with it. A LiveReadState carries a `minute` and no
+            `clock_display` — it is the CONDITIONING coordinate this row
+            was placed in, not the clock — so it falls through to the
+            minute by the shared rule rather than by a second one spelt
+            here. The `data-source` says which field answered, so the
+            two are checkable against each other rather than merely
+            different. */}
+        {sideClock.source !== "unstated" && (
+          <span data-testid="watched-read-clock"
+            data-source={sideClock.source}>{sideClock.text}</span>
+        )}
       </p>
       <dl className="mt-2 space-y-1.5">
         {Object.keys(comps).map((key) => (
-          <ComponentRow key={key} c={comps[key]} />
+          <ComponentRow key={key} c={comps[key]} registry={registry} />
         ))}
       </dl>
+      {/* THE PAYLOAD'S OWN REASON THE ROWS ABOVE ARE NULL.
+          UNTIL 2026-09-11 THIS FILE WROTE ITS OWN: "the provider did not
+          send it, and missing is never zero", beside every null
+          component, on every card. The second half is this project's
+          rule and stands. The first half is a CAUSE, and on the live
+          payload that morning it was false and the same response
+          disproved it — `states.counts` carried shots 6/7 and
+          possession 42.5/57.5 for the fixture whose eight components
+          were all null, and the admin tape held 36 snapshots with
+          possession on 33 of them. The provider sent them.
+          A null has three causes the surface cannot tell apart and the
+          payload can: the provider omitted the input, no match time has
+          been observed yet, or live_read's minimum-evidence gate
+          withheld the rate. So the reason is READ — by its REGISTRY
+          NAME when the payload codes it, off the side's own `basis`
+          when it does not, and named as an absence in the RESPONSE when
+          it carries neither. In the accessible tree, never on a
+          title=. */}
+      {why && (
+        <p data-testid="watched-component-null-reason"
+          data-source={why.source}
+          data-codes={why.codes.map((r) => r.code).join(" ")}
+          className="mt-2 text-[11px] leading-relaxed text-warn">
+          {nulls.length === 1
+            ? `${nulls[0].component_key} is null. `
+            : `${nulls.length} of these components are null. `}
+          {why.words}
+          {why.codes.map((r) => r.defined && (
+            <span key={r.code} className="block text-ink-low">
+              {r.code} — {r.defined}
+            </span>
+          ))}
+          <span className="sr-only">
+            {" "}— and missing is never zero: no number above was floored
+            to one.
+          </span>
+        </p>
+      )}
       {/* THE UNITS AND THE SPAN, WHICH ARE PART OF THE NUMBERS. The
           rules about them — that the four are never combined, that a
           composite would be a claim — are the same sentence on every
@@ -1773,7 +1931,9 @@ function ReadSideBlock({ side, team }: { side: LiveReadSide; team: string }) {
   );
 }
 
-function ComponentRow({ c }: { c: LiveReadComponentPayload }) {
+function ComponentRow({ c, registry }: {
+  c: LiveReadComponentPayload; registry: Record<string, string>;
+}) {
   // THE VALUE RIDES UNDER THE KEY THAT CARRIES ITS UNIT, and the block
   // names that key. It used to ride under the component's own name, so
   // the four blocks were one uniform subscript apart and the composite
@@ -1781,17 +1941,42 @@ function ComponentRow({ c }: { c: LiveReadComponentPayload }) {
   // through `value_key` — never `component_key`, which is the name.
   const v = c ? (c[c.value_key] as number | null | undefined) : null;
   const label = (c?.component_key ?? "").replace(/_read$/, "").replace(/_/g, " ");
+  // THE NAME THIS BLOCK GIVES ITS OWN ABSENCE, when it gives one — and
+  // it is DERIVED from the registry the payload carries, never from a
+  // code spelled in this file. The words live under the side's one
+  // reason line; the chip is here so a reader knows WHICH row the
+  // registered refusal belongs to.
+  const own = componentRefusals(c, registry);
+  // HOW MUCH MATCH TIME IS BEHIND THIS NUMBER. On the payload and drawn
+  // nowhere until 2026-09-11 — "a rate over two observed minutes and
+  // one over thirty are not the same evidence", which is the emitter's
+  // own reason for sending it. NULL is not 0: an unstated window is
+  // simply not drawn.
+  const secs = c?.observed_seconds;
+  const ivals = c?.observed_intervals;
+  const window = (typeof ivals === "number" ? `${ivals}i` : "")
+    + (typeof secs === "number"
+      ? `${typeof ivals === "number" ? "/" : ""}${Math.round(secs)}s` : "");
   return (
     <div data-testid="watched-component" data-component={c?.component_key}
       className="flex flex-wrap items-baseline gap-x-2">
       <dt className="font-mono text-[11px] text-ink-low">{label}</dt>
+      {window !== "" && (
+        <dd data-testid="watched-component-window"
+          className="font-mono text-[10px] text-ink-faint">
+          {window}
+          <span className="sr-only">
+            {" "}— the observed intervals and match seconds behind this
+            component, as the payload counted them
+          </span>
+        </dd>
+      )}
       <dd className="ml-auto text-right font-mono text-[13px] tabular-nums text-ink-hi">
         {v == null
-          ? <span data-testid="watched-component-null" className="text-warn">
+          ? <span data-testid="watched-component-null"
+              data-code={own[0]?.code ?? ""} className="text-warn">
               not read this tick
-              <span className="sr-only">
-                {" "}— the provider did not send it, and missing is never zero
-              </span>
+              {own.length > 0 && ` · ${own.map((r) => r.code).join(" · ")}`}
             </span>
           : <>{v.toFixed(2)}{" "}
               <span className="font-mono text-[10px] text-ink-faint">{c.unit}</span></>}

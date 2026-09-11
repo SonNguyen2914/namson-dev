@@ -895,16 +895,18 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
   );
 }
 
-/** THE ONE FACT EVERY REFUSED CELL BELOW IS AN INSTANCE OF, in one
- *  sentence, hung on each of them as its hover text.
+/** THE SENTENCE FOR A BOARD THAT SHIPS NONE — AND NOTHING ELSE.
  *
- *  The five cells a ranked card fills and this one cannot — the rank
- *  number, the anchor and its key, the dumbbell, the ranks pair, the
- *  shape chip and the tier trio — are not five separate absences. They
- *  are one refusal seen from five angles: a comparison between two clubs
- *  that were measured on different scales. `src/picker/stages.py`
- *  (rate_pair) names the rule on the backend and this is its frontend
- *  half, said once here rather than paraphrased five times. */
+ *  This was the card's OWN paragraph about which figures are withheld
+ *  and why, hung on every refused cell and printed once more in full
+ *  underneath. The backend has authored that sentence all along
+ *  (`picker/stages.REFUSAL_WITHHELD`, on `refusal.withheld`), so the
+ *  copy here was a second voice on one fact — free to drift from the
+ *  rule it paraphrased the day either of them moved, which is the
+ *  failure `refusal-reason` two blocks down already avoids by quoting.
+ *
+ *  It stays ONLY as the named fallback for a board built before the
+ *  block, and every slot that uses it says which of the two it drew. */
 const REFUSED_RULE =
   "REFUSED, not missing. This figure compares two clubs that are not on "
   + "one scale: the promoted club has no row in the table the other club "
@@ -919,11 +921,18 @@ const REFUSED_RULE =
  *  an empty box: those three all read as a rendering failure, and this
  *  is a decision. `data-refused` names WHICH cell it is standing in, so
  *  a guard can assert the set rather than counting anonymous words. */
-function Refused({ what, className = "" }: {
-  what: string; className?: string;
+function Refused({ what, says, className = "" }: {
+  what: string;
+  /** THE WORDS THAT TRAVEL WITH THE CELL — the payload's
+   *  `refusal.withheld` where the board sends one, and this file's
+   *  named fallback where it does not. Passed in rather than read here
+   *  so one card cannot draw two different accounts of one refusal in
+   *  six cells. */
+  says: string;
+  className?: string;
 }) {
   return (
-    <span data-testid="refused-cell" data-refused={what} title={REFUSED_RULE}
+    <span data-testid="refused-cell" data-refused={what} title={says}
       className={`text-ink-faint ${className}`}>
       refused
     </span>
@@ -1023,6 +1032,21 @@ function RefusalCard({ r, dated = true, dense = false }: {
   const own = r.this_season;
   const opp = r.opponent_row;
 
+  /* THE REFUSAL'S OWN ACCOUNT, READ ONCE AND USED EVERYWHERE IT IS SAID.
+     picker/stages.refused_row ships `withheld` (the figures this board
+     will never carry, in the module's own words), `why` (what THIS case
+     can honestly report), `carries` / `absent` (which per-side blocks
+     landed and the sentence for each that did not). Every one of those
+     was written out here in this file's voice until 2026-09-11.
+     `admission.says` three blocks down has been quoted verbatim since
+     the card was built, for exactly the reason its own comment gives —
+     "a paraphrase here would be a second voice on one fact, free to
+     drift from the policy it came from". This is that move, one cell
+     over. */
+  const ref = r.refusal ?? null;
+  const withheld = ref?.withheld ?? REFUSED_RULE;
+  const absent = Object.entries(ref?.absent ?? {});
+
   /* WHICH SIDE OF THE FIXTURE WAS REFUSED. Everything per-club on this
      card is keyed off it, because the payload names the refused club and
      the venue, and those two together say which row gets which numbers.
@@ -1114,7 +1138,7 @@ function RefusalCard({ r, dated = true, dense = false }: {
               + "so this fixture has no position in the day's ladder. A "
               + "number here would be a placement nobody measured."}
             className="font-mono text-[11px] tabular-nums text-ink-low">
-            rank <Refused what="rank" />
+            rank <Refused what="rank" says={withheld} />
           </span>
           {/* THE TAG, IN THE OPERATOR'S OWN CHARACTERS. Lower case and
               with its `#`, because that is what he wrote and it is what
@@ -1220,7 +1244,7 @@ function RefusalCard({ r, dated = true, dense = false }: {
         <span data-testid="anchor-block"
           className={`flex-none text-right${
             dense ? " md:flex md:items-baseline md:justify-end md:gap-2" : ""}`}>
-          <Refused what="anchor"
+          <Refused what="anchor" says={withheld}
             className="block font-mono text-[13px] font-normal leading-none" />
           <span data-testid="anchor-key"
             className={`mt-1 block font-mono text-[8.5px] uppercase leading-[1.35] tracking-[0.12em] text-ink-low${
@@ -1236,7 +1260,7 @@ function RefusalCard({ r, dated = true, dense = false }: {
           numbers. Saying it in the instrument's own 9px band keeps the
           card's vertical rhythm identical to a ranked one's. */}
       <span data-testid="refused-dumbbell" data-refused="dumbbell"
-        title={REFUSED_RULE}
+        title={withheld}
         className="mt-2 flex h-[9px] items-center font-mono text-[8px] uppercase leading-none tracking-[0.12em] text-ink-faint">
         no shared ladder · refused
       </span>
@@ -1266,7 +1290,7 @@ function RefusalCard({ r, dated = true, dense = false }: {
               + "one absence, not a pair of ranks."}
           className="text-ink-faint">
           {refusedSide == null
-            ? <>ranks <Refused what="rank-pair" /></>
+            ? <>ranks <Refused what="rank-pair" says={withheld} /></>
             : <>{rankText("home", homeRank)} v {rankText("away", awayRank)}</>}
         </span>
         {/* THE CONVERSION, AND THE ONE THE OPERATOR ASKED FOR. A ranked
@@ -1293,7 +1317,7 @@ function RefusalCard({ r, dated = true, dense = false }: {
           <span className="text-ink-mid">A {figure(awayPpg)}</span>
         </span>
         <span className="text-ink-low">
-          rank <Refused what="rank-gap" />
+          rank <Refused what="rank-gap" says={withheld} />
         </span>
         {/* GAMES PLAYED — a COUNT, not a rate, so it crosses no scale and
             is simply drawn. It is also the number the refusal turns on:
@@ -1317,7 +1341,7 @@ function RefusalCard({ r, dated = true, dense = false }: {
           are gone, but the fact is one fact and says itself once. */}
       <div className="mt-3 flex flex-wrap items-end gap-x-2.5 gap-y-1">
         <span data-testid="refused-tiers" data-refused="tiers"
-          title={REFUSED_RULE}
+          title={withheld}
           className="inline-flex flex-col items-center gap-[2px] font-mono text-[10px] leading-none">
           <span className="inline-flex items-end gap-2.5 text-[7.5px] uppercase tracking-[0.12em] text-ink-faint">
             {AXIS_ORDER.map((lbl) => <span key={lbl}>{lbl}</span>)}
@@ -1325,7 +1349,7 @@ function RefusalCard({ r, dated = true, dense = false }: {
           <span className="text-ink-faint">refused</span>
         </span>
         <span data-testid="refused-shape" data-refused="shape"
-          title={REFUSED_RULE}
+          title={withheld}
           className="rounded border border-line px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
           shape refused
         </span>
@@ -1338,17 +1362,54 @@ function RefusalCard({ r, dated = true, dense = false }: {
         className="mt-3 font-mono text-[10.5px] leading-relaxed text-ink-mid">
         {r.club} — {r.reason}
       </p>
-      {/* AND THE RULE, SAID ONCE. Six cells above print `refused`; this
-          says why all six do, so the card explains itself instead of
-          repeating a paragraph per cell. The per-cell hover carries the
-          long form for anyone who wants it. */}
-      <p data-testid="refused-rule"
+      {/* AND THE RULE, SAID ONCE, IN THE MODULE'S OWN WORDS. Six cells
+          above print `refused`; this says why all six do, so the card
+          explains itself instead of repeating a paragraph per cell.
+          WHOSE WORDS THEY ARE CHANGED ON 2026-09-11. This paragraph was
+          written here — "these two clubs are measured on different
+          scales, so the comparison is declined rather than imputed" —
+          while `refusal.withheld` sat on the same payload saying the
+          same thing in the voice of the module that made the decision,
+          and naming the seven figures rather than gesturing at them.
+          Two authors for one fact is how the frontend half goes on
+          asserting a rule the backend has moved. `data-source` says
+          which of the two a reader is looking at. */}
+      <p data-testid="refused-rule" data-source={ref ? "payload" : "unstated"}
         className="mt-1 text-[11px] leading-relaxed text-ink-low">
-        Every cell marked <span className="text-ink-mid">refused</span> above
-        is one fact: these two clubs are measured on different scales, so
-        the comparison is declined rather than imputed. Everything else on
-        this card is measured.
+        {ref ? <>Withheld — {ref.withheld}</> : <>{REFUSED_RULE}</>}
       </p>
+      {/* WHAT THIS CASE CAN HONESTLY CARRY. The reason string above is
+          the raw `no_prior_row`-class token; `case` is what it RESOLVED
+          to (one reason covers a club this season lists and a club it
+          does not, and those two carry different figures), and `why` is
+          the registry's sentence for that case. Drawn only when the
+          board sends it — a card that invented a case would be reading
+          the token this file explicitly does not parse. */}
+      {ref && (
+        <p data-testid="refused-case" data-case={ref.case}
+          data-carries={(ref.carries ?? []).join(" ")}
+          className="mt-1 text-[11px] leading-relaxed text-ink-low">
+          {ref.why}
+        </p>
+      )}
+      {/* AND THE BLOCKS THAT ARE NOT HERE, EACH WITH THE BACKEND'S OWN
+          SENTENCE FOR WHY. `absent` is DERIVED upstream from
+          REFUSAL_BLOCKS against the row itself, so a block added to the
+          contract names itself here with no edit — and a reader learns
+          that a missing season block is a decision under this reason
+          rather than a card that forgot to draw one. */}
+      {absent.length > 0 && (
+        <ul data-testid="refused-absent" data-blocks={absent.length}
+          className="mt-1 space-y-0.5 text-[11px] leading-relaxed text-ink-low">
+          {absent.map(([block, why]) => (
+            <li key={block} data-block={block}>
+              <span className="font-mono text-[10px] text-ink-faint">
+                {block}
+              </span>{" "}— {why}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {/* ── THE ADMISSION COUNTDOWN — the one block a ranked card has no
           use for. A refusal that states no end reads as a permanent

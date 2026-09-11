@@ -85,6 +85,20 @@ const RANKED = {
   },
 };
 
+/** picker/stages.REFUSAL_WITHHELD, VERBATIM off the emitter and
+ *  verified on the live board. The card printed a paragraph of its own
+ *  in this slot until 2026-09-11 — six cells' worth of hover text and
+ *  one more copy underneath — while this sentence, written by the
+ *  module that made the decision and naming the seven figures rather
+ *  than gesturing at them, sat on the same payload. */
+const WITHHELD =
+  "every figure that compares the two clubs — the ppg, GD/g and rank "
+  + "gaps, the favourite, the tiers, the shape and the venue-aware "
+  + "annotation. The comparison is what was refused: this club has no "
+  + "row in the ordering the other club's rank and tier are positions "
+  + "in, so a gap would be measured against a club that is not in the "
+  + "table.";
+
 /** THE WHOLE CONTRACT, as the backend serves it for a `no_prior_row`
  *  refusal. Sunderland resolved; Promoted Rovers FC did not. */
 const FULL = {
@@ -122,6 +136,65 @@ const FULL = {
     ask_c: 71, bid_c: 66, spread_c: 5,
     ask_size: 90, bid_size: 140, flags: [],
   },
+  /* THE REFUSAL'S OWN ACCOUNT OF ITSELF — picker/stages.refused_row,
+     and VERIFIED on the live board 2026-09-11 (Chelsea v Hull City,
+     Crystal Palace v Ipswich Town, Racing Santander v Alavés, Atlante v
+     Pachuca all carry it, all `below_admission`, all with `absent: {}`).
+     `withheld` is REFUSAL_WITHHELD verbatim and `why` is
+     REFUSAL_CASES["below_admission"] verbatim; `carries` and `absent`
+     are DERIVED upstream from REFUSAL_BLOCKS against the row itself.
+
+     THE CARD WROTE ALL OF THIS OUT IN ITS OWN WORDS until the same day,
+     over a payload that had been carrying it. */
+  refusal: {
+    reason: "no_prior_row",
+    case: "below_admission",
+    why: "the club has no prior-season row and has not yet played "
+      + "enough of this one, so the blend gives it no row to compare "
+      + "with. Its OWN current season is measured and is reported, "
+      + "beside the gate it has not passed yet.",
+    carries: ["this_season", "admission", "opponent_row"],
+    absent: {},
+    withheld: WITHHELD,
+  },
+};
+
+/** picker/stages.REFUSAL_WITHHELD, verbatim: one sentence, identical
+ *  under every reason, naming what no refusal will ever carry. */
+const AMBIGUOUS = {
+  refused: true, league: "epl",
+  home: "Sunderland", away: "Rovers",
+  club: "Rovers",
+  reason: "ambiguous:2",
+  event_id: "401879888", kickoff: inHours(13),
+  /* THE BLOCKS THIS CASE CANNOT CARRY, each with the backend's own
+     sentence for why — `_league_refusal` sets `this_season` to None
+     under every stem but `not_in_this_season`, and `admission_why`
+     follows from that. A card that drew nothing here would read as a
+     card that forgot, rather than as a board that declined. */
+  refusal: {
+    reason: "ambiguous:2",
+    case: "ambiguous",
+    why: "the club's name matched more than one club in the table and "
+      + "the board refuses to guess which. NO figures can be reported: "
+      + "this club may well have a prior row, and printing a "
+      + "candidate's season would attribute some other club's football "
+      + "to this fixture — invisible on the board and wrong in every "
+      + "number on the card.",
+    carries: ["opponent_row"],
+    absent: {
+      this_season: "the club's name matched more than one club in the "
+        + "table and the board refuses to guess which. NO figures can "
+        + "be reported: this club may well have a prior row, and "
+        + "printing a candidate's season would attribute some other "
+        + "club's football to this fixture — invisible on the board and "
+        + "wrong in every number on the card.",
+      admission: "there is no current-season line to be short of",
+    },
+    withheld: WITHHELD,
+  },
+  opponent_row: { club: "Sunderland", rank: 12, gp_current: 4, ppg: 1.25,
+                  gf: 1.0, ga: 1.25, gdg: -0.25 },
 };
 
 /** THE SAME REFUSAL FROM A BOARD THAT PREDATES THE CONTRACT — every
@@ -361,10 +434,47 @@ test("every comparison cell is refused BY NAME, in the cell where the "
     for (const axis of ["ovr", "atk", "def"]) {
       await expect(tiers).toContainText(axis);
     }
-    // the rule is said ONCE, not six times
+    /* THE RULE IS SAID ONCE, NOT SIX TIMES — AND IT IS THE BACKEND'S
+       SENTENCE (2026-09-11). This assertion read
+       `/measured on different scales/i` until then, and what it pinned
+       was a paragraph THIS FILE'S SOURCE wrote while
+       `refusal.withheld` — authored by the module that made the
+       decision, and naming the seven figures rather than gesturing at
+       them — sat on the same payload unread. Two authors for one fact
+       is how a frontend goes on asserting a rule the backend has moved,
+       which is exactly what `refusal-reason` below already avoids by
+       quoting.
+
+       THE EXPECTED TEXT IS THE FIXTURE'S OWN CONSTANT, not a literal:
+       the fixture speaks the emitter's vocabulary, so a reader that
+       re-paraphrases fails this whatever words it chooses. */
     await expect(c.getByTestId("refused-rule")).toHaveCount(1);
     await expect(c.getByTestId("refused-rule"))
-      .toContainText(/measured on different scales/i);
+      .toHaveAttribute("data-source", "payload");
+    await expect(c.getByTestId("refused-rule")).toContainText(WITHHELD);
+    /* AND IT TRAVELS WITH EVERY CELL THAT PRINTS THE WORD — the same
+       sentence, never a second account of one refusal. The set is the
+       `Refused` component's own (`refused-cell`) plus the three slots
+       that print the word inline, so it is derived from what rendered
+       rather than from a list typed here. Anchored on a visible first
+       match before `evaluateAll`, which does not auto-wait. */
+    await expect(c.getByTestId("refused-cell").first()).toBeVisible();
+    const said = await c.getByTestId("refused-cell")
+      .evaluateAll((els) => els.map((e) => e.getAttribute("title")));
+    expect(said.length, "no refused cell rendered — this loop would "
+      + "pass over an empty set").toBeGreaterThan(0);
+    for (const t of said) expect(t).toBe(WITHHELD);
+    for (const slot of ["refused-dumbbell", "refused-tiers",
+                        "refused-shape"]) {
+      await expect(c.getByTestId(slot))
+        .toHaveAttribute("title", WITHHELD);
+    }
+    // THE CASE'S OWN SENTENCE, which is a different fact from
+    // `withheld`: what THIS refusal can honestly carry, versus what no
+    // refusal ever carries.
+    const why = c.getByTestId("refused-case");
+    await expect(why).toHaveAttribute("data-case", "below_admission");
+    await expect(why).toContainText(FULL.refusal.why);
     /* A RANKED CARD CAN NEVER SAY ANY OF THIS — which is what makes the
        two unmistakable even cropped to their middles, with the border
        out of frame. Both the card ELEMENT and its descendants, because
@@ -543,6 +653,59 @@ test("a board that predates the contract names every absence, and renders "
                         "shape"]) {
       await expect(c.locator(`[data-refused="${what}"]`)).toHaveCount(1);
     }
+  });
+
+test("the blocks a refusal cannot carry are named, each with the "
+   + "backend's own sentence for why", async ({ page }) => {
+    /* `carries` and `absent` are DERIVED upstream from REFUSAL_BLOCKS
+       against the row itself — "a hand-written list of what this reason
+       carries is a list that stays green while the case it forgot
+       drifts", in the emitter's own words. The card reads them for the
+       same reason: a season block missing under an AMBIGUOUS name is a
+       decision ("printing a candidate's season would attribute some
+       other club's football to this fixture"), not a card that forgot
+       to draw one, and only the payload knows which. */
+    await open(page, [AMBIGUOUS]);
+    const c = refused(page);
+    const why = c.getByTestId("refused-case");
+    await expect(why).toHaveAttribute("data-case", "ambiguous");
+    await expect(why).toHaveAttribute("data-carries", "opponent_row");
+    await expect(why).toContainText(AMBIGUOUS.refusal.why);
+
+    const absent = c.getByTestId("refused-absent");
+    await expect(absent.locator("li")).toHaveCount(2);
+    for (const [block, words] of Object.entries(AMBIGUOUS.refusal.absent)) {
+      const row = absent.locator(`li[data-block="${block}"]`);
+      await expect(row).toHaveCount(1);
+      await expect(row).toContainText(words);
+    }
+    // the sentence naming what NO refusal carries is a different fact
+    // and is still said, once, in its own slot
+    await expect(c.getByTestId("refused-rule")).toContainText(WITHHELD);
+  });
+
+test("a board that ships no refusal block says so — the card falls back "
+   + "and marks the fallback as its own", async ({ page }) => {
+    /* THE HONEST HALF OF QUOTING A PAYLOAD: a board built before the
+       contract carries none of it, and the card must not present its
+       own fallback as the backend's sentence. `data-source` is what
+       separates them, and the two case blocks are absent rather than
+       invented. */
+    await open(page, [BARE]);
+    const c = refused(page);
+    await expect(c.getByTestId("refused-rule"))
+      .toHaveAttribute("data-source", "unstated");
+    await expect(c.getByTestId("refused-rule")).not.toContainText(WITHHELD);
+    await expect(c.getByTestId("refused-case")).toHaveCount(0);
+    await expect(c.getByTestId("refused-absent")).toHaveCount(0);
+    // and the fallback still travels with every cell that prints the
+    // word, so one card never shows two accounts of one refusal
+    await expect(c.getByTestId("refused-cell").first()).toBeVisible();
+    const said = await c.getByTestId("refused-cell")
+      .evaluateAll((els) => els.map((e) => e.getAttribute("title")));
+    expect(said.length).toBeGreaterThan(0);
+    expect(new Set(said).size, "one card, one account of its refusal")
+      .toBe(1);
   });
 
 test("a refusal with no kickoff says so in the date's own slot",
