@@ -431,14 +431,25 @@ test.describe("three states, and no two of them render alike", () => {
     // DERIVED, not typed: the same page is served each of the three
     // payloads and the token it draws is collected. Three payloads must
     // produce three DIFFERENT tokens, or two states are one rendering.
+    /* A PAGE PER PAYLOAD (2026-09-10). This reused ONE page and
+       re-served it three times, reading `data-has` after each. Run
+       alone that always won the race; in the full 783-test suite it
+       lost — two iterations reported the SAME token and the test
+       failed 2-of-3, which reads exactly like two states sharing a
+       rendering, the one defect this test exists to catch.
+       `unrouteAll` stops the next answer, it does not un-render the
+       last one. A fresh page cannot carry the previous payload's DOM,
+       so the race has nowhere to happen. */
     const seen: string[] = [];
     for (const body of [REVIEW_ASKED_EMPTY, REVIEW_NEVER_ASKED,
                         REVIEW_ASKED_FAILED]) {
-      await open(page, "/bet-suggester/ucl", UCL_BOARD, body);
-      const toggle = tail(page, "ucl").getByTestId("review-toggle");
+      const p2 = await page.context().newPage();
+      await open(p2, "/bet-suggester/ucl", UCL_BOARD, body);
+      const toggle = tail(p2, "ucl").getByTestId("review-toggle");
       await expect(toggle).toBeVisible();
+      await expect(toggle).not.toHaveAttribute("data-has", "");
       seen.push(await toggle.getAttribute("data-has") ?? "");
-      await page.unrouteAll();
+      await p2.close();
     }
     expect(new Set(seen).size).toBe(seen.length);
     expect(seen).not.toContain("");
