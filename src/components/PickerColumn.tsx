@@ -1041,9 +1041,18 @@ function RefusalCard({ r, dated = true, dense = false }: {
      number under two keys — and letting the gp cell say "not stated"
      while the countdown below it says "played 6" would be one card
      contradicting itself. */
+  /* AND THE RATED SIDE'S COUNT RIDES UNDER ITS OWN KEY. `gp_current`,
+     not `gp`: the rated club has a blended games-played its rating is
+     built from and a current-season one, and the cell beside the
+     refused club's current-season count must be the same quantity.
+     Read as `gp` until 2026-09-11 — an optional key that is never sent
+     is `undefined`, not a type error, so the board printed "gp not
+     stated/3" for Chelsea v Hull City while `gp_current: 3` sat on the
+     payload. */
   const ownGp = own?.gp ?? adm?.gp ?? null;
-  const homeGp = pick("home", ownGp, opp?.gp ?? null) ?? null;
-  const awayGp = pick("away", ownGp, opp?.gp ?? null) ?? null;
+  const oppGp = opp?.gp_current ?? null;
+  const homeGp = pick("home", ownGp, oppGp) ?? null;
+  const awayGp = pick("away", ownGp, oppGp) ?? null;
   const homePpg = pick("home", own?.ppg ?? null, opp?.ppg ?? null) ?? null;
   const awayPpg = pick("away", own?.ppg ?? null, opp?.ppg ?? null) ?? null;
 

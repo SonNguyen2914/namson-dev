@@ -421,8 +421,18 @@ export interface BoardRefusal {
    *  the table the refused club has no row in. That asymmetry IS the
    *  refusal, so the card prints this side's rank and says the other has
    *  none, rather than drawing half a pair. */
+  /** THE RATED SIDE'S OWN LINE. Its games-played key is `gp_current`
+   *  and NOT `gp`, which is the backend's name for it
+   *  (picker/stages.rated_side) — a rated club has two counts, the
+   *  blended one its rating is built from and the current-season one,
+   *  and only the second is a fact about this season. This type said
+   *  `gp` until 2026-09-11 and the key is optional, so `tsc` was happy
+   *  and the cell rendered "gp not stated/3" on the live board over a
+   *  number the payload was carrying all along. Named as the wire names
+   *  it, with no second spelling accepted: a fallback to a key the
+   *  backend never sends is dead code that hides the next drift. */
   opponent_row?: {
-    club: string; rank?: number | null; gp?: number | null;
+    club: string; rank?: number | null; gp_current?: number | null;
     ppg?: number | null; gf?: number | null; ga?: number | null;
     gdg?: number | null;
   } | null;
