@@ -1586,6 +1586,83 @@ export interface WatchedStripResponse {
   };
 }
 
+/** ONE REFUSAL ON A SWEEP, in the backend's own words.
+ *
+ *  `reason` is the sentence and `code` is the label; the surface prints
+ *  both and paraphrases neither.
+ *
+ *  `fixture_id` IS NULLABLE, AND THE NULL IS A FACT RATHER THAN A GAP.
+ *  This read `number` until the backend half landed, which is the
+ *  vocabulary #57 was written about: a type transcribing the brief
+ *  instead of the wire, optional enough that `tsc` never argued. The
+ *  route emits THREE SLATE-WIDE codes — `too_soon`, `plane_dormant`,
+ *  `nothing_declared_in_play` — and every one of them carries
+ *  `fixture_id: null`, because they are answers about the PRESS and not
+ *  about any match. The per-fixture codes carry an id. So a refusal
+ *  with no fixture beside it is not a card hiding which match it means;
+ *  it is a refusal that is about no match, and it is drawn without one.
+ *  The card names every refusal it was sent either way, so one card can
+ *  never imply the sweep did more than it did. */
+export interface TapeNowRefusal {
+  code: string;
+  fixture_id: number | null;
+  reason: string;
+}
+
+/** What POST /api/admin/live/tape-now answers, AND MOST OF ITS
+ *  REFUSALS ARE 200s.
+ *
+ *  A press made too soon after the last sweep comes back 200 with
+ *  `swept: 0`, a named refusal and `next_allowed_at` — the backend
+ *  saying "I heard you, and the floor has not elapsed". That is a
+ *  normal answer and not an error, and nothing between here and the
+ *  button may sort it into one.
+ *
+ *  `min_interval_seconds` IS THE CADENCE FLOOR, FROM THE PAYLOAD. No
+ *  surface in this repo types the collector's period: the match card
+ *  already reads `interval_seconds` off the card payload
+ *  (components/SuggestionCard.tsx's TickAge) rather than naming a
+ *  number, and this field is the same discipline for the same reason —
+ *  the period is the backend's to set, and it has just changed.
+ *
+ *  SEVEN KEYS, AND THE SET IS PINNED FROM THE OTHER SIDE. The route
+ *  answers with more than these — `read_rows_written`, the prose
+ *  `min_interval_basis`, `floor_is_process_local`, `refusal_codes` and
+ *  four `manual tape does not...` notes — and none of them is declared
+ *  here, because nothing on this surface reads them. That is not a
+ *  preference: the backend's own `tests/test_tape_now.py` parses THIS
+ *  interface out of THIS file and asserts set EQUALITY against its
+ *  `TAPE_NOW_CONTRACT`, so a key added here for tidiness turns the
+ *  other repository's suite red. Declare a field when a surface starts
+ *  reading it, and move the backend's set in the same round. */
+export interface TapeNowResponse {
+  swept: number;
+  rows_written: number;
+  fixtures: number[];
+  refusals: TapeNowRefusal[];
+  captured_at: string;
+  min_interval_seconds: number;
+  next_allowed_at: string | null;
+}
+
+/** A press and its answer, AS ONE VALUE FOR THE SURFACE.
+ *
+ *  THE READER STILL THROWS. postTapeNow below refuses a body that is
+ *  not a sweep report by throwing, exactly as fetchWatchedStrip does and
+ *  for the reason e2e/body-readers-agree.spec.ts derives from this file:
+ *  a guard is only worth something if it stops `return body as T` being
+ *  reached. What is a value is the ANSWER THE BUTTON DRAWS — both halves
+ *  of it, the sweep's own numbers and the reason there are none — built
+ *  from that throw by tapeNowResult. `ok: false` carries the status, the
+ *  label and the upstream's own sentence, exactly as WatchedStripRefusal
+ *  does, and the button prints them rather than a word of its own. */
+export type TapeNowResult =
+  | { ok: true; body: TapeNowResponse }
+  /** `status` is null only when the fetch itself threw in the browser —
+   *  a different fact from the proxy's own `proxy_unreachable`, which
+   *  arrives as a 502 WITH that label on it. */
+  | { ok: false; status: number | null; said: string; code: string };
+
 const base = "/api/bet-suggester";
 
 /** A read that answered with something that is not a payload.
@@ -1762,6 +1839,13 @@ export const api = {
   // signal through to `fetch`.
   watchedStrip: (token?: string, signal?: AbortSignal) =>
     fetchWatchedStrip(token ?? "", signal),
+
+  // THE PRESS THE OPERATOR MAKES WHEN THE AGE ON A CARD IS OLDER
+  // THAN HE WANTS TO WAIT. One POST, gated by the same token, and
+  // its answer — including the answer that says it swept nothing —
+  // is a value rather than a throw — built from postTapeNow's throw
+  // by tapeNowResult, both below.
+  tapeNow: (token?: string) => tapeNowResult(token ?? ""),
 };
 
 /** A watched-strip read that did not produce a payload.
@@ -1872,6 +1956,155 @@ async function fetchWatchedStrip(token: string, signal?: AbortSignal):
       + "being declared", sent);
   }
   return body as WatchedStripResponse;
+}
+
+/** A press whose answer was not a sweep report.
+ *
+ *  THE SAME SHAPE AS WatchedStripRefusal, AND FOR THE SAME REASON. Every
+ *  field is EVIDENCE and none is a paraphrase: `status` is the status
+ *  the proxy returned (null when nothing answered at all), `said` is the
+ *  backend's own `detail`/`error` string verbatim (empty when it sent
+ *  none — an absent sentence is not an invented one), `code` is the
+ *  `error` LABEL where there is one, and `sentToken` records whether
+ *  this client had a credential to send. The surface needs them to tell
+ *  "we never asked" from "we asked and cannot hear the answer", which on
+ *  a route that WRITES are opposite things to tell an operator deciding
+ *  whether to press again.
+ *
+ *  Named for the read, not for the sweep: a sweep that REFUSED answers
+ *  200 and is a payload, never this. */
+export class TapeNowReadFailure extends Error {
+  readonly status: number | null;
+  readonly said: string;
+  readonly sentToken: boolean;
+  readonly code: string;
+  constructor(status: number | null, said: string, sentToken: boolean,
+              code = "") {
+    super(said || (status == null
+      ? "the press got no answer at all"
+      : `the press answered ${status}`));
+    this.name = "TapeNowReadFailure";
+    this.status = status;
+    this.said = said;
+    this.sentToken = sentToken;
+    this.code = code;
+  }
+}
+
+/** THE OPERATOR'S OWN PRESS ON THE TAPE. One POST, one answer.
+ *
+ *  THE TOKEN IS AN ARGUMENT AND IS HELD NOWHERE — the same rule as
+ *  fetchWatchedStrip above, and on a route that WRITES it is the same
+ *  rule for a stronger reason. It is typed by a person into
+ *  WatchDeclaration's panel, lives in that component's state for as long
+ *  as the tab does, and travels as ONE header. It is never in an env
+ *  var, never in localStorage and never in this module.
+ *
+ *  A REFUSAL IS NOT A FAILURE HERE. `swept: 0` with a named refusal and
+ *  a `next_allowed_at` is a 200 and is RETURNED — the sweep answered,
+ *  and it answered that it swept nothing. Only an answer that is not a
+ *  sweep report at all throws.
+ *
+ *  IT THROWS, LIKE EVERY OTHER BODY READER IN THIS FILE. The first draft
+ *  of this function returned a union instead, on the argument that a
+ *  press is a single act whose failure the surface DRAWS; that is true
+ *  of the surface and irrelevant here, and
+ *  e2e/body-readers-agree.spec.ts — which derives the reader set from
+ *  this file rather than listing it — failed on the day it was written.
+ *  The rule it holds is that the guard must stop `return body as T`
+ *  being reached, and a reader that returns its refusal is a reader
+ *  whose caller can ignore it. The union the button wants is built one
+ *  function below, FROM the throw. */
+async function postTapeNow(token: string): Promise<TapeNowResponse> {
+  const sent = token !== "";
+  let res: Response;
+  try {
+    res = await fetch(`${base}/tape-now`, {
+      method: "POST",
+      headers: sent ? { "x-admin-token": token } : {},
+    });
+  } catch (err) {
+    // NOTHING ANSWERED, in the browser. Not folded into a status, and
+    // not into the proxy's own `proxy_unreachable` either — that one
+    // arrives as a 502 with a label, from a route that ran.
+    throw new TapeNowReadFailure(null, String(err), sent);
+  }
+  let raw: string;
+  try {
+    raw = await res.text();
+  } catch (err) {
+    throw new TapeNowReadFailure(res.status,
+      `the press answered ${res.status} and the body could not be read `
+      + `to the end (${String(err)}) — the request WAS delivered, so `
+      + "whether a row was written is unknown rather than answered",
+      sent);
+  }
+  let parsed = false;
+  let body: unknown = null;
+  try { body = JSON.parse(raw); parsed = true; }
+  catch { /* a non-JSON body is kept as text below, as evidence */ }
+  const b = body as { detail?: unknown; error?: unknown } | null;
+  // THE LABEL AS WELL AS THE SENTENCE. `error` is a CODE on the answers
+  // this repo's own proxy authors; on a backend refusal it is usually
+  // absent, and where it is the only string it is already the sentence.
+  const code = typeof b?.error === "string" ? b.error : "";
+  if (!res.ok) {
+    // The backend's own words, or the proxy's. Never this layer's
+    // paraphrase: every refusal on this surface is written down
+    // upstream, and a gloss here would be a second claim.
+    const said = typeof b?.detail === "string" ? b.detail
+      : typeof b?.error === "string" ? b.error
+      : parsed ? "" : raw.trim().slice(0, 400);
+    throw new TapeNowReadFailure(res.status, said, sent, code);
+  }
+  if (!parsed) {
+    throw new TapeNowReadFailure(res.status,
+      `the press answered ${res.status} with a body that is not JSON `
+      + `(${raw.length} characters) — AN ANSWER WE COULD NOT READ, `
+      + "which is not a sweep that swept nothing: "
+      + `${raw.trim().slice(0, 200)}`, sent);
+  }
+  // A 200 IS NOT A SWEEP REPORT. The hole fetchWatchedStrip fell into on
+  // 2026-09-07: an unparseable 200 left `body` at its initialiser and
+  // was cast to the payload type, and the surface drew the branch that
+  // means "nothing". Here that branch reads "swept nothing", which is a
+  // claim about a WRITE.
+  if (body === null || typeof body !== "object") {
+    throw new TapeNowReadFailure(res.status,
+      `the press answered ${res.status} with ${JSON.stringify(body)} `
+      + "where a sweep report was expected — no count, no refusals and "
+      + "no stamp, so nothing here can be told apart from a sweep that "
+      + "took no rows", sent);
+  }
+  // AND AN OBJECT IS NOT ONE EITHER. The whole answer is a count, so
+  // the count is what proves the shape: without it every line the card
+  // prints is `undefined`, and the button would report a sweep off a
+  // body that never described one.
+  if (typeof (body as { swept?: unknown }).swept !== "number") {
+    throw new TapeNowReadFailure(res.status,
+      `the press answered ${res.status} with an object carrying no `
+      + "`swept` count, so it is not a sweep report — this is an ANSWER "
+      + "WE COULD NOT READ and not a sweep that took no rows: "
+      + `${raw.trim().slice(0, 200)}`, sent);
+  }
+  return body as TapeNowResponse;
+}
+
+/** The press as a VALUE, built FROM the throw and never instead of it.
+ *
+ *  The button draws both halves of the answer — the sweep's own numbers
+ *  and the reason there are none — so it wants one object, not a
+ *  try/catch around a render. This is the one place the conversion
+ *  happens, and it loses nothing: status, label and the upstream's own
+ *  sentence all ride across. */
+async function tapeNowResult(token: string): Promise<TapeNowResult> {
+  try {
+    return { ok: true, body: await postTapeNow(token) };
+  } catch (e) {
+    const f = e instanceof TapeNowReadFailure ? e
+      : new TapeNowReadFailure(null, String(e), token !== "");
+    return { ok: false, status: f.status, said: f.said, code: f.code };
+  }
 }
 
 // -- formatting helpers -------------------------------------------------
