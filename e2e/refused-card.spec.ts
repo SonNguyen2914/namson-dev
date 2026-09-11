@@ -105,7 +105,14 @@ const FULL = {
       + "table every other club is placed in, so no comparison is shown.",
   },
   this_season: { gp: 6, ppg: 1.5, gf: 1.33, ga: 1.17, gdg: 0.16 },
-  opponent_row: { club: "Sunderland", rank: 12, gp: 4, ppg: 1.25,
+  // `gp_current` IS THE WIRE'S NAME FOR IT — this fixture said `gp`
+  // until 2026-09-11 and every test below passed while the LIVE board
+  // printed "gp not stated/3" for Chelsea v Hull City over a payload
+  // carrying `gp_current: 3`. The fixture was speaking the brief's
+  // vocabulary instead of the backend's, which is the failure this repo
+  // has already paid for once on venue classes. Verified against
+  // production: picker/stages.rated_side emits `gp_current`.
+  opponent_row: { club: "Sunderland", rank: 12, gp_current: 4, ppg: 1.25,
                   gf: 1.0, ga: 1.25, gdg: -0.25 },
   form: { home: ["W", "D", "L", "W", "W"], away: "LWWDW",
           scope: "Premier League", scope_is_cup: false },
