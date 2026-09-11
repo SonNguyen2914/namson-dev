@@ -895,7 +895,62 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
   );
 }
 
-/** A REFUSED FIXTURE, DRAWN WHERE IT KICKS OFF (operator, 2026-09-07).
+/** THE ONE FACT EVERY REFUSED CELL BELOW IS AN INSTANCE OF, in one
+ *  sentence, hung on each of them as its hover text.
+ *
+ *  The five cells a ranked card fills and this one cannot — the rank
+ *  number, the anchor and its key, the dumbbell, the ranks pair, the
+ *  shape chip and the tier trio — are not five separate absences. They
+ *  are one refusal seen from five angles: a comparison between two clubs
+ *  that were measured on different scales. `src/picker/stages.py`
+ *  (rate_pair) names the rule on the backend and this is its frontend
+ *  half, said once here rather than paraphrased five times. */
+const REFUSED_RULE =
+  "REFUSED, not missing. This figure compares two clubs that are not on "
+  + "one scale: the promoted club has no row in the table the other club "
+  + "is placed in, so any number here would be a subtraction across two "
+  + "different measurements. The board declines it rather than imputing "
+  + "a value — and every other number on this card is measured and real.";
+
+/** The word a refused cell prints where its figure would be.
+ *
+ *  ONE WORD, EVERYWHERE, so a reader learns it once and then recognises
+ *  it in the next cell without re-reading. It is never a dash, a zero or
+ *  an empty box: those three all read as a rendering failure, and this
+ *  is a decision. `data-refused` names WHICH cell it is standing in, so
+ *  a guard can assert the set rather than counting anonymous words. */
+function Refused({ what, className = "" }: {
+  what: string; className?: string;
+}) {
+  return (
+    <span data-testid="refused-cell" data-refused={what} title={REFUSED_RULE}
+      className={`text-ink-faint ${className}`}>
+      refused
+    </span>
+  );
+}
+
+/** A MEASURED NUMBER, OR THE WORDS FOR NOT HAVING IT — never "—", never
+ *  0.00. `places` of null prints an integer (games played is a count). */
+function figure(n: number | null | undefined, places: number | null = 2) {
+  if (n == null) return "not stated";
+  return places == null ? String(n) : n.toFixed(places);
+}
+
+/** A form sequence, however the payload spelt it.
+ *
+ *  The board's own rows carry form as a string ("WWDLW") and the refusal
+ *  contract writes it as a list. Both are the same sequence, so both are
+ *  accepted: a serialisation choice must never turn into a club whose
+ *  form silently vanished off its card. */
+function formText(f: string | string[] | null | undefined): string | null {
+  if (f == null) return null;
+  const s = Array.isArray(f) ? f.join("") : f;
+  return s.length > 0 ? s : null;
+}
+
+/** A REFUSED FIXTURE, DRAWN WHERE IT KICKS OFF (operator, 2026-09-07)
+ *  AND DRAWN AS A FULL CARD (operator, 2026-09-11).
  *
  *  These were collected into a block at the column's foot, under every
  *  ranked match and above the finished tail — so a fixture kicking off on
@@ -903,37 +958,480 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
  *  scanning a matchday saw a complete-looking day that was missing a
  *  match. A refusal is not an error and not a leftover: it is a fixture
  *  that will be played at a known time and that this board declined to
- *  RANK. It belongs on its own date.
+ *  RANK. It belongs on its own date. That placement is unchanged.
  *
- *  IT IS NOT A ROW CARD AND MUST NOT PASS FOR ONE. No rank number, no
- *  anchor figure, no dumbbell, a dashed border and the warn tone — every
- *  cue that carries a ranking on this board is absent, because there is
- *  no ranking. What it does carry is the two clubs, the club that could
- *  not be rated, and the backend's own reason. */
-function RefusalCard({ r, dated = true }: {
+ *  IT IS THE ROW CARD'S SKELETON NOW, AND STILL MUST NOT PASS FOR A
+ *  RANKED ONE. The old note here said the opposite — "no rank number, no
+ *  anchor figure, no dumbbell, a dashed border and the warn tone" — on
+ *  the reasoning that every cue carrying a ranking must be absent because
+ *  there is no ranking. The operator has overridden that: "for refused
+ *  promoted team, also give them a normal board but with highlighted
+ *  border and a #refused tag. You can use any data we have up to date for
+ *  those promoted team." He is right about the cost of the stub. A
+ *  four-line box beside a full card read as a fixture the board had
+ *  nothing on, when in fact it has this club's whole current season, both
+ *  clubs' form, the kickoff, the book, and the exact date the refusal
+ *  ends. Absence-by-design rendering as nothing-was-measured is the
+ *  defect this entire surface exists to refuse, and the stub was
+ *  committing it.
+ *
+ *  SO WHAT KEEPS IT FROM PASSING FOR A RANKED CARD IS NO LONGER WHAT IS
+ *  MISSING — it is what is SAID:
+ *
+ *    - THE HIGHLIGHTED BORDER. Solid, brighter than any ranked card's,
+ *      lit on the ink ladder rather than in gold (the brand, and rank 01)
+ *      or the traffic light (a verdict about the match). See
+ *      `.card-refused` in styles/globals.css, where the choice is argued
+ *      out. It reads as emphasis, which is what it is; the old dashed
+ *      warn border read as damage, which the fixture is not.
+ *    - THE `#refused` TAG, in the chip row, in words, so the fact
+ *      survives a reader who never sees the border — a screenshot at
+ *      thumbnail size, high-contrast mode, a colour-blind reader.
+ *    - NO RANK NUMBER. The one thing the old note got exactly right and
+ *      the one cue this card must never grow: `01` is a POSITION in the
+ *      day's ladder, and a refused row is not in the ladder. Its slot
+ *      says so in the ladder's own place.
+ *    - EVERY COMPARISON CELL REFUSED BY NAME. The anchor and its GD/g
+ *      key, the dumbbell, the ranks pair, the rank gap, the shape chip
+ *      and the tier trio all print the word `refused` where their figure
+ *      would be. A ranked card cannot show that word anywhere; this one
+ *      shows it six times, which is what makes the two unmistakable at a
+ *      glance even cropped to their middles.
+ *
+ *  AND WHAT IS FILLED IS FILLED BECAUSE IT WAS MEASURED: kickoff, both
+ *  clubs with their pips and the venue label, both form strips, games
+ *  played per side, each club's OWN points per game (labelled per side
+ *  and never differenced — the difference is the refused act), the
+ *  market line, the watch control, and the admission countdown, which is
+ *  the one line a ranked card has no use for: this refusal has an end
+ *  date, and the card says when.
+ *
+ *  MISSING IS NEVER ZERO, and the whole contract above is optional, so
+ *  every branch here names its own absence: "not stated" for a number
+ *  the payload did not carry, a sentence for an admission block that is
+ *  not there at all, and a distinction between a Kalshi key that is null
+ *  (no event matched) and one that was never sent (the board said
+ *  nothing about the market either way). */
+function RefusalCard({ r, dated = true, dense = false }: {
   r: BoardRefusal; dated?: boolean;
+  /** in a narrow dense-grid track — the same reflow RowRead documents,
+   *  applied to the same elements, so a refused card and a ranked card
+   *  narrow together rather than one of them staying wide. */
+  dense?: boolean;
 }) {
+  const adm = r.admission;
+  const own = r.this_season;
+  const opp = r.opponent_row;
+
+  /* WHICH SIDE OF THE FIXTURE WAS REFUSED. Everything per-club on this
+     card is keyed off it, because the payload names the refused club and
+     the venue, and those two together say which row gets which numbers.
+     Null when `club` matches neither side — a shape nothing produces
+     today, and one this card states rather than guesses at. */
+  const refusedSide = r.club === r.home ? "home"
+    : r.club === r.away ? "away" : null;
+  const pick = <T,>(side: "home" | "away", a: T, b: T) =>
+    refusedSide == null ? undefined : refusedSide === side ? a : b;
+
+  /* THE REFUSED CLUB'S GAMES PLAYED HAS TWO SOURCES AND THEY ARE THE
+     SAME FACT. `this_season.gp` is the club's current-season count;
+     `admission.gp` is the count the gate was evaluated against, which is
+     that same count by construction (picker/tables.admission). Reading
+     the second when the first is absent is not a default — it is the one
+     number under two keys — and letting the gp cell say "not stated"
+     while the countdown below it says "played 6" would be one card
+     contradicting itself. */
+  const ownGp = own?.gp ?? adm?.gp ?? null;
+  const homeGp = pick("home", ownGp, opp?.gp ?? null) ?? null;
+  const awayGp = pick("away", ownGp, opp?.gp ?? null) ?? null;
+  const homePpg = pick("home", own?.ppg ?? null, opp?.ppg ?? null) ?? null;
+  const awayPpg = pick("away", own?.ppg ?? null, opp?.ppg ?? null) ?? null;
+
+  const oppRank = opp?.rank ?? null;
+  const homeRank = pick("home", null, oppRank);
+  const awayRank = pick("away", null, oppRank);
+  const rankText = (side: "home" | "away", v: number | null | undefined) =>
+    refusedSide === side ? "no rank"
+      : v == null ? "not stated" : `#${v}`;
+
+  const homeForm = formText(r.form?.home);
+  const awayForm = formText(r.form?.away);
+
   return (
-    <div data-testid="picker-refusal" data-club={r.club}
+    <article
+      data-testid="picker-refusal"
+      data-club={r.club}
       data-dated={dated ? "1" : "0"}
-      className="rounded-[10px] border border-dashed border-warn/30 bg-warn/5 px-3 py-2.5">
-      <div className="flex items-baseline gap-2">
-        <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-warn">
-          refused
-        </span>
-        {r.kickoff && (
-          <span className="ml-auto font-mono text-[9.5px] tabular-nums text-ink-faint">
-            {fmtDate(r.kickoff)}
+      data-league={r.league}
+      data-column={r.column ?? r.league}
+      data-event={r.event_id ?? undefined}
+      data-refused-side={refusedSide ?? undefined}
+      /* THE COUNTDOWN, AS DATA AS WELL AS INK — a guard reads it, and a
+         card with no admission block carries no such attribute at all
+         rather than one asserting a countdown nobody sent. */
+      data-until-rated={adm?.games_until_rated ?? undefined}
+      /* NO `hover:border-…` AND NO `transition-colors`, both of which a
+         ranked card carries: those belong to a card you can open, and
+         this one is not a link. A hover response with nothing behind it
+         is an affordance that lies. */
+      className={`card-refused rounded-xl border bg-gradient-to-b from-elev2/60 to-elev/40 ${
+        dense ? "p-4 md:p-3" : "p-4"}`}
+    >
+      {/* ── THE CHIP ROW, FULL WIDTH, ABOVE THE READ — RowCard's own row,
+          with the rank badge's slot refusing instead of numbering and the
+          `#refused` tag beside it.
+
+          THE DATE IS PINNED RATHER THAN PUSHED (2026-09-11, measured).
+          A ranked card's chip row is two items — `01` and the kickoff —
+          so `ml-auto` in one wrapping flex row is enough to keep the
+          date top-right. This card's row is three, and three did not
+          fit a 290px track: the date wrapped to a second line and stopped
+          being "the most top right", which is the operator's own rule
+          from #55 and is stated in this brief as well. So the left-hand
+          chips get their OWN wrapping box and the date sits outside it,
+          `flex-none`, at the card's content edge — the date's placement
+          is then independent of how many chips precede it, at every
+          width, and only the chips wrap. */}
+      <div className="flex items-baseline gap-3">
+        <span className={`flex min-w-0 flex-1 flex-wrap items-baseline gap-y-1 ${
+          dense ? "gap-x-3 md:gap-x-2" : "gap-x-3"}`}>
+          {/* WHERE `01` GOES. A rank is a POSITION in this day's ladder
+              and a refused fixture is not in the ladder — so the slot
+              says that, in the ladder's own place, rather than going
+              blank and letting the card creep one step closer to a
+              ranked one. */}
+          <span data-testid="refused-rank"
+            title={`${r.club} has no row in the table this column ranks on, `
+              + "so this fixture has no position in the day's ladder. A "
+              + "number here would be a placement nobody measured."}
+            className="font-mono text-[11px] tabular-nums text-ink-low">
+            rank <Refused what="rank" />
           </span>
-        )}
+          {/* THE TAG, IN THE OPERATOR'S OWN CHARACTERS. Lower case and
+              with its `#`, because that is what he wrote and it is what
+              makes it read as a tag rather than as one more uppercase
+              badge in a row of them. It carries the card's whole status
+              in words, which is what a border can never do for a reader
+              who cannot see one. */}
+          <span data-testid="refused-tag"
+            title={"this fixture is listed but not ranked — the board refused "
+              + "to place these two clubs on one scale"}
+            className="rounded border border-line-strong bg-ink-hi/[0.06] px-1.5 py-0.5 font-mono text-[9.5px] tracking-[0.12em] text-ink-hi">
+            #refused
+          </span>
+          {/* THE COMPETITION, when it is not the column — the same badge,
+              on the same condition, a ranked card carries. A cup tie
+              folded into a league column is still a cup tie whether or
+              not it was ranked. */}
+          {r.column && r.column !== r.league && (
+            <span data-testid="competition-badge"
+              title={`${leagueLabel(r.league)} fixture, shown in the ${leagueLabel(r.column)} column`}
+              className="rounded border border-accent/40 bg-accent/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-accent">
+              {leagueLabel(r.league)}
+            </span>
+          )}
+        </span>
+        {/* THE KICKOFF — measured, so it is drawn, in a ranked card's
+            place for it. Without one the slot SAYS there is none: the
+            foot block this card then sits in explains why at the block
+            level, and the card must not look like it simply forgot. */}
+        <span data-testid="refused-kickoff"
+          title={r.kickoff ? undefined
+            : "the payload carried no kickoff for this fixture, so there "
+              + "is no matchday band to draw it in"}
+          className={`flex-none font-mono text-[11px] tabular-nums ${
+            r.kickoff ? "text-ink-faint" : "text-ink-low"}`}>
+          {r.kickoff ? fmtDate(r.kickoff, "short") : "no kickoff"}
+        </span>
       </div>
-      <p className="mt-1.5 text-sm text-ink-hi">
-        {r.home} <span className="text-ink-faint">vs</span> {r.away}
-      </p>
-      <p className="mt-1 font-mono text-[11px] leading-relaxed text-warn">
+
+      {/* ── THE MATCHUP AND THE ANCHOR'S SLOT. RowRead's block, element
+          for element, with two differences that are the card's whole
+          point: it is NOT a link (there is no ranked read to open), and
+          the two rows are HOME then AWAY rather than favourite then
+          opponent — because naming a favourite is a comparison, which is
+          the act that was refused. The pips keep their shapes so the
+          card reads as a card; what they mark here is the venue, and the
+          title says so rather than leaving a reader to assume a ranking
+          the board declined to make. */}
+      <div className={`mt-2.5 flex items-start gap-3${
+        dense ? " md:flex-col md:items-stretch md:gap-1" : ""}`}>
+        <span className="min-w-0 flex-1">
+          <span className={`flex min-w-0 items-center gap-2${
+            dense ? " md:flex-wrap" : ""}`}>
+            <span aria-hidden
+              className="h-2 w-2 flex-none rounded-full [background:var(--lg)]" />
+            <span
+              className={`text-[15.5px] font-semibold text-ink-hi [font-family:var(--font-archivo)] [font-stretch:95%] ${
+                dense ? "min-w-0 [overflow-wrap:anywhere]" : "truncate"}`}
+              title={`${r.home} v ${r.away} — neither club is named the `
+                + "favourite here, because naming one is the comparison "
+                + "this fixture was refused for. These are home and away."}>
+              {r.home}
+            </span>
+            {/* THE VENUE, ON THE CLUB IT IS ABOUT. A ranked card's badge
+                answers "is the FAVOURITE at home at this venue"; with no
+                favourite that question has no subject, so this one
+                answers the question the payload can actually support —
+                which side the fixture lists at home — and its own title
+                says that is what it is. A different fact gets a different
+                testid: nothing here may be counted as a `home-badge`. */}
+            <span data-testid="refused-venue" data-venue-side="home"
+              title={`${r.home} is the home side on this fixture. A refused `
+                + "fixture carries no venue classification, so this is the "
+                + "fixture's own label and not a reading of the ground."}
+              className="flex-none rounded border border-line px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-low">
+              H
+            </span>
+            <FormStrip form={homeForm} name={r.home}
+              scope={r.form?.scope} cupScope={r.form?.scope_is_cup}
+              className="ml-auto pl-2" />
+          </span>
+          <span className={`mt-0.5 flex min-w-0 items-center gap-2${
+            dense ? " md:flex-wrap" : ""}`}>
+            <span aria-hidden
+              className="h-[7px] w-[7px] flex-none rounded-full border border-ink-low bg-bs" />
+            <span className={`text-[12.5px] text-ink-low [font-family:var(--font-archivo)] [font-stretch:96%] ${
+              dense ? "min-w-0 [overflow-wrap:anywhere]" : "truncate"}`}>
+              <span className="text-ink-faint">vs </span>{r.away}
+            </span>
+            <FormStrip form={awayForm} name={r.away}
+              scope={r.form?.scope} cupScope={r.form?.scope_is_cup}
+              className="ml-auto pl-2" />
+          </span>
+        </span>
+        {/* THE ANCHOR'S SLOT, REFUSED. The figure is the one number the
+            whole board is ordered by, so its absence is the loudest
+            thing on this card — and it is drawn at 13px rather than the
+            ranked card's 20px on purpose: at 20px a word occupies the
+            visual weight of a magnitude, and this is emphatically not
+            one. The key below keeps its two-line shape and NAMES what
+            was refused, which is how a reader knows which figure is
+            gone rather than merely that one is. */}
+        <span data-testid="anchor-block"
+          className={`flex-none text-right${
+            dense ? " md:flex md:items-baseline md:justify-end md:gap-2" : ""}`}>
+          <Refused what="anchor"
+            className="block font-mono text-[13px] font-normal leading-none" />
+          <span data-testid="anchor-key"
+            className={`mt-1 block font-mono text-[8.5px] uppercase leading-[1.35] tracking-[0.12em] text-ink-low${
+              dense ? " md:mt-0" : ""}`}>
+            gd/g gap
+          </span>
+        </span>
+      </div>
+
+      {/* THE DUMBBELL'S SLOT, AT THE DUMBBELL'S HEIGHT. The instrument
+          plots both clubs on one 1..N axis; there is no such axis here,
+          which is the same refusal the ranks pair below states in
+          numbers. Saying it in the instrument's own 9px band keeps the
+          card's vertical rhythm identical to a ranked one's. */}
+      <span data-testid="refused-dumbbell" data-refused="dumbbell"
+        title={REFUSED_RULE}
+        className="mt-2 flex h-[9px] items-center font-mono text-[8px] uppercase leading-none tracking-[0.12em] text-ink-faint">
+        no shared ladder · refused
+      </span>
+
+      {/* ── STAGE 1, in RowRead's own row and order: the ranks pair, the
+          points-per-game cell, the rank gap, and games played. Two of the
+          four are refused and two are filled, in place, so the reader
+          sees exactly where the board stops. */}
+      <div className={`mt-2.5 flex flex-wrap items-baseline gap-y-1 font-mono text-[10.5px] tabular-nums ${
+        dense ? "gap-x-4 md:gap-x-2.5" : "gap-x-4"}`}>
+        {/* `#N v #N`, AND WHY IT IS NOT HALF A PAIR. One of these clubs
+            HAS a rank — it has a row in the table, and printing its
+            position is no more a comparison than printing its name. The
+            other has no row at all, so it has no position, and "no rank"
+            is the true half rather than a blank one. Printing `#12 v —`
+            would be the same sentence dressed as a rendering failure;
+            printing nothing would lose a measured fact. */}
+        <span data-testid="refused-rank-pair" data-refused="rank-pair"
+          data-opp-rank={oppRank ?? undefined}
+          title={refusedSide == null
+            ? `the refusal names ${r.club}, which matches neither ${r.home} `
+              + "nor " + r.away + " — so the board cannot say which side of "
+              + "this fixture holds the rank, and prints neither."
+            : `${opp?.club ?? "the club that resolved"} has a row in the `
+              + `table and therefore a position in it. ${r.club} has no row `
+              + "there at all, so it has no position — this is one rank and "
+              + "one absence, not a pair of ranks."}
+          className="text-ink-faint">
+          {refusedSide == null
+            ? <>ranks <Refused what="rank-pair" /></>
+            : <>{rankText("home", homeRank)} v {rankText("away", awayRank)}</>}
+        </span>
+        {/* THE CONVERSION, AND THE ONE THE OPERATOR ASKED FOR. A ranked
+            card prints `ppg +1.00`, a GAP — the two clubs' rates
+            subtracted. That subtraction is precisely what this fixture
+            was refused for, so the cell prints the two rates THEMSELVES,
+            each labelled with the side it belongs to, and no difference
+            anywhere. `H` and `A` are the card's own vocabulary six lines
+            up, so the labels cost no width and teach themselves; the
+            title spells both club names out for anyone they do not.
+            Each rate is real, measured this season, on its own league's
+            table — which is exactly why they cannot be subtracted. */}
+        <span data-testid="refused-ppg"
+          data-home-ppg={homePpg ?? undefined}
+          data-away-ppg={awayPpg ?? undefined}
+          title={`${r.home} ${figure(homePpg)} points per game and ${r.away} `
+            + `${figure(awayPpg)} points per game, each measured on its own `
+            + "table this season. They are shown side by side and NOT "
+            + "differenced: the difference of two rates from two different "
+            + "tables is the number this fixture was refused for."}
+          className="text-ink-low">
+          ppg <span className="text-ink-mid">H {figure(homePpg)}</span>
+          <span className="text-ink-faint"> · </span>
+          <span className="text-ink-mid">A {figure(awayPpg)}</span>
+        </span>
+        <span className="text-ink-low">
+          rank <Refused what="rank-gap" />
+        </span>
+        {/* GAMES PLAYED — a COUNT, not a rate, so it crosses no scale and
+            is simply drawn. It is also the number the refusal turns on:
+            the countdown below is this figure against the gate. */}
+        <span data-testid="refused-gp"
+          data-home-gp={homeGp ?? undefined} data-away-gp={awayGp ?? undefined}
+          title={`games played this season — ${r.home} ${figure(homeGp, null)}, `
+            + `${r.away} ${figure(awayGp, null)}. A count is not a rate, so it `
+            + "crosses no scale and nothing about it is refused."}
+          className="text-ink-faint">
+          gp {figure(homeGp, null)}/{figure(awayGp, null)}
+        </span>
+      </div>
+
+      {/* ── STAGE 2 — the tier trio and the shape chip, both refused, in
+          their own slots. A tier is a POSITION IN AN ORDERING and a shape
+          is a verdict read off three of them, so each is the same refusal
+          the anchor makes, one level further on. The trio keeps its three
+          labels and prints ONE `refused` under them rather than three:
+          the axes are named because a reader needs to know which figures
+          are gone, but the fact is one fact and says itself once. */}
+      <div className="mt-3 flex flex-wrap items-end gap-x-2.5 gap-y-1">
+        <span data-testid="refused-tiers" data-refused="tiers"
+          title={REFUSED_RULE}
+          className="inline-flex flex-col items-center gap-[2px] font-mono text-[10px] leading-none">
+          <span className="inline-flex items-end gap-2.5 text-[7.5px] uppercase tracking-[0.12em] text-ink-faint">
+            {AXIS_ORDER.map((lbl) => <span key={lbl}>{lbl}</span>)}
+          </span>
+          <span className="text-ink-faint">refused</span>
+        </span>
+        <span data-testid="refused-shape" data-refused="shape"
+          title={REFUSED_RULE}
+          className="rounded border border-line px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
+          shape refused
+        </span>
+      </div>
+
+      {/* THE BACKEND'S OWN REASON, kept verbatim and kept prominent — it
+          is the sentence this card was built around and the one the
+          column's foot used to be the only place to read. */}
+      <p data-testid="refusal-reason"
+        className="mt-3 font-mono text-[10.5px] leading-relaxed text-ink-mid">
         {r.club} — {r.reason}
       </p>
-    </div>
+      {/* AND THE RULE, SAID ONCE. Six cells above print `refused`; this
+          says why all six do, so the card explains itself instead of
+          repeating a paragraph per cell. The per-cell hover carries the
+          long form for anyone who wants it. */}
+      <p data-testid="refused-rule"
+        className="mt-1 text-[11px] leading-relaxed text-ink-low">
+        Every cell marked <span className="text-ink-mid">refused</span> above
+        is one fact: these two clubs are measured on different scales, so
+        the comparison is declined rather than imputed. Everything else on
+        this card is measured.
+      </p>
+
+      {/* ── THE ADMISSION COUNTDOWN — the one block a ranked card has no
+          use for. A refusal that states no end reads as a permanent
+          verdict on a club, which this is not: it is a gate on games
+          played, the club is walking toward it every week, and the board
+          knows the number. Saying so turns "we will not rate this" into
+          "we will rate this in four games", which is the difference
+          between a refusal and a dismissal. */}
+      {adm ? (
+        <div data-testid="refused-admission"
+          data-k={adm.k} data-gp={adm.gp ?? undefined}
+          data-to-go={adm.games_until_rated ?? undefined}
+          className="mt-3 rounded-md border border-line bg-elev2/40 px-2.5 py-2">
+          <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-low">
+            admission countdown
+          </p>
+          {/* THE ARITHMETIC ON ONE LINE, WITH THE POLICY'S OWN WORDS ON
+              HOVER. Each of the three numbers is drawn only if it was
+              sent: a countdown computed from a games-played count nobody
+              has is exactly the invention this card refuses elsewhere. */}
+          <p className="mt-1 font-mono text-[10.5px] tabular-nums text-ink-mid"
+            title={adm.gate}>
+            rated at {adm.k} games
+            <span className="text-ink-faint"> · </span>
+            played {figure(adm.gp, null)}
+            <span className="text-ink-faint"> · </span>
+            {adm.games_until_rated == null
+              ? <span className="text-ink-low">no count opens the gate</span>
+              : <>{adm.games_until_rated} to go</>}
+          </p>
+          {/* THE BACKEND'S SENTENCE, VERBATIM. It already says this in
+              one readable line and a paraphrase here would be a second
+              voice on one fact, free to drift from the policy it came
+              from. */}
+          <p data-testid="admission-says"
+            className="mt-1.5 text-[11px] leading-relaxed text-ink-low">
+            {adm.says}
+          </p>
+          {/* WHAT IT WILL BE RATED ON when it is — the backend's own key,
+              printed as the backend's own word rather than translated
+              into a sentence this file made up. */}
+          <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.12em] text-ink-faint"
+            title={"the basis the club is rated on once the gate opens — no "
+              + "prior-season row exists to blend with, so it is this "
+              + "season alone, reported at full weight"}>
+            then rated on · {adm.basis_when_admitted}
+          </p>
+        </div>
+      ) : (
+        // AN ABSENT COUNTDOWN IS NAMED, not skipped. A card that silently
+        // dropped this block would read as a refusal with no end, which is
+        // a stronger claim than the payload made.
+        <p data-testid="refused-admission" data-absent="1"
+          className="mt-3 text-[11px] leading-relaxed text-ink-low">
+          This refusal carries no admission countdown, so the board cannot
+          say here how many games away this club is from being rated.
+        </p>
+      )}
+
+      {/* ── THE MARKET LINE AND THE WATCH CONTROL, under the same rule a
+          ranked card draws them under. A refusal to RANK is not a refusal
+          to QUOTE: Kalshi prices this match either way, and a reader who
+          wants to watch it should not have to leave the card to say so. */}
+      <div className="mt-3 border-t border-line pt-3">
+        {/* TWO DIFFERENT SILENCES ABOUT THE BOOK, KEPT APART. `kalshi:
+            null` is the board saying it looked and matched no event —
+            KalshiCell's own wording, and the same cell a ranked card
+            shows. A payload with NO `kalshi` key never said anything
+            about the market at all, and printing "no kalshi event" over
+            that would be this card making a claim on the backend's
+            behalf. */}
+        {"kalshi" in r
+          ? <KalshiCell quote={r.kalshi} />
+          : (
+            <span data-testid="refused-no-market"
+              className="font-mono text-[11px] text-ink-faint">
+              this refusal carries no market read — the board did not say
+              whether Kalshi lists this fixture
+            </span>
+          )}
+        {r.event_id
+          ? <WatchToggle eventId={r.event_id}
+              label={`${r.home} v ${r.away}`} />
+          : (
+            <p data-testid="refused-no-watch"
+              className="mt-2 font-mono text-[10px] leading-relaxed text-ink-faint">
+              no event id on this refusal — there is nothing for a watch
+              declaration to key to
+            </p>
+          )}
+      </div>
+    </article>
   );
 }
 
@@ -1789,7 +2287,7 @@ export function LeagueColumn({
                 field={field} />
             ))}
             {refused.map((r, i) => (
-              <RefusalCard key={`ref-${r.club}-${i}`} r={r} />
+              <RefusalCard key={`ref-${r.club}-${i}`} r={r} dense={dense} />
             ))}
           </>
         );
@@ -1916,7 +2414,8 @@ export function LeagueColumn({
               width under a six-up grid reads as a different surface. */}
           <div className={dense ? `mt-2 ${DENSE_GRID}` : "mt-2 space-y-2"}>
             {undated.map((r, i) => (
-              <RefusalCard key={`${r.club}-${i}`} r={r} dated={false} />
+              <RefusalCard key={`${r.club}-${i}`} r={r} dated={false}
+                dense={dense} />
             ))}
           </div>
           <div className="mt-2.5"><RefusalWhy /></div>

@@ -371,6 +371,74 @@ export interface BoardRefusal {
   reason: string;
   event_id?: string;
   kickoff?: string;
+
+  /* ── WHAT A REFUSAL CARRIES BESIDES ITS REASON (operator, 2026-09-11)
+     ────────────────────────────────────────────────────────────────
+     "for refused promoted team, also give them a normal board but with
+     highlighted border and a #refused tag. You can use any data we have
+     up to date for those promoted team."
+
+     The refusal is of ONE act — placing two clubs on a single scale. It
+     was never a refusal to MEASURE either of them, and the backend has
+     held both clubs' current-season numbers all along (see
+     picker/tables.admission and picker/stages.rate_pair, whose own
+     docstring says reporting each rate "is not a step toward that
+     subtraction"). So the card stops being a stub and draws the same
+     skeleton a ranked card draws, with the comparison cells refused BY
+     NAME and the measured ones filled.
+
+     EVERY KEY BELOW IS OPTIONAL, and each absence is NAMED on the card
+     rather than defaulted: a board built before this contract carries
+     none of them, and a refusal whose standings never said how many
+     games a club has played carries `gp: null` inside `admission`.
+     Missing is never zero, here as everywhere on this surface. */
+
+  /** WHEN THE REFUSAL ENDS, in the blend policy's own arithmetic. A
+   *  promoted club has no prior-season row, so it is rated once this
+   *  season's weight reaches the majority — GP >= k. `says` is the
+   *  backend's one sentence for a reader; `gate` is the rule it came
+   *  from. `gp` and `games_until_rated` are null when the standings did
+   *  not say how many games the club has played: that is reported as
+   *  not knowing, never as a countdown from a number nobody has. */
+  admission?: {
+    k: number;
+    gp: number | null;
+    games_until_rated: number | null;
+    gate: string;
+    /** what it will be rated on once admitted — "current_only" */
+    basis_when_admitted: string;
+    says: string;
+  } | null;
+  /** THE REFUSED CLUB'S OWN CURRENT SEASON. Measured, on its own
+   *  league's scale, and reported for the same reason `BoardRow.rates`
+   *  is: seeing two real rates is what lets a reader decline to subtract
+   *  them. Any field may be null. */
+  this_season?: {
+    gp?: number | null; ppg?: number | null;
+    gf?: number | null; ga?: number | null; gdg?: number | null;
+  } | null;
+  /** THE CLUB THAT DID RESOLVE — it has a row, and therefore a rank, in
+   *  the table the refused club has no row in. That asymmetry IS the
+   *  refusal, so the card prints this side's rank and says the other has
+   *  none, rather than drawing half a pair. */
+  opponent_row?: {
+    club: string; rank?: number | null; gp?: number | null;
+    ppg?: number | null; gf?: number | null; ga?: number | null;
+    gdg?: number | null;
+  } | null;
+  /** LAST-5 BY VENUE, not by favourite — a refused fixture has no
+   *  favourite to key a strip to. A letter sequence either way: the
+   *  board's own string form and a list of letters are both accepted,
+   *  because a serialisation choice must not turn into a club whose
+   *  form silently vanished. */
+  form?: {
+    home?: string | string[] | null; away?: string | string[] | null;
+    scope?: string; scope_is_cup?: boolean;
+  } | null;
+  /** the book, when Kalshi listed this fixture. A refusal to RANK is not
+   *  a refusal to quote: the market prices this match either way, and
+   *  the card says so in the same cell a ranked card uses. */
+  kalshi?: KalshiQuote | null;
 }
 
 export interface LeagueMeta {

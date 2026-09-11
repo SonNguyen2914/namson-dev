@@ -499,6 +499,70 @@ html {
               0 0 18px rgba(245, 197, 66, 0.12);
 }
 
+/* ── THE REFUSED CARD'S HIGHLIGHTED BORDER (operator, 2026-09-11) ──────
+   "also give them a normal board but with highlighted border and a
+   #refused tag."
+
+   THE COLOUR IS THE WHOLE DECISION, and three of this palette's four
+   families were ruled out before one was picked:
+
+     - GOLD (--accent) is the BRAND, and rank 01. Never a verdict — the
+       rule this file has repeated since the Sept 1 redesign. A gold card
+       in a league column already means "top of this day's ladder", which
+       is the one thing a refused card is not.
+     - THE TRAFFIC LIGHT (--up / --warn / --neg) is a verdict about a
+       fixture. The card wore --warn, dashed, until today and the
+       operator rejected exactly that reading: a refused fixture is not
+       damaged, not an error and not a warning about the match — it is a
+       match this board declined to RANK, and the two clubs are fine.
+     - A LEAGUE HUE (--lg-*) is WAYFINDING — it says WHICH competition,
+       and every card in a column already carries the same one, so
+       lighting one card's border in it would say nothing about that card
+       and would dilute the one ink whose job is telling columns apart.
+
+   WHICH LEAVES THE INK LADDER, and that is the right answer rather than
+   the leftover one. "Gray does the talking, white is scarce" is this
+   system's own rule, so spending white is how it says LOOK HERE without
+   saying good or bad — the same spend the form strip's latest cell makes
+   with `ring-ink-hi/70`. A refusal is a statement about the board's
+   coverage, not a judgement on the match, so it takes the one family
+   that carries no judgement at all.
+
+   EMPHASIS, NOT DAMAGE. Solid, not dashed: a dashed border is the
+   vocabulary of a placeholder (see the rest-day cell, which IS one), and
+   this card is full of real measured numbers. The surface underneath is
+   the ranked card's own gradient, untouched — same material, brighter
+   edge — because the operator asked for "a normal board" and a different
+   fill would have made it a different object.
+
+   STATIC, like .chip-soon above and for the same reason: a pulse reads
+   as urgency, and nothing here is urgent.
+
+   FORCED COLOURS. Every custom colour above is discarded in
+   high-contrast mode, so the highlight would vanish silently and the
+   card would look like its neighbours. The outline carries it in the one
+   property that survives — and the card writes `#refused` in words
+   anyway, because a fact carried only by a border is a fact some readers
+   never get. */
+/* THE STRENGTH WAS MEASURED ON THE BOARD rather than picked off a scale.
+   At --line-strong (white 16%) the card sat between an ordinary row's
+   border and rank 01's gold and read as neither — and "highlighted" has
+   to survive a screenshot of a whole matchday, which is how the operator
+   actually looks at this surface. White 32% on the edge, an inner line
+   and a short outer bloom is the least ink that reads as LIT from two
+   feet away, and it is still the one colour family on this board that
+   says nothing about whether a fixture is good or bad. */
+.card-refused {
+  border-color: rgba(245, 245, 247, 0.32);
+  box-shadow:
+    inset 0 0 0 1px rgba(245, 245, 247, 0.10),
+    0 0 0 1px rgba(245, 245, 247, 0.07),
+    0 0 18px -6px rgba(245, 245, 247, 0.5);
+}
+@media (forced-colors: active) {
+  .card-refused { outline: 2px solid currentColor; outline-offset: 1px; }
+}
+
 /* ================= League mode transitions v2 ==========================
    The effect IS the transition. The incoming league mounts immediately
    and a full-page REVEAL uncovers it while a matching full-viewport
