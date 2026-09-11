@@ -505,7 +505,11 @@ function FieldRanks({ field }: { field: RowField }) {
              any width — the same reasoning, and the same offset, its
              dense mode already uses. The trio's label row and the
              panel's therefore no longer align, which was a real virtue
-             and is the price of the corner the operator asked for. */
+             and is the price of opening on the right-hand side. (The
+             anchor's corner, asked for the same day, went back beside
+             the club names on 2026-09-11; this placement did not move
+             with it — the operator asked for it and has not disputed
+             it.) */
           className="absolute right-0 top-[calc(100%+7px)] z-20 w-max max-w-full rounded-lg border border-line-strong bg-elev2 p-3 shadow-xl">
           {/* `flex`, NOT `inline-flex`. An inline-flex is an atomic
               inline and sits on its parent's baseline, so the strut's

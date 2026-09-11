@@ -1216,23 +1216,30 @@ test("a long club name is drawn WHOLE in a narrow track, not ellipsised",
     }
   });
 
-// ------------------------- the card's upper-right corner --------------
+// ------------- the date on top, the anchor under it --------------------
 //
-// Operator, 2026-09-10, on a live Champions League card: "fix this
-// design, the hover ranking must display on the right hand, and the
-// League gap number need to be on the upper right corner, move the form
-// closer to team names."
+// Operator, 2026-09-11, on the landing board: "this was so good and then
+// recent fix ruin it"; "make the UCL card consistent with this one too";
+// "the date is the most top right, then GD/g go under it."
 //
-// The anchor used to sit inside the matchup link, to the right of the
-// two club-name rows — so it read as a fact about the NAMES. It is a
-// fact about the CARD, of the same kind as the rank badge and the
-// kickoff time; it now sits in a column of its own, top-aligned with
-// that chip row.
+// #48 had read an earlier instruction — "the League gap number need to be
+// on the upper right corner" — as the CORNER ITSELF, and hoisted the
+// anchor out of the matchup into a column level with the chip row. That
+// put the figure OUTBOARD of the kickoff: the date, which had been the
+// card's top-right ink, moved 84-88px inboard to make room for it. The
+// arrangement below is the one that shipped before that, restored.
 //
-// THESE MEASURE, they do not read classes. The corner is a claim about
-// where the box lands at each step of the ladder, and the failure mode
-// is silent: a corner that fits at 1440 and squeezes the names into
-// syllables at 1024 passes every text assertion in this file.
+// TWO BOARDS, ONE CARD. `/bet-suggester` draws its columns WIDE and
+// `/bet-suggester/ucl` draws one column's matchday four abreast, off the
+// same component with `dense` flipped — and the operator has now asked
+// for them to agree. So each of these runs against BOTH, because "the
+// same card" is a claim about two pages and a test on one of them proves
+// half of it.
+//
+// THESE MEASURE, they do not read classes. Every one of them is a claim
+// about where a box lands at a given width, and the failure mode is
+// silent: an arrangement that reads correctly at 1440 and inverts at 390
+// passes every text assertion in this file.
 
 /** Where each part of one card's top region is, settled. */
 async function topRegion(card: ReturnType<typeof col>) {
@@ -1244,12 +1251,21 @@ async function topRegion(card: ReturnType<typeof col>) {
     };
     const cs = getComputedStyle(el as HTMLElement);
     const cr = (el as HTMLElement).getBoundingClientRect();
-    // the FAVOURITE's name — the span whose whole text is the club, and
-    // the group (pip + name) it wraps with
+    /* THE CHIP ROW AND ITS DATE, FOUND THROUGH THE RANK. The kickoff
+       carries no testid of its own and does not need one: it is the
+       LAST item of the row the rank badge opens, which is what `ml-auto`
+       there means. Reading it that way also makes the test fail if the
+       date stops being last, which is the same defect by another
+       route. */
+    const rank = el.querySelector('[data-testid="row-rank"]')!;
+    const chip = rank.parentElement!;
+    const date = chip.lastElementChild!;
+    // the FAVOURITE's name — the span whose whole text is the club
+    const fav = (el.querySelector("a[href]")?.getAttribute("aria-label") ?? "")
+      .replace(/^open /, "").replace(/ versus .*$/, "");
     const name = Array.from(el.querySelectorAll("span")).find(
-      (s) => (s.textContent ?? "").trim()
-        === (el.querySelector("a[href]")?.getAttribute("aria-label") ?? "")
-          .replace(/^open /, "").replace(/ versus .*$/, ""));
+      (s) => (s.textContent ?? "").trim() === fav) as HTMLElement | undefined;
+    const pip = name?.previousElementSibling ?? null;
     return {
       content: { l: cr.left + parseFloat(cs.borderLeftWidth)
                      + parseFloat(cs.paddingLeft),
@@ -1257,14 +1273,28 @@ async function topRegion(card: ReturnType<typeof col>) {
                      - parseFloat(cs.paddingRight) },
       anchor: q(el.querySelector('[data-testid="row-anchor"]')),
       block: q(el.querySelector('[data-testid="anchor-block"]')),
-      rank: q(el.querySelector('[data-testid="row-rank"]')),
+      rank: q(rank), chip: q(chip), date: q(date),
       name: q(name ?? null),
+      /* THE NAME AND ITS PIP, AS ONE EXTENT. This is the quantity #48's
+         guard read and called "the name": its own markup wrapped the two
+         in a group span, and the finder above matched that group first.
+         The group went back out with the corner, so the same number now
+         has to be composed rather than measured — and it is the right
+         number to hold the bar against, because a pip with no room for
+         a name beside it is the failure being watched for. */
+      pair: name
+        ? { l: (pip ?? name).getBoundingClientRect().left,
+            r: name.getBoundingClientRect().right }
+        : null,
       nameWhole: name
         ? (name as HTMLElement).scrollWidth
             <= (name as HTMLElement).clientWidth + 1
         : null,
       nameWidth: name ? (name as HTMLElement).getBoundingClientRect().width
                       : null,
+      // the two club-name rows, as one band: the strip that wraps under
+      // a name is part of the matchup, so the band is the link's own box
+      matchup: q(el.querySelector("a[href]")),
     };
   });
   // A LAYOUT READ MUST WAIT FOR THE LAYOUT — see cardBoxes above.
@@ -1277,45 +1307,171 @@ async function topRegion(card: ReturnType<typeof col>) {
   throw new Error("the card never stopped moving");
 }
 
-test("the anchor figure sits in the card's upper-right corner, level with "
-   + "the rank badge, at every step of the ladder", async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openUcl(page, GRID_BOARD);
-    const card = col(page, "ucl").getByTestId("picker-row").first();
-    await expect(card).toBeVisible();
+/** The same card on both boards: [name, opener]. */
+const BOTH_BOARDS: [string, (p: import("@playwright/test").Page)
+  => Promise<void>][] = [
+  ["the wide board", (p) => open(p, GRID_BOARD)],
+  ["the UCL board", (p) => openUcl(p, GRID_BOARD)],
+];
 
-    for (const width of [390, 820, 1024, 1280, 1440]) {
-      await page.setViewportSize({ width, height: 900 });
-      const g = await topRegion(card);
-      const at = `at ${width}px`;
-      expect(g.block, `${at}: the card draws no anchor block at all`)
-        .not.toBeNull();
+for (const [board, openIt] of BOTH_BOARDS) {
+  test(`the kickoff is the card's top-right ink on ${board}, at every step `
+     + "of the ladder", async ({ page }) => {
+      /* "THE DATE IS THE MOST TOP RIGHT" (operator, 2026-09-11). Said as
+         an EQUALITY against the card's content edge rather than as
+         "near the right", because the arrangement it refuses put the
+         date 84-88px inboard of that edge at every width — comfortably
+         still on the right-hand half of the card, and wrong. */
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await openIt(page);
+      const card = col(page, "ucl").getByTestId("picker-row").first();
+      await expect(card).toBeVisible();
 
-      // IN THE CORNER: flush with the card's content edge on the right…
-      expect(g.block!.r, `${at}: the anchor is at the card's right edge`)
-        .toBeCloseTo(g.content.r, 0);
-      // …and level with the chip row that carries the rank, not below
-      // the names. One device pixel: they are the two columns of one
-      // row, so this is an alignment and not an approximation.
-      expect(Math.abs(g.anchor!.t - g.rank!.t),
-        `${at}: the anchor's top is the rank badge's top`)
-        .toBeLessThanOrEqual(1);
-      // and it is BESIDE the names rather than over them
-      expect(g.block!.l, `${at}: the anchor clears the club name`)
-        .toBeGreaterThanOrEqual(g.name!.r - 0.5);
-      // it never leaves the card
-      expect(g.block!.l).toBeGreaterThanOrEqual(g.content.l);
-    }
-  });
+      for (const width of [390, 820, 1024, 1280, 1440]) {
+        await page.setViewportSize({ width, height: 900 });
+        const g = await topRegion(card);
+        const at = `${board} at ${width}px`;
+        expect(g.date!.r, `${at}: the kickoff is at the card's right edge`)
+          .toBeCloseTo(g.content.r, 0);
+        /* AND NOTHING IS ABOVE IT. The chip row is the card's first
+           element, so "most top" is the claim that no other ink shares
+           or clears its top — the anchor was the one that did. */
+        expect(g.block!.t, `${at}: the anchor is level with the kickoff`)
+          .toBeGreaterThan(g.date!.t);
+      }
+    });
+
+  test(`the anchor sits UNDER that date on ${board}, right-aligned to the `
+     + "same edge, beside the club names", async ({ page }) => {
+      /* "THEN GD/G GO UNDER IT" (operator, 2026-09-11). Three
+         properties, and each one fails on the arrangement this
+         replaces:
+          - the figure's column shares the DATE's right edge, so the two
+            read as one right-hand column instead of two corners;
+          - its top clears the whole chip row, so it is under the date
+            rather than level with the rank badge (#48: 40-93px ABOVE
+            that row's bottom);
+          - it is in the MATCHUP's band — beside the two club names in a
+            wide track, and stacked under them where the dense card is
+            too narrow to hold both. Never in the chip row's band, which
+            is where it was. */
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await openIt(page);
+      const card = col(page, "ucl").getByTestId("picker-row").first();
+      await expect(card).toBeVisible();
+
+      for (const width of [390, 820, 1024, 1280, 1440]) {
+        await page.setViewportSize({ width, height: 900 });
+        const g = await topRegion(card);
+        const at = `${board} at ${width}px`;
+        expect(g.block, `${at}: the card draws no anchor block at all`)
+          .not.toBeNull();
+        // ONE COLUMN WITH THE DATE: the same right edge, to the pixel.
+        expect(g.block!.r, `${at}: the anchor is at the card's right edge`)
+          .toBeCloseTo(g.content.r, 0);
+        expect(g.block!.r, `${at}: the anchor and the date share an edge`)
+          .toBeCloseTo(g.date!.r, 0);
+        // UNDER THE DATE: clear of the whole chip row, not level with it.
+        expect(g.block!.t, `${at}: the anchor is inside the chip row`)
+          .toBeGreaterThanOrEqual(g.chip!.b);
+        /* IN THE MATCHUP'S BAND. Beside the names, or — where the dense
+           card stacks — under them; either way the anchor's top is
+           inside the link's own box, which the chip row's is not. */
+        expect(g.block!.t, `${at}: the anchor is above the matchup`)
+          .toBeGreaterThanOrEqual(g.matchup!.t - 0.5);
+        if (g.block!.t < g.name!.b) {
+          // sharing the line: strictly to the RIGHT of the club name
+          expect(g.block!.l, `${at}: the anchor overlaps the club name`)
+            .toBeGreaterThanOrEqual(g.name!.r - 0.5);
+        } else {
+          // stacked: the names had the whole width above it
+          expect(g.block!.t, `${at}: the anchor overlaps the club name`)
+            .toBeGreaterThanOrEqual(g.name!.b - 0.5);
+        }
+      }
+    });
+
+  test(`each form strip is parked at its row's right edge on ${board}`,
+    async ({ page }) => {
+      /* `ml-auto pl-2`, RESTORED 2026-09-11. #48 read the auto margin as
+         distance from the club and took it off; the operator asked for
+         the card it was on. The alignment is what it buys: a column of
+         cards reads as one ladder of form only if every strip shares a
+         right edge, and the club name beside each of them is a different
+         length.
+         THE PROPERTY IS "NO FREE SPACE TO ITS RIGHT", which is what an
+         auto margin actually guarantees and is true on both of the
+         layouts this row is allowed to take. On a line it shares with
+         the name, the margin eats the slack and the strip finishes at
+         the line's end. On a line of its own — what happens when the
+         whole name will not sit beside it — the strip is the only item
+         and finishes at the end of that line too. Without `ml-auto` the
+         strip follows the name by one gap and leaves 23-195px of slack
+         behind it, which is what this measures.
+         AT OR PAST, not equal to: in the narrowest track the board can
+         produce the row has no free space at all, and an auto margin
+         absorbs only free space. The strip then sits hard against the
+         name — the behaviour the operator's own card shows — and this
+         still holds. */
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await openIt(page);
+      const card = col(page, "ucl").getByTestId("picker-row").first();
+      await expect(card).toBeVisible();
+      // the fixture draws the widest strip there is AND the badge that
+      // sits between it and the name — see GRID_ROWS
+      await expect(card.getByTestId("form-strip")).toHaveCount(2);
+      await expect(card.getByTestId("home-badge")).toHaveCount(1);
+
+      for (const width of [390, 820, 1024, 1280, 1440]) {
+        await page.setViewportSize({ width, height: 900 });
+        const read = () => card.evaluate((el) => {
+          const out: { row: number; slack: number }[] = [];
+          el.querySelectorAll('[data-testid="form-strip"]')
+            .forEach((s, i) => {
+              const rb = s.parentElement!.getBoundingClientRect();
+              out.push({ row: i,
+                         slack: rb.right - s.getBoundingClientRect().right });
+            });
+          return out;
+        });
+        let prev = await read();
+        for (let i = 0; i < 25; i++) {
+          const next = await read();
+          if (JSON.stringify(next) === JSON.stringify(prev)) break;
+          prev = next;
+        }
+        for (const m of prev) {
+          expect(m.slack,
+            `${board} at ${width}px, strip ${m.row}: ${
+              Math.round(m.slack)}px of slack after it`)
+            .toBeLessThanOrEqual(0.5);
+        }
+      }
+    });
+}
 
 test("the club name is still drawn whole beside it, at the narrow end and "
    + "at the wide one", async ({ page }) => {
-    /* THE COST OF THE CORNER, MEASURED RATHER THAN ASSUMED. The anchor
-       column takes 76px of the card's content width at every width, and
-       the narrowest track this board lays is ~237px at lg. `truncate`
-       is off on a dense card by design — a board of "Bayer Le…" is a
-       board you cannot read — so the way this fails is a name reflowed
-       into a column of syllables, which no text assertion can see. */
+    /* THE COST OF THE ANCHOR'S COLUMN, MEASURED RATHER THAN ASSUMED. The
+       figure and its key take their own width out of the card at every
+       track this board lays, and the narrowest is ~211px at lg.
+       `truncate` is off on a dense card by design — a board of "Bayer
+       Le…" is a board you cannot read — so the way this fails is a name
+       reflowed into a column of syllables, which no text assertion can
+       see.
+       90px IS #48'S OWN BAR, AND IT IS UNCHANGED. What changed is the
+       box the bar is held against, because #48's markup wrapped the pip
+       and the name in a group span and the finder above matched that
+       group — so the guard had always been reading the pair, not the
+       name. The group went back out with the corner on 2026-09-11, so
+       `pair` composes the same extent from the pip and the name
+       directly, and falls back to the matched element when they are
+       already one box. Same quantity, same number, either markup:
+       104.6px on this fixture against a bar of 90. THIS GUARD THEREFORE
+       PASSES ON BOTH BUILDS BY DESIGN — it is the one in this block that
+       is not a claim about the arrangement, and a version of it that
+       went red on the layout it was written for would be measuring
+       something else. */
     await page.setViewportSize({ width: 1440, height: 900 });
     await openUcl(page, GRID_BOARD);
     const card = col(page, "ucl").getByTestId("picker-row").first();
@@ -1329,78 +1485,8 @@ test("the club name is still drawn whole beside it, at the narrow end and "
       expect(g.nameWhole, `${at}: the name is clipped`).toBe(true);
       // AND AT READING WIDTH. A name reflowed into a 2px box satisfies
       // the line above and says nothing.
-      expect(g.nameWidth, `${at}: the name draws only ${
-        Math.round(g.nameWidth ?? 0)}px wide`).toBeGreaterThan(90);
-    }
-  });
-
-test("each form strip is drawn against the name it describes, not parked "
-   + "at the row's right edge", async ({ page }) => {
-    /* "move the form closer to team names" (operator, 2026-09-10). The
-       strips carried `ml-auto`, which parks them at the row's right
-       edge — on a wide card a strip of five 7px cells floating half a
-       card from the club whose form it is.
-       THE PROPERTY IS "NO VOID BEFORE IT", which covers both of the
-       layouts this row is allowed to take. On a line it shares, the
-       strip follows whatever precedes it — the name, or the H badge
-       between them — within one gap. On a line of its own, which is
-       what happens when the whole name will not sit beside it, it
-       starts at the row's own left edge, under the name. `ml-auto`
-       satisfies neither: it leaves exactly the void this measures. */
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openUcl(page, GRID_BOARD);
-    const card = col(page, "ucl").getByTestId("picker-row").first();
-    await expect(card).toBeVisible();
-    // the fixture draws the widest strip there is AND the badge that
-    // sits between it and the name — see GRID_ROWS
-    await expect(card.getByTestId("form-strip")).toHaveCount(2);
-    await expect(card.getByTestId("home-badge")).toHaveCount(1);
-
-    for (const width of [390, 820, 1440]) {
-      await page.setViewportSize({ width, height: 900 });
-      const read = () => card.evaluate((el) => {
-        const out: { row: number; gap: number; fromLeft: number }[] = [];
-        const strips = el.querySelectorAll('[data-testid="form-strip"]');
-        strips.forEach((s, i) => {
-          const row = s.parentElement!;
-          const sb = s.getBoundingClientRect();
-          const rb = row.getBoundingClientRect();
-          // the siblings sharing this strip's LINE, to its left
-          const mid = sb.top + sb.height / 2;
-          let before = -Infinity;
-          for (const sib of Array.from(row.children)) {
-            if (sib === s) continue;
-            const b = sib.getBoundingClientRect();
-            const sameLine = mid > b.top - 4 && mid < b.bottom + 4;
-            if (sameLine && b.right <= sb.left + 0.5) {
-              before = Math.max(before, b.right);
-            }
-          }
-          out.push({ row: i,
-                     gap: before === -Infinity ? NaN : sb.left - before,
-                     fromLeft: sb.left - rb.left });
-        });
-        return out;
-      });
-      let prev = await read();
-      for (let i = 0; i < 25; i++) {
-        const next = await read();
-        if (JSON.stringify(next) === JSON.stringify(prev)) break;
-        prev = next;
-      }
-      for (const m of prev) {
-        const at = `at ${width}px, strip ${m.row}`;
-        if (Number.isNaN(m.gap)) {
-          // a line of its own: directly under the name, at the row's
-          // own left edge
-          expect(m.fromLeft, `${at}: on its own line, it starts left`)
-            .toBeLessThanOrEqual(0.5);
-        } else {
-          // sharing a line: one gap after whatever precedes it
-          expect(m.gap, `${at}: ${Math.round(m.gap)}px of void before it`)
-            .toBeLessThanOrEqual(12);
-        }
-      }
+      expect(g.pair!.r - g.pair!.l, `${at}: the name and its pip draw only ${
+        Math.round(g.pair!.r - g.pair!.l)}px wide`).toBeGreaterThan(90);
     }
   });
 
