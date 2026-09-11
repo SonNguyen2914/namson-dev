@@ -71,16 +71,32 @@ export const WATCHED_STRIP_POLL_MS = 15_000;
 
 /** HOW LONG A READ MAY GO UNANSWERED BEFORE THIS CLIENT ABANDONS IT.
  *
- *  DERIVED FROM THE CADENCE, not typed beside it. One full period plus
- *  a five-second grace: by the time a read has been out this long its
- *  successor's answer is already on screen, so it has nothing left to
- *  tell anybody — and the ceiling being a little OVER the period rather
- *  than under it is deliberate, because a read that takes 16s on a bad
- *  connection should be allowed to land late rather than be guaranteed
- *  to fail forever. The bound that matters is that hung reads cannot
- *  ACCUMULATE: at most two are ever in flight, and the older of the two
- *  can no longer reach the screen. */
-export const WATCHED_STRIP_READ_CEILING_MS = WATCHED_STRIP_POLL_MS + 5_000;
+ *  NOT DERIVED FROM THE CADENCE ANY MORE, and the reason is a live
+ *  outage. This was `WATCHED_STRIP_POLL_MS + 5_000` = 20s, argued from
+ *  "by the time a read has been out this long its successor's answer is
+ *  already on screen, so it has nothing left to tell anybody". That
+ *  holds only while the successor SUCCEEDS. On 2026-09-11 the operator's
+ *  declared set reached 27 matches, the payload reached 1.09MB and the
+ *  backend took 24s to build it — so every read was abandoned four
+ *  seconds before its answer arrived, every successor was abandoned too,
+ *  and the strip rendered NOTHING at all. The assumption inverted: the
+ *  ceiling stopped bounding a pathology and became one.
+ *
+ *  HOW LONG A READ TAKES AND HOW OFTEN IT IS ASKED FOR ARE DIFFERENT
+ *  QUANTITIES. The first belongs to the backend and the size of the
+ *  payload; the second is a choice about how fresh the screen should be.
+ *  Tying one to the other made a slow backend invisible instead of slow.
+ *  So this is now a bound on a connection that has HUNG — a minute, past
+ *  which nobody is still waiting — and the job it used to be given, of
+ *  stopping reads accumulating, is done structurally in `poll` by not
+ *  starting a scheduled one while another is in flight.
+ *
+ *  IT IS STILL A JUDGEMENT AND NOT A MEASUREMENT. Nothing has measured
+ *  how long this read may legitimately take; 24s was measured once, on
+ *  one payload, and the backend fix for that is separate. A minute is
+ *  chosen to be comfortably past any read worth waiting for rather than
+ *  fitted to one. */
+export const WATCHED_STRIP_READ_CEILING_MS = 60_000;
 
 /** THE ONE SENTENCE ON THIS READ THAT NO UPSTREAM LAYER WROTE.
  *
@@ -156,7 +172,21 @@ function publish(feed: Feed, next: WatchedStripRead): void {
   for (const l of [...feed.listeners]) l();
 }
 
-async function poll(feed: Feed): Promise<void> {
+async function poll(feed: Feed, forced = false): Promise<void> {
+  // A SCHEDULED TICK DOES NOT STACK ON A READ THAT IS STILL COMING.
+  //
+  // This is what actually bounds accumulation, and the ceiling below is
+  // no longer asked to do it. When every read outlasts the cadence —
+  // measured 2026-09-11: 24s for a 1.09MB payload on 27 declared
+  // matches, against a 15s period — a timer that fires regardless opens
+  // a second request on top of a first that is still in flight, and the
+  // backend is asked to build the same megabyte twice.
+  //
+  // THE PRESS IS EXEMPT. `refreshWatchedStrip` is the operator asking
+  // for this read NOW, having just changed what it would say; making
+  // him wait out an in-flight poll would be the button declining to do
+  // the one thing it exists for.
+  if (!forced && feed.flight.size > 0) return;
   const seq = (feed.issued += 1);
   const ctl = new AbortController();
   feed.flight.add(ctl);
@@ -250,7 +280,7 @@ export function watchedStripSnapshot(token: string): WatchedStripRead {
  *  flight cannot land on top of its answer. */
 export function refreshWatchedStrip(token: string): void {
   const feed = feeds.get(token);
-  if (feed !== undefined && feed.live) void poll(feed);
+  if (feed !== undefined && feed.live) void poll(feed, true);
 }
 
 /** THE READ, FOR A COMPONENT.
