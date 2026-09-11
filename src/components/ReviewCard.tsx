@@ -449,7 +449,63 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
   const ft = row.shot_state.full_time;
   const fit = row.fit;
 
+  /* A CAPTURE MADE BY A RULE THAT HAS SINCE BEEN CORRECTED
+     (2026-09-10).
+
+     The cross-league favourite used to be chosen by comparing
+     WITHIN-LEAGUE tier tuples across leagues and breaking ties on the
+     club's NAME. Sabah FK, top of the Azerbaijani Premyer Liqa, beat
+     Manchester United on that rule; Slavia Prague beat Lens; Viking FK
+     beat VfB Stuttgart. Backend 8dfa813 replaced it with the 36-club
+     field and flipped 50 of 113 rated fixtures.
+
+     A CAPTURE CANNOT BE RE-TAKEN AND MUST NOT BE REWRITTEN. It is
+     "what the picker actually said", the match is over so there is no
+     pre-kickoff board left to read, and a cup has no season archive to
+     rewind (`cup_has_no_season_archive`). Silently restating it with
+     today's answer would destroy the only record of what was shown.
+
+     So it is MARKED, and the mark has to be loud, because this is not
+     a footnote on one figure: every signed field below is oriented from
+     that favourite — the tier gaps, the shape, and the whole "whether
+     it fit" verdict. `FAVOURITE WON: NO` on Liverpool 2-1 Atlético is
+     answering about the wrong club.
+
+     THE SIGNAL IS EXACT, not a date comparison. The current rule emits
+     `fav_source: "field"` and carries a `field` block on a
+     cross-league row; the superseded one emitted `"rank"` and carried
+     none. A row that is not cross-league never used either rule. */
+  const favRuleSuperseded = Boolean(
+    read?.cross_league && read?.fav_source === "rank" && !read?.field);
+
   const winner = res?.winner ?? null;
+/** THE FAVOURITE, AS A SHAPE RATHER THAN A COLOUR.
+ *
+ *  Filled = the picker's favourite before kickoff; hollow = the
+ *  opponent. The board's upcoming card draws exactly this pair on its
+ *  two club lines, so a reader who knows one surface knows this one.
+ *
+ *  NOTHING IS DRAWN WHEN NO FAVOURITE IS KNOWN. A row whose capture was
+ *  unavailable has no favourite, and a hollow ring on both sides would
+ *  say "we picked neither" — which is a claim. Absent says the
+ *  question was never answered, which is the truth. */
+function FavPip({ side, favSide }: {
+  side: "home" | "away"; favSide: "home" | "away" | null | undefined;
+}) {
+  if (!favSide) return null;
+  const isFav = favSide === side;
+  return (
+    <span data-testid="fav-mark" data-side={side}
+      data-fav={isFav ? "yes" : "no"} aria-hidden
+      title={isFav
+        ? "the picker's favourite before kickoff"
+        : "not the picker's favourite"}
+      className={isFav
+        ? "h-2 w-2 flex-none self-center rounded-full bg-ink-hi"
+        : "h-[7px] w-[7px] flex-none self-center rounded-full border border-ink-low bg-bs"} />
+  );
+}
+
   const scoreTone = (side: "home" | "away") =>
     winner === side ? "text-ink-hi font-semibold" : "text-ink-mid";
 
@@ -489,29 +545,77 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
         className="mt-2 block rounded-md outline-none transition-colors hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bs">
         <div data-testid="review-score"
           className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          {/* TWO FACTS, TWO CHANNELS, AND THEY USED TO FIGHT (2026-09-10).
+              WEIGHT says who WON — `scoreTone` gives the winner
+              `text-ink-hi font-semibold` and the loser `text-ink-mid`.
+              A trailing gold `fav` chip said who we PICKED. On Liverpool
+              2-1 Atlético the winner was Liverpool and the favourite was
+              Atlético, so the row read "**Liverpool** 2–1 Atlético
+              Madrid [FAV] →": the brightest word and the gold chip
+              belonged to different clubs, and the operator read them as
+              one statement. "no, I saw Liverpool was the fav" — and the
+              card had told him so.
+
+              Gold was the wrong channel besides. The design rule is that
+              gold is the brand and never a verdict, and "this is the one
+              we picked" is a verdict.
+
+              SO THE MARK IS THE SHAPE THE BOARD ALREADY USES: a filled
+              pip on the favourite, a hollow ring on the opponent, drawn
+              BEFORE each name where a reader meets it first. Same idiom
+              as the upcoming card's two club lines, so one convention
+              covers both surfaces and neither has to be learned twice.
+              Weight still says who won; nothing competes for it. */}
+          <FavPip side="home" favSide={favSide} />
           <span className={`text-sm ${scoreTone("home")}`}>{row.home}</span>
-          {favSide === "home" && (
-            <span data-testid="fav-mark" data-side="home"
-              title="the picker's favourite before kickoff"
-              className="rounded border border-accent/40 px-1 py-0.5 font-mono text-[8px] uppercase tracking-[0.14em] text-accent">
-              fav
-            </span>
-          )}
           <span className="font-mono text-lg font-semibold tabular-nums text-ink-hi">
             {res ? `${res.home}–${res.away}` : "—"}
           </span>
+          <FavPip side="away" favSide={favSide} />
           <span className={`text-sm ${scoreTone("away")}`}>{row.away}</span>
-          {favSide === "away" && (
-            <span data-testid="fav-mark" data-side="away"
-              title="the picker's favourite before kickoff"
-              className="rounded border border-accent/40 px-1 py-0.5 font-mono text-[8px] uppercase tracking-[0.14em] text-accent">
-              fav
-            </span>
-          )}
           <span aria-hidden className="text-ink-faint">→</span>
         </div>
       </Link>
 
+      {/* THE FAVOURITE ON THIS CARD WAS NAMED BY A RULE SINCE
+          CORRECTED, SAID BEFORE ANYTHING SIGNED FROM IT.
+
+          It sits above the capture rather than inside it because it
+          does not qualify one figure — it qualifies the ORIENTATION of
+          every signed field below, the shape, and the "whether it fit"
+          verdict, all of which are computed from the favourite. A note
+          beside the tier row would have read as a caveat on the tiers.
+
+          `warn`, not `neg`: the capture is not broken and not a failed
+          read. It is a faithful record of what the board said, and what
+          the board said has since been corrected. Those are different
+          claims and the traffic light keeps them apart. */}
+      {favRuleSuperseded && (
+        <div data-testid="fav-rule-superseded"
+          className="mt-3 rounded-lg border border-warn/40 bg-warn/5 p-3">
+          <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
+            favourite named by a superseded rule
+          </p>
+          <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-mid">
+            This capture was frozen before the cross-league favourite was
+            fixed. The old rule compared each club&rsquo;s standing{" "}
+            <em className="not-italic text-ink-hi">within its own league</em>{" "}
+            and broke ties on the club&rsquo;s name, so a club top of a
+            weak league outranked a stronger club mid-table in a strong
+            one. It named{" "}
+            <span className="text-ink-hi">{read?.favourite}</span>{" "}
+            here. The board now rates both clubs on the competition&rsquo;s
+            own 36-club field.
+          </p>
+          <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-low">
+            Everything signed below &mdash; the gaps, the tier reading,
+            the shape and whether the favourite won &mdash; is oriented
+            from that favourite, so read it as the record of what was
+            shown, not as the current reading. The capture is kept
+            unrewritten on purpose: it is what the picker actually said.
+          </p>
+        </div>
+      )}
       {/* ─────────────── 1 · what the picker said before kickoff ─────────── */}
       <section data-testid="pre-kickoff" data-origin={origin}
         className={`mt-3 rounded-lg border-l-2 py-2 pl-3 ${
