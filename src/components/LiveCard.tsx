@@ -90,23 +90,27 @@ import {
 } from "../lib/pickerApi";
 import {
   LiveReadComponentPayload, STATE_ABSENT_WORDS, WatchedMatch,
-  WatchedPosition, WatchedStripResponse, api, readMatchStates,
+  WatchedPosition, readMatchStates,
 } from "../lib/suggesterApi";
+import { useWatchedStrip } from "../lib/watchedStripFeed";
 import { clubColors } from "../lib/teamColors";
+import ErrorBoundary from "./ErrorBoundary";
 import { RowRead, hueOf } from "./PickerColumn";
 import { KalshiCell } from "./PickerRead";
 import { useWatchToken } from "./WatchDeclaration";
 import { tapeVerdictOf } from "./WatchedStrip";
 
-/** THE STRIP'S OWN CONSTANT, and the claim beside it was false. This
- *  read "the backend's own 15s live tick, as the strip does" until
- *  2026-09-09; there is no 15s tick. `config.LIVE_STATE_INTERVAL_SECONDS`
- *  is `max(60, int(getenv(..., "120")))`, so the collector writes a
- *  state-tape row every 120s by default and no faster than every 60s
- *  under any env value. See the same note over WatchedStrip's copy: the
- *  cadence is left alone because slowing it changes what he sees when a
- *  goal lands, and nothing here has measured that. */
-const POLL_MS = 15000;
+// THE POLL IS NOT THIS FILE'S ANY MORE, and `POLL_MS` has gone with it.
+//
+// This constant and WatchedStrip's copy of it ran TWO timers against
+// one operator-gated route: measured on production 2026-09-11, two
+// requests per 15s cycle, ~139KB each, 2.4s out of phase — and, worse
+// than the bandwidth, the strip and these cards drew two independent
+// reads of one moving match as a single screen. The cadence, the
+// ordering guard and the read's ceiling now live in
+// lib/watchedStripFeed.ts, where the note about what the collector's
+// own interval is (the BACKEND'S number, not this file's to restate)
+// has moved with them.
 
 /** FOUR ACROSS, TWO ROWS, AND THEN A SECOND PAGE. Four because the
  *  ranked board below is four columns and a live grid on a different
@@ -1282,8 +1286,14 @@ export function LiveCard({ m, generatedAt, row, clubCount }: {
  *  unknown, and drop them SILENTLY into a section that then reads as
  *  "these are all the live matches". "We could not look" is not "it is
  *  not running", and the card that says so is the point. */
-export function isLiveish(m: WatchedMatch): boolean {
-  return m.state?.in_play === true || tapeVerdictOf(m) === "failed";
+export function isLiveish(m: WatchedMatch | null | undefined): boolean {
+  // `m?.` BECAUSE A LIST CAN CARRY A HOLE. An entry in `matches` that
+  // is not a match block read `m.state` here and unmounted the whole
+  // page. THE COMPLETE RECORD OF WHAT THE PAYLOAD SENT — including the
+  // entries nothing could draw — is the STRIP'S, which counts and names
+  // them (`watched-undrawable`); this section draws the subset of the
+  // declared set it can read and has never claimed to be the record.
+  return m?.state?.in_play === true || tapeVerdictOf(m) === "failed";
 }
 
 /** PAGE ORDER IS KICKOFF, NEVER INTEREST. A match must not move between
@@ -1313,7 +1323,7 @@ export function columnOf(m: WatchedMatch,
   return r ? (r.column ?? r.league) : null;
 }
 
-export default function LiveSection({ rows, leagues, columns }: {
+function LiveSection({ rows, leagues, columns }: {
   rows: BoardRow[];
   leagues: Record<string, LeagueMeta>;
   /** THE COLUMN SET THIS BOARD IS NARROWED TO, or undefined on the full
@@ -1332,42 +1342,38 @@ export default function LiveSection({ rows, leagues, columns }: {
   columns?: readonly string[] | null;
 }) {
   const token = useWatchToken();
-  const [data, setData] = useState<WatchedStripResponse | null>(null);
-  const [asked, setAsked] = useState(false);
+  // ONE READ, SHARED WITH THE STRIP ABOVE — see lib/watchedStripFeed.ts
+  // for the measurement that moved it there, and for the three defects
+  // that were in BOTH copies of the effect this replaces (a straggler
+  // overwriting the screen with older data, a hung poll that was
+  // invisible and accumulated, and a stale banner armed off the wrong
+  // fact).
+  //
+  // A FAILED READ IS STILL KEPT AND STILL NOT DRAWN HERE. The feed
+  // holds the earlier payload across a failed poll, exactly as this
+  // effect's `catch` did, so the section does not quietly empty as
+  // though no match were live — and it still does not draw the refusal,
+  // because WatchedStrip is mounted on the same page against the same
+  // gate and renders it with the status and the backend's own sentence.
+  // A second copy would say one thing twice. Every tape age here keeps
+  // being measured against the PAYLOAD'S own `generated_at`, so the
+  // cards age visibly rather than freezing.
+  //
+  // AND THE HOOK RETURNS `reread`, WHICH IS THE HANDLE PR #54 PARKS IN
+  // A REF. That PR keeps a `loadRef` inside the effect this replaces so
+  // a press on a card's tape readout can take a row and show it without
+  // waiting out the cadence — the capability is unchanged and survives
+  // this change; on merge, `reread` off this hook IS that handle and
+  // can be handed straight to the card as `onTaped`, with no ref and no
+  // closure to keep alive. It is not destructured here because nothing
+  // on this branch presses anything yet.
+  const { data, asked } = useWatchedStrip(token);
   // THE PAGE SURVIVES A POLL. It is state, not a value derived from the
   // payload, so a 15s refresh cannot walk the reader back to page one
   // mid-read. It is clamped where it is READ rather than corrected in an
   // effect: a page that no longer exists must not be rendered, and
   // setting state during render is how a poll and a clamp start fighting.
   const [page, setPage] = useState(0);
-
-  useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      try {
-        const r = await api.watchedStrip(token);
-        if (!alive) return;
-        setData(r);
-        setAsked(true);
-      } catch {
-        if (!alive) return;
-        setAsked(true);
-        // A FAILED READ IS KEPT, NOT SWALLOWED — but this section is not
-        // where it is DRAWN. WatchedStrip, mounted on the same page and
-        // polling the same endpoint with the same token, renders that
-        // refusal with its status and the backend's own sentence; a
-        // second copy would say one thing twice. What must not happen
-        // here is the section quietly emptying as though no match were
-        // live, so the EARLIER payload is kept and stays on screen —
-        // and every tape age on it keeps being measured against THAT
-        // payload's own `generated_at`, so the cards age visibly rather
-        // than freezing at whatever they last said.
-      }
-    };
-    load();
-    const id = setInterval(load, POLL_MS);
-    return () => { alive = false; clearInterval(id); };
-  }, [token]);
 
   const byEvent = useMemo(() => {
     const m = new Map<string, BoardRow>();
@@ -1469,6 +1475,75 @@ export default function LiveSection({ rows, leagues, columns }: {
           );
         })}
       </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------
+// THE SECTION, GUARDED
+//
+// There was no error boundary anywhere in this frontend until
+// 2026-09-11, so an unexpected shape inside a live card unmounted the
+// WHOLE page: `<main>` gone, and the picker board and every league
+// column dead with a section that sits above them and shares nothing
+// with them but a page. This section and the strip read the same
+// payload, so they can fail on the same shape, and they are isolated
+// from each other as well as from the board — one of them stopping must
+// not stop the other.
+//
+// IT SAYS WHAT HAPPENED. A boundary that renders a blank is not the
+// answer here: an absent "Under way" frame reads as "no match is under
+// way", which is a claim about a set nobody counted, and it is exactly
+// the conclusion this surface exists to refuse. It resets on each new
+// payload, so a one-off shape does not keep the frame dark for the life
+// of the tab.
+// ---------------------------------------------------------------------
+
+export default function GuardedLiveSection(props: {
+  rows: BoardRow[];
+  leagues: Record<string, LeagueMeta>;
+  columns?: readonly string[] | null;
+}) {
+  const token = useWatchToken();
+  // THE SAME SHARED READ THE SECTION ITSELF SUBSCRIBES TO, and it costs
+  // no second request — that is what the feed is for. It is read here
+  // only for the boundary's reset key: the identity of the payload the
+  // children are drawing.
+  const { data } = useWatchedStrip(token);
+  return (
+    <ErrorBoundary resetKey={data?.generated_at ?? ""}
+      fallback={(err) => <LiveSectionDidNotDraw err={err} />}>
+      <LiveSection {...props} />
+    </ErrorBoundary>
+  );
+}
+
+function LiveSectionDidNotDraw({ err }: { err: unknown }) {
+  const said = err instanceof Error
+    ? `${err.name}: ${err.message}` : String(err);
+  return (
+    <section data-testid="live-section-boundary" data-said={said}
+      aria-live="polite" aria-label="matches under way — not drawn"
+      className="mt-8 rounded-2xl border border-warn/40 bg-warn/5 p-4 sm:p-5">
+      <h2 className="text-lg font-medium text-warn">
+        The matches under way could not be drawn
+      </h2>
+      <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-ink-mid">
+        A read came back and the code that draws these cards raised on
+        the way through — a shape this surface does not expect. This
+        frame is saying so rather than closing, because a frame that is
+        not here is read as though nothing were under way, and that is a
+        claim about a set nobody counted.
+      </p>
+      <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-ink-mid">
+        The ranked board below, the review and every other section draw
+        from their own reads and are unaffected. Nothing was written
+        anywhere.
+      </p>
+      <p data-testid="live-section-boundary-said"
+        className="mt-2 font-mono text-[11px] leading-relaxed text-warn">
+        {said}
+      </p>
     </section>
   );
 }

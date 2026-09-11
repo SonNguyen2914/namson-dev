@@ -49,6 +49,33 @@
 // marked in real text. A match that silently drops off this section is
 // the bug.
 //
+// AND ON 2026-09-11 THIS FILE WAS BREAKING THAT INVARIANT ITSELF, in
+// one line: `if (data.dormant) return null`. A dormant plane is the one
+// answer the backend deliberately sends WITH A SENTENCE rather than as
+// a plausible empty set, and this surface deleted the sentence, the
+// finding, and every match on the payload with them. It is the
+// operator's own reported symptom, twice — "live matches disappeared",
+// "the live matches still hidden". It is drawn now. Three more things
+// changed in the same round, each of them measured rather than
+// theorised, and each written up where it is fixed:
+//
+//   - THE READ MOVED OUT. lib/watchedStripFeed.ts owns the poll for
+//     this surface AND for LiveCard's section, which had its own timer
+//     against the same route. It carries the ordering guard (a
+//     straggler used to overwrite the screen with older data), the
+//     ceiling (a hung poll used to be invisible and to accumulate) and
+//     the stale flag (armed off the wrong fact, so one missing envelope
+//     key disarmed the whole thing).
+//   - THE CONTRACT IS READ. `version` was consumed nowhere at all; a
+//     payload announcing a different one rendered as this one. See
+//     `ContractNotice`, which also states what a surface should do when
+//     the contract changes under it.
+//   - THE SURFACE IS ISOLATED. There was no error boundary anywhere in
+//     this frontend, so an unexpected shape here took the picker board
+//     and every league column down with the strip. The default export
+//     is now the guarded one and the six unguarded reads that could
+//     reach it are named absences instead.
+//
 // AND THE SECOND HALF OF THE SAME INVARIANT, ADDED 2026-09-06. Of 38
 // declared, 17 carried a coverage row saying in its own words "there is
 // no read left to run", 20 had no establishable phase, and ONE had the
@@ -94,32 +121,32 @@
 // verdict, which is why the cost of certainty below is rendered in plain
 // ink: colouring "it is free to take certainty" green would be this
 // surface making the recommendation the whole stage refuses to make.
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import {
   CertaintyPremium, EntryMap, EntryMapBranch, LiveReadComponentPayload,
-  LiveReadSide, PartialExit, PartialExitFraction, PartialExitRealises,
-  WatchedMatch, WatchedPosition, WatchedStripResponse, WatchedStripRefusal,
-  api, money,
+  LiveReadSide, OutcomeBranch, PartialExit, PartialExitFraction,
+  PartialExitRealises, WatchedMatch, WatchedPosition, WatchedStripResponse,
+  WatchedStripRefusal, money,
 } from "../lib/suggesterApi";
+import { WatchedStripRead, useWatchedStrip } from "../lib/watchedStripFeed";
 import { liveCompLabel } from "../lib/pickerApi";
 import { useWatchToken } from "./WatchDeclaration";
+import ErrorBoundary from "./ErrorBoundary";
 import { Eyebrow } from "./ui";
 
-/** THERE IS NO 15s TICK, and this comment claimed one until 2026-09-09:
- *  "matches the backend's 15s live tick". The state collector's own
- *  interval is `config.LIVE_STATE_INTERVAL_SECONDS`, which is
- *  `max(60, int(getenv(..., "120")))` — 120s by default and 60s at the
- *  floor, so the claim was false under every value the env can take.
- *  The tape cannot change between eight of these polls, and each one
- *  re-runs an operator-gated read the backend itself describes as a
- *  scan of the whole snapshot table; LiveCard.tsx polls the same route
- *  on its own copy of this constant, so it is sixteen per tick.
+/** THE CONTRACT THIS SURFACE WAS BUILT AGAINST, and the only version
+ *  string it has ever been shown.
  *
- *  THE NUMBER IS LEFT WHERE IT IS. Slowing the poll changes what the
- *  operator sees the moment a goal lands, and no measurement of that
- *  trade-off exists here — a comment corrected is not a cadence
- *  decided. What is fixed is the false claim about why it is 15s. */
-const POLL_MS = 15000;
+ *  `data.version` USED TO BE READ NOWHERE AT ALL. It was filed under
+ *  BOOKKEEPING_ENVELOPE_KEYS — "an identifier that carries no finding
+ *  about any match" — and that was true of the value and false of the
+ *  mismatch: a `watched-strip-v2` payload rendered as v1, silently, and
+ *  every key this file reads by name would have been read against a
+ *  contract the payload no longer claimed to speak. What a surface
+ *  should do when the contract changes under it is written out beside
+ *  the notice that does it (`ContractNotice`), because a decision like
+ *  that belongs in words rather than in the absence of a check. */
+export const WATCHED_STRIP_CONTRACT = "watched-strip-v1";
 
 /** League hue for WAYFINDING ONLY — a dot beside the slug, never a
  *  quantity. Keyed off the competition slug's league prefix; an
@@ -363,10 +390,16 @@ function proseNotes(node: unknown, skip: Set<string>,
 // is nothing there" — the fold this surface exists against.
 type TapeVerdict = "read" | "failed" | "no_row";
 
-export function tapeVerdictOf(m: WatchedMatch): TapeVerdict {
-  const refusals = m.state?.refusals ?? [];
-  if (refusals.some((r) => r?.code === "tape_unreadable")) return "failed";
-  const st = m.state;
+export function tapeVerdictOf(m: WatchedMatch | null | undefined): TapeVerdict {
+  // READ THROUGH, NOT INTO. An entry in `matches` that is not a match
+  // block, or a `refusals` that is not a list, must not raise out of a
+  // verdict function — the strip counts the undrawable entries and
+  // names them (see `isMatchBlock`), and this returns the honest "no
+  // row" for anything it cannot read rather than taking the page down.
+  const refusals = m?.state?.refusals;
+  if (Array.isArray(refusals)
+      && refusals.some((r) => r?.code === "tape_unreadable")) return "failed";
+  const st = m?.state;
   if (st == null) return "no_row";
   const noRow = (st.captured_at == null || st.captured_at === "")
     && (st.match_state == null || st.match_state === "");
@@ -475,6 +508,113 @@ function UnreadableLists({ keys }: { keys: readonly string[] }) {
   );
 }
 
+/** Whether an entry in `matches` is a match block this surface can
+ *  draw. `fixture_id` is required because it is the identity every
+ *  block on the card is keyed and labelled by — an entry without one
+ *  cannot be drawn AND cannot be named, so it is counted instead. */
+function isMatchBlock(m: unknown): m is WatchedMatch {
+  return isObj(m) && typeof m.fixture_id === "number";
+}
+
+/** WHAT THIS SURFACE DOES WHEN THE CONTRACT CHANGES UNDER IT.
+ *
+ *  THE DECISION, IN WORDS, BECAUSE IT IS A DECISION. `version` was read
+ *  NOWHERE in this file until 2026-09-11: a `watched-strip-v2` payload
+ *  rendered as v1 with no notice of any kind. There are three things a
+ *  surface can do about that and only one of them is honest here.
+ *
+ *  IT DOES NOT BLANK. A section that disappears on a version bump is
+ *  read as "nothing is declared and nothing is under way" — a claim
+ *  about a set nobody counted, and the single failure this whole stage
+ *  exists to prevent. It is also the wrong trade: a version is usually
+ *  bumped for something ADDITIVE, and blanking would throw away a
+ *  payload almost all of which this file can still read.
+ *
+ *  IT DOES NOT SAY NOTHING EITHER, which is what it did. Every figure
+ *  below is read out of this payload BY KEY NAME against the meanings
+ *  `watched-strip-v1` gives those names, and a payload announcing a
+ *  different contract is not promising them. A reader is entitled to
+ *  know that before reading a price.
+ *
+ *  SO IT DRAWS WHAT IT CAN READ AND NAMES THE MISMATCH, once, above
+ *  everything it is about — and the rest of the file's machinery does
+ *  the remaining work by construction: a key that moved or was renamed
+ *  arrives as a NAMED ABSENCE (`UnreadableLists`, the per-block
+ *  refusals) rather than as a number, and a key that is new is named by
+ *  the envelope walk. Nothing is imputed and nothing is hidden. */
+function ContractNotice({ got }: { got: unknown }) {
+  if (got === WATCHED_STRIP_CONTRACT) return null;
+  const named = typeof got === "string" && got !== "" ? got : null;
+  // A LIVE REGION BY `aria-live`, NEVER role="status" — this notice and
+  // the two beside it carry the lesson the gate notice already records.
+  // The picker board draws one role="status" skeleton PER LEAGUE while
+  // it loads and e2e/restructure.spec.ts counts them, so a node that
+  // takes that role here breaks a guard in another file that has
+  // nothing to do with this section. Same announcement, no borrowed
+  // role.
+  return (
+    <p data-testid="watched-contract" data-got={named ?? ""}
+      data-want={WATCHED_STRIP_CONTRACT}
+      aria-live="polite"
+      className="mt-3 rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-[12px] leading-relaxed text-warn">
+      {named
+        ? <>This payload says it is{" "}
+            <span className="font-mono">{named}</span>.</>
+        : <>This payload names no contract version at all.</>}{" "}
+      This surface reads{" "}
+      <span className="font-mono">{WATCHED_STRIP_CONTRACT}</span> — every
+      figure below is taken out of it by key name, with the meanings that
+      contract gives those names, and a payload that does not claim it is
+      not promising them.
+      <span className="block mt-1.5">
+        NOTHING IS HIDDEN OVER IT AND NOTHING IS IMPUTED. The section
+        keeps drawing, because a section that vanishes on a version bump
+        reads as though nothing were declared, and that is a claim about
+        a set nobody counted. What this read could not find, it names:
+        a list that moved is reported as unreadable rather than as
+        empty, a block that was renamed refuses by name on its card, and
+        a key nobody here has seen before is recorded as unaccounted
+        for. Read the figures as belonging to{" "}
+        {named ?? "an unnamed contract"} and check them before you act
+        on them.
+      </span>
+    </p>
+  );
+}
+
+/** A DORMANT PLANE, DRAWN — with the sentence the backend sent instead
+ *  of a plausible empty set.
+ *
+ *  api/main.py answers `dormant: true` together with its own `detail`
+ *  BECAUSE the two cases are indistinguishable otherwise: a live plane
+ *  that is not configured, and a board on which nothing has been
+ *  declared, look identical to a reader who is shown neither. The
+ *  backend refused to send the empty set alone; this file used to throw
+ *  away both the sentence and everything under it. */
+function DormantNotice({ detail }: { detail?: unknown }) {
+  const said = typeof detail === "string" && detail.trim() !== ""
+    ? detail.trim() : null;
+  return (
+    <p data-testid="watched-dormant" data-said={said ? "true" : "false"}
+      aria-live="polite"
+      className="mt-3 rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-[12px] leading-relaxed text-warn">
+      THE LIVE PLANE ANSWERED <span className="font-mono">dormant</span>.
+      That is the backend saying it is not configured to hold a
+      declaration or to price a position — it is NOT a board with
+      nothing on it, and the two are told apart only by this line.{" "}
+      {said
+        ? <>The plane&apos;s own words: {said}</>
+        : <>This payload carried no <span className="font-mono">detail</span>,
+            so the reason is not stated — and none is invented here.</>}
+      <span className="block mt-1.5">
+        Anything the payload carried underneath is still drawn below. A
+        dormant answer that also carried matches is not this surface&apos;s
+        to reconcile by deleting one of them.
+      </span>
+    </p>
+  );
+}
+
 // --- the strip --------------------------------------------------------
 
 export default function WatchedStrip() {
@@ -486,70 +626,111 @@ export default function WatchedStrip() {
   // inventing a credential. Outside the provider it is "" and the
   // section says so.
   const token = useWatchToken();
-  const [data, setData] = useState<WatchedStripResponse | null>(null);
-  // A FAILED POLL IS NOT A QUIET MATCH. LiveScoreboard can keep its last
-  // payload silently because a scoreline that is 30s old is still a
-  // scoreline. These figures are priced off a book with an age ceiling,
-  // so when the newest poll fails the strip keeps showing what it had
-  // and SAYS the numbers are from the earlier read, with the clock.
-  const [staleSince, setStaleSince] = useState<string | null>(null);
-  // ABSENT AND REFUSED ARE DIFFERENT FACTS, AND THIS IS WHERE THEY
-  // SEPARATE. Until this round every failure — no proxy route, no
-  // credential, a credential the backend refused, a dead backend —
-  // arrived as one blank space, and the blank space read as "no live
-  // matches". It never was: the strip has never rendered in production
-  // at all. So a read that produced no payload is now kept, with its
-  // status and the backend's own sentence, and DRAWN.
-  const [refusal, setRefusal] = useState<WatchedStripRefusal | null>(null);
-  // Whether the first poll has come back. Before it has, this surface
-  // knows nothing and renders nothing — that is absence with a reason,
-  // not a claim about the watchlist.
-  const [asked, setAsked] = useState(false);
-  const lastOk = useRef<string | null>(null);
+  // ONE POLL FOR THE WHOLE PAGE, AND IT IS NOT THIS COMPONENT'S ANY
+  // MORE. This file and LiveCard's LiveSection each ran their own 15s
+  // timer against the same route — two requests per cycle, 2.4s out of
+  // phase, and two independent reads of one moving match drawn side by
+  // side as one screen. The read, its ordering guard and its ceiling
+  // now live in lib/watchedStripFeed.ts, which is also where the three
+  // effect-level defects of 2026-09-11 are written down; what stays
+  // here is every decision about WHAT TO DRAW, which was always this
+  // file's and still is.
+  const read = useWatchedStrip(token);
+  // THE BOUNDARY IS PART OF THE SURFACE, NOT OF THE PAGE THAT MOUNTS
+  // IT. There was no error boundary anywhere in this frontend until
+  // 2026-09-11, so an unexpected shape inside this section unmounted
+  // the whole tree: `<main>` gone, `document.body.innerText` down to
+  // 127 characters, and the picker board and every league column dead
+  // with the strip. Wrapping at the mount site would have left the next
+  // mount unguarded; wrapping the default export means a caller cannot
+  // forget. It RETRIES on each new payload — see ErrorBoundary — so a
+  // one-off shape does not keep the section dark for the tab's life.
+  return (
+    <ErrorBoundary resetKey={read.data?.generated_at ?? ""}
+      fallback={(err) => <StripDidNotDraw err={err} />}>
+      <Strip read={read} />
+    </ErrorBoundary>
+  );
+}
 
-  useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      try {
-        const r = await api.watchedStrip(token);
-        if (!alive) return;
-        lastOk.current = r.generated_at;
-        setData(r);
-        setRefusal(null);
-        setStaleSince(null);
-        setAsked(true);
-      } catch (e) {
-        if (!alive) return;
-        setAsked(true);
-        // The refusal is KEPT, never swallowed. A throw that is not a
-        // WatchedStripRefusal has no status and no upstream sentence,
-        // and is wrapped as exactly that rather than glossed.
-        setRefusal(e instanceof WatchedStripRefusal ? e
-          : new WatchedStripRefusal(null, String(e), token !== ""));
-        // With a payload in hand the figures stay up and dated.
-        if (lastOk.current) setStaleSince(lastOk.current);
-      }
-    };
-    load();
-    const id = setInterval(load, POLL_MS);
-    return () => { alive = false; clearInterval(id); };
-    // Re-read the moment a token is typed or changed: the operator
-    // should not have to reload the page to see the section they were
-    // just told needs a credential.
-  }, [token]);
+/** WHAT THIS SECTION SAYS WHEN ITS OWN RENDER RAISED.
+ *
+ *  A BOUNDARY THAT RENDERS A BLANK IS NOT AN ANSWER. An absent Live
+ *  section is read as "there is nothing live" — the single conclusion
+ *  this whole surface exists against, and one about a set nobody
+ *  counted. So the boundary draws, in this surface's own idiom: what
+ *  happened, what it is NOT a claim about, and the raised message
+ *  verbatim as the only evidence there is. */
+function StripDidNotDraw({ err }: { err: unknown }) {
+  const said = err instanceof Error
+    ? `${err.name}: ${err.message}` : String(err);
+  return (
+    <section data-testid="watched-strip-boundary" data-said={said}
+      aria-live="polite" aria-labelledby="watched-strip-boundary-h"
+      className="mt-8 rounded-2xl border border-warn/40 bg-warn/5 px-4 py-5 sm:px-6">
+      <Eyebrow tone="warn">watched · not drawn</Eyebrow>
+      <h2 id="watched-strip-boundary-h" className="mt-1 text-lg font-medium text-warn">
+        This section could not be drawn
+      </h2>
+      <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-ink-mid">
+        A read came back and the code that draws it raised on the way
+        through — a shape this surface does not expect. It is saying so
+        HERE rather than leaving a blank space, because a blank one
+        would be read as though nothing were declared and nothing were
+        under way, and that is a claim about a set nobody counted.
+      </p>
+      <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-ink-mid">
+        NOTHING HERE IS A CLAIM ABOUT YOUR WATCHLIST. Matches you
+        declared may be live and unrendered; no position was priced,
+        refused or closed by this, and nothing was written anywhere. The
+        rest of the board — the ranked columns, the review, every other
+        section — draws from its own reads and is unaffected.
+      </p>
+      <p data-testid="watched-strip-boundary-said"
+        className="mt-2 font-mono text-[11px] leading-relaxed text-warn">
+        {said}
+      </p>
+    </section>
+  );
+}
+
+function Strip({ read }: { read: WatchedStripRead }) {
+  const { data, refusal, asked, stale, staleSince } = read;
 
   // NOTHING HAS BEEN READ YET — not a statement about the watchlist.
   if (!data && !asked) return null;
   // READ, AND REFUSED. Drawn, because a blank Live section is read as
   // "no live matches" and this surface has no evidence for that.
   if (!data) return refusal ? <GateNotice r={refusal} /> : null;
-  if (data.dormant) return null;
+  // A DORMANT PLANE IS A FINDING, AND IT USED TO BE DELETED HERE.
+  //
+  // This line was `if (data.dormant) return null;` until 2026-09-11.
+  // The backend answers `dormant: true` WITH ITS OWN SENTENCE under
+  // `detail` precisely so the surface would not have to guess — the
+  // route's author wrote that a plausible empty set was the thing to
+  // avoid — and this file dropped the sentence, dropped the finding and
+  // dropped every match on the payload with it. The file's own registry
+  // recorded half of it ("a plane that is not configured and a board
+  // with nothing declared look identical to a reader") and not the
+  // other half: that `return null` also deletes EVERY DECLARED MATCH
+  // FROM THE DOM, which breaks the one invariant this surface is
+  // responsible for. It is the operator's own reported symptom, twice:
+  // "live matches disappeared", "the live matches still hidden".
+  //
+  // So dormant is now DRAWN — the finding, the plane's own words, and
+  // whatever the payload carried underneath it, because a payload that
+  // says dormant AND carries matches is not this file's to reconcile by
+  // discarding one of them.
+  const dormant = data.dormant === true;
   // A KEY THE PAYLOAD DID NOT CARRY IS NOT AN EMPTY LIST — read through
   // `requiredList`, never through `?? []`. See the block above it.
   const matches = requiredList<WatchedMatch>(data, "matches");
   const orphans = requiredList<number>(data, "open_positions_not_monitored");
   const unreadableLists = REQUIRED_LISTS.filter(
     (k) => requiredList(data, k) === null);
+  // THE CONTRACT THE PAYLOAD CLAIMS TO SPEAK, against the one this file
+  // reads. Drawn when they differ; see `ContractNotice`.
+  const offContract = data.version !== WATCHED_STRIP_CONTRACT;
   // A DECLARED MATCH THAT IS NOT IN `matches`. The backend registers
   // this hole (WATCHED_STRIP_OPEN["no_identity_row"]) and says in the
   // record that an operator watching the strip alone would not see it.
@@ -565,7 +746,11 @@ export default function WatchedStrip() {
   const undescribed = data.monitored_not_described ?? [];
   // ABSENT, NOT EMPTY — with the exceptions that are findings, and
   // A LIST THAT COULD NOT BE READ IS NEVER ONE OF THE EMPTY CASES.
-  if (unreadableLists.length === 0
+  // A DORMANT PLANE AND AN OFF-CONTRACT PAYLOAD ARE TWO MORE FINDINGS:
+  // both are things a reader has to be told, and both used to end as a
+  // blank section that reads as "nothing is declared".
+  if (!dormant && !offContract
+      && unreadableLists.length === 0
       && matches!.length === 0 && orphans!.length === 0
       && undescribed.length === 0) return null;
   // From here the two are drawn as far as they were readable. A list
@@ -573,9 +758,25 @@ export default function WatchedStrip() {
   // `UnreadableLists` below — it never quietly contributes zero.
   const matchRows = matches ?? [];
   const orphanRows = orphans ?? [];
+  // AN ENTRY THAT IS NOT A MATCH BLOCK IS NOT A MATCH, AND IS NOT
+  // DROPPED EITHER. `matches` is a list of objects on every payload
+  // this route has ever emitted; a null or a string in it read
+  // `m.state` and took the entire page down with it before this
+  // surface had a boundary. Undrawable entries are counted and named
+  // below — a row this file cannot draw is exactly the shape of the
+  // thing it must never silently omit.
+  const drawable = matchRows.filter(isMatchBlock);
+  const undrawableRows = matchRows.length - drawable.length;
 
-  const registry = data.refusal_codes ?? {};
-  const bySource = data.monitored_by_source ?? {};
+  const registry = isObj(data.refusal_codes)
+    ? (data.refusal_codes as Record<string, string>) : {};
+  // MISSING IS NEVER ZERO AND NEITHER IS UNREADABLE. `?? {}` folded a
+  // `monitored_by_source` of the wrong shape into "no source counts on
+  // this payload", which is a statement about the SET; the two are
+  // separated here and the counts line says which it has.
+  const sourcesReadable = isObj(data.monitored_by_source);
+  const bySource = sourcesReadable
+    ? (data.monitored_by_source as Record<string, unknown>) : {};
   // IN PLAY FIRST, AND THE FLAG IS THE PAYLOAD'S OWN. `state.in_play`
   // is `match_state == "in"` on the backend and nothing else; a match
   // with no state block is NOT folded into "in play" here, it is simply
@@ -585,8 +786,8 @@ export default function WatchedStrip() {
   // add back to `matches` exactly. Array.prototype.sort is not used:
   // two lists make the partition obvious and keep the payload's own
   // order inside each.
-  const live = matchRows.filter(isInPlay);
-  const rest = matchRows.filter((m) => !isInPlay(m));
+  const live = drawable.filter(isInPlay);
+  const rest = drawable.filter((m) => !isInPlay(m));
   // The tape states that MEAN in play, as the PAYLOAD carries them.
   // null = this payload published no such registry, and this surface
   // then makes no claim about which states are in play.
@@ -599,6 +800,12 @@ export default function WatchedStrip() {
 
   return (
     <section data-testid="watched-strip" aria-labelledby="watched-strip-h"
+      // WHICH READ IS ON SCREEN, as data for a guard and never as a
+      // sentence: the straggler defect is invisible from the outside
+      // unless the payload the surface settled on can be named.
+      data-generated-at={typeof data.generated_at === "string"
+        ? data.generated_at : ""}
+      data-dormant={dormant ? "true" : "false"}
       className="mt-8 rounded-2xl border border-line bg-elev px-4 py-5 sm:px-6">
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <Eyebrow tone="accent">watched · hold / exit</Eyebrow>
@@ -611,10 +818,20 @@ export default function WatchedStrip() {
             forever, so there is no total here and there never will be. */}
         <p data-testid="watched-sources"
           className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
-          {Object.keys(bySource).length === 0
+          {!sourcesReadable
+            ? "monitored_by_source is not a map on this payload"
+            : Object.keys(bySource).length === 0
             ? "no source counts on this payload"
-            : Object.keys(bySource).sort().map((k) =>
-                `${k.replace(/_/g, " ")} ${bySource[k].length}`).join(" · ")}
+            // A COUNT OFF A VALUE THAT IS NOT A LIST IS NOT A COUNT.
+            // `.length` here read straight off the payload and threw
+            // the whole page away on a value of the wrong shape; a
+            // source whose set could not be read is named instead, and
+            // never contributes a plausible number.
+            : Object.keys(bySource).sort().map((k) => {
+                const v = bySource[k];
+                return `${k.replace(/_/g, " ")} ${
+                  Array.isArray(v) ? v.length : "(not a list)"}`;
+              }).join(" · ")}
           <span className="sr-only">
             {" "}— counted separately by source and deliberately not added
             together: a set you chose and a set that followed your open
@@ -648,13 +865,35 @@ export default function WatchedStrip() {
         </p>
       </details>
 
-      {staleSince && (
+      {/* THE CONTRACT, WHEN IT IS NOT THE ONE THIS FILE READS. First,
+          above every figure it is about. */}
+      <ContractNotice got={data.version} />
+
+      {/* A DORMANT PLANE, IN THE PLANE'S OWN WORDS. Above the matches
+          because it is a fact about whether there could be any. */}
+      {dormant && <DormantNotice detail={data.detail} />}
+
+      {/* ARMED BY "THERE WAS A GOOD READ AND THE NEWEST ONE FAILED",
+          AND BY NOTHING ELSE.
+          It used to be armed by `if (lastOk.current)`, and `lastOk`
+          held `generated_at` — so a good poll whose envelope carried no
+          `generated_at`, followed by a 403, drew NO banner, NO gate and
+          nothing else: the read was being refused and not one thing on
+          the screen said so. Whether there was an earlier good read and
+          WHEN it was taken are two different facts, and one of them
+          missing is not a reason to withhold the other. */}
+      {stale && (
         <p data-testid="watched-stale" role="status"
+          data-since={staleSince ?? ""}
           className="mt-3 rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-[12px] leading-relaxed text-warn">
-          The last poll failed. Every figure below is from the read
-          generated at {staleSince} and none of it has been refreshed —
-          these prices are quoted off a book with an age ceiling, so
-          treat them as that read and not as now.
+          The last poll failed. Every figure below is from{" "}
+          {staleSince
+            ? `the read generated at ${staleSince}`
+            : "an earlier read THAT CARRIED NO `generated_at`, so this "
+              + "surface cannot say when it was taken"}{" "}
+          and none of it has been refreshed — these prices are quoted off
+          a book with an age ceiling, so treat them as that read and not
+          as now.
           {/* WHY it failed, in the layer's own words rather than as a
               shrug. A refused credential and a dead backend leave the
               same stale figures on the page and are not the same
@@ -670,6 +909,23 @@ export default function WatchedStrip() {
       )}
 
       <UnreadableLists keys={unreadableLists} />
+
+      {/* AN ENTRY IN `matches` THAT IS NOT A MATCH. Named, counted, and
+          never folded into the total below it. */}
+      {undrawableRows > 0 && (
+        <p data-testid="watched-undrawable" data-count={undrawableRows}
+          aria-live="polite"
+          className="mt-3 rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-[12px] leading-relaxed text-warn">
+          {undrawableRows} entr{undrawableRows === 1 ? "y" : "ies"} in{" "}
+          <span className="font-mono">matches</span>{" "}
+          {undrawableRows === 1 ? "is" : "are"} not a match block — no{" "}
+          <span className="font-mono">fixture_id</span> this surface can
+          read — so {undrawableRows === 1 ? "it is" : "they are"} not
+          drawn below. THE COUNT UNDER EACH HEADING IS THEREFORE NOT THE
+          LENGTH OF THE LIST THE PAYLOAD SENT, and this line is the
+          difference rather than a row quietly missing from it.
+        </p>
+      )}
 
       {orphanRows.length > 0 && (
         <p data-testid="watched-orphans"
@@ -796,7 +1052,8 @@ export default function WatchedStrip() {
  *  flag or any non-true value therefore means NOT in this group; it
  *  does not mean the match is quiet, and the card says which of its
  *  fields are missing by name. */
-const isInPlay = (m: WatchedMatch): boolean => m.state?.in_play === true;
+const isInPlay = (m: WatchedMatch | null | undefined): boolean =>
+  m?.state?.in_play === true;
 
 /** The tape's OWN WORD for this match, verbatim, or a named absence.
  *
@@ -1923,11 +2180,60 @@ function Ledger({ p }: { p: WatchedPosition }) {
 
 // --- 3. the branches — the expectation AND the two outcomes behind it -
 
+/** THE TWO THINGS THAT CAN ACTUALLY HAPPEN, one row each.
+ *
+ *  `b.percent.toFixed(1)` USED TO READ STRAIGHT OFF THE PAYLOAD, in
+ *  both the hold block and the sell block, and a branch carrying no
+ *  `percent` — or a null one — threw out of render and took the whole
+ *  page with it. MISSING IS NEVER ZERO on this surface, so the cell is
+ *  a named absence rather than `0.0%`: a branch drawn at nought per
+ *  cent is a forecast nobody made. */
+function BranchRow({ b }: { b: OutcomeBranch | null | undefined }) {
+  const pc = typeof b?.percent === "number" && Number.isFinite(b.percent)
+    ? b.percent : null;
+  const outcome = typeof b?.outcome === "string" && b.outcome !== ""
+    ? b.outcome : null;
+  return (
+    <li data-testid="watched-branch"
+      className="flex items-baseline gap-2 text-[12px] text-ink-mid">
+      <span className="w-14 shrink-0 font-mono tabular-nums text-ink-hi">
+        {pc != null ? `${pc.toFixed(1)}%` : (
+          <span data-testid="watched-branch-no-percent" className="text-warn">
+            —
+            <span className="sr-only">
+              {" "}no percent on this branch — the payload carried none,
+              and a branch is not drawn at zero
+            </span>
+          </span>
+        )}
+      </span>
+      <span className="min-w-0">
+        {outcome ?? (
+          <span className="text-warn">
+            no outcome named on this branch
+          </span>
+        )}
+      </span>
+    </li>
+  );
+}
+
+/** The branch list, or a named absence when this payload's `branches`
+ *  is not a list. `hold?.branches ? …` was TRUTHY on an object, a
+ *  string and a number alike, and then called `.map` on it. */
+function branchList(side: { branches?: unknown } | undefined):
+    OutcomeBranch[] | null {
+  return Array.isArray(side?.branches)
+    ? (side.branches as OutcomeBranch[]) : null;
+}
+
 function Branches({ p }: { p: WatchedPosition }) {
   const bv = p.branch_view;
   const hold = bv?.hold?.conditioned_grid ?? bv?.hold?.engine_read;
   const holdQ = quantityNumbers(hold?.quantity);
   const sell = bv?.sell;
+  const holdBranches = branchList(hold);
+  const sellBranches = branchList(sell);
   return (
     <div data-testid="watched-branches"
       className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -1941,7 +2247,7 @@ function Branches({ p }: { p: WatchedPosition }) {
             className="mt-1 font-mono text-[11px] uppercase tracking-[0.1em] text-warn">
             refused{hold.refusal_code ? ` · ${hold.refusal_code}` : ""}
           </p>
-        ) : hold?.branches ? (
+        ) : hold && holdBranches ? (
           <>
             <p className="mt-1 font-mono text-[15px] tabular-nums text-ink-hi">
               {usdc(hold.expectation_cents) ?? `$${hold.expectation_dollars}`}
@@ -1954,15 +2260,7 @@ function Branches({ p }: { p: WatchedPosition }) {
                 it pays. Drawn beside it, always — this is the line the
                 2026-09-02 card collapsed. */}
             <ul className="mt-1.5 space-y-1">
-              {hold.branches.map((b, i) => (
-                <li key={i} data-testid="watched-branch"
-                  className="flex items-baseline gap-2 text-[12px] text-ink-mid">
-                  <span className="w-14 shrink-0 font-mono tabular-nums text-ink-hi">
-                    {b.percent.toFixed(1)}%
-                  </span>
-                  <span className="min-w-0">{b.outcome}</span>
-                </li>
-              ))}
+              {holdBranches.map((b, i) => <BranchRow key={i} b={b} />)}
             </ul>
             {/* THE QUANTITY IS READ THROUGH ITS OWN `quantity_key` —
                 `quantityNumbers`, the map's reader, ONE function for
@@ -2021,21 +2319,13 @@ function Branches({ p }: { p: WatchedPosition }) {
               the disclosure at the foot of this card.
             </span>
           </p>
-        ) : sell?.branches ? (
+        ) : sell && sellBranches ? (
           <>
             <p className="mt-1 font-mono text-[15px] tabular-nums text-ink-hi">
               {usdc(sell.expectation_cents) ?? `$${sell.expectation_dollars}`}
             </p>
             <ul className="mt-1.5 space-y-1">
-              {sell.branches.map((b, i) => (
-                <li key={i} data-testid="watched-branch"
-                  className="flex items-baseline gap-2 text-[12px] text-ink-mid">
-                  <span className="w-14 shrink-0 font-mono tabular-nums text-ink-hi">
-                    {b.percent.toFixed(1)}%
-                  </span>
-                  <span className="min-w-0">{b.outcome}</span>
-                </li>
-              ))}
+              {sellBranches.map((b, i) => <BranchRow key={i} b={b} />)}
             </ul>
           </>
         ) : (
@@ -2394,11 +2684,22 @@ function PartialExits({ pe }: { pe: PartialExit | undefined }) {
     );
   }
   const book = pe.book;
+  // A BLOCK THAT ARRIVED WITHOUT ITS FRACTIONS IS NOT FOUR SIZES OF
+  // NOTHING. `pe.fractions.length` and `pe.fractions.map` both read
+  // straight off the payload — a `partial_exit` present with no
+  // `fractions` threw out of render and took the page with it — and
+  // folding the absence to `[]` would print "0 sizes of one trade",
+  // which is a measurement nobody made. Named, both places.
+  const fractions = Array.isArray(pe.fractions)
+    ? (pe.fractions as PartialExitFraction[]) : null;
   return (
     <div data-testid="watched-partial-exit"
+      data-fractions={fractions ? fractions.length : "unreadable"}
       className="mt-3 rounded-lg border border-line px-3 py-2.5">
       <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
-        partial exit · {pe.fractions.length} sizes of one trade ·{" "}
+        partial exit · {fractions
+          ? `${fractions.length} sizes of one trade`
+          : "a fraction list this payload did not carry"} ·{" "}
         {pe.fractions_priced} priced
       </p>
 
@@ -2475,7 +2776,9 @@ function PartialExits({ pe }: { pe: PartialExit | undefined }) {
       ) : null}
 
       <ul className="mt-2 space-y-2">
-        {pe.fractions.map((f) => <Fraction key={f.label} f={f} />)}
+        {(fractions ?? []).map((f, i) => (
+          <Fraction key={f?.label ?? i} f={f} />
+        ))}
       </ul>
 
       {/* THE BLOCK'S FIVE STANDING SENTENCES — the ladder rule, the fee
@@ -3253,14 +3556,23 @@ function UncodedAbsences({ m, registry }: {
 
 /** Envelope keys this surface actually reads and draws. */
 export const CONSUMED_ENVELOPE_KEYS: readonly string[] = [
-  "generated_at", "dormant", "matches", "monitored_by_source",
-  "open_positions_not_monitored", "monitored_not_described",
-  "refusal_codes", "policy_codes",
+  "generated_at", "dormant", "detail", "version", "matches",
+  "monitored_by_source", "open_positions_not_monitored",
+  "monitored_not_described", "refusal_codes", "policy_codes",
 ];
 
 /** Envelope keys that identify the payload rather than describe a
- *  match. Not drawn, and nothing about a fixture is lost by that. */
-export const BOOKKEEPING_ENVELOPE_KEYS: readonly string[] = ["version"];
+ *  match. Not drawn, and nothing about a fixture is lost by that.
+ *
+ *  EMPTY SINCE 2026-09-11, AND KEPT. Its one member was `version`,
+ *  filed here as "an identifier that carries no finding about any
+ *  match" — true of the VALUE and false of the MISMATCH, which is a
+ *  finding about every figure on the payload at once. It is consumed
+ *  now (see `ContractNotice`). The set stays because the partition has
+ *  to be total: the next key that genuinely identifies a payload and
+ *  says nothing about a fixture belongs here, and a set deleted for
+ *  being empty is a set the next author invents differently. */
+export const BOOKKEEPING_ENVELOPE_KEYS: readonly string[] = [];
 
 /** Envelope keys that CARRY A FINDING this surface does not draw. */
 export const UNRENDERED_ENVELOPE_KEYS: Record<string, {
@@ -3298,16 +3610,19 @@ export const UNRENDERED_ENVELOPE_KEYS: Record<string, {
       + "or one of them starts carrying a per-fixture finding; then it "
       + "is drawn where that finding belongs and this record retires.",
   },
-  detail: {
-    finding: "the reason a DORMANT plane gave for having no watchlist. "
-      + "This surface renders nothing at all when `dormant` is true, so "
-      + "the reason is dropped with it — a plane that is not configured "
-      + "and a board with nothing declared look identical to a reader.",
-    closes_when: "the dormant answer is drawn the way a refused read now "
-      + "is — as a section that says which of the two it is — and this "
-      + "record retires with the guard in e2e/watched-strip.spec.ts that "
-      + "pins dormant to an absent strip.",
-  },
+  // `detail` WAS REGISTERED HERE AND IS RETIRED, 2026-09-11. Its record
+  // read: "the reason a DORMANT plane gave for having no watchlist.
+  // This surface renders nothing at all when `dormant` is true, so the
+  // reason is dropped with it — a plane that is not configured and a
+  // board with nothing declared look identical to a reader", closing
+  // "when the dormant answer is drawn the way a refused read now is —
+  // as a section that says which of the two it is — and this record
+  // retires with the guard in e2e/watched-strip.spec.ts that pins
+  // dormant to an absent strip." Both halves are done: `DormantNotice`
+  // draws it, and the guard that pinned the blank has been replaced by
+  // one that pins the drawing. The key is CONSUMED now, and leaving the
+  // record standing beside it is the prose-outliving-the-hole failure
+  // this whole registry exists to prevent.
 };
 
 /** Envelope keys on THIS payload that no set above accounts for.
