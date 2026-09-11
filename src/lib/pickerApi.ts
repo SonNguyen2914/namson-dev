@@ -449,6 +449,43 @@ export interface BoardRefusal {
    *  a refusal to quote: the market prices this match either way, and
    *  the card says so in the same cell a ranked card uses. */
   kalshi?: KalshiQuote | null;
+
+  /** THE REFUSAL'S OWN ACCOUNT OF ITSELF — picker/stages.refused_row,
+   *  verbatim, and shipping on the live board since 2026-09-11.
+   *
+   *  The card wrote all of this out in its own words until the same
+   *  day: a hard-coded paragraph naming which figures were withheld and
+   *  why, hung on every refused cell as a title and said once more in
+   *  full underneath. Every sentence of it already existed on the
+   *  payload, authored by the module that made the decision
+   *  (REFUSAL_WITHHELD, REFUSAL_CASES) — so the frontend copy was a
+   *  second voice on one fact, free to drift from the rule it was
+   *  paraphrasing the day either moved.
+   *
+   *  `case` is NOT `reason`: one reason (`no_prior_row`) covers a club
+   *  this season lists and a club it does not, and those two carry
+   *  different figures. `carries` and `absent` are DERIVED in the
+   *  backend from REFUSAL_BLOCKS against the row itself, which is why
+   *  the card reads them rather than deciding from the blocks it
+   *  happens to find.
+   *
+   *  OPTIONAL, like everything else on this contract: a board built
+   *  before the block carries none of it, and the card names that
+   *  absence instead of assuming the sentence. */
+  refusal?: {
+    reason: string;
+    /** the CASE the reason falls in — below_admission, ambiguous, … */
+    case: string;
+    /** what that case can honestly carry, and why, in its own words */
+    why: string;
+    /** the per-side blocks this row DOES carry (REFUSAL_BLOCKS) */
+    carries?: string[];
+    /** block name -> the backend's sentence for why it is not here */
+    absent?: Record<string, string>;
+    /** one sentence, identical under every reason, naming what no
+     *  refusal will ever carry */
+    withheld: string;
+  } | null;
 }
 
 export interface LeagueMeta {

@@ -1248,6 +1248,251 @@ export const STATE_ABSENT_WORDS =
   "no state — the row carries no possession, and a side with two of "
   + "the three inputs has none. Missing is never an even match.";
 
+// --- THE CLOCK, READ ONCE FOR EVERY SURFACE THAT DRAWS ONE -----------
+//
+// TWO READERS WITH OPPOSITE PRECEDENCE, ON ONE SCREEN, OFF ONE RESPONSE
+// (found live 2026-09-11). WatchedStrip preferred `state.minute` and
+// kept `clock_display` as a fallback; LiveCard preferred
+// `clock_display`. Both mount on /bet-suggester and both are fed by the
+// SAME api.watchedStrip() call, so a fixture in stoppage time printed
+// `45'` in the strip and `45'+5'` on the card below it — the same match,
+// two clocks, one screen, neither of them wrong on its own terms.
+//
+// `clock_display` WINS, AND IT IS NOT A PREFERENCE. It is the provider's
+// own string for where the match is; `minute` is what patterns._minute
+// PARSED out of it, which is the integer part and nothing else. Stoppage
+// time exists only in the first. Rendering the parse in front of the
+// thing it was parsed from is AGENTS.md §3 one plane over: a derived
+// value drawn where the source was available.
+//
+// A LiveReadState carries a `minute` and NO `clock_display` — it is a
+// conditioning coordinate, not a clock — so it falls through to the
+// minute by the same rule rather than by a second one.
+
+/** What a surface may print for "where the match is", and WHICH FIELD
+ *  it came off, so a guard reads the source rather than the sentence. */
+export interface MatchClock {
+  text: string;
+  source: "clock_display" | "minute" | "unstated";
+}
+
+/** The words for a row with no clock at all. A statement about THIS
+ *  RESPONSE — not about the provider, whose absence this payload does
+ *  not attribute, and never minute 0. */
+export const CLOCK_ABSENT_WORDS = "no clock on this tape row";
+
+/** READ THE CLOCK ONCE, FOR BOTH PLACES THAT DRAW ONE.
+ *
+ *  Takes `unknown`-ish on purpose: the state block, the read's own
+ *  per-side state row and a tape row that refused all reach here, and a
+ *  type is a claim about the build rather than about the wire. */
+export function readMatchClock(st: {
+  minute?: number | null;
+  clock_display?: string | null;
+} | null | undefined): MatchClock {
+  const shown = st?.clock_display;
+  if (typeof shown === "string" && shown.trim() !== "") {
+    return { text: shown, source: "clock_display" };
+  }
+  const m = st?.minute;
+  if (typeof m === "number" && Number.isFinite(m)) {
+    return { text: `${Math.round(m)}'`, source: "minute" };
+  }
+  return { text: CLOCK_ABSENT_WORDS, source: "unstated" };
+}
+
+// --- WHY A NUMBER IS NULL, IN THE PAYLOAD'S OWN WORDS ----------------
+//
+// THE HABIT THIS CLOSES. Beside every null component the strip printed
+// "the provider did not send it, and missing is never zero". The second
+// half is this project's rule and is true. THE FIRST HALF IS A CAUSE,
+// and on the live payload of 2026-09-11 it was false and the same
+// response disproved it: `states.counts` carried shots 6/7 and
+// possession 42.5/57.5 on the fixture whose eight components were all
+// null. The provider sent them. What the payload actually said — on
+// `read.sides.*.basis`, which no surface drew — was "no elapsed match
+// time observed yet — NULL, not a zero", because the watch was declared
+// at minute 44.
+//
+// A NULL HAS MORE THAN ONE CAUSE and the payload is the only layer that
+// knows which: the provider omitted the input, no match time has been
+// observed, or live_read's minimum-evidence gate withheld the rate
+// (`thin_observed_window`, position.REFUSAL_CODES). So the reason is
+// READ, never authored — and the codes are DERIVED from the registry
+// the response carries, so a name adopted upstream names itself here
+// the day it ships.
+
+/** A refusal the payload states about itself: the registry NAME, the
+ *  block's own sentence, and the registry's definition of the name when
+ *  this response published one. */
+export interface PayloadRefusal {
+  code: string;
+  says: string;
+  /** the registry's own gloss, or null when it defines no such code —
+   *  an unregistered name still renders, never glossed with a guess */
+  defined: string | null;
+}
+
+/** Every coded refusal inside one payload sentence.
+ *
+ *  `position._coded` writes `"<code>: <reason>"` and `live_read._basis`
+ *  joins such sentences with " | ", so a coded refusal is found by
+ *  splitting on the join and matching the leading name AGAINST THE
+ *  REGISTRY THIS RESPONSE CARRIES. No code is spelled here. */
+export function codedRefusals(
+  text: unknown, registry: Record<string, string>,
+): PayloadRefusal[] {
+  if (typeof text !== "string" || text === "") return [];
+  const out: PayloadRefusal[] = [];
+  for (const part of text.split(" | ")) {
+    const at = part.indexOf(":");
+    if (at <= 0) continue;
+    const code = part.slice(0, at).trim();
+    if (!(code in registry)) continue;
+    out.push({ code, says: part.trim(), defined: registry[code] });
+  }
+  return out;
+}
+
+/** What ONE component block says about itself — the `refusal_code` /
+ *  `refused` pair every other block on these payloads uses, plus a
+ *  `note` that leads with a registry name (which is the shape
+ *  `_Fold.read()` writes its minimum-evidence refusal in). */
+export function componentRefusals(
+  c: LiveReadComponentPayload | null | undefined,
+  registry: Record<string, string>,
+): PayloadRefusal[] {
+  if (!c) return [];
+  const out: PayloadRefusal[] = [];
+  // READ THROUGH THE INDEX SIGNATURE, NOT OFF A DECLARED KEY. The
+  // `refusal_code` / `refused` pair is the shape every OTHER block on
+  // these payloads refuses in, and it is read here so a component that
+  // adopts it is drawn the day it does. It is NOT added to the
+  // interface above: the minimum-evidence gate (backend PR #125) writes
+  // its refusal into `note`, and declaring a key no emitter has been
+  // recorded writing is how a TS type stops describing the wire.
+  const code = c.refusal_code;
+  const said = c.refused;
+  if (typeof code === "string" && code in registry) {
+    out.push({ code, defined: registry[code],
+      says: typeof said === "string" && said !== ""
+        ? said : registry[code] });
+  }
+  out.push(...codedRefusals(c.note, registry));
+  return dedupeByCode(out, registry);
+}
+
+function dedupeByCode(
+  rs: PayloadRefusal[], registry: Record<string, string>,
+): PayloadRefusal[] {
+  const seen = new Set<string>();
+  const out: PayloadRefusal[] = [];
+  for (const r of rs) {
+    if (seen.has(r.code)) continue;
+    seen.add(r.code);
+    out.push(r);
+  }
+  // the registry's own order, so two sides never report one set twice
+  // over in two orders
+  const order = Object.keys(registry);
+  const rank = (c: string) => {
+    const i = order.indexOf(c);
+    return i < 0 ? order.length : i;
+  };
+  return out.sort((a, b) => rank(a.code) - rank(b.code));
+}
+
+/** WHY A READ DREW NOTHING, IN THE PAYLOAD'S OWN WORDS — and which part
+ *  of the payload they came off. */
+export interface ReadSilence {
+  /** the payload's sentence, ready to draw. Never a claim this layer
+   *  invented about the collector or about the provider. */
+  words: string;
+  /** "refusal" — a registered code and its words;
+   *  "basis"   — the side's own account of what backs the read;
+   *  "payload" — `read.words`, the backend's absent-case sentence;
+   *  "unstated"— the response carried no reason, and that is said as a
+   *              fact about the RESPONSE and about nothing else. */
+  source: "refusal" | "basis" | "payload" | "unstated";
+  codes: PayloadRefusal[];
+  /** how many sides the read carried. 0 is "nothing was persisted";
+   *  more than 0 with no value anywhere is "a read that ran and
+   *  measured nothing", and those are DIFFERENT FACTS — conflating
+   *  them is how a card asserted the collector had written nothing
+   *  about a fixture whose read was sitting on the same response. */
+  sides: number;
+}
+
+const SILENCE_UNSTATED =
+  "This response carries no reason for the absence — neither a "
+  + "registered refusal nor a basis for the read. Nothing here says "
+  + "what the provider sent or did not send.";
+
+/** ONE SIDE's account of its own nulls. */
+export function sideSilence(
+  side: LiveReadSide | null | undefined,
+  registry: Record<string, string>,
+): ReadSilence {
+  const codes = dedupeByCode([
+    ...Object.values(side?.components ?? {})
+      .flatMap((c) => componentRefusals(c, registry)),
+    ...codedRefusals(side?.basis, registry),
+  ], registry);
+  if (codes.length > 0) {
+    return { words: codes.map((r) => r.says).join(" · "),
+             source: "refusal", codes, sides: side ? 1 : 0 };
+  }
+  const basis = side?.basis;
+  if (typeof basis === "string" && basis.trim() !== "") {
+    return { words: basis, source: "basis", codes, sides: 1 };
+  }
+  return { words: SILENCE_UNSTATED, source: "unstated", codes,
+           sides: side ? 1 : 0 };
+}
+
+/** THE WHOLE READ's account of itself, for a block drawn once per card.
+ *
+ *  A read WITH sides answers out of those sides — their coded refusals
+ *  first, their basis second. Only a read with NO sides falls through
+ *  to `read.words`, which is the backend's sentence for "nothing has
+ *  been persisted": saying that over a read that exists is the claim
+ *  this reader was built to stop. */
+export function readSilence(
+  read: LiveReadPayload | null | undefined,
+  registry: Record<string, string>,
+): ReadSilence {
+  const sides = Object.values(read?.sides ?? {});
+  if (sides.length > 0) {
+    const codes = dedupeByCode(
+      sides.flatMap((s) => sideSilence(s, registry).codes), registry);
+    if (codes.length > 0) {
+      return { words: codes.map((r) => r.says).join(" · "),
+               source: "refusal", codes, sides: sides.length };
+    }
+    // DEDUPED BY TEXT, as the emitter itself dedupes its notes: two
+    // sides that were read under one condition say it once.
+    const bases = [...new Set(sides
+      .map((s) => (typeof s?.basis === "string" ? s.basis.trim() : ""))
+      .filter((b) => b !== ""))];
+    if (bases.length > 0) {
+      return { words: bases.join(" · "), source: "basis", codes,
+               sides: sides.length };
+    }
+    return { words: SILENCE_UNSTATED, source: "unstated", codes,
+             sides: sides.length };
+  }
+  const w = read?.words;
+  if (typeof w === "string" && w.trim() !== "") {
+    return { words: w, source: "payload", codes: [], sides: 0 };
+  }
+  return {
+    source: "unstated", codes: [], sides: 0,
+    words: "This response carries no live read for this fixture and no "
+      + "words for its absence — neither a persisted read nor a reason "
+      + "there is none. Nothing here says the collector wrote nothing.",
+  };
+}
+
 export interface WatchedStripResponse {
   version: string;
   generated_at: string;
