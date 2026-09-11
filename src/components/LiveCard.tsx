@@ -43,8 +43,10 @@
 // that do not REFUSE BY NAME rather than drawing a plausible number:
 //
 //   HAS IT   the tape age (derived from `state.captured_at` against the
-//            envelope's `generated_at`), the score and the minute, the
-//            four live-read components per side, the held position;
+//            envelope's `generated_at`, and since 2026-09-11 the PRESS
+//            that takes a new row — see THE AGE IS ALSO THE PRESS), the
+//            score and the minute, the four live-read components per
+//            side, the held position;
 //            since 2026-09-07, one MATCH STATE per side (`states`,
 //            backend card.live_states), which refuses by name on a row
 //            without possession or without shot counts; and, wired the
@@ -89,8 +91,9 @@ import {
   BoardRow, LeagueMeta, leagueLabel, liveCompLabel,
 } from "../lib/pickerApi";
 import {
-  LiveReadComponentPayload, STATE_ABSENT_WORDS, WatchedMatch,
-  WatchedPosition, readMatchClock, readMatchStates, readSilence,
+  LiveReadComponentPayload, STATE_ABSENT_WORDS, TapeNowResult,
+  WatchedMatch, WatchedPosition, api, readMatchClock,
+  readMatchStates, readSilence,
 } from "../lib/suggesterApi";
 import { useWatchedStrip } from "../lib/watchedStripFeed";
 import { clubColors } from "../lib/teamColors";
@@ -166,6 +169,214 @@ export function tapeWords(m: WatchedMatch, generatedAt: string | undefined):
     };
   }
   return { text: `tape ${s}s`, dead: false };
+}
+
+// ---------------------------------------------------------------------
+// THE AGE IS ALSO THE PRESS
+//
+// SON'S WORDS: "make tape every 30s and a button to tape now, you can
+// make the tape button with the seconds display right on it" — so the
+// readout above is not joined by a button, it BECOMES one. The number
+// the operator is already looking at when he decides the tape is too
+// old is the thing he presses.
+//
+// THE PRESS IS A SWEEP, NOT A TAPE OF THIS FIXTURE. POST
+// /api/admin/live/tape-now takes a row for the declared set and answers
+// with what it swept; the button sits on a card because that is where
+// the age is, and the answer it prints is the WHOLE answer — every
+// refusal, each named with the fixture it is about. Showing only this
+// card's own refusal would let one card imply the sweep did more than
+// it did.
+//
+// A REFUSAL HERE IS AN ANSWER, AND IS DRAWN AS ONE. Pressed inside the
+// backend's own floor, the route answers 200 with `swept: 0`, a named
+// refusal and `next_allowed_at`. It is not a failure, so it gets no
+// warn ink and no traffic light: the colour on this card means "this
+// figure is not a measurement", and "I heard you, and it is too soon"
+// is a measurement of exactly the thing it was asked about. Only an
+// answer that is not a sweep report at all (`ok: false`) takes warn.
+//
+// NOTHING HERE INVENTS A SENTENCE. Every word below is a field name or
+// a string the backend sent; the numbers are the payload's, including
+// `min_interval_seconds`, which is the cadence floor and is READ rather
+// than typed — the period is the backend's to set and it has just
+// changed, which is the whole reason this control exists.
+// ---------------------------------------------------------------------
+
+/** The clock on an ISO stamp, AS THE BACKEND SENT IT.
+ *
+ *  No conversion to the viewer's zone and no arithmetic against the
+ *  viewer's clock. `tapeAgeSeconds` above already refuses to measure
+ *  the tape against this browser's time, for the reason written there;
+ *  a countdown to `next_allowed_at` would be the same mistake with a
+ *  bigger number on it, and a laptop an hour out would confidently
+ *  report a floor that had already elapsed. A stamp that is not the
+ *  shape this expects comes back WHOLE rather than sliced — an
+ *  unrecognised value is never quietly reshaped into a plausible one. */
+export function utcClock(iso: string): string {
+  const m = /T(\d{2}:\d{2}:\d{2})/.exec(iso);
+  return m ? `${m[1]}Z` : iso;
+}
+
+/** WHAT THE CARD SAYS ABOUT A PRESS — or `null`, when it must say
+ *  nothing.
+ *
+ *  `null` IS THE 401/403 CASE AND ONLY THAT. WatchedStrip, mounted on
+ *  this same page against this same gate with this same token, already
+ *  draws the refusal with its status and the backend's own sentence. A
+ *  second copy here would be the page saying one thing twice and the
+ *  operator reading it twice; the button still marks itself refused, so
+ *  the press is not left looking as though nothing happened.
+ *
+ *  Exported for the guard: these are the only words this control has,
+ *  and a spec that retyped them would be checking a copy of itself. */
+export function tapeAnswerLines(r: TapeNowResult): string[] | null {
+  if (!r.ok) {
+    if (r.status === 401 || r.status === 403) return null;
+    // NAMED BY ITS CODE where there is one — `proxy_unreachable` and
+    // `proxy_body_unreadable` are the two this repo's own proxy
+    // authors, and they mean opposite things about whether the sweep
+    // was ever asked for. With no code the STATUS is the name, because
+    // the alternative is a sentence nobody upstream wrote.
+    const named = r.code !== "" ? r.code
+      : r.status == null ? "nothing answered the press"
+      : `the press answered ${r.status}`;
+    return [r.said !== "" ? `${named} — ${r.said}` : named];
+  }
+  const b = r.body;
+  const num = (v: unknown): v is number =>
+    typeof v === "number" && Number.isFinite(v);
+  // `swept` is the one field postTapeNow proves before calling this a
+  // sweep report, so it is printed rather than guarded. The rest are
+  // checked: a field the backend did not send is left OFF the line, and
+  // never rendered as a zero or as the word `undefined`.
+  const head = [`swept ${b.swept}`];
+  if (num(b.rows_written)) head.push(`${b.rows_written} rows written`);
+  if (num(b.min_interval_seconds)) {
+    head.push(`min interval ${b.min_interval_seconds}s`);
+  }
+  const lines = [head.join(" · ")];
+  const when: string[] = [];
+  if (typeof b.captured_at === "string" && b.captured_at !== "") {
+    when.push(`captured_at ${utcClock(b.captured_at)}`);
+  }
+  // WHEN THE NEXT ONE IS ALLOWED, off the field that carries it. The
+  // REASON it is not allowed yet is the refusal's own sentence, printed
+  // below in the backend's words; this is the stamp beside it.
+  if (typeof b.next_allowed_at === "string" && b.next_allowed_at !== "") {
+    when.push(`next_allowed_at ${utcClock(b.next_allowed_at)}`);
+  }
+  if (when.length > 0) lines.push(when.join(" · "));
+  for (const x of Array.isArray(b.refusals) ? b.refusals : []) {
+    const code = typeof x?.code === "string" && x.code !== ""
+      ? x.code : "refusal";
+    const fx = num(x?.fixture_id) ? ` · fixture ${x.fixture_id}` : "";
+    const why = typeof x?.reason === "string" && x.reason !== ""
+      ? ` — ${x.reason}` : "";
+    lines.push(`${code}${fx}${why}`);
+  }
+  return lines;
+}
+
+/** The press, its flight, and the answer it is still showing.
+ *
+ *  THE FLIGHT GUARD IS A REF, NOT THE STATE. `disabled` stops a second
+ *  click and a ref stops everything else — a repeat key, a synthetic
+ *  event, a second call from a stale closure — because the state a
+ *  closure captured is the state at its last render and a write route
+ *  must not be fired twice on the strength of that.
+ *
+ *  THE RE-READ FIRES ON A ROW, not on a press. `rows_written > 0` is
+ *  the condition under which there is something new for the strip to
+ *  show; a sweep that wrote nothing has nothing to re-read for, and
+ *  that read is operator-gated and scans the whole snapshot table (see
+ *  the cadence note in lib/watchedStripFeed.ts, which is where both
+ *  components' poll constants went). A press that changed nothing must
+ *  not cost one. */
+function useTapePress(token: string, onTaped: () => void) {
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<TapeNowResult | null>(null);
+  const flight = useRef(false);
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
+  const press = useCallback(async () => {
+    if (flight.current || token === "") return;
+    flight.current = true;
+    setBusy(true);
+    try {
+      const r = await api.tapeNow(token);
+      if (!alive.current) return;
+      setSaid(r);
+      if (r.ok && typeof r.body.rows_written === "number"
+          && r.body.rows_written > 0) onTaped();
+    } finally {
+      flight.current = false;
+      if (alive.current) setBusy(false);
+    }
+  }, [token, onTaped]);
+  return { busy, said, press };
+}
+
+/** THE AGE OF THE TAPE, AND THE PRESS THAT TAKES A NEW ONE.
+ *
+ *  THE READOUT SURVIVES THE BUTTON BEING UNUSABLE. `live-tape` carries
+ *  the age words and nothing else in every state — no token, in flight,
+ *  refused — because the age is the information and the press is the
+ *  extra. With no token held there is no button at all: a control that
+ *  cannot work must not look as though it could, and a disabled one
+ *  still reads as "this does something, later".
+ *
+ *  IN FLIGHT IT SAYS SO IN WORDS, beside the age rather than instead of
+ *  it, and the control is disabled for the duration so a press cannot
+ *  be double-fired or stacked.
+ *
+ *  THE STATE IS THE CARD'S, not this component's: the answer draws
+ *  UNDER the strip and the press sits INSIDE it, and one press cannot
+ *  own two places in the tree. */
+function TapeReadout({ tape, token, busy, said, press }: {
+  tape: { text: string; dead: boolean };
+  token: string;
+  busy: boolean;
+  said: TapeNowResult | null;
+  press: () => void;
+}) {
+  const readout = (
+    <span data-testid="live-tape"
+      className={tape.dead ? "text-warn" : "text-ink-mid"}>
+      {tape.text}
+    </span>
+  );
+  if (token === "") return readout;
+  return (
+    <button type="button" data-testid="live-tape-now"
+      data-flight={busy ? "true" : "false"}
+      data-answered={said == null ? "" : said.ok ? "swept" : "failed"}
+      onClick={press} disabled={busy}
+      aria-label={`take a tape row now · ${tape.text}`}
+      className="-my-[1px] inline-flex items-baseline gap-[4px] rounded-[4px] border border-line px-[5px] py-[1px] align-baseline transition-colors hover:border-accent/60 disabled:cursor-progress disabled:opacity-70 disabled:hover:border-line">
+      {readout}
+      <span data-testid="live-tape-flight" className="text-ink-faint">
+        {busy ? "taping…" : "↻"}
+      </span>
+    </button>
+  );
+}
+
+/** The answer to the last press, under the strip it was pressed on.
+ *  Absent until there is one, and absent for the gated case the page
+ *  already answers elsewhere — see tapeAnswerLines. */
+function TapeAnswer({ said }: { said: TapeNowResult | null }) {
+  if (said == null) return null;
+  const lines = tapeAnswerLines(said);
+  if (lines == null) return null;
+  return (
+    <p data-testid="live-tape-said" data-ok={said.ok ? "true" : "false"}
+      className={`mb-2 rounded-md border px-2 py-1 font-mono text-[9px] leading-relaxed ${
+        said.ok ? "border-line bg-elev/40 text-ink-mid"
+          : "border-warn/40 bg-warn/5 text-warn"}`}>
+      {lines.map((l) => <span key={l} className="block">{l}</span>)}
+    </p>
+  );
 }
 
 // ---------------------------------------------------------------------
@@ -1110,7 +1321,8 @@ function PositionBlock({ p }: { p: WatchedPosition | undefined }) {
 // THE CARD
 // ---------------------------------------------------------------------
 
-export function LiveCard({ m, generatedAt, row, clubCount, registry }: {
+export function LiveCard({ m, generatedAt, row, clubCount, registry,
+                          onTaped }: {
   m: WatchedMatch;
   generatedAt: string | undefined;
   /** the response's own position.REFUSAL_CODES — never a set typed here */
@@ -1120,10 +1332,21 @@ export function LiveCard({ m, generatedAt, row, clubCount, registry }: {
    *  board is upcoming fixtures, and a match in play has often left it) */
   row: BoardRow | null;
   clubCount: number;
+  /** RE-READ THE STRIP THIS CARD CAME OFF, after a press wrote a row.
+   *  The section owns the poll, so the section owns the re-read; this
+   *  card only knows that something new exists to read. */
+  onTaped: () => void;
 }) {
   const [flipped, setFlipped] = useState(false);
   const colours = clubColors(m.home, m.away);
   const tape = tapeWords(m, generatedAt);
+  // ONE TOKEN, AND IT IS THE ONE ALREADY TYPED. The watch toggle
+  // declares a match, the strip reads it back and this press writes a
+  // row; all three are the same `_admin_ok` gate on the same backend,
+  // so a second field for the same secret would be this page inventing
+  // a credential. Outside the provider it is "" and there is no button.
+  const token = useWatchToken();
+  const { busy, said, press } = useTapePress(token, onTaped);
   const st = m.state;
   const positions = m.positions ?? [];
   const held = positions[0];
@@ -1161,20 +1384,24 @@ export function LiveCard({ m, generatedAt, row, clubCount, registry }: {
         held ? "border-accent/35" : "border-line"}`}>
 
       {/* 1 — THE STRIP. The competition on the left; the kickoff and THE
-          AGE OF THE TAPE on the right. NO RANK: the section says nothing
-          here is ranked, and a number down the grid is a number a reader
-          is entitled to read as an order. */}
+          AGE OF THE TAPE on the right — and, with a token held, that age
+          IS THE PRESS that takes a new one. NO RANK: the section says
+          nothing here is ranked, and a number down the grid is a number
+          a reader is entitled to read as an order. */}
       <div data-testid="live-strip"
         className="mb-2 flex items-baseline justify-between gap-2 font-mono text-[9px] tracking-[0.08em] text-ink-faint">
         <span>{comp}</span>
         <span>
           {row ? `${fmtDate(row.kickoff, "short")} · ` : ""}
-          <span data-testid="live-tape"
-            className={tape.dead ? "text-warn" : "text-ink-mid"}>
-            {tape.text}
-          </span>
+          <TapeReadout tape={tape} token={token} busy={busy} said={said}
+            press={press} />
         </span>
       </div>
+
+      {/* WHAT THE LAST PRESS ANSWERED, under the strip it was pressed
+          on and never inside it: the age has to stay one short readout
+          whatever the sweep said, and a refusal is a sentence. */}
+      <TapeAnswer said={said} />
 
       {/* 2 — THE SCOREBOARD HEAD. Home left, away right, the score
           between them and the clock directly above it: the arrangement
@@ -1396,15 +1623,27 @@ function LiveSection({ rows, leagues, columns }: {
   // being measured against the PAYLOAD'S own `generated_at`, so the
   // cards age visibly rather than freezing.
   //
-  // AND THE HOOK RETURNS `reread`, WHICH IS THE HANDLE PR #54 PARKS IN
-  // A REF. That PR keeps a `loadRef` inside the effect this replaces so
-  // a press on a card's tape readout can take a row and show it without
-  // waiting out the cadence — the capability is unchanged and survives
-  // this change; on merge, `reread` off this hook IS that handle and
-  // can be handed straight to the card as `onTaped`, with no ref and no
-  // closure to keep alive. It is not destructured here because nothing
-  // on this branch presses anything yet.
-  const { data, asked } = useWatchedStrip(token);
+  // AND THE HOOK RETURNS `reread`, WHICH IS WHAT THE PRESS CALLS. This
+  // branch parked `LiveSection`'s own `load` in a `loadRef` so a press
+  // on a card's tape readout could take a row and show it without
+  // waiting out the cadence. The effect that built that `load` is gone
+  // and the ref went with it: `reread` IS that handle, with no closure
+  // for a card to keep alive past the token that made it, and it is
+  // NUMBERED like every other read on the feed — so a scheduled poll
+  // already in flight cannot land on top of the press's answer, which
+  // the parked `load` had nothing to stop. It is handed to the card as
+  // `onTaped` below.
+  //
+  // WHAT THE FEED CHANGED ABOUT THE RE-READ: it now refreshes the whole
+  // live surface rather than these cards alone. That is a consequence
+  // of one read, not a decision taken here — WatchedStrip subscribes to
+  // the same feed, so the strip and the cards move together on a press
+  // exactly as they do on a poll. This branch's note about deliberately
+  // NOT refreshing the strip described a page with two independent
+  // reads on it; there is one, and a re-read that updated one of two
+  // surfaces drawing one payload is the tear the feed exists to
+  // prevent.
+  const { data, asked, reread } = useWatchedStrip(token);
   // THE PAGE SURVIVES A POLL. It is state, not a value derived from the
   // payload, so a 15s refresh cannot walk the reader back to page one
   // mid-read. It is clamped where it is READ rather than corrected in an
@@ -1515,7 +1754,7 @@ function LiveSection({ rows, leagues, columns }: {
                  ships. An envelope that published none is an empty
                  registry and NOT a licence to guess. */
               registry={data?.refusal_codes ?? {}}
-              clubCount={leagues[slug]?.clubs ?? 0} />
+              clubCount={leagues[slug]?.clubs ?? 0} onTaped={reread} />
           );
         })}
       </div>

@@ -2726,9 +2726,32 @@ function EvidenceLine({ e, resp }: { e?: EvidenceLayer; resp: CardResponse }) {
 
 /* ---------- the card ---------- */
 
-// The collector ticks every 120s, so a 60s re-fetch never sits on a
-// stale tick for a whole cycle. Polling runs ONLY while live_now is on
-// the payload, and only while the tab is visible.
+// THIS NUMBER'S JUSTIFICATION EXPIRED ON 2026-09-11, and is replaced
+// rather than deleted so the next reader knows what changed. It said:
+// "the collector ticks every 120s, so a 60s re-fetch never sits on a
+// stale tick for a whole cycle." Son moved the collector to a shorter
+// period to follow a match closer, and a re-fetch slower than the tape
+// sits a whole cycle behind it — sometimes more.
+//
+// AND THE NEW NUMBER IS NOT WRITTEN DOWN HERE EITHER, which is the
+// actual lesson. `config.LIVE_STATE_INTERVAL_SECONDS` is the BACKEND'S,
+// any env value can move it again, and a copy of it in a frontend
+// comment is a claim with nothing holding it true — this comment has
+// now been wrong about it once. The two other frontend copies were
+// deleted outright with their poll constants when the live surface went
+// to one read (lib/watchedStripFeed.ts); this is the last site that
+// ever named it, and it does not.
+//
+// THE CADENCE IS NOT CHANGED HERE, because nothing has measured what it
+// should be and a stale comment is not a licence to pick one: this
+// route is a full card read, not a tape row. What the page already does
+// say truthfully is HOW OLD the state is — TickAge reads
+// `interval_seconds` off the payload rather than naming a number, so
+// the reader is told when this card is behind even while this constant
+// is not tuned for it.
+//
+// Polling runs ONLY while live_now is on the payload, and only while
+// the tab is visible.
 const LIVE_REFRESH_MS = 60_000;
 
 const stampUtc = () => `${new Date().toISOString().slice(11, 19)}Z`;
