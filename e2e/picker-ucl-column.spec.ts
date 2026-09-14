@@ -809,7 +809,16 @@ test("a member table that failed is named, and rated_on does not shrink",
     const ucl = col(page, "ucl");
     const block = ucl.getByTestId("col-member-errors");
     await expect(block).toContainText("1 of 7 member tables did not load");
-    await expect(block).toContainText("HTTPError: 503 from ESPN");
+    /* THE FAILURE IS STILL NAMED, AND THE EXCEPTION CLASS IS NOT
+       (2026-09-14). This used to assert `toContainText("HTTPError: 503
+       from ESPN")` — it pinned the defect rather than the rule. A
+       reader is shown a sentence, never an internal token: the league,
+       the status and the provider stay; `HTTPError:` is Python's word
+       for its own type and means nothing to anyone reading a board.
+       See e2e/no-machine-text-reaches-the-reader.spec.ts. */
+    await expect(block).toContainText("Eredivisie");
+    await expect(block).toContainText("503 from ESPN");
+    await expect(block).not.toContainText("HTTPError");
     // the SPEC is unchanged — what the column is defined on must not
     // quietly become what it managed to fetch
     await expect(ucl.getByTestId("col-cup")).toContainText("Eredivisie");

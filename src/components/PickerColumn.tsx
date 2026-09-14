@@ -27,11 +27,14 @@
 // to components/PickerRead.tsx so the tail renders THE SAME READ this
 // column does, rather than a hand-copied one free to drift from it.
 import Link from "next/link";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
   AXIS_ORDER, Axis, FieldRead, Ratings, fieldFor,
 } from "../lib/fieldApi";
 import { dayLabel, fmtDate, localDay } from "../lib/matchday";
+import {
+  ProviderFailure, announceFailure, failureSentence, readFailure,
+} from "../lib/providerFailure";
 import {
   BoardRefusal, BoardRow, LeagueMeta, RatePair, RowField, SEASON_BLEND_K,
   homeBadge, leagueLabel, rowHref, seasonDisagreement, seasonSpan,
@@ -1685,6 +1688,7 @@ export function columnNotes(
     }
     return only;
   };
+  const fieldFailure = readFailure(field?.error);
   return {
     gap: agreed((r) => r.gap_note),
     regTime: agreed((r) => r.reg_time_note),
@@ -1694,8 +1698,16 @@ export function columnNotes(
        must be A SENTENCE. A field that could not be read leaves every
        card on its league ranks and league tiers, which is exactly what
        a competition with no field measured looks like. Naming it here
-       is what keeps those two apart. */
-    fieldError: field?.error ?? null,
+       is what keeps those two apart.
+
+       "MUST BE A SENTENCE" IS NOW ENFORCED RATHER THAN HOPED FOR
+       (2026-09-14). This carried `field.error` verbatim, which is the
+       backend's own words when the backend sent words and a Python
+       exception repr when it did not — the same hole the Kalshi note
+       leaked a provider URL through. `readFailure` keeps prose and
+       replaces machine text; see src/lib/providerFailure.ts. */
+    fieldError: fieldFailure
+      ? failureSentence(fieldFailure) : null,
   };
 }
 
@@ -2104,9 +2116,45 @@ export function LeagueColumn({
       storeNote={review.storeNote} />
   );
 
-  // a cup member league that did not build. ABSENT, not empty, when
-  // every member built — so this block cannot draw a reassuring "0".
-  const memberErrors = Object.entries(meta?.member_errors ?? {});
+  /* ── THIS COLUMN'S UPSTREAM FAILURES, READ ONCE ────────────────────
+     Every one of these arrives as a string the backend built out of a
+     Python exception, and every one of them used to be printed to the
+     reader as-is. `readFailure` keeps the backend's own words when they
+     are prose and writes its own sentence when they are not; the raw
+     text is never drawn, and goes to the console below.
+
+     a cup member league that did not build is ABSENT, not empty, when
+     every member built — so that block cannot draw a reassuring "0". */
+  const colFailure = readFailure(meta?.error);
+  const kalshiFailure = readFailure(meta?.kalshi_error);
+  const memberFailures = Object.entries(meta?.member_errors ?? {})
+    .map(([lg, raw]) => [lg, readFailure(raw)] as const)
+    .filter((e): e is readonly [string, ProviderFailure] => e[1] != null);
+
+  /* AND THE OPERATOR'S COPY, WHERE A READER DOES NOT LOOK AND HE DOES.
+     "Do not print the endpoint" is not "throw the endpoint away": which
+     URL, which parameters and which exception is exactly what he needs
+     when a column goes quiet. The console is where `ErrorBoundary`
+     already puts the error it catches, and it is not the column body. */
+  /* THE RAW STRINGS ARE THE IDENTITY. A column re-renders on every sort
+     change and a warning per render is a console nobody reads, so what
+     the effect turns on is the set of (site, raw string) pairs and not
+     the objects above, which are rebuilt on every render. Serialised to
+     one string so the dependency array stays statically checkable, and
+     parsed back inside — JSON rather than a delimiter, because a
+     provider string is free to contain whichever delimiter was picked. */
+  const announcements = JSON.stringify([
+    [`${slug} column`, meta?.error ?? null],
+    [`${slug} kalshi`, meta?.kalshi_error ?? null],
+    [`${slug} field`, field?.error ?? null],
+    ...Object.entries(meta?.member_errors ?? {})
+      .map(([lg, raw]) => [`${slug} member table ${lg}`, raw]),
+  ].filter(([, raw]) => Boolean(raw)));
+  useEffect(() => {
+    for (const [where, raw] of JSON.parse(announcements) as [string, string][]) {
+      announceFailure(where, readFailure(raw));
+    }
+  }, [announcements]);
 
   // the subgrid track plan, shared with the page: row 1 header, then
   // per day a label track + a content track, then refusals, then tail
@@ -2259,11 +2307,28 @@ export function LeagueColumn({
           )}
         </div>
 
-        {meta?.error && (
+        {/* ── THREE FAILURES, AND NOT ONE OF THEM PRINTS WHAT THE
+            PROVIDER SAID (2026-09-14). Each of these carried a raw
+            string straight onto the page; the Kalshi one is the defect
+            that was caught, on the live La Liga column:
+
+              kalshi unavailable — 429 Client Error: Too Many Requests
+              for url: https://api.elections.kalshi.com/trade-api/v2/…
+
+            The reader cannot act on any of that, and an internal
+            endpoint with its query string should not be on a public
+            page at all. THE ABSENCE IS STILL NAMED — that is the whole
+            point of these three boxes and none of them is quieter than
+            it was. What changed is that the words are now a sentence:
+            the provider named, the reason in plain language, the status
+            kept because a reader CAN act on a 429. The untouched
+            provider string goes to the console instead, which is where
+            an operator looks. See src/lib/providerFailure.ts. */}
+        {colFailure && (
           <div data-testid="col-error"
             className="mt-2 rounded-md border border-live/30 bg-live/5 px-2.5 py-2">
             <p className="font-mono text-[11px] leading-relaxed text-live">
-              {meta.error}
+              {leagueLabel(slug)} could not be read — {failureSentence(colFailure)}.
             </p>
             <p className="mt-1 text-[11px] leading-relaxed text-ink-low">
               This league could not be rated and contributes no fixtures.
@@ -2271,19 +2336,19 @@ export function LeagueColumn({
             </p>
           </div>
         )}
-        {memberErrors.length > 0 && (
+        {memberFailures.length > 0 && (
           <div data-testid="col-member-errors"
             className="mt-2 rounded-md border border-warn/30 bg-warn/5 px-2.5 py-2">
             <p className="font-mono text-[11px] leading-relaxed text-warn">
-              {memberErrors.length} of {(meta?.rated_on ?? []).length} member
+              {memberFailures.length} of {(meta?.rated_on ?? []).length} member
               tables did not load — rated on{" "}
               {(meta?.rated_on_built ?? []).map(leagueLabel).join(" + ")
                 || "no member league"}
             </p>
             <ul className="mt-1 space-y-0.5">
-              {memberErrors.map(([lg, err]) => (
+              {memberFailures.map(([lg, f]) => (
                 <li key={lg} className="font-mono text-[10.5px] text-ink-low">
-                  {leagueLabel(lg)} — {err}
+                  {leagueLabel(lg)} — {failureSentence(f)}
                 </li>
               ))}
             </ul>
@@ -2294,11 +2359,12 @@ export function LeagueColumn({
             </p>
           </div>
         )}
-        {meta?.kalshi_error && (
+        {kalshiFailure && (
           <p data-testid="col-kalshi-error"
             className="mt-2 font-mono text-[11px] leading-relaxed text-warn">
-            kalshi unavailable — {meta.kalshi_error}. Prices are annotation
-            here, so every fixture below is still ranked and listed.
+            Kalshi prices could not be read — {failureSentence(kalshiFailure)}.
+            Prices are annotation here, so every fixture below is still
+            ranked and listed.
           </p>
         )}
 

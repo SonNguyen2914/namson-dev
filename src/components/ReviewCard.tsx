@@ -54,6 +54,7 @@ import {
   loadReviewOpen, loadReviewSort, reviewModeById, saveReviewOpen,
   saveReviewSort, sortReviewRows,
 } from "../lib/pickerReviewSort";
+import { failureSentence, readFailure } from "../lib/providerFailure";
 import {
   KalshiCell, SeasonWeight, TierGaps, dec, sign,
 } from "./PickerRead";
@@ -201,7 +202,12 @@ function CheckpointRow({ cp, slot }: { cp: Checkpoint | null; slot: string }) {
  *  every fixture, so it cannot flatter one and bury another. */
 function tapeSentence(row: ReviewRow): string {
   const s = row.shot_state;
-  if (s.error) return `The tape could not be read — ${s.error}`;
+  /* THE PLAYS FEED'S FAILURE, IN WORDS — never in the provider's own
+     repr. Same rule as the column's three failure boxes above it: the
+     absence is named, the reason is plain, the raw string does not
+     reach the page. See src/lib/providerFailure.ts. */
+  const failed = readFailure(s.error);
+  if (failed) return `The tape could not be read — ${failureSentence(failed)}`;
   const g = s.before_first_goal;
   const fgm = s.first_goal_minute;
   if (!g || fgm == null) {
@@ -481,6 +487,10 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
   const res = row.result;
   const favSide = read?.fav_side ?? null;
   const ft = row.shot_state.full_time;
+  /* THE TAPE'S OWN FAILURE, READ ONCE. `shot_state.error` is the plays
+     feed's exception as the backend caught it; the card names the
+     absence and not the exception. */
+  const shotFailure = readFailure(row.shot_state.error);
   const fit = row.fit;
 
   /* A CAPTURE MADE BY A RULE THAT HAS SINCE BEEN CORRECTED
@@ -751,11 +761,11 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
           className="text-xs leading-relaxed text-ink-mid">
           {tapeSentence(row)}
         </p>
-        {row.shot_state.error ? (
+        {shotFailure ? (
           <p data-testid="shot-error"
             className="mt-2 font-mono text-[11px] leading-relaxed text-warn">
-            shot state unavailable — {row.shot_state.error}. The score above
-            is the scoreboard&apos;s, and it stands on its own.
+            shot state unavailable — {failureSentence(shotFailure)}. The score
+            above is the scoreboard&apos;s, and it stands on its own.
           </p>
         ) : (
           <div className="mt-2 space-y-1.5">
@@ -937,6 +947,14 @@ export function ReviewTail({
   // second claim free to fall out of step with the first
   const confirmNote = rows.find((r) => r.fit?.confirm_note)?.fit.confirm_note
     ?? null;
+  /* THE TAIL'S TWO FAILURES, READ ONCE EACH. Both used to be printed to
+     the reader exactly as the backend composed them — `error` is
+     `fetchReview`'s carried `detail`, `meta.error` is
+     `f"{type(exc).__name__}: {exc}"` (src/picker/review.py:558). The
+     absence is still named here in both cases; the provider's own
+     formatting is not. See src/lib/providerFailure.ts. */
+  const tailFailure = readFailure(error);
+  const leagueFailure = readFailure(meta?.error);
 
   const apply = (next: ReviewSort) => {
     setSort(next);
@@ -1107,10 +1125,12 @@ export function ReviewTail({
           className="mt-3 font-mono text-[11px] text-ink-faint">
           reading the last {back} days…
         </p>
-      ) : error ? (
+      ) : tailFailure ? (
         <div data-testid="review-error"
           className="mt-3 rounded-lg border border-live/30 bg-live/5 px-3 py-2.5">
-          <p className="font-mono text-[11px] leading-relaxed text-live">{error}</p>
+          <p className="font-mono text-[11px] leading-relaxed text-live">
+            {failureSentence(tailFailure)}
+          </p>
           <p className="mt-1 text-[11px] leading-relaxed text-ink-low">
             The finished matches could not be loaded. Nothing is being shown
             from an earlier request.
@@ -1148,11 +1168,11 @@ export function ReviewTail({
             </p>
           )}
         </div>
-      ) : meta?.error ? (
+      ) : leagueFailure ? (
         <div data-testid="review-league-error"
           className="mt-3 rounded-lg border border-live/30 bg-live/5 px-3 py-2.5">
           <p className="font-mono text-[11px] leading-relaxed text-live">
-            {meta.error}
+            {leagueLabel(slug)} could not be read — {failureSentence(leagueFailure)}.
           </p>
           <p className="mt-1 text-[11px] leading-relaxed text-ink-low">
             This league&apos;s finished fixtures could not be read. The
