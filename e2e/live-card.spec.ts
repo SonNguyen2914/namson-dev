@@ -4,6 +4,12 @@ import { expect, test } from "@playwright/test";
 // agree — a fixture speaking the reader's vocabulary instead of the
 // wire's is how twelve green tests once certified a venue bug.
 import { CLOCK_ABSENT_WORDS } from "../src/lib/suggesterApi";
+// THE STRIP IS SERVED AS `watched-strip-v2` (backend #129). The
+// fixtures below stay the shape RECORDED off this route and `toV2`
+// applies the route's OWN hoist to them at the serve site, so the
+// v2 payload under test is a transformation of a real one rather
+// than a v2 shape typed into this file. See e2e/standing.ts.
+import { toV2 } from "./standing";
 
 // THE LIVE SECTION — the cards for matches under way, above the ranked
 // board on /bet-suggester (components/LiveCard.tsx).
@@ -466,11 +472,26 @@ type Page = import("@playwright/test").Page;
 const liveCard = (page: Page, id: number | string) =>
   page.locator(`[data-testid="live-card"][data-fixture="${id}"]`);
 
-async function open(page: Page, strip: unknown, board = BOARD) {
+const isObj = (v: unknown): v is object =>
+  v != null && typeof v === "object" && !Array.isArray(v);
+
+/** The recorded fixture served EXACTLY as written — no hoist, no
+ *  version rewritten. For the leg that has to see `watched-strip-v1` on
+ *  the wire. */
+async function openAsSent(page: Page, strip: unknown, board = BOARD) {
   await page.route("**/api/picker/board**", (r) => r.fulfill(json(board)));
   await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW)));
   await page.route("**/api/bet-suggester/watched-strip**",
     (r) => r.fulfill(json(strip)));
+  await page.goto("/bet-suggester");
+  await page.getByTestId("live-section").waitFor({ timeout: 15_000 });
+}
+
+async function open(page: Page, strip: unknown, board = BOARD) {
+  await page.route("**/api/picker/board**", (r) => r.fulfill(json(board)));
+  await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW)));
+  await page.route("**/api/bet-suggester/watched-strip**",
+    (r) => r.fulfill(json(isObj(strip) ? toV2(strip) : strip)));
   await page.goto("/bet-suggester");
   await page.getByTestId("live-section").waitFor({ timeout: 15_000 });
 }
@@ -803,6 +824,40 @@ test("the live row carries its OWN sentence, and it leaves with the row",
       .toHaveText(/adds this side's shots/);
   });
 
+test("the live row's own sentence survives moving to the envelope",
+  async ({ page }) => {
+    // `model_live.line` is card.LIVE_INFORMED_LINE — a standing
+    // sentence, the same on every match — so backend #129 hoists it.
+    // This card read it by key name off the block, and the day that
+    // landed the bar kept drawing while the line saying WHAT THE BAR IS
+    // stopped: a caveat lost off a number, with no mark on screen. The
+    // test above pins the sentence; this one pins that it was actually
+    // MOVED first, so that test cannot pass because nothing happened.
+    const withLine = { ...STRIP, matches: [liveMatch({
+      model_v_market: {
+        model: { home: 62, draw: 21, away: 17 },
+        market: { home: 55, draw: 24, away: 21 }, side: "home",
+      },
+      model_live: {
+        model_live: { home: 71, draw: 18, away: 11 },
+        line: "model · live adds this side's shots to the minute",
+      },
+    })] };
+    const v2 = toV2(withLine) as Record<string, unknown>;
+    const ml = (v2.matches as Record<string, unknown>[])[0]
+      .model_live as object;
+    expect(ml, "the hoist left `line` on the match").not
+      .toHaveProperty("line");
+    expect(((v2.standing_blocks as Record<string, unknown>)
+      .blocks as Record<string, Record<string, unknown>>).model_live.line)
+      .toContain("adds this side's shots");
+
+    await open(page, withLine);
+    await expect(page.getByTestId("live-card").first()
+      .getByTestId("live-model-live-line"))
+      .toHaveText(/adds this side's shots/);
+  });
+
 test("a live read the backend refused leaves the other two rows alone",
   async ({ page }) => {
     /* It refuses far more often than it draws — M1 fitted the
@@ -1010,6 +1065,45 @@ test("every pairing the backend can send is drawn, per side, in the "
   // end-to-end game, which is the defect this set was built to close.
   await expect(liveCard(page, 303).getByTestId("live-state"))
     .toContainText("no ball · no chances · ahead");
+});
+
+test("the cut CONVENTIONS still ride beside the word after the sentence "
+  + "moved off the match", async ({ page }) => {
+  // BACKEND #129 HOISTS `states.conventions` ONTO THE ENVELOPE, and
+  // this card reads it by key name off the block. The day that landed,
+  // `title={got.conventions}` resolved to `undefined`: the sentence
+  // saying the cut is a DECLARED CONVENTION and not a fitted threshold
+  // silently stopped travelling with the word it qualifies. A caveat
+  // lost off a number is the one failure this tree exists against, and
+  // it leaves no mark on screen at all.
+  //
+  // BOTH SHAPES, ONE ASSERTION. `open` serves the recorded fixture
+  // through the route's own hoist, so this runs against the v2 payload
+  // production will answer with; the v1 leg below serves it AS SENT.
+  const withStates = { ...ENVELOPE,
+    matches: [liveMatch({ fixture_id: 301, states: states(STATES.siege) })] };
+  // the block-level key really is taken off the match by the hoist —
+  // otherwise this test passes against a payload that never moved
+  const v2 = toV2(withStates) as Record<string, unknown>;
+  const m0 = (v2.matches as Record<string, unknown>[])[0];
+  expect(m0.states as object).not.toHaveProperty("conventions");
+  expect(((v2.standing_blocks as Record<string, unknown>)
+    .blocks as Record<string, Record<string, unknown>>).states.conventions)
+    .toBe(CONVENTIONS);
+
+  await open(page, withStates);
+  const label = liveCard(page, 301).getByTestId("live-state")
+    .locator('span[title]').filter({ hasText: "state" });
+  await expect(label).toHaveAttribute("title", CONVENTIONS);
+
+  // AND ON v1, where the sentence is still on the block. Production
+  // answers v1 until #129 deploys and the two repositories deploy
+  // independently, so both are live.
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  await openAsSent(page, withStates);
+  const v1Label = liveCard(page, 301).getByTestId("live-state")
+    .locator('span[title]').filter({ hasText: "state" });
+  await expect(v1Label).toHaveAttribute("title", CONVENTIONS);
 });
 
 test("a row the backend could not read carries NO state, and says "

@@ -15,6 +15,20 @@ import {
 // still agree — which is what a fixture speaking the reader's
 // vocabulary always does.
 import { CLOCK_ABSENT_WORDS } from "../src/lib/suggesterApi";
+// THE HOIST, AND THE TWO SHAPES THIS SURFACE HAS TO READ. Backend
+// #129 moves the standing prose off every match onto the envelope and
+// bumps the contract to `watched-strip-v2`. `toV2` applies the ROUTE'S
+// OWN transformation to the payloads recorded below, so the v2 shape
+// under test is a real payload transformed rather than a v2 payload
+// typed into this file — which is how two of #129's own tests passed
+// vacuously before falsification caught them. The recorded v1 payloads
+// stay exactly as they were and are served UNTOUCHED by the v1 tests,
+// because production answers v1 until #129 deploys and the two
+// repositories deploy independently.
+import {
+  DECLARED, PERIOD_STAYS_ON_THE_STRIP, STANDING_RIDES_ONCE,
+  WATCHED_STRIP_V1, WATCHED_STRIP_V2, movedBy, toV2,
+} from "./standing";
 
 /** A payload MINUS one key — the shape a route that stopped sending it
  *  produces. Written as a helper so the served object is the real thing
@@ -2728,8 +2742,14 @@ const SHARED_LEG = {
   })),
 };
 
+// THE RECORDED PAYLOADS STAY v1 AND ARE NOT REWRITTEN IN PLACE. They
+// are the shape this route was recorded emitting; `open`/`openSettled`
+// serve them through the route's own hoist (`toV2`), and the handful of
+// tests that must see v1 on the wire serve them AS SENT. Editing the
+// version here instead would have left this file with no recorded copy
+// of the shape production still answers with.
 const STRIP = {
-  version: "watched-strip-v1",
+  version: WATCHED_STRIP_V1,
   generated_at: "2026-09-04T21:05:11Z",
   matches: [AHEAD, BEHIND, UNKNOWN_SIDE, NOT_STARTED, SHARED_LEG],
   monitored_by_source: { manual: [101, 303], open_position: [202, 404, 505] },
@@ -2739,7 +2759,7 @@ const STRIP = {
 };
 
 const EMPTY = {
-  version: "watched-strip-v1",
+  version: WATCHED_STRIP_V1,
   generated_at: "2026-09-04T12:00:00Z",
   matches: [],
   monitored_by_source: { manual: [], open_position: [] },
@@ -2754,7 +2774,27 @@ type Page = import("@playwright/test").Page;
 
 const STRIP_URL = "/api/bet-suggester/watched-strip";
 
+/** A recorded payload, as #129's route now emits it: the standing
+ *  prose hoisted onto `standing_blocks` and the version at v2. Every
+ *  helper below serves through this, so the DEFAULT shape under test is
+ *  the one production will answer with. A body that is not an object —
+ *  a 404 detail, a bare string — is served as it is. */
+const asV2 = (b: unknown): unknown =>
+  b != null && typeof b === "object" && !Array.isArray(b)
+    ? toV2(b as object) : b;
+
 async function routes(page: Page, strip: unknown, status = 200) {
+  await routesAsSent(page, asV2(strip), status);
+}
+
+/** THE PAYLOAD EXACTLY AS WRITTEN — no hoist, no version rewritten.
+ *
+ *  For the tests that are ABOUT the version string, and for the v1
+ *  payload production answers with today: this frontend ships before
+ *  #129 merges and the two repositories deploy independently, so there
+ *  is a window in which a v1 backend feeds a v2 client. A helper that
+ *  quietly upgraded every fixture would leave that window untested. */
+async function routesAsSent(page: Page, strip: unknown, status = 200) {
   await page.route("**/api/picker/board**", (r) => r.fulfill(json(BOARD)));
   await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW)));
   if (strip !== undefined) {
@@ -2815,6 +2855,18 @@ async function openNotes(page: Page) {
 
 async function open(page: Page, strip: unknown, status = 200) {
   await routes(page, strip, status);
+  const settled = page.waitForResponse(
+    (r) => r.url().includes(STRIP_URL)).catch(() => null);
+  await page.goto("/bet-suggester");
+  await settled;
+  await expandCollapsed(page);
+  await openNotes(page);
+}
+
+/** `open`, with the payload served EXACTLY as written — see
+ *  `routesAsSent`. */
+async function openAsSent(page: Page, strip: unknown, status = 200) {
+  await routesAsSent(page, strip, status);
   const settled = page.waitForResponse(
     (r) => r.url().includes(STRIP_URL)).catch(() => null);
   await page.goto("/bet-suggester");
@@ -2997,7 +3049,7 @@ const DORMANT_SAID = "the live plane is not configured, so no "
   + "declaration can be read and no position can be priced";
 
 const DORMANT = {
-  version: "watched-strip-v1",
+  version: WATCHED_STRIP_V1,
   generated_at: "2026-09-04T12:00:00Z",
   dormant: true, detail: DORMANT_SAID, matches: [],
   monitored_by_source: {}, open_positions_not_monitored: [],
@@ -3063,19 +3115,27 @@ test("a dormant plane that sent no `detail` says the reason is absent "
 
 test("a payload announcing a contract this surface was not built "
    + "against says so, and keeps drawing", async ({ page }) => {
-    // `data.version` WAS READ NOWHERE AT ALL until 2026-09-11: a
-    // `watched-strip-v2` payload rendered as v1, silently, with every
-    // figure below taken out of it by key name against meanings v1
-    // gives those names. What the surface DOES about that is a
-    // decision, and it is written out beside the notice that makes it
-    // (WatchedStrip's `ContractNotice`): it draws what it can read and
-    // names the mismatch, because a section that vanishes on a version
-    // bump reads as "nothing is declared".
-    await open(page, { ...STRIP, version: "watched-strip-v2" });
+    // `data.version` WAS READ NOWHERE AT ALL until 2026-09-11: a payload
+    // announcing another contract rendered as this one, silently, with
+    // every figure below taken out of it by key name against meanings
+    // this contract gives those names. What the surface DOES about that
+    // is a decision, and it is written out beside the notice that makes
+    // it (WatchedStrip's `ContractNotice`): it draws what it can read
+    // and names the mismatch, because a section that vanishes on a
+    // version bump reads as "nothing is declared".
+    //
+    // THE EXAMPLE MOVED WITH THE CONTRACT, 2026-09-14. This test used
+    // `watched-strip-v2` as its off-contract payload, and v2 is now the
+    // contract this surface reads — leaving the string here would have
+    // turned the guard into an assertion that the CURRENT contract
+    // draws a mismatch notice, which is the opposite rule. The example
+    // is a version nobody has emitted, served AS SENT so no helper can
+    // quietly rewrite the one field under test.
+    await openAsSent(page, { ...STRIP, version: "watched-strip-v3" });
     const note = page.getByTestId("watched-contract");
     await expect(note).toBeVisible();
-    await expect(note).toHaveAttribute("data-got", "watched-strip-v2");
-    await expect(note).toContainText("watched-strip-v1");
+    await expect(note).toHaveAttribute("data-got", "watched-strip-v3");
+    await expect(note).toContainText(WATCHED_STRIP_V2);
     // IT KEEPS DRAWING. Every declared match is still on the page.
     await expect(page.getByTestId("watched-match"))
       .toHaveCount(STRIP.matches.length);
@@ -3083,7 +3143,7 @@ test("a payload announcing a contract this surface was not built "
 
 test("a payload that names no contract at all is named too, and the "
    + "contract this surface reads is not claimed for it", async ({ page }) => {
-    await open(page, omit(STRIP, "version"));
+    await openAsSent(page, omit(STRIP, "version"));
     const note = page.getByTestId("watched-contract");
     await expect(note).toBeVisible();
     await expect(note).toHaveAttribute("data-got", "");
@@ -3092,6 +3152,8 @@ test("a payload that names no contract at all is named too, and the "
 
 test("the contract this surface reads draws NO notice — the notice is a "
    + "finding, not furniture", async ({ page }) => {
+    // `open` serves the recorded payload through the route's own hoist,
+    // so this is the v2 shape production will answer with.
     await open(page, STRIP);
     await expect(strip(page)).toBeVisible();
     await expect(page.getByTestId("watched-contract")).toHaveCount(0);
@@ -5779,4 +5841,315 @@ test("the hold branch's interval is read through the payload's own "
     await open(page, STRIP);
     await expect(match(page, 101).getByTestId("watched-hold-n"))
       .toContainText(`band [${band[0]}, ${band[1]}]`);
+  });
+
+// ============ 13. the standing prose rides ONCE, and both shapes read
+//
+// Backend #129 hoists the sentences that were byte-identical on all 27
+// matches of a production poll — 18,989 of the 21,511 bytes a `read`
+// block cost — off every match and onto the envelope under
+// `standing_blocks`, and bumps the contract to `watched-strip-v2`.
+// Payload: 1,225,764 -> 468,276 bytes.
+//
+// WHAT THIS SURFACE OWES THE CHANGE, and every test below is one of the
+// ways it could have failed to pay it:
+//
+//   the new envelope key could arrive unaccounted for  (the partition)
+//   the method notes could quietly lose every definition (the walk)
+//   the cut conventions could stop travelling with the word they
+//     qualify                                          (the title)
+//   the version bump could read as a crash or a blank   (the notice)
+//   and ALL OF IT has to keep working against v1, because production
+//     answers v1 until #129 deploys and the two repositories deploy
+//     independently.
+//
+// THE FIXTURES ARE THE RECORDED ONES, TRANSFORMED. Nothing below types
+// a v2 payload: `toV2` applies the route's own hoist to the same STRIP
+// the rest of this file has always used, so every sentence on the v2
+// side is a sentence the wire actually carried. The one thing that
+// could still drift is `DECLARED` — a mirror of a declaration in
+// another repository — so the first test asserts the hoist was not a
+// no-op on any block, which is what stops a misspelled key name from
+// passing as "there was nothing to move".
+
+/** The v2 payload under test, derived from the recorded v1 one. */
+const STRIP_V2 = toV2(STRIP) as Record<string, unknown>;
+
+/** A sentence that is on the ENVELOPE under v2 and was on the MATCH
+ *  under v1 — picked off the transformation rather than typed, so it
+ *  cannot name a key the fixture never carried. */
+function aHoistedSentence(): { block: string; key: string; words: string } {
+  const moved = movedBy(STRIP);
+  for (const block of Object.keys(moved)) {
+    const keys = moved[block] as Record<string, unknown>;
+    for (const key of Object.keys(keys)) {
+      const words = keys[key];
+      if (typeof words === "string" && words.trim().length >= 60) {
+        return { block, key, words: words.trim() };
+      }
+    }
+  }
+  throw new Error("the recorded payload carried no hoistable sentence");
+}
+
+/** THE (block, key) PAIRS THE RECORDED PAYLOAD ACTUALLY CARRIES under
+ *  a name #129 declares standing — read off STRIP by hand, once, and
+ *  then checked from BOTH ends by the test below.
+ *
+ *  IT IS A HAND-LIST AND THAT IS THE POINT. `DECLARED` in e2e/standing.ts
+ *  mirrors a declaration in another repository, so it is the one thing
+ *  here that can go stale without anything noticing: a key misspelled
+ *  there simply never matches, the hoist quietly becomes a no-op for it,
+ *  and every v2 assertion in this file would then run against a payload
+ *  identical to v1. Deriving this list FROM `DECLARED` would inherit the
+ *  same typo and prove nothing — which is exactly what the first version
+ *  of this guard did, and falsifying it by misspelling
+ *  `no_history_is_not_quiet` left it GREEN, because a block that moves
+ *  nothing at all drops out of the result and the loop never visited it.
+ *  So the expectation is written independently and both halves are
+ *  asserted: the key IS on the recorded payload, and it DID move. */
+const HOISTED_BY_THIS_FIXTURE: [string, string][] = [
+  ["coverage", "no_history_is_not_quiet"],
+  ["read", "components_registry"],
+  ["read", "kinds"],
+];
+
+test("the hoist moves exactly the keys this recorded payload carries — "
+   + "a mirror that has gone stale moves nothing and proves nothing", () => {
+    const moved = movedBy(STRIP);
+    // ONE — every expected key really is on the RECORDED payload, so
+    // the list below cannot be satisfied by a key nobody ever sent.
+    for (const [block, key] of HOISTED_BY_THIS_FIXTURE) {
+      const carried = STRIP.matches.some((m) => {
+        const b = (m as unknown as Record<string, unknown>)[block];
+        return b != null && typeof b === "object"
+          && key in (b as Record<string, unknown>);
+      }) || STRIP.matches.some((m) => {
+        // `read` carries a nested `coverage`, which the hoist descends
+        // into — the one nesting #129's registry names.
+        const r = (m as unknown as Record<string, unknown>).read as
+          Record<string, unknown> | undefined;
+        const b = r?.[block];
+        return b != null && typeof b === "object"
+          && key in (b as Record<string, unknown>);
+      });
+      expect(carried, `${block}.${key} is not on the recorded payload`)
+        .toBe(true);
+    }
+    // TWO — and every one of them actually moved.
+    const got = Object.keys(moved).flatMap(
+      (b) => Object.keys(moved[b] as object).map((k) => `${b}.${k}`)).sort();
+    expect(got).toEqual(
+      HOISTED_BY_THIS_FIXTURE.map(([b, k]) => `${b}.${k}`).sort());
+    // THREE — and nothing moved that `DECLARED` does not name.
+    for (const [block, key] of HOISTED_BY_THIS_FIXTURE) {
+      expect(DECLARED[block], `${block}.${key} is not declared`)
+        .toContain(key);
+    }
+    // FOUR — the keys are GONE from every match. Both halves of the
+    // point, derived from what was actually moved.
+    for (const m of STRIP_V2.matches as Record<string, unknown>[]) {
+      for (const block of Object.keys(moved)) {
+        const b = m[block];
+        if (b == null || typeof b !== "object") continue;
+        for (const key of Object.keys(moved[block] as object)) {
+          expect(b as Record<string, unknown>,
+            `fixture ${m.fixture_id} still carries ${block}.${key}`)
+            .not.toHaveProperty(key);
+        }
+      }
+    }
+  });
+
+test("`standing_blocks` is ACCOUNTED FOR by the envelope partition — it "
+   + "is not named as a key nobody has seen", async ({ page }) => {
+    // THE GUARD THAT FIRES FIRST when #129 lands. `standing_blocks` is
+    // an envelope key, and every envelope key is CONSUMED, BOOKKEEPING
+    // or REGISTERED; one in none of them is reported as unaccounted
+    // for. It is CONSUMED — this surface reads it — so nothing should
+    // be named.
+    await open(page, STRIP);
+    await expect(strip(page)).toBeVisible();
+    const un = page.getByTestId("watched-envelope-unaccounted");
+    await expect(un).toHaveCount(0);
+    // NON-VACUITY, in the same run: the namer is alive and would have
+    // named it. A key nobody accounts for on the SAME payload is
+    // reported, so the count above is a finding and not a dead locator.
+    await open(page, { ...STRIP, a_key_nobody_declared: { note: "x" } });
+    await expect(page.getByTestId("watched-envelope-unaccounted"))
+      .toHaveAttribute("data-keys", "a_key_nobody_declared");
+  });
+
+test("`standing_blocks` is CONSUMED and not registered — a key this "
+   + "surface reads may not also carry a record saying it does not", () => {
+    // THE PARTITION, FROM THE REGISTRY ITSELF. Filing a key that IS
+    // drawn under a registered hole is the prose outliving the hole,
+    // one direction over — the failure that whole registry exists to
+    // prevent, and the reason `detail` was retired from it.
+    expect(CONSUMED_ENVELOPE_KEYS).toContain("standing_blocks");
+    expect(Object.keys(UNRENDERED_ENVELOPE_KEYS))
+      .not.toContain("standing_blocks");
+    expect(BOOKKEEPING_ENVELOPE_KEYS).not.toContain("standing_blocks");
+    // and `standing` — a DIFFERENT envelope key, the route's own
+    // charter sentences — keeps its record. #129 did not touch it.
+    expect(Object.keys(UNRENDERED_ENVELOPE_KEYS)).toContain("standing");
+  });
+
+test("a sentence that moved to the envelope is still drawn on the card "
+   + "it used to ride on — hoisting may not make a hole", async ({ page }) => {
+    // THE RULE THIS WHOLE CHANGE IS GOVERNED BY. The method-notes
+    // disclosure is where the payload's definitions are read, and
+    // `proseNotes` walks the MATCH. Under v2 the standing sentences are
+    // not on the match any more, so a walk that stopped there would
+    // empty the "definitions" half of that disclosure on every card and
+    // say nothing about it.
+    //
+    // THE SENTENCE IS PICKED OFF THE TRANSFORMATION, never typed: it is
+    // whatever the recorded payload actually carried and the route
+    // actually moved.
+    const moved = aHoistedSentence();
+    await open(page, STRIP);
+    const notes101 = notes(page, 101).getByTestId("watched-note");
+    const seen = await notes101.evaluateAll(
+      (els) => els.map((e) => e.textContent!.trim()));
+    expect(seen, `the sentence that moved off ${moved.block}.${moved.key} `
+      + "is not drawn anywhere on the card").toContain(moved.words);
+  });
+
+test("the SAME sentence is drawn from a v1 payload, where it still "
+   + "rides on the match", async ({ page }) => {
+    // BOTH SHAPES, ONE SURFACE. Production answers `watched-strip-v1`
+    // until #129 deploys, and the two repositories deploy
+    // independently — so this file is live against a v1 backend for a
+    // window of its own. Served AS SENT: no helper upgrades it.
+    const moved = aHoistedSentence();
+    await openAsSent(page, STRIP);
+    const seen = await notes(page, 101).getByTestId("watched-note")
+      .evaluateAll((els) => els.map((e) => e.textContent!.trim()));
+    expect(seen, "a v1 payload lost a sentence that is ON its match")
+      .toContain(moved.words);
+  });
+
+test("no sentence is drawn TWICE when the envelope and the match both "
+   + "carry it", async ({ page }) => {
+    // THE HOIST DROPS A KEY ONLY WHILE THE EMITTER IS STILL SENDING THE
+    // DECLARED CONSTANT — so a block that carries something else keeps
+    // it, ON THE MATCH, and the envelope's standing copy rides beside
+    // it. That is the one payload where a naive "walk the match, then
+    // walk the envelope" draws one sentence twice.
+    //
+    // The served payload is the v2 one with the moved sentence PUT BACK
+    // on match 101, which is exactly the shape `_hoisted`'s equality
+    // guard produces.
+    const moved = aHoistedSentence();
+    const matches = (STRIP_V2.matches as Record<string, unknown>[])
+      .map((m) => (m.fixture_id === 101
+        ? { ...m, [moved.block]: {
+              ...(m[moved.block] as Record<string, unknown>),
+              [moved.key]: moved.words } }
+        : m));
+    await openAsSent(page, { ...STRIP_V2, matches });
+    const seen = await notes(page, 101).getByTestId("watched-note")
+      .evaluateAll((els) => els.map((e) => e.textContent!.trim()));
+    expect(seen.filter((t) => t === moved.words).length,
+      "the sentence is drawn twice on one card").toBe(1);
+    // and the OTHER cards, which only have the envelope's copy, still
+    // draw it exactly once
+    const other = await notes(page, 202).getByTestId("watched-note")
+      .evaluateAll((els) => els.map((e) => e.textContent!.trim()));
+    expect(other.filter((t) => t === moved.words).length).toBe(1);
+  });
+
+test("the envelope's own words about the move are the ROUTE'S, and the "
+   + "map it publishes resolves on the payload it rides on", () => {
+    // `where` IS THE WHOLE REACHABILITY STORY. A client that still
+    // reads `matches[].read.registered_holes` meets a NAMED FACT
+    // instead of a hole, and a map that points at nothing is worse than
+    // no map at all. This checks the fixture the surface is tested
+    // against actually has that property — the same assertion #129
+    // makes on the backend, on this side of the wire.
+    const sb = STRIP_V2.standing_blocks as Record<string, unknown>;
+    expect(sb.moved).toBe(STANDING_RIDES_ONCE);
+    expect(sb.moved_from).toBe(WATCHED_STRIP_V1);
+    expect(sb.moved_in).toBe(WATCHED_STRIP_V2);
+    expect(STRIP_V2.version).toBe(WATCHED_STRIP_V2);
+    const where = sb.where as Record<string, string>;
+    expect(Object.keys(where).length).toBeGreaterThan(0);
+    for (const [old, next] of Object.entries(where)) {
+      expect(old.startsWith("matches[].")).toBe(true);
+      let node: unknown = STRIP_V2;
+      for (const part of next.split(".")) {
+        expect(node && typeof node === "object", `${old} -> ${next}`)
+          .toBeTruthy();
+        node = (node as Record<string, unknown>)[part];
+      }
+      expect(node, `${old} -> ${next} resolves to nothing`)
+        .not.toBe(undefined);
+    }
+  });
+
+test("the version mismatch is a NAMED fact on a v1 payload, and every "
+   + "declared match is still drawn under it", async ({ page }) => {
+    // THE WINDOW THIS SURFACE HAS TO SURVIVE, drawn. A v1 backend
+    // feeding a v2 client must produce the notice `ContractNotice` was
+    // written for — not a crash, not a blank, and not a silent render
+    // against meanings the payload no longer promises.
+    await openAsSent(page, STRIP);
+    await expect(strip(page)).toBeVisible();
+    const note = page.getByTestId("watched-contract");
+    await expect(note).toBeVisible();
+    await expect(note).toHaveAttribute("data-got", WATCHED_STRIP_V1);
+    await expect(note).toHaveAttribute("data-want", WATCHED_STRIP_V2);
+    // IT KEEPS DRAWING, which is the half a blank would have lost.
+    await expect(page.getByTestId("watched-match"))
+      .toHaveCount(STRIP.matches.length);
+    // and nothing on a v1 payload is reported as an unaccounted key:
+    // `standing_blocks` is simply absent, which is not a finding.
+    await expect(page.getByTestId("watched-envelope-unaccounted"))
+      .toHaveCount(0);
+  });
+
+test("a v1 payload still draws every figure it always drew — the "
+   + "contract notice is a caveat, not a downgrade", async ({ page }) => {
+    // NON-VACUITY FOR THE TEST ABOVE. "It keeps drawing" is worth
+    // nothing if what it draws is an empty card, so this pins the same
+    // figures the v1 tests elsewhere in this file pin, on the v1 wire,
+    // with the notice up.
+    await openAsSent(page, STRIP);
+    await expect(match(page, 101).getByTestId("watched-hold-n"))
+      .toContainText("band [");
+    await expect(match(page, 101).getByTestId("watched-branches"))
+      .toContainText("n=");
+    const seen = await notes(page, 101).getByTestId("watched-note")
+      .evaluateAll((els) => els.map((e) => e.textContent!.trim()));
+    expect(seen.length, "a v1 card drew no notes at all")
+      .toBeGreaterThan(0);
+    expect(new Set(seen).size, "a v1 card repeats a note")
+      .toBe(seen.length);
+  });
+
+test("the standing charter the route owns is still reachable from the "
+   + "match it is about", async ({ page }) => {
+    // `state.period_stays_on_the_strip` is the one hoisted sentence the
+    // ROUTE owns rather than an emitter, and it is the sentence a
+    // reader wants at exactly the moment a card looks wrong — a match
+    // at half-time, still on the strip, with its clock refusing. It
+    // must not be the casualty of the hoist.
+    //
+    // THE FIXTURE IS THE RECORDED ONE WITH THE ROUTE'S OWN SENTENCE ON
+    // IT, verbatim off api/main.py, then put through the route's hoist.
+    const halfTime = {
+      ...STRIP,
+      matches: [{ ...AHEAD, state: {
+        ...AHEAD.state, clock_display: "45'+5'",
+        period_stays_on_the_strip: PERIOD_STAYS_ON_THE_STRIP } }],
+    };
+    // it is DECLARED, so the hoist takes it off the match
+    expect(Object.keys(movedBy(halfTime).state as object))
+      .toContain("period_stays_on_the_strip");
+    await open(page, halfTime);
+    const seen = await notes(page, 101).getByTestId("watched-note")
+      .evaluateAll((els) => els.map((e) => e.textContent!.trim()));
+    expect(seen, "the route's own standing sentence is drawn nowhere")
+      .toContain(PERIOD_STAYS_ON_THE_STRIP);
   });

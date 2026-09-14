@@ -93,7 +93,7 @@ import {
 import {
   LiveReadComponentPayload, STATE_ABSENT_WORDS, TapeNowResult,
   WatchedMatch, WatchedPosition, api, readMatchClock,
-  readMatchStates, readSilence,
+  readMatchStates, readSilence, standingAt,
 } from "../lib/suggesterApi";
 import { useWatchedStrip } from "../lib/watchedStripFeed";
 import { clubColors } from "../lib/teamColors";
@@ -834,12 +834,22 @@ function StatsBlock({ m, hc, ac, registry }: {
 // life naming `states` on screen as a key it had no shape for while its
 // chip could never draw. lib/suggesterApi.readMatchStates is now the one
 // place either surface may learn what this payload says.
-function statesOf(m: WatchedMatch) {
-  return readMatchStates((m as unknown as Record<string, unknown>).states);
+// AND THE CUT CONVENTIONS MOVED OFF THE MATCH (backend #129,
+// `watched-strip-v2`). `states.conventions` — the sentence saying the
+// cut points are DECLARED conventions rather than fitted thresholds —
+// now rides once on the envelope, so the title below resolved to
+// `undefined` and the caveat silently stopped travelling with the word
+// it qualifies. `readMatchStates` resolves it from the block, then from
+// the SIDE's own copy (which did not move), then from the envelope
+// through `standing_blocks.where`; `standing` is that last source and
+// is `undefined` on a v1 payload, where the first source answers.
+function statesOf(m: WatchedMatch, standing?: unknown) {
+  return readMatchStates((m as unknown as Record<string, unknown>).states,
+                         standing);
 }
 
-function StateRow({ m }: { m: WatchedMatch }) {
-  const got = statesOf(m);
+function StateRow({ m, standing }: { m: WatchedMatch; standing?: unknown }) {
+  const got = statesOf(m, standing);
   if (!got) return null;
   if (!got.home || !got.away) {
     return (
@@ -986,7 +996,7 @@ function triple(v: unknown): [number, number, number] | null {
  *  the block around it: it refuses far more often than it draws, because
  *  M1 fitted the shots-to-goals conversion at four minutes and nothing
  *  interpolates one for minute 47. */
-export function liveReadOf(m: WatchedMatch): {
+export function liveReadOf(m: WatchedMatch, standingLine?: unknown): {
   live: [number, number, number]; moved: [number, number, number] | null;
   /** this row's OWN sentence, which travels with it — so the eighty-six
    *  minutes a match has no measured horizon take the words away too */
@@ -998,7 +1008,20 @@ export function liveReadOf(m: WatchedMatch): {
   const live = triple(o.model_live);
   if (!live) return null;
   const moved = triple(o.moved_by);
-  const line = typeof o.line === "string" && o.line.trim() ? o.line : null;
+  // AND THE LINE MOVED TO THE ENVELOPE (backend #129). `model_live.line`
+  // is card.LIVE_INFORMED_LINE — a standing sentence, the same on every
+  // match — so `watched-strip-v2` hoists it and this read found nothing
+  // under the key: the bar kept drawing and the sentence that says what
+  // it IS stopped drawing beneath it. That is a caveat lost off a
+  // number, and it leaves no mark on screen.
+  //
+  // THE MATCH FIRST, THE ENVELOPE SECOND, for the reason lib/
+  // suggesterApi's `matchOrStanding` gives: the hoist leaves a value on
+  // the match whenever the emitter sends something other than the
+  // standing constant, and that copy must always win.
+  const own = typeof o.line === "string" && o.line.trim() ? o.line : null;
+  const line = own ?? (typeof standingLine === "string"
+    && standingLine.trim() ? standingLine : null);
   return { live, moved: moved ?? null, line };
 }
 
@@ -1017,11 +1040,13 @@ export function triplesOf(m: WatchedMatch): Triples | null {
   return { model, market, side, caveat, caveatBasis };
 }
 
-function ModelVMarket({ m, hc, ac }: {
+function ModelVMarket({ m, hc, ac, standing }: {
   m: WatchedMatch; hc: string; ac: string;
+  /** the response this card came off — see `LiveCard`'s `standing` */
+  standing?: unknown;
 }) {
   const t = triplesOf(m);
-  const live = liveReadOf(m);
+  const live = liveReadOf(m, standingAt(standing, "model_live", "line"));
   if (!t) {
     return (
       <>
@@ -1322,9 +1347,21 @@ function PositionBlock({ p }: { p: WatchedPosition | undefined }) {
 // ---------------------------------------------------------------------
 
 export function LiveCard({ m, generatedAt, row, clubCount, registry,
-                          onTaped }: {
+                          standing, onTaped }: {
   m: WatchedMatch;
   generatedAt: string | undefined;
+  /** THE RESPONSE THIS CARD CAME OFF, for the keys that left the match.
+   *
+   *  Backend #129 (`watched-strip-v2`) hoists the standing prose onto
+   *  the envelope, and this card reads two of those sentences by key
+   *  name: `states.conventions` beside the state word, and
+   *  `model_live.line` beneath the live bar. Neither is a figure and
+   *  both are caveats, so both vanish with no mark on screen when the
+   *  key is simply gone. They are resolved through `standingAt`, which
+   *  follows the payload's OWN `standing_blocks.where` map rather than
+   *  a path typed into this file — so `undefined` here is a v1 payload
+   *  where the blocks still carry their own copies, not a hole. */
+  standing?: unknown;
   /** the response's own position.REFUSAL_CODES — never a set typed here */
   registry: Record<string, string>;
   /** the ranked board's OWN row for this fixture, joined on
@@ -1459,7 +1496,8 @@ export function LiveCard({ m, generatedAt, row, clubCount, registry,
               registry={registry} />
             {/* INSIDE THE FLIP, directly under the bars it is derived
                 from — see the block comment above StateRow. */}
-            <StateRow m={m} />
+            <StateRow m={m}
+              standing={standingAt(standing, "states", "conventions")} />
           </div>
           <div inert={!flipped} aria-hidden={!flipped}
             data-testid="live-face-prematch"
@@ -1497,7 +1535,8 @@ export function LiveCard({ m, generatedAt, row, clubCount, registry,
 
       {/* 5 — MODEL V MARKET */}
       <Rule label="model v market" />
-      <ModelVMarket m={m} hc={colours.home} ac={colours.away} />
+      <ModelVMarket m={m} hc={colours.home} ac={colours.away}
+        standing={standing} />
 
       {/* 6 — HAZARD, THEN POSITION */}
       <Rule label="hazard" />
@@ -1747,6 +1786,11 @@ function LiveSection({ rows, leagues, columns }: {
           return (
             <LiveCard key={m.fixture_id} m={m}
               generatedAt={data?.generated_at} row={row}
+              /* THE WHOLE RESPONSE, for the sentences that moved onto
+                 its envelope. Only the section holds it, and the card
+                 follows the payload's own `standing_blocks.where` map
+                 to reach them — see `LiveCard`'s `standing`. */
+              standing={data}
               /* THE REGISTRY RIDES ON THE RESPONSE, and the card names
                  a refusal out of it rather than out of a list spelled
                  in this file — position.REFUSAL_CODES, verbatim, so a
