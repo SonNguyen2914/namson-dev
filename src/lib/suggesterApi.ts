@@ -598,7 +598,26 @@ export interface BotsResponse {
 export interface WatchedCoverage {
   monitored: boolean;
   complete_history: boolean;
-  no_history_is_not_quiet: string;
+  /** watchlist.NO_HISTORY_IS_NOT_QUIET.
+   *
+   *  OPTIONAL SINCE `watched-strip-v2`, AND THE `?` IS THE CONTRACT
+   *  RATHER THAN A SHRUG. It is a STANDING sentence — a fact about the
+   *  emitter, true of every match at once — so the watched-strip route
+   *  hoists it onto the envelope under `standing_blocks` and stops
+   *  sending it per match (backend #129). It still rides here on the
+   *  payloads that never hoisted it, and it still rides here under v2
+   *  whenever the emitter sends something that is NOT the standing
+   *  constant, because the hoist drops a key only while the value is
+   *  still exactly the declared one. Present-or-absent by which payload
+   *  this is — which is what `?` says — and
+   *  `standingAt(data, "coverage", "no_history_is_not_quiet")` is how a
+   *  reader reaches the words when they are not here. A type that
+   *  declares a key the wire no longer sends is the stale contract this
+   *  file has been bitten by before. */
+  no_history_is_not_quiet?: string;
+  /** watchlist.COVERAGE_IS_ANCHORED — standing, and hoisted with the
+   *  sentence above from `watched-strip-v2`. */
+  coverage_is_anchored?: string;
   history?: string;
   joined_phase?: string;
   joined_phase_meaning?: string;
@@ -694,8 +713,23 @@ export interface LiveReadPayload {
   fixture_id: number;
   monitored: boolean;
   coverage: WatchedCoverage;
-  components_registry: Record<string, { kind: string; unit: string; meaning: string }>;
-  kinds: Record<string, string>;
+  /** live_read.COMPONENTS / live_read.KINDS — the emitter's own
+   *  registries, and OPTIONAL SINCE `watched-strip-v2` for the same
+   *  reason `no_history_is_not_quiet` above is: they are facts about
+   *  the emitter rather than about a fixture, so the watched-strip
+   *  route hoists them to `standing_blocks.blocks.read` and stops
+   *  sending a copy per match (backend #129). `/api/live/card` and
+   *  every other consumer of `live_read.read_for_fixture` is untouched
+   *  and still carries them here.
+   *
+   *  A READER THAT NEEDS THEM MUST GO THROUGH `standingAt`, never
+   *  through a `?? {}` — an empty registry is a claim that the emitter
+   *  registers no component, and the whole point of these two keys is
+   *  that every name is counted and said. */
+  components_registry?: Record<string, { kind: string; unit: string; meaning: string }>;
+  kinds?: Record<string, string>;
+  /** live_read.REGISTERED_HOLES — standing, hoisted with the two above */
+  registered_holes?: Record<string, unknown>;
   sides: Record<string, LiveReadSide>;
   /** present INSTEAD of sides when nothing has been persisted: "not a
    *  match in which nothing has happened" */
@@ -1215,9 +1249,35 @@ export interface MatchStatesRead {
  *  refused — a caller draws nothing for the first and a named absence
  *  for the second. Nothing here computes a share, a cut or a word:
  *  every one of them is card.live_states'. */
-export function readMatchStates(raw: unknown): MatchStatesRead | null {
+export function readMatchStates(raw: unknown,
+                                standing?: unknown): MatchStatesRead | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as MatchStates;
+  // THE CUT CONVENTIONS, AND THE KEY THAT CARRIES THEM MOVED.
+  //
+  // `states.conventions` is card.STATE_CUTS_ARE_CONVENTIONS — a
+  // DECLARED convention rather than a fitted threshold — and it is
+  // hoisted to the envelope from `watched-strip-v2` (backend #129). A
+  // reader that only knows the block-level key draws an empty tooltip
+  // on every card the day that lands: the sentence saying the cut was
+  // chosen and not measured would silently stop travelling with the
+  // word it qualifies, which is a caveat lost off a number.
+  //
+  // THREE SOURCES, IN THE ORDER THAT CANNOT LIE:
+  //   1. the block's own key — v1, and v2 whenever the emitter sends
+  //      something other than the standing constant;
+  //   2. the SIDE's copy. card.live_states puts the same sentence on
+  //      `home`/`away` beside the word it is about, and it did NOT move
+  //      — it is not in the route's hoist declaration. It is also the
+  //      copy that sits closest to the claim;
+  //   3. the envelope, via `standingAt` — passed in by a caller that
+  //      holds the payload, because this reader is given one block and
+  //      may not go looking for the rest of the response.
+  // Nothing is typed here as a fallback: all three are the payload's.
+  const conventions = o.conventions
+    ?? o.home?.conventions ?? o.away?.conventions
+    ?? (typeof standing === "string" && standing !== ""
+      ? standing : undefined);
   const side = (s: MatchSideState | undefined): MatchStateWord | null =>
     (s && typeof s.state === "string" && s.state.trim() !== ""
       ? { word: s.state,
@@ -1229,7 +1289,7 @@ export function readMatchStates(raw: unknown): MatchStatesRead | null {
   // same cut read from two ends — so one word beside an empty slot
   // would be a claim the payload never makes.
   if (home && away) {
-    return { home, away, conventions: o.conventions, broke: "", refused: "" };
+    return { home, away, conventions, broke: "", refused: "" };
   }
   // A READ THAT FAILED IS NOT A ROW WITHOUT POSSESSION. `unavailable`
   // is card._layer's fault isolation — the emitter itself broke — and
@@ -1493,6 +1553,107 @@ export function readSilence(
   };
 }
 
+// --- THE STANDING PROSE, RIDING ONCE ---------------------------------
+//
+// `watched-strip-v2` (backend #129). Sentences that were byte-identical
+// on every match — 18,989 of the 21,511 bytes a `read` block cost, on a
+// 27-match poll — are facts about the EMITTER rather than about any
+// fixture, and were re-sent once per declared match. They ride once on
+// the envelope now, exactly as `refusal_codes` and `policy_codes`
+// already did.
+//
+// WHAT DID NOT MOVE IS WHAT MATTERS HERE. Every refusal, every `basis`,
+// every coded sentence and every registered hole that FIRES still rides
+// on its own match, at the site where the claim is made, in the
+// registry's own words. What moved is the standing rule a reader
+// consults AFTER meeting the claim.
+//
+// SO A HOISTED KEY MUST STILL BE REACHABLE FROM THE SITE THAT NEEDS IT,
+// and `where` is how: it maps the path a key rode under v1
+// (`matches[].read.registered_holes`) to the path it rides now
+// (`standing_blocks.blocks.read.registered_holes`). `standingAt` below
+// follows that map and nothing else — this file hand-lists no path, so
+// a key the backend hoists tomorrow is reachable here without an edit,
+// and a map that points at nothing resolves to `undefined` rather than
+// to a sentence this surface made up.
+
+export interface WatchedStandingBlocks {
+  /** why the move happened, in the route's own words */
+  moved?: string;
+  /** declared, never deduced — the route's own words */
+  declared_not_deduced?: string;
+  /** the contract these keys rode on per match */
+  moved_from?: string;
+  /** the contract they ride once on */
+  moved_in?: string;
+  /** `matches[].<block>.<key>` -> `standing_blocks.blocks.<block>.<key>` */
+  where?: Record<string, string>;
+  /** the words themselves, keyed by the per-match block they rode on */
+  blocks?: Record<string, Record<string, unknown>>;
+}
+
+/** The prefix `where` writes a per-match path under. The backend builds
+ *  the key as `f"matches[].{block}.{key}"`; this is the same string and
+ *  it is written once. */
+export const STANDING_WHERE_PREFIX = "matches[].";
+
+/** The envelope's `standing_blocks`, or null when this payload carries
+ *  none — which is every `watched-strip-v1` payload, and is NOT a
+ *  finding. */
+export function standingBlocks(data: unknown): WatchedStandingBlocks | null {
+  if (!data || typeof data !== "object") return null;
+  const sb = (data as Record<string, unknown>).standing_blocks;
+  return sb && typeof sb === "object" && !Array.isArray(sb)
+    ? (sb as WatchedStandingBlocks) : null;
+}
+
+/** The words a per-match block used to carry, reached THE WAY A READER
+ *  IS POINTED AT THEM — by following `standing_blocks.where`, the map
+ *  the payload publishes about itself, rather than by a path typed into
+ *  this file.
+ *
+ *  Returns `undefined` when this payload publishes no map (v1), when
+ *  the map does not name this key, or when the path it names does not
+ *  resolve. A hole is left as a hole: the caller then draws the named
+ *  absence it would have drawn anyway, and never a borrowed sentence. */
+export function standingAt(data: unknown, block: string,
+                           key: string): unknown {
+  const sb = standingBlocks(data);
+  const path = sb?.where?.[`${STANDING_WHERE_PREFIX}${block}.${key}`];
+  if (typeof path !== "string" || path === "") return undefined;
+  let node: unknown = data;
+  for (const part of path.split(".")) {
+    if (!node || typeof node !== "object" || Array.isArray(node)) {
+      return undefined;
+    }
+    node = (node as Record<string, unknown>)[part];
+  }
+  return node;
+}
+
+/** THE MATCH FIRST, THE ENVELOPE SECOND, AND THE ORDER IS THE RULE.
+ *
+ *  The backend drops a key from a match only while the emitter is still
+ *  sending exactly the declared constant under it; a block that carries
+ *  something ELSE keeps it, on the match, where a reader meets it. So a
+ *  value found on the match is always the one to use, and the envelope
+ *  is consulted only where the match is silent. Reading the envelope
+ *  first would let one fixture's own wording be replaced by the
+ *  standing copy — the exact failure the backend's
+ *  `declared_not_deduced` rule exists to prevent — and it would be
+ *  invisible.
+ *
+ *  This is also why it works unchanged against v1: there the match
+ *  carries the key, so the envelope is never reached. */
+export function matchOrStanding(data: unknown, block: unknown,
+                                blockName: string, key: string): unknown {
+  if (block && typeof block === "object" && !Array.isArray(block)) {
+    const own = (block as Record<string, unknown>)[key];
+    if (own !== undefined) return own;
+  }
+  return standingAt(data, blockName, key);
+}
+
 export interface WatchedStripResponse {
   version: string;
   generated_at: string;
@@ -1527,6 +1688,11 @@ export interface WatchedStripResponse {
   refusal_codes: Record<string, string>;
   policy_codes?: Record<string, string>;
   standing?: Record<string, string>;
+  /** THE STANDING PROSE, RIDING ONCE — `watched-strip-v2` (backend
+   *  #129). Absent on v1, which is why it is optional here and why
+   *  every reader goes through `standingAt` rather than through the
+   *  key. See `WatchedStandingBlocks`. */
+  standing_blocks?: WatchedStandingBlocks;
   /** SON'S INVARIANT, THE HALF THE PICKER CANNOT SERVE: every fixture
    *  the STATE TAPE shows under way that nobody declared. The watch
    *  toggle lives on the picker board and

@@ -1,4 +1,17 @@
 import { expect, test } from "@playwright/test";
+// THE STRIP IS SERVED AS `watched-strip-v2` (backend #129). The
+// fixtures below stay the shape RECORDED off this route and `toV2`
+// applies the route's OWN hoist to them at the serve site, so the
+// v2 payload under test is a transformation of a real one rather
+// than a v2 shape typed into this file. See e2e/standing.ts.
+import { toV2 } from "./standing";
+
+/** The recorded v1 fixture, as the route emits it under v2. A
+ *  non-object body (a 404 detail, a string) is served untouched. */
+const asV2 = (b: unknown): unknown =>
+  b != null && typeof b === "object" && !Array.isArray(b)
+    ? toV2(b as object) : b;
+
 
 // THE AGE OF THE TAPE IS ALSO THE PRESS THAT TAKES A NEW ONE.
 //
@@ -230,7 +243,7 @@ async function serve(page: Page, opts: {
   await page.route("**/api/bet-suggester/watched-strip**", (r) => {
     hits.strip += 1;
     const body = strips[Math.min(hits.phase, strips.length - 1)];
-    return r.fulfill(json(body, opts.stripStatus ?? 200));
+    return r.fulfill(json(asV2(body), opts.stripStatus ?? 200));
   });
   return hits;
 }

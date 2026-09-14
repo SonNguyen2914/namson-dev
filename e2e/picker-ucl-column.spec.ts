@@ -1,4 +1,17 @@
 import { expect, test } from "@playwright/test";
+// THE STRIP IS SERVED AS `watched-strip-v2` (backend #129). The
+// fixtures below stay the shape RECORDED off this route and `toV2`
+// applies the route's OWN hoist to them at the serve site, so the
+// v2 payload under test is a transformation of a real one rather
+// than a v2 shape typed into this file. See e2e/standing.ts.
+import { toV2 } from "./standing";
+
+/** The recorded v1 fixture, as the route emits it under v2. A
+ *  non-object body (a 404 detail, a string) is served untouched. */
+const asV2 = (b: unknown): unknown =>
+  b != null && typeof b === "object" && !Array.isArray(b)
+    ? toV2(b as object) : b;
+
 
 // THE CHAMPIONS LEAGUE COLUMN — the operator decision of 2026-09-08,
 // recorded in backend docs/DECISION-ucl-board-sort-2026-09-08.md, drawn.
@@ -1582,7 +1595,7 @@ async function openBoard(page: import("@playwright/test").Page,
   await page.route("**/api/picker/review**", (r) =>
     r.fulfill(json(EMPTY_REVIEW)));
   await page.route("**/api/bet-suggester/watched-strip**", (r) =>
-    r.fulfill(json(strip)));
+    r.fulfill(json(asV2(strip))));
   await page.goto(route);
   await page.getByTestId("live-section").waitFor({ timeout: 15_000 });
 }

@@ -127,7 +127,7 @@ import {
   LiveReadSide, OutcomeBranch, PartialExit, PartialExitFraction,
   PartialExitRealises, WatchedMatch, WatchedPosition, WatchedStripResponse,
   WatchedStripRefusal, componentRefusals, money, readMatchClock,
-  readSilence, sideSilence,
+  readSilence, sideSilence, standingBlocks,
 } from "../lib/suggesterApi";
 import { WatchedStripRead, useWatchedStrip } from "../lib/watchedStripFeed";
 import { liveCompLabel } from "../lib/pickerApi";
@@ -141,13 +141,32 @@ import { Eyebrow } from "./ui";
  *  `data.version` USED TO BE READ NOWHERE AT ALL. It was filed under
  *  BOOKKEEPING_ENVELOPE_KEYS — "an identifier that carries no finding
  *  about any match" — and that was true of the value and false of the
- *  mismatch: a `watched-strip-v2` payload rendered as v1, silently, and
- *  every key this file reads by name would have been read against a
- *  contract the payload no longer claimed to speak. What a surface
- *  should do when the contract changes under it is written out beside
- *  the notice that does it (`ContractNotice`), because a decision like
- *  that belongs in words rather than in the absence of a check. */
-export const WATCHED_STRIP_CONTRACT = "watched-strip-v1";
+ *  mismatch: a payload announcing another contract rendered as this
+ *  one, silently, and every key this file reads by name would have been
+ *  read against a contract the payload no longer claimed to speak. What
+ *  a surface should do when the contract changes under it is written
+ *  out beside the notice that does it (`ContractNotice`), because a
+ *  decision like that belongs in words rather than in the absence of a
+ *  check.
+ *
+ *  AND ON 2026-09-14 THE CONTRACT ACTUALLY MOVED, WHICH IS WHY THE
+ *  NOTICE WAS WRITTEN. Backend #129 hoists the STANDING prose — the
+ *  sentences measured byte-identical on all 27 matches of a production
+ *  poll — off every match and onto the envelope under `standing_blocks`.
+ *  That is a SUBTRACTION from what a match block promises, and the
+ *  notice below says a version "is usually bumped for something
+ *  ADDITIVE". This is the other case, and leaving the string at v1
+ *  would let a match key that is simply gone draw an empty tooltip with
+ *  nothing said about why.
+ *
+ *  BOTH SHAPES ARE LIVE AND BOTH ARE HANDLED. Production serves v1
+ *  until #129 deploys, and the two repositories deploy independently,
+ *  so this file spends a window against a v1 backend. Every key that
+ *  moved is read MATCH-FIRST, ENVELOPE-SECOND (`matchOrStanding` /
+ *  `standingAt` in lib/suggesterApi) — one code path over both shapes,
+ *  with the match's own copy always winning — and the mismatch itself
+ *  is drawn as a NAMED fact rather than as a blank or a crash. */
+export const WATCHED_STRIP_CONTRACT = "watched-strip-v2";
 
 /** League hue for WAYFINDING ONLY — a dot beside the slug, never a
  *  quantity. Keyed off the competition slug's league prefix; an
@@ -346,6 +365,29 @@ const NOTE_SKIP_KEYS = new Set([
   "registered", "refusal_codes", "policy_codes", "standing",
 ]);
 
+/** THE SENTENCES THAT MOVED OFF THE MATCH, AND WHY THIS WALK FOLLOWS
+ *  THEM.
+ *
+ *  `proseNotes` walks the MATCH, and from `watched-strip-v2` (backend
+ *  #129) the standing sentences are no longer on it: the charters, the
+ *  component registry, the block-level rules and the registered holes
+ *  ride once on the envelope under `standing_blocks`. Walking the match
+ *  alone would quietly empty this disclosure of every definition in it
+ *  — the "method · definitions" half of what it promises — and nothing
+ *  would say so. So the walk continues into the envelope's blocks.
+ *
+ *  ONE `seen` SET ACROSS BOTH, WHICH IS WHAT MAKES IT ONE CODE PATH FOR
+ *  BOTH SHAPES. Under v1 every one of these sentences is already on the
+ *  match, so the second walk adds nothing at all and the disclosure is
+ *  byte-identical to what it drew before. Under v2 the same sentences
+ *  arrive from the envelope instead. Nothing here re-words anything:
+ *  every note is a string the payload sent.
+ *
+ *  THE ORDER IS MATCH FIRST, DELIBERATELY. A sentence that is on the
+ *  match is a fact about THIS fixture and reads first; the standing
+ *  definitions follow it, which is also the order they were read in
+ *  when they rode per match, since the emitter put its registries after
+ *  the findings. */
 function proseNotes(node: unknown, skip: Set<string>,
                     out: string[] = [], seen = new Set<string>()): string[] {
   if (Array.isArray(node)) {
@@ -798,6 +840,12 @@ function Strip({ read }: { read: WatchedStripRead }) {
   // competition" apart from "the tape read FAILED" on a match with no
   // row — the one distinction the collapse below must not lose.
   const stateTaped = stateTapedCompetitions(data);
+  // THE SENTENCES THAT USED TO RIDE ON EVERY MATCH (backend #129).
+  // `undefined` on a v1 payload, where they are still on the matches
+  // themselves — which is not a hole and draws no notice of its own:
+  // the version mismatch above already names the shape, once, and this
+  // read simply finds the words where that shape puts them.
+  const standing = standingBlocks(data)?.blocks;
 
   return (
     <section data-testid="watched-strip" aria-labelledby="watched-strip-h"
@@ -1020,7 +1068,7 @@ function Strip({ read }: { read: WatchedStripRead }) {
             </p>
             {live.map((m) => (
               <MatchBlock key={m.fixture_id} m={m} registry={registry}
-                policyCodes={data.policy_codes ?? {}}
+                policyCodes={data.policy_codes ?? {}} standing={standing}
                 inPlayStates={inPlayStates} stateTaped={stateTaped} />
             ))}
           </section>
@@ -1030,7 +1078,7 @@ function Strip({ read }: { read: WatchedStripRead }) {
             <CollapsedGroup ms={rest} startOpen={live.length === 0}>
               {rest.map((m) => (
                 <MatchBlock key={m.fixture_id} m={m} registry={registry}
-                  policyCodes={data.policy_codes ?? {}}
+                  policyCodes={data.policy_codes ?? {}} standing={standing}
                   inPlayStates={inPlayStates} stateTaped={stateTaped} />
               ))}
             </CollapsedGroup>
@@ -1371,10 +1419,15 @@ function GateNotice({ r }: { r: WatchedStripRefusal }) {
 // card however silent the tape is — those are figures, and a figure is
 // never collapsed into a line about the tape.
 
-function MatchBlock({ m, registry, policyCodes, inPlayStates, stateTaped }: {
+function MatchBlock({ m, registry, policyCodes, inPlayStates, stateTaped,
+                     standing }: {
   m: WatchedMatch;
   registry: Record<string, string>;
   policyCodes: Record<string, string>;
+  /** `standing_blocks.blocks` off the envelope, or undefined on a
+   *  payload that carries none (v1). The sentences it holds used to
+   *  ride on `m`; the card's one disclosure walks both. */
+  standing?: unknown;
   /** the payload's own in-play tape states, or null when it published
    *  none — null means no claim, never a fallback guess */
   inPlayStates: string[] | null;
@@ -1485,9 +1538,10 @@ function MatchBlock({ m, registry, policyCodes, inPlayStates, stateTaped }: {
             grey note if they were long enough, and out of the DOM
             entirely if they were not. */}
         <CardNotes m={m} registry={registry} refusals={allRefusals}
+          standing={standing}
           summary="what this line does not say · method · every refusal"
           shown={[readAbsentWords(m, registry), m.positions_note,
-                  possessionCaveat(m), ...faceReadProse(m, registry),
+                  possessionCaveat(m), ...faceReadProse(m, registry, standing),
                   ...faceProse(m)]}
           lead={<LineReads m={m} registry={registry} />} />
         <UncodedAbsences m={m} registry={registry} />
@@ -1594,7 +1648,7 @@ function MatchBlock({ m, registry, policyCodes, inPlayStates, stateTaped }: {
       </p>
 
       {/* 1 — THE STATE: the live read's components */}
-      <ReadBlock m={m} registry={registry} />
+      <ReadBlock m={m} registry={registry} standing={standing} />
 
       {/* 2..5 — per held position */}
       {/* NO POSITION, OR NO ANSWER — AND THEY ARE NOT THE SAME FACT.
@@ -1645,9 +1699,9 @@ function MatchBlock({ m, registry, policyCodes, inPlayStates, stateTaped }: {
           in full — real text in the accessible tree, and not a word of
           it above the match. */}
       <CardNotes m={m} registry={registry} refusals={allRefusals}
-        policyCodes={policyCodes}
+        policyCodes={policyCodes} standing={standing}
         shown={[readAbsentWords(m, registry), m.positions_note,
-                possessionCaveat(m), ...faceReadProse(m, registry),
+                possessionCaveat(m), ...faceReadProse(m, registry, standing),
                 ...faceProse(m)]} />
       <UncodedAbsences m={m} registry={registry} />
     </article>
@@ -1719,11 +1773,15 @@ function RefusalChips({ refusals, testid }: {
  *  unfinished business, with its `closes_when`, is bookkeeping for a
  *  guard and not something to hand an operator mid-match. */
 function CardNotes({ m, registry, refusals, policyCodes, summary,
-                     shown = [], lead }: {
+                     standing, shown = [], lead }: {
   m: WatchedMatch;
   registry: Record<string, string>;
   refusals: Refusal[];
   policyCodes?: Record<string, string>;
+  /** `standing_blocks.blocks` — the standing sentences this payload
+   *  hoisted off every match (backend #129). Absent on v1, where they
+   *  are already on `m`. See `proseNotes`. */
+  standing?: unknown;
   summary?: string;
   /** sentences this card already draws on its face. Excluded from the
    *  notes so that NOTHING on a card is rendered twice — which is the
@@ -1741,7 +1799,12 @@ function CardNotes({ m, registry, refusals, policyCodes, summary,
     ...refusals.map((r) => r.says).filter(Boolean),
     ...shown.filter((x): x is string => typeof x === "string" && x !== ""),
   ]);
+  // THE MATCH, THEN WHAT MOVED OFF IT. One `out`, one `seen` — see the
+  // block above `proseNotes`. On a v1 payload the second walk finds
+  // nothing new because everything it carries is already on the match.
   const notes = proseNotes(m, said);
+  if (standing !== undefined) proseNotes(standing, said, notes,
+                                         new Set(notes));
   const policy = m.coverage?.policy_code;
   if (groups.length === 0 && notes.length === 0 && lead == null) return null;
   return (
@@ -1902,7 +1965,8 @@ const readAbsent = (m: WatchedMatch, registry: Record<string, string>) =>
  *  needs no edit here — and the read's own sides are excluded from the
  *  walk by identity, because a component note that also appears in the
  *  basis it was deduped into is ONE fact, not two. */
-function saidOutsideTheRead(m: WatchedMatch): Set<string> {
+function saidOutsideTheRead(m: WatchedMatch,
+                            standing?: unknown): Set<string> {
   const out = new Set<string>();
   const sides = m.read?.sides;
   const walk = (node: unknown) => {
@@ -1917,6 +1981,25 @@ function saidOutsideTheRead(m: WatchedMatch): Set<string> {
     }
   };
   walk(m as unknown as Record<string, unknown>);
+  // AND WHAT MOVED OFF THE MATCH IS STILL SAID ELSEWHERE ON THE
+  // PAYLOAD — measured, not assumed, and it is the one place the
+  // `watched-strip-v2` hoist changed what this surface DRAWS.
+  //
+  // `elsewhere` is what lets the read's basis line leave a segment to
+  // the block it belongs to. Under v1 the coverage block carried
+  // `no_history_is_not_quiet` on the match, so a basis ending in that
+  // sentence dropped the segment and the coverage block said it once.
+  // Backend #129 hoists that sentence onto the envelope — and with the
+  // walk stopping at the match, `elsewhere` lost it, the basis stopped
+  // deferring, and the read's reason on the FACE started restating a
+  // sentence that belongs to the coverage block. The sentence also
+  // dropped out of the card's disclosure with it, because the face's
+  // copy is excluded from the notes by exact text.
+  //
+  // So the walk follows the sentences to where they ride now. It is
+  // the same set on both shapes: under v1 the standing blocks are
+  // absent and every one of these strings is already on the match.
+  if (standing !== undefined) walk(standing);
   return out;
 }
 
@@ -1942,9 +2025,10 @@ function readReasonFor(side: LiveReadSide | null | undefined,
  *  reason and each of its segments, so the card's one disclosure
  *  excludes them by exact text rather than by substring. */
 function faceReadProse(m: WatchedMatch,
-                       registry: Record<string, string>): string[] {
+                       registry: Record<string, string>,
+                       standing?: unknown): string[] {
   const out: string[] = [];
-  const elsewhere = saidOutsideTheRead(m);
+  const elsewhere = saidOutsideTheRead(m, standing);
   for (const side of Object.values(m.read?.sides ?? {})) {
     if (!hasNullComponent(side)) continue;
     const why = readReasonFor(side, registry, elsewhere);
@@ -2027,8 +2111,10 @@ function possessionCaveat(m: WatchedMatch): string | null {
   return null;
 }
 
-function ReadBlock({ m, registry }: {
+function ReadBlock({ m, registry, standing }: {
   m: WatchedMatch; registry: Record<string, string>;
+  /** `standing_blocks.blocks` — see `saidOutsideTheRead` */
+  standing?: unknown;
 }) {
   const sides = m.read?.sides ?? {};
   const names = Object.keys(sides);
@@ -2051,7 +2137,7 @@ function ReadBlock({ m, registry }: {
   const caveat = possessionCaveat(m);
   // WALKED ONCE PER CARD, not once per side: it is a fact about the
   // match payload and both sides ask it the same question.
-  const elsewhere = saidOutsideTheRead(m);
+  const elsewhere = saidOutsideTheRead(m, standing);
   return (
     <>
       <div data-testid="watched-read" className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -3740,11 +3826,20 @@ function UncodedAbsences({ m, registry }: {
 // makes a record retire when the block that replaces it ships, instead
 // of standing as prose after it stops being true.
 
-/** Envelope keys this surface actually reads and draws. */
+/** Envelope keys this surface actually reads and draws.
+ *
+ *  `standing_blocks` IS CONSUMED AND NOT REGISTERED, 2026-09-14. It is
+ *  the standing prose that used to ride on every match (backend #129),
+ *  and this surface draws exactly as much of it as it drew when the
+ *  sentences arrived per match: the method-notes disclosure walks it
+ *  beside the match, and `states.conventions` is resolved through its
+ *  `where` map. Filing a key this surface READS under a registered hole
+ *  would be the prose outliving the hole, one direction over. */
 export const CONSUMED_ENVELOPE_KEYS: readonly string[] = [
   "generated_at", "dormant", "detail", "version", "matches",
   "monitored_by_source", "open_positions_not_monitored",
   "monitored_not_described", "refusal_codes", "policy_codes",
+  "standing_blocks",
 ];
 
 /** Envelope keys that identify the payload rather than describe a

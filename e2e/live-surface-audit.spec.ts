@@ -1,4 +1,10 @@
 import { expect, test } from "@playwright/test";
+// THE STRIP IS SERVED AS `watched-strip-v2` (backend #129). The
+// fixtures below stay the shape RECORDED off this route and `toV2`
+// applies the route's OWN hoist to them at the serve site, so the
+// v2 payload under test is a transformation of a real one rather
+// than a v2 shape typed into this file. See e2e/standing.ts.
+import { toV2 } from "./standing";
 
 // THE LIVE SURFACE — the things it was found saying on 2026-09-09, and
 // the shape of each so a repeat cannot pass.
@@ -101,7 +107,7 @@ async function open(page: Page, matches: unknown[]) {
   await page.route("**/api/picker/board**", (r) => r.fulfill(json(BOARD)));
   await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW)));
   await page.route("**/api/bet-suggester/watched-strip**",
-    (r) => r.fulfill(json({ ...ENVELOPE, matches })));
+    (r) => r.fulfill(json(toV2({ ...ENVELOPE, matches }))));
   await page.goto("/bet-suggester");
   await page.getByTestId("live-section").waitFor({ timeout: 15_000 });
 }
