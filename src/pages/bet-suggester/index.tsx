@@ -71,6 +71,7 @@ import {
   isDefaultSort, loadBoardSort, modeById, nullNoteFor, orderPhrase,
   saveBoardSort,
 } from "../../lib/pickerSort";
+import { failureSentence, readFailure } from "../../lib/providerFailure";
 import { Eyebrow } from "../../components/ui";
 import { ArchiveMenu } from "../../components/ArchiveMenu";
 import { CompRail } from "../../components/CompRail";
@@ -275,6 +276,11 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   const finished = review?.finished ?? [];
   const finishedRefusals = review?.refusals ?? [];
   const reviewLeagues = review?.leagues ?? {};
+  /* THE WHOLE-BOARD FAILURE, SCREENED. `restructure.spec.ts` already
+     keeps the browser's raw vocabulary off this box ("a dead network
+     renders a sentence, not the browser's raw string"); the backend's
+     `detail` was the half of the same rule nobody was holding. */
+  const boardFailure = readFailure(error);
   // "Nothing was captured" and "capture was never possible here" are
   // different facts, and only the payload can tell them apart. When the
   // store reports it cannot write, EVERY read in every tail below is a
@@ -889,7 +895,15 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             <div data-testid="board-error"
               className="rounded-xl border border-live/30 bg-live/5 p-5">
               <Eyebrow tone="live">the board could not be built</Eyebrow>
-              <p className="mt-2 font-mono text-[12px] text-live">{error}</p>
+              {/* THE BACKEND'S SENTENCE WHEN IT SENT ONE, and this
+                  module's own when what it sent was machine text. The
+                  board's `detail` is carried forward exactly as before
+                  — "picker board unavailable" still reads as it did —
+                  but a `detail` that is a provider exception no longer
+                  publishes a URL on the page. */}
+              <p className="mt-2 font-mono text-[12px] text-live">
+                {boardFailure ? failureSentence(boardFailure) : error}
+              </p>
               <p className="mt-3 text-sm text-ink-low">
                 Nothing is being shown from an earlier request — a stale board
                 dressed as a current one is worse than none.

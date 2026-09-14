@@ -28,6 +28,7 @@
 
 import { useState } from "react";
 import { AXIS_ORDER, Axis, Ratings } from "../lib/fieldApi";
+import { failureSentence, readFailure } from "../lib/providerFailure";
 
 /* THE SHAPE OF A FIELD IS NOT THIS COMPONENT'S PROPERTY. It moved to
    lib/fieldApi.ts on 2026-09-09, when a board card began reading the
@@ -299,7 +300,14 @@ export default function FieldAxes(
   // succeeded and no field has been measured; the request has not
   // answered yet. Only the last renders nothing, because "not yet" is
   // the one state a blank space actually describes.
-  if (error) {
+  /* AND IT IS NAMED IN WORDS, NEVER IN THE PROVIDER'S OWN REPR. This
+     drew `error` verbatim; the string reaching it is whatever
+     `fetchRatings` carried forward, which is the backend's own sentence
+     when there was one and a Python exception — URL, query and all —
+     when there was not. The failure is still named and the status is
+     still said. See src/lib/providerFailure.ts. */
+  const failure = readFailure(error);
+  if (failure) {
     return (
       <section data-testid="field-axes-error"
         className="mt-8 rounded-2xl border border-live/30 bg-live/5 p-5">
@@ -307,7 +315,7 @@ export default function FieldAxes(
           the field could not be read
         </p>
         <p className="mt-2 max-w-2xl font-mono text-[12px] leading-relaxed text-live">
-          {error}
+          {failureSentence(failure)}
         </p>
         <p className="mt-2.5 max-w-2xl text-[13px] leading-relaxed text-ink-low">
           This says the request failed, not that this competition has no

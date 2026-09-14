@@ -65,57 +65,184 @@ const FLOOR_NOTE =
   + "than one band of the field, so the evidence does not place it in a "
   + "tier.";
 
-/** One club on one axis. `tier_set` is the read and `tier` is only its
- *  first member — carried because the payload carries it, and never the
- *  thing a surface prints on its own. */
+/** THE BACKEND'S OWN PARAGRAPH when an axis is cut finer than the
+ *  measurement licenses. `FieldAxes` prints it verbatim beside the two
+ *  figures, so the fixture carries the real one. */
+const ABOVE_LICENCE_NOTE =
+  "DECLARED ABOVE WHAT THE MEASUREMENT LICENSES, AND THAT IS A DECISION "
+  + "RATHER THAN A BUG. The band count on this axis is the operator's "
+  + "declaration — he asked for this many bands with the measurement in "
+  + "front of him — and it is finer than the distinguishable levels "
+  + "beside it support. What that buys is a wider spread of point tiers "
+  + "across the field. What it costs is that most clubs' 95% intervals "
+  + "reach into more than one band, so `tier_set` is the reading and "
+  + "`tier` is only where the estimate falls. NOTHING HERE CLAIMS THE "
+  + "EVIDENCE SEPARATES THIS MANY LEVELS: `bands_licensed` is what it "
+  + "separates, `bands_declared` is how finely the operator asked for it "
+  + "to be drawn, and the two are published side by side precisely so "
+  + "neither can be read as the other.";
+
+/** One club on one axis.
+ *
+ *  `tier` IS A PARAMETER, NOT `set[0]` (corrected 2026-09-14). This
+ *  helper computed `tier: set[0]`, and on the live field it is nothing
+ *  of the kind: `tier` is the band the POINT ESTIMATE falls in and
+ *  `tier_set` is every band the 95% interval touches, so on the real
+ *  Champions League payload they differ on 31 of 36 attack rows and 32
+ *  of 36 defence rows. The trio test above says in its own words that
+ *  the card must draw "not the set's first member either" — and with
+ *  every fixture row making those two the same number, that assertion
+ *  could not tell them apart. A fixture that speaks the code's
+ *  vocabulary instead of the feed's is the shape that certified a venue
+ *  bug through twelve green tests. */
 const axisRow = (rank: number, club: string, league: string, value: number,
-                 hw: number, set: number[], below = false,
+                 hw: number, set: number[], tier: number, below = false,
                  rate: number | null = null) => ({
   rank, club, league, value, half_width_95: hw,
-  interval: [value - hw, value + hw], tier: set[0], tier_set: set,
+  interval: [value - hw, value + hw], tier, tier_set: set,
   straddles: set.length > 1, below_floor: below, rate,
   floor_note: below ? FLOOR_NOTE : null,
 });
 
+/* ── THE THREE AXES, AGAINST THE WIRE (corrected 2026-09-14) ─────────
+ *
+ * WHAT WAS WRONG. Attack and defence carried `bands: 3` with two cuts —
+ * the geometry from before the operator declared FIVE bands on all
+ * three axes (2026-09-10). `GET /api/comp/ucl/ratings` answers
+ * `bands: 5` on every axis today, and `e2e/field-axes.spec.ts` was
+ * recut for it on the day; this file was missed. Nothing asserted the
+ * number, so it was harmless — and a fixture that disagrees with the
+ * wire while nobody reads it is exactly the thing that produced five
+ * separate bugs on 2026-09-11.
+ *
+ * WHAT ELSE DID NOT MATCH, found while correcting it. Read off the live
+ * payload, not guessed:
+ *
+ *   CUTS RUN BEST-FIRST. The wire lists them descending — ovr
+ *   [1845.99, 1727.54, 1609.10, 1490.65]. This file had them ascending.
+ *   They are also EQUAL-WIDTH over the span, so a cut list and a band
+ *   count that disagree is not a payload the backend can emit: five
+ *   bands is four cuts, and each one sits a fifth of the span apart.
+ *
+ *   THE SPAN IS THE FIELD'S OWN RANGE — [lowest club's value, highest
+ *   club's value] — not a pair of round numbers outside it. An interval
+ *   may reach past either end; a VALUE may not.
+ *
+ *   DEFENCE READS THE SAME WAY ROUND AS THE OTHER TWO. On the wire
+ *   rank 1 on `def` has the HIGHEST value (Arsenal, 1.149) and the
+ *   LOWEST concede rate (0.338): `value` is defensive strength, `rate`
+ *   is goals against. This file had `value` ascending with rank, so
+ *   the fixture's best defence was its smallest number — the axis
+ *   inverted against the feed it claims to be.
+ *
+ *   `tier` IS NOT `tier_set[0]`. See `axisRow` above.
+ *
+ *   THE DECLARATION KEYS ARE CARRIED. `bands_declared`,
+ *   `bands_licensed_by_the_measurement`, `declared_above_licence` and
+ *   `band_count_note` are what `FieldAxes.BandCount` reads to tell a
+ *   count that OUTRAN its evidence (atk, def: 5 declared, 3 licensed)
+ *   from one that sits inside it (ovr: 5 declared, 7 licensed). Without
+ *   them this fixture exercised only the pre-recut fallback path.
+ *
+ * STILL ABSENT, AND DELIBERATELY: `five_band_price` (top level) and
+ * each axis's `combined_reading`. Both ride the live payload; no
+ * surface in this repo reads either, so carrying them here would be
+ * ink asserting nothing. */
 const AXES = {
   ovr: {
     axis: "ovr", label: "overall", bands: 5, distinguishable_levels: 6.12,
     unit: "elo",
-    why_this_many_bands: "6.12 distinguishable levels; five bands sit inside it",
-    cuts: [1750, 1850, 1950, 2050], span: [1600, 2150],
+    // DECLARED BELOW ITS LICENCE — five asked for, seven measured. No
+    // flag and no note, and that is the difference this axis exists to
+    // hold against the two below it.
+    bands_declared: 5, bands_licensed_by_the_measurement: 7,
+    band_count_is_declared_not_derived: true,
+    declared_above_licence: false, band_count_note: null,
+    why_this_many_bands:
+      "five bands, declared. The measurement licenses more than five "
+      + "here — 6.12 distinguishable levels — so the cut sits inside "
+      + "what the evidence supports. BAND COUNT: 5 declared, 7 licensed "
+      + "by the measurement (6.12 distinguishable levels — the field's "
+      + "span over the typical club's 95% interval). The declared count "
+      + "is the operator's and sits inside the licence, so a single-band "
+      + "`tier_set` on this axis is a placement the evidence will stand "
+      + "behind.",
+    // span = [lowest value, highest value]; cuts every 76 elo, best first
+    cuts: [2004, 1928, 1852, 1776], span: [1700, 2080],
     rows: [
-      axisRow(1, "Barcelona", "la-liga", 2080, 40, [1]),
-      axisRow(2, "Feyenoord", "eredivisie", 1900, 70, [2, 3]),
+      // [2040, 2120] — clear of the top cut at both ends, the one club
+      // this axis places
+      axisRow(1, "Barcelona", "la-liga", 2080, 40, [1], 1),
+      // [1855, 1945] — band 3 to band 2; the ESTIMATE is in band 3
+      axisRow(2, "Feyenoord", "eredivisie", 1900, 45, [2, 3], 3),
+      // [1540, 1860] — three bands wide, and the estimate is in the
+      // bottom one: `tier` 5 against a set that opens at 3
       axisRow(3, "Kairat Almaty", "azerbaijan-premyer-liqa", 1700, 160,
-              [3, 4, 5], true),
+              [3, 4, 5], 5, true),
     ],
     straddling: 2, placed: 1,
   },
   atk: {
-    axis: "atk", label: "attack", bands: 3, distinguishable_levels: 2.41,
+    axis: "atk", label: "attack", bands: 5, distinguishable_levels: 2.41,
     unit: "log_goals",
-    why_this_many_bands: "2.41 distinguishable levels; five bands would "
-      + "assign every club to a band narrower than its own interval",
-    cuts: [0.35, 0.75], span: [-0.2, 1.1],
+    // DECLARED ABOVE ITS LICENCE — five asked for, three measured, and
+    // the backend's own paragraph rides the flag.
+    bands_declared: 5, bands_licensed_by_the_measurement: 3,
+    band_count_is_declared_not_derived: true,
+    declared_above_licence: true, band_count_note: ABOVE_LICENCE_NOTE,
+    why_this_many_bands:
+      "five bands, declared by the operator on 2026-09-10 after seeing "
+      + "this measurement. It is a finer cut than the evidence licenses "
+      + "and is meant to spread the point tiers out; the interval beside "
+      + "each club is what it costs. BAND COUNT: 5 declared, 3 licensed "
+      + "by the measurement (2.41 distinguishable levels — the field's "
+      + "span over the typical club's 95% interval). The declared count "
+      + "is the operator's and it is 2 above the licence. That is a "
+      + "decision about how finely to draw this axis, taken with the "
+      + "measurement in view, and not a claim that the evidence "
+      + "separates 5 levels — read `tier_set`, which names every band a "
+      + "club's interval touches, and treat `tier` as where the estimate "
+      + "falls.",
+    cuts: [0.676, 0.532, 0.388, 0.244], span: [0.10, 0.82],
     rows: [
-      axisRow(1, "Barcelona", "la-liga", 0.82, 0.11, [2, 3], false, 2.61),
-      axisRow(2, "Feyenoord", "eredivisie", 0.44, 0.14, [2], false, 1.98),
+      axisRow(1, "Barcelona", "la-liga", 0.82, 0.11, [1], 1, false, 2.61),
+      axisRow(2, "Feyenoord", "eredivisie", 0.44, 0.14, [2, 3, 4], 3,
+              false, 1.98),
       axisRow(3, "Kairat Almaty", "azerbaijan-premyer-liqa", 0.10, 0.31,
-              [1, 2], true, 1.21),
+              [3, 4, 5], 5, true, 1.21),
     ],
     straddling: 2, placed: 1,
   },
   def: {
-    axis: "def", label: "defence", bands: 3, distinguishable_levels: 2.33,
+    axis: "def", label: "defence", bands: 5, distinguishable_levels: 2.33,
     unit: "log_goals",
-    why_this_many_bands: "2.33 distinguishable levels; on this axis every "
-      + "one of the clubs straddles a cut, so the set is the read",
-    cuts: [0.30, 0.70], span: [-0.3, 1.0],
+    bands_declared: 5, bands_licensed_by_the_measurement: 3,
+    band_count_is_declared_not_derived: true,
+    declared_above_licence: true, band_count_note: ABOVE_LICENCE_NOTE,
+    why_this_many_bands:
+      "five bands, declared by the operator on 2026-09-10 after seeing "
+      + "this measurement. It is the finest cut of the three against the "
+      + "widest intervals, so on this axis the set is the read and the "
+      + "point tier is only where the estimate falls. BAND COUNT: 5 "
+      + "declared, 3 licensed by the measurement (2.33 distinguishable "
+      + "levels — the field's span over the typical club's 95% "
+      + "interval). The declared count is the operator's and it is 2 "
+      + "above the licence. That is a decision about how finely to draw "
+      + "this axis, taken with the measurement in view, and not a claim "
+      + "that the evidence separates 5 levels — read `tier_set`, which "
+      + "names every band a club's interval touches, and treat `tier` as "
+      + "where the estimate falls.",
+    /* VALUE IS DEFENSIVE STRENGTH, HIGHEST FIRST, and `rate` is goals
+       CONCEDED, lowest first — the wire's polarity, which this axis had
+       backwards. Rank 1 now has the biggest number on the axis and the
+       smallest number beside it, as Arsenal does on the live payload. */
+    cuts: [0.684, 0.558, 0.432, 0.306], span: [0.18, 0.81],
     rows: [
-      axisRow(1, "Barcelona", "la-liga", 0.18, 0.13, [1], false, 0.74),
-      axisRow(2, "Feyenoord", "eredivisie", 0.52, 0.16, [1, 2], false, 1.32),
-      axisRow(3, "Kairat Almaty", "azerbaijan-premyer-liqa", 0.81, 0.29,
-              [2, 3], true, 1.90),
+      axisRow(1, "Barcelona", "la-liga", 0.81, 0.11, [1], 1, false, 0.74),
+      axisRow(2, "Feyenoord", "eredivisie", 0.52, 0.16, [2, 3, 4], 3,
+              false, 1.32),
+      axisRow(3, "Kairat Almaty", "azerbaijan-premyer-liqa", 0.18, 0.29,
+              [3, 4, 5], 5, true, 1.90),
     ],
     straddling: 2, placed: 1,
   },
@@ -123,11 +250,19 @@ const AXES = {
 
 const RATINGS = {
   competition: "ucl", passes: "10", display: "UEFA Champions League",
-  corpus_sha256: "deadbeef", admitted_leagues: ["la-liga", "eredivisie"],
+  // a corpus hash is 64 hex on the wire; "deadbeef" was eight, which is
+  // the shape of a git abbreviation and not of this field
+  corpus_sha256:
+    "00b3d0a3a08668a412d583a5b10e943244e49d20e3364bbd4aca812d7d773acf",
+  admitted_leagues: ["la-liga", "eredivisie"],
   below_floor_clubs: ["Kairat Almaty"],
   below_floor_note: FLOOR_NOTE,
+  // the backend's whole sentence, which `FieldAxes` prints; this had
+  // only its first clause, and the clause it dropped is the REASON
   axes_disagree_note: "The three axes are read from two different "
-    + "measurements and do not agree.",
+    + "measurements and do not agree. Attack and defence come from "
+    + "goals, not from Elo, because Elo is a single number and any "
+    + "decomposition of it would order the clubs identically twice.",
   not_a_trading_signal: true,
   axes: AXES,
 };
