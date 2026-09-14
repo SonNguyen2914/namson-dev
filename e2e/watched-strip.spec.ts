@@ -29,6 +29,14 @@ import {
   DECLARED, PERIOD_STAYS_ON_THE_STRIP, STANDING_RIDES_ONCE,
   WATCHED_STRIP_V1, WATCHED_STRIP_V2, movedBy, toV2,
 } from "./standing";
+// THE DECLARATION AS THE EMITTER PUBLISHES IT — key names recorded off
+// production's own `standing_blocks`, which carries the registry
+// verbatim rather than the subset that moved. It is the one source
+// `DECLARED` can be checked against without being checked against
+// itself.
+import {
+  WIRE, backendSkipReason, readBackendDeclaration, resolveBackend,
+} from "./standing-wire";
 
 /** A payload MINUS one key — the shape a route that stopped sending it
  *  produces. Written as a helper so the served object is the real thing
@@ -5958,6 +5966,105 @@ test("the hoist moves exactly the keys this recorded payload carries — "
             .not.toHaveProperty(key);
         }
       }
+    }
+  });
+
+// ---- and the mirror is COMPLETE, not merely non-empty
+//
+// WHAT THE GUARD ABOVE CANNOT SEE, stated where the next reader meets
+// it. It asserts that the keys this RECORDED PAYLOAD carries all
+// moved, and that is worth having — it is what catches a misspelling.
+// But the recorded payload carries three of the thirty-three declared
+// keys, so thirty of them are outside its question entirely. A key
+// DROPPED from `DECLARED` moves nothing, is on no fixture, and every
+// assertion in this file goes on passing while the sentence rides on
+// all 27 matches forever. That is exactly what had happened:
+// `DECLARED.read` listed sixteen keys where the route declares
+// seventeen, and `a_rate_needs_time` — 3,818 bytes/match, the
+// second-largest of them — had never been in the mirror at all.
+//
+// THE CIRCULARITY IS THE WHOLE DIFFICULTY. Every v2 fixture in this
+// file is produced BY `toV2()` FROM `DECLARED`, so no fixture can
+// testify about `DECLARED`; it would only ever agree with itself, and
+// a key missing from both is missing from the question. Completeness
+// needs a source that was never touched by the mirror. `WIRE` is that
+// source — key names off production's own `standing_blocks`, which
+// api/main.py builds from the registry VERBATIM before it walks a
+// single match, so it is the declaration and not the subset that
+// happened to move. See e2e/standing-wire.ts for the recording and its
+// provenance.
+
+test("the mirror is COMPLETE against the emitter's published "
+   + "declaration — a key MISSING from it is red, not silent", () => {
+    // BOTH DIRECTIONS, over the block NAMES first. A block dropped
+    // from the mirror is the same failure one level up, and a guard
+    // that iterated `DECLARED`'s own blocks could not see it.
+    expect(Object.keys(DECLARED).sort(),
+      "the mirror and the emitter disagree about which BLOCKS exist")
+      .toEqual(Object.keys(WIRE).sort());
+
+    // then key by key, per block, as SETS — order is the route's
+    // literal and means nothing, presence is everything.
+    for (const block of Object.keys(WIRE).sort()) {
+      const mirror = [...(DECLARED[block] ?? [])].sort();
+      const wire = [...WIRE[block]].sort();
+      const missing = wire.filter((k) => !mirror.includes(k));
+      const invented = mirror.filter((k) => !wire.includes(k));
+      expect(mirror,
+        `\`DECLARED.${block}\` does not match the declaration the route `
+        + `publishes.\n  MISSING from the mirror (the route hoists `
+        + `these, the mirror leaves them on every match): `
+        + `${missing.join(", ") || "none"}\n  INVENTED by the mirror `
+        + `(nothing on the wire answers to these): `
+        + `${invented.join(", ") || "none"}`)
+        .toEqual(wire);
+    }
+
+    // AND THE MIRROR IS NOT EMPTY, which the set comparison would
+    // satisfy if `WIRE` itself were ever gutted. Cheap, and it pins
+    // the count the recording was made at.
+    const total = Object.values(WIRE).reduce((n, ks) => n + ks.length, 0);
+    expect(total, "the recorded declaration has lost keys — re-read "
+      + "e2e/standing-wire.ts before relaxing this").toBe(33);
+  });
+
+// ---- and the recording itself is FRESH
+//
+// THE GUARD ABOVE IS HERMETIC AND THEREFORE BLIND TO ONE THING: both
+// halves of it live in this repository, so the day the emitter
+// declares a thirty-fourth key, `DECLARED` and `WIRE` agree with each
+// other and both are wrong. Only the other repository can settle that.
+//
+// A SKIP IS NOT A PASS. This check reports SKIPPED WITH ITS REASON
+// when no backend checkout resolves — never a quiet early return,
+// which is the failure this repo fixed on 2026-09-13: a test that
+// reported success by not running. Everything else — an unreadable
+// ref, a declaration whose shape the extractor does not know, a
+// missing python3 — THROWS, because each of those is a fact about the
+// emitter or the arrangement and not a reason to say nothing.
+//
+// It reads `origin/main`, never the working tree: the backend checkout
+// on the machine this was written on sat on a feature branch that
+// predates #129, and a check that went red over whose branch was out
+// would be a red build about nothing.
+
+test("`WIRE` is the emitter's CURRENT declaration — the cross-repo "
+   + "freshness check the hermetic guard cannot make", () => {
+    const { root, tried } = resolveBackend();
+    test.skip(root === null, backendSkipReason(tried));
+
+    const backend = readBackendDeclaration(root as string);
+    expect(Object.keys(backend).sort(),
+      "backend origin/main declares a different set of BLOCKS than "
+      + "e2e/standing-wire.ts records — re-record it")
+      .toEqual(Object.keys(WIRE).sort());
+    for (const block of Object.keys(backend).sort()) {
+      expect([...backend[block]].sort(),
+        `backend origin/main's \`${block}\` no longer matches the `
+        + "recording in e2e/standing-wire.ts — the emitter moved and "
+        + "the recording has to be re-read off a v2 envelope (names "
+        + "only; the payload carries positions)")
+        .toEqual([...WIRE[block]].sort());
     }
   });
 
