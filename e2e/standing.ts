@@ -17,7 +17,10 @@
 //
 // WHAT IS DECLARED HERE AND WHERE IT CAME FROM. `DECLARED` below is
 // `api/main.py::watched_strip_standing_blocks()` at #129's head
-// (d392017), read off the source by AST rather than transcribed:
+// (d392017 — squashed at merge, so that SHA is NOT on backend
+// origin/main; the change landed as 6eb14a1, which is what production
+// serves and what e2e/standing-wire.ts is recorded against), read off
+// the source by AST rather than transcribed:
 // `read` is `live_read.STANDING` expanded plus the three registries
 // read_for_fixture() names one by one, and the other five blocks are
 // the constants the route lists. It is a mirror of a declaration in
