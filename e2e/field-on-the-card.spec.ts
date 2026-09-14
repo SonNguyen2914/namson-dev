@@ -351,6 +351,107 @@ async function openBoard(page: import("@playwright/test").Page,
 const card = (page: import("@playwright/test").Page, event: string) =>
   page.locator(`[data-testid="picker-row"][data-event="${event}"]`);
 
+// ────────────────────── 0. the fixture speaks the backend's language ─
+//
+// THE HALF THE CORRECTION ABOVE DID NOT CLOSE. `bands: 3` stood on
+// attack and defence for four days after the operator declared five;
+// the cuts ran ascending where the wire runs best-first; defence was
+// inverted against its own feed; `tier` was `tier_set[0]`, which the
+// trio test names in its own words as the thing the card must not
+// draw. Every one of those was corrected by reading the live payload —
+// and NOT ONE of them was found by this suite, because every test here
+// reads its expectation off `AXES`, which makes `AXES` being wrong the
+// one failure none of them can see. The fixture is right today and
+// nothing here would notice the day it stops being.
+//
+// So the rules are asserted, and they are THE EMITTER'S rather than
+// this file's opinion: src/picker/cross_league_axes.py's
+// `equal_width_cuts` (bands - 1 cuts, equal-width over the span, BEST
+// FIRST), `tier_of` (1 = best; a value ON a cut takes the better
+// tier), `tier_set_of` (every band the 95% interval touches),
+// `supported_bands` (int(levels) + 1, floor 2), and the descending
+// sort that assigns the ranks. A fixture that disagrees with any of
+// them describes a payload the backend cannot emit.
+//
+// AN INTERVAL MAY REACH PAST THE SPAN AND A VALUE MAY NOT, which is
+// the block above's own sentence: the span IS the field's range of
+// values, so a value outside it is a fixture claiming a field that
+// does not contain its own clubs.
+
+const tierOf = (v: number, cuts: number[]) => {
+  for (let i = 0; i < cuts.length; i++) if (v >= cuts[i]) return i + 1;
+  return cuts.length + 1;
+};
+const tierSetOf = (lo: number, hi: number, cuts: number[]) => {
+  const out: number[] = [];
+  for (let i = tierOf(hi, cuts); i <= tierOf(lo, cuts); i++) out.push(i);
+  return out;
+};
+const equalWidthCuts = (lo: number, hi: number, bands: number) => {
+  const w = (hi - lo) / bands;
+  return Array.from({ length: bands - 1 }, (_, k) => hi - w * (k + 1));
+};
+
+test("the fixture is a payload the backend could actually emit",
+  async () => {
+    expect(AXIS_KEYS.length).toBeGreaterThan(0);
+    for (const k of AXIS_KEYS) {
+      const a = AXES[k];
+      const where = `axis ${k}`;
+      // THE CUT GEOMETRY *IS* THE BAND COUNT. Declaring one without
+      // recutting the other is the contradiction that stood here, and
+      // it is a single subtraction to catch.
+      expect(a.cuts.length, `${where}: cuts for ${a.bands} bands`)
+        .toBe(a.bands - 1);
+      expect(a.bands_declared, `${where}: bands vs bands_declared`)
+        .toBe(a.bands);
+      const want = equalWidthCuts(a.span[0], a.span[1], a.bands);
+      a.cuts.forEach((c, i) => expect(c, `${where}: cut ${i}, best first`)
+        .toBeCloseTo(want[i], 6));
+      // the declaration beside the measurement, and the note that
+      // rides the flag the way `floor_note` rides `below_floor`
+      expect(a.bands_licensed_by_the_measurement, `${where}: licence`)
+        .toBe(Math.max(Math.trunc(a.distinguishable_levels) + 1, 2));
+      expect(a.declared_above_licence, `${where}: above-licence flag`)
+        .toBe(a.bands_declared > a.bands_licensed_by_the_measurement);
+      expect(a.band_count_note !== null, `${where}: note rides the flag`)
+        .toBe(a.declared_above_licence);
+      let straddling = 0;
+      let placed = 0;
+      for (const r of a.rows) {
+        const seat = `${where}/${r.club}`;
+        expect(r.interval, `${seat}: interval`)
+          .toEqual([r.value - r.half_width_95, r.value + r.half_width_95]);
+        const set = tierSetOf(r.interval[0], r.interval[1], a.cuts);
+        expect(r.tier_set, `${seat}: tier_set`).toEqual(set);
+        // THE POINT TIER, NOT THE SET'S FIRST MEMBER
+        expect(r.tier, `${seat}: point tier`).toBe(tierOf(r.value, a.cuts));
+        expect(r.tier_set, `${seat}: point tier is in the set`)
+          .toContain(r.tier);
+        expect(r.straddles, `${seat}: straddles`).toBe(set.length > 1);
+        expect(Boolean(r.floor_note), `${seat}: floor note rides the flag`)
+          .toBe(r.below_floor);
+        // a value outside the span is a field that does not contain
+        // its own clubs; an INTERVAL past either end is ordinary
+        expect(r.value, `${seat}: value inside the span`)
+          .toBeGreaterThanOrEqual(Math.min(...a.span));
+        expect(r.value, `${seat}: value inside the span`)
+          .toBeLessThanOrEqual(Math.max(...a.span));
+        straddling += set.length > 1 ? 1 : 0;
+        placed += set.length === 1 ? 1 : 0;
+      }
+      expect(a.straddling, `${where}: straddling count`).toBe(straddling);
+      expect(a.placed, `${where}: placed count`).toBe(placed);
+      // the backend sorts DESCENDING by value on every axis, defence
+      // included — `value` there is defensive strength and `rate` is
+      // the goals conceded that produce it
+      const byRank = [...a.rows].sort((x, y) => x.rank - y.rank)
+        .map((r) => r.value);
+      expect(byRank, `${where}: ranks descend by value`)
+        .toEqual([...byRank].sort((x, y) => y - x));
+    }
+  });
+
 // ─────────────────────────────────────── 1. the ranks are the FIELD'S ─
 
 test("the ranks pair is read on the FIELD's ladder, of N — not on two "
