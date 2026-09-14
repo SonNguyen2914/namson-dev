@@ -6,19 +6,28 @@ import { expect, test } from "@playwright/test";
  * vs Sabah the board said Sabah is the fav", then "same thing for slav
  * and lens".
  *
- * Both true, and neither a new defect. Every UCL capture in the window
- * was frozen BEFORE 8dfa813 replaced the cross-league favourite rule —
- * Sabah v United was captured 37 hours before kickoff, a day before the
- * fix deployed. The old rule compared WITHIN-LEAGUE standing across
- * leagues and broke ties on the club's NAME, so Sabah FK (top of the
- * Azerbaijani Premyer Liqa) outranked Manchester United. Twelve of the
- * eighteen finished cards name a favourite the current rule contradicts.
+ * Both true, and neither a new defect. Those favourites were named by
+ * the TIER TRIPLE: within-league quintiles compared across leagues,
+ * ties broken on the club's NAME, so Sabah FK (top of the Azerbaijani
+ * Premyer Liqa) outranked Manchester United. Twelve of the eighteen
+ * finished UCL cards name a favourite the field rule contradicts — still
+ * true of the live payload on 2026-09-14, all twelve being every
+ * captured row in the window.
  *
  * THE CAPTURE CANNOT BE RE-TAKEN AND MUST NOT BE REWRITTEN: the match is
  * over, a cup has no season archive to rewind, and restating it with
  * today's answer destroys the only record of what was shown. So it is
  * marked — and the mark has to cover the whole card, because every
- * signed field is oriented from that favourite. */
+ * signed field is oriented from that favourite.
+ *
+ * WHAT THE MARK IS ALLOWED TO CLAIM. `cross_league` + `fav_source:
+ * "rank"` + no `field` identifies the RULE, not the age: backend
+ * `stages.compare_cup` still reaches the tier triple whenever a
+ * competition has no measured field, with `fav_rule` at its "rank"
+ * default and no field block. A present-day Leagues Cup tie is
+ * therefore byte-identical to a pre-fix UCL capture here, and the two
+ * tests at the bottom of this file hold the banner to the claim it can
+ * actually support. */
 
 const state = (over: Record<string, unknown> = {}) => ({
   refused: false, league: "ucl", home: "Manchester United", away: "Sabah FK",
@@ -147,6 +156,27 @@ test("a SAME-LEAGUE capture is never marked — neither rule applied to it",
     await expect(card(page).getByTestId("fav-rule-superseded")).toHaveCount(0);
   });
 
+test("a field block outvotes a stale `fav_source` — the mark is off the "
+   + "EVIDENCE, not off one word", async ({ page }) => {
+    /* THE CONJUNCT THIS PINS. `!read.field` was in the condition and no
+       test could tell whether it was load-bearing: every other fixture
+       here that carries a field also says `fav_source: "field"`, so
+       dropping `!field` left the whole file green.
+
+       It is not decoration. Backend `compare_cup` sets `fav_rule` to
+       "field" and attaches the `field` block from the SAME
+       `field_club` call, so the two agree by construction today — and
+       a condition that trusts the word alone would start marking rated
+       rows the day that construction changes. The block is the
+       evidence the field placed both clubs; the string is a label on
+       it. The evidence wins. */
+    await open(page, [finished(state({
+      fav_source: "rank",
+      field: { competition: "ucl", size: 36 },
+    }))]);
+    await expect(card(page).getByTestId("fav-rule-superseded")).toHaveCount(0);
+  });
+
 test("the favourite is marked by SHAPE, not by the accent colour",
   async ({ page }) => {
     /* Weight already says who WON. A gold `fav` chip said who we
@@ -168,4 +198,40 @@ test("no favourite, no pips — a row without a capture claims neither club",
     await open(page, [finished(null)]);
     await expect(card(page).getByTestId("fav-mark")).toHaveCount(0);
     await expect(card(page).getByTestId("fav-rule-superseded")).toHaveCount(0);
+  });
+
+test("the mark names the RULE, never the deploy that replaced it",
+  async ({ page }) => {
+    /* THE CLAIM THE SIGNAL CANNOT SUPPORT. The first draft opened "this
+       capture was frozen before the cross-league favourite was fixed",
+       which is a statement about DEPLOY ORDER that no field on the row
+       carries. `compare_cup` keeps the tier triple as the live fallback
+       for a competition with no measured field and reaches it with
+       `fav_rule` at "rank" and no `field` block — so the row below,
+       captured an hour ago, is byte-identical to a pre-fix capture and
+       would have been told it predates a fix it postdates.
+
+       The three keys are all the card gets, and they are identical in
+       both cases, so the banner's words have to be true of both. That
+       is what is asserted: the reason it gives is READ OFF THE ROW (no
+       field block), and no word in it places the capture in time. */
+    await open(page, [finished()]);
+    const note = card(page).getByTestId("fav-rule-superseded");
+    await expect(note).toBeVisible();
+    // the reason is the row's own missing field, not a date
+    await expect(note).toContainText(/carries no field/i);
+    await expect(note).toContainText(/the rule the field replaced/i);
+    // and nothing in it dates the capture
+    await expect(note).not.toContainText(/frozen|deploy|fixed|before/i);
+  });
+
+test("the capture is described once, by the block that owns the words",
+  async ({ page }) => {
+    /* #59's rule, one card over: the banner used to close "the capture
+       is kept unrewritten on purpose: it is what the picker actually
+       said" while `CaptureBanner` prints that exact phrase six lines
+       below it. Two voices on one fact, free to drift apart. */
+    await open(page, [finished()]);
+    await expect(card(page).getByText("what the picker actually said"))
+      .toHaveCount(1);
   });

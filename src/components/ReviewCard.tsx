@@ -425,6 +425,40 @@ function Verdict({ testid, label, value, yes, no, reason }: {
   );
 }
 
+/** THE FAVOURITE, AS A SHAPE RATHER THAN A COLOUR.
+ *
+ *  Filled = the picker's favourite before kickoff; hollow = the
+ *  opponent. The board's upcoming card draws exactly this pair on its
+ *  two club lines, so a reader who knows one surface knows this one.
+ *
+ *  NOTHING IS DRAWN WHEN NO FAVOURITE IS KNOWN. A row whose capture was
+ *  unavailable has no favourite, and a hollow ring on both sides would
+ *  say "we picked neither" — which is a claim. Absent says the
+ *  question was never answered, which is the truth.
+ *
+ *  DECLARED AT MODULE SCOPE, beside `Verdict`, and not inside the card.
+ *  A component created during a render is a NEW TYPE on every pass, so
+ *  React unmounts and remounts its subtree each time instead of
+ *  updating it — the pips would be torn down and rebuilt on every
+ *  parent render. `react-hooks/static-components` is right to refuse
+ *  it, and the fix is the hoist rather than a disable comment. */
+function FavPip({ side, favSide }: {
+  side: "home" | "away"; favSide: "home" | "away" | null | undefined;
+}) {
+  if (!favSide) return null;
+  const isFav = favSide === side;
+  return (
+    <span data-testid="fav-mark" data-side={side}
+      data-fav={isFav ? "yes" : "no"} aria-hidden
+      title={isFav
+        ? "the picker's favourite before kickoff"
+        : "not the picker's favourite"}
+      className={isFav
+        ? "h-2 w-2 flex-none self-center rounded-full bg-ink-hi"
+        : "h-[7px] w-[7px] flex-none self-center rounded-full border border-ink-low bg-bs"} />
+  );
+}
+
 // ----------------------------------------------------------------- card
 
 export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
@@ -471,40 +505,27 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
      it fit" verdict. `FAVOURITE WON: NO` on Liverpool 2-1 Atlético is
      answering about the wrong club.
 
-     THE SIGNAL IS EXACT, not a date comparison. The current rule emits
-     `fav_source: "field"` and carries a `field` block on a
-     cross-league row; the superseded one emitted `"rank"` and carried
-     none. A row that is not cross-league never used either rule. */
+     THE SIGNAL IS A RULE TEST, NOT A DATE COMPARISON. The field rule
+     emits `fav_source: "field"` and carries a `field` block on a
+     cross-league row; the tier triple emits `"rank"` and carries none.
+     A row that is not cross-league never used either rule.
+
+     WHAT IT DOES NOT PROVE. Read against production on 2026-09-14, this
+     fires on all 12 captured UCL rows in the window and on none of the
+     58 league rows — the league builder emits `fav_source: "rank"` on
+     every row it makes, which is why `cross_league` is the first
+     conjunct and not a tidy extra. But `compare_cup` still REACHES the
+     tier triple today, on purpose, whenever the competition has no
+     measured field ("the Leagues Cup has no measured field and a row
+     still has to be signed from some side"), and it gets there with
+     `fav_rule` at its `"rank"` default and no `field` block. So this
+     flag means "the tier triple named this favourite" — it does NOT
+     mean "frozen before the fix", and the banner below says the first
+     rather than the second. */
   const favRuleSuperseded = Boolean(
     read?.cross_league && read?.fav_source === "rank" && !read?.field);
 
   const winner = res?.winner ?? null;
-/** THE FAVOURITE, AS A SHAPE RATHER THAN A COLOUR.
- *
- *  Filled = the picker's favourite before kickoff; hollow = the
- *  opponent. The board's upcoming card draws exactly this pair on its
- *  two club lines, so a reader who knows one surface knows this one.
- *
- *  NOTHING IS DRAWN WHEN NO FAVOURITE IS KNOWN. A row whose capture was
- *  unavailable has no favourite, and a hollow ring on both sides would
- *  say "we picked neither" — which is a claim. Absent says the
- *  question was never answered, which is the truth. */
-function FavPip({ side, favSide }: {
-  side: "home" | "away"; favSide: "home" | "away" | null | undefined;
-}) {
-  if (!favSide) return null;
-  const isFav = favSide === side;
-  return (
-    <span data-testid="fav-mark" data-side={side}
-      data-fav={isFav ? "yes" : "no"} aria-hidden
-      title={isFav
-        ? "the picker's favourite before kickoff"
-        : "not the picker's favourite"}
-      className={isFav
-        ? "h-2 w-2 flex-none self-center rounded-full bg-ink-hi"
-        : "h-[7px] w-[7px] flex-none self-center rounded-full border border-ink-low bg-bs"} />
-  );
-}
 
   const scoreTone = (side: "home" | "away") =>
     winner === side ? "text-ink-hi font-semibold" : "text-ink-mid";
@@ -589,7 +610,25 @@ function FavPip({ side, favSide }: {
           `warn`, not `neg`: the capture is not broken and not a failed
           read. It is a faithful record of what the board said, and what
           the board said has since been corrected. Those are different
-          claims and the traffic light keeps them apart. */}
+          claims and the traffic light keeps them apart.
+
+          THE PROSE CLAIMS WHAT THE SIGNAL PROVES AND NOT A WORD MORE.
+          It used to open "this capture was frozen before the
+          cross-league favourite was fixed", which is a claim about
+          DEPLOY ORDER that no field on the row carries. Backend
+          `stages.compare_cup` keeps the tier triple as the live
+          FALLBACK — "the Leagues Cup has no measured field and a row
+          still has to be signed from some side" — and reaches it with
+          `fav_rule` still at its `"rank"` default and no `field` block,
+          which is byte for byte what a pre-fix capture looks like. So a
+          current Leagues Cup tie would have been told it was frozen
+          before a fix it postdates. What the row actually establishes
+          is WHICH RULE NAMED THE FAVOURITE, which is the fact the
+          reader needs, and it is now what the paragraph says.
+
+          And it no longer ends "it is what the picker actually said":
+          `CaptureBanner`, six lines down this same card, already says
+          that. One fact, one voice — the habit #59 removed. */}
       {favRuleSuperseded && (
         <div data-testid="fav-rule-superseded"
           className="mt-3 rounded-lg border border-warn/40 bg-warn/5 p-3">
@@ -597,22 +636,23 @@ function FavPip({ side, favSide }: {
             favourite named by a superseded rule
           </p>
           <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-mid">
-            This capture was frozen before the cross-league favourite was
-            fixed. The old rule compared each club&rsquo;s standing{" "}
-            <em className="not-italic text-ink-hi">within its own league</em>{" "}
-            and broke ties on the club&rsquo;s name, so a club top of a
-            weak league outranked a stronger club mid-table in a strong
-            one. It named{" "}
+            This row carries no field for the competition, so its
+            favourite came from the rule the field replaced: each
+            club&rsquo;s standing{" "}
+            <em className="not-italic text-ink-hi">within its own league</em>,
+            with ties broken on the club&rsquo;s name &mdash; so a club
+            top of a weak league outranked a stronger club mid-table in a
+            strong one. It named{" "}
             <span className="text-ink-hi">{read?.favourite}</span>{" "}
-            here. The board now rates both clubs on the competition&rsquo;s
-            own 36-club field.
+            here. Where the competition&rsquo;s own field places both
+            clubs, the board ranks them on that instead.
           </p>
           <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-low">
             Everything signed below &mdash; the gaps, the tier reading,
             the shape and whether the favourite won &mdash; is oriented
             from that favourite, so read it as the record of what was
             shown, not as the current reading. The capture is kept
-            unrewritten on purpose: it is what the picker actually said.
+            unrewritten on purpose.
           </p>
         </div>
       )}

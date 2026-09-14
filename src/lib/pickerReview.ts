@@ -63,10 +63,16 @@ export interface PreKickoffRow {
    *  All three are OPTIONAL because a capture frozen before they
    *  existed carries none, and a reader that turned a missing
    *  `fav_source` into "the current rule" would date a record it never
-   *  read. The current rule emits `"field"` with a `field` block on a
-   *  cross-league row; the superseded one emitted `"rank"` and carried
-   *  no field, which is how a pre-8dfa813 capture is recognised without
-   *  comparing timestamps to a deploy. */
+   *  read. The field rule emits `"field"` with a `field` block on a
+   *  cross-league row; the tier triple emits `"rank"` and carries no
+   *  field.
+   *
+   *  THAT PAIR NAMES A RULE, NOT AN AGE. The backend still reaches the
+   *  tier triple on a cross-league row whose competition has no
+   *  measured field, so "no field, source rank" is what a pre-fix
+   *  capture and a present-day Leagues Cup tie both look like. Every
+   *  reader of these three keys must claim the rule and not the date —
+   *  see the banner in components/ReviewCard.tsx. */
   cross_league?: boolean | null;
   fav_source?: string | null;
   field?: unknown;
