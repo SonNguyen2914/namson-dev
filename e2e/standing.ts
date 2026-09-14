@@ -17,7 +17,10 @@
 //
 // WHAT IS DECLARED HERE AND WHERE IT CAME FROM. `DECLARED` below is
 // `api/main.py::watched_strip_standing_blocks()` at #129's head
-// (d392017), read off the source by AST rather than transcribed:
+// (d392017 — squashed at merge, so that SHA is NOT on backend
+// origin/main; the change landed as 6eb14a1, which is what production
+// serves and what e2e/standing-wire.ts is recorded against), read off
+// the source by AST rather than transcribed:
 // `read` is `live_read.STANDING` expanded plus the three registries
 // read_for_fixture() names one by one, and the other five blocks are
 // the constants the route lists. It is a mirror of a declaration in
@@ -25,6 +28,28 @@
 // stale — so `hoisted()` reports what it actually moved, and the guard
 // in watched-strip.spec.ts asserts that every block moved something. A
 // key name misspelled here is a red test, not a silent pass.
+//
+// THAT WAS NOT ENOUGH, AND THE GAP IT LEFT IS WHY e2e/standing-wire.ts
+// EXISTS. "Every block moved something" is satisfied by sixteen keys
+// exactly as well as by seventeen. A misspelled key is red because it
+// moves nothing and its block drops out; a key simply LEFT OUT is
+// invisible — it is on no fixture, so nothing here ever asks about it,
+// and the sentence goes on riding on all 27 matches. `read` was short
+// by `a_rate_needs_time` (3,818 bytes/match) from the day this mirror
+// was written until 2026-09-14, with every spec in the suite green.
+//
+// It could not be caught from inside this file. The v2 fixtures are
+// produced BY `toV2()` FROM `DECLARED`, so checking the mirror against
+// anything derived from it only proves it agrees with itself.
+// `e2e/standing-wire.ts` records the emitter's published declaration —
+// key names off production's own `standing_blocks`, which api/main.py
+// fills from the registry verbatim before it walks a single match — and
+// the guard "the mirror is COMPLETE against the emitter's published
+// declaration" asserts SET EQUALITY both ways. A key missing here is
+// now red. KEEP THE TWO IN STEP BY RE-READING THE EMITTER, never by
+// copying one list into the other: they are two readings of one
+// declaration and the value is entirely in their being able to
+// disagree.
 //
 // WHAT DID NOT MOVE, and it is the point of the change rather than an
 // exception to it: every refusal, every `basis`, every coded sentence
@@ -40,7 +65,7 @@ export const DECLARED: Record<string, readonly string[]> = {
     "read_is_a_description", "every_name_is_counted_and_said",
     "no_composite_before_m1", "the_wall_has_a_limit",
     "baseline_is_joined", "the_join_is_not_state_partitioned",
-    "the_favourite_flag_is_price_native",
+    "the_favourite_flag_is_price_native", "a_rate_needs_time",
     "possession_is_distrusted", "persisted_at_the_time",
     "the_clock_is_the_match_clock",
     "a_counter_that_falls_is_a_revision",
