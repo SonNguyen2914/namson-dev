@@ -10,9 +10,33 @@ on:
     branches: [main]
   pull_request:
 
+# A SUPERSEDED RUN IS SPENT, NOT SAVED — and only pull requests cancel.
+#
+# MEASURED 2026-09-14, the day the account's Actions minutes ran out:
+# 123 runs on this repo in September for ~849 minutes, beside ~1,988 on
+# the backend. Every force-push to a branch started a second run while
+# the first went on to completion against a revision nobody would merge.
+#
+# PUSHES TO MAIN ARE NEVER CANCELLED. A cancelled run is not a green
+# one, and Vercel and the deploy gates read the result rather than the
+# intent — cancelling the run that gates a deploy does not save it, it
+# skips it. So the cancellation is conditioned on the event: a branch
+# may lose its stale run, main never loses the one that gates its
+# deploy.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   frontend:
     runs-on: ubuntu-latest
+    # A CEILING ON A RUN THAT HANGS. GitHub's default is 360 minutes, so
+    # one wedged step — a Playwright server that never binds, a browser
+    # that never exits — can spend six hours of the month's allowance on
+    # a single job while reporting nothing. The observed average here is
+    # ~7 minutes and the slowest legitimate run measured is ~10.5; 30 is
+    # wide enough that a slow runner is not failed for being slow.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
