@@ -958,24 +958,32 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   </button>
                 </div>
               )}
-              {/* A FIXTURE THAT KICKED OFF LEFT THE BOARD, AND THE
-                  BOARD SAYS SO (2026-09-10).
+              {/* A FIXTURE THAT LEFT THE BOARD IS NAMED, AND THE BOARD
+                  SAYS WHERE IT WENT (2026-09-10).
 
-                  The picker is a PRE-KICKOFF surface by design: every
-                  number on a card is about a match that has not
-                  started, so the backend removes one that has. It has
-                  always said which, with a `code`, a count per code and
-                  a `why` in its own words — and nothing on this page
-                  read a byte of it. On the first Champions League
-                  matchday two ties kicked off at 16:45, the board went
-                  from six cards to four, and the page said nothing at
-                  all. The operator's words were "live matches
-                  disappeared", which is exactly right: they had.
+                  On the first Champions League matchday two ties kicked
+                  off at 16:45, the board went from six cards to four,
+                  and the page said nothing at all. The operator's words
+                  were "live matches disappeared", which is exactly
+                  right: they had. The backend had always named them,
+                  with a `code`, a count per code and a `why` in its own
+                  words, and nothing on this page read a byte of it.
+
+                  KICKING OFF IS NO LONGER A WAY TO LEAVE (2026-09-14).
+                  `board.BOARD_STATES` keeps a match under way in its
+                  own card spot with a live clock in the date cell, so
+                  the only code this strip now draws on the declared
+                  board is `finished` — which hands the reader the
+                  review tail directly below, needing no token. THIS
+                  STRIP IS NOT DEAD AND MUST NOT BE DELETED: it still
+                  carries the finished departures, and a narrowed caller
+                  can still produce `kicked_off`. It draws whatever the
+                  payload names, which is why neither change needed an
+                  edit here.
 
                   ABSENT-BY-DESIGN MUST NOT READ AS VANISHED. That is
                   the sentence this codebase repeats everywhere else and
-                  did not honour on its own board. The removal is
-                  correct and stays; only the silence goes.
+                  did not honour on its own board.
 
                   THE BACKEND'S WORDS, NOT THIS FILE'S. `why` is
                   printed rather than restated, so a reason that changes

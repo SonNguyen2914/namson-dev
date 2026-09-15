@@ -355,6 +355,68 @@ export interface BoardRow {
   kickoff: string;
   espn: string;
   kalshi: KalshiQuote | null;
+  /** The provider's own status token for this fixture — `"pre"` or
+   *  `"in"` on a board row, because `board.BOARD_STATES` is what put it
+   *  here. Raw data; the CLASSIFICATION of it is `in_play` below, and a
+   *  surface should read that rather than compare this against a
+   *  string. Optional so a payload from before 2026-09-14 still
+   *  renders. */
+  state?: string | null;
+  /** WHETHER THE MATCH IS UNDER WAY — the backend's own derivation off
+   *  `board.IN_PLAY_STATES`, in the module that owns the registry.
+   *
+   *  THE BOARD KEEPS A MATCH WHEN IT KICKS OFF (operator, 2026-09-14:
+   *  "still show it in its match card spot and instead of showing the
+   *  kickoff date and time, shows live with minute"). So the card's
+   *  date cell reads THIS, not `live`: the clock is an annotation and a
+   *  tape read that failed must not be able to put a kickoff time back
+   *  on a match that has started.
+   *
+   *  Absent on an older payload, which is why `rowIsInPlay` treats
+   *  absence as "not in play" — the pre-2026-09-14 board could not
+   *  serve an in-play row at all. */
+  in_play?: boolean;
+  /** WHERE the match is, when it is under way. Present ONLY on an
+   *  in-play row — a pre-kickoff card has no clock to be missing, so a
+   *  block of nulls there would be a claim rather than an absence. */
+  live?: BoardRowLive | null;
+}
+
+/** One tape row's reading of a live match, as the board serves it.
+ *  Field for field the shape `api/main.py`'s watched strip publishes,
+ *  because both come off `live_stat_snapshot` through the same two
+ *  readers (`patterns._minute`, `patterns.period_of`) — which is what
+ *  lets ONE clock reader serve the board and the live cards. */
+export interface BoardRowClock {
+  minute: number | null;
+  clock_display: string | null;
+  score_home: number | null;
+  score_away: number | null;
+  status_detail: string | null;
+  period: string | null;
+  period_basis: string | null;
+  match_state: string | null;
+  captured_at: string | null;
+}
+
+export interface BoardRowLive {
+  in_play: boolean;
+  /** when the board made the tape read — not the viewer's clock, and
+   *  not the board's `generated_at` either, though the two coincide */
+  read_at: string;
+  window_seconds: number;
+  row_age_seconds: number | null;
+  /** EITHER a clock or a named absence, never both and never neither */
+  clock: BoardRowClock | null;
+  absent: { code: string; why: string } | null;
+  basis: string;
+}
+
+/** IS THIS MATCH UNDER WAY? The backend's verdict, read — never
+ *  recomputed here from `state`, which would be this codebase typing a
+ *  provider's vocabulary into a second place. */
+export function rowIsInPlay(row: { in_play?: boolean }): boolean {
+  return row.in_play === true;
 }
 
 /** A fixture the picker would not rate, named with the reason. Refusals
@@ -371,6 +433,16 @@ export interface BoardRefusal {
   reason: string;
   event_id?: string;
   kickoff?: string;
+  /** THE SAME THREE KEYS A RANKED ROW CARRIES, and for the same reason
+   *  every other key on this contract is here: a refused fixture draws
+   *  a card with a date on it, so a refused fixture that has kicked off
+   *  would otherwise be the one card on the board still showing a
+   *  kickoff time for a match under way. The backend attaches them
+   *  before the refusal branch, in one pass — see
+   *  `board.assemble_board`'s annotation comment. */
+  state?: string | null;
+  in_play?: boolean;
+  live?: BoardRowLive | null;
 
   /* ── WHAT A REFUSAL CARRIES BESIDES ITS REASON (operator, 2026-09-11)
      ────────────────────────────────────────────────────────────────
@@ -516,6 +588,17 @@ export interface LeagueMeta {
   error?: string;
   /** prices are annotation, so a Kalshi failure costs quotes, not rows */
   kalshi_error?: string;
+  /** WHAT THE COLUMN'S LIVE READ COST, when it made one. ABSENT — not
+   *  an empty block — on a column with nothing under way, so "no match
+   *  is on" and "the read found nothing" never read the same. */
+  live_read?: {
+    read_at: string; window_seconds: number; queries: number;
+    fixtures_asked: number; rows_read: number;
+  } | null;
+  /** the state tape's own upstream failure. Like `kalshi_error` it costs
+   *  the column its clocks and nothing else — the rows still say the
+   *  match is under way, because that comes off a different witness. */
+  live_error?: string;
 }
 
 export interface Board {
