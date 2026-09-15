@@ -86,8 +86,21 @@ export const DECLARED: Record<string, readonly string[]> = {
   coverage: [
     "coverage_is_anchored", "no_history_is_not_quiet",
   ],
+  // BOTH ARE THE ROUTE'S OWN, true of the SURFACE and of no single
+  // fixture: a match at the interval stays on the strip, and a row older
+  // than the window stops being evidence about now.
+  //
+  // `stale_row_is_not_a_verdict` ARRIVED WITH TRIVELA #137 on
+  // 2026-09-15 and is the first key this mirror has had to learn from a
+  // backend change rather than from the change that created the mirror.
+  // That is the drift the completeness guard was built for one day
+  // earlier: the route hoists it, the mirror did not list it, and
+  // `toV2()` would have left it on every match while the envelope also
+  // carried it — the sentence drawn twice, which is the defect the
+  // hoist exists to prevent. Caught by the guard, not by review.
   state: [
     "period_stays_on_the_strip",
+    "stale_row_is_not_a_verdict",
   ],
 };
 
