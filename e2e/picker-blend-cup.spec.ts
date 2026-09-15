@@ -1,4 +1,9 @@
 import { expect, test } from "@playwright/test";
+/* THE ORDER THE BOARD DRAWS IN IS IMPORTED, NEVER RETYPED. `boardColumns`
+   applies `PICKER_COLUMN_ORDER` — the operator's reading order — to a
+   board's declaration, and it is the same call the page makes. See
+   src/lib/pickerApi. */
+import { boardColumns } from "../src/lib/pickerApi";
 
 // Two changes to the picker board, drawn: THE SEASON BLEND and THE
 // LEAGUES CUP COLUMN.
@@ -237,19 +242,33 @@ const orderOf = (c: ReturnType<typeof col>) =>
    opens, and every test about it has to bring it on screen first.
 
    `show` jumps to the leftmost column that still leaves `slug` inside
-   the four, which keeps the declared order of the columns around it
-   rather than dragging the target to the front. At four or fewer
-   declared it is a no-op, because the window is. */
+   the four, which keeps the DRAWN order of the columns around it rather
+   than dragging the target to the front. At four or fewer declared it
+   is a no-op, because the window is. */
 const COLUMNS = ["mls", "epl", "laliga", "ligamx", "leaguescup"];
 const VIEW = 4;                       // src/pages/bet-suggester/index.tsx
 
+/* DECLARED IS NOT DRAWN. `COLUMNS` is this fixture's DECLARATION — the
+   keys of `board.leagues` — which decides WHICH columns exist and
+   nothing about their order. The order is the operator's, written once
+   in `PICKER_COLUMN_ORDER` and applied by `boardColumns`, so a pill's
+   index is an index into THAT.
+
+   `show` computed its jump off the declaration until 2026-09-15 and
+   agreed with the board only while the two coincided; when the reading
+   order grew to eight it stopped bringing its own subject on screen.
+   Derived here, so the order has one copy and this follows it. */
+const drawnOrder = (columns: readonly string[] = COLUMNS) =>
+  boardColumns(columns);
+
 async function show(page: import("@playwright/test").Page, slug: string,
                     columns: readonly string[] = COLUMNS) {
-  const i = columns.indexOf(slug);
+  const order = drawnOrder(columns);
+  const i = order.indexOf(slug);
   expect(i, `${slug} is not a declared column of this board`)
     .toBeGreaterThanOrEqual(0);
-  if (columns.length > VIEW) {
-    const lead = columns[i < VIEW ? 0 : Math.min(i, columns.length - VIEW)];
+  if (order.length > VIEW) {
+    const lead = order[i < VIEW ? 0 : Math.min(i, order.length - VIEW)];
     await page.locator(
       `[data-testid="ribbon-pill"][data-slug="${lead}"]`).click();
   }
@@ -284,18 +303,32 @@ test("the Leagues Cup gets its own column, after the four leagues",
     expect(await page.getByTestId("ribbon-pill").evaluateAll(
       (els) => els.map((e) => e.getAttribute("data-slug")).sort()))
       .toEqual([...COLUMNS].sort());
-    // the four on screen are the four the ribbon says are on screen
-    expect(await page.getByTestId("ribbon-pill")
+    /* THE FOUR ON SCREEN ARE THE FOUR THE RIBBON SAYS ARE ON SCREEN —
+       and which four that is comes from `boardColumns`, not from a list
+       typed here. The subject is the agreement between the lit pills and
+       the drawn columns; the identity of the leagues is the operator's
+       reading order, which lives in one file and is read from it. */
+    const lit = () => page.getByTestId("ribbon-pill")
       .and(page.locator('[aria-selected="true"]'))
-      .evaluateAll((els) => els.map((e) => e.getAttribute("data-slug"))))
-      .toEqual(["mls", "epl", "laliga", "ligamx"]);
+      .evaluateAll((els) => els.map((e) => e.getAttribute("data-slug")));
+    const drawn = () => cols.evaluateAll(
+      (els) => els.map((e) => e.getAttribute("data-league")));
+    expect(await lit()).toEqual(drawnOrder().slice(0, VIEW));
+    expect(await drawn()).toEqual(await lit());
 
-    // AND IT SITS AFTER THE FOUR LEAGUES, which is the claim: bring it
-    // on screen and it is last, with its neighbours in declared order.
+    /* AND IT SITS AFTER THE LEAGUES, which is the claim: bring it on
+       screen and it is LAST, with its neighbours still in drawn order
+       and no league displaced to make room for it. A cup is not named in
+       `PICKER_COLUMN_ORDER` at all, so "after the leagues" is a property
+       of that list rather than of this fixture's five slugs. */
     await show(page, "leaguescup");
-    expect(await cols.evaluateAll(
-      (els) => els.map((e) => e.getAttribute("data-league"))))
-      .toEqual(["epl", "laliga", "ligamx", "leaguescup"]);
+    await expect(cols).toHaveCount(VIEW);
+    const withCup = await drawn();
+    expect(withCup[withCup.length - 1]).toBe("leaguescup");
+    expect(withCup).toEqual(drawnOrder().slice(-VIEW));
+    // …and the ribbon agrees about the move, so the two readings of the
+    // window cannot drift apart
+    expect(await lit()).toEqual(withCup);
     const cup = col(page, "leaguescup");
     await expect(cup.getByRole("heading", { name: "Leagues Cup" }))
       .toBeVisible();
@@ -722,10 +755,20 @@ test("no sort mode drops a cup row — ranks, never cuts", async ({ page }) => {
     await expect(cup.getByTestId("picker-row")).toHaveCount(3);
     await bandDir(page).click();
   }
-  /* SIX SERVED, FIVE DRAWN — and the one that is not drawn is the MLS
-     row, whose column is paged off screen by the jump above, not a row
-     any sort cut. Counted per COLUMN as well so the difference is
-     stated rather than absorbed. */
+  /* SIX SERVED, FIVE DRAWN — and the row that is not drawn belongs to
+     the ONE column this jump pages off screen, not to any sort's cut.
+     WHICH league that is follows the operator's reading order and is
+     therefore not typed here: it is the declared column the board is
+     not currently drawing, named by subtraction. (It was MLS until
+     2026-09-15 and is EPL now; the claim never was about either of
+     them.) Counted per COLUMN as well, so the difference is stated
+     rather than absorbed. */
+  const onScreen = await page.getByTestId("league-col")
+    .evaluateAll((els) => els.map((e) => e.getAttribute("data-league")));
+  const paged = drawnOrder().filter((s) => !onScreen.includes(s));
+  expect(paged, "five declared and four drawn leaves exactly one off")
+    .toHaveLength(1);
+  await expect(col(page, paged[0])).toHaveCount(0);
   await expect(page.getByTestId("picker-row")).toHaveCount(5);
   await expect(col(page, "ligamx").getByTestId("picker-row")).toHaveCount(1);
   await show(page, "mls");
