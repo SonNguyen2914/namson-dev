@@ -344,18 +344,10 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   // so its day belongs in this union or its card has no band to sit in.
   // A refusal with no kickoff still cannot be placed, and says so where
   // the column draws it, rather than being dropped here.
-  const dated: { kickoff: string }[] = [
-    ...rows,
-    ...refusals.filter((r): r is typeof r & { kickoff: string } =>
-      Boolean(r.kickoff)),
-  ];
-  const dayKeys = [...new Set(dated.map((r) => localDay(r.kickoff)))]
-    .filter(Boolean).sort();
-  const dayLabelFor: Record<string, string> = {};
-  for (const r of dated) {
-    const k = localDay(r.kickoff);
-    if (k && !dayLabelFor[k]) dayLabelFor[k] = dayLabel(r.kickoff);
-  }
+  // THE BANDS ARE BUILT FROM THE DRAWN COLUMNS, further down this
+  // function — `drawnSlugs` does not exist yet here, and the union has
+  // to be taken over the four leagues on screen rather than all eight.
+  // See "MATCHDAY BANDS FOLLOW THE WINDOW" below.
   const sortFor = (k: string): ColumnSort => daySorts[k] ?? boardSort;
   const boardMode = modeById(boardSort.mode) ?? modeById(DEFAULT_SORT.mode)!;
 
@@ -601,6 +593,38 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
     : columnSlugs;
   const stepWindow = (d: number) => setWindowStart((w) =>
     ((w + d) % columnSlugs.length + columnSlugs.length) % columnSlugs.length);
+
+  /* ── MATCHDAY BANDS FOLLOW THE WINDOW (operator, 2026-09-15) ───────
+     The union of day keys is taken over the rows of the columns being
+     DRAWN, not over every row the board holds. Eight leagues keep eight
+     schedules, and a Tuesday only the Bundesliga plays is still a
+     Tuesday — so while the window sat elsewhere the board drew that
+     date full-width with four "rest day" boxes beneath it, an empty
+     band announcing a day on which nothing on screen happens. A date
+     rail is a promise that the columns under it have something at that
+     date; over an undrawn league it is a promise about a column the
+     reader cannot see.
+
+     Rotating the window therefore re-cuts the bands, which is the
+     point: the dates on the rail are the dates of the four leagues in
+     front of you. `columnsOf` is the same reader the columns use to
+     claim a row, so a folded fixture counts for every column it is
+     drawn in and cannot fall out of the union while it is on screen. */
+  const drawnSet = new Set(drawnSlugs);
+  const inWindow = (r: Parameters<typeof columnsOf>[0]) =>
+    columnsOf(r).some((c) => drawnSet.has(c));
+  const dated: { kickoff: string }[] = [
+    ...rows.filter(inWindow),
+    ...refusals.filter((r): r is typeof r & { kickoff: string } =>
+      Boolean(r.kickoff) && inWindow(r)),
+  ];
+  const dayKeys = [...new Set(dated.map((r) => localDay(r.kickoff)))]
+    .filter(Boolean).sort();
+  const dayLabelFor: Record<string, string> = {};
+  for (const r of dated) {
+    const k = localDay(r.kickoff);
+    if (k && !dayLabelFor[k]) dayLabelFor[k] = dayLabel(r.kickoff);
+  }
   const runningSorts = columnSlugs.map((sl) => columnSort(sl, boardSort));
 
   /* ARROW KEYS STEP THE WINDOW. Guarded against a form control so a
