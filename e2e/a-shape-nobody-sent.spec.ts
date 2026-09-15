@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative, sep } from "node:path";
 // THE STRIP IS SERVED AS `watched-strip-v2` (backend #129). The
 // fixtures below stay the shape RECORDED off this route and `toV2`
 // applies the route's OWN hoist to them at the serve site, so the
@@ -12,6 +14,81 @@ const asV2 = (b: unknown): unknown =>
   b != null && typeof b === "object" && !Array.isArray(b)
     ? toV2(b as object) : b;
 
+// ---------------------------------------------------------------------
+// WHERE THE STRIP IS DRAWN — READ OUT OF THE TREE, NEVER TYPED HERE
+// (2026-09-15).
+//
+// `<WatchedStrip />` came off /bet-suggester. The read is
+// operator-gated, and with no token held in an ordinary tab it could
+// only ever draw its own refusal — permanently, to a reader who cannot
+// fix it. `components/WatchedStrip.tsx` is UNTOUCHED, and so is every
+// claim in this file: what moved is the SURFACE the claims are made
+// against, not one word of what they say about the component.
+//
+// SO THE ROUTE IS FOUND RATHER THAN WRITTEN DOWN. A mount that moves to
+// another page moves these guards with it on the next run, with nothing
+// to drift; a mount that exists NOWHERE stops them BY NAME rather than
+// letting them assert against a page that cannot draw the thing. That
+// is this surface's own rule applied to itself — an absence is named,
+// never folded into a pass — and it is the reason none of these tests
+// is deleted: the day any page mounts the strip again, every one of
+// them comes back and has to pass, with no edit here.
+//
+// AND THE REMOVAL IS PINNED, not merely worked around: "the landing
+// page draws the DECLARATION panel and not the watched-strip READ" in
+// e2e/watched-strip.spec.ts asserts it at both levels, so a skip here
+// can never be the suite quietly losing a surface.
+// ---------------------------------------------------------------------
+
+const SRC_DIR = join(__dirname, "..", "src");
+const PAGES_DIR = join(SRC_DIR, "pages");
+
+function tsxUnder(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(dir).sort()) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) tsxUnder(p, out);
+    else if (name.endsWith(".tsx")) out.push(p);
+  }
+  return out;
+}
+
+/** The page route that renders `<WatchedStrip />`, or `null` when no
+ *  page does. A mount that is NOT a page RAISES rather than returning
+ *  null: the section would then be on screen somewhere these guards
+ *  cannot see, and skipping quietly is the one answer that would be
+ *  wrong. */
+function watchedStripRoute(): string | null {
+  const MOUNT = /<WatchedStrip[\s/>]/;
+  const mounts = tsxUnder(SRC_DIR)
+    .filter((p) => MOUNT.test(readFileSync(p, "utf8")));
+  const onPages = mounts.filter((p) => p.startsWith(PAGES_DIR + sep)
+    && !/(^|[\\/])_/.test(relative(PAGES_DIR, p)));
+  if (mounts.length > 0 && onPages.length === 0) {
+    throw new Error(
+      `<WatchedStrip /> is mounted in ${mounts.join(", ")} — not a page. `
+      + "Name the route that reaches it here: these guards must not skip "
+      + "while the section is on screen.");
+  }
+  if (onPages.length === 0) return null;
+  const route = `/${relative(PAGES_DIR, onPages[0]).split(sep).join("/")}`
+    .replace(/\.tsx$/, "").replace(/\/index$/, "");
+  return route === "" ? "/" : route;
+}
+
+const STRIP_ROUTE = watchedStripRoute();
+
+/** The route the strip draws on, or a NAMED skip carrying the condition
+ *  that retires it. Called FIRST by every entry point below — before a
+ *  route is registered and before a response is waited on — so a skipped
+ *  test leaves nothing in flight. */
+function stripSurface(): string {
+  test.skip(STRIP_ROUTE === null,
+    "no page mounts <WatchedStrip />: the read came off /bet-suggester on "
+    + "2026-09-15 and was not remounted anywhere. This claim is still true "
+    + "of the component and is KEPT, not deleted — it re-arms at whatever "
+    + "route mounts the strip next, with no edit to this file.");
+  return STRIP_ROUTE!;
+}
 
 // SIX READS THAT TOOK THE WHOLE PAGE DOWN, one shape each.
 //
@@ -134,6 +211,9 @@ const envelope = (over: Record<string, unknown> = {}) => ({
 const strip = (page: Page) => page.getByTestId("watched-strip");
 
 async function open(page: Page, body: unknown) {
+  // FIRST, so a run with no surface to draw on registers nothing and
+  // waits for nothing.
+  const at = stripSurface();
   await page.route("**/api/picker/board**", (r) => r.fulfill(json(BOARD)));
   await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW)));
   await page.route("**/api/comp/*/fixtures**", (r) =>
@@ -150,7 +230,7 @@ async function open(page: Page, body: unknown) {
                      unreadable_references: [] })));
   await page.route("**/api/bet-suggester/watched-strip**", (r) =>
     r.fulfill(json(asV2(body))));
-  await page.goto("/bet-suggester");
+  await page.goto(at);
   // THE SECTION DREW. Every test here depends on this being a stronger
   // statement than "the page did not die", so it is asserted first and
   // by visibility rather than by count.
@@ -159,12 +239,26 @@ async function open(page: Page, body: unknown) {
   await expect(page.getByTestId("watched-strip-boundary")).toHaveCount(0);
 }
 
-/** The board below the strip is alive on every one of these — the
- *  page-level harm, checked every time rather than once. */
+/** The page around the strip is alive on every one of these — the
+ *  page-level harm, checked every time rather than once.
+ *
+ *  THE PAGE, NOT "THE BOARD", since 2026-09-15. The harm this measures
+ *  has never been about the league columns specifically: it is that one
+ *  unexpected shape inside this section unmounted the whole tree, with
+ *  `document.body.innerText` down to 127 characters. `<main>` and the
+ *  page's own length say that wherever the strip is drawn. The ranked
+ *  board is still checked BY NAME on the route that carries it, because
+ *  that is the surface the finding was reported on and a weaker
+ *  assertion there would be this file giving something up. */
 async function boardSurvives(page: Page) {
-  await expect(page.getByTestId("board-rank-heading")).toBeVisible();
-  expect(await page.locator("body").innerText())
-    .not.toContain("Application error");
+  await expect(page.locator("main")).toHaveCount(1);
+  if (STRIP_ROUTE === "/bet-suggester") {
+    await expect(page.getByTestId("board-rank-heading")).toBeVisible();
+  }
+  const body = await page.locator("body").innerText();
+  expect(body).not.toContain("Application error");
+  expect(body.length, "the page collapsed to a client-side exception")
+    .toBeGreaterThan(1000);
 }
 
 // ------------------------------------------------- the branch percents

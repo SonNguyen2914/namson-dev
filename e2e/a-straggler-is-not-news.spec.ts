@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative, sep } from "node:path";
 // THE STRIP IS SERVED AS `watched-strip-v2` (backend #129). The
 // fixtures below stay the shape RECORDED off this route and `toV2`
 // applies the route's OWN hoist to them at the serve site, so the
@@ -12,6 +14,81 @@ const asV2 = (b: unknown): unknown =>
   b != null && typeof b === "object" && !Array.isArray(b)
     ? toV2(b as object) : b;
 
+// ---------------------------------------------------------------------
+// WHERE THE STRIP IS DRAWN — READ OUT OF THE TREE, NEVER TYPED HERE
+// (2026-09-15).
+//
+// `<WatchedStrip />` came off /bet-suggester. The read is
+// operator-gated, and with no token held in an ordinary tab it could
+// only ever draw its own refusal — permanently, to a reader who cannot
+// fix it. `components/WatchedStrip.tsx` is UNTOUCHED, and so is every
+// claim in this file: what moved is the SURFACE the claims are made
+// against, not one word of what they say about the component.
+//
+// SO THE ROUTE IS FOUND RATHER THAN WRITTEN DOWN. A mount that moves to
+// another page moves these guards with it on the next run, with nothing
+// to drift; a mount that exists NOWHERE stops them BY NAME rather than
+// letting them assert against a page that cannot draw the thing. That
+// is this surface's own rule applied to itself — an absence is named,
+// never folded into a pass — and it is the reason none of these tests
+// is deleted: the day any page mounts the strip again, every one of
+// them comes back and has to pass, with no edit here.
+//
+// AND THE REMOVAL IS PINNED, not merely worked around: "the landing
+// page draws the DECLARATION panel and not the watched-strip READ" in
+// e2e/watched-strip.spec.ts asserts it at both levels, so a skip here
+// can never be the suite quietly losing a surface.
+// ---------------------------------------------------------------------
+
+const SRC_DIR = join(__dirname, "..", "src");
+const PAGES_DIR = join(SRC_DIR, "pages");
+
+function tsxUnder(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(dir).sort()) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) tsxUnder(p, out);
+    else if (name.endsWith(".tsx")) out.push(p);
+  }
+  return out;
+}
+
+/** The page route that renders `<WatchedStrip />`, or `null` when no
+ *  page does. A mount that is NOT a page RAISES rather than returning
+ *  null: the section would then be on screen somewhere these guards
+ *  cannot see, and skipping quietly is the one answer that would be
+ *  wrong. */
+function watchedStripRoute(): string | null {
+  const MOUNT = /<WatchedStrip[\s/>]/;
+  const mounts = tsxUnder(SRC_DIR)
+    .filter((p) => MOUNT.test(readFileSync(p, "utf8")));
+  const onPages = mounts.filter((p) => p.startsWith(PAGES_DIR + sep)
+    && !/(^|[\\/])_/.test(relative(PAGES_DIR, p)));
+  if (mounts.length > 0 && onPages.length === 0) {
+    throw new Error(
+      `<WatchedStrip /> is mounted in ${mounts.join(", ")} — not a page. `
+      + "Name the route that reaches it here: these guards must not skip "
+      + "while the section is on screen.");
+  }
+  if (onPages.length === 0) return null;
+  const route = `/${relative(PAGES_DIR, onPages[0]).split(sep).join("/")}`
+    .replace(/\.tsx$/, "").replace(/\/index$/, "");
+  return route === "" ? "/" : route;
+}
+
+const STRIP_ROUTE = watchedStripRoute();
+
+/** The route the strip draws on, or a NAMED skip carrying the condition
+ *  that retires it. Called FIRST by every entry point below — before a
+ *  route is registered and before a response is waited on — so a skipped
+ *  test leaves nothing in flight. */
+function stripSurface(): string {
+  test.skip(STRIP_ROUTE === null,
+    "no page mounts <WatchedStrip />: the read came off /bet-suggester on "
+    + "2026-09-15 and was not remounted anywhere. This claim is still true "
+    + "of the component and is KEPT, not deleted — it re-arms at whatever "
+    + "route mounts the strip next, with no edit to this file.");
+  return STRIP_ROUTE!;
+}
 
 import {
   WATCHED_STRIP_POLL_MS, WATCHED_STRIP_READ_CEILING_MS,
@@ -220,7 +297,7 @@ test("a response that left BEFORE the one already on screen never lands",
     await serve(page, (n) => (n === 1
       ? { body: OLD, delayMs: 17_000 }
       : { body: NEW }));
-    await page.goto("/bet-suggester");
+    await page.goto(stripSurface());
     // THE WAIT IS MEASURED FROM THE NAVIGATION, NOT FROM THE ASSERTION
     // ABOVE IT. A `sleep` chained after a `toHaveAttribute` is measured
     // from whenever that resolved, which moves with the build under
@@ -298,7 +375,7 @@ test("a read that never answers is abandoned and DRAWN — a section that "
     // one conclusion this surface exists against.
     test.setTimeout(CEILING_LANDS + 30_000);
     await serve(page, () => undefined);
-    await page.goto("/bet-suggester");
+    await page.goto(stripSurface());
     const gate = page.getByTestId("watched-strip-gate");
     await expect(gate).toBeVisible({ timeout: CEILING_LANDS });
     // IT SAYS WHOSE SENTENCE THIS IS. Every other refusal on this
@@ -326,7 +403,7 @@ test("a hung poll AFTER a good one marks the figures as the earlier "
     // the failure that arms the banner.
     test.setTimeout(SECOND_POLL_CEILING_LANDS + 30_000);
     await serve(page, (n) => (n === 1 ? { body: NEW } : undefined));
-    await page.goto("/bet-suggester");
+    await page.goto(stripSurface());
     await expect(section(page)).toHaveAttribute(
       "data-generated-at", NEW.generated_at, { timeout: 30_000 });
     const stale = page.getByTestId("watched-stale");
@@ -358,7 +435,7 @@ test("a good read with no `generated_at`, then a refusal, still says "
     await serve(page, (n) => (n === 1
       ? { body: NO_STAMP }
       : { body: { detail: REFUSED_SAID }, status: 403 }));
-    await page.goto("/bet-suggester");
+    await page.goto(stripSurface());
     await expect(scoreline(page)).toContainText("2–1", { timeout: 30_000 });
     const stale = page.getByTestId("watched-stale");
     await expect(stale).toBeVisible({ timeout: 40_000 });
@@ -389,12 +466,17 @@ test("a shape the strip cannot draw stops the STRIP and nothing else",
     // that has not happened yet.
     await serve(page, () => ({ body: {
       ...NEW, monitored_not_described: "not a list" } }));
-    await page.goto("/bet-suggester");
+    await page.goto(stripSurface());
 
-    // THE BOARD LIVES. This is the assertion the whole test exists for.
-    await expect(page.getByTestId("board-rank-heading"))
-      .toBeVisible({ timeout: 30_000 });
-    await expect(page.locator("main")).toHaveCount(1);
+    // THE PAGE LIVES. This is the assertion the whole test exists for,
+    // and it was never about the league columns specifically: the
+    // finding was `<main>` GONE and the body down to 127 characters.
+    // The ranked board is still named on the route that carries it,
+    // because that is the surface the harm was reported on.
+    await expect(page.locator("main")).toHaveCount(1, { timeout: 30_000 });
+    if (STRIP_ROUTE === "/bet-suggester") {
+      await expect(page.getByTestId("board-rank-heading")).toBeVisible();
+    }
     const chars = await page.evaluate(() => document.body.innerText.length);
     expect(chars, "the page collapsed to a client-side exception")
       .toBeGreaterThan(1000);
@@ -418,21 +500,53 @@ test("a shape the strip cannot draw stops the STRIP and nothing else",
 
 // ================================= 5. one read, for every surface on it
 
-test("the two surfaces that draw this read share ONE poll", async ({ page }) => {
+test("one read per cadence, however many surfaces draw it",
+  async ({ page }) => {
     // MEASURED ON PRODUCTION: WatchedStrip and LiveCard's LiveSection
     // each ran their own 15s timer against the same operator-gated
     // route — two requests per cycle, 2.4s out of phase, ~139KB each.
     // The phase drift is what made the straggler defect visible rather
     // than theoretical, and two independent reads of one moving match
     // were being rendered side by side as one screen.
+    //
+    // RETARGETED 2026-09-15, AND THE CLAIM IS UNCHANGED. This used to
+    // read "the TWO SURFACES that draw this read share one poll" and
+    // named the strip and the live section, both on /bet-suggester.
+    // The strip came off that page, so the pair is no longer there —
+    // but sharing was never a property of those two components. It is a
+    // property of the feed, and this page still holds more than one
+    // subscriber to it: `GuardedLiveSection` reads it for the error
+    // boundary's reset key and `LiveSection` reads it for the cards.
+    // The defect this was written against — a surface running its OWN
+    // timer — still doubles the number below, so the measurement is the
+    // same one. It runs UNGATED for that reason: it is the one claim in
+    // this file that is fully measurable with the strip unmounted, and
+    // parking it would be giving up coverage the page still supports.
     test.setTimeout(90_000);
+
+    // NON-VACUITY, COUNTED IN THE TREE RATHER THAN REMEMBERED. A page
+    // with a single subscriber would pass the request count below for a
+    // reason that has nothing to do with sharing, so the premise is
+    // measured: `useWatchedStrip` IS the subscription, and the surface
+    // whose testid this test asserts takes it more than once.
+    const subscriptions = (readFileSync(
+      join(SRC_DIR, "components", "LiveCard.tsx"), "utf8")
+      .match(/\buseWatchedStrip\(/g) ?? []).length;
+    expect(subscriptions,
+      "the live surface no longer subscribes more than once, so the "
+      + "count below stops being evidence of sharing").toBeGreaterThan(1);
+
     const hits = await serve(page, () => ({ body: NEW }));
     await page.goto("/bet-suggester");
 
-    // BOTH SURFACES ARE GENUINELY ON SCREEN. Without this the count
-    // below could pass because one of them never mounted.
-    await expect(section(page)).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId("live-section")).toBeVisible();
+    // THE SURFACE IS GENUINELY ON SCREEN. Without this the count below
+    // could pass because nothing ever mounted.
+    await expect(page.getByTestId("live-section"))
+      .toBeVisible({ timeout: 30_000 });
+    // AND THE STRIP TOO, ON THE DAY IT IS MOUNTED HERE AGAIN.
+    if (STRIP_ROUTE === "/bet-suggester") {
+      await expect(section(page)).toBeVisible();
+    }
 
     // TWO TICKS OF THE CADENCE. One request each, not two.
     await sleep(18_000);
@@ -441,10 +555,12 @@ test("the two surfaces that draw this read share ONE poll", async ({ page }) => 
       .toBeLessThanOrEqual(2);
     expect(hits.strip, "and the poll is still running").toBeGreaterThan(1);
 
-    // AND THE TWO SURFACES ARE DRAWING THE SAME READ, which is the half
-    // of this that is not about bandwidth.
-    await expect(section(page))
-      .toHaveAttribute("data-generated-at", NEW.generated_at);
+    // AND THE SURFACES ARE DRAWING THAT READ, which is the half of this
+    // that is not about bandwidth.
+    if (STRIP_ROUTE === "/bet-suggester") {
+      await expect(section(page))
+        .toHaveAttribute("data-generated-at", NEW.generated_at);
+    }
     await expect(page.getByTestId("live-tape")).toBeVisible();
   });
 
@@ -466,7 +582,7 @@ test("a read that outlasts the poll PERIOD is not abandoned — the "
     // is red on the build that shipped the outage and green after.
     test.setTimeout(SECOND_POLL_CEILING_LANDS + 30_000);
     await serve(page, () => ({ body: NEW, delayMs: 25_000 }));
-    await page.goto("/bet-suggester");
+    await page.goto(stripSurface());
     // It lands, late, and it is the payload — not a gate, not a blank.
     await expect(section(page)).toHaveAttribute(
       "data-generated-at", NEW.generated_at,
@@ -487,7 +603,7 @@ test("a scheduled poll does not stack on a read that is still coming",
     // and asks the backend to build the same megabyte twice.
     test.setTimeout(SECOND_POLL_CEILING_LANDS + 30_000);
     const hits = await serve(page, () => ({ body: NEW, delayMs: 25_000 }));
-    await page.goto("/bet-suggester");
+    await page.goto(stripSurface());
     await expect(section(page)).toHaveAttribute(
       "data-generated-at", NEW.generated_at,
       { timeout: WATCHED_STRIP_READ_CEILING_MS });
