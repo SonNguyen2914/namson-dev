@@ -60,7 +60,8 @@ import { FieldRead, fetchRatings } from "../../lib/fieldApi";
 import { TZ, dayLabel, localDay } from "../../lib/matchday";
 import {
   Board, CUP_COMP_KEY, SEASON_BLEND_K, THIN_ASK_SIZE, WIDE_SPREAD_C,
-  askHonoured, boardColumns, declarationOf, fetchBoard, leagueLabel,
+  askHonoured, boardColumns, columnsOf, declarationOf, fetchBoard,
+  leagueLabel,
 } from "../../lib/pickerApi";
 import {
   DEFAULT_BACK, REVIEW_WINDOWS, Review, fetchReview, readHere,
@@ -303,7 +304,22 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   // in that league's column with the competition named on the card
   // rather than in a column of its own (backend 2026-09-01). `?? league`
   // keeps an older payload rendering exactly as it did.
-  const colOf = (r: { column?: string; league: string }) => r.column ?? r.league;
+  //
+  // AND A ROW CAN BE IN MORE THAN ONE (backend #136, 2026-09-14). The
+  // Campeones Cup is `tables.FOLDED_INTO_COLUMNS` — rows and no column
+  // of its own — and Inter Miami v Cruz Azul belongs in the MLS column
+  // AND the Liga MX column, because neither league's table describes a
+  // cross-league tie and both clubs' readers want it. `columns` is the
+  // whole set and `column` is its FIRST entry, so a singular reader
+  // shows such a row in ONE column and silently drops it from the other.
+  // `columnsOf` is that reader made plural, and it lives in pickerApi
+  // beside the type so the card in the column and the filter that put it
+  // there cannot disagree.
+  //
+  // THE COLUMN SET IS UNTOUCHED — it is `Object.keys(board.leagues)`
+  // below, the operator's own declaration, and `campeones` is not one of
+  // its keys. A row naming a column nobody draws is drawn nowhere, which
+  // is the same thing an unknown `column` has always done.
 
   // MATCHDAY BANDS (operator, 2026-09-01): the board is day-major. One
   // ordered union of day keys, computed here so every column lays its
@@ -1139,11 +1155,11 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                     dayLabels={dayLabelFor} colIndex={ci + 1}
                     dense={Boolean(soleColumn)}
                     meta={leaguesMap[slug]}
-                    rows={rows.filter((r) => colOf(r) === slug)}
-                    refusals={refusals.filter((r) => colOf(r) === slug)}
+                    rows={rows.filter((r) => columnsOf(r).includes(slug))}
+                    refusals={refusals.filter((r) => columnsOf(r).includes(slug))}
                     review={{
-                      rows: finished.filter((r) => colOf(r) === slug),
-                      refusals: finishedRefusals.filter((r) => colOf(r) === slug),
+                      rows: finished.filter((r) => columnsOf(r).includes(slug)),
+                      refusals: finishedRefusals.filter((r) => columnsOf(r).includes(slug)),
                       meta: reviewLeagues[slug],
                       back, loading: reviewLoading, error: reviewError,
                       /* WAS THIS COMPETITION READ AT ALL? Off the
