@@ -534,8 +534,10 @@ test("the frontend's own reading order cannot ADMIT a column — a league it nam
        — because the operator reads his board left to right in that order
        every day and the payload does not carry an order. A list like that
        used to be PREPENDED to the column set, which is to say it admitted
-       four columns whatever the board said; it is intersected with the
-       declaration now, so it can only ever reorder.
+       whatever it named whatever the board said; it is intersected with
+       the declaration now, so it can only ever reorder. (It names eight
+       slugs since 2026-09-15 and this test still turns on the same
+       property — the count was never the point.)
        NO OTHER TEST ON THIS BOARD CAN SEE THE DIFFERENCE, because every
        other fixture here declares all four leagues — a list that admits
        and a list that orders produce identical boards until the board
