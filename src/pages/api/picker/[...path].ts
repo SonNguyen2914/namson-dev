@@ -15,12 +15,19 @@
 // browser, so no test ever exercised the proxy file). e2e/picker.spec.ts
 // carries an unmocked proxy test pinning exactly this file.
 import type { NextApiRequest, NextApiResponse } from "next";
-import { leagueRouteAllowed, proxy } from "../../../lib/suggesterProxy";
+import {
+  leagueRouteAllowed,
+  proxy,
+  refuseLeagueRoute,
+} from "../../../lib/suggesterProxy";
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const segs = ((req.query.path as string[]) || []).join("/");
   if (req.method !== "GET" || !leagueRouteAllowed("picker", segs)) {
-    return res.status(404).json({ error: "unknown picker route" });
+    // The refusal is authored in lib/suggesterProxy.ts so all ten
+    // proxies say it in one shape — JSON that names the competition
+    // and which finding this is, never Next's HTML 404 page.
+    return refuseLeagueRoute(res, "picker", segs);
   }
   const qs = req.url?.includes("?") ? "?" + req.url.split("?")[1] : "";
   return proxy(req, res, `/api/picker/${segs}${qs}`);

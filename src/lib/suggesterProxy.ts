@@ -21,6 +21,11 @@
 // UPSTREAM STATUS — a 404 stays a 404, a 503 stays a 503 — with the
 // unparseable bytes carried as evidence rather than paraphrased.
 import type { NextApiRequest, NextApiResponse } from "next";
+// The ONE table of competition display names this repo has. Imported so
+// a refusal can NAME the competition it is refusing instead of handing
+// the caller a bare slug; `pickerApi` imports nothing, so this is a
+// one-way edge and not a cycle.
+import { LEAGUE_LABEL } from "./pickerApi";
 
 const BACKEND = process.env.SUGGESTER_BACKEND_URL || "http://localhost:8000";
 
@@ -188,6 +193,33 @@ export const LEAGUE_PROXY_ALLOWED: Record<string, readonly string[]> = {
   // refusal.
   laliga: ["scoreboard", "schedule", "standings", "markets", "odds",
            "status"],
+  // THE FOUR LEAGUES THAT JOINED THE BOARD ON 2026-09-08 AND HAD NO
+  // PROXY PREFIX AT ALL until 2026-09-15. Measured that day on
+  // namson.dev: /api/bundesliga/standings, /api/seriea/standings,
+  // /api/ligue1/standings and /api/eredivisie/standings each answered
+  // NEXT'S HTML 404 PAGE — 3,729 bytes of `text/html` to a caller that
+  // had asked for JSON — while the backend answered all four with a
+  // real 200 table on the same request. `src/picker/tables.py` marks
+  // these four `routed: False`, which is true of a MATCH HUB and was
+  // read as true of the standings route too; the backend has served
+  // their tables since the day they joined.
+  //
+  // ONE ROUTE EACH, AND ONLY ONE. Read off the backend's own
+  // /openapi.json the same day: `/api/bundesliga/`, `/api/seriea/`,
+  // `/api/ligue1/` and `/api/eredivisie/` hold exactly ONE path apiece
+  // — `standings` — against epl's eight and mls's twenty. These leagues
+  // serve no page of their own; they exist so a Champions League club
+  // has a real ppg, GD/g, rank and tier (see LEAGUE_LABEL in
+  // lib/pickerApi.ts), and so the board can rank them. A list copied
+  // from the EPL one beside it would have forwarded scoreboard,
+  // schedule, markets, odds and approval to a guaranteed backend 404 —
+  // the `laliga/approval` shape this file already carries a scar for —
+  // so these four stay exact. The drift guard checks both directions
+  // against that document, so they cannot quietly stop being exact.
+  bundesliga: ["standings"],
+  seriea: ["standings"],
+  ligue1: ["standings"],
+  eredivisie: ["standings"],
   // Deliberately tiny: no standings (none exist for friendlies), no
   // odds, no admin. "coverage" was MISSING here once, so the backend
   // census route was unreachable from the deployed frontend.
@@ -390,12 +422,119 @@ export const PROXY_GUARDS_OPEN: Record<string, {
   finding: string; closes_when: string;
 }> = {};
 
+/** An OWN entry of a slug-keyed table, or undefined.
+ *
+ *  `table[prefix]` is not the same question as "is `prefix` declared in
+ *  this table", and the difference stopped being academic the day the
+ *  prefix came out of the URL. `LEAGUE_PROXY_ALLOWED["constructor"]`
+ *  answers with Object's constructor — TRUTHY, and with no `.includes`
+ *  — so the guard below would have passed its `if (!list)` check and
+ *  then thrown a TypeError, which Next renders as a 500 HTML page. A
+ *  request that names nothing would have come back looking exactly like
+ *  a broken server, which is the whole defect this round is about,
+ *  arriving through the fix for it. `toString`, `valueOf` and
+ *  `__proto__` are the same shape. */
+function ownEntry<T>(table: Record<string, T>, prefix: string): T | undefined {
+  return Object.prototype.hasOwnProperty.call(table, prefix)
+    ? table[prefix] : undefined;
+}
+
 /** True when `segs` is a route this prefix's proxy forwards. */
 export function leagueRouteAllowed(prefix: string, segs: string): boolean {
-  const list = LEAGUE_PROXY_ALLOWED[prefix];
+  const list = ownEntry(LEAGUE_PROXY_ALLOWED, prefix);
   if (!list) return false;
   return list.includes(segs)
-    || (LEAGUE_PROXY_ID_ROUTES[prefix] || []).some((re) => re.test(segs));
+    || (ownEntry(LEAGUE_PROXY_ID_ROUTES, prefix) || []).some(
+         (re) => re.test(segs));
+}
+
+/** WHY AN ABSENT ROUTE MAY NOT RENDER AS HTML.
+ *
+ *  Measured on namson.dev 2026-09-15: five slugs the board names —
+ *  bundesliga, seriea, ligue1, eredivisie and the folded campeones —
+ *  answered /api/<slug>/standings with Next's own 404 PAGE: 3,729 bytes
+ *  of `text/html` beginning `<!DOCTYPE html>`. Every caller on this
+ *  surface asks for JSON and parses what it gets, so that page does not
+ *  arrive as "there is no such route". It arrives as whatever the
+ *  parser does with a `<` — a SyntaxError in one reader, a null in
+ *  another, a rendered census-of-nothing in a third — and not one of
+ *  those says the route is absent. An absence and a breakage became
+ *  indistinguishable, which is the same folding `proxy()` above was
+ *  rewritten to refuse one layer down.
+ *
+ *  So a refusal is AUTHORED, in JSON, and it names which of two
+ *  findings it is. Both travel under 404 — "not a thing here", as
+ *  distinct from the 502 `proxy()` authors for "we could not get an
+ *  answer" — and neither contacts a backend at all:
+ *
+ *    route_not_forwarded      the prefix IS a declared proxy and this
+ *                             sub-path is not on its list. The refusal
+ *                             the nine per-league handlers have always
+ *                             authored.
+ *    competition_not_proxied  no prefix is declared for this slug, so
+ *                             nothing under it is forwarded. campeones
+ *                             is the case that prompted this: it is
+ *                             FOLDED into the mls and ligamx columns
+ *                             rather than drawn as one of its own, and
+ *                             the backend publishes no /api/campeones/
+ *                             path of any kind (checked against
+ *                             /openapi.json the same day), so a route
+ *                             here would forward to a guaranteed 404.
+ *
+ *  `error` keeps the exact sentence the nine handlers already emitted —
+ *  every guard in e2e/proxy-allowlists.spec.ts reads it — and the rest
+ *  is added beside it rather than in place of it. */
+export type LeagueRouteRefusal = {
+  error: string;
+  reason: "route_not_forwarded" | "competition_not_proxied";
+  competition: string;
+  /** Only when a name is actually known. A prefix like `comp` or
+   *  `hunter` has none, and inventing one from the slug would put a
+   *  machine key where a reader expects a competition. */
+  competition_name?: string;
+  route: string;
+  detail: string;
+};
+
+/** A path segment, bounded and stripped, safe to quote back. The prefix
+ *  and the sub-path both come from the URL now, so neither is echoed
+ *  unedited. */
+const quotable = (s: string, max: number) =>
+  s.replace(/[^A-Za-z0-9/_.-]/g, "").slice(0, max) || "(unnamed)";
+
+export function leagueRouteRefusal(
+  prefix: string, segs: string
+): LeagueRouteRefusal {
+  const slug = quotable(prefix, 40);
+  const route = quotable(segs, 120);
+  const declared = ownEntry(LEAGUE_PROXY_ALLOWED, prefix) !== undefined;
+  const name = ownEntry(LEAGUE_LABEL, prefix);
+  return {
+    error: `unknown ${slug} route`,
+    reason: declared ? "route_not_forwarded" : "competition_not_proxied",
+    competition: slug,
+    ...(name ? { competition_name: name } : {}),
+    route,
+    detail: declared
+      ? `the ${slug} proxy forwards a named set of routes and `
+        + `"${route}" is not one of them (GET only). This refusal is `
+        + "authored here: no backend was contacted, so it is not an "
+        + "upstream 404 and not a failure of one."
+      : `${name ? `${name} (${slug})` : `"${slug}"`} has no proxy prefix `
+        + "in this frontend, so no route under it is forwarded — "
+        + "standings included. That is a declaration in "
+        + "LEAGUE_PROXY_ALLOWED, not a breakage: no backend was "
+        + "contacted. An absent route is a fact, and this JSON says so "
+        + "where Next's HTML 404 page could only be guessed at.",
+  };
+}
+
+/** The refusal, written to the response. One line at every call site so
+ *  the shape cannot drift between the ten handlers that author it. */
+export function refuseLeagueRoute(
+  res: NextApiResponse, prefix: string, segs: string
+) {
+  return res.status(404).json(leagueRouteRefusal(prefix, segs));
 }
 
 /** One prefix's drift against the backend's OWN published path table.
