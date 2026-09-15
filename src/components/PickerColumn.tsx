@@ -2275,8 +2275,6 @@ export function LeagueColumn({
      and that block says which of the two it is. */
   const placed = new Set(byDay.flatMap((d) => d.refused));
   const undated = refusals.filter((r) => !placed.has(r));
-  // the first day that draws a refusal is where the reason is explained
-  const firstRefusalDay = byDay.find((d) => d.refused.length > 0)?.key ?? null;
   /* IS THIS COLUMN ON ITS OWN SORT RIGHT NOW? `columnSort` substitutes
      exactly while the control it was handed is untouched, so the same
      test answers it here — one rule, asked twice, rather than two rules

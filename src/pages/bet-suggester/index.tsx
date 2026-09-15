@@ -64,13 +64,11 @@ import {
   leagueLabel,
 } from "../../lib/pickerApi";
 import {
-  DEFAULT_BACK, REVIEW_WINDOWS, Review, fetchReview, readHere,
-  reviewAskHonoured,
+  DEFAULT_BACK, Review, fetchReview, readHere, reviewAskHonoured,
 } from "../../lib/pickerReview";
 import {
   COLUMN_DEFAULT_SORT, ColumnSort, DEFAULT_SORT, SORT_MODES, columnSort,
-  isDefaultSort, loadBoardSort, modeById, nullNoteFor, orderPhrase,
-  saveBoardSort,
+  loadBoardSort, modeById, nullNoteFor, orderPhrase,
 } from "../../lib/pickerSort";
 import { failureSentence, readFailure } from "../../lib/providerFailure";
 import { Eyebrow } from "../../components/ui";
@@ -82,16 +80,15 @@ import { LeagueRibbon } from "../../components/LeagueRibbon";
 import {
   WatchDeclarationProvider, WatchPanel,
 } from "../../components/WatchDeclaration";
-import WatchedStrip from "../../components/WatchedStrip";
 import {
   Collapse, NavChip, RouteProgress, SkeletonRows, TopBar,
 } from "../../components/chrome";
 
-const WINDOWS = [1, 2, 3, 8, 14];   // the endpoint accepts 1..14
-// 7, not the endpoint's own 2: four league columns deserve a fuller
+// 8, not the endpoint's own 2: four league columns deserve a fuller
 // slate than a two-day sliver — a column that is usually empty teaches
-// the reader to stop looking at it. The window control still offers the
-// short reads.
+// the reader to stop looking at it. The chips that offered the shorter
+// reads came off on 2026-09-15, so this number is now the whole
+// contract — there is nothing left that can ask for another length.
 const DEFAULT_DAYS = 8;
 
 /** The board's own ET date key, YYYYMMDD, made readable. Left as the raw
@@ -130,7 +127,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   backTo?: { href: string; label: string };
 } = {}) {
   const router = useRouter();
-  const [days, setDays] = useState(DEFAULT_DAYS);
+  const days = DEFAULT_DAYS;
   /* HOW MANY COLUMNS ARE DRAWN AT ONCE, and which four they are.
      Four is measured, not chosen: the board's track is `max-w-[96rem]`,
      so a card stops growing at 1536px and a wider monitor renders the
@@ -147,25 +144,29 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   const [nonce, setNonce] = useState(0);
   // The finished tail rides on its OWN state, its own request and its own
   // window. A dead review must not blank the board, and a slow one must
-  // not hold the board's first paint.
-  const [back, setBack] = useState(DEFAULT_BACK);
+  // not hold the board's first paint. The window itself is a constant
+  // rather than state: its chips came off with the forward board's on
+  // 2026-09-15 and nothing on the page can ask for another length.
+  const back = DEFAULT_BACK;
   /* And so does the cross-league field, per column that has one. Keyed
      by COLUMN SLUG rather than held as one object, because a board can
      draw two cups at once and each has its own field, its own request
      and its own way of failing. */
   const [fields, setFields] = useState<Record<string, FieldRead>>({});
   // SORT LIVES ON THE MATCHDAY (2026-09-01, draft C shipped): one board
-  // default, remembered on this device, plus per-day overrides that are
-  // session-only — a remembered "Saturday" override would silently
-  // apply to a different Saturday next week. Changing the default
-  // clears every override, so the board never mixes stale intentions.
-  const [boardSort, setBoardSort] = useState<ColumnSort>(() => loadBoardSort());
+  // default beneath per-day overrides that are session-only — a
+  // remembered "Saturday" override would silently apply to a different
+  // Saturday next week.
+  // THE DEFAULT IS NO LONGER CHOSEN, NOR REMEMBERED (operator,
+  // 2026-09-15). The board-level control is gone, so nothing can set
+  // this; it is still held as state because `loadBoardSort` must run
+  // ONCE, and what it does is clear the key that control persisted and
+  // answer `DEFAULT_SORT`. It is READ on every render — `sortFor` falls
+  // back to it for any day carrying no override, and `columnSort` is
+  // handed it to decide whether a column may run its own key — so this
+  // is a live value, not a leftover.
+  const [boardSort] = useState<ColumnSort>(() => loadBoardSort());
   const [daySorts, setDaySorts] = useState<Record<string, ColumnSort>>({});
-  const applyBoardSort = (next: ColumnSort) => {
-    setBoardSort(next);
-    saveBoardSort(next);
-    setDaySorts({});
-  };
   const applyDaySort = (day: string, next: ColumnSort) =>
     setDaySorts((prev) => ({ ...prev, [day]: next }));
   const [review, setReview] = useState<Review | null>(null);
@@ -522,23 +523,6 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
     return () => { clearTimeout(t); ac.abort(); };
   }, [fieldKey, nonce, deepLink]);
 
-  /* THE SEASON BANNER DESCRIBES THIS BOARD'S COLUMNS, NOT THE PAYLOAD'S
-     (2026-09-08). It counted every league in `board.leagues` regardless
-     of which of them got a column, so /bet-suggester/ucl printed
-     "1 OF 4 LEAGUES · Liga MX 6 GP" on a board with no Liga MX column —
-     a caveat about numbers that are nowhere on the page. It is derived
-     from `columnSlugs` now, which is a no-op on the full board (that
-     set IS the keys of `leagues`, since 2026-09-09) and the whole point
-     on a narrowed one.
-     Cup columns stay excluded from the count for the older reason: a
-     knockout has no season table of its own to be rated on, and folding
-     it into "N of M leagues" would make that sentence untrue. A board
-     narrowed to a cup therefore has NO league column to caveat, and the
-     banner is correctly absent rather than borrowed from elsewhere. */
-  const leagues = Object.entries(leaguesMap).filter(
-    ([slug, m]) => m.kind !== "cup" && columnSlugs.includes(slug));
-  const priorLeagues = leagues.filter(([, m]) => m.src === "prior");
-
   /* WHAT THE PAGE SAYS IT RANKS BY MUST BE WHAT IT RANKS BY.
      The board's framing names the TABLE GAP, and on the four league
      columns that is exactly right. A single-column board whose column
@@ -591,8 +575,6 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
     ? Array.from({ length: VIEW },
         (_, i) => columnSlugs[(windowStart + i) % columnSlugs.length])
     : columnSlugs;
-  const stepWindow = (d: number) => setWindowStart((w) =>
-    ((w + d) % columnSlugs.length + columnSlugs.length) % columnSlugs.length);
 
   /* ── MATCHDAY BANDS FOLLOW THE WINDOW (operator, 2026-09-15) ───────
      The union of day keys is taken over the rows of the columns being
@@ -629,15 +611,25 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
 
   /* ARROW KEYS STEP THE WINDOW. Guarded against a form control so a
      reader inside the matchday sort can still use them to change option,
-     and against modifier combinations so browser shortcuts survive. */
+     and against modifier combinations so browser shortcuts survive.
+     THE STEP IS COMPUTED IN HERE, not lifted out: a `stepWindow` defined
+     in the render body was a new function every render and could not
+     honestly appear in this dependency list, which left the effect
+     claiming to read less than it did. What it genuinely reads is the
+     column COUNT — `setWindowStart` is stable, and the wrap needs
+     nothing else — so that count is the dependency, and re-binding the
+     listener when a column joins or leaves the board is exactly right. */
   useEffect(() => {
     if (!windowed) return;
+    const n = columnSlugs.length;
+    const step = (d: number) =>
+      setWindowStart((w) => ((w + d) % n + n) % n);
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === "ArrowRight") { e.preventDefault(); stepWindow(1); }
-      else if (e.key === "ArrowLeft") { e.preventDefault(); stepWindow(-1); }
+      if (e.key === "ArrowRight") { e.preventDefault(); step(1); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); step(-1); }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -773,8 +765,9 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
           {/* THE WINDOW CHIPS ARE GONE TOO (operator, 2026-09-15): "using
               the default is enough since I have never touched this
               section". Both windows open at 8 days — `DEFAULT_DAYS` and
-              `DEFAULT_BACK` — and the state behind them is untouched, so
-              the board asks for exactly what it asked for before. What is
+              `DEFAULT_BACK` — and the values behind them are plain
+              constants now rather than state nothing can set, so the
+              board asks for exactly what it asked for before. What is
               kept is the PROVENANCE beside them: when the board was
               built, which slate it is, and how many fixtures it holds.
               That is not a control and was never the thing taking up the
