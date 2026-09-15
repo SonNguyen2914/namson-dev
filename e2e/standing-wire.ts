@@ -137,7 +137,21 @@ export const WIRE: Record<string, readonly string[]> = {
   ],
   shared_exit_book: ["rule", "consult_rule"],
   coverage: ["coverage_is_anchored", "no_history_is_not_quiet"],
-  state: ["period_stays_on_the_strip"],
+  // RE-RECORDED 2026-09-15 against backend `origin/main` d213631, which
+  // added `stale_row_is_not_a_verdict` in TRIVELA #137 — a row older
+  // than the window stops being evidence about now, which is true of
+  // the SURFACE and of no single fixture, so the route hoists it beside
+  // `period_stays_on_the_strip`.
+  //
+  // RECORDED FROM origin/main AND NOT FROM PRODUCTION, deliberately, and
+  // this is the first time the two have disagreed. #137 is merged and
+  // not yet deployed, so production still serves the older set — and the
+  // freshness guard compares this recording against the backend's
+  // CURRENT declaration, not against what is deployed. Recording what
+  // production happens to be serving would make this file track a
+  // deploy queue rather than a contract, and it would go red on every
+  // gap between a merge and its release.
+  state: ["period_stays_on_the_strip", "stale_row_is_not_a_verdict"],
 };
 
 // ============ re-deriving it from a backend checkout

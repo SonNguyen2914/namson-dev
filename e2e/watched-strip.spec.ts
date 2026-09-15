@@ -6025,7 +6025,7 @@ test("the mirror is COMPLETE against the emitter's published "
     // the count the recording was made at.
     const total = Object.values(WIRE).reduce((n, ks) => n + ks.length, 0);
     expect(total, "the recorded declaration has lost keys — re-read "
-      + "e2e/standing-wire.ts before relaxing this").toBe(33);
+      + "e2e/standing-wire.ts before relaxing this").toBe(34);
   });
 
 // ---- and the recording itself is FRESH
