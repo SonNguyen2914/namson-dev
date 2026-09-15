@@ -218,21 +218,31 @@ export function utcClock(iso: string): string {
   return m ? `${m[1]}Z` : iso;
 }
 
-/** WHAT THE CARD SAYS ABOUT A PRESS — or `null`, when it must say
- *  nothing.
+/** WHAT THE CARD SAYS ABOUT A PRESS.
  *
- *  `null` IS THE 401/403 CASE AND ONLY THAT. WatchedStrip, mounted on
- *  this same page against this same gate with this same token, already
- *  draws the refusal with its status and the backend's own sentence. A
- *  second copy here would be the page saying one thing twice and the
- *  operator reading it twice; the button still marks itself refused, so
- *  the press is not left looking as though nothing happened.
+ *  IT NOW SAYS THE 401/403 ITSELF (2026-09-15). This returned `null` for
+ *  those two, and the reason was sound while it held: WatchedStrip was
+ *  mounted on this same page, against this same gate, with this same
+ *  token, and already drew the refusal with its status and the backend's
+ *  own sentence. A second copy would have been the page saying one thing
+ *  twice.
+ *
+ *  THE STRIP CAME OFF THIS PAGE, and the silence outlived its reason. An
+ *  operator whose token is refused pressed a button and read NOTHING —
+ *  the blank that says "nothing is live" when what happened is "you were
+ *  not allowed to ask", which is the single failure this whole surface
+ *  is built against. A suppression that depends on a neighbour has to
+ *  die with the neighbour.
+ *
+ *  So the gate is named here, with its status, like every other answer.
+ *  If the strip is ever mounted beside this again, THAT is when to
+ *  reconsider — and the duplication will be visible rather than the
+ *  silence being invisible.
  *
  *  Exported for the guard: these are the only words this control has,
  *  and a spec that retyped them would be checking a copy of itself. */
-export function tapeAnswerLines(r: TapeNowResult): string[] | null {
+export function tapeAnswerLines(r: TapeNowResult): string[] {
   if (!r.ok) {
-    if (r.status === 401 || r.status === 403) return null;
     // NAMED BY ITS CODE where there is one — `proxy_unreachable` and
     // `proxy_body_unreadable` are the two this repo's own proxy
     // authors, and they mean opposite things about whether the sweep
@@ -363,12 +373,12 @@ function TapeReadout({ tape, token, busy, said, press }: {
 }
 
 /** The answer to the last press, under the strip it was pressed on.
- *  Absent until there is one, and absent for the gated case the page
- *  already answers elsewhere — see tapeAnswerLines. */
+ *  Absent until there is one. THE GATED CASE IS NO LONGER AN
+ *  EXCEPTION: it was silent here because WatchedStrip answered it on the
+ *  same page, and the strip came off — see tapeAnswerLines. */
 function TapeAnswer({ said }: { said: TapeNowResult | null }) {
   if (said == null) return null;
   const lines = tapeAnswerLines(said);
-  if (lines == null) return null;
   return (
     <p data-testid="live-tape-said" data-ok={said.ok ? "true" : "false"}
       className={`mb-2 rounded-md border px-2 py-1 font-mono text-[9px] leading-relaxed ${
