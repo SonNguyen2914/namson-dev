@@ -1,4 +1,8 @@
 import { expect, test } from "@playwright/test";
+/* THE ORDER THE BOARD DRAWS IN IS IMPORTED, NEVER RETYPED. `boardColumns`
+   is the one door the page's column order comes through, and it is the
+   same call the page makes — see src/lib/pickerApi. */
+import { boardColumns } from "../src/lib/pickerApi";
 // THE STRIP IS SERVED AS `watched-strip-v2` (backend #129). The
 // fixtures below stay the shape RECORDED off this route and `toV2`
 // applies the route's OWN hoist to them at the serve site, so the
@@ -366,17 +370,35 @@ const orderOf = async (c: ReturnType<typeof col>, n: number) => {
    and no ribbon is built at all — pinned by its own test below.
 
    `show` jumps to the leftmost column that still leaves `slug` inside
-   the four, so the columns around it keep their declared order. */
+   the four, so the columns around it keep the order they are DRAWN in. */
 const COLUMNS = ["mls", "epl", "laliga", "ligamx", "leaguescup", "ucl"];
 const VIEW = 4;                       // src/pages/bet-suggester/index.tsx
 
+/* DECLARED IS NOT DRAWN. `COLUMNS` above is this fixture's DECLARATION —
+   the keys of `board.leagues`, which is what the payload carries and the
+   only thing that decides WHICH columns exist. The order they are drawn
+   in is the operator's, held in `PICKER_COLUMN_ORDER` and applied by
+   `boardColumns`, so the window a pill opens is an index into THAT and
+   not into the payload.
+
+   THIS HELPER COMPUTED ITS JUMP OFF THE DECLARATION until 2026-09-15,
+   and agreed with the board only for as long as the two happened to
+   coincide. When the reading order grew to eight the operator's order
+   put EPL first, `show` went on pressing the pill the payload's key
+   order implied, and 37 tests in this file and its sibling stopped
+   bringing their own subject on screen. Derived here, so there is one
+   copy of the order and this follows it. */
+const drawnOrder = (columns: readonly string[] = COLUMNS) =>
+  boardColumns(columns);
+
 async function show(page: import("@playwright/test").Page, slug: string,
                     columns: readonly string[] = COLUMNS) {
-  const i = columns.indexOf(slug);
+  const order = drawnOrder(columns);
+  const i = order.indexOf(slug);
   expect(i, `${slug} is not a declared column of this board`)
     .toBeGreaterThanOrEqual(0);
-  if (columns.length > VIEW) {
-    const lead = columns[i < VIEW ? 0 : Math.min(i, columns.length - VIEW)];
+  if (order.length > VIEW) {
+    const lead = order[i < VIEW ? 0 : Math.min(i, order.length - VIEW)];
     await page.locator(
       `[data-testid="ribbon-pill"][data-slug="${lead}"]`).click();
   }
@@ -571,9 +593,32 @@ test("the UCL column ranks on shape while the board control is untouched, "
   });
 
 test("the four league columns are untouched by it", async ({ page }) => {
-    await openWide(page);
-    await expect(col(page, "epl").getByTestId("col-own-sort"))
-      .toHaveCount(0);
+    /* A COLUMN HAS TO BE ON SCREEN FOR "UNTOUCHED" TO MEAN ANYTHING.
+       This named `epl` and asserted it carries no own-sort chip, on the
+       window `openWide` opens — which does not draw EPL beside the
+       Champions League under any reading order this board has had. The
+       count was 0 because the column was ABSENT, not because it was
+       untouched, and the assertion could not have failed. So the league
+       columns are derived from the payload's own `kind`, each is
+       brought on screen in its turn, and its presence is asserted
+       before its chip's absence is. */
+    await open(page);
+    const leagues = Object.entries(LEAGUES)
+      .filter(([, m]) => (m as { kind?: string }).kind !== "cup")
+      .map(([slug]) => slug);
+    expect(leagues.length, "this test needs league columns to be about")
+      .toBe(4);
+    for (const slug of leagues) {
+      await show(page, slug);                    // …and it is drawn
+      await expect(col(page, slug).getByTestId("col-own-sort"),
+        `${slug} is a league column and runs the board's key`)
+        .toHaveCount(0);
+    }
+    /* AND THE COLUMN THAT DOES RUN ITS OWN KEY SAYS SO, which is what
+       makes the four absences above a fact about league columns rather
+       than a chip nothing renders any more. */
+    await show(page, "ucl");
+    await expect(col(page, "ucl").getByTestId("col-own-sort")).toHaveCount(1);
   });
 
 // ------ 2c. THE HEADING NAMES THE SORT THAT IS RUNNING (2026-09-09) ----

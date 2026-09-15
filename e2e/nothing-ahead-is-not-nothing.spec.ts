@@ -6,6 +6,11 @@ import { expect, test } from "@playwright/test";
    it was typed. Note the column draws THIS number rather than the review
    payload's `back` — the page states the window it ASKED for. */
 import { DEFAULT_BACK } from "../src/lib/pickerReview";
+/* …and the reordering the page applies to a declaration, from the page's
+   own function. `boardColumns` intersects the operator's reading order
+   with what the board declares, so it can only ever reorder — which is
+   the property the last test in part 4 is about. */
+import { boardColumns } from "../src/lib/pickerApi";
 
 // A COLUMN WITH NOTHING AHEAD OF IT IS NOT AN EMPTY COLUMN.
 //
@@ -555,11 +560,24 @@ test("the frontend's own reading order cannot ADMIT a column — a league it nam
     await expect(col(page, "ligamx")).toHaveCount(0);
     await expect(page.locator('[data-testid="ribbon-pill"][data-slug="ligamx"]'))
       .toHaveCount(0);
-    // ...and the survivors are still in reading order, MLS first: the
-    // list lost its power to admit without losing its job
+    /* ...AND THE SURVIVORS ARE STILL IN READING ORDER: the list lost its
+       power to admit without losing its job. Which order that is comes
+       from `boardColumns`, run on the declaration this board actually
+       serves — a literal here would be a second copy of the operator's
+       list, and it is the copy that rots (this line read "MLS first"
+       for as long as the reading order named four leagues, and was
+       wrong the day it named eight). The window is open at its start,
+       so the drawn columns are its first four. */
+    const order = boardColumns(Object.keys(withoutLigamx));
+    expect(order, "four drawn of five declared — this board must be windowed")
+      .toHaveLength(5);
     const drawn = await page.getByTestId("league-col")
       .evaluateAll((els) => els.map((e) => e.getAttribute("data-league")!));
-    expect(drawn.slice(0, 3)).toEqual(["mls", "epl", "laliga"]);
+    expect(drawn).toEqual(order.slice(0, 4));
+    // NON-VACUITY: the surviving order is NOT simply the payload's key
+    // order, so this is a claim about the reading order and not about
+    // the object literal above.
+    expect(order).not.toEqual(Object.keys(withoutLigamx));
     const pills = await page.getByTestId("ribbon-pill")
       .evaluateAll((els) => els.map((e) => e.getAttribute("data-slug")!));
     expect([...pills].sort()).toEqual(Object.keys(withoutLigamx).sort());

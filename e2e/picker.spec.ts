@@ -2,6 +2,11 @@ import { expect, test } from "@playwright/test";
 // the SAME day-key function the board groups by, so a test can never
 // disagree with the page about which band a kickoff belongs to
 import { localDay as localDayOf } from "../src/lib/matchday";
+/* …and the SAME reordering the board applies to its declaration, so a
+   test can never disagree with the page about which column comes first.
+   `boardColumns` intersects the operator's reading order
+   (`PICKER_COLUMN_ORDER`) with what the payload declares. */
+import { boardColumns } from "../src/lib/pickerApi";
 
 // The picker board (/bet-suggester) and the archive dropdown.
 //
@@ -377,12 +382,28 @@ test("four league columns, fixed order, each header carrying its facts",
     await open(page);
     const cols = page.getByTestId("league-col");
     await expect(cols).toHaveCount(4);
+    /* THE ORDER IS READ FROM WHERE IT IS DECLARED, not copied here.
+       `boardColumns` is the one door the page's column order comes
+       through and it is the same call the page makes, so what this
+       pins is that the board OBEYS the operator's reading order —
+       rather than echoing the payload's key order, or inventing one.
+       A literal list here would be a second copy of a declaration that
+       has exactly one home, and the copy is the half that rots: this
+       line said `mls, epl, laliga, ligamx` for as long as the reading
+       order named only four leagues, and went stale the day it named
+       eight. If the order has to change, it changes in
+       src/lib/pickerApi and this follows. */
     expect(await cols.evaluateAll(
       (els) => els.map((e) => e.getAttribute("data-league"))))
-      .toEqual(["mls", "epl", "laliga", "ligamx"]);
+      .toEqual(boardColumns(Object.keys(LEAGUES)));
+    /* AND THE HEADERS ARE READ BY NAME, not by position. Each block
+       below is about what a particular league's header says; the
+       position it says it from is the previous assertion's business,
+       and indexing by it made these blocks fail for the wrong reason
+       whenever the reading order moved. */
     // MLS: current-season badge with its min GP, and an in-window league
     // with nothing coming SAYS SO rather than sitting blank
-    const mls = cols.nth(0);
+    const mls = col(page, "mls");
     await expect(mls.getByRole("heading", { name: "MLS" })).toBeVisible();
     await expect(mls.getByText(/this szn · min 21 GP/)).toBeVisible();
     /* THE COUNT COUNTS WHAT THE COLUMN HOLDS (operator, 2026-09-08).
@@ -401,7 +422,7 @@ test("four league columns, fixed order, each header carrying its facts",
     await expect(mls.getByTestId("col-empty"))
       .toContainText("No MLS fixtures in the next 8 days");
     // La Liga: prior-season badge in the header, and a true count
-    const laliga = cols.nth(2);
+    const laliga = col(page, "laliga");
     await expect(laliga.getByText("prior szn").first()).toBeVisible();
     await expect(laliga.getByTestId("col-count")).toHaveText("2 fixtures");
     // the jump chips are a phone affordance — not desktop chrome
@@ -414,6 +435,27 @@ test("four league columns, fixed order, each header carrying its facts",
        one fact: four declared, four drawn, nothing to page through. */
     await expect(page.getByTestId("league-ribbon")).toHaveCount(0);
     await expect(page.getByTestId("ribbon-pill")).toHaveCount(0);
+
+    /* AND THE ORDER IS THE OPERATOR'S, NOT THE PAYLOAD'S — which the
+       assertion above cannot see on its own, because this fixture's
+       keys happen to arrive in the order the board draws them. A page
+       that simply echoed `Object.keys(board.leagues)` would satisfy it.
+       So the SAME four leagues are served with their keys reversed and
+       the board must come out in exactly the same order: the payload
+       says WHICH columns exist and never in what order they are read.
+       (This is the defect the reading order was written against — the
+       four new leagues once fell to the tail "in whatever order the
+       payload's keys happened to arrive in".) */
+    const reversed = Object.fromEntries(
+      Object.entries(LEAGUES).reverse());
+    expect(Object.keys(reversed), "the shuffle must actually shuffle")
+      .not.toEqual(Object.keys(LEAGUES));
+    await open(page, { ...BOARD, leagues: reversed });
+    await expect(cols).toHaveCount(4);
+    expect(await cols.evaluateAll(
+      (els) => els.map((e) => e.getAttribute("data-league"))),
+      "the board read its columns out of the payload's key order")
+      .toEqual(boardColumns(Object.keys(LEAGUES)));
   });
 
 test("the board carries no sort control of its own — the matchday does",
