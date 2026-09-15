@@ -25,12 +25,24 @@ import { PICKER_COLUMN_ORDER } from "../src/lib/pickerApi";
 
 const VIEW = 4; // mirrors index.tsx — four drawn of eight held
 
-/** The pairs the window can NEVER show together, from the order alone. */
+/** The pairs the window can NEVER show together, from the order alone.
+ *
+ *  Two columns share a window iff their CIRCULAR distance is at most
+ *  VIEW-1, so the impossible pairs are every pair at distance VIEW or
+ *  more. This used to take only the pair at distance exactly VIEW, which
+ *  is the same set when the board holds exactly 2*VIEW columns and a
+ *  different one otherwise — and the board stopped holding eight the day
+ *  the Campeones Cup joined it. Arithmetic that is correct at one board
+ *  size goes quietly wrong on the day the board changes, which is the
+ *  day the guard is needed. */
 function impossiblePairs(order: readonly string[]) {
   const n = order.length;
   const out = new Set<string>();
   for (let i = 0; i < n; i++) {
-    out.add([order[i], order[(i + VIEW) % n]].sort().join("|"));
+    for (let j = i + 1; j < n; j++) {
+      const d = Math.min((j - i + n) % n, (i - j + n) % n);
+      if (d >= VIEW) out.add([order[i], order[j]].sort().join("|"));
+    }
   }
   return out;
 }
@@ -95,6 +107,13 @@ test.describe("the reading order is a declaration, and the palette depends on it
       /* The first test's whole value is that it goes red when the order
          moves. Proving that here means the guard cannot quietly become
          a tautology if `impossiblePairs` is ever broken. */
+      /* SWAP TWO NEIGHBOURS. It is the mutation that bites hardest, which
+         is not obvious: moving a column HALF the board instead leaves
+         every claimed pair intact, because the two columns exchanged are
+         themselves VIEW apart and swapping them preserves that distance
+         exactly. A neighbour swap shifts each by one and drops two pairs
+         to VIEW-1, which is co-visible. (Measured: the half-board
+         mutation kept 4 of 4; this keeps 2 of 4.) */
       const shuffled = [...PICKER_COLUMN_ORDER];
       [shuffled[0], shuffled[1]] = [shuffled[1], shuffled[0]];
       const impossible = impossiblePairs(shuffled);
