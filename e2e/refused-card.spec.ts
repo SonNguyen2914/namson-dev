@@ -30,19 +30,39 @@ import { localDay as localDayOf } from "../src/lib/matchday";
  * whole current season, both clubs' form, the kickoff, the book, and the
  * games-played count that ends the refusal.
  *
- * WHAT THIS SPEC IS FOR. Three properties, none of which a prettier card
+ * AND IT IS THE SIZE OF ONE (operator, 2026-09-15): "the refused card
+ * MUST be the size of other cards". Nothing measured was cut to get
+ * there — the size came out of DELETING DUPLICATED WORDING. The header
+ * said `rank refused` while the `#refused` tag beside it and the axes
+ * row below it both said it too, so the REASON stands in that slot now;
+ * the rank-gap cell repeated the header and is gone; the tier trio and
+ * the shape chip each said `refused` separately, over three stacked
+ * labels, and are ONE span naming all four axes once; `ppg H 0.75 · A
+ * 1.30` became `ppg 0.75/1.30` with the labels in the title; and every
+ * paragraph moved behind the circled i, including the general rule that
+ * used to be printed once per column under the first refused card a
+ * reader met.
+ *
+ * WHAT THIS SPEC IS FOR. Four properties, none of which a prettier card
  * could quietly lose:
  *
  *   1. SAME FOOTPRINT. A refused card and a ranked card in one column are
  *      the same width and carry the same blocks in the same order, at
  *      390 and at 1280. That is what "a normal board" means.
- *   2. UNMISTAKABLE. `#refused` in words, a highlighted border that is
- *      neither dashed nor gold nor the traffic light, NO rank number, and
- *      the word `refused` standing in every comparison cell.
- *   3. MISSING IS NEVER ZERO — the rule this repo enforces absolutely.
+ *   2. SAME SIZE. Six blocks each, and the same height under the chip
+ *      row — measured on the cards' own content extents rather than on
+ *      the boxes a stretching grid hands them, which are equal whatever
+ *      either card holds.
+ *   3. UNMISTAKABLE. `#refused` in words, a highlighted border that is
+ *      neither dashed nor gold nor the traffic light, NO rank number,
+ *      and the word `refused` standing in every slot where a comparison
+ *      between the two clubs would be.
+ *   4. MISSING IS NEVER ZERO — the rule this repo enforces absolutely.
  *      No cell on this card may render `0`, `0.00`, `—` or nothing at
  *      all. A refused figure says `refused`; an unsent figure says `not
- *      stated`; an absent block says it is absent, in a sentence.
+ *      stated`; an absent block says it is absent, in a sentence. ONE
+ *      branch stopped doing that on 2026-09-15 and is named where it is
+ *      asserted: an absent admission countdown now draws nothing.
  *
  * Hermetic: every route the board touches is served here, and an
  * unmatched `/api/` request fails the test rather than reaching
@@ -298,8 +318,7 @@ test("a refused card and a ranked card are the same card, at 390 and 1280",
       expect(Math.abs(a!.width - b!.width),
         `widths agree at ${w} (ranked ${a!.width}, refused ${b!.width})`)
         .toBeLessThanOrEqual(1);
-      // and it is a CARD, not a strip: a refused card's height is within
-      // half of a ranked one's rather than a quarter of it
+      // and it is a CARD, not a strip
       expect(b!.height / a!.height,
         `refused card is card-sized at ${w}`).toBeGreaterThan(0.6);
 
@@ -315,16 +334,137 @@ test("a refused card and a ranked card are the same card, at 390 and 1280",
     }
   });
 
+/** THE NATURAL HEIGHT OF A CARD — what it would be if nothing stretched
+ *  it. `boundingBox()` reports the GRID's answer: both cards sit in one
+ *  day track, tracks stretch their items, so at 1280 the two boxes are
+ *  319.97px each whatever either card holds. A height assertion on that
+ *  number is an assertion about CSS Grid, and it passes over a stub.
+ *
+ *  So the measure is the card's own content extent: the bottom of its
+ *  last block, plus the padding under it, from the card's top. */
+async function naturalHeight(loc: import("@playwright/test").Locator) {
+  return loc.evaluate((el) => {
+    const pad = parseFloat(getComputedStyle(el).paddingBottom);
+    const last = el.lastElementChild as HTMLElement;
+    return last.getBoundingClientRect().bottom
+      - el.getBoundingClientRect().top + pad;
+  });
+}
+
+/** TWO CONSECUTIVE READS THAT AGREE. `evaluate` does not auto-wait and a
+ *  viewport change is not synchronous with reflow, so one read can
+ *  faithfully describe the PREVIOUS layout — the bug that once reported
+ *  three tracks at 1440 where there are six. */
+async function settled(read: () => Promise<number>) {
+  let prev = await read();
+  for (let i = 0; i < 25; i++) {
+    const next = await read();
+    if (Math.abs(next - prev) < 0.5) return next;
+    prev = next;
+  }
+  throw new Error("the layout never settled — 25 consecutive reads disagreed");
+}
+
+test("the refused card is the SIZE of a ranked card — six blocks, and the "
+   + "same skeleton under the chip row", async ({ page }) => {
+    /* THE OPERATOR'S REQUIREMENT, 2026-09-15: "the refused card MUST be
+       the size of other cards". Nothing pinned it. The old check above
+       asks only that the refused card be more than 60% of a ranked one's
+       STRETCHED box — which a grid guarantees and a four-line stub would
+       have squeaked past on a short day.
+
+       WHAT IS MEASURED, and why it is measured in two parts:
+
+         1. THE SAME NUMBER OF BLOCKS. Six each, counted off both cards
+            rather than typed: chip row, matchup + anchor, dumbbell,
+            Stage 1, Stage 2, market + watch. This is the "same skeleton"
+            half of the requirement and it is the half a restyle breaks
+            first — the tier trio was stacked over three labels and the
+            reason sat on a line of its own until today, which is two
+            blocks this card no longer spends.
+
+         2. THE SAME HEIGHT UNDER THE CHIP ROW. Everything below the
+            first block is the ranked card's own furniture and measures
+            within a few pixels of it (4.75px at 390, measured). The chip
+            row itself is the one block that CANNOT match: it carries the
+            refusal's REASON, whose length is the backend's and whose
+            wrap is the column's width. So the whole-card difference is
+            asserted to be ACCOUNTED FOR by that one row — which is a
+            tighter statement than a tolerance on the total, and goes red
+            if any other block grows. */
+    for (const w of [390, 1280]) {
+      await page.setViewportSize({ width: w, height: 1600 });
+      await open(page);
+      const r = ranked(page).first();
+      const f = refused(page).first();
+
+      const blocks = async (loc: import("@playwright/test").Locator) =>
+        loc.evaluate((el) => el.children.length);
+      const rBlocks = await blocks(r);
+      expect(await blocks(f), `the refused card's block count at ${w}`)
+        .toBe(rBlocks);
+      /* AND SIX IS THE NUMBER, said absolutely as well as relatively:
+         "both cards have the same count" is satisfied by both of them
+         collapsing together, which is a card losing its skeleton rather
+         than matching one. */
+      expect(rBlocks, `the ranked card's block count at ${w}`).toBe(6);
+
+      const rTotal = await settled(() => naturalHeight(r));
+      const fTotal = await settled(() => naturalHeight(f));
+      const chip = async (loc: import("@playwright/test").Locator) =>
+        loc.evaluate((el) =>
+          (el.children[0] as HTMLElement).getBoundingClientRect().height);
+      const rChip = await chip(r);
+      const fChip = await chip(f);
+
+      // the skeleton under the chip row is the ranked card's, to the pixel
+      expect(Math.abs((fTotal - fChip) - (rTotal - rChip)),
+        `under the chip row the two cards differ at ${w} `
+        + `(refused ${fTotal - fChip}, ranked ${rTotal - rChip})`)
+        .toBeLessThanOrEqual(8);
+
+      // and the whole difference is the reason's own wrap, nothing else
+      expect(Math.abs((fTotal - rTotal) - (fChip - rChip)),
+        `the card's height difference at ${w} is not accounted for by the `
+        + "chip row").toBeLessThanOrEqual(8);
+
+      // NON-VACUITY: a stub would satisfy neither, and a card that never
+      // rendered would satisfy both. Both cards were drawn and both have
+      // a real height.
+      expect(rTotal, `the ranked card has a height at ${w}`).toBeGreaterThan(100);
+      expect(fTotal, `the refused card has a height at ${w}`).toBeGreaterThan(100);
+    }
+  });
+
 test("it carries the ranked card's blocks, in the ranked card's order",
   async ({ page }) => {
     await open(page);
     const c = refused(page);
     const chips = ["refused-rank", "refused-tag", "refused-kickoff"];
-    // the read below the chip row, top to bottom: matchup + anchor slot,
-    // dumbbell slot, Stage 1, Stage 2, and the admission block
+    /* THE READ BELOW THE CHIP ROW, top to bottom: matchup + anchor slot,
+       dumbbell slot, Stage 1, Stage 2, and the admission chip.
+
+       `refused-shape` IS NOT IN THIS LIST AND NO LONGER EXISTS. The shape
+       chip and the tier trio each said `refused` separately, over three
+       stacked labels; they are ONE span now — `refused-tiers`, carrying
+       `data-shape-refused` and reading `OVR ATK DEF SHAPE refused`. Every
+       axis is still NAMED (asserted below); the fact is said once. That
+       is a block this card no longer spends, which is how it came to the
+       same height as a ranked one.
+
+       AND THE ADMISSION CHIP SHARES STAGE 2's ROW rather than opening a
+       block of its own, beside the fold marker and the circled i — where
+       a ranked card keeps its tiers and its own i. */
     const order = ["anchor-block", "refused-dumbbell", "refused-rank-pair",
                    "refused-ppg", "refused-gp", "refused-tiers",
-                   "refused-shape", "refused-admission"];
+                   "refused-admission"];
+    await expect(c.getByTestId("refused-shape"),
+      "the shape chip merged into refused-tiers and must not come back "
+      + "as a second slot saying the same word").toHaveCount(0);
+    // the REASON stands where the rank number would be — the one thing
+    // neither the `#refused` tag nor the axes row says
+    await expect(c.getByTestId("refused-rank")
+      .getByTestId("refusal-reason")).toHaveCount(1);
     for (const id of [...chips, ...order]) {
       await expect(c.getByTestId(id), `${id} is drawn`).toHaveCount(1);
     }
@@ -415,9 +555,33 @@ test("there is NO rank number — a refused row is not in the ladder",
       .toHaveText("01");
     await expect(refused(page).getByTestId("row-rank")).toHaveCount(0);
     const slot = refused(page).getByTestId("refused-rank");
-    await expect(slot).toContainText("rank");
-    await expect(slot).toContainText("refused");
-    // and no two-digit ladder position hiding anywhere in that slot
+    /* WHAT STANDS IN THE LADDER'S PLACE, and why it is no longer the
+       words "rank refused". Those two words were a THIRD copy of a fact
+       the `#refused` tag beside them and the axes row below them both
+       carry. The REASON stands there now — the one thing neither of them
+       says — and the slot's own hover keeps the ladder sentence, so the
+       claim "this row is not in the ladder" is still made in the ladder's
+       own place, by the slot, the tag and the title together. */
+    await expect(slot.getByTestId("refusal-reason"))
+      .toHaveText(FULL.reason);
+    // `toHaveAttribute` retries for 15s and can wait out a transient;
+    // this title is fixed at render, so read it once and assert on it.
+    const says = (await slot.getAttribute("title")) ?? "";
+    expect(says).toContain("no position in the day's ladder");
+    expect(says).toContain("A number here would be a placement nobody "
+      + "measured");
+    // and the status is still said in WORDS, beside it, for a reader who
+    // never hovers
+    await expect(refused(page).getByTestId("refused-tag"))
+      .toHaveText("#refused");
+    /* AND NO LADDER POSITION HIDING ANYWHERE IN THAT SLOT. The fixture's
+       reason carries no digit of its own, which is what makes the sweep
+       below mean "no number" rather than "no number that isn't already
+       in the reason" — stated here so the check cannot quietly become
+       unfalsifiable behind a reason string that grows one. */
+    expect(FULL.reason, "this fixture's reason carries a digit, so the "
+      + "sweep below no longer proves the slot prints no rank")
+      .not.toMatch(/\d/);
     expect(await slot.innerText()).not.toMatch(/\d/);
   });
 
@@ -425,15 +589,33 @@ test("every comparison cell is refused BY NAME, in the cell where the "
   + "number would be", async ({ page }) => {
     await open(page);
     const c = refused(page);
-    /* THE FIVE THE OPERATOR NAMED, plus the rank gap that travels with
-       them: the rank number, the anchor and its GD/g key, the dumbbell,
-       the ranks pair, the shape chip and the tier trio. All of them are
-       one fact — a comparison between two clubs measured on different
-       scales — and each says so in its own slot rather than going
-       blank. */
-    const cells = ["rank", "anchor", "dumbbell", "rank-gap", "tiers",
-                   "shape"];
-    for (const what of cells) {
+    /* THE SLOTS THAT PRINT THE WORD, DERIVED FROM THE CARD rather than
+       typed beside it — a hand-typed list stays green the day a slot
+       stops saying it. Every `data-refused` on the card is read back and
+       the SET is asserted, so a slot that vanished fails here and a slot
+       that appeared has to be named here too.
+
+       THREE SLOTS PRINT THE WORD NOW, NOT SIX, AND NOTHING MEASURED WENT
+       WITH THE OTHER THREE:
+         - the RANK GAP cell is gone. The card's own header said "rank
+           refused" in the ladder's place and the gap cell said it again
+           one row down; a second copy of a fact is the copy that rots.
+         - the SHAPE chip merged into the tier span, which names all four
+           axes and says the word once (asserted below).
+         - the RANK SLOT carries the REASON now, which is the thing the
+           `#refused` tag and the axes row do not say. It is still marked
+           — `refused-tag`, in words — and its hover still gives the
+           ladder sentence; both are pinned in the test above.
+       The ranks PAIR keeps its `data-refused` mark because the GAP
+       between two positions in two orderings is what was refused, while
+       the positions themselves are measured and printed. */
+    await expect(c.locator("[data-refused]").first()).toBeAttached();
+    const marks = await c.locator("[data-refused]")
+      .evaluateAll((els) => els.map((e) => e.getAttribute("data-refused")!));
+    expect([...marks].sort(),
+      "the set of refused slots on the card")
+      .toEqual(["anchor", "dumbbell", "rank-pair", "tiers"]);
+    for (const what of ["anchor", "dumbbell", "tiers"]) {
       const cell = c.locator(`[data-refused="${what}"]`);
       await expect(cell, `the ${what} cell exists`).toHaveCount(1);
       await expect(cell, `the ${what} cell says refused`)
@@ -442,11 +624,18 @@ test("every comparison cell is refused BY NAME, in the cell where the "
     // the anchor's KEY still names which figure is gone — "refused" alone
     // would say a figure is missing without saying which
     await expect(c.getByTestId("anchor-key")).toHaveText("gd/g gap");
-    // and the tier trio keeps its three axis names for the same reason
+    /* AND THE MERGED SPAN STILL NAMES EVERY AXIS. This is the whole of
+       what the trio and the shape chip said between them: a reader has
+       to know WHICH figures are gone, and the fourth name is the one the
+       separate `refused-shape` chip used to carry. */
     const tiers = c.getByTestId("refused-tiers");
-    for (const axis of ["ovr", "atk", "def"]) {
-      await expect(tiers).toContainText(axis);
+    for (const axis of ["ovr", "atk", "def", "shape"]) {
+      await expect(tiers, `the axes row names ${axis}`).toContainText(axis);
     }
+    await expect(tiers).toHaveAttribute("data-shape-refused", "1");
+    // said ONCE, not four times: the word appears a single time in the span
+    expect(((await tiers.innerText()).match(/refused/gi) ?? []).length,
+      "the axes row says `refused` once for four named axes").toBe(1);
     /* THE RULE IS SAID ONCE, NOT SIX TIMES — AND IT IS THE BACKEND'S
        SENTENCE (2026-09-11). This assertion read
        `/measured on different scales/i` until then, and what it pinned
@@ -461,9 +650,16 @@ test("every comparison cell is refused BY NAME, in the cell where the "
        THE EXPECTED TEXT IS THE FIXTURE'S OWN CONSTANT, not a literal:
        the fixture speaks the emitter's vocabulary, so a reader that
        re-paraphrases fails this whatever words it chooses. */
+    /* IT LIVES BEHIND THE CIRCLED i NOW. All of this card's prose moved
+       into `refusal-notes`; `refused-rule` is that panel's "what is
+       withheld" section. `data-source` went with the move, and what
+       replaced it is better than an attribute: the section that quotes
+       the payload OPENS with the word `Withheld`, and the file's own
+       fallback opens "REFUSED, not missing" — so a reader, not only a
+       guard, can tell whose sentence they are being shown. Both halves
+       are asserted, here and in the fallback test below. */
     await expect(c.getByTestId("refused-rule")).toHaveCount(1);
-    await expect(c.getByTestId("refused-rule"))
-      .toHaveAttribute("data-source", "payload");
+    await expect(c.getByTestId("refused-rule")).toContainText("Withheld —");
     await expect(c.getByTestId("refused-rule")).toContainText(WITHHELD);
     /* AND IT TRAVELS WITH EVERY CELL THAT PRINTS THE WORD — the same
        sentence, never a second account of one refusal. The set is the
@@ -477,17 +673,17 @@ test("every comparison cell is refused BY NAME, in the cell where the "
     expect(said.length, "no refused cell rendered — this loop would "
       + "pass over an empty set").toBeGreaterThan(0);
     for (const t of said) expect(t).toBe(WITHHELD);
-    for (const slot of ["refused-dumbbell", "refused-tiers",
-                        "refused-shape"]) {
+    for (const slot of ["refused-dumbbell", "refused-tiers"]) {
       await expect(c.getByTestId(slot))
         .toHaveAttribute("title", WITHHELD);
     }
-    // THE CASE'S OWN SENTENCE, which is a different fact from
-    // `withheld`: what THIS refusal can honestly carry, versus what no
-    // refusal ever carries.
-    const why = c.getByTestId("refused-case");
-    await expect(why).toHaveAttribute("data-case", "below_admission");
-    await expect(why).toContainText(FULL.refusal.why);
+    /* THE CASE'S OWN SENTENCE, which is a different fact from
+       `withheld`: what THIS refusal can honestly carry, versus what no
+       refusal ever carries. It is the panel's "why this case" section
+       now; `data-case` moved off the element with the prose, so the
+       sentence itself — the payload's, verbatim — is the assertion. */
+    await expect(c.getByTestId("refused-case"))
+      .toContainText(FULL.refusal.why);
     /* A RANKED CARD CAN NEVER SAY ANY OF THIS — which is what makes the
        two unmistakable even cropped to their middles, with the border
        out of frame. Both the card ELEMENT and its descendants, because
@@ -566,20 +762,35 @@ test("ppg is CONVERTED from a gap to the two sides' own rates, labelled, "
        measured this season, and neither is derived from the other. */
     await expect(ranked(page).first()).toContainText(/ppg\s*\+0\.53/);
 
+    /* `ppg H 1.25 · A 1.30` BECAME `ppg 1.25/1.50` (2026-09-15). Same
+       two measured values, same order — home over away — and the labels
+       did not vanish: they moved to the title, which spells both club
+       names out rather than abbreviating them. The cell that carried
+       them inline was the one pushing this row onto a second line while
+       the ranked card beside it sat on one. */
     const cell = refused(page).getByTestId("refused-ppg");
-    await expect(cell).toHaveText("ppg H 1.25 · A 1.50");
+    await expect(cell).toHaveText("ppg 1.25/1.50");
     await expect(cell).toHaveAttribute("data-home-ppg", "1.25");
     await expect(cell).toHaveAttribute("data-away-ppg", "1.5");
+    /* AND BOTH ARE STILL LABELLED — which club owns which rate, said in
+       the payload's own club names and readable without hovering the
+       other cells. An unlabelled pair is two numbers and a guess. */
+    const label = (await cell.getAttribute("title")) ?? "";
+    expect(label).toContain("Sunderland 1.25 points per game");
+    expect(label).toContain("Promoted Rovers FC 1.50 points per game");
+    // the ORDER on the card is the order in the title, so the pair can
+    // be read off the ink without opening anything
+    expect(label.indexOf("Sunderland")).toBeLessThan(
+      label.indexOf("Promoted Rovers FC"));
     // NO DIFFERENCE IS PRINTED. A signed figure in this cell would be
     // the cross-scale subtraction the whole card refuses, and 1.50−1.25
     // = +0.25 is exactly the number a careless restyle would reach for.
     const text = await cell.innerText();
     expect(text).not.toMatch(/[+−-]\s*\d/);
     expect(text).not.toContain("0.25");
-    // each side is labelled — an unlabelled pair is two numbers and a
-    // guess about which club owns which
-    expect(text).toMatch(/H\s*1\.25/);
-    expect(text).toMatch(/A\s*1\.50/);
+    // both values are present, in the home-then-away order the card's
+    // own vocabulary uses six lines up
+    expect(text).toMatch(/1\.25\s*\/\s*1\.50/);
   });
 
 test("the admission countdown says when the refusal ends, in the backend's "
@@ -588,21 +799,34 @@ test("the admission countdown says when the refusal ends, in the backend's "
     /* THE ONE LINE A RANKED CARD DOES NOT HAVE. A refusal with no stated
        end reads as a permanent verdict on a club; it is a gate on games
        played, and the board knows the number. */
-    const a = refused(page).getByTestId("refused-admission");
-    await expect(a).toContainText("rated at 10 games");
-    await expect(a).toContainText("played 6");
-    await expect(a).toContainText("4 to go");
+    /* IT IS A CHIP IN STAGE 2's ROW NOW, not a block of its own — the
+       countdown, the fold marker and the circled i share the line a
+       ranked card spends on its tiers. The FIGURE a reader needs at a
+       glance is the one that changes every week, so that is what the
+       chip prints; the arithmetic behind it rides the hover and the
+       panel, where the rest of this card's prose went. */
+    const c = refused(page);
+    const a = c.getByTestId("refused-admission");
+    await expect(a).toHaveText("4 to go");
     await expect(a).toHaveAttribute("data-k", "10");
+    await expect(a).toHaveAttribute("data-gp", "6");
     await expect(a).toHaveAttribute("data-to-go", "4");
+    // the arithmetic, and the gate itself in the policy's own words
+    const gate = (await a.getAttribute("title")) ?? "";
+    expect(gate).toContain("rated at 10 games");
+    expect(gate).toContain("played 6");
+    expect(gate).toMatch(/w_current = GP\/\(GP\+k\)/);
     // the backend's own sentence, verbatim — not a paraphrase free to
     // drift from the policy it came from
-    await expect(a.getByTestId("admission-says"))
-      .toContainText("It has played 6; 4 to go.");
-    // and the gate itself, in the policy's words, on the figure it made
-    await expect(a.locator("p", { hasText: "rated at 10 games" }))
-      .toHaveAttribute("title", /w_current = GP\/\(GP\+k\)/);
-    // a ranked card has no such block
+    const says = c.getByTestId("admission-says");
+    await expect(says).toContainText("It has played 6; 4 to go.");
+    // with the arithmetic under it, and the basis it will be rated on
+    await expect(says).toContainText("rated at 10 games · played 6");
+    await expect(says).toContainText("then rated on · current_only");
+    // a ranked card has neither the chip nor the section
     await expect(ranked(page).first().getByTestId("refused-admission"))
+      .toHaveCount(0);
+    await expect(ranked(page).first().getByTestId("admission-says"))
       .toHaveCount(0);
   });
 
@@ -617,11 +841,25 @@ test("a board that predates the contract names every absence, and renders "
     await open(page, [BARE]);
     const c = refused(page);
 
-    // the absent blocks SAY they are absent
-    await expect(c.getByTestId("refused-admission"))
-      .toHaveAttribute("data-absent", "1");
-    await expect(c.getByTestId("refused-admission"))
-      .toContainText(/no admission countdown/i);
+    /* THE ABSENT BLOCKS SAY THEY ARE ABSENT — with ONE gone, and it is
+       reported rather than quietly dropped from this guard.
+
+       THE CLAIM THAT NO LONGER HOLDS: an absent admission countdown used
+       to draw its own named absence — `refused-admission` with
+       `data-absent="1"`, reading "This refusal carries no admission
+       countdown, so the board cannot say here how many games away this
+       club is from being rated." The 2026-09-15 rebuild made the
+       countdown a chip (`{adm && …}`), so a payload with no admission
+       block now draws NOTHING in its place. The card's own doc comment
+       still promises "a sentence for an admission block that is not
+       there at all", so this is a slip rather than a decision — reported
+       to the operator, not papered over here. Absent-by-design reading
+       as vanished is the defect this whole surface exists to refuse.
+
+       What IS still asserted is that nothing invents a countdown. */
+    await expect(c.getByTestId("refused-admission")).toHaveCount(0);
+    expect(await c.innerText(), "a card with no admission block must not "
+      + "print a countdown it was never sent").not.toMatch(/to go|rated at/i);
     await expect(c.getByTestId("refused-no-market"))
       .toContainText(/did not say whether Kalshi lists/i);
     // an absent form strip is simply not drawn — a strip of five empty
@@ -632,7 +870,7 @@ test("a board that predates the contract names every absence, and renders "
     await expect(c.getByTestId("refused-gp"))
       .toHaveText("gp not stated/not stated");
     await expect(c.getByTestId("refused-ppg"))
-      .toHaveText("ppg H not stated · A not stated");
+      .toHaveText("ppg not stated/not stated");
     // with no opponent_row there is no rank to print, and the cell says
     // that rather than inventing one or printing half a pair. "not
     // stated" and "no rank" are DIFFERENT facts and stay apart: one club
@@ -653,7 +891,7 @@ test("a board that predates the contract names every absence, and renders "
     const findings: string[] = [];
     for (const id of ["refused-rank", "anchor-block", "refused-dumbbell",
                       "refused-rank-pair", "refused-ppg", "refused-gp",
-                      "refused-tiers", "refused-shape"]) {
+                      "refused-tiers"]) {
       const t = (await c.getByTestId(id).innerText()).trim();
       if (t === "") findings.push(`${id} is empty`);
       if (/[—–]/.test(t)) findings.push(`${id} renders a dash: "${t}"`);
@@ -661,10 +899,16 @@ test("a board that predates the contract names every absence, and renders "
         findings.push(`${id} renders a bare zero: "${t}"`);
     }
     expect(findings).toEqual([]);
-    // the refused cells are still all present and still all named
-    for (const what of ["rank", "anchor", "dumbbell", "rank-gap", "tiers",
-                        "shape"]) {
-      await expect(c.locator(`[data-refused="${what}"]`)).toHaveCount(1);
+    // the refused slots are still all present and still all named, and
+    // the axes row still names every axis on a payload that carried none
+    // of them
+    await expect(c.locator("[data-refused]").first()).toBeAttached();
+    const marks = await c.locator("[data-refused]")
+      .evaluateAll((els) => els.map((e) => e.getAttribute("data-refused")!));
+    expect([...marks].sort())
+      .toEqual(["anchor", "dumbbell", "rank-pair", "tiers"]);
+    for (const axis of ["ovr", "atk", "def", "shape"]) {
+      await expect(c.getByTestId("refused-tiers")).toContainText(axis);
     }
   });
 
@@ -680,17 +924,32 @@ test("the blocks a refusal cannot carry are named, each with the "
        to draw one, and only the payload knows which. */
     await open(page, [AMBIGUOUS]);
     const c = refused(page);
+    /* THE PROSE IS BEHIND THE CIRCLED i (2026-09-15). These were blocks
+       on the card's face with `data-case`, `data-carries` and one `li`
+       per absent block; they are sections of `refusal-notes` now, and
+       the attributes went with the markup. So the assertions are on the
+       SENTENCES — the payload's own, which is what the reader is being
+       shown and what a drifting frontend would stop quoting. Opened
+       first, because a claim about what a reader can read should be made
+       against a panel a reader has opened. */
+    await c.getByTestId("refusal-why-open").click();
+    await expect(c.getByTestId("refusal-notes")).toBeVisible();
+
     const why = c.getByTestId("refused-case");
-    await expect(why).toHaveAttribute("data-case", "ambiguous");
-    await expect(why).toHaveAttribute("data-carries", "opponent_row");
     await expect(why).toContainText(AMBIGUOUS.refusal.why);
 
+    /* EACH ABSENT BLOCK, NAMED, WITH THE BACKEND'S OWN SENTENCE FOR WHY.
+       Derived from the payload's keys: a list typed here would stay
+       green the day the emitter adds a block this card never draws. */
     const absent = c.getByTestId("refused-absent");
-    await expect(absent.locator("li")).toHaveCount(2);
-    for (const [block, words] of Object.entries(AMBIGUOUS.refusal.absent)) {
-      const row = absent.locator(`li[data-block="${block}"]`);
-      await expect(row).toHaveCount(1);
-      await expect(row).toContainText(words);
+    const blocks = Object.entries(AMBIGUOUS.refusal.absent);
+    expect(blocks.length, "the payload carries no absent blocks to check")
+      .toBe(2);
+    for (const [block, words] of blocks) {
+      await expect(absent, `${block} is named as absent`)
+        .toContainText(block);
+      await expect(absent, `${block} carries the backend's sentence`)
+        .toContainText(words);
     }
     // the sentence naming what NO refusal carries is a different fact
     // and is still said, once, in its own slot
@@ -706,8 +965,14 @@ test("a board that ships no refusal block says so — the card falls back "
        invented. */
     await open(page, [BARE]);
     const c = refused(page);
+    /* `data-source` MOVED INTO THE READER'S OWN VIEW. The panel's "what
+       is withheld" section opens with `Withheld —` when it is quoting
+       the payload and with "REFUSED, not missing" when it is this file's
+       named fallback, so the two are told apart by anyone reading them
+       rather than only by a guard reading an attribute. */
     await expect(c.getByTestId("refused-rule"))
-      .toHaveAttribute("data-source", "unstated");
+      .toContainText("REFUSED, not missing");
+    await expect(c.getByTestId("refused-rule")).not.toContainText("Withheld —");
     await expect(c.getByTestId("refused-rule")).not.toContainText(WITHHELD);
     await expect(c.getByTestId("refused-case")).toHaveCount(0);
     await expect(c.getByTestId("refused-absent")).toHaveCount(0);
@@ -763,12 +1028,148 @@ test("it still sits in its own matchday band, beside that day's ranked "
     await expect(band.getByTestId("picker-refusal")).toHaveCount(1);
     await expect(band.getByTestId("picker-row")).toHaveCount(1);
     await expect(epl(page).getByTestId("refusals")).toHaveCount(0);
-    // and the reason a refusal exists at all is still said once, per
-    // column, where a reader first meets one
-    await expect(epl(page).getByTestId("refusal-why")).toHaveCount(1);
+    /* THE PER-COLUMN PARAGRAPH IS GONE, AND ITS SENTENCE IS NOT
+       (operator, 2026-09-15: "remove the paragraph below it and put it
+       into the same hovering i symbol"). `RefusalWhy` printed the general
+       rule once per column, under the first refused card a reader met —
+       four lines of prose at a distance from the card it explained, on a
+       board that scrolls sideways. It is the FIRST section of every
+       refused card's own panel now, which is nearer the card and costs
+       nothing until asked for. */
+    await expect(epl(page).getByTestId("refusal-why")).toHaveCount(0);
+    const panel = refused(page).getByTestId("refusal-notes");
+    const first = await panel.evaluate((el) =>
+      el.querySelector("[data-testid]")!.getAttribute("data-testid"));
+    expect(first, "the general rule is the panel's FIRST section — a "
+      + "reader meeting a refused card for the first time reads it first")
+      .toBe("refusal-rule-general");
+    await expect(refused(page).getByTestId("refusal-rule-general"))
+      .toContainText("cannot be ranked against one that has a row");
+    await expect(refused(page).getByTestId("refusal-rule-general"))
+      .toContainText("refuses it by name instead of imputing a number");
     // the backend's own reason string survives on the card itself
     await expect(refused(page).getByTestId("refusal-reason"))
       .toContainText("no row in the prior-season top-flight table");
+  });
+
+// ───────────────── 6. the panel opens without React being there ──────
+
+test("the i opens on HOVER with no JavaScript state — the panel is always "
+   + "in the DOM and the hover is CSS", async ({ page }) => {
+    /* THE THING THAT BROKE SILENTLY. `NotesPanel`'s panel used to be
+       MOUNTED ONLY WHILE OPEN — `{open && <div …>}` — which meant it
+       existed solely because React was running: correct in the app, and
+       completely dead anywhere the markup is rendered without it. Hover
+       and keyboard-focus are plain CSS on the wrapper now and the panel
+       is always in the DOM; state only adds the PINNED case, which
+       genuinely needs it. Nothing pinned that, and a revert would look
+       identical in every other test in this file, because Playwright
+       drives a browser with React attached and cannot tell the two
+       mechanisms apart by hovering.
+
+       SO THE PROOF IS A CLONE. `cloneNode(true)` copies the markup, the
+       classes and the ids and copies NO event listeners — React's
+       `onMouseEnter` does not travel. A clone parked in the page and
+       hovered is the markup answering on its own. If the panel ever goes
+       back to being state-mounted, the clone has no panel to show and
+       this goes red; if the CSS rule is dropped, the clone stays shut. */
+    await open(page);
+    const c = refused(page);
+    const panel = c.getByTestId("refusal-notes");
+
+    // AT REST: in the DOM, and shut. Both halves matter — "attached" is
+    // the half the old build failed, "hidden" is the half that keeps
+    // this from passing on a panel that is simply always open.
+    await expect(panel).toHaveCount(1);
+    await expect(panel).toBeAttached();
+    await expect(panel).toBeHidden();
+    await expect(panel).toHaveAttribute("data-open", "hover");
+    await expect(c.getByTestId("refusal-why-open"))
+      .toHaveAttribute("aria-expanded", "false");
+
+    /* THE MARKUP, ON ITS OWN. Parked at a fixed point with no React
+       behind it; the mouse is then moved onto it for real, so what
+       answers is the stylesheet. */
+    const at = await page.evaluate(() => {
+      const card = document.querySelector('[data-testid="picker-refusal"]')!;
+      const wrap = card
+        .querySelector('[data-testid="refusal-why-open"]')!.parentElement!;
+      const clone = wrap.cloneNode(true) as HTMLElement;
+      clone.setAttribute("data-detached-copy", "1");
+      const host = document.createElement("div");
+      host.style.cssText = "position:fixed;left:40px;top:40px;z-index:9999";
+      host.appendChild(clone);
+      document.body.appendChild(host);
+      const b = clone
+        .querySelector('[data-testid="refusal-why-open"]')! .getBoundingClientRect();
+      return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+    });
+    const copy = page.locator(
+      '[data-detached-copy="1"] [data-testid="refusal-notes"]');
+    const display = () => copy.evaluate((e) => getComputedStyle(e).display);
+
+    // it exists in the copy at all — a state-mounted panel would not
+    await expect(copy).toHaveCount(1);
+    expect(await display(), "the detached copy's panel is shut at rest")
+      .toBe("none");
+
+    await page.mouse.move(at.x, at.y);
+    /* SETTLED MEANS TWO CONSECUTIVE READS AGREE. `evaluate` does not
+       auto-wait, and a pointer move is not synchronous with a style
+       recalc. */
+    let prev = await display();
+    for (let i = 0; i < 25 && !(prev === "block" && await display() === "block");
+         i++) prev = await display();
+    expect(prev, "the panel did not open on hover with no React behind it "
+      + "— either the group-hover rule is gone or the panel is "
+      + "state-mounted again").toBe("block");
+
+    await page.mouse.move(5, 5);
+    let off = await display();
+    for (let i = 0; i < 25 && !(off === "none" && await display() === "none");
+         i++) off = await display();
+    expect(off, "the panel stayed open after the pointer left").toBe("none");
+
+    /* AND THE RULE ITSELF, read out of the CSSOM — the mechanism named,
+       not merely its effect. Tailwind puts utilities inside `@layer`, so
+       the walk has to descend into grouping rules; a top-level scan
+       finds nothing and would report "no rule" over a sheet that has
+       one. */
+    const rules = await page.evaluate(() => {
+      const out: string[] = [];
+      const walk = (rs: CSSRuleList) => {
+        for (const r of Array.from(rs)) {
+          const sr = r as CSSStyleRule;
+          if (sr.selectorText && /group-hover|group-focus-within/
+            .test(sr.selectorText) && /display:\s*block/.test(sr.style.cssText))
+            out.push(sr.selectorText);
+          const inner = (r as CSSGroupingRule).cssRules;
+          if (inner) walk(inner);
+        }
+      };
+      for (const s of Array.from(document.styleSheets)) {
+        try { walk((s as CSSStyleSheet).cssRules); } catch { /* cross-origin */ }
+      }
+      return out;
+    });
+    expect(rules.some((r) => r.includes("group-hover")),
+      `no group-hover rule shows the panel; found ${JSON.stringify(rules)}`)
+      .toBe(true);
+    // and the keyboard half, which is the same mechanism for a reader
+    // who never touches a mouse
+    expect(rules.some((r) => r.includes("group-focus-within")),
+      "the panel has no focus-within rule, so a keyboard reader cannot "
+      + "open it without pinning it").toBe(true);
+
+    // CLICK IS THE ONLY THING STATE DOES. It pins, and the pin survives
+    // the pointer leaving — which is exactly what CSS cannot do.
+    await c.getByTestId("refusal-why-open").click();
+    await expect(panel).toBeVisible();
+    await expect(c.getByTestId("refusal-why-open"))
+      .toHaveAttribute("aria-expanded", "true");
+    await page.mouse.move(5, 5);
+    await expect(panel).toBeVisible();
+    await expect(panel).toHaveAttribute("data-open", "pinned");
   });
 
 test("no request left the mocks", async ({ page }) => {

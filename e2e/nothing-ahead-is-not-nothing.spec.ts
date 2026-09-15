@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
 
+/* THE WINDOW THE PAGE ASKS FOR, from the page's own constant. Both
+   windows opened at 8 days on 2026-09-15 and the chips that used to set
+   them are gone, so a number typed here would pin the default of the day
+   it was typed. Note the column draws THIS number rather than the review
+   payload's `back` — the page states the window it ASKED for. */
+import { DEFAULT_BACK } from "../src/lib/pickerReview";
+
 // A COLUMN WITH NOTHING AHEAD OF IT IS NOT AN EMPTY COLUMN.
 //
 // THE OPERATOR'S BOARD, 2026-09-08. "LEAGUES CUP · 0 FIXTURES", no chips
@@ -228,6 +235,54 @@ async function open(page: import("@playwright/test").Page,
 const col = (page: import("@playwright/test").Page, slug: string) =>
   page.locator(`[data-testid="league-col"][data-league="${slug}"]`);
 
+/** THE BOARD DRAWS FOUR OF ITS COLUMNS AT A TIME (operator, 2026-09-15).
+ *
+ *  Card width is arithmetic: the board's track stops growing at 96rem,
+ *  so eight columns side by side leave the club name at zero pixels
+ *  whatever monitor you use. Four are lit; the rest are reached by
+ *  stepping a ribbon, and EVERY declared column keeps a pill in it
+ *  whether it is drawn or not — a hidden column would be
+ *  absent-by-design reading as vanished.
+ *
+ *  THIS BOARD DECLARES SIX, so it is windowed and the two cups start off
+ *  screen. Nothing in this file's subject changed: a column with nothing
+ *  ahead still has to count what it HOLDS. What changed is that reaching
+ *  the column is now part of reading it, so this helper does what a
+ *  reader does — presses the pill. Idempotent: a column already drawn is
+ *  returned as it stands, so a four-column board (where the window is a
+ *  NO-OP and no ribbon renders) goes through untouched.
+ *
+ *  `count()` DOES NOT AUTO-WAIT, so the board is waited for first — a
+ *  bare count straight after `goto` reads the empty page and would press
+ *  a pill that is not there yet. */
+async function show(page: import("@playwright/test").Page, slug: string) {
+  await expect(page.getByTestId("league-col").first()).toBeAttached();
+  if (await col(page, slug).count() === 0) {
+    const pill = page.locator(`[data-testid="ribbon-pill"][data-slug="${slug}"]`);
+    await expect(pill, `${slug} is neither drawn nor reachable — the ribbon `
+      + "carries no pill for it").toHaveCount(1);
+    await pill.click();
+  }
+  await expect(col(page, slug)).toHaveCount(1);
+  return col(page, slug);
+}
+
+/** EVERY DECLARED COLUMN, VISITED. Steps the window through the whole
+ *  ribbon and hands each column to `read` while it is on screen. The
+ *  return is keyed by slug, so a caller compares the SET it got back
+ *  against the set the board declared rather than against a list typed
+ *  beside the check. */
+async function eachColumn<T>(page: import("@playwright/test").Page,
+                             declared: readonly string[],
+                             read: (slug: string) => Promise<T>) {
+  const out = new Map<string, T>();
+  for (const slug of declared) {
+    await show(page, slug);
+    out.set(slug, await read(slug));
+  }
+  return out;
+}
+
 // ------------------------------------------------------- 1 + 2: the count
 
 test("a column with nothing ahead counts what it HOLDS, and an empty one still says zero",
@@ -237,7 +292,7 @@ test("a column with nothing ahead counts what it HOLDS, and an empty one still s
        nothing upcoming; La Liga and Liga MX hold nothing at all; MLS
        holds fixtures. Three readings, one payload. */
     await open(page);
-    await expect(col(page, "leaguescup")).toHaveCount(1);
+    await show(page, "leaguescup");
 
     const cup = col(page, "leaguescup").getByTestId("col-count");
     await expect(cup).toHaveText("3 finished");
@@ -246,6 +301,7 @@ test("a column with nothing ahead counts what it HOLDS, and an empty one still s
     // a LEAGUE the board carries, with a quiet week and matches behind
     // it, reads exactly the same way — the number means one thing on
     // this board, not one thing per column
+    await show(page, "epl");
     const epl = col(page, "epl").getByTestId("col-count");
     await expect(epl).toHaveText("2 finished");
     await expect(epl).toHaveAttribute("data-counts", "finished");
@@ -254,12 +310,14 @@ test("a column with nothing ahead counts what it HOLDS, and an empty one still s
     // nothing behind: "0 fixtures" is a measured zero over a payload
     // that was read, and it stays.
     for (const slug of ["laliga", "ligamx"]) {
+      await show(page, slug);
       const c = col(page, slug).getByTestId("col-count");
       await expect(c).toHaveText("0 fixtures");
       await expect(c).toHaveAttribute("data-counts", "upcoming");
     }
 
     // and a column with fixtures counts those, in the old words
+    await show(page, "mls");
     await expect(col(page, "mls").getByTestId("col-count"))
       .toHaveText("2 fixtures");
   });
@@ -267,26 +325,37 @@ test("a column with nothing ahead counts what it HOLDS, and an empty one still s
 test("the empty box says what the column DOES have, and an empty column says only that",
   async ({ page }) => {
     await open(page);
-    // both kinds of column keep the sentence the empty-window guard
-    // pins — "no fixtures in the next N days" — and only one of them
-    // adds the second line
+    /* BOTH KINDS OF COLUMN KEEP THE SENTENCE the empty-window guard pins
+       — "no fixtures in the next N days" — and only one of them adds the
+       second line.
+
+       THE WINDOW IS NOT TYPED HERE. Both the forward and the backward
+       window opened at 8 days on 2026-09-15 and the chips that used to
+       set them are gone, so a spec that named 7 would be pinning a
+       default rather than the sentence. The FORWARD number is the page's
+       own; the BACKWARD one is the review payload's `back`, so that half
+       stays exact — a count over a window nobody measured is the defect
+       this file is named after. */
+    await show(page, "leaguescup");
     const cup = col(page, "leaguescup").getByTestId("col-empty");
-    await expect(cup).toContainText("in the next 7 days");
+    await expect(cup).toContainText(/No Leagues Cup fixtures in the next \d+ days\./);
     await expect(cup).toHaveAttribute("data-holds", "finished");
     await expect(cup.getByTestId("col-empty-finished"))
-      .toContainText("3 finished in the last 7 days");
+      .toContainText(`3 finished in the last ${DEFAULT_BACK} days`);
 
+    await show(page, "laliga");
     const empty = col(page, "laliga").getByTestId("col-empty");
-    await expect(empty).toContainText("in the next 7 days");
+    await expect(empty).toContainText(/No La Liga fixtures in the next \d+ days\./);
     await expect(empty).toHaveAttribute("data-holds", "nothing");
     await expect(empty.getByTestId("col-empty-finished")).toHaveCount(0);
 
     // EPL is a league rather than a cup and reads exactly the same way —
     // the sentence is about what the column holds, not about what kind
     // of competition it is
+    await show(page, "epl");
     const eplEmpty = col(page, "epl").getByTestId("col-empty");
     await expect(eplEmpty.getByTestId("col-empty-finished"))
-      .toContainText("2 finished in the last 7 days");
+      .toContainText(`2 finished in the last ${DEFAULT_BACK} days`);
 
     /* AND NOT ONE COLUMN ON THIS BOARD IS SPEAKING FOR AN ABSENT
        PAYLOAD. Every column here was DECLARED, so every one of them has
@@ -307,11 +376,24 @@ test("a review that FAILED is not a column with nothing finished",
        `review.rows.length` is 0 for exactly the same reason a hundred
        real matches would be. The header must not report that zero. */
     await open(page, { detail: "review unavailable" }, 503);
-    // the board itself is unharmed — the two payloads fail apart
-    await expect(page.getByTestId("picker-row")).toHaveCount(3);
+    /* THE BOARD ITSELF IS UNHARMED — the two payloads fail apart. Every
+       row the board served is still drawn, counted ACROSS THE WINDOW
+       rather than in one four-column view: the UCL row rides a column
+       that starts off screen, and counting what happens to be lit would
+       report two rows over a payload carrying three. */
+    const drawnRows = new Set<string>();
+    await eachColumn(page, Object.keys(LEAGUES), async () => {
+      for (const e of await page.getByTestId("picker-row")
+        .evaluateAll((els) => els.map((x) => x.getAttribute("data-event")!)))
+        drawnRows.add(e);
+    });
+    expect([...drawnRows].sort())
+      .toEqual(BOARD.rows
+        .map((r) => (r as unknown as { event_id: string }).event_id).sort());
 
-    // EPL is one of the four columns the board always draws, and it has
+    // EPL is one of the four columns the board draws first, and it has
     // nothing upcoming. Its count says the one thing that IS known.
+    await show(page, "epl");
     const epl = col(page, "epl").getByTestId("col-count");
     await expect(epl).toHaveText("0 fixtures");
     await expect(epl).toHaveAttribute("data-counts", "upcoming");
@@ -325,17 +407,21 @@ test("a review that FAILED is not a column with nothing finished",
     const toggle = col(page, "epl").getByTestId("review-toggle");
     await expect(toggle).toHaveAttribute("data-has", "unread");
     await expect(col(page, "epl").getByTestId("review-count"))
-      .toHaveText("not read · last 7d");
+      .toHaveText(`not read · last ${DEFAULT_BACK}d`);
 
-    /* AND THE BOARD IS STILL THE BOARD. Every declared column is drawn,
-       including the cup that has nothing upcoming: the column set comes
-       from the payload that SUCCEEDED, so a dead review costs finished
-       counts and costs nothing else. Before 2026-09-09 this column's
-       existence depended on the review, and a failed review deleted it —
-       one request's failure silently editing the other's declaration. */
-    await expect(page.getByTestId("league-col"))
+    /* AND THE BOARD IS STILL THE BOARD. Every declared column is still
+       REACHABLE, including the cup that has nothing upcoming: the column
+       set comes from the payload that SUCCEEDED, so a dead review costs
+       finished counts and costs nothing else. Before 2026-09-09 this
+       column's existence depended on the review, and a failed review
+       deleted it — one request's failure silently editing the other's
+       declaration.
+       ASSERTED OFF THE RIBBON, which carries one pill per DECLARED
+       column, because the board draws four of them at a time and a count
+       of what is on screen would now say four whatever the review did. */
+    await expect(page.getByTestId("ribbon-pill"))
       .toHaveCount(Object.keys(LEAGUES).length);
-    await expect(col(page, "leaguescup")).toHaveCount(1);
+    await show(page, "leaguescup");
     await expect(col(page, "leaguescup").getByTestId("col-count"))
       .toHaveAttribute("data-counts", "upcoming");
   });
@@ -352,6 +438,7 @@ test("one league's tail failing costs that league's count, not the board's",
           error: "ConnectionError: scoreboard fetch failed" },
       },
     });
+    await show(page, "leaguescup");
     await expect(col(page, "leaguescup").getByTestId("col-count"))
       .toHaveText("0 fixtures");
     await expect(col(page, "leaguescup").getByTestId("col-empty-finished"))
@@ -360,6 +447,7 @@ test("one league's tail failing costs that league's count, not the board's",
       .toHaveAttribute("data-has", "unread");
     // the EPL tail read fine and still counts — one league's failure is
     // not the board's
+    await show(page, "epl");
     await expect(col(page, "epl").getByTestId("col-count"))
       .toHaveText("2 finished");
     await expect(col(page, "epl").getByTestId("review-toggle"))
@@ -391,10 +479,33 @@ test("the columns drawn are exactly the ones the board declares, and a competiti
        is green because it checked no columns. */
     await expect(page.getByTestId("league-col").first()).toBeAttached();
     const declared = Object.keys(LEAGUES);
-    await expect(page.getByTestId("league-col"))
-      .toHaveCount(declared.length);
-    const drawn = await page.getByTestId("league-col")
-      .evaluateAll((els) => els.map((e) => e.getAttribute("data-league")!));
+
+    /* THE BOARD REACHES EXACTLY THE DECLARED SET, and draws four of it
+       at a time (2026-09-15). The old assertion — every declared column
+       drawn, counted — is now two claims, and both are made:
+
+         a. THE RIBBON CARRIES ONE PILL PER DECLARED COLUMN, by LENGTH
+            as well as by membership. This is where the set is visible
+            at a glance and it is the whole of what the board admits;
+            a seventh competition appearing beside the six goes red here
+            exactly as it used to go red on the column count.
+         b. STEPPING THROUGH THE WHOLE RIBBON DRAWS EVERY ONE OF THEM AND
+            NOTHING ELSE. `eachColumn` visits the declared set and the
+            union of what was on screen is compared against it — so a
+            column that is declared and unreachable fails, and a column
+            that appears from somewhere else fails too. */
+    await expect(page.getByTestId("ribbon-pill")).toHaveCount(declared.length);
+    const pills = await page.getByTestId("ribbon-pill")
+      .evaluateAll((els) => els.map((e) => e.getAttribute("data-slug")!));
+    expect([...pills].sort()).toEqual([...declared].sort());
+
+    const seen = new Set<string>();
+    await eachColumn(page, declared, async () => {
+      for (const s of await page.getByTestId("league-col")
+        .evaluateAll((els) => els.map((e) => e.getAttribute("data-league")!)))
+        seen.add(s);
+    });
+    const drawn = [...seen];
     expect(drawn.length).toBe(declared.length);
     expect([...drawn].sort()).toEqual([...declared].sort());
 
@@ -405,6 +516,7 @@ test("the columns drawn are exactly the ones the board declares, and a competiti
        explicitly as well as covered by the set equality, because this
        is the specific door that was open. */
     expect(drawn).not.toContain("asean");
+    expect(pills).not.toContain("asean");
     await expect(col(page, "asean")).toHaveCount(0);
 
     /* NOR CAN THE OTHER SIX DOORS OPEN IT. A finished row's `league` is
@@ -432,15 +544,23 @@ test("the frontend's own reading order cannot ADMIT a column — a league it nam
     delete withoutLigamx.ligamx;
     await open(page, REVIEW, 200, { ...BOARD, leagues: withoutLigamx });
 
-    await expect(page.getByTestId("league-col"))
+    /* FIVE DECLARED, SO THE BOARD IS STILL WINDOWED and the set is read
+       off the ribbon — one pill per declared column, and Liga MX has
+       neither a pill nor a column. */
+    await expect(page.getByTestId("league-col").first()).toBeAttached();
+    await expect(page.getByTestId("ribbon-pill"))
       .toHaveCount(Object.keys(withoutLigamx).length);
     await expect(col(page, "ligamx")).toHaveCount(0);
+    await expect(page.locator('[data-testid="ribbon-pill"][data-slug="ligamx"]'))
+      .toHaveCount(0);
     // ...and the survivors are still in reading order, MLS first: the
     // list lost its power to admit without losing its job
     const drawn = await page.getByTestId("league-col")
       .evaluateAll((els) => els.map((e) => e.getAttribute("data-league")!));
     expect(drawn.slice(0, 3)).toEqual(["mls", "epl", "laliga"]);
-    expect([...drawn].sort()).toEqual(Object.keys(withoutLigamx).sort());
+    const pills = await page.getByTestId("ribbon-pill")
+      .evaluateAll((els) => els.map((e) => e.getAttribute("data-slug")!));
+    expect([...pills].sort()).toEqual(Object.keys(withoutLigamx).sort());
 
     // the phone jump-nav is built from the same set, so it cannot offer
     // a link to a column that is not there
@@ -492,6 +612,14 @@ test("with nothing ahead the tail is drawn beside the fixtures, not at the foot 
     await open(page);
     await expect(page.getByTestId("picker-row").first()).toBeVisible();
 
+    /* THE CUP AND MLS HAVE TO BE ON SCREEN TOGETHER, because the
+       measurement below is the cup tail's position AGAINST the MLS
+       column's fixtures. Pressing the cup's pill puts it leftmost and
+       MLS next to it, which is the four-wide window this board draws. */
+    await show(page, "leaguescup");
+    await show(page, "mls");
+    await expect(col(page, "leaguescup")).toHaveCount(1);
+
     const cupTail = col(page, "leaguescup").getByTestId("review-tail");
     await expect(col(page, "leaguescup").locator('[data-slot="tail-track"]'))
       .toHaveAttribute("data-at", "head");
@@ -529,6 +657,13 @@ test("a finished list with matches in it does not look like one without",
        glance — and on a column whose only content is behind that
        control, that is what "an empty column" looked like. */
     await open(page);
+    /* BOTH ON SCREEN AT ONCE, because the assertion at the foot of this
+       test compares the two columns' INK against each other — a
+       comparison across two window positions would be comparing two
+       renders. Pressing the cup's pill draws leaguescup, mls, epl and
+       laliga together, which is the pair this test needs. */
+    await show(page, "leaguescup");
+    await expect(col(page, "laliga")).toHaveCount(1);
     await expect(col(page, "leaguescup").getByTestId("review-toggle"))
       .toHaveAttribute("data-has", "matches");
     await expect(col(page, "laliga").getByTestId("review-toggle"))
@@ -538,7 +673,7 @@ test("a finished list with matches in it does not look like one without",
     await expect(col(page, "leaguescup").getByTestId("review-toggle"))
       .toHaveAttribute("aria-expanded", "false");
     await expect(col(page, "leaguescup").getByTestId("review-count"))
-      .toHaveText("3 matches · last 7d");
+      .toHaveText(`3 matches · last ${DEFAULT_BACK}d`);
 
     // and the ink differs, which is the part a reader actually sees
     const inkOf = (slug: string) => col(page, slug)
@@ -548,6 +683,21 @@ test("a finished list with matches in it does not look like one without",
   });
 
 // -------------------------------------------------------- 7: the hues
+
+/** THE PAINTED RAIL OF EVERY DECLARED COLUMN, stepping the window
+ *  through the whole ribbon. Read off the INK, never the token name: two
+ *  different names resolving to one colour is the failure, and a name
+ *  check cannot see it. */
+async function rails(page: import("@playwright/test").Page,
+                     declared: readonly string[]) {
+  await expect(page.getByTestId("col-rail").first()).toBeAttached();
+  const got = await eachColumn(page, declared, (slug) =>
+    col(page, slug).locator('[data-testid="col-rail"]')
+      .evaluate((e) => getComputedStyle(e).backgroundColor));
+  expect(got.size, "no rail was read — this check would pass over an "
+    + "empty set").toBe(declared.length);
+  return got;
+}
 
 test("every column on the board carries a hue of its own",
   async ({ page }) => {
@@ -561,22 +711,14 @@ test("every column on the board carries a hue of its own",
        would stay green the day a seventh competition inherits the
        fallback again — and off the PAINTED rail rather than the token
        name, because two different names resolving to one colour is
-       exactly the failure. */
+       exactly the failure.
+       STEPPED THROUGH THE WHOLE RIBBON since 2026-09-15: the board draws
+       four columns at a time, so a single read compares four of six and
+       a collision between two columns that are never co-visible would
+       go unseen — which is precisely the gap the new hues were chosen
+       around. */
     await open(page);
-    // both cups in, or `evaluateAll` reads a board that has not drawn
-    // the second one yet and the collision it exists to catch is not on
-    // the page to be caught
-    await expect(col(page, "leaguescup")).toHaveCount(1);
-    await expect(col(page, "ucl")).toHaveCount(1);
-    await expect(page.getByTestId("col-rail").first()).toBeAttached();
-    const hues = await page.getByTestId("league-col").evaluateAll(
-      (els) => els.map((e) => [
-        e.getAttribute("data-league")!,
-        getComputedStyle(
-          e.querySelector('[data-testid="col-rail"]')!,
-        ).backgroundColor,
-      ] as [string, string]));
-    expect(hues.length).toBeGreaterThan(1);
+    const hues = await rails(page, Object.keys(LEAGUES));
     for (const [slug, hue] of hues) {
       expect(hue, `${slug} has no painted rail`)
         .toMatch(/^rgba?\((?!0, 0, 0, 0\))/);
@@ -587,5 +729,86 @@ test("every column on the board carries a hue of its own",
       expect(clash, `${slug} and ${clash} are the same hue (${hue})`)
         .toBeUndefined();
       seen.set(hue, slug);
+    }
+  });
+
+/** THE BRAND GOLD, AS INK. `--accent` and `--lg-cup` are byte-identical
+ *  (#f5c542) in styles/globals.css — which is the point of the fallback
+ *  and the whole of the hazard: a league slug `LEAGUE_HUE` does not know
+ *  resolves to `--lg-cup`, and the column comes out wearing the brand.
+ *  Written as the painted string a browser reports. */
+const BRAND_GOLD = "rgb(245, 197, 66)";
+
+/** THE EIGHT LEAGUES THE BOARD NOW CARRIES. Four joined on 2026-09-15
+ *  and none of them had an entry in `LEAGUE_HUE`, so all four fell
+ *  through to the cup fallback — four columns wearing the brand,
+ *  indistinguishable from each other and from a cup tie folded in beside
+ *  them. Declaring the CSS variables does not fix that: the MAP is what
+ *  resolves a slug, and a slug it does not know never reaches them. */
+const EIGHT = {
+  mls: { src: "current", min_current_gp: 22, clubs: 30, kind: "league" },
+  epl: { src: "current", min_current_gp: 12, clubs: 20, kind: "league" },
+  laliga: { src: "current", min_current_gp: 12, clubs: 20, kind: "league" },
+  ligamx: { src: "prior", min_current_gp: 6, clubs: 18, kind: "league" },
+  bundesliga: { src: "current", min_current_gp: 12, clubs: 18, kind: "league" },
+  seriea: { src: "current", min_current_gp: 12, clubs: 20, kind: "league" },
+  ligue1: { src: "current", min_current_gp: 12, clubs: 18, kind: "league" },
+  eredivisie: { src: "current", min_current_gp: 12, clubs: 18, kind: "league" },
+};
+
+test("no league column is painted in the brand gold — the fallback is for "
+   + "a competition nobody has picked a hue for, not for a league",
+  async ({ page }) => {
+    /* THE FAILURE A NAME CHECK CANNOT SEE. `hueOf` returns
+       `var(--lg-<slug>)` for a slug it knows and `var(--lg-cup)` for one
+       it does not; `--lg-cup` is the brand gold, and gold is also rank
+       01 and the "this opens" affordance. So an unmapped league does not
+       render broken — it renders BRANDED, and two unmapped leagues
+       render identically. That is how the UCL and the Leagues Cup became
+       indistinguishable, and how four new leagues would have arrived all
+       wearing the same colour as each other.
+       The check is on the PAINTED ink, so a second token pointing at the
+       same value fails here the same way a missing entry does.
+
+       A CUP IS DIFFERENT AND IS NOT SWEPT: `--lg-cup` on a competition
+       nobody has chosen a hue for is honest — an unassigned column looks
+       unassigned. Every column on THIS board is a league. */
+    await open(page, REVIEW, 200, { ...BOARD, leagues: EIGHT, rows: [] });
+    const declared = Object.keys(EIGHT);
+    await expect(page.getByTestId("ribbon-pill")).toHaveCount(declared.length);
+
+    const hues = await rails(page, declared);
+    const branded = [...hues].filter(([, hue]) => hue === BRAND_GOLD)
+      .map(([slug]) => slug);
+    expect(branded, `these league columns resolve to the cup fallback and `
+      + `are painted in the brand gold (${BRAND_GOLD}): ${branded.join(", ")}`)
+      .toEqual([]);
+
+    // and, still, no two of the eight share an ink
+    const seen = new Map<string, string>();
+    for (const [slug, hue] of hues) {
+      expect(seen.get(hue),
+        `${slug} and ${seen.get(hue)} are the same hue (${hue})`)
+        .toBeUndefined();
+      seen.set(hue, slug);
+    }
+
+    /* AND THE RIBBON PAINTS THE SAME EIGHT. The pill's dot is styled
+       from `var(--lg-<slug>)` DIRECTLY rather than through `hueOf`, so
+       a slug with a declared CSS variable and no map entry would light
+       its pill correctly and its column in gold — two inks for one
+       league, one of them the brand. Read off the pills' own dots, and
+       matched against the column each one leads to. */
+    const dots = await page.getByTestId("ribbon-pill").evaluateAll((els) =>
+      els.map((e) => [e.getAttribute("data-slug")!,
+        getComputedStyle(e.querySelector("i")!).backgroundColor] as const));
+    expect(dots.length).toBe(declared.length);
+    for (const [slug, dot] of dots) {
+      expect(dot, `${slug}'s ribbon dot is unpainted`)
+        .toMatch(/^rgba?\((?!0, 0, 0, 0\))/);
+      expect(dot, `${slug}'s ribbon dot is the brand gold`)
+        .not.toBe(BRAND_GOLD);
+      expect(dot, `${slug}'s ribbon dot and its column's rail are two `
+        + "different inks for one league").toBe(hues.get(slug));
     }
   });
