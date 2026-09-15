@@ -2314,14 +2314,22 @@ export const BOARD_EIGHT = {
 "rank_gap": 4
 }
 },
-/* ── A DAY ONE LEAGUE OWNS, AND THAT LEAGUE OPENS OUT OF THE WINDOW
-   (2026-09-15) ──────────────────────────────────────────────────
-   The eight recorded columns all play on the same five dates, so at
-   `windowStart = 0` the union over ALL rows and the union over the
-   DRAWN four are the same set — a fixture on which the band defect
-   (a full-width date over four rest days) is invisible. This row
-   gives Serie A, which is COLUMN SIX and therefore undrawn at the
-   opening window, a Thursday of its own.
+/* ── A SECOND MATCHDAY THAT ONE LEAGUE OWNS (2026-09-15) ──────────
+   The eight recorded columns all play the same five dates, and only
+   one of those — the Wednesday La Liga owns — is a date a single
+   league plays. The board draws four of eight columns, so a day
+   nobody on screen plays is the one shape the date rail must never
+   take, and with a single such day in the whole payload the guards
+   for it rested on one row of one column: edit that row and the
+   defect becomes invisible with nothing going red.
+
+   This gives Serie A a Thursday of its own, so two different leagues
+   each own a matchday. WHICH of them is on screen at a given window
+   position is not a fact this file may assume — the operator's
+   reading order decides it, and it changed under these guards once
+   already (PICKER_COLUMN_ORDER, 2026-09-15) — so the guards in
+   eight-column-board.spec.ts search the window for the position they
+   need rather than naming one.
 
    IT IS A RECORDED ROW, NOT AN INVENTED ONE: the Serie A row above
    it verbatim, with the identity fields moved — event, kickoff,
