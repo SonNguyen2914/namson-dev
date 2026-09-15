@@ -577,29 +577,43 @@ test("an answer that is not a sweep report is NAMED BY ITS CODE, and "
     await expect(button(page)).toHaveAttribute("data-answered", "failed");
   });
 
-test("on a 403 the card prints no second copy of a fact the page "
-  + "already carries", async ({ page }) => {
+test("on a 403 the card says so ITSELF, now that nothing else on the page "
+  + "does", async ({ page }) => {
     await serve(page);
-    // The backend's own refusal shape — FastAPI's HTTPException(403).
-    // The strip on this same page, against this same gate with this
-    // same token, draws that sentence with its status. Saying it again
-    // here is the operator reading one fact twice and fixing it twice.
+    /* THE PREMISE OF THIS GUARD CHANGED, SO THE GUARD DID (2026-09-15).
+       It used to assert SILENCE here, and the reason was sound while it
+       held: WatchedStrip was mounted on this same page, against this same
+       gate, with this same token, and drew the refusal with its status.
+       Saying it again would have been the operator reading one fact
+       twice.
+
+       The strip came off the landing page. The silence outlived its
+       reason, and an operator whose token is refused pressed a button and
+       read NOTHING — the blank that says "nothing is live" when what
+       happened is "you were not allowed to ask". A suppression that
+       depends on a neighbour has to die with the neighbour.
+
+       So a 403 is now named here like every other answer. If the strip is
+       ever mounted beside this again, the duplication will be VISIBLE —
+       which is the failure worth having, against a silence that is not. */
     await page.route("**/api/bet-suggester/tape-now**", (r) =>
       r.fulfill(json({ detail: "operator credentials required" }, 403)));
     await openBoard(page);
     await typeToken(page);
     await button(page).click();
-    // The press is still MARKED as refused, so it does not read as a
-    // press that did nothing at all.
     await expect(button(page)).toHaveAttribute("data-answered", "failed");
-    await expect(said(page)).toHaveCount(0);
+    const answer = said(page);
+    await expect(answer).toHaveCount(1);
+    await expect(answer).toContainText("the press answered 403");
+    await expect(answer).toContainText("operator credentials required");
+    // a refusal is an ANSWER — it is not the read-never-happened case
+    await expect(answer).toHaveAttribute("data-ok", "false");
 
-    // NON-VACUITY. This absence must be able to go red, and the thing
-    // that makes it red is a status the page does NOT already answer
-    // elsewhere: the same route, the same body, a 500.
+    // AND 401 IS THE SAME FACT, not a second silence hiding behind the
+    // first: the two statuses were suppressed together and must speak
+    // together.
     await page.route("**/api/bet-suggester/tape-now**", (r) =>
-      r.fulfill(json({ detail: "operator credentials required" }, 500)));
+      r.fulfill(json({ detail: "operator credentials required" }, 401)));
     await button(page).click();
-    await expect(said(page)).toHaveCount(1);
-    await expect(said(page)).toContainText("the press answered 500");
+    await expect(said(page)).toContainText("the press answered 401");
   });
