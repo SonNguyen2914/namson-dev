@@ -251,6 +251,15 @@ export interface BoardRow {
    *  withheld exactly because neither table can host it. Optional so an
    *  older payload still renders. */
   column?: string;
+  /** EVERY COLUMN it renders in (backend #136, 2026-09-14). `column` is
+   *  the FIRST of these, kept so a consumer written before that day
+   *  reads the row unchanged; this is the whole set. A league row and a
+   *  cup tie folded into one league carry `[slug]`, one entry. A fixture
+   *  folded into TWO — `tables.FOLDED_INTO_COLUMNS`, a competition with
+   *  rows and no column of its own — carries both, and is ONE fixture
+   *  drawn twice rather than two. Read it through `columnsOf`, never by
+   *  picking `column`: picking picks the first and loses the rest. */
+  columns?: string[];
   /** Last-≤5 results per side — "WDLWW", oldest→newest, each club's own
    *  perspective, derived server-side from a past scoreboard sweep.
    *  null/absent when the sweep knows nothing of the club (early
@@ -419,6 +428,33 @@ export function rowIsInPlay(row: { in_play?: boolean }): boolean {
   return row.in_play === true;
 }
 
+/** ONE CLUB'S OWN LINE off its OWN league's table — picker/stages
+ *  .rated_side, verbatim. Every field is a fact about that one club and
+ *  none of them is signed against the other side, so a refusal of the
+ *  COMPARISON can print all of it. `of` is the size of the ordering
+ *  `rank` is a position in, and it is the field that makes two ranks
+ *  from two leagues read as incommensurable rather than comparable. */
+export interface RefusedSide {
+  club: string;
+  /** the row the club resolved to, when the table spells it differently */
+  table_club?: string | null;
+  resolved_by?: string | null;
+  rated?: boolean;
+  /** WHICH LEAGUE'S TABLE these figures are off */
+  rated_in?: string | null;
+  table_note?: string | null;
+  ppg?: number | null;
+  gf?: number | null;
+  ga?: number | null;
+  gdg?: number | null;
+  gp_current?: number | null;
+  rank?: number | null;
+  /** how many clubs are in that ordering */
+  of?: number | null;
+  weight?: number | null;
+  basis?: BlendBasis | string | null;
+}
+
 /** A fixture the picker would not rate, named with the reason. Refusals
  *  are LISTED, never hidden: a fixture that vanishes without a word is
  *  the defect this whole surface is built against. */
@@ -427,9 +463,22 @@ export interface BoardRefusal {
   league: string;
   /** see BoardRow.column */
   column?: string;
+  /** see BoardRow.columns — read it through `columnsOf` */
+  columns?: string[];
   home: string;
   away: string;
-  club: string;
+  /** THE CLUB THIS ROW WAS REFUSED FOR — **or `null`, when there is no
+   *  single one** (backend #136, 2026-09-14). A `no_prior_row` refusal
+   *  is about ONE club: it has no row in the table the other's rank is
+   *  a position in. A `no_shared_scale` refusal is about the PAIRING —
+   *  both clubs are rated, each on its own league's table, and no
+   *  measured field puts those two tables on one scale — so naming a
+   *  club here would name a victim the backend explicitly declines to
+   *  name. Null is the shape, not a gap: `sides` carries both clubs'
+   *  own figures instead, and every sentence keyed to this field must
+   *  branch rather than interpolate. It read `string` until today, and
+   *  `${r.club}` then put the word "null" in front of a reader. */
+  club: string | null;
   reason: string;
   event_id?: string;
   kickoff?: string;
@@ -443,6 +492,10 @@ export interface BoardRefusal {
   state?: string | null;
   in_play?: boolean;
   live?: BoardRowLive | null;
+  /** the competition's settlement rule, as on a rated row — a refusal
+   *  to RANK is not a refusal to say what a leg settles under, and
+   *  `annotate_row` attaches it to refusals for that reason. */
+  reg_time_note?: string | null;
 
   /* ── WHAT A REFUSAL CARRIES BESIDES ITS REASON (operator, 2026-09-11)
      ────────────────────────────────────────────────────────────────
@@ -507,7 +560,19 @@ export interface BoardRefusal {
     club: string; rank?: number | null; gp_current?: number | null;
     ppg?: number | null; gf?: number | null; ga?: number | null;
     gdg?: number | null;
+    /** what that league's table says about its own read of this club */
+    table_note?: string | null;
   } | null;
+  /** BOTH CLUBS' OWN LINES, when the refusal is of the PAIRING rather
+   *  than of a club (backend #136). `opponent_row` is one side —- the
+   *  club that DID resolve, printed beside the one that did not. Here
+   *  neither is the opponent OF the other: each is rated, each on its
+   *  own league's table, and `rated_in` names which table that is.
+   *  Nothing in this block crosses the two, which is exactly why the
+   *  card may draw all of it: a rank out of `of`, a rate, a count. The
+   *  games-played key is `gp_current`, the backend's own name for it
+   *  and the same one `opponent_row` uses. */
+  sides?: { home: RefusedSide; away: RefusedSide } | null;
   /** LAST-5 BY VENUE, not by favourite — a refused fixture has no
    *  favourite to key a strip to. A letter sequence either way: the
    *  board's own string form and a list of letters are both accepted,
@@ -557,8 +622,33 @@ export interface BoardRefusal {
     /** one sentence, identical under every reason, naming what no
      *  refusal will ever carry */
     withheld: string;
+    /** THE MEASUREMENT BEHIND THE REFUSAL, per case, in the backend's
+     *  own words (backend #136). `no_field` carries the corpus numbers
+     *  for a competition no measured field places both clubs in —- an
+     *  absence that now DECIDES a favourite, so it travels with the
+     *  evidence rather than as a bare token. */
+    detail?: { no_field?: string;
+               field_holds_neither_club?: string } | null;
   } | null;
 }
+
+/** EVERY COLUMN A ROW IS DRAWN IN, derived from the row itself.
+ *
+ *  Read by the landing page (which filters four lists by it) and by the
+ *  refused card (which says, on the card, that this is ONE fixture in
+ *  two columns). ONE definition, because two readers that disagree
+ *  about where a row belongs is a fixture drawn in a column the card
+ *  then describes as somewhere else.
+ *
+ *  THE ORDER IS THE PAYLOAD'S. `column` is the first entry by the
+ *  backend's own construction, so a singular reader and this one agree
+ *  on the head and differ only in the tail they keep. The two fallbacks
+ *  are for payloads built before #136: `column` alone (2026-09-01) and
+ *  `league` alone (before that). Neither invents a second column. */
+export const columnsOf = (
+  r: { columns?: string[]; column?: string; league: string },
+): string[] => (r.columns?.length ? r.columns
+  : r.column ? [r.column] : [r.league]);
 
 export interface LeagueMeta {
   src: Src | null;
@@ -727,6 +817,12 @@ export const LEAGUE_LABEL: Record<string, string> = {
   slovaksuperliga: "Slovak Super Liga",
   azerpremyer: "Premyer Liqa",
   ucl: "Champions League",
+  // 2026-09-14. A competition with ROWS AND NO COLUMN — its one fixture
+  // is drawn in the MLS and Liga MX columns instead. It is named on the
+  // card that rides in them, so a missing entry here would print
+  // `campeones` at the operator exactly as the four league slugs did
+  // above. Taken from the backend registry's own `display`.
+  campeones: "Campeones Cup",
 };
 
 /** THE BADGE BESIDE THE FAVOURITE, and what it is allowed to claim.

@@ -37,7 +37,8 @@ import {
 } from "../lib/providerFailure";
 import {
   BoardRefusal, BoardRow, LeagueMeta, RatePair, RowField, SEASON_BLEND_K,
-  homeBadge, leagueLabel, rowHref, rowIsInPlay, seasonDisagreement,
+  columnsOf, homeBadge, leagueLabel, rowHref, rowIsInPlay,
+  seasonDisagreement,
   seasonSpan, seasonSpanLabel, venueDisagreement,
 } from "../lib/pickerApi";
 import {
@@ -1030,8 +1031,15 @@ function formText(f: string | string[] | null | undefined): string | null {
  *  not there at all, and a distinction between a Kalshi key that is null
  *  (no event matched) and one that was never sent (the board said
  *  nothing about the market either way). */
-function RefusalCard({ r, dated = true, dense = false }: {
-  r: BoardRefusal; dated?: boolean;
+function RefusalCard({ r, col, dated = true, dense = false }: {
+  r: BoardRefusal;
+  /** THE COLUMN THIS CARD IS BEING DRAWN IN, passed by the column that
+   *  draws it. NOT `r.column`: since backend #136 a row can name two
+   *  columns and `r.column` is only the first of them, so a card in the
+   *  SECOND column that read `r.column` would tell its reader it was
+   *  somewhere else. Where a card is, is a fact the caller holds. */
+  col: string;
+  dated?: boolean;
   /** in a narrow dense-grid track — the same reflow RowRead documents,
    *  applied to the same elements, so a refused card and a ranked card
    *  narrow together rather than one of them staying wide. */
@@ -1055,6 +1063,11 @@ function RefusalCard({ r, dated = true, dense = false }: {
   const ref = r.refusal ?? null;
   const withheld = ref?.withheld ?? REFUSED_RULE;
   const absent = Object.entries(ref?.absent ?? {});
+  /* the per-case measurement, same treatment as `absent`: entries off
+     the object, never a list of keys typed here that a key added
+     upstream would silently fall out of. */
+  const detail = Object.entries(ref?.detail ?? {})
+    .filter((e): e is [string, string] => typeof e[1] === "string" && e[1] !== "");
 
   /* WHICH SIDE OF THE FIXTURE WAS REFUSED. Everything per-club on this
      card is keyed off it, because the payload names the refused club and
@@ -1065,6 +1078,31 @@ function RefusalCard({ r, dated = true, dense = false }: {
     : r.club === r.away ? "away" : null;
   const pick = <T,>(side: "home" | "away", a: T, b: T) =>
     refusedSide == null ? undefined : refusedSide === side ? a : b;
+
+  /* ── WHEN NOTHING WAS REFUSED *FOR* A CLUB (backend #136) ──────────
+     `no_shared_scale`: both clubs are rated, each on its OWN league's
+     table, and no measured field puts those tables on one scale. There
+     is no victim, so `club` is null and the two blocks above — the
+     refused club's season, the opponent's row — are absent BY NAME in
+     `refusal.absent`. `sides` is what rides instead: each club's own
+     rank out of its own ordering, its own rates, its own count. Every
+     figure in it is a fact about one club and none is signed against
+     the other, which is precisely why this card may draw all of it.
+     Without it the card fell through every `pick` above to `undefined`
+     and printed "not stated" over numbers the payload was carrying —
+     the same defect `gp_current` caused on 2026-09-11, one shape on. */
+  const sides = r.sides ?? null;
+  const side = (s: "home" | "away") => sides?.[s] ?? null;
+  /** the club names, for a sentence that must not say `null` */
+  const pairing = `${r.home} v ${r.away}`;
+
+  /* WHICH COLUMNS THIS ONE FIXTURE IS DRAWN IN, off the row, through
+     the same reader the landing page filtered with. `others` is the
+     rest of them — what the card has to SAY, so the second copy of a
+     fixture reads as the same match and not as a duplicate nobody
+     caught. */
+  const cols = columnsOf(r);
+  const others = cols.filter((c) => c !== col);
 
   /* THE REFUSED CLUB'S GAMES PLAYED HAS TWO SOURCES AND THEY ARE THE
      SAME FACT. `this_season.gp` is the club's current-season count;
@@ -1084,17 +1122,29 @@ function RefusalCard({ r, dated = true, dense = false }: {
      payload. */
   const ownGp = own?.gp ?? adm?.gp ?? null;
   const oppGp = opp?.gp_current ?? null;
-  const homeGp = pick("home", ownGp, oppGp) ?? null;
-  const awayGp = pick("away", ownGp, oppGp) ?? null;
-  const homePpg = pick("home", own?.ppg ?? null, opp?.ppg ?? null) ?? null;
-  const awayPpg = pick("away", own?.ppg ?? null, opp?.ppg ?? null) ?? null;
+  /* `sides` FIRST, and the club-keyed pick behind it. The two never
+     both arrive — one refusal names a club and the other names the
+     pairing — so this is a choice between two shapes, not a fallback
+     chain that could silently prefer a stale one. */
+  const homeGp = side("home")?.gp_current ?? pick("home", ownGp, oppGp) ?? null;
+  const awayGp = side("away")?.gp_current ?? pick("away", ownGp, oppGp) ?? null;
+  const homePpg = side("home")?.ppg
+    ?? pick("home", own?.ppg ?? null, opp?.ppg ?? null) ?? null;
+  const awayPpg = side("away")?.ppg
+    ?? pick("away", own?.ppg ?? null, opp?.ppg ?? null) ?? null;
 
   const oppRank = opp?.rank ?? null;
-  const homeRank = pick("home", null, oppRank);
-  const awayRank = pick("away", null, oppRank);
-  const rankText = (side: "home" | "away", v: number | null | undefined) =>
-    refusedSide === side ? "no rank"
-      : v == null ? "not stated" : `#${v}`;
+  const homeRank = side("home")?.rank ?? pick("home", null, oppRank);
+  const awayRank = side("away")?.rank ?? pick("away", null, oppRank);
+  const rankText = (s: "home" | "away", v: number | null | undefined) =>
+    refusedSide === s ? "no rank"
+      : v == null ? "not stated"
+        /* THE SIZE OF THE ORDERING RIDES WITH THE POSITION. `#2` beside
+           `#3` reads as a comparison; `#2 of 17` beside `#3 of 20` says
+           on its face that these are positions in two different
+           orderings — which is the fact the gap cell then refuses. `of`
+           is drawn only when the payload sent it. */
+        : `#${v}${side(s)?.of != null ? ` of ${side(s)!.of}` : ""}`;
 
   const homeForm = formText(r.form?.home);
   const awayForm = formText(r.form?.away);
@@ -1105,7 +1155,13 @@ function RefusalCard({ r, dated = true, dense = false }: {
       data-club={r.club}
       data-dated={dated ? "1" : "0"}
       data-league={r.league}
-      data-column={r.column ?? r.league}
+      /* WHERE THIS CARD IS, and the WHOLE SET the row asked for. The
+         first was `r.column` until #136 — the row's first column, which
+         is a lie on the card drawn in its second. A guard derives the
+         set from `data-columns` rather than counting the columns it
+         happens to find a card in. */
+      data-column={col}
+      data-columns={cols.join(" ")}
       data-event={r.event_id ?? undefined}
       data-refused-side={refusedSide ?? undefined}
       /* THE COUNTDOWN, AS DATA AS WELL AS INK — a guard reads it, and a
@@ -1142,8 +1198,23 @@ function RefusalCard({ r, dated = true, dense = false }: {
               says that, in the ladder's own place, rather than going
               blank and letting the card creep one step closer to a
               ranked one. */}
+          {/* WHOSE ABSENCE IT IS, BRANCHED RATHER THAN INTERPOLATED.
+              `${r.club}` was the whole sentence's subject until #136 —
+              and on a refusal that names no club it rendered the string
+              "null" at a reader, the same class of defect as a raw slug
+              (`e2e/no-raw-slug-reaches-the-reader.spec.ts`) or a
+              provider's exception (`lib/providerFailure.ts`). Nulling
+              the subject would not have fixed it either: "has no row in
+              the table this column ranks on" is FALSE of this fixture —
+              both clubs have rows, in two tables that were never
+              measured against each other. A missing value needs a
+              different sentence, not a shorter one. */}
           <span data-testid="refused-rank"
-            title={`${r.club} has no row in the table this column ranks on, `
+            title={(r.club
+              ? `${r.club} has no row in the table this column ranks on, `
+              : `${pairing} is not refused for either club — both are `
+                + "rated, on two different leagues' tables, and no "
+                + "measured field puts those tables on one scale, ")
               + "so this fixture has no position in the day's ladder. A "
               + "number here would be a placement nobody measured."}
             className="font-mono text-[11px] tabular-nums text-ink-low">
@@ -1165,11 +1236,35 @@ function RefusalCard({ r, dated = true, dense = false }: {
               on the same condition, a ranked card carries. A cup tie
               folded into a league column is still a cup tie whether or
               not it was ranked. */}
-          {r.column && r.column !== r.league && (
+          {/* KEYED TO THE COLUMN THIS CARD IS IN, not to `r.column`.
+              The old condition asked whether the row's FIRST column
+              differed from its competition, and its title named that
+              first column — so the Campeones Cup card in the Liga MX
+              column would have said "shown in the MLS column". Where a
+              card is, is what the column drawing it knows. */}
+          {r.league !== col && (
             <span data-testid="competition-badge"
-              title={`${leagueLabel(r.league)} fixture, shown in the ${leagueLabel(r.column)} column`}
+              data-also-in={others.join(" ") || undefined}
+              title={`${leagueLabel(r.league)} fixture, shown in the `
+                + `${leagueLabel(col)} column`
+                + (others.length > 0
+                  ? ` and in the ${others.map(leagueLabel).join(" and the ")}`
+                    + ` column${others.length > 1 ? "s" : ""}. It is ONE `
+                    + "fixture listed in both, not one fixture per column."
+                  : "")}
               className="rounded border border-accent/40 bg-accent/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-accent">
               {leagueLabel(r.league)}
+              {/* AND THE OTHER COLUMN, ON THE BADGE ITSELF. A reader
+                  scanning one column has no way to know a card is
+                  repeated in another, and two cards with the same two
+                  club names four columns apart read as two fixtures.
+                  Said in the chip row, in words, so it survives a
+                  screenshot and a reader who never hovers. */}
+              {others.length > 0 && (
+                <span className="text-accent/70">
+                  {" · also in "}{others.map(leagueLabel).join(" + ")}
+                </span>
+              )}
             </span>
           )}
         </span>
@@ -1300,20 +1395,43 @@ function RefusalCard({ r, dated = true, dense = false }: {
             is the true half rather than a blank one. Printing `#12 v —`
             would be the same sentence dressed as a rendering failure;
             printing nothing would lose a measured fact. */}
+        {/* AND WHEN BOTH CLUBS HAVE ONE. `sides` carries a rank and the
+            SIZE of the ordering it is a position in, per club, off two
+            different leagues' tables. Both are measured, neither is
+            derived from the other, and printing them is no more a
+            comparison than printing the two clubs' names — the same
+            argument the ppg cell below already makes, and the reason
+            the backend ships `of` at all. The GAP between them stays
+            refused, in its own cell, two along. */}
         <span data-testid="refused-rank-pair" data-refused="rank-pair"
           data-opp-rank={oppRank ?? undefined}
-          title={refusedSide == null
-            ? `the refusal names ${r.club}, which matches neither ${r.home} `
-              + "nor " + r.away + " — so the board cannot say which side of "
-              + "this fixture holds the rank, and prints neither."
-            : `${opp?.club ?? "the club that resolved"} has a row in the `
-              + `table and therefore a position in it. ${r.club} has no row `
-              + "there at all, so it has no position — this is one rank and "
-              + "one absence, not a pair of ranks."}
+          data-home-rank={homeRank ?? undefined}
+          data-away-rank={awayRank ?? undefined}
+          title={sides
+            ? `${r.home} is ${rankText("home", homeRank)} in the `
+              + `${leagueLabel(side("home")?.rated_in ?? r.league)} table and `
+              + `${r.away} is ${rankText("away", awayRank)} in the `
+              + `${leagueLabel(side("away")?.rated_in ?? r.league)} table. Two `
+              + "positions in two different orderings, shown side by side and "
+              + "NOT differenced: the distance between them is the figure "
+              + "this fixture was refused for."
+            : refusedSide == null
+              ? `the refusal names ${r.club ?? "no club"}, which matches `
+                + `neither ${r.home} nor ${r.away} — so the board cannot say `
+                + "which side of this fixture holds the rank, and prints "
+                + "neither."
+              : `${opp?.club ?? "the club that resolved"} has a row in the `
+                + `table and therefore a position in it. ${r.club} has no row `
+                + "there at all, so it has no position — this is one rank and "
+                + "one absence, not a pair of ranks."}
           className="text-ink-faint">
-          {refusedSide == null
-            ? <>ranks <Refused what="rank-pair" says={withheld} /></>
-            : <>{rankText("home", homeRank)} v {rankText("away", awayRank)}</>}
+          {sides
+            ? <>ranks <span className="text-ink-mid">H {rankText("home", homeRank)}</span>
+              <span className="text-ink-faint"> · </span>
+              <span className="text-ink-mid">A {rankText("away", awayRank)}</span></>
+            : refusedSide == null
+              ? <>ranks <Refused what="rank-pair" says={withheld} /></>
+              : <>{rankText("home", homeRank)} v {rankText("away", awayRank)}</>}
         </span>
         {/* THE CONVERSION, AND THE ONE THE OPERATOR ASKED FOR. A ranked
             card prints `ppg +1.00`, a GAP — the two clubs' rates
@@ -1380,9 +1498,14 @@ function RefusalCard({ r, dated = true, dense = false }: {
       {/* THE BACKEND'S OWN REASON, kept verbatim and kept prominent — it
           is the sentence this card was built around and the one the
           column's foot used to be the only place to read. */}
-      <p data-testid="refusal-reason"
+      {/* THE SUBJECT IS THE ROW'S, NOT A DASH WITH NOTHING IN FRONT OF
+          IT. `{r.club}` renders as NOTHING when club is null — React
+          drops it — so this line became " — no_shared_scale", a reason
+          with no subject, which reads as a card that failed to load one.
+          The refusal of a PAIRING has a subject: the pairing. */}
+      <p data-testid="refusal-reason" data-subject={r.club ? "club" : "pairing"}
         className="mt-3 font-mono text-[10.5px] leading-relaxed text-ink-mid">
-        {r.club} — {r.reason}
+        {r.club ?? pairing} — {r.reason}
       </p>
       {/* AND THE RULE, SAID ONCE, IN THE MODULE'S OWN WORDS. Six cells
           above print `refused`; this says why all six do, so the card
@@ -1431,6 +1554,80 @@ function RefusalCard({ r, dated = true, dense = false }: {
             </li>
           ))}
         </ul>
+      )}
+
+      {/* ── THE MEASUREMENT BEHIND THE REFUSAL. `refusal.detail` carries
+          it per case — for `no_shared_scale`, the corpus numbers for why
+          no field places these two clubs: which leagues are in the Elo
+          corpus, which component they form, which artifact holds neither
+          of them. An absence that DECIDES a favourite has to travel with
+          its evidence, or "no field" is indistinguishable from "nobody
+          looked". DERIVED from the object, like `absent` above: a key
+          added upstream draws itself here with no edit, and a key
+          removed stops being drawn rather than rendering `undefined`. */}
+      {detail.length > 0 && (
+        <ul data-testid="refused-detail" data-keys={detail.map(([k]) => k).join(" ")}
+          className="mt-1 space-y-0.5 text-[11px] leading-relaxed text-ink-low">
+          {detail.map(([key, says]) => (
+            <li key={key} data-detail={key}>
+              <span className="font-mono text-[10px] text-ink-faint">
+                {key}
+              </span>{" "}— {says}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* ── ONE FIXTURE, DRAWN IN TWO COLUMNS (backend #136).
+          The badge in the chip row says it in three words; this says it
+          in a sentence, because the failure it guards against is a
+          reader meeting the SECOND copy and counting a second fixture.
+          The two clubs' names are identical on both cards, and four
+          columns apart nothing else would tell them apart.
+          EVERY NAME HERE IS OFF THE ROW: the columns from `columns`, the
+          tables each club is rated on from `sides.rated_in`. A sentence
+          that hard-coded "MLS and Liga MX" would be this file asserting
+          a fold the backend declares. */}
+      {others.length > 0 && (
+        <p data-testid="folded-into" data-columns={cols.join(" ")}
+          data-drawn-in={col} data-also-in={others.join(" ")}
+          className="mt-1 text-[11px] leading-relaxed text-ink-low">
+          One fixture, drawn in {cols.length} columns —{" "}
+          {cols.map(leagueLabel).join(" and ")}. This is the same match as
+          the card in the {others.map(leagueLabel).join(" and the ")}{" "}
+          column{others.length > 1 ? "s" : ""}, listed again and not
+          played again.
+          {sides && (side("home")?.rated_in || side("away")?.rated_in) ? (
+            <>{" "}{r.home} is rated on the{" "}
+              {leagueLabel(side("home")?.rated_in ?? r.league)}{" "}table and{" "}
+              {r.away} on the{" "}
+              {leagueLabel(side("away")?.rated_in ?? r.league)}{" "}table, so
+              neither column&apos;s table describes this fixture on its own
+              and it belongs under both.</>
+          ) : null}
+        </p>
+      )}
+
+      {/* ── WHAT THIS LEG SETTLES UNDER, when the row carries it. A
+          refusal to RANK is not a refusal to say what a market would
+          settle on, and `annotate_row` attaches the note to refusals for
+          that reason — on this fixture it is the sentence that says
+          there is NO Kalshi series for the competition at all, which is
+          the difference between a book that was searched and one that
+          does not exist. NOT `RegTimeNote`: that component's summary
+          line asserts "regulation time only — the price is 90 minutes",
+          which is true of the Leagues Cup note it was written for and
+          FALSE of this one, whose own words decline to claim anything
+          about what happens after 90 minutes. A fixed headline over a
+          variable paragraph is a second voice on one fact. */}
+      {r.reg_time_note && (
+        <details data-testid="refused-reg-time"
+          className="mt-2 rounded-md border border-line bg-elev2/40 px-2.5 py-1.5 text-[11px] leading-relaxed text-ink-low">
+          <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.1em] text-ink-faint">
+            what this leg settles under
+          </summary>
+          <p className="mt-1.5">{r.reg_time_note}</p>
+        </details>
       )}
 
       {/* ── THE ADMISSION COUNTDOWN — the one block a ranked card has no
@@ -1487,7 +1684,15 @@ function RefusalCard({ r, dated = true, dense = false }: {
         <p data-testid="refused-admission" data-absent="1"
           className="mt-3 text-[11px] leading-relaxed text-ink-low">
           This refusal carries no admission countdown, so the board cannot
-          say here how many games away this club is from being rated.
+          say here how many games away{" "}
+          {/* WHOSE COUNTDOWN IT WOULD BE. "this club" has no referent on
+              a refusal that names no club — and on THIS shape there is no
+              countdown to have: both clubs are already rated, and what
+              the refusal waits on is somebody measuring a field. The
+              backend says exactly that in `refusal.absent.admission`
+              above; this line must not contradict it by implying a club
+              is short of a gate. */}
+          {r.club ? "this club is" : "either club is"} from being rated.
         </p>
       )}
 
@@ -2442,7 +2647,8 @@ export function LeagueColumn({
                 field={field} />
             ))}
             {refused.map((r, i) => (
-              <RefusalCard key={`ref-${r.club}-${i}`} r={r} dense={dense} />
+              <RefusalCard key={`ref-${r.event_id ?? r.club}-${i}`} r={r}
+                col={slug} dense={dense} />
             ))}
           </>
         );
@@ -2569,8 +2775,8 @@ export function LeagueColumn({
               width under a six-up grid reads as a different surface. */}
           <div className={dense ? `mt-2 ${DENSE_GRID}` : "mt-2 space-y-2"}>
             {undated.map((r, i) => (
-              <RefusalCard key={`${r.club}-${i}`} r={r} dated={false}
-                dense={dense} />
+              <RefusalCard key={`${r.event_id ?? r.club}-${i}`} r={r} dated={false}
+                col={slug} dense={dense} />
             ))}
           </div>
           <div className="mt-2.5"><RefusalWhy /></div>
