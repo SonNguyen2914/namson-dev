@@ -12,21 +12,29 @@ import { localDay as localDayOf } from "../src/lib/matchday";
 //
 // What is at stake here is not pixels. The picker RANKS, NEVER CUTS, and
 // two of its three stages exist only to annotate. Since 2026-08-31 the
-// board is FOUR COLUMNS — one per league, fixed order, each with its own
-// sort control — so the assertions are about properties a prettier board
-// could quietly lose:
+// board is FOUR COLUMNS — one per league, in a fixed order the board
+// itself declares — so the assertions are about properties a prettier
+// board could quietly lose:
 //
 //   - every row served is drawn in its league's column, including a gap
 //     of exactly 0.00, and NO SORT MODE changes that count;
-//   - each column opens in |GD/g gap| descending and applies the order
-//     itself, so a reordered payload cannot reorder the board;
+//   - each column opens in kickoff order and applies it itself, so a
+//     reordered payload cannot reorder the board;
 //   - a row with no value under the active sort key sorts LAST, in both
-//     directions, and the column says so on screen;
+//     directions, and the board says so on screen;
 //   - a row can lead on the table gap and be LEVEL underneath, and that
 //     has to be visible without reading a number;
-//   - "prior szn" is a banner, not a footnote;
+//   - "prior szn" is a COLUMN's fact, said once by that column;
 //   - a refused fixture is listed with its club and reason, never hidden;
 //   - nothing on the page reads as advice.
+//
+// 2026-09-15, THE OPERATOR STRIPPED THE CONTROLS. The board-level sort
+// (`col-sort` / `col-dir` / `col-reset`), both window chip rows, the
+// refresh button and the season-basis banner are gone; both windows open
+// at 8 days; the header is centred. Every claim above is still made — by
+// the MATCHDAY band's sort, which is the one control left, and by the
+// column headers' own chips — and the absences themselves are pinned,
+// because an absent control is invisible to every other test here.
 
 const json = (body: unknown, status = 200) => ({
   status,
@@ -288,6 +296,24 @@ const orderOf = (c: ReturnType<typeof col>) =>
   c.getByTestId("picker-row")
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-event")));
 
+/* ── SORTING IS THE MATCHDAY'S, AND ONLY THE MATCHDAY'S (operator,
+   2026-09-15) ─────────────────────────────────────────────────────────
+
+   The board-level `col-sort` / `col-dir` / `col-reset` trio is gone.
+   Every matchday band still carries its own sort, and that is the one
+   the specs below drive: `DEFAULT_SORT` is `kickoff asc` either way, so
+   the board opens in the order it always did and a band control changes
+   the order of the day it heads — in every column at once, which is the
+   claim the board control used to carry.
+
+   EVERY FIXTURE IN THIS FILE LANDS IN ONE MATCHDAY (see `inHours`), so
+   there is exactly one band and these resolve to a single element. A
+   fixture that ever spans two days must say `.nth(i)` and mean it. */
+const bandSort = (page: import("@playwright/test").Page) =>
+  page.getByTestId("band-sort");
+const bandDir = (page: import("@playwright/test").Page) =>
+  page.getByTestId("band-dir");
+
 // ---------------------------------------------------------------- board
 
 test("the landing page IS the picker board", async ({ page }) => {
@@ -299,6 +325,52 @@ test("the landing page IS the picker board", async ({ page }) => {
   await expect(page.getByText(/ranked by how far apart the two clubs sit/i))
     .toBeVisible();
 });
+
+test("the header is centred, and centring changed not one word of the framing",
+  async ({ page }) => {
+    /* 2026-09-15: the eyebrow, the H1 and the framing line were centred.
+       A LAYOUT CHANGE IS EXACTLY WHEN COPY GETS EDITED — a line that no
+       longer fits its new shape is the tempting thing to trim — and this
+       paragraph is where four non-negotiable sentences live: the ranking
+       key, and the three decision-safety invariants. So both halves are
+       pinned together: the words are unchanged, and the shape is the one
+       that was asked for.
+
+       CENTRED AS A BLOCK, not line by line. `mx-auto` on a capped
+       measure gives one shape; `text-center` on an uncapped paragraph
+       would give three ragged edges. Measured as the two side margins
+       being equal, which is what a centred block IS and what a
+       left-aligned one can never be at this width. */
+    await open(page);
+    const intro = page.getByTestId("board-framing");
+    await expect(intro).toBeVisible();
+    // THE FOUR PHRASES, in the paragraph itself and not merely somewhere
+    // on the page
+    await expect(intro)
+      .toContainText(/ranked by how far apart the two clubs sit in their own league's table/i);
+    await expect(intro).toContainText(/no model runs on this page/i);
+    await expect(intro)
+      .toContainText(/no number below is a probability or an edge of ours/i);
+    await expect(intro).toContainText(/nothing here is a recommendation/i);
+    await expect(intro).toContainText(/you are the one who picks/i);
+
+    // CENTRED, and so are the two lines above it
+    for (const [what, box] of [
+      ["the framing line", intro],
+      ["the H1", page.getByRole("heading", { name: "Every fixture, ranked" })],
+    ] as const) {
+      const m = await box.evaluate((el) => {
+        const p = el.parentElement!.getBoundingClientRect();
+        const r = el.getBoundingClientRect();
+        return { left: r.left - p.left, right: p.right - r.right,
+                 align: getComputedStyle(el).textAlign };
+      });
+      expect(Math.abs(m.left - m.right), `${what} is not centred in its own `
+        + `container: ${Math.round(m.left)}px left, ${Math.round(m.right)}px right`)
+        .toBeLessThanOrEqual(1);
+      expect(m.align, `${what} is not centred text`).toBe("center");
+    }
+  });
 
 test("four league columns, fixed order, each header carrying its facts",
   async ({ page }) => {
@@ -327,13 +399,57 @@ test("four league columns, fixed order, each header carrying its facts",
     await expect(mls.getByTestId("col-count"))
       .toHaveAttribute("data-counts", "finished");
     await expect(mls.getByTestId("col-empty"))
-      .toContainText("No MLS fixtures in the next 7 days");
+      .toContainText("No MLS fixtures in the next 8 days");
     // La Liga: prior-season badge in the header, and a true count
     const laliga = cols.nth(2);
     await expect(laliga.getByText("prior szn").first()).toBeVisible();
     await expect(laliga.getByTestId("col-count")).toHaveText("2 fixtures");
     // the jump chips are a phone affordance — not desktop chrome
     await expect(page.getByTestId("league-jump")).toBeHidden();
+    /* AND THE WINDOW IS A NO-OP AT FOUR (2026-09-15). A board that
+       declares more columns than it can draw carries a ribbon and shows
+       four at a time; THIS board declares exactly four, so every one of
+       them is drawn and no ribbon is built at all. Asserted here, on the
+       test that already fixes the column set, because the two facts are
+       one fact: four declared, four drawn, nothing to page through. */
+    await expect(page.getByTestId("league-ribbon")).toHaveCount(0);
+    await expect(page.getByTestId("ribbon-pill")).toHaveCount(0);
+  });
+
+test("the board carries no sort control of its own — the matchday does",
+  async ({ page }) => {
+    /* 2026-09-15, OPERATOR CUT. The command bar above the columns held a
+       sort select, a direction button and a reset. Every matchday band
+       below it carries the same three choices for the day it heads, and
+       the band is the one that answers "what is worth looking at TODAY";
+       a second control above them only ever reordered days against each
+       other, which is not a question the board asks.
+
+       THE ABSENCE IS PINNED, not left to chance: an absent control is
+       invisible to every other test in this file, so without this one
+       the trio could be restored — or half-restored — with nothing
+       going red. `DEFAULT_SORT` is kickoff ascending, which is what the
+       board opened in before the cut and what it opens in now. */
+    await open(page, SORT_BOARD);
+    await expect(page.getByTestId("league-col").first()).toBeAttached();
+    for (const gone of ["col-sort", "col-dir", "col-reset"]) {
+      await expect(page.getByTestId(gone),
+        `${gone} is the board-level sort control and was removed`)
+        .toHaveCount(0);
+    }
+    // the window and refresh chips went with it
+    await expect(page.getByTestId("review-window")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /refresh/i }))
+      .toHaveCount(0);
+    // …and the matchday's own control is still there, one per band
+    await expect(page.getByTestId("day-band")).toHaveCount(1);
+    await expect(bandSort(page)).toHaveCount(1);
+    await expect(bandDir(page)).toHaveCount(1);
+    await expect(bandSort(page)).toHaveValue("kickoff");
+    await expect(bandDir(page)).toHaveAttribute("data-dir", "asc");
+    // and the board opens in that default order, as it always did
+    await expect.poll(() => orderOf(col(page, "mls")))
+      .toEqual(EXPECTED.kickoff);
   });
 
 test("every row served is drawn in its league's column, opening in KICKOFF order, including a 0.00 gap",
@@ -422,24 +538,56 @@ test("a hollow row is marked differently from a clean one", async ({ page }) => 
     .getByText(/better tier overall, in attack and in defence/i)).toBeVisible();
 });
 
-test("prior-season rating is a banner, not a footnote", async ({ page }) => {
+test("prior-season rating is a COLUMN fact — on every column that has it, "
+   + "and nowhere else", async ({ page }) => {
+  /* WAS "prior-season rating is a banner, not a footnote" until
+     2026-09-15, when the operator took the banner off the landing page:
+     "every column already prints its own blend on its own chip — a
+     second copy of a fact is the copy that rots".
+
+     THE CLAIM IS THE SAME ONE, and every half of it is still asserted
+     here. The basis is a fact about a LEAGUE, so it is said once per
+     league and not 29 times on 29 cards; the leagues it is true of say
+     it and the league it is not true of says the other thing; and a row
+     inside a prior-rated column stays CLEAN of it. What changed is the
+     address — the column's own header chip rather than a box above the
+     board that had to name three leagues to state one caveat.
+
+     ONE THING GENUINELY WENT WITH THE BANNER: the count, "3 of 4
+     leagues". It is asserted below as what it always described — the
+     set of columns carrying the chip — read off the board rather than
+     printed on it. */
   await open(page);
-  const banner = page.getByTestId("prior-banner");
-  await expect(banner).toBeVisible();
-  await expect(banner).toContainText("3 of 4 leagues");
-  await expect(banner).toContainText("Premier League 1 GP");
-  await expect(banner).toContainText("La Liga 2 GP");
-  await expect(banner).toContainText("Liga MX 5 GP");
-  /* A BANNER, NOT A FOOTNOTE — which is this test's own title, and the
-     line below used to contradict it. Every club in a league is rated on
-     the same table, so the basis belongs to the banner and the column
-     header; repeating it on all 29 cards said one sentence 29 times and
-     buried the rows where it genuinely differs. The row is now asserted
-     CLEAN, and the column header is asserted to carry it. */
+  // no second copy above the board, in either half
+  await expect(page.getByTestId("prior-banner")).toHaveCount(0);
+  await expect(page.getByTestId("prior-banner-blend")).toHaveCount(0);
+
+  // THREE OF THE FOUR, named, each with the GP floor that is WHY —
+  // which is exactly what the banner's "Premier League 1 GP · …" said.
+  for (const [slug, floor] of
+       [["epl", 1], ["laliga", 2], ["ligamx", 5]] as const) {
+    const chip = col(page, slug).getByTestId("col-season");
+    await expect(chip).toBeVisible();
+    await expect(chip).toHaveText(/prior szn/);
+    await expect(chip).toHaveAttribute("title", new RegExp(`${floor} GP`));
+  }
+  // and the fourth says the other thing rather than staying silent
+  const mls = col(page, "mls").getByTestId("col-season");
+  await expect(mls).toHaveText(/this szn · min 21 GP/);
+  await expect(mls).not.toHaveText(/prior szn/);
+  // THE COUNT THE BANNER PRINTED, DERIVED: three of the four columns
+  // carry it. Off the board, so it cannot drift from what is drawn.
+  const seasons = await page.getByTestId("league-col")
+    .getByTestId("col-season")
+    .evaluateAll((els) => els.map((e) => (e.textContent ?? "").trim()));
+  expect(seasons).toHaveLength(4);
+  expect(seasons.filter((t) => /prior szn/.test(t))).toHaveLength(3);
+
+  /* AND NOT ON THE CARD. Every club in a league is rated on the same
+     table, so repeating the basis on all 29 rows said one sentence 29
+     times and buried the rows where it genuinely differs. */
   const top = page.getByTestId("picker-row").filter({ hasText: "Barcelona" });
   await expect(top.getByText("prior szn")).toHaveCount(0);
-  await expect(page.locator('[data-testid="league-col"][data-league="laliga"]')
-    .getByText("prior szn").first()).toBeVisible();
 });
 
 test("a refused fixture is drawn on its OWN kickoff date, not swept to the foot",
@@ -470,9 +618,19 @@ test("a refused fixture is drawn on its OWN kickoff date, not swept to the foot"
       .getByTestId("picker-refusal")).toHaveCount(1);
     // and nothing is left at the foot, because nothing was undatable
     await expect(epl.getByTestId("refusals")).toHaveCount(0);
-    // the reason a refusal exists is still said, once, where it is met
-    await expect(epl.getByTestId("refusal-why")).toHaveCount(1);
-    await expect(epl.getByTestId("refusal-why"))
+    /* THE REASON A REFUSAL EXISTS IS STILL SAID, ONCE — and since
+       2026-09-15 it is said ON THE CARD rather than as a paragraph under
+       the column: "remove the paragraph below it and put it into the
+       same hovering i symbol" (operator). The claim is unchanged and the
+       words are the same words; what moved is where a reader meets them,
+       which is now beside the card they explain instead of one of eight
+       columns away on a board that pages sideways. */
+    await expect(epl.getByTestId("refusal-why")).toHaveCount(0);
+    await expect(card.getByTestId("refusal-why-open")).toHaveCount(1);
+    await card.getByTestId("refusal-why-open").click();
+    const why = card.getByTestId("refusal-notes");
+    await expect(why).toBeVisible();
+    await expect(why.getByTestId("refusal-rule-general"))
       .toContainText(/refuses it by name instead of imputing/i);
   });
 
@@ -575,7 +733,7 @@ test("an empty window says so in every column that IS empty, and keeps the refus
     await expect(page.getByTestId("col-empty")).toHaveCount(3);
     await expect(col(page, "epl").getByTestId("col-empty")).toHaveCount(0);
     await expect(page.getByTestId("col-empty").first())
-      .toContainText("in the next 7 days");
+      .toContainText("in the next 8 days");
     // an empty board is not an excuse to drop the thing that was refused
     await expect(page.getByTestId("picker-refusal")).toHaveCount(1);
     await expect(col(page, "epl").getByTestId("picker-refusal"))
@@ -616,7 +774,7 @@ test("every sort mode reorders its column, and none of them filters",
   async ({ page }) => {
     await open(page, SORT_BOARD);
     const mls = col(page, "mls");
-    const select = page.getByTestId("col-sort");
+    const select = bandSort(page);
     for (const [modeId, want] of Object.entries(EXPECTED)) {
       await select.selectOption(modeId);
       await expect.poll(() => orderOf(mls), {
@@ -640,55 +798,107 @@ test("the direction toggle flips the measured rows; no-quote rows sort last both
   async ({ page }) => {
     await open(page, SORT_BOARD);
     const mls = col(page, "mls");
-    await page.getByTestId("col-sort").selectOption("ask");
-    // the null policy is ON SCREEN while a book key is active
-    await expect(page.getByTestId("col-null-note"))
-      .toHaveText("no quote sorts last");
-    await expect(page.getByTestId("col-dir")).toHaveAttribute("data-dir", "asc");
+    await bandSort(page).selectOption("ask");
+    await expect(bandDir(page)).toHaveAttribute("data-dir", "asc");
     await expect.poll(() => orderOf(mls))
       .toEqual(["m-alpha", "m-bravo", "m-charlie", "m-delta"]);
-    await page.getByTestId("col-dir").click();
-    await expect(page.getByTestId("col-dir")).toHaveAttribute("data-dir", "desc");
+    await bandDir(page).click();
+    await expect(bandDir(page)).toHaveAttribute("data-dir", "desc");
     // the priced rows reverse; the quoteless row is NOT "smallest" or
     // "largest" — it stays last under both directions
     await expect.poll(() => orderOf(mls))
       .toEqual(["m-charlie", "m-bravo", "m-alpha", "m-delta"]);
   });
 
-test("the board sort moves every column together", async ({ page }) => {
-  // sorting lives on the matchday since the C ship (2026-09-01): the
-  // command-bar default applies to all four columns at once, and
-  // per-DAY divergence is the band override's job (picker-blend-cup).
+test("the null-sort policy is stated on screen whenever the board runs a key "
+   + "that has one", async ({ page }) => {
+    /* SPLIT OUT OF THE TEST ABOVE, 2026-09-15. "no quote sorts last" is
+       drawn beside the board's controls, from the BOARD's sort — and the
+       board's sort control is gone. The state is still reachable and
+       still real: `loadBoardSort` reads `picker:sort:board` on every
+       load, so a choice made before the cut is what the board opens in
+       today, and the note that explains its ordering has to be there for
+       that reader.
+
+       SEEDED THROUGH THE APP'S OWN DOOR — the stored value that
+       `loadBoardSort` parses — rather than through a control, because
+       there is no longer a control and the sentence would otherwise be
+       unreachable and therefore deletable by the next tidy-up.
+
+       KNOWN, AND REPORTED: no control on the page can now produce this
+       state, and the matchday bands do NOT drive this note — picking a
+       book key on a band reorders the day and leaves the note unsaid.
+       That is a src question, not a spec one. */
+    await page.addInitScript(() => {
+      try {
+        window.localStorage.setItem("picker:sort:board",
+          JSON.stringify({ mode: "ask", dir: "asc" }));
+      } catch { /* a browser with no storage opens on the default */ }
+    });
+    await open(page, SORT_BOARD);
+    const mls = col(page, "mls");
+    // the stored choice IS what the board is running
+    await expect(bandSort(page)).toHaveValue("ask");
+    await expect.poll(() => orderOf(mls))
+      .toEqual(["m-alpha", "m-bravo", "m-charlie", "m-delta"]);
+    // …and the policy that put Delta last is on screen, not inferred
+    await expect(page.getByTestId("col-null-note"))
+      .toHaveText("no quote sorts last");
+  });
+
+test("the matchday sort moves every column together", async ({ page }) => {
+  /* WAS "the board sort moves every column together" until 2026-09-15.
+     Sorting has lived on the matchday since the C ship (2026-09-01) and
+     now lives there ALONE: one band control applies to every column of
+     that day at once, and per-DAY divergence is the band override's job
+     (picker-blend-cup). This is the half the removed board control used
+     to carry, asserted through the control that is left. */
   await open(page, SORT_BOARD);
   const mls = col(page, "mls");
   const laliga = col(page, "laliga");
-  await page.getByTestId("col-sort").selectOption("kickoff");
+  // move it OFF the default first: `kickoff` is the default, so
+  // selecting it would prove nothing about the control at all
+  await bandSort(page).selectOption("gdg");
+  await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.gdg);
+  await expect.poll(() => orderOf(laliga))
+    .toEqual(["401882903", "401882901"]);      // 1.63 then 0.00
+  await bandSort(page).selectOption("kickoff");
   await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.kickoff);
-  // La Liga follows the same board sort: chronological too
+  // La Liga follows the same band sort: chronological too
   await expect.poll(() => orderOf(laliga))
     .toEqual(["401882901", "401882903"]);
 });
 
-test("the board's sort survives a reload, and reset returns (and forgets) the default",
+test("a matchday sort is a one-night decision — a reload returns the board "
+   + "to its default order",
   async ({ page }) => {
+    /* WAS "the board's sort survives a reload, and reset returns (and
+       forgets) the default" until 2026-09-15. The remembered BOARD sort
+       and its `col-reset` were the control the operator removed; what is
+       left is the matchday's own sort, which was always session-only by
+       design — and the property it has is the opposite one, so it is
+       asserted as the opposite one rather than dropped. */
     await open(page, SORT_BOARD);
     const mls = col(page, "mls");
     // settle on the default order FIRST: the board renders client-side
     // after its fetch, and selecting into a still-mounting tree is the
     // race this test once lost
     await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.kickoff);
-    await page.getByTestId("col-sort").selectOption("gdg");
+    await bandSort(page).selectOption("gdg");
     await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.gdg);
+    /* A MATCHDAY OVERRIDE IS A ONE-NIGHT DECISION, and the board says so
+       by forgetting it: `daySorts` is session-only on purpose, because a
+       remembered "Saturday" would silently apply to a DIFFERENT Saturday
+       next week. So a reload is the reset — the board comes back in
+       `DEFAULT_SORT`, kickoff ascending, with the control saying so. */
     await page.reload();
-    await expect(page.getByTestId("col-sort")).toHaveValue("gdg");
-    await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.gdg);
-    // reset: default order, default control, and the stored choice gone
-    await page.getByTestId("col-reset").click();
-    await expect(page.getByTestId("col-sort")).toHaveValue("kickoff");
+    await expect(bandSort(page)).toHaveValue("kickoff");
+    await expect(bandDir(page)).toHaveAttribute("data-dir", "asc");
     await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.kickoff);
+    // and nothing was written, so a second reload is the same read
     await page.reload();
-    await expect(page.getByTestId("col-sort")).toHaveValue("kickoff");
-    await expect(page.getByTestId("col-reset")).toHaveCount(0);
+    await expect(bandSort(page)).toHaveValue("kickoff");
+    await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.kickoff);
   });
 
 test("a browser with no usable storage still renders, and still sorts",
@@ -703,7 +913,7 @@ test("a browser with no usable storage still renders, and still sorts",
     await open(page, SORT_BOARD);
     const mls = col(page, "mls");
     await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.kickoff);
-    await page.getByTestId("col-sort").selectOption("ppg");
+    await bandSort(page).selectOption("ppg");
     await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.ppg);
   });
 
@@ -1544,7 +1754,7 @@ test("every league column carries a finished tail, below its upcoming fixtures",
     const mls = tail(page, "mls");
     await expect(mls.getByTestId("review-row")).toHaveCount(3);
     await expect(mls.getByTestId("review-count"))
-      .toHaveText("3 matches · last 7d");
+      .toHaveText("3 matches · last 8d");
     // and it opens most-recent-first, from a payload served out of order
     await expect.poll(() => tailOrder(mls))
       .toEqual(["761770", "761764", "761762"]);
@@ -1880,7 +2090,7 @@ test("the finished tail sorts independently of the column above it",
     const colMls = col(page, "mls");
     const tailMls = tail(page, "mls");
     // move the UPCOMING column: the tail below it does not budge
-    await page.getByTestId("col-sort").selectOption("ask");
+    await bandSort(page).selectOption("ask");
     await expect.poll(() => orderOf(colMls)).toEqual(EXPECTED.ask);
     await expect(tailMls.getByTestId("review-sort")).toHaveValue("kickoff");
     await expect.poll(() => tailOrder(tailMls))
@@ -1888,7 +2098,7 @@ test("the finished tail sorts independently of the column above it",
     // move the TAIL: the column above it does not budge either
     await tailMls.getByTestId("review-sort").selectOption("gdg");
     await expect.poll(() => tailOrder(tailMls)).toEqual(REVIEW_EXPECTED.gdg);
-    await expect(page.getByTestId("col-sort")).toHaveValue("ask");
+    await expect(bandSort(page)).toHaveValue("ask");
     await expect.poll(() => orderOf(colMls)).toEqual(EXPECTED.ask);
     // and another league's tail kept its own default
     await expect(tail(page, "epl").getByTestId("review-sort"))
@@ -1921,7 +2131,7 @@ test("an empty finished tail says so, and a fixture that was never played stays 
     // rendering an unexplained gap under the divider
     const mx = tail(page, "ligamx");
     await expect(mx.getByTestId("review-empty"))
-      .toContainText("No Liga MX fixtures finished in the last 7 days");
+      .toContainText("No Liga MX fixtures finished in the last 8 days");
     await expect(mx.getByTestId("review-row")).toHaveCount(0);
     // the postponed fixture is LISTED, not counted as a nil-nil
     await expect(mx.getByTestId("review-refusal")).toHaveCount(1);
@@ -1997,14 +2207,34 @@ test("a deployment that freezes nothing says so, rather than letting every card 
 
 // -------------------------------------------------- window, links, honesty
 
-test("the finished window has its own control, separate from the board's",
-  async ({ page }) => {
+test("both windows open at 8 days, asked for once each, with no control to "
+   + "change either", async ({ page }) => {
+    /* WAS "the finished window has its own control, separate from the
+       board's" until 2026-09-15, when the operator took BOTH windows'
+       chips off — "using the default is enough since I have never
+       touched this section" — and moved both defaults to 8 days
+       (`DEFAULT_DAYS`, `DEFAULT_BACK`).
+
+       WHAT THE OLD TEST PROVED AND THIS ONE STILL PROVES: the two
+       windows are separate questions asked of separate endpoints, and
+       the tail opens at the same length as the forward board so a
+       column tells one continuous story. What is gone with the chips is
+       the half about lengthening one without touching the other; it is
+       named in this comment rather than left as a silent deletion.
+
+       BOTH NUMBERS ARE READ OFF THE REQUESTS, not off the page: a
+       default that drifts in the source is invisible to a screenshot
+       and obvious in the query string. */
     const asked: string[] = [];
+    const askedDays: string[] = [];
     await page.route("**/api/picker/review**", (r) => {
       asked.push(new URL(r.request().url()).searchParams.get("back") || "");
       return r.fulfill(json(REVIEW));
     });
-    await serveBoard(page);
+    await page.route("**/api/picker/board**", (r) => {
+      askedDays.push(new URL(r.request().url()).searchParams.get("days") || "");
+      return r.fulfill(json(BOARD));
+    });
     // this test navigates itself rather than through open(), so it seeds
     // the tail the same way — it is about the review WINDOW, not about
     // the collapse
@@ -2016,16 +2246,30 @@ test("the finished window has its own control, separate from the board's",
     }, TAIL_LEAGUES);
     await page.goto("/bet-suggester");
     await expect(page.getByTestId("review-row").first()).toBeVisible();
-    expect(asked, "the tail opens at 7 days, matching the forward window")
-      .toEqual(["7"]);
-    // lengthening the finished window must not touch the forward one
-    await page.getByRole("button", { name: /finished window, last 14 days/i })
-      .click();
-    await expect.poll(() => asked).toEqual(["7", "14"]);
-    await expect(page.getByRole("button", { name: "7d" }))
-      .toHaveAttribute("aria-pressed", "true");
+    expect(asked, "the tail opens at 8 days, matching the forward window")
+      .toEqual(["8"]);
+    expect(askedDays, "the forward board opens at 8 days").toEqual(["8"]);
+    // and the page says the same number where a reader can see it
     await expect(tail(page, "mls").getByTestId("review-count"))
-      .toContainText("last 14d");
+      .toContainText("last 8d");
+    await expect(col(page, "mls").getByTestId("col-empty"))
+      .toContainText("in the next 8 days");
+
+    // NO CONTROL FOR EITHER, which is why the defaults are now the whole
+    // contract: the forward chips, the finished chips and the refresh
+    // are gone, and nothing is left that could ask for a third length.
+    await expect(page.getByTestId("review-window")).toHaveCount(0);
+    for (const label of ["1d", "2d", "3d", "7d", "8d", "14d", "30d"]) {
+      await expect(page.getByRole("button", { name: label, exact: true }),
+        `${label} is a window chip and the chips were removed`)
+        .toHaveCount(0);
+    }
+    await expect(page.getByRole("button", { name: /finished window/i }))
+      .toHaveCount(0);
+    await expect(page.getByRole("button", { name: /refresh/i })).toHaveCount(0);
+    // …and nothing re-asked either endpoint behind the reader's back
+    expect(asked).toEqual(["8"]);
+    expect(askedDays).toEqual(["8"]);
   });
 
 test("a finished card is the way back into its match page", async ({ page }) => {

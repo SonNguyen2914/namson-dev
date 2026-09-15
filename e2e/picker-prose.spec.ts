@@ -20,8 +20,13 @@ import { TZ } from "../src/lib/matchday";
 // were therefore deletable by the next tidy-up. The third pins the
 // ABSENCE of a sentence that went, which is the only way a cut stays
 // cut. The blend disclosure has its own pin in
-// e2e/picker-blend-cup.spec.ts ("the banner explains the blend rather
-// than a threshold"), moved there with the sentence it follows.
+// e2e/picker-blend-cup.spec.ts ("the season basis is a chip on its own
+// column"), moved there with the sentence it follows.
+//
+// 2026-09-15: the operator cut the season-basis BANNER out of the
+// landing page as well, so the third test below now asserts the same
+// keep/drop rule against where those two halves live instead — the
+// caveat on the column's own chip, the arithmetic in the legend.
 //
 // Hermetic.
 
@@ -121,30 +126,55 @@ test("the times note keeps the two facts and sends the reasoning to the legend",
     await expect(legend).toContainText("cached for 90 seconds");
   });
 
-test("the season banner opens with the caveat, not with the derivation",
-  async ({ page }) => {
+test("the season basis arrives on its own column, and the derivation stays "
+   + "one click away", async ({ page }) => {
+    /* 2026-09-15, THE SAME CUT ONE STEP FURTHER (operator). This test
+       used to pin the season-basis BANNER: the caveat on arrival, the
+       blend's arithmetic behind a `prior-banner-blend` disclosure shut
+       under it. The banner is gone from the landing page.
+
+       THE RULE IT CARRIED IS UNCHANGED and is asserted here still —
+       KEEP the sentence that says what a number is made of, MOVE the
+       derivation behind a disclosure. Only the two addresses changed:
+       the caveat is now the column's own chip, which is the same fact
+       said where it applies rather than a page-wide box that had to name
+       every league to say it once, and the arithmetic is in the legend,
+       which is exactly the disclosure the test above sends reasoning to.
+
+       So this asserts THREE things: no second copy above the board, the
+       caveat present on arrival where the numbers it qualifies are, and
+       the derivation still in the document behind one deliberate click. */
     await open(page);
-    // This board has no prior-season league, so the banner is absent —
-    // re-serve one that does.
+    // This board has no prior-season league, so no column would carry
+    // the chip — re-serve one that does.
     await page.route("**/api/picker/board**", (r) => r.fulfill(json({
       ...BOARD,
       leagues: { ...BOARD.leagues,
                  epl: { src: "prior", min_current_gp: 1, clubs: 20 } },
     })));
     await page.reload();
-    const banner = page.getByTestId("prior-banner");
-    await expect(banner).toBeVisible();
-    // The derivation is behind a disclosure and the disclosure is SHUT
-    // when the reader arrives. Present in the accessible tree, not
-    // shouting.
-    await expect(banner.getByTestId("prior-banner-blend"))
-      .not.toHaveAttribute("open", /.*/);
-    // ON ARRIVAL: which leagues, how many games, and what that does to
-    // the numbers. Nothing else.
-    await expect(banner.getByText(/LAST SEASON carries most of the rating/))
-      .toBeVisible();
-    const visible = ((await banner.textContent()) || "");
-    const shown = visible.split("how the two seasons are weighed")[0];
-    expect(shown.trim().split(/\s+/).length,
-      "the banner's text above its disclosure").toBeLessThan(40);
+    await expect(page.getByTestId("picker-row").first()).toBeVisible();
+
+    // NO SECOND COPY ABOVE THE BOARD — neither half of it.
+    await expect(page.getByTestId("prior-banner")).toHaveCount(0);
+    await expect(page.getByTestId("prior-banner-blend")).toHaveCount(0);
+
+    // ON ARRIVAL, on the column the caveat is ABOUT: which season the
+    // table is, visible without opening anything.
+    const chip = page.locator('[data-testid="league-col"][data-league="epl"]')
+      .getByTestId("col-season");
+    await expect(chip).toBeVisible();
+    await expect(chip).toHaveText(/prior szn/);
+    // and it is a CHIP, not the paragraph it replaced
+    const words = ((await chip.textContent()) || "").trim().split(/\s+/);
+    expect(words.length, "the column's season chip").toBeLessThan(10);
+
+    // THE DERIVATION IS STILL IN THE DOCUMENT, and still shut on
+    // arrival: the legend is the disclosure the reader opens.
+    await expect(page.getByTestId("legend")).toHaveCount(0);
+    await page.getByRole("button", { name: /how to read a row/i }).click();
+    const legend = page.getByTestId("legend");
+    await expect(legend)
+      .toContainText("weighted average of this season and last");
+    await expect(legend).toContainText("GP / (GP + 10)");
   });

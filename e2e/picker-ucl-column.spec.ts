@@ -37,9 +37,13 @@ const asV2 = (b: unknown): unknown =>
 //     magnitudes are withheld, and `shape` is derived from the three
 //     tier gaps, which are not.
 //  3. ONE CONTROL STAYS AUTHORITATIVE. The column's own default holds
-//     only while the board's control is untouched. Choose a sort and
-//     this column obeys it like every other, or the control would
-//     silently not mean what it says on part of the board.
+//     only while the control it is handed is untouched. Choose a sort
+//     and this column obeys it like every other, or the control would
+//     silently not mean what it says on part of the board. Since
+//     2026-09-15 that control is the MATCHDAY band's — the board-level
+//     trio was removed — and the rule is unchanged, because it was
+//     never about which control: `columnSort` asks whether what it was
+//     handed is the default.
 //  4. IT SAYS SO. A column ordered differently from its neighbours reads
 //     as a defect to a reader who does not know why.
 //  5. THE RULE IS KEYED BY SLUG, NOT BY "IS A CUP". The Leagues Cup is
@@ -350,6 +354,51 @@ const orderOf = async (c: ReturnType<typeof col>, n: number) => {
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-event")));
 };
 
+/* ── SIX DECLARED, FOUR DRAWN (operator, 2026-09-15) ──────────────────
+   The FULL board draws four columns at a time behind a ribbon
+   (`league-ribbon`, `ribbon-pill`); a pill jumps the window so its
+   league is the LEFTMOST drawn column. This fixture declares six, and
+   the Champions League is the sixth, so every test that reads its
+   column off `/bet-suggester` has to bring it on screen first.
+
+   THE NARROWED PAGE IS THE OTHER HALF OF THIS AND IS UNTOUCHED:
+   `/bet-suggester/ucl` declares ONE column, the window is a no-op there,
+   and no ribbon is built at all — pinned by its own test below.
+
+   `show` jumps to the leftmost column that still leaves `slug` inside
+   the four, so the columns around it keep their declared order. */
+const COLUMNS = ["mls", "epl", "laliga", "ligamx", "leaguescup", "ucl"];
+const VIEW = 4;                       // src/pages/bet-suggester/index.tsx
+
+async function show(page: import("@playwright/test").Page, slug: string,
+                    columns: readonly string[] = COLUMNS) {
+  const i = columns.indexOf(slug);
+  expect(i, `${slug} is not a declared column of this board`)
+    .toBeGreaterThanOrEqual(0);
+  if (columns.length > VIEW) {
+    const lead = columns[i < VIEW ? 0 : Math.min(i, columns.length - VIEW)];
+    await page.locator(
+      `[data-testid="ribbon-pill"][data-slug="${lead}"]`).click();
+  }
+  await expect(col(page, slug)).toHaveCount(1);
+}
+
+/** The full board with the Champions League column on screen — which is
+ *  what `open(page)` meant to every test in this file before the window
+ *  existed, so the callers read the same as they always did. */
+async function openWide(page: import("@playwright/test").Page,
+                        body: unknown = BOARD) {
+  await open(page, body);
+  await show(page, "ucl");
+}
+
+/* SORTING IS THE MATCHDAY'S ALONE since 2026-09-15: the board-level
+   `col-sort` / `col-dir` / `col-reset` trio is gone and each band keeps
+   its own. Every fixture in this file lands in one matchday, so these
+   resolve to a single element. */
+const bandSort = (page: import("@playwright/test").Page) =>
+  page.getByTestId("band-sort");
+
 // ---------------------------------------------- 1. the anchor ----------
 
 // THE ANCHOR WAS THE TIER GAP UNTIL 2026-09-09, and it was measured —
@@ -372,7 +421,7 @@ const orderOf = async (c: ReturnType<typeof col>, n: number) => {
 test("a cross-league UCL row anchors on the two clubs' own-league GD/g, "
    + "differenced — not on a tier gap that is 0 on most of the column",
   async ({ page }) => {
-    await open(page);
+    await openWide(page);
     const ucl = col(page, "ucl");
     const clean = ucl.getByTestId("picker-row")
       .filter({ hasText: "Real Madrid" });
@@ -417,7 +466,7 @@ test("a cross-league row with no own-GD/g falls back exactly as before",
         return rest;
       }),
     };
-    await open(page, stripped);
+    await openWide(page, stripped);
     const anchor = col(page, "ucl").getByTestId("picker-row")
       .filter({ hasText: "Real Madrid" }).getByTestId("row-anchor");
     await expect(anchor).toHaveAttribute("data-anchor", "tier_ovr");
@@ -433,7 +482,7 @@ test("the withheld gaps keep saying so, and each club's OWN rate is drawn "
     // Filling them in is not overwriting the refusal: delete the `n/a`
     // and the first half of this fails; compute the gap from the pair
     // and the second half does.
-    await open(page);
+    await openWide(page);
     const clean = col(page, "ucl").getByTestId("picker-row")
       .filter({ hasText: "Real Madrid" });
     await expect(clean).toContainText(/GD\/g\s*n\/a/);
@@ -460,7 +509,7 @@ test("a same-league row's own-GD/g difference IS its GD/g gap",
     // ONE SCALE, so the two agree — and this is where a reader can see
     // that they do. It is the same arithmetic on both kinds of row; only
     // the CLAIM differs, and only because the scales do.
-    await open(page);
+    await openWide(page);
     const same = col(page, "ucl").getByTestId("picker-row")
       .filter({ hasText: "Arsenal" });
     // `row()` takes its overrides untyped, so the gap is read back
@@ -476,7 +525,7 @@ test("a same-league row's own-GD/g difference IS its GD/g gap",
 
 test("a same-league UCL row keeps GD/g — the anchor follows the row",
   async ({ page }) => {
-    await open(page);
+    await openWide(page);
     const same = col(page, "ucl").getByTestId("picker-row")
       .filter({ hasText: "Arsenal" });
     await expect(same).toHaveAttribute("data-cross-league", "false");
@@ -488,7 +537,7 @@ test("a same-league UCL row keeps GD/g — the anchor follows the row",
 test("the figure the anchor shows is not repeated in the strip below it, "
    + "and the one it does not show still is",
   async ({ page }) => {
-    await open(page);
+    await openWide(page);
     const ucl = col(page, "ucl");
     // cross-league: the anchor is the tier gap, so GD/g — withheld here
     // — must still be drawn below rather than silently dropped
@@ -510,7 +559,7 @@ test("the figure the anchor shows is not repeated in the strip below it, "
 
 test("the UCL column ranks on shape while the board control is untouched, "
    + "and says so", async ({ page }) => {
-    await open(page);
+    await openWide(page);
     const ucl = col(page, "ucl");
     // CLEAN before SPLIT before HOLLOW — not the kickoff order, which
     // would be hollow(6) → clean(8) → same(10)
@@ -522,7 +571,7 @@ test("the UCL column ranks on shape while the board control is untouched, "
   });
 
 test("the four league columns are untouched by it", async ({ page }) => {
-    await open(page);
+    await openWide(page);
     await expect(col(page, "epl").getByTestId("col-own-sort"))
       .toHaveCount(0);
   });
@@ -549,19 +598,40 @@ test("the rank heading names the sort actually running, and says so when "
     const head = page.getByTestId("board-rank-heading");
     const note = page.getByTestId("board-order-note");
 
-    // UNTOUCHED CONTROL: the league column runs kickoff, the UCL column
-    // runs shape. No single key is true of the board, and it says so
-    // rather than picking one column's and stating it as everyone's.
+    // UNTOUCHED: the league column runs kickoff, the UCL column runs
+    // shape. No single key is true of the board, and it says so rather
+    // than picking one column's and stating it as everyone's.
     await expect(head).toHaveText(/each column.s own key/i);
     await expect(note).toContainText(/except where a column names its own/i);
     // the false claim specifically
     await expect(note).not.toContainText(/GD\/g gap/i);
 
-    // PICK A MODE: every column obeys it (columnSort's rule), so one key
-    // IS true of the board again — and the sentence names that one.
-    await page.getByTestId("col-sort").selectOption("ppg");
+    /* A KEY IS CHOSEN: every column obeys it (columnSort's rule), so one
+       key IS true of the board again — and the sentence names that one.
+
+       CHOSEN THROUGH THE STORED BOARD SORT SINCE 2026-09-15, because the
+       control that used to set it is gone and this sentence is derived
+       from the BOARD's key, not from a band's. `loadBoardSort` reads
+       that value on every load, so this is the state of a reader who
+       picked a mode before the cut — and the sentence has to be true for
+       them, which is the whole claim.
+
+       REPORTED, NOT ASSERTED AWAY: picking `ppg` on a matchday band
+       reorders every column of that day and leaves this heading saying
+       "each column's own key". That is a src question. */
+    await page.addInitScript(() => {
+      try {
+        window.localStorage.setItem("picker:sort:board",
+          JSON.stringify({ mode: "ppg", dir: "desc" }));
+      } catch { /* a browser with no storage opens on the default */ }
+    });
+    await open(page);
+    await expect(bandSort(page)).toHaveValue("ppg");
     await expect(head).toHaveText(/ranked by ppg gap/i);
     await expect(note).toContainText(/\|ppg gap\| descending within each day/i);
+    // and the column that had its own key has stopped claiming one
+    await show(page, "ucl");
+    await expect(col(page, "ucl").getByTestId("col-own-sort")).toHaveCount(0);
   });
 
 test("a board narrowed to the UCL column names shape, not the tiebreak",
@@ -632,7 +702,7 @@ const TIEBREAK_BOARD = {
 
 test("inside one shape bucket the withheld-gap rows fall to own_gdg, "
    + "and a measured gap still outranks a withheld one", async ({ page }) => {
-    await open(page, TIEBREAK_BOARD);
+    await openWide(page, TIEBREAK_BOARD);
     const ucl = col(page, "ucl");
     // all three are CLEAN, so `shape` separates none of them
     expect(await orderOf(ucl, 3))
@@ -734,7 +804,7 @@ test("the note's panel opens inside its own column at the narrowest track",
     // the chip row rather than to the 16px button is what makes this fit
     // by construction instead of by arithmetic on a breakpoint.
     await page.setViewportSize({ width: 1280, height: 900 });
-    await open(page);
+    await openWide(page);
     const ucl = col(page, "ucl");
     const trigger = ucl.getByTestId("col-notes-open");
     await trigger.click();
@@ -774,7 +844,7 @@ test("the note's panel opens inside its own column at the narrowest track",
 
 test("the Leagues Cup is a cup with a cross-league row too, and keeps the "
    + "board default", async ({ page }) => {
-    await open(page);
+    await openWide(page);
     const lc = col(page, "leaguescup");
     await expect(lc.getByTestId("col-own-sort")).toHaveCount(0);
     // its cross-league row therefore still anchors the way the board
@@ -791,11 +861,17 @@ test("the Leagues Cup is a cup with a cross-league row too, and keeps the "
 
 test("choosing a sort takes the UCL column back onto the board's",
   async ({ page }) => {
-    await open(page);
+    /* THE CONTROL IS THE MATCHDAY'S SINCE 2026-09-15 and the rule is
+       unchanged: this column's own key holds only while the control it
+       is handed is UNTOUCHED (`columnSort`), so a chosen mode reaches it
+       like every other column and the chip that claims a private sort
+       goes with it. Driven through `band-sort`, which is the only sort
+       control left on the board. */
+    await openWide(page);
     const ucl = col(page, "ucl");
     await expect(ucl.getByTestId("col-own-sort")).toHaveCount(1);
 
-    await page.getByTestId("col-sort").selectOption("rank");
+    await bandSort(page).selectOption("rank");
     // the operator asked for rank: this column obeys, and stops
     // claiming a sort of its own
     await expect(ucl.getByTestId("col-own-sort")).toHaveCount(0);
@@ -807,7 +883,7 @@ test("choosing a sort takes the UCL column back onto the board's",
 
 test("a member table that failed is named, and rated_on does not shrink",
   async ({ page }) => {
-    await open(page, {
+    await openWide(page, {
       ...BOARD,
       leagues: {
         ...LEAGUES,
@@ -839,7 +915,7 @@ test("a member table that failed is named, and rated_on does not shrink",
 
 test("a healthy column draws no member-failure block at all",
   async ({ page }) => {
-    await open(page);
+    await openWide(page);
     await expect(col(page, "ucl").getByTestId("col-member-errors"))
       .toHaveCount(0);
   });
@@ -860,6 +936,9 @@ test("every cup column the board serves opens somewhere that exists",
       .map(([slug]) => slug);
     expect(cups.length).toBeGreaterThan(1);   // this test needs >1 to mean anything
     for (const slug of cups) {
+      // the board draws four of its six columns, so each cup is brought
+      // on screen in its turn rather than assumed to be there
+      await show(page, slug);
       const rows = col(page, slug).getByTestId("picker-row");
       await expect(rows.first()).toBeVisible();   // evaluateAll cannot wait
       const hrefs = await rows.locator("a[href]").evaluateAll(
@@ -892,13 +971,33 @@ test("the UCL route draws the board's own furniture, with one column",
     await expect(cols).toHaveCount(1);
     await expect(cols).toHaveAttribute("data-league", "ucl");
 
-    // the landing page's own instruments, present here because it IS
-    // the landing page: the board sort control, the matchday bands, the
-    // ranked rows, and the refusal block with its reason
-    await expect(page.getByTestId("col-sort")).toHaveCount(1);
+    /* the landing page's own instruments, present here because it IS
+       the landing page: the matchday band with its sort, the ranked
+       rows, and the anchor on every card. The BOARD-level sort control
+       went from the landing page on 2026-09-15 and therefore from this
+       one too — the identity is what is asserted, so the trio is pinned
+       absent here as well as there. */
     await expect(page.getByTestId("day-band").first()).toBeAttached();
+    await expect(page.getByTestId("band-sort")).toHaveCount(1);
+    await expect(page.getByTestId("band-dir")).toHaveCount(1);
+    for (const gone of ["col-sort", "col-dir", "col-reset"]) {
+      await expect(page.getByTestId(gone)).toHaveCount(0);
+    }
     await expect(page.getByTestId("picker-row")).toHaveCount(3);
     await expect(page.getByTestId("row-anchor").first()).toBeVisible();
+
+    /* AND NO RIBBON, WHICH IS THE POINT OF A NARROWED PAGE. The window
+       that draws four of eight columns is a NO-OP at four or fewer:
+       `drawnSlugs === columnSlugs`, and nothing is built to page
+       through. One column is the extreme case of that, and it is the
+       case a reader of this page must never be shown a control for —
+       there is nowhere to page to. */
+    await expect(page.getByTestId("league-ribbon")).toHaveCount(0);
+    await expect(page.getByTestId("ribbon-pill")).toHaveCount(0);
+    // …and the full board, on the same payload, does build one
+    await open(page);
+    await expect(page.getByTestId("league-ribbon")).toHaveCount(1);
+    await expect(page.getByTestId("ribbon-pill")).toHaveCount(COLUMNS.length);
   });
 
 test("the four league columns are absent from it, not merely empty",
@@ -1102,7 +1201,7 @@ test("the grid steps down as the viewport narrows, and never scrolls the "
 test("the DEFAULT board is not laid out this way — one card per row inside "
    + "a league column", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await open(page, GRID_BOARD);          // /bet-suggester, every column
+    await openWide(page, GRID_BOARD);      // /bet-suggester, every column
     // it is many columns, and the UCL one holds the same eight fixtures
     await expect(page.getByTestId("league-col").first()).toBeAttached();
     expect(await page.getByTestId("league-col").count()).toBeGreaterThan(1);
@@ -1332,7 +1431,10 @@ async function topRegion(card: ReturnType<typeof col>) {
 /** The same card on both boards: [name, opener]. */
 const BOTH_BOARDS: [string, (p: import("@playwright/test").Page)
   => Promise<void>][] = [
-  ["the wide board", (p) => open(p, GRID_BOARD)],
+  // the wide board pages through six columns four at a time, so its
+  // opener brings the Champions League one on screen; the narrowed page
+  // draws one column and has no window to move
+  ["the wide board", (p) => openWide(p, GRID_BOARD)],
   ["the UCL board", (p) => openUcl(p, GRID_BOARD)],
 ];
 
@@ -1684,30 +1786,59 @@ test("a live match this board cannot place is NAMED, not dropped",
     await expect(page.getByTestId("live-unplaceable")).toHaveCount(0);
   });
 
-test("the season banner names only leagues that HAVE a column here",
-  async ({ page }) => {
-    // THE SCREENSHOT THAT REPORTED THIS: "1 OF 4 LEAGUES · Liga MX 6 GP"
-    // on a board with no Liga MX column. The banner is a caveat about
-    // the numbers on the page, so a league that is not on the page has
-    // no caveat to make here.
-    await openBoard(page, "/bet-suggester");
-    const banner = page.getByTestId("prior-banner");
-    await expect(banner).toBeVisible();
-    await expect(banner).toContainText("Liga MX 6 GP");
-    await expect(banner).toContainText("1 of 4 leagues");
-    // THE INVARIANT, not the instance: every league the banner names is
-    // drawn as a column on the page it is caveating.
-    const cols = await page.getByTestId("league-col")
-      .evaluateAll((els) => els.map((e) => e.getAttribute("data-league")));
-    expect(cols).toContain("ligamx");
+test("the season basis is said by a column, so it can only ever name a "
+   + "league this page draws", async ({ page }) => {
+    /* THE SCREENSHOT THAT REPORTED THIS: "1 OF 4 LEAGUES · Liga MX 6 GP"
+       on a board with no Liga MX column. A season basis is a caveat
+       about the numbers ON THE PAGE, so a league that is not on the page
+       has no caveat to make here.
 
-    // ...and on the narrowed board there is no league column to caveat,
-    // so there is no banner — rather than one describing three leagues
-    // and a Liga MX that is nowhere in sight.
+       THE BANNER WENT ON 2026-09-15, and with it the whole class of
+       defect: a page-wide box that enumerates leagues can name one it
+       does not draw, and a chip inside a column cannot — it is drawn BY
+       the column or not at all. So the invariant is asserted the way it
+       now holds, by construction: every season chip on the page belongs
+       to a column the page draws, on both boards, and the banner is
+       pinned ABSENT so it cannot come back and reintroduce the gap. */
+    await openBoard(page, "/bet-suggester");
+    await expect(page.getByTestId("prior-banner")).toHaveCount(0);
+    await expect(page.getByText(/of 4 leagues/)).toHaveCount(0);
+
+    // THE INVARIANT, not the instance: every league that states a basis
+    // here is drawn as a column here. Read off the page, on both halves
+    // of the window, so a paged-off column is not quietly exempted.
+    for (const jump of ["mls", "ucl"]) {
+      await show(page, jump);
+      await expect(page.getByTestId("league-col")).toHaveCount(VIEW);
+      const said = await page.getByTestId("league-col")
+        .evaluateAll((els) => els
+          .filter((e) => e.querySelector('[data-testid="col-season"]'))
+          .map((e) => e.getAttribute("data-league")));
+      const drawn = await page.getByTestId("league-col")
+        .evaluateAll((els) => els.map((e) => e.getAttribute("data-league")));
+      expect(said.length).toBeGreaterThan(0);
+      for (const slug of said) expect(drawn).toContain(slug);
+    }
+    // and Liga MX, the league the screenshot caught, states its own
+    await show(page, "mls");
+    await expect(col(page, "ligamx").getByTestId("col-season"))
+      .toHaveText(/prior szn/);
+
+    /* ...and on the narrowed board there is no Liga MX COLUMN, so no
+       season basis for Liga MX is stated anywhere on the page — which is
+       the claim the banner's absence used to carry, now carried by there
+       being no page-wide voice to make it.
+
+       The site's own nav still links Liga MX, and must: a page that
+       does not RATE a league is not a page that hides it. So this
+       matches the shape of a basis claim ("Liga MX 6 GP"), not the
+       club's name on its own. */
     await openBoard(page, "/bet-suggester/ucl");
     await expect(page.getByTestId("league-col")).toHaveCount(1);
     await expect(page.getByTestId("prior-banner")).toHaveCount(0);
-    await expect(page.getByText("Liga MX 6 GP")).toHaveCount(0);
+    await expect(page.getByText(/Liga MX \d+ GP/)).toHaveCount(0);
+    await expect(page.getByTestId("league-col")
+      .getByTestId("col-season")).toHaveCount(1);
     await expect(page.getByText(/of 4 leagues/)).toHaveCount(0);
   });
 
