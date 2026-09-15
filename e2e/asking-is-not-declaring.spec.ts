@@ -198,13 +198,23 @@ test("it draws the landing page's own card over those rows — the same "
     const ucl = cols(page).filter({ has: page.locator("[data-league]") });
     await expect(ucl).toHaveCount(1);
     /* THE BOARD'S OWN FURNITURE, reached here because this route IS the
-       board: the anchor number, the rank pair, the shape chip, the sort
-       control and the matchday bands. Counted against the payload's own
-       row count rather than a typed number. */
+       board: the anchor number, the rank pair, the ladder position and
+       the matchday bands. Counted against the payload's own row count
+       rather than a typed number.
+
+       THE BOARD-WIDE SORT CONTROL IS GONE (operator, 2026-09-15), so
+       `col-sort` is no longer a piece of furniture any route can show —
+       it is not the narrowed page dropping it. WHAT THE SORT SAID IS
+       STILL SAID: `col-own-sort` is the column's own statement of what
+       it is running, which is the fact a reader needs and the one this
+       route must not lose, and it is drawn on a cup column precisely
+       because a cup runs a sort of its own. */
     await expect(page.getByTestId("picker-row"))
       .toHaveCount(NARROWED_UCL.rows.length);
     await expect(page.getByTestId("row-anchor").first()).toBeVisible();
-    await expect(page.getByTestId("col-sort")).toHaveCount(1);
+    await expect(page.getByTestId("rank-pair").first()).toBeAttached();
+    await expect(page.getByTestId("row-rank").first()).toBeVisible();
+    await expect(page.getByTestId("col-own-sort")).toHaveCount(1);
     await expect(page.getByTestId("day-band").first()).toBeAttached();
   });
 

@@ -22,6 +22,41 @@ import { toV2 } from "./standing";
 // mls-2026 / epl-2026 / la-liga-2026 / liga-mx-2026 /
 // leagues-cup-2026), which is not the picker's, and that difference is
 // the whole point of one of these tests.
+//
+// ─────────────────────────────────────────────────────────────────────
+// WHAT THIS FILE LOST ON 2026-09-15, AND WHY IT IS REPORTED RATHER THAN
+// QUIETLY DROPPED.
+//
+// `<WatchedStrip />` came off the landing page ("it is operator-gated,
+// and with no token held in an ordinary tab it could only ever draw its
+// own refusal"). The component is not mounted on any route now, so the
+// strip is not a surface a spec can reach at all.
+//
+// TWO TESTS WENT WITH IT. Both were about `watched-strip-gate`, which is
+// the strip's own element:
+//
+//   · "a body-unreadable 502 does not claim nothing answered" — the
+//     proxy returns 502 for two OPPOSITE findings and labels them apart
+//     in `error`; the surface sorted on the STATUS, so a body whose own
+//     words say "THE BACKEND WAS REACHED" rendered under the headline
+//     "Nothing answered the read".
+//   · "a 403 says which of the two it is, and a 500 says it is neither"
+//     — a held token REFUSED by the read must never render as "no token
+//     is held", and a failure that is not a gate must render as
+//     neither.
+//
+// NOTHING COVERS EITHER CLAIM NOW. `e2e/watched-strip.spec.ts` tests the
+// same component and has no page to mount it on either. And the gap is
+// wider than these two tests: `LiveCard`'s own comment says it
+// deliberately does NOT draw a failed or refused read "because
+// WatchedStrip is mounted on the same page against the same gate and
+// renders it with the status and the backend's own sentence" — a
+// premise that is now false. So a 403, a 502 or a 500 on
+// /api/bet-suggester/watched-strip currently renders NOTHING on the
+// landing page: a failed read drawn as an empty slate, which is the one
+// shape this tree exists to refuse. Reported to the operator as a src
+// fix; it cannot be asserted from here without asserting the defect.
+// ─────────────────────────────────────────────────────────────────────
 
 const json = (body: unknown, status = 200) => ({
   status, contentType: "application/json", body: JSON.stringify(body),
@@ -128,15 +163,16 @@ async function open(page: Page, matches: unknown[]) {
 
 const LOOKS_LIKE_A_SLUG = /^[a-z0-9]+(?:[-_.][a-z0-9]+)*$/;
 
-test("no live-plane competition slug reaches the reader, on the card or "
-   + "on the strip", async ({ page }) => {
-  await open(page, [
+test("no live-plane competition slug reaches the reader, anywhere on the "
+   + "page", async ({ page }) => {
+  const matches = [
     liveMatch(),
     liveMatch({ fixture_id: 202, competition_slug: "liga-mx-2026",
       home: "Tigres UANL", away: "Club América" }),
     liveMatch({ fixture_id: 303, competition_slug: "la-liga-2026",
       home: "Real Betis", away: "Sevilla" }),
-  ]);
+  ];
+  await open(page, matches);
 
   // the card's own competition line, per card
   const comps = await page.locator('[data-testid="live-strip"] > span:first-child')
@@ -149,15 +185,28 @@ test("no live-plane competition slug reaches the reader, on the card or "
       + "of an internal key rather than a name").toBe(false);
   }
 
-  // and the strip's identity line
-  const strip = await page.getByTestId("watched-comp")
-    .evaluateAll((els) => els.map((e) => (e.textContent ?? "").trim()));
-  expect(strip.length, "no watched row was drawn").toBeGreaterThan(2);
-  for (const c of strip) {
-    expect(LOOKS_LIKE_A_SLUG.test(c),
-      `the watched strip's identity line reads "${c}", which has the `
-      + "shape of an internal key rather than a name").toBe(false);
+  /* AND NOWHERE ELSE ON THE PAGE. The second half of this test read the
+     watched strip's own identity line until the strip came off the
+     landing page (see the note at the top of this file); the RULE it
+     enforced is not the strip's, it is the reader's, so it is made over
+     the whole rendered page instead — which is a stronger check than the
+     one it replaces and does not depend on which surfaces are mounted.
+     DERIVED from the payload's own slugs, never a list typed here: the
+     hand-typed list is the thing already found missing entries in
+     e2e/no-raw-slug-reaches-the-reader.spec.ts. */
+  const slugs = [...new Set(matches.map((m) => m.competition_slug))];
+  expect(slugs.length, "the payload carries no slugs to look for")
+    .toBeGreaterThan(2);
+  const pageText = await page.locator("body").innerText();
+  expect(pageText.length, "nothing was rendered — the sweep proved nothing")
+    .toBeGreaterThan(200);
+  for (const slug of slugs) {
+    expect(pageText, `the live-plane key "${slug}" is on the page`)
+      .not.toContain(slug);
   }
+  // NON-VACUITY: the clubs those slugs arrived with ARE on the page, so
+  // the sweep is looking at the right render.
+  for (const m of matches) expect(pageText).toContain(m.home);
 });
 
 // --------------------------------------------------------------------
@@ -211,97 +260,4 @@ test("the position block does not print its own heading twice",
     .evaluate((e) => (e as HTMLElement).innerText)).toLowerCase();
   expect(text, `the position block reads "${text}" directly under a rule `
     + 'labelled "position"').not.toContain("position");
-});
-
-// --------------------------------------------------------------------
-// 4. A 502 THE PROXY AUTHORED FOR A BACKEND THAT ANSWERED IS NOT
-//    "NOTHING ANSWERED THE READ".
-//
-// THE DEFECT: pages/api/bet-suggester/watched-strip.ts returns 502 for
-// two opposite findings and labels them apart in `error`. The surface
-// sorted on the STATUS, so `proxy_body_unreadable` — whose own body
-// says "THE BACKEND WAS REACHED: this is not `proxy_unreachable`" —
-// rendered under the headline "Nothing answered the read", with "The
-// read did not get past the proxy" beneath it. The proxy's own comment
-// predicted this defect and then produced it.
-// --------------------------------------------------------------------
-
-const BODY_UNREADABLE = {
-  error: "proxy_body_unreadable", upstream_status: 200,
-  detail: "the strip's backend answered 200 and the body could not be "
-    + "read to the end, so there is nothing to relay. THE BACKEND WAS "
-    + "REACHED: this is not `proxy_unreachable`, not a refusal, and not "
-    + "an empty watchlist",
-};
-
-async function gate(page: Page, body: unknown, status: number) {
-  await page.route("**/api/picker/board**", (r) => r.fulfill(json(BOARD)));
-  await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW)));
-  await page.route("**/api/bet-suggester/watched-strip**",
-    (r) => r.fulfill(json(body, status)));
-  await page.goto("/bet-suggester");
-  const g = page.getByTestId("watched-strip-gate");
-  await g.waitFor({ timeout: 15_000 });
-  return g;
-}
-
-test("a body-unreadable 502 does not claim nothing answered",
-  async ({ page }) => {
-  const g = await gate(page, BODY_UNREADABLE, 502);
-  await expect(g).toHaveAttribute("data-kind", "body_unreadable");
-  const text = (await g.textContent()) ?? "";
-  // THE EVIDENCE IS STILL PRINTED — the status and the backend's own
-  // sentence, verbatim. What must not survive is the claim beside it.
-  expect(text).toContain("502");
-  expect(text).toContain("THE BACKEND WAS REACHED");
-  expect(text, "the surface says nothing answered, directly above a "
-    + "sentence saying the backend was reached")
-    .not.toContain("Nothing answered the read");
-  expect(text, "the surface says the read did not get past the proxy, "
-    + "over a body that says it did")
-    .not.toContain("did not get past the proxy");
-});
-
-test("a proxy that genuinely never reached the backend still says so",
-  async ({ page }) => {
-  // NON-VACUITY, AND THE OTHER DIRECTION: the branch that was right is
-  // still right. A labelled `proxy_unreachable` keeps its sentence.
-  const g = await gate(page, { error: "proxy_unreachable",
-    detail: "the strip's backend was never reached, so there is no "
-      + "answer to relay — this is not a refusal and not an empty "
-      + "watchlist" }, 502);
-  await expect(g).toHaveAttribute("data-kind", "unreachable");
-  await expect(g).toContainText("Nothing answered the read");
-});
-
-// --------------------------------------------------------------------
-// 5. THE GATE IS HONEST IN BOTH DIRECTIONS.
-//
-// NO DEFECT FOUND — this is the check that would have caught one. A
-// held token refused by the read must never render as "no token is
-// held", and a failure that is not a gate at all must never render as
-// either.
-// --------------------------------------------------------------------
-
-test("a 403 says which of the two it is, and a 500 says it is neither",
-  async ({ page }) => {
-  const g = await gate(page, { detail: "operator credentials required" }, 403);
-  await expect(g).toHaveAttribute("data-kind", "needs_token");
-  await expect(g).toHaveAttribute("data-token-held", "false");
-
-  // the same 403, with a token typed into the panel on this page
-  const panel = page.getByTestId("watch-panel");
-  if (!(await panel.evaluate((d) => (d as HTMLDetailsElement).open))) {
-    await panel.locator("summary").click();
-  }
-  await page.locator("#watch-token").fill("a-token-the-backend-refuses");
-  await expect(g).toHaveAttribute("data-kind", "token_refused");
-  await expect(g).toHaveAttribute("data-token-held", "true");
-  await expect(g).not.toContainText("no token is held");
-
-  // and a failure that is not a gate is not sorted into one
-  const h = await gate(page, { detail: "boom" }, 500);
-  await expect(h).toHaveAttribute("data-kind", "unexpected_status");
-  await expect(h).not.toContainText("no token is held");
-  await expect(h).not.toContainText("was refused by the read");
 });

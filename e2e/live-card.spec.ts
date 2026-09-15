@@ -620,36 +620,40 @@ test("a read that RAN and measured nothing is never reported as a read "
   await expect(none).toContainText("no component read has been persisted");
 });
 
-test("the strip and the card draw ONE clock for one fixture — the same "
-   + "reader, off the same response", async ({ page }) => {
-  /* THE DEFECT, EXACTLY AS IT SHIPPED. Both surfaces mount on
-     /bet-suggester and both are fed by api.watchedStrip(). WatchedStrip
+test("the card's clock is the payload's own field, and it says WHICH "
+   + "field answered", async ({ page }) => {
+  /* THE DEFECT, EXACTLY AS IT SHIPPED. Two surfaces mounted on
+     /bet-suggester and both were fed by api.watchedStrip(). WatchedStrip
      preferred `state.minute` with `clock_display` as its fallback;
-     LiveCard preferred `clock_display`. In stoppage time that is 45'
+     LiveCard preferred `clock_display`. In stoppage time that was 45'
      in the strip and 45'+5' on the card below it — the same match, two
      clocks, one screen.
 
-     THE ASSERTION IS AGREEMENT, not a literal: it compares the two
-     surfaces against EACH OTHER and against the payload's own field, so
-     it goes red for either reader drifting rather than for the string
-     changing. */
+     THE SECOND SURFACE IS GONE (operator, 2026-09-15): `<WatchedStrip />`
+     came off the landing page and the component is mounted on no route,
+     so the AGREEMENT half of this test has nothing to compare against
+     and is not asserted any more. What survives is the half that was
+     load-bearing on its own and would still catch a drifting reader: the
+     card reads `clock_display` — the field that carries stoppage time —
+     and NAMES the field it read, so a future disagreement is a
+     disagreement about the payload rather than about a sentence. Should
+     a second clock-drawing surface ever mount here again, the agreement
+     assertion belongs back in this test. */
   const stoppage = { ...liveMatch(), state: { ...liveMatch().state,
     minute: 45, clock_display: "45'+5'" } };
   await open(page, { ...ENVELOPE, matches: [stoppage] });
 
   const card = liveCard(page, 101).getByTestId("live-minute");
-  const strip = page.locator('[data-testid="watched-match"][data-fixture="101"]')
-    .getByTestId("watched-clock");
   await expect(card).toHaveCount(1);
-  await expect(strip).toHaveCount(1);
   await expect(card).toHaveText("45'+5'");
-  await expect(strip).toHaveText("45'+5'");
-  expect((await strip.innerText()).trim())
-    .toBe((await card.innerText()).trim());
-  // and both say WHICH field answered, so a future disagreement is a
-  // disagreement about the payload rather than about a sentence
   await expect(card).toHaveAttribute("data-source", "clock_display");
-  await expect(strip).toHaveAttribute("data-source", "clock_display");
+  /* AND NOT `state.minute`, which is the whole of the disagreement: 45
+     and 45'+5' are the same match, and one of them silently drops the
+     five minutes still to be played. */
+  expect((await card.innerText()).trim()).not.toBe("45'");
+  // NO SECOND CLOCK ON THE PAGE. If one comes back, it has to be read
+  // off the same field, and this count is where that conversation starts.
+  await expect(page.getByTestId("watched-clock")).toHaveCount(0);
 });
 
 // ================================================== the flip, and what

@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
 
+/* THE WINDOW THE PAGE ASKS FOR, off the page's own constant. Both
+   windows opened at 8 days on 2026-09-15 and the chips that used to set
+   them are gone, so a spec naming a number pins the default of the day
+   it was typed rather than the sentence it means to guard. */
+import { DEFAULT_BACK } from "../src/lib/pickerReview";
+
 // THE FINISHED TAIL ASKS FOR ITS OWN COMPETITION — and the three states
 // a tail may report are kept apart.
 //
@@ -356,7 +362,8 @@ test.describe("three states, and no two of them render alike", () => {
       await expect(t.getByTestId("review-count")).toContainText("0 matches");
       await t.getByTestId("review-toggle").click();
       await expect(t.getByTestId("review-empty"))
-        .toContainText("No Champions League fixtures finished in the last 7 days");
+        .toContainText("No Champions League fixtures finished in the last "
+          + `${DEFAULT_BACK} days`);
       // …and it is the ONLY one of the three drawn
       await expect(t.getByTestId("review-unasked")).toHaveCount(0);
       await expect(t.getByTestId("review-league-error")).toHaveCount(0);
@@ -385,7 +392,8 @@ test.describe("three states, and no two of them render alike", () => {
       // not share a rendering — the whole rule, in one assertion.
       await expect(t.getByTestId("review-empty")).toHaveCount(0);
       await expect(page.getByText(
-        "No Champions League fixtures finished in the last 7 days"))
+        "No Champions League fixtures finished in the last "
+        + `${DEFAULT_BACK} days`))
         .toHaveCount(0);
     });
 

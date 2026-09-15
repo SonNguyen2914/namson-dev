@@ -136,10 +136,24 @@ test("each column numbers its own ladder, and the folded row is in "
        number, and must not renumber the column it joined. */
     for (const slug of COLS) {
       await expect(col(page, slug).getByTestId("picker-row")).toHaveCount(1);
-      await expect(col(page, slug).getByTestId("refused-rank"))
-        .toContainText("rank");
-      await expect(col(page, slug).getByTestId("refused-rank"))
-        .toContainText("refused");
+      /* THE SLOT WHERE `01` WOULD GO SAYS WHY THERE IS NO NUMBER. It
+         read the words "rank refused" until 2026-09-15 — a third copy of
+         a fact the `#refused` tag beside it and the axes row below it
+         both carry. It carries the REASON now, which is what neither of
+         them says; the status is still in words on the tag, and the
+         ladder sentence is still in the slot's own hover. What may never
+         come back is a POSITION: a refused row is not in the ladder. */
+      const slot = col(page, slug).getByTestId("refused-rank");
+      await expect(slot.getByTestId("refusal-reason")).toHaveCount(1);
+      await expect(slot).toHaveText(ROW.reason);
+      expect(await slot.getAttribute("title"))
+        .toContain("no position in the day's ladder");
+      await expect(col(page, slug).getByTestId("refused-tag"))
+        .toHaveText("#refused");
+      // and the ranked card in this column keeps `01` — the folded row
+      // consumed no number and renumbered nothing
+      await expect(col(page, slug).getByTestId("row-rank")).toHaveCount(1);
+      await expect(col(page, slug).getByTestId("row-rank")).toHaveText("01");
     }
   });
 
@@ -164,20 +178,35 @@ test("the card says it is one fixture in two columns, and names the "
     await open(page);
     for (const slug of COLS) {
       const others = COLS.filter((c) => c !== slug);
+      /* THE FOLD MARKER IS A CHIP NOW, in Stage 2's row beside the
+         circled i — `+1`, with the declared set still riding as data and
+         the columns named in its hover. The paragraph it replaced said
+         "One fixture, drawn in 2 columns — MLS and Liga MX… listed again
+         and not played again", a second copy of what the competition
+         badge two lines up already says in the chip row where a reader
+         first meets the card. What may not be lost is the SET, and it is
+         asserted off the payload rather than off the cards found. */
       const note = cardIn(page, slug).getByTestId("folded-into");
       await expect(note).toHaveCount(1);
-      // the whole declared set rides as data, so a guard reads the
-      // row's own list rather than counting cards it happened to find
       await expect(note).toHaveAttribute("data-columns", COLS.join(" "));
-      await expect(note).toHaveAttribute("data-drawn-in", slug);
-      await expect(note).toHaveAttribute("data-also-in", others.join(" "));
-      // and it says so in words: "listed again and not played again"
-      await expect(note).toContainText("One fixture");
-      await expect(note).toContainText("not played again");
-      // the OTHER column is named on the card, in the chip row too
+      await expect(note).toHaveText(`+${COLS.length - 1}`);
+      expect(await note.getAttribute("title"))
+        .toBe(`this fixture is drawn in ${
+          COLS.map((c) => c === "mls" ? "MLS" : "Liga MX").join(" and ")}`);
+      // WHERE THIS CARD IS stayed on the card itself, which is where it
+      // was always the more reliable fact — `data-drawn-in` duplicated it
+      await expect(cardIn(page, slug)).toHaveAttribute("data-column", slug);
+      // and the OTHER column is named IN WORDS, in the chip row, which is
+      // the copy that survives a screenshot and a reader who never hovers
       const badge = cardIn(page, slug).getByTestId("competition-badge");
       await expect(badge).toHaveAttribute("data-also-in", others.join(" "));
       await expect(badge).toContainText("also in");
+      await expect(badge).toContainText(
+        others.map((c) => c === "mls" ? "MLS" : "Liga MX").join(" + "));
+      // "one fixture, not one per column" is still said, on the badge
+      expect(await badge.getAttribute("title"))
+        .toContain("It is ONE fixture listed in both, not one fixture per "
+          + "column.");
     }
   });
 
@@ -252,10 +281,25 @@ test("the reason line keeps its subject when no club was refused",
        drops a null child, so the line lost its subject and read as a
        card that had failed to load one. A refusal of a PAIRING has a
        subject, and it is the pairing. */
+    /* IT STANDS WHERE THE RANK NUMBER WOULD GO NOW (2026-09-15), which
+       is the slot a reader's eye already goes to, and it is the only
+       copy: the header used to read "rank refused" over this line, and
+       the `#refused` tag and the axes row both say that too.
+       THE LINE ITSELF IS THE REASON. Its SUBJECT — the pairing, on a
+       refusal that names no club — travels in `data-subject` and in the
+       title, because the slot it now occupies is one line wide and a
+       full sentence would push the chip row onto a second line, which is
+       the exact cost this rebuild was undoing. What must never happen is
+       the old defect: `{r.club} — {r.reason}` rendering as
+       " — no_shared_scale", a reason with no subject at all. */
     const line = cardIn(page, COLS[0]).getByTestId("refusal-reason");
     await expect(line).toHaveAttribute("data-subject", "pairing");
-    await expect(line).toHaveText(`${ROW.home} v ${ROW.away} — ${ROW.reason}`);
+    await expect(line).toHaveText(ROW.reason);
+    expect(await line.getAttribute("title"))
+      .toBe(`${ROW.home} v ${ROW.away} — ${ROW.reason}`);
     expect((await line.textContent() ?? "").trim())
+      .not.toMatch(/^[\s—-]/);
+    expect((await line.getAttribute("title") ?? "").trim())
       .not.toMatch(/^[\s—-]/);
   });
 
@@ -288,9 +332,15 @@ test("no club is named favourite — the card says so in the backend's "
        attaches the idea to a club. */
     for (const slug of COLS) {
       const card = cardIn(page, slug);
-      // the refusal, stated, in the module's own words
+      /* THE REFUSAL, STATED, IN THE MODULE'S OWN WORDS — behind the
+         circled i since 2026-09-15, with `data-source` replaced by
+         something a reader can see: the section quoting the payload
+         opens with `Withheld —`, and this file's fallback opens
+         "REFUSED, not missing". */
       await expect(card.getByTestId("refused-rule"))
-        .toHaveAttribute("data-source", "payload");
+        .toContainText("Withheld —");
+      await expect(card.getByTestId("refused-rule"))
+        .toContainText(ROW.refusal.withheld);
       await expect(card.getByTestId("refused-rule"))
         .toContainText("the favourite");
       // the anchor — the one figure the board is ordered by — is refused
@@ -315,21 +365,32 @@ test("the refusal is named in the BACKEND's words, with the measurement "
   + "behind it", async ({ page }) => {
     await open(page);
     const card = cardIn(page, COLS[0]);
+    /* ALL OF IT IS BEHIND THE CIRCLED i NOW, as sections of one panel —
+       so it is OPENED before being read, which is what a reader does.
+       `data-case`, `data-keys` and the per-key `data-detail` elements
+       went with the markup; what replaced them is the emitter's own
+       sentences, which is the fact that matters and the one a drifting
+       frontend would stop quoting. */
+    await card.getByTestId("refusal-why-open").click();
+    await expect(card.getByTestId("refusal-notes")).toBeVisible();
+
     // the case, and the registry's sentence for it
     await expect(card.getByTestId("refused-case"))
-      .toHaveAttribute("data-case", ROW.refusal.case);
+      .toContainText(ROW.refusal.why);
     await expect(card.getByTestId("refused-case"))
       .toContainText("no field has been measured");
     /* AND THE CORPUS NUMBERS. An absence that DECIDES a favourite has
        to travel with its evidence, or "no field" is indistinguishable
-       from "nobody looked". DERIVED from the payload's own keys. */
+       from "nobody looked". DERIVED from the payload's own keys: each
+       key is NAMED and each key's sentence is printed under it. */
     const detail = card.getByTestId("refused-detail");
     const keys = Object.keys(ROW.refusal.detail);
     expect(keys.length, "the payload carries no detail to check")
       .toBeGreaterThan(0);
-    await expect(detail).toHaveAttribute("data-keys", keys.join(" "));
     for (const k of keys) {
-      await expect(detail.locator(`[data-detail="${k}"]`)).toHaveCount(1);
+      await expect(detail, `${k} is named`).toContainText(k);
+      await expect(detail, `${k} carries its own measurement`)
+        .toContainText(ROW.refusal.detail[k as keyof typeof ROW.refusal.detail]);
     }
     await expect(detail).toContainText("NO MEASURED FIELD");
   });
@@ -337,12 +398,21 @@ test("the refusal is named in the BACKEND's words, with the measurement "
 test("the blocks a pairing refusal cannot carry are named, one sentence "
   + "each, off the payload", async ({ page }) => {
     await open(page);
-    const absent = cardIn(page, COLS[0]).getByTestId("refused-absent");
-    const blocks = Object.keys(ROW.refusal.absent);
+    const card = cardIn(page, COLS[0]);
+    await card.getByTestId("refusal-why-open").click();
+    await expect(card.getByTestId("refusal-notes")).toBeVisible();
+    const absent = card.getByTestId("refused-absent");
+    const blocks = Object.entries(ROW.refusal.absent);
     expect(blocks.length).toBeGreaterThan(0);
-    await expect(absent).toHaveAttribute("data-blocks", String(blocks.length));
-    for (const b of blocks) {
-      await expect(absent.locator(`[data-block="${b}"]`)).toHaveCount(1);
+    /* ONE SENTENCE EACH, NAMED. They were `li`s with `data-block` until
+       the prose moved into the panel; the names and the sentences are
+       the claim and both are still printed, so a block the emitter adds
+       arrives here rather than being silently dropped — the keys are
+       read off the payload, never typed beside the check. */
+    for (const [b, words] of blocks) {
+      await expect(absent, `${b} is named as absent`).toContainText(b);
+      await expect(absent, `${b} carries the backend's own sentence`)
+        .toContainText(words as string);
     }
   });
 
@@ -360,15 +430,28 @@ test("both clubs' OWN figures are drawn — rank out of its own ordering, "
       const pair = card.getByTestId("refused-rank-pair");
       await expect(pair).toHaveText(
         `ranks H #${s.home.rank} of ${s.home.of} · A #${s.away.rank} of ${s.away.of}`);
+      // and the SIZE of each ordering rides with the position, which is
+      // what makes them read as incommensurable rather than comparable
+      expect(await pair.getAttribute("title"))
+        .toContain("NOT differenced");
       await expect(pair).toHaveAttribute("data-home-rank", String(s.home.rank));
       await expect(pair).toHaveAttribute("data-away-rank", String(s.away.rank));
 
       /* THE RATES, side by side and NOT subtracted. A signed figure in
          this cell would be the cross-scale subtraction the whole card
          refuses. */
+      /* `ppg H 2.80 · A 1.90` BECAME `ppg 2.80/1.90` (2026-09-15) — the
+         same two measured rates in the same home-then-away order, in
+         half the width, with the labels moved to the title where both
+         club names are spelt out rather than abbreviated. */
       const ppg = card.getByTestId("refused-ppg");
       await expect(ppg).toHaveAttribute("data-home-ppg", String(s.home.ppg));
       await expect(ppg).toHaveAttribute("data-away-ppg", String(s.away.ppg));
+      await expect(ppg).toHaveText(
+        `ppg ${s.home.ppg.toFixed(2)}/${s.away.ppg.toFixed(2)}`);
+      const labelled = (await ppg.getAttribute("title")) ?? "";
+      expect(labelled).toContain(`${ROW.home} ${s.home.ppg.toFixed(2)} points per game`);
+      expect(labelled).toContain(`${ROW.away} ${s.away.ppg.toFixed(2)} points per game`);
       const ppgText = (await ppg.innerText());
       expect(ppgText).not.toMatch(/[+−-]\s*\d/);
 
@@ -380,9 +463,27 @@ test("both clubs' OWN figures are drawn — rank out of its own ordering, "
         `gp ${s.home.gp_current}/${s.away.gp_current}`);
       expect(await gp.innerText()).not.toContain("not stated");
 
-      // THE GAP between any two of them is still refused, in its own
-      // cell — the figures are drawn, the comparison is not.
-      await expect(card).toContainText("rank refused");
+      /* THE GAP BETWEEN ANY TWO OF THEM IS STILL REFUSED — the figures
+         are drawn, the comparison is not. The card said "rank refused"
+         in its header until 2026-09-15 and that slot carries the REASON
+         now; the refusal is still marked in every slot where a
+         comparison would stand, and the SET is read off the card rather
+         than typed here. */
+      await expect(card.locator("[data-refused]").first()).toBeAttached();
+      const marks = await card.locator("[data-refused]")
+        .evaluateAll((els) => els.map((e) => e.getAttribute("data-refused")!));
+      expect([...marks].sort())
+        .toEqual(["anchor", "dumbbell", "rank-pair", "tiers"]);
+      for (const what of ["anchor", "dumbbell", "tiers"]) {
+        await expect(card.locator(`[data-refused="${what}"]`),
+          `the ${what} slot says refused`).toContainText("refused");
+      }
+      // and every axis is still NAMED, in the one span that replaced the
+      // stacked trio and the separate shape chip
+      for (const axis of ["ovr", "atk", "def", "shape"]) {
+        await expect(card.getByTestId("refused-tiers")).toContainText(axis);
+      }
+      await expect(card.getByTestId("refused-shape")).toHaveCount(0);
     }
   });
 

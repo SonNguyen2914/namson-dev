@@ -77,30 +77,45 @@ test("the header dates the board: built (LA), slate (ET), fixture count",
     await expect(line).toContainText("2 fixtures");
   });
 
-// ------------- window switches re-enter loading honestly (D3 + F6) -------------
+// ------------- loading re-enters honestly (D3 + F6) -------------
 
-test("a window switch shows skeletons and hides the previous board's header line",
-  async ({ page }) => {
-    await openBoard(page);
-    await page.unroute("**/api/picker/board**");
+test("a board still in flight shows skeletons and NO header line, then "
+   + "both arrive together", async ({ page }) => {
+    /* WHAT THIS PINS, AND WHAT IT LOST. The rule is that the loading
+       state never stands beside a header line — the error state promises
+       nothing stale is ever shown and the loading state is held to the
+       same rule. It used to be exercised by clicking a window chip with
+       a board already on screen, which is the harder case: a REFETCH
+       must drop the previous board's line as well as its rows.
+       THE WINDOW CHIPS ARE GONE (operator, 2026-09-15: "using the days
+       to filter is not needed"), and with them the last control that
+       refetches the board on this page — `setDays` is never called now,
+       and nothing else changes the fetch's inputs. So the stale-header
+       half of this claim has no trigger left to reach it and is reported
+       rather than asserted; if a refresh or a window control comes back,
+       the click belongs in this test again.
+       What is still reachable, and still the half that ships broken most
+       often, is the cold load: skeletons, one per declared column, no
+       rows, and no header line over them. */
     await page.route("**/api/picker/board**", async (r) => {
       await new Promise((res) => setTimeout(res, 1200));
       await r.fulfill(json(BOARD));
     });
-    // 3d, NOT 7d: since the four-column board (2026-08-31) the page's
-    // default window IS 7 - clicking the already-active chip is a no-op
-    // and would never re-enter loading.
-    await page.getByRole("button", { name: "3d" }).click();
-    // four columns, four skeleton stacks - one per league since 2026-08-31
-    await expect(page.getByRole("status")).toHaveCount(4);
+    await page.goto("/bet-suggester");
+
+    // one skeleton stack per DECLARED column, counted off the payload
+    const columns = Object.keys(BOARD.leagues).length;
+    await expect(page.getByRole("status")).toHaveCount(columns);
     await expect(page.getByRole("status").first()).toBeVisible();
     await expect(page.getByTestId("picker-row")).toHaveCount(0);
-    // the OLD board's "built …" line must not stand beside skeletons —
-    // the error state promises nothing stale is ever shown, and the
-    // loading state holds itself to the same rule
+    // and no "built …" line stands beside them
     await expect(page.getByText(/built .+ · slate/)).toHaveCount(0);
+
+    // then the board and its header arrive together — the header is not
+    // drawn one paint before the rows it dates
     await expect(page.getByTestId("picker-row")).toHaveCount(2);
     await expect(page.getByText(/built .+ · slate/)).toBeVisible();
+    await expect(page.getByRole("status")).toHaveCount(0);
   });
 
 // ------------------- a network failure is named, not pasted -------------------
