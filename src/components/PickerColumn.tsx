@@ -71,9 +71,36 @@ import { Eyebrow } from "./ui";
 // the reader nothing. The UCL is named here now; the fallback stays for
 // a competition nobody has picked a hue for yet, which is honest (an
 // unassigned column looks unassigned) rather than a collision.
+//
+// EIGHT COLUMNS, EIGHT INKS (operator, 2026-09-15). The four leagues
+// joining the board had no entry here, so every one of them fell through
+// to `--lg-cup` — which is byte-identical to `--accent`, the brand gold.
+// Four columns wearing the brand, indistinguishable from each other and
+// from a cup card folded into a column beside them. Declaring the CSS
+// variables does not fix it: THIS MAP is what resolves a slug, and a slug
+// it does not know never reaches them.
+//
+// WHERE THE FOUR NEW HUES COME FROM. Not taste — the loop's own
+// structure. A four-wide window over eight columns can never show a pair
+// sitting four apart, so exactly four pairs are impossible, and each one
+// couples a new league to an existing one:
+//
+//     bundesliga / mls        ligue1     / epl
+//     seriea     / ligamx     eredivisie / laliga
+//
+// Each new hue therefore sits in the SHADOW of the colour it can never
+// appear beside, which frees a region that colour would otherwise block —
+// bundesliga may be a cyan precisely because MLS's cyan is never on
+// screen with it. Measured in CIELAB against every pair that CAN be
+// co-visible: minimum dE 57.0 co-visible, 61.3 between loop-adjacent
+// columns (and that pair is mls/ligamx, which already existed), 45.3
+// clearance from the brand gold. Placing them by hue angle alone scored
+// 24-39 and kept stacking greens.
 const LEAGUE_HUE: Record<string, string> = {
   mls: "var(--lg-mls)", epl: "var(--lg-epl)", laliga: "var(--lg-laliga)",
   ligamx: "var(--lg-ligamx)", ucl: "var(--lg-ucl)",
+  bundesliga: "var(--lg-bundesliga)", seriea: "var(--lg-seriea)",
+  ligue1: "var(--lg-ligue1)", eredivisie: "var(--lg-eredivisie)",
 };
 export const hueOf = (slug: string) => LEAGUE_HUE[slug] ?? "var(--lg-cup)";
 
@@ -1218,7 +1245,16 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
               + "so this fixture has no position in the day's ladder. A "
               + "number here would be a placement nobody measured."}
             className="font-mono text-[11px] tabular-nums text-ink-low">
-            rank <Refused what="rank" says={withheld} />
+            {/* THE REASON STANDS WHERE THE RANK WOULD BE. "rank refused"
+                here was a third copy of a fact the #refused tag beside it
+                and the axes row below it both carry; the REASON is the
+                one thing neither of them says, and the rank slot is
+                exactly where a reader's eye already goes. */}
+            <span data-testid="refusal-reason"
+              data-subject={r.club ? "club" : "pairing"}
+              title={`${r.club ?? pairing} — ${r.reason}`}>
+              {r.reason}
+            </span>
           </span>
           {/* THE TAG, IN THE OPERATOR'S OWN CHARACTERS. Lower case and
               with its `#`, because that is what he wrote and it is what
@@ -1386,8 +1422,14 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
           points-per-game cell, the rank gap, and games played. Two of the
           four are refused and two are filled, in place, so the reader
           sees exactly where the board stops. */}
-      <div className={`mt-2.5 flex flex-wrap items-baseline gap-y-1 font-mono text-[10.5px] tabular-nums ${
-        dense ? "gap-x-4 md:gap-x-2.5" : "gap-x-4"}`}>
+      {/* TIGHTER GAPS, SAME CELLS. Four verbose cells at gap-x-4 took
+          three lines in a 356px track; none of them may be cut — "no
+          rank" is the TRUE half of a pair and "not stated" is a named
+          absence, never a dash — so the space between them gives way
+          instead. The RANKED card's identical row is untouched: its
+          cells are short and it already fits on one line. */}
+      <div className={`mt-2.5 flex flex-wrap items-baseline gap-y-0.5 font-mono text-[10.5px] tabular-nums ${
+        dense ? "gap-x-2.5 md:gap-x-2" : "gap-x-2.5"}`}>
         {/* `#N v #N`, AND WHY IT IS NOT HALF A PAIR. One of these clubs
             HAS a rank — it has a row in the table, and printing its
             position is no more a comparison than printing its name. The
@@ -1452,13 +1494,20 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
             + "differenced: the difference of two rates from two different "
             + "tables is the number this fixture was refused for."}
           className="text-ink-low">
-          ppg <span className="text-ink-mid">H {figure(homePpg)}</span>
-          <span className="text-ink-faint"> · </span>
-          <span className="text-ink-mid">A {figure(awayPpg)}</span>
+          {/* BOTH VALUES, STILL LABELLED, IN HALF THE WIDTH. `H 0.75 · A
+              1.30` was the cell that pushed this row onto a second line
+              while the ranked card beside it sat on one. Home over away
+              with a slash is the same two measured numbers in the same
+              order, and the title still spells out which is which. */}
+          ppg <span className="text-ink-mid">{figure(homePpg)}</span>
+          <span className="text-ink-faint">/</span>
+          <span className="text-ink-mid">{figure(awayPpg)}</span>
         </span>
-        <span className="text-ink-low">
-          rank <Refused what="rank-gap" says={withheld} />
-        </span>
+        {/* THE RANK-GAP CELL IS GONE, and nothing measured went with it.
+            The card's own header already reads "rank refused" — this was
+            the same fact a second time, and it was the cell pushing this
+            row onto a second line while the ranked card beside it sits on
+            one. A second copy of a fact is the copy that rots. */}
         {/* GAMES PLAYED — a COUNT, not a rate, so it crosses no scale and
             is simply drawn. It is also the number the refusal turns on:
             the countdown below is this figure against the gate. */}
@@ -1479,19 +1528,80 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
           labels and prints ONE `refused` under them rather than three:
           the axes are named because a reader needs to know which figures
           are gone, but the fact is one fact and says itself once. */}
-      <div className="mt-3 flex flex-wrap items-end gap-x-2.5 gap-y-1">
+      {/* ONE ROW, THE RANKED CARD'S ROW. The trio was stacked — three
+          labels over the word `refused` — which cost a line the ranked
+          card does not spend, and the reason sat on a line of its own
+          below it, which cost another. Both now sit where a ranked card
+          keeps its tiers and its circled i, so the two cards have the
+          same skeleton and the same height. The axes are still NAMED:
+          a reader must know which figures are gone. */}
+      <div className="relative mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+        {/* FOUR NAMED ABSENCES, ONE WORD. The trio said `refused` under
+            its three labels and the shape chip said it again beside them;
+            the header said it a third time. Every axis is still NAMED —
+            a reader has to know WHICH figures are gone — but the fact is
+            one fact and now says itself once, which is what gets this row
+            onto the single line a ranked card uses. */}
         <span data-testid="refused-tiers" data-refused="tiers"
+          data-shape-refused="1"
           title={withheld}
-          className="inline-flex flex-col items-center gap-[2px] font-mono text-[10px] leading-none">
-          <span className="inline-flex items-end gap-2.5 text-[7.5px] uppercase tracking-[0.12em] text-ink-faint">
-            {AXIS_ORDER.map((lbl) => <span key={lbl}>{lbl}</span>)}
+          className="inline-flex items-baseline gap-1 font-mono text-[10px] leading-none">
+          <span className="text-[7.5px] uppercase tracking-[0.12em] text-ink-faint">
+            {AXIS_ORDER.join(" ")} shape
           </span>
           <span className="text-ink-faint">refused</span>
         </span>
-        <span data-testid="refused-shape" data-refused="shape"
-          title={withheld}
-          className="rounded border border-line px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
-          shape refused
+        {adm && (
+          <span data-testid="refused-admission"
+            data-k={adm.k} data-gp={adm.gp ?? undefined}
+            data-to-go={adm.games_until_rated ?? undefined}
+            title={`${adm.gate} — rated at ${adm.k} games, played ${adm.gp ?? "not stated"}`}
+            className="rounded border border-warn/35 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.08em] text-warn">
+            {adm.games_until_rated == null
+              ? <>rated at {adm.k}</>
+              : <>{adm.games_until_rated} to go</>}
+          </span>
+        )}
+        {cols.length > 1 && (
+          <span data-testid="folded-into" data-columns={cols.join(" ")}
+            title={`this fixture is drawn in ${cols.map((c) => leagueLabel(c)).join(" and ")}`}
+            className="font-mono text-[9px] uppercase tracking-[0.08em] text-ink-faint">
+            +{cols.length - 1}
+          </span>
+        )}
+        <span className="ml-auto">
+          <NotesPanel
+            idPrefix={`refusal-${r.event_id ?? `${r.home}-${r.away}`}`}
+            testidOpen="refusal-why-open" testidPanel="refusal-notes"
+            label={`why ${r.club ?? pairing} is refused, and what is withheld`}
+            sections={([
+              { id: "refusal-rule-general", tone: "text-ink-low",
+                head: "why a fixture is refused",
+                body: REFUSAL_GENERAL },
+              { id: "refused-rule", tone: "text-warn",
+                head: "what is withheld",
+                body: ref ? `Withheld — ${ref.withheld}` : REFUSED_RULE },
+              { id: "refused-case", tone: "text-ink-low",
+                head: "why this case", body: ref?.why ?? "" },
+              { id: "refused-absent", tone: "text-ink-low",
+                head: "blocks this refusal does not carry",
+                body: absent.map(([b, w]) => `${b} — ${w}`).join("\n") },
+              { id: "refused-detail", tone: "text-ink-low",
+                head: "what was looked at",
+                body: detail.map(([k, says]) => `${k} — ${says}`).join("\n") },
+              { id: "admission-says", tone: "text-warn",
+                head: "the admission countdown",
+                body: adm
+                  ? `${adm.says}\n\nrated at ${adm.k} games · played ${adm.gp ?? "not stated"}` +
+                    (adm.basis_when_admitted
+                      ? `\nthen rated on · ${adm.basis_when_admitted}` : "")
+                  : "" },
+              { id: "refused-reg-time", tone: "text-skylive",
+                head: "what the price settles on",
+                body: r.reg_time_note ?? "" },
+            ] as const).filter(
+              (x): x is typeof x & { body: string } => Boolean(x.body))}
+          />
         </span>
       </div>
 
@@ -1503,199 +1613,6 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
           drops it — so this line became " — no_shared_scale", a reason
           with no subject, which reads as a card that failed to load one.
           The refusal of a PAIRING has a subject: the pairing. */}
-      <p data-testid="refusal-reason" data-subject={r.club ? "club" : "pairing"}
-        className="mt-3 font-mono text-[10.5px] leading-relaxed text-ink-mid">
-        {r.club ?? pairing} — {r.reason}
-      </p>
-      {/* AND THE RULE, SAID ONCE, IN THE MODULE'S OWN WORDS. Six cells
-          above print `refused`; this says why all six do, so the card
-          explains itself instead of repeating a paragraph per cell.
-          WHOSE WORDS THEY ARE CHANGED ON 2026-09-11. This paragraph was
-          written here — "these two clubs are measured on different
-          scales, so the comparison is declined rather than imputed" —
-          while `refusal.withheld` sat on the same payload saying the
-          same thing in the voice of the module that made the decision,
-          and naming the seven figures rather than gesturing at them.
-          Two authors for one fact is how the frontend half goes on
-          asserting a rule the backend has moved. `data-source` says
-          which of the two a reader is looking at. */}
-      <p data-testid="refused-rule" data-source={ref ? "payload" : "unstated"}
-        className="mt-1 text-[11px] leading-relaxed text-ink-low">
-        {ref ? <>Withheld — {ref.withheld}</> : <>{REFUSED_RULE}</>}
-      </p>
-      {/* WHAT THIS CASE CAN HONESTLY CARRY. The reason string above is
-          the raw `no_prior_row`-class token; `case` is what it RESOLVED
-          to (one reason covers a club this season lists and a club it
-          does not, and those two carry different figures), and `why` is
-          the registry's sentence for that case. Drawn only when the
-          board sends it — a card that invented a case would be reading
-          the token this file explicitly does not parse. */}
-      {ref && (
-        <p data-testid="refused-case" data-case={ref.case}
-          data-carries={(ref.carries ?? []).join(" ")}
-          className="mt-1 text-[11px] leading-relaxed text-ink-low">
-          {ref.why}
-        </p>
-      )}
-      {/* AND THE BLOCKS THAT ARE NOT HERE, EACH WITH THE BACKEND'S OWN
-          SENTENCE FOR WHY. `absent` is DERIVED upstream from
-          REFUSAL_BLOCKS against the row itself, so a block added to the
-          contract names itself here with no edit — and a reader learns
-          that a missing season block is a decision under this reason
-          rather than a card that forgot to draw one. */}
-      {absent.length > 0 && (
-        <ul data-testid="refused-absent" data-blocks={absent.length}
-          className="mt-1 space-y-0.5 text-[11px] leading-relaxed text-ink-low">
-          {absent.map(([block, why]) => (
-            <li key={block} data-block={block}>
-              <span className="font-mono text-[10px] text-ink-faint">
-                {block}
-              </span>{" "}— {why}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {/* ── THE MEASUREMENT BEHIND THE REFUSAL. `refusal.detail` carries
-          it per case — for `no_shared_scale`, the corpus numbers for why
-          no field places these two clubs: which leagues are in the Elo
-          corpus, which component they form, which artifact holds neither
-          of them. An absence that DECIDES a favourite has to travel with
-          its evidence, or "no field" is indistinguishable from "nobody
-          looked". DERIVED from the object, like `absent` above: a key
-          added upstream draws itself here with no edit, and a key
-          removed stops being drawn rather than rendering `undefined`. */}
-      {detail.length > 0 && (
-        <ul data-testid="refused-detail" data-keys={detail.map(([k]) => k).join(" ")}
-          className="mt-1 space-y-0.5 text-[11px] leading-relaxed text-ink-low">
-          {detail.map(([key, says]) => (
-            <li key={key} data-detail={key}>
-              <span className="font-mono text-[10px] text-ink-faint">
-                {key}
-              </span>{" "}— {says}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {/* ── ONE FIXTURE, DRAWN IN TWO COLUMNS (backend #136).
-          The badge in the chip row says it in three words; this says it
-          in a sentence, because the failure it guards against is a
-          reader meeting the SECOND copy and counting a second fixture.
-          The two clubs' names are identical on both cards, and four
-          columns apart nothing else would tell them apart.
-          EVERY NAME HERE IS OFF THE ROW: the columns from `columns`, the
-          tables each club is rated on from `sides.rated_in`. A sentence
-          that hard-coded "MLS and Liga MX" would be this file asserting
-          a fold the backend declares. */}
-      {others.length > 0 && (
-        <p data-testid="folded-into" data-columns={cols.join(" ")}
-          data-drawn-in={col} data-also-in={others.join(" ")}
-          className="mt-1 text-[11px] leading-relaxed text-ink-low">
-          One fixture, drawn in {cols.length} columns —{" "}
-          {cols.map(leagueLabel).join(" and ")}. This is the same match as
-          the card in the {others.map(leagueLabel).join(" and the ")}{" "}
-          column{others.length > 1 ? "s" : ""}, listed again and not
-          played again.
-          {sides && (side("home")?.rated_in || side("away")?.rated_in) ? (
-            <>{" "}{r.home} is rated on the{" "}
-              {leagueLabel(side("home")?.rated_in ?? r.league)}{" "}table and{" "}
-              {r.away} on the{" "}
-              {leagueLabel(side("away")?.rated_in ?? r.league)}{" "}table, so
-              neither column&apos;s table describes this fixture on its own
-              and it belongs under both.</>
-          ) : null}
-        </p>
-      )}
-
-      {/* ── WHAT THIS LEG SETTLES UNDER, when the row carries it. A
-          refusal to RANK is not a refusal to say what a market would
-          settle on, and `annotate_row` attaches the note to refusals for
-          that reason — on this fixture it is the sentence that says
-          there is NO Kalshi series for the competition at all, which is
-          the difference between a book that was searched and one that
-          does not exist. NOT `RegTimeNote`: that component's summary
-          line asserts "regulation time only — the price is 90 minutes",
-          which is true of the Leagues Cup note it was written for and
-          FALSE of this one, whose own words decline to claim anything
-          about what happens after 90 minutes. A fixed headline over a
-          variable paragraph is a second voice on one fact. */}
-      {r.reg_time_note && (
-        <details data-testid="refused-reg-time"
-          className="mt-2 rounded-md border border-line bg-elev2/40 px-2.5 py-1.5 text-[11px] leading-relaxed text-ink-low">
-          <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.1em] text-ink-faint">
-            what this leg settles under
-          </summary>
-          <p className="mt-1.5">{r.reg_time_note}</p>
-        </details>
-      )}
-
-      {/* ── THE ADMISSION COUNTDOWN — the one block a ranked card has no
-          use for. A refusal that states no end reads as a permanent
-          verdict on a club, which this is not: it is a gate on games
-          played, the club is walking toward it every week, and the board
-          knows the number. Saying so turns "we will not rate this" into
-          "we will rate this in four games", which is the difference
-          between a refusal and a dismissal. */}
-      {adm ? (
-        <div data-testid="refused-admission"
-          data-k={adm.k} data-gp={adm.gp ?? undefined}
-          data-to-go={adm.games_until_rated ?? undefined}
-          className="mt-3 rounded-md border border-line bg-elev2/40 px-2.5 py-2">
-          <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-low">
-            admission countdown
-          </p>
-          {/* THE ARITHMETIC ON ONE LINE, WITH THE POLICY'S OWN WORDS ON
-              HOVER. Each of the three numbers is drawn only if it was
-              sent: a countdown computed from a games-played count nobody
-              has is exactly the invention this card refuses elsewhere. */}
-          <p className="mt-1 font-mono text-[10.5px] tabular-nums text-ink-mid"
-            title={adm.gate}>
-            rated at {adm.k} games
-            <span className="text-ink-faint"> · </span>
-            played {figure(adm.gp, null)}
-            <span className="text-ink-faint"> · </span>
-            {adm.games_until_rated == null
-              ? <span className="text-ink-low">no count opens the gate</span>
-              : <>{adm.games_until_rated} to go</>}
-          </p>
-          {/* THE BACKEND'S SENTENCE, VERBATIM. It already says this in
-              one readable line and a paraphrase here would be a second
-              voice on one fact, free to drift from the policy it came
-              from. */}
-          <p data-testid="admission-says"
-            className="mt-1.5 text-[11px] leading-relaxed text-ink-low">
-            {adm.says}
-          </p>
-          {/* WHAT IT WILL BE RATED ON when it is — the backend's own key,
-              printed as the backend's own word rather than translated
-              into a sentence this file made up. */}
-          <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.12em] text-ink-faint"
-            title={"the basis the club is rated on once the gate opens — no "
-              + "prior-season row exists to blend with, so it is this "
-              + "season alone, reported at full weight"}>
-            then rated on · {adm.basis_when_admitted}
-          </p>
-        </div>
-      ) : (
-        // AN ABSENT COUNTDOWN IS NAMED, not skipped. A card that silently
-        // dropped this block would read as a refusal with no end, which is
-        // a stronger claim than the payload made.
-        <p data-testid="refused-admission" data-absent="1"
-          className="mt-3 text-[11px] leading-relaxed text-ink-low">
-          This refusal carries no admission countdown, so the board cannot
-          say here how many games away{" "}
-          {/* WHOSE COUNTDOWN IT WOULD BE. "this club" has no referent on
-              a refusal that names no club — and on THIS shape there is no
-              countdown to have: both clubs are already rated, and what
-              the refusal waits on is somebody measuring a field. The
-              backend says exactly that in `refusal.absent.admission`
-              above; this line must not contradict it by implying a club
-              is short of a gate. */}
-          {r.club ? "this club is" : "either club is"} from being rated.
-        </p>
-      )}
-
       {/* ── THE MARKET LINE AND THE WATCH CONTROL, under the same rule a
           ranked card draws them under. A refusal to RANK is not a refusal
           to QUOTE: Kalshi prices this match either way, and a reader who
@@ -1771,19 +1688,23 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
 const DENSE_GRID = "grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 "
   + "lg:grid-cols-4";
 
-/** Said once per column, where a reader first meets a refused card. */
-function RefusalWhy() {
-  return (
-    <p data-testid="refusal-why"
-      className="text-[11px] leading-relaxed text-ink-low">
-      A club with no row in the table in use — a promoted side, most
-      often — cannot be ranked against one that has a row, and its
-      lower-division numbers were measured as no help at all. The
-      picker refuses it by name instead of imputing a number, and the
-      fixture is listed here rather than quietly dropped.
-    </p>
-  );
-}
+/** THE GENERAL RULE, NOW ON THE CARD RATHER THAN UNDER THE COLUMN
+ *  (operator, 2026-09-15): "remove the paragraph below it and put it
+ *  into the same hovering i symbol".
+ *
+ *  It used to be a paragraph printed once per column, under the first
+ *  refused card a reader met. Two things were wrong with that: it was
+ *  four lines of prose for a reader who already knew, and it sat at a
+ *  distance from the card it explained — one of eight columns away, on
+ *  a board that scrolls sideways. As the first section of each refused
+ *  card's own panel it is in the same place as every other sentence
+ *  about that refusal, and costs nothing until asked for. */
+const REFUSAL_GENERAL =
+  "A club with no row in the table in use — a promoted side, most often "
+  + "— cannot be ranked against one that has a row, and its lower-division "
+  + "numbers were measured as no help at all. The picker refuses it by name "
+  + "instead of imputing a number, and the fixture is listed here rather "
+  + "than quietly dropped.";
 
 /** WHAT A COLUMN'S NOTES ARE, AS OPPOSED TO A CARD'S (operator,
  *  2026-09-09 — the THIRD time this rule has been given).
@@ -1985,6 +1906,77 @@ export function columnNotes(
  *  accent only on hover/focus/open — the same gold `tier-read` uses to
  *  mean "this opens", which is brand, never a verdict. The traffic
  *  light stays on the numbers. */
+/** THE "i" PANEL, SHARED. It was ColumnNotes' own render until the
+ *  refused cards needed the same affordance: a 16px circled i that opens
+ *  on hover, on focus, and pins on click, over a capped scrollable body.
+ *  Two of these built separately would drift — one would learn to close
+ *  on Escape and the other would not — so there is one, and the sections
+ *  are the caller's.
+ *
+ *  A SECTION WITH NO BODY IS NOT DRAWN, and a panel with no sections
+ *  renders NOTHING AT ALL rather than an empty circle: an affordance
+ *  that opens onto nothing is the same lie as a hover response with
+ *  nothing behind it. */
+export function NotesPanel({ sections, label, idPrefix, testidOpen, testidPanel }: {
+  sections: readonly { id: string; head: string; body: string; tone: string }[];
+  label: string; idPrefix: string; testidOpen: string; testidPanel: string;
+}) {
+  const [pinned, setPinned] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const panelId = `${idPrefix}-panel`;
+  if (sections.length === 0) return null;
+  const open = pinned || hovered || focused;
+  const shut = () => { setPinned(false); setHovered(false); setFocused(false); };
+  return (
+    /* `group` so HOVER IS CSS, not state. The panel used to be mounted
+       only while `open`, which meant it existed solely because React was
+       running — correct in the app, and completely dead anywhere the
+       markup is rendered without it. Hover and keyboard-focus are now
+       plain CSS on this wrapper and the panel is always in the DOM;
+       `open` only adds the PINNED case, which genuinely needs state. A
+       reader hovering gets the same panel either way. */
+    <span className="group relative inline-flex"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onKeyDown={(e) => { if (e.key === "Escape") shut(); }}>
+      <button type="button" data-testid={testidOpen}
+        aria-expanded={open} aria-label={label}
+        aria-describedby={open ? panelId : undefined}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onClick={(e) => {
+          e.preventDefault(); e.stopPropagation();
+          setPinned((x) => !x); setHovered(false); setFocused(false);
+        }}
+        className={`inline-flex h-[16px] w-[16px] items-center justify-center self-center rounded-full border text-[11px] font-semibold leading-none transition-colors ${
+          open ? "border-accent/60 text-accent"
+            : "border-line-strong text-ink-low hover:border-accent/40 hover:text-accent"}`}>
+        i
+      </button>
+      {(
+        <div data-testid={testidPanel} id={panelId} role="note"
+          data-open={open ? "pinned" : "hover"}
+          /* WIDTH IS THE COLUMN'S, NOT THIS 16px BUTTON'S. `min-w` plus a
+             right-anchored position keeps a panel opened near the right
+             edge of the board inside the viewport instead of off it. */
+          className={`absolute right-0 top-[calc(100%+7px)] z-30 max-h-[min(70vh,40rem)] w-[min(22rem,80vw)] overflow-y-auto rounded-lg border border-line-strong bg-elev2 p-3 text-left text-[11px] leading-relaxed text-ink-mid shadow-xl group-hover:block group-focus-within:block ${
+            open ? "block" : "hidden"}`}>
+          {sections.map((s, i) => (
+            <div key={s.id}>
+              {i > 0 && <hr className="my-2.5 border-line" />}
+              <p className={`font-mono text-[9px] uppercase tracking-[0.14em] ${s.tone}`}>
+                {s.head}
+              </p>
+              <p data-testid={s.id} className="mt-1 whitespace-pre-line">{s.body}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </span>
+  );
+}
+
 function ColumnNotes({ notes }: { notes: ColumnNoteSet }) {
   const panelId = useId();
   const [pinned, setPinned] = useState(false);
@@ -2283,8 +2275,6 @@ export function LeagueColumn({
      and that block says which of the two it is. */
   const placed = new Set(byDay.flatMap((d) => d.refused));
   const undated = refusals.filter((r) => !placed.has(r));
-  // the first day that draws a refusal is where the reason is explained
-  const firstRefusalDay = byDay.find((d) => d.refused.length > 0)?.key ?? null;
   /* IS THIS COLUMN ON ITS OWN SORT RIGHT NOW? `columnSort` substitutes
      exactly while the control it was handed is untouched, so the same
      test answers it here — one rule, asked twice, rather than two rules
@@ -2431,8 +2421,22 @@ export function LeagueColumn({
             below. Every column now has the same shape whatever it is
             called, which also survives the narrower tracks a fifth
             competition brings. */}
-        <div className="flex items-baseline gap-x-2">
-          <h3 className="min-w-0 flex-1 truncate text-base font-bold uppercase tracking-[0.03em] text-ink-hi [font-family:var(--font-archivo)] [font-stretch:106%]">
+        {/* CENTRED (operator, 2026-09-15). The name no longer takes the
+            whole track with the count pinned to the far edge; the two sit
+            together on one axis. `min-w-0` and the truncate stay — a long
+            league name must still give way rather than push the count out
+            of the column — and the count keeps `flex-none` so it is the
+            name that yields, never the number. */}
+        {/* THREE LINES, EACH CENTRED (operator, 2026-09-15): the name, the
+            count, then the season chip. Stacking them settles the wrap
+            question the old one-row layout kept losing — MLS fitted its
+            count beside the name and PREMIER LEAGUE did not, so adjacent
+            columns of one board had different shapes for no reason but
+            the length of a word. On its own line every column looks the
+            same whatever it is called, and the name gets the whole track
+            before it has to truncate. */}
+        <div className="flex flex-col items-center gap-y-0.5">
+          <h3 className="w-full truncate text-center text-base font-bold uppercase tracking-[0.03em] text-ink-hi [font-family:var(--font-archivo)] [font-stretch:106%]">
             {leagueLabel(slug)}
           </h3>
           {/* THE COUNT COUNTS WHAT THIS COLUMN HOLDS — see
@@ -2448,14 +2452,14 @@ export function LeagueColumn({
               : nothingAhead && boardSilent
               ? "the board payload declared no column for this competition, so it ranked none of its fixtures — this is the absence of a ranking, not a count of zero matches"
               : undefined}
-            className="flex-none font-mono text-[10px] uppercase tracking-[0.14em] tabular-nums text-ink-faint">
+            className="font-mono text-[10px] uppercase tracking-[0.14em] tabular-nums text-ink-faint">
             {columnCountLabel(rows.length, finished, boardSilent)}
           </span>
         </div>
         {/* `relative` so the column-notes panel below hangs off THE CHIP
             ROW — one column wide, whatever the board's track count — and
             not off its own 16px trigger. See ColumnNotes. */}
-        <div className="relative mt-1.5 flex flex-wrap items-baseline gap-1 empty:mt-0">
+        <div className="relative mt-1.5 flex flex-wrap items-baseline justify-center gap-1 empty:mt-0">
           {/* THE COLUMN'S CAVEATS, ONCE, AT THE HEAD OF THE CHIP ROW —
               "put it ontop with the 'prior szn' label" (operator). It
               leads rather than trails so the trigger is beside the
@@ -2669,7 +2673,6 @@ export function LeagueColumn({
             {dense
               ? <div data-testid="day-grid" className={DENSE_GRID}>{cards}</div>
               : cards}
-            {key === firstRefusalDay && <RefusalWhy />}
           </div>
         );
       })}
@@ -2779,7 +2782,6 @@ export function LeagueColumn({
                 col={slug} dense={dense} />
             ))}
           </div>
-          <div className="mt-2.5"><RefusalWhy /></div>
         </div>
       )}
 

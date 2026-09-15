@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative, sep } from "node:path";
 // STATIC, not `await import(...)` inside the test. A dynamic import is
 // executed by Node at RUNTIME and bypasses Playwright's TypeScript
 // transform, so Node reads the .tsx source itself and dies on
@@ -38,6 +40,82 @@ import {
   WIRE, backendSkipReason, readBackendDeclaration, resolveBackend,
 } from "./standing-wire";
 
+// ---------------------------------------------------------------------
+// WHERE THE STRIP IS DRAWN — READ OUT OF THE TREE, NEVER TYPED HERE
+// (2026-09-15).
+//
+// `<WatchedStrip />` came off /bet-suggester. The read is
+// operator-gated, and with no token held in an ordinary tab it could
+// only ever draw its own refusal — permanently, to a reader who cannot
+// fix it. `components/WatchedStrip.tsx` is UNTOUCHED, and so is every
+// claim in this file: what moved is the SURFACE the claims are made
+// against, not one word of what they say about the component.
+//
+// SO THE ROUTE IS FOUND RATHER THAN WRITTEN DOWN. A mount that moves to
+// another page moves these guards with it on the next run, with nothing
+// to drift; a mount that exists NOWHERE stops them BY NAME rather than
+// letting them assert against a page that cannot draw the thing. That
+// is this surface's own rule applied to itself — an absence is named,
+// never folded into a pass — and it is the reason none of these tests
+// is deleted: the day any page mounts the strip again, every one of
+// them comes back and has to pass, with no edit here.
+//
+// AND THE REMOVAL IS PINNED, not merely worked around: "the landing
+// page draws the DECLARATION panel and not the watched-strip READ" in
+// e2e/watched-strip.spec.ts asserts it at both levels, so a skip here
+// can never be the suite quietly losing a surface.
+// ---------------------------------------------------------------------
+
+const SRC_DIR = join(__dirname, "..", "src");
+const PAGES_DIR = join(SRC_DIR, "pages");
+
+function tsxUnder(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(dir).sort()) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) tsxUnder(p, out);
+    else if (name.endsWith(".tsx")) out.push(p);
+  }
+  return out;
+}
+
+/** The page route that renders `<WatchedStrip />`, or `null` when no
+ *  page does. A mount that is NOT a page RAISES rather than returning
+ *  null: the section would then be on screen somewhere these guards
+ *  cannot see, and skipping quietly is the one answer that would be
+ *  wrong. */
+function watchedStripRoute(): string | null {
+  const MOUNT = /<WatchedStrip[\s/>]/;
+  const mounts = tsxUnder(SRC_DIR)
+    .filter((p) => MOUNT.test(readFileSync(p, "utf8")));
+  const onPages = mounts.filter((p) => p.startsWith(PAGES_DIR + sep)
+    && !/(^|[\\/])_/.test(relative(PAGES_DIR, p)));
+  if (mounts.length > 0 && onPages.length === 0) {
+    throw new Error(
+      `<WatchedStrip /> is mounted in ${mounts.join(", ")} — not a page. `
+      + "Name the route that reaches it here: these guards must not skip "
+      + "while the section is on screen.");
+  }
+  if (onPages.length === 0) return null;
+  const route = `/${relative(PAGES_DIR, onPages[0]).split(sep).join("/")}`
+    .replace(/\.tsx$/, "").replace(/\/index$/, "");
+  return route === "" ? "/" : route;
+}
+
+const STRIP_ROUTE = watchedStripRoute();
+
+/** The route the strip draws on, or a NAMED skip carrying the condition
+ *  that retires it. Called FIRST by every entry point below — before a
+ *  route is registered and before a response is waited on — so a skipped
+ *  test leaves nothing in flight. */
+function stripSurface(): string {
+  test.skip(STRIP_ROUTE === null,
+    "no page mounts <WatchedStrip />: the read came off /bet-suggester on "
+    + "2026-09-15 and was not remounted anywhere. This claim is still true "
+    + "of the component and is KEPT, not deleted — it re-arms at whatever "
+    + "route mounts the strip next, with no edit to this file.");
+  return STRIP_ROUTE!;
+}
+
 /** A payload MINUS one key — the shape a route that stopped sending it
  *  produces. Written as a helper so the served object is the real thing
  *  with a hole in it, not a hand-built lookalike. */
@@ -47,8 +125,10 @@ function omit<T extends object>(o: T, key: string): Record<string, unknown> {
   return out;
 }
 
-// The watched strip — the HOLD/EXIT stage's surface, above the league
-// columns on /bet-suggester.
+// The watched strip — the HOLD/EXIT stage's surface. It was drawn above
+// the league columns on /bet-suggester until 2026-09-15; the route it is
+// drawn on now is found in the tree (see WHERE THE STRIP IS DRAWN
+// above), never written down here, and today there is none.
 //
 // Hermetic: every test serves a RECORDED SHAPE of
 // GET /api/bet-suggester/watched-strip, plus the board and review reads
@@ -2862,10 +2942,11 @@ async function openNotes(page: Page) {
 }
 
 async function open(page: Page, strip: unknown, status = 200) {
+  const at = stripSurface();
   await routes(page, strip, status);
   const settled = page.waitForResponse(
     (r) => r.url().includes(STRIP_URL)).catch(() => null);
-  await page.goto("/bet-suggester");
+  await page.goto(at);
   await settled;
   await expandCollapsed(page);
   await openNotes(page);
@@ -2874,10 +2955,11 @@ async function open(page: Page, strip: unknown, status = 200) {
 /** `open`, with the payload served EXACTLY as written — see
  *  `routesAsSent`. */
 async function openAsSent(page: Page, strip: unknown, status = 200) {
+  const at = stripSurface();
   await routesAsSent(page, strip, status);
   const settled = page.waitForResponse(
     (r) => r.url().includes(STRIP_URL)).catch(() => null);
-  await page.goto("/bet-suggester");
+  await page.goto(at);
   await settled;
   await expandCollapsed(page);
   await openNotes(page);
@@ -2897,9 +2979,10 @@ async function openAsSent(page: Page, strip: unknown, status = 200) {
  *  404 from the route that does not exist yet is a different absence
  *  from an empty watchlist). */
 async function openSettled(page: Page, strip: unknown, status = 200) {
+  const at = stripSurface();
   await routes(page, strip, status);
   const settled = page.waitForResponse((r) => r.url().includes(STRIP_URL));
-  await page.goto("/bet-suggester");
+  await page.goto(at);
   const resp = await settled;
   await page.waitForTimeout(1000);
   await expandCollapsed(page);
@@ -3178,20 +3261,78 @@ test("an open position on a fixture nobody declared renders even with no "
   await expect(orphans).toContainText("census of nothing");
 });
 
-// ------------------------------------------------- where, and in order
+// --------------------------------- where it is, and where it is not
 
-test("the strip mounts ABOVE the league columns", async ({ page }) => {
-  await open(page, STRIP);
-  await expect(strip(page)).toBeVisible();
-  const order = await page.evaluate(() => {
-    const s = document.querySelector('[data-testid="watched-strip"]');
-    const board = document.querySelector('[data-testid="league-col"]')
-      ?? document.querySelector("h2");
-    if (!s || !board) return "missing";
-    return (s.compareDocumentPosition(board)
-      & Node.DOCUMENT_POSITION_FOLLOWING) ? "above" : "below";
-  });
-  expect(order).toBe("above");
+// THE GUARD THAT STOOD HERE IS DELETED, AND SAYING SO IS THE POINT.
+//
+// It read "the strip mounts ABOVE the league columns" and compared the
+// section's document position against `[data-testid="league-col"]`. Of
+// everything in this file it was the ONE claim genuinely about THE
+// LANDING PAGE CARRYING THE STRIP rather than about the strip: the
+// operator took the read off /bet-suggester on 2026-09-15, so a guard
+// pinning where it sits among the league columns pins a layout that has
+// been decided against. Nothing else covered that ordering and nothing
+// else needs to — it no longer exists to be got wrong.
+//
+// WHAT REPLACES IT IS THE OPPOSITE ASSERTION, and it is deliberately as
+// pinned as the behaviour was. A removal that only shows up as guards
+// quietly not running is a removal nobody is holding to.
+
+test("the landing page draws the DECLARATION panel and not the "
+   + "watched-strip READ", async ({ page }) => {
+  // ONE FACT, ASSERTED AT BOTH LEVELS, and the two cannot drift: the
+  // route above is READ OUT OF THE TREE, so this is the same lookup
+  // every gated guard in this file makes. If a page mounts the strip
+  // again, this goes red and those come back on the same run.
+  expect(STRIP_ROUTE,
+    "a page mounts <WatchedStrip /> again — if that page is the board, "
+    + "the 2026-09-15 removal has been reversed and this guard is the "
+    + "conversation about it")
+    .not.toBe("/bet-suggester");
+
+  // AND ON THE PAGE ITSELF, against a payload with plenty to draw. The
+  // panel's own reads are served too, so nothing here reaches a real
+  // backend.
+  await watchlistRoutes(page);
+  await routes(page, STRIP);
+  const settled = page.waitForResponse((r) => r.url().includes(STRIP_URL));
+  await page.goto("/bet-suggester");
+  const resp = await settled;
+
+  // NON-VACUITY, AND IT IS THE WHOLE DIFFICULTY HERE. `toHaveCount(0)`
+  // on a client-fetched section passes the instant the page loads —
+  // before the request has even resolved — so an absence asserted that
+  // way is true for the wrong reason, and this file's own helpers exist
+  // because the mutation pass caught exactly that. So the read is
+  // proved to have LANDED and to have been CONSUMED by this page before
+  // anything is called absent: the live surface draws the very payload
+  // the strip would have drawn.
+  expect(resp.status()).toBe(200);
+  await expect(page.getByTestId("live-section"))
+    .toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("live-tape").first()).toBeVisible();
+
+  // THE READ IS NOT DRAWN — not as a section, not as a gate, and not as
+  // a boundary. All three, because the point of the removal is that a
+  // reader with no token stopped being shown a box explaining why it is
+  // empty: a refusal notice standing in for the strip would be the
+  // thing that was taken away, still there.
+  await expect(strip(page)).toHaveCount(0);
+  await expect(page.getByTestId("watched-strip-gate")).toHaveCount(0);
+  await expect(page.getByTestId("watched-strip-boundary")).toHaveCount(0);
+
+  // AND THE DECLARATION PANEL STILL OPENS FOR WHOEVER HOLDS THE TOKEN.
+  // Only the read went; the operator's way in did not. It names itself
+  // as operator-only rather than hiding — absent-by-design must not
+  // read as vanished, and this page keeps saying what it can and
+  // cannot do instead of removing the control.
+  const panel = page.getByTestId("watch-panel");
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText("matches to watch");
+  await expect(page.getByTestId("watch-panel-chip"))
+    .toContainText("operator only");
+  await panel.locator("summary").click();
+  await expect(page.locator("#watch-token")).toBeVisible();
 });
 
 test("every declared match is drawn, and each block appears in the order "
@@ -4541,7 +4682,7 @@ test("a failed poll leaves the figures up and dated, never silently "
     await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW)));
     await page.route("**/api/bet-suggester/watched-strip**", (r) =>
       served++ === 0 ? r.fulfill(json(STRIP)) : r.abort());
-    await page.goto("/bet-suggester");
+    await page.goto(stripSurface());
     await expect(strip(page)).toBeVisible();
     await expect(page.getByTestId("watched-stale")).toHaveCount(0);
     const stale = page.getByTestId("watched-stale");
@@ -4636,7 +4777,7 @@ test("a token that the backend refuses is reported as a REFUSED TOKEN, "
     // second is the one that needs a different action from the reader.
     await watchlistRoutes(page);
     await routes(page, { detail: "operator credentials required" }, 403);
-    await page.goto("/bet-suggester");
+    await page.goto(stripSurface());
     await expect(gate(page)).toHaveAttribute("data-kind", "needs_token");
     await typeToken(page, "a-token-the-backend-does-not-like");
     await expect(gate(page)).toHaveAttribute("data-kind", "token_refused");
@@ -4715,7 +4856,7 @@ test("the read carries the operator token the watch toggle holds, as ONE "
       }
       return r.fulfill(json(seen.length === 1 ? EMPTY : STRIP));
     });
-    await page.goto("/bet-suggester");
+    await page.goto(stripSurface());
     await expect
       .poll(() => seen.length, { timeout: 15_000 }).toBeGreaterThan(0);
     // BEFORE a token is typed: no header. The site holds no credential
@@ -4809,10 +4950,11 @@ test("the two groups partition the declared set — nothing is filtered "
 /** Open WITHOUT the helper's expand step, so the default state is what
  *  is under test. */
 async function openCollapsed(page: Page, strip: unknown) {
+  const at = stripSurface();
   await routes(page, strip, 200);
   const settled = page.waitForResponse(
     (r) => r.url().includes(STRIP_URL)).catch(() => null);
-  await page.goto("/bet-suggester");
+  await page.goto(at);
   await settled;
   await expect(page.getByTestId("watched-strip")).toBeVisible();
 }
@@ -5112,7 +5254,7 @@ test("when the newest poll fails, the stale banner says WHY, not just "
     await page.route(`**${STRIP_URL}**`, (r) =>
       served++ === 0 ? r.fulfill(json(STRIP))
         : r.fulfill(json({ detail: "operator credentials required" }, 403)));
-    await page.goto("/bet-suggester");
+    await page.goto(stripSurface());
     await expect(strip(page)).toBeVisible();
     const why = page.getByTestId("watched-stale-why");
     await expect(why).toBeVisible({ timeout: 25_000 });
@@ -5407,9 +5549,10 @@ test("no sentence the payload writes is drawn twice on one card",
 
 test("the method and the definitions are behind ONE disclosure per card, "
    + "in the accessible tree", async ({ page }) => {
+    const at = stripSurface();
     await routes(page, STRIP);
     const settled = page.waitForResponse((r) => r.url().includes(STRIP_URL));
-    await page.goto("/bet-suggester");
+    await page.goto(at);
     await settled;
     await expandCollapsed(page);
     // NOT OPENED. This is the state a reader arrives in.

@@ -185,6 +185,29 @@ async function open(page: import("@playwright/test").Page,
 const card = (page: import("@playwright/test").Page, event: string) =>
   page.locator(`[data-testid="picker-row"][data-event="${event}"]`);
 
+/** BRING A DECLARED COLUMN ON SCREEN (2026-09-15).
+ *
+ *  The board draws FOUR of its columns at a time — card width is
+ *  arithmetic, and eight abreast leaves the club name at zero pixels —
+ *  and the rest are reached by stepping a ribbon that keeps one pill per
+ *  declared column. This board declares five, so the Leagues Cup starts
+ *  off screen and the refused row riding it is not drawn until a reader
+ *  goes there. This helper does what that reader does.
+ *
+ *  `count()` DOES NOT AUTO-WAIT, so the board is waited for first: a
+ *  bare count straight after `goto` reads the page before the payload
+ *  landed and presses a pill that is not there. */
+async function show(page: import("@playwright/test").Page, slug: string) {
+  const col = page.locator(`[data-testid="league-col"][data-league="${slug}"]`);
+  await expect(page.getByTestId("league-col").first()).toBeAttached();
+  if (await col.count() === 0) {
+    const pill = page.locator(`[data-testid="ribbon-pill"][data-slug="${slug}"]`);
+    await expect(pill, `${slug} is neither drawn nor reachable`).toHaveCount(1);
+    await pill.click();
+  }
+  await expect(col).toHaveCount(1);
+}
+
 test("a venue rule that disagrees is carried on the row and said on the badge",
   async ({ page }) => {
     await open(page);
@@ -219,6 +242,11 @@ test("an agreeing row, a refused one and an older payload all claim NOTHING",
        agreement — an absent mark is a fact, a present one saying "no"
        is a claim. */
     await open(page);
+    /* THE REFUSED ROW RIDES THE LEAGUES CUP, which is the fifth declared
+       column on a board that draws four — so it is brought on screen
+       first. Pressing that pill draws leaguescup, mls, epl and laliga
+       together, which holds every row this test names. */
+    await show(page, "leaguescup");
     for (const [event, why] of [
       ["v-agree", "the rule agreed"],
       ["v-refused", "the rule refused: no_gdg_gap"],

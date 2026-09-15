@@ -69,18 +69,32 @@ for (const { path, ask } of BOARDS) {
       test.setTimeout(90_000);
 
       const asked: string[] = [];
-      const answered: { status: number; rows: number | null }[] = [];
+      const answered: { status: number; rows: number | null;
+        rowCols: string[][] | null }[] = [];
       page.on("request", (r) => {
         if (/\/api\/picker\/board/.test(r.url())) asked.push(r.url());
       });
       page.on("response", async (r) => {
         if (!/\/api\/picker\/board/.test(r.url())) return;
         let rows: number | null = null;
+        let rowCols: string[][] | null = null;
         try {
           const b = await r.json();
           rows = Array.isArray(b?.rows) ? b.rows.length : null;
+          /* WHICH COLUMNS THE PAYLOAD DECLARED. The board DRAWS four of
+             them at a time once there are more than four (see the window
+             in bet-suggester/index.tsx), so the payload's total row count
+             stopped being the number of cards on screen the day an eight
+             league board shipped. Counting the rows that belong to the
+             DRAWN columns is the same claim — "it drew what it held" —
+             measured against what it actually undertook to draw. */
+          rowCols = Array.isArray(b?.rows)
+            ? b.rows.map((r: Record<string, unknown>) =>
+                (r.columns as string[] | undefined)
+                  ?? [r.column ?? r.league] as string[])
+            : null;
         } catch { /* not JSON; the status is the finding */ }
-        answered.push({ status: r.status(), rows });
+        answered.push({ status: r.status(), rows, rowCols });
       });
 
       await page.goto(path);
@@ -141,10 +155,24 @@ for (const { path, ask } of BOARDS) {
          "drew part of it". */
       expect(last.rows, `${path}: the board answered 200 with no rows array`)
         .not.toBeNull();
+      /* THE COLUMNS THE PAGE ACTUALLY DREW, read off the page rather than
+         assumed — four when the board is windowed, all of them when it is
+         not, and exactly the narrowed one on a competition page. */
+      const drawn = await page.getByTestId("league-col")
+        .evaluateAll((es) => es.map((e) => e.getAttribute("data-league")));
+      expect(drawn.length, `${path}: no column was drawn at all`)
+        .toBeGreaterThan(0);
+      /* ONE CARD PER ROW PER COLUMN IT RIDES IN. A folded fixture — the
+         Campeones Cup is drawn in BOTH MLS and Liga MX — is one row in
+         the payload and TWO cards on the board, so counting rows would
+         be short by exactly the folds. */
+      const owed = (last.rowCols ?? []).reduce(
+        (n, cols) => n + cols.filter((c) => drawn.includes(c)).length, 0);
       await expect(page.getByTestId("picker-row"),
-        `${path}: the board answered with ${last.rows} rows and the page `
-        + `drew a different number of cards`)
-        .toHaveCount(last.rows as number, { timeout: 30_000 });
+        `${path}: the board answered with ${last.rows} rows, ${owed} of them `
+        + `in the ${drawn.length} column(s) it drew, and the page drew a `
+        + "different number of cards")
+        .toHaveCount(owed, { timeout: 30_000 });
       await expect(page.getByTestId("league-col").first(),
         `${path}: no column was drawn at all`).toBeAttached();
     });

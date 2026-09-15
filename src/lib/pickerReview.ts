@@ -335,8 +335,8 @@ export function reviewAskHonoured(
  *  default because it MATCHES THE BOARD'S FORWARD WINDOW: a league column
  *  should tell one continuous story, and two different windows above and
  *  below the divider would make the tail read as a separate page. */
-export const REVIEW_WINDOWS = [1, 3, 7, 14, 30];
-export const DEFAULT_BACK = 7;
+export const REVIEW_WINDOWS = [1, 3, 8, 14, 30];
+export const DEFAULT_BACK = 8;
 export const MAX_BACK = 30;
 
 /** True when this pre-kickoff state is a full read rather than a refusal

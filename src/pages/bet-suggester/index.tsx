@@ -64,13 +64,11 @@ import {
   leagueLabel,
 } from "../../lib/pickerApi";
 import {
-  DEFAULT_BACK, REVIEW_WINDOWS, Review, fetchReview, readHere,
-  reviewAskHonoured,
+  DEFAULT_BACK, Review, fetchReview, readHere, reviewAskHonoured,
 } from "../../lib/pickerReview";
 import {
   COLUMN_DEFAULT_SORT, ColumnSort, DEFAULT_SORT, SORT_MODES, columnSort,
-  isDefaultSort, loadBoardSort, modeById, nullNoteFor, orderPhrase,
-  saveBoardSort,
+  loadBoardSort, modeById, nullNoteFor, orderPhrase,
 } from "../../lib/pickerSort";
 import { failureSentence, readFailure } from "../../lib/providerFailure";
 import { Eyebrow } from "../../components/ui";
@@ -78,20 +76,20 @@ import { ArchiveMenu } from "../../components/ArchiveMenu";
 import { CompRail } from "../../components/CompRail";
 import LiveSection from "../../components/LiveCard";
 import { LeagueColumn } from "../../components/PickerColumn";
+import { LeagueRibbon } from "../../components/LeagueRibbon";
 import {
   WatchDeclarationProvider, WatchPanel,
 } from "../../components/WatchDeclaration";
-import WatchedStrip from "../../components/WatchedStrip";
 import {
   Collapse, NavChip, RouteProgress, SkeletonRows, TopBar,
 } from "../../components/chrome";
 
-const WINDOWS = [1, 2, 3, 7, 14];   // the endpoint accepts 1..14
-// 7, not the endpoint's own 2: four league columns deserve a fuller
+// 8, not the endpoint's own 2: four league columns deserve a fuller
 // slate than a two-day sliver — a column that is usually empty teaches
-// the reader to stop looking at it. The window control still offers the
-// short reads.
-const DEFAULT_DAYS = 7;
+// the reader to stop looking at it. The chips that offered the shorter
+// reads came off on 2026-09-15, so this number is now the whole
+// contract — there is nothing left that can ask for another length.
+const DEFAULT_DAYS = 8;
 
 /** The board's own ET date key, YYYYMMDD, made readable. Left as the raw
  *  key if it is ever any other shape — inventing a date from a string we
@@ -129,32 +127,46 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   backTo?: { href: string; label: string };
 } = {}) {
   const router = useRouter();
-  const [days, setDays] = useState(DEFAULT_DAYS);
+  const days = DEFAULT_DAYS;
+  /* HOW MANY COLUMNS ARE DRAWN AT ONCE, and which four they are.
+     Four is measured, not chosen: the board's track is `max-w-[96rem]`,
+     so a card stops growing at 1536px and a wider monitor renders the
+     identical one — 4 columns give 356px and an intact club name, 5 give
+     280px, 6 give 20px of name, 7 give ZERO. `windowStart` is the index
+     in the declared order of the LEFTMOST column on screen; the window
+     wraps, so past the last column comes the first again and there is no
+     end to hit in either direction. */
+  const VIEW = 4;
+  const [windowStart, setWindowStart] = useState(0);
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [nonce, setNonce] = useState(0);
   // The finished tail rides on its OWN state, its own request and its own
   // window. A dead review must not blank the board, and a slow one must
-  // not hold the board's first paint.
-  const [back, setBack] = useState(DEFAULT_BACK);
+  // not hold the board's first paint. The window itself is a constant
+  // rather than state: its chips came off with the forward board's on
+  // 2026-09-15 and nothing on the page can ask for another length.
+  const back = DEFAULT_BACK;
   /* And so does the cross-league field, per column that has one. Keyed
      by COLUMN SLUG rather than held as one object, because a board can
      draw two cups at once and each has its own field, its own request
      and its own way of failing. */
   const [fields, setFields] = useState<Record<string, FieldRead>>({});
   // SORT LIVES ON THE MATCHDAY (2026-09-01, draft C shipped): one board
-  // default, remembered on this device, plus per-day overrides that are
-  // session-only — a remembered "Saturday" override would silently
-  // apply to a different Saturday next week. Changing the default
-  // clears every override, so the board never mixes stale intentions.
-  const [boardSort, setBoardSort] = useState<ColumnSort>(() => loadBoardSort());
+  // default beneath per-day overrides that are session-only — a
+  // remembered "Saturday" override would silently apply to a different
+  // Saturday next week.
+  // THE DEFAULT IS NO LONGER CHOSEN, NOR REMEMBERED (operator,
+  // 2026-09-15). The board-level control is gone, so nothing can set
+  // this; it is still held as state because `loadBoardSort` must run
+  // ONCE, and what it does is clear the key that control persisted and
+  // answer `DEFAULT_SORT`. It is READ on every render — `sortFor` falls
+  // back to it for any day carrying no override, and `columnSort` is
+  // handed it to decide whether a column may run its own key — so this
+  // is a live value, not a leftover.
+  const [boardSort] = useState<ColumnSort>(() => loadBoardSort());
   const [daySorts, setDaySorts] = useState<Record<string, ColumnSort>>({});
-  const applyBoardSort = (next: ColumnSort) => {
-    setBoardSort(next);
-    saveBoardSort(next);
-    setDaySorts({});
-  };
   const applyDaySort = (day: string, next: ColumnSort) =>
     setDaySorts((prev) => ({ ...prev, [day]: next }));
   const [review, setReview] = useState<Review | null>(null);
@@ -333,21 +345,13 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   // so its day belongs in this union or its card has no band to sit in.
   // A refusal with no kickoff still cannot be placed, and says so where
   // the column draws it, rather than being dropped here.
-  const dated: { kickoff: string }[] = [
-    ...rows,
-    ...refusals.filter((r): r is typeof r & { kickoff: string } =>
-      Boolean(r.kickoff)),
-  ];
-  const dayKeys = [...new Set(dated.map((r) => localDay(r.kickoff)))]
-    .filter(Boolean).sort();
-  const dayLabelFor: Record<string, string> = {};
-  for (const r of dated) {
-    const k = localDay(r.kickoff);
-    if (k && !dayLabelFor[k]) dayLabelFor[k] = dayLabel(r.kickoff);
-  }
+  // THE BANDS ARE BUILT FROM THE DRAWN COLUMNS, further down this
+  // function — `drawnSlugs` does not exist yet here, and the union has
+  // to be taken over the four leagues on screen rather than all eight.
+  // See "MATCHDAY BANDS FOLLOW THE WINDOW" below.
   const sortFor = (k: string): ColumnSort => daySorts[k] ?? boardSort;
   const boardMode = modeById(boardSort.mode) ?? modeById(DEFAULT_SORT.mode)!;
-  const boardNullNote = nullNoteFor(boardMode, rows);
+
 
   /* ── THE COLUMN SET IS THE BOARD'S DECLARATION (operator,
      2026-09-09) ──────────────────────────────────────────────────────
@@ -519,23 +523,6 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
     return () => { clearTimeout(t); ac.abort(); };
   }, [fieldKey, nonce, deepLink]);
 
-  /* THE SEASON BANNER DESCRIBES THIS BOARD'S COLUMNS, NOT THE PAYLOAD'S
-     (2026-09-08). It counted every league in `board.leagues` regardless
-     of which of them got a column, so /bet-suggester/ucl printed
-     "1 OF 4 LEAGUES · Liga MX 6 GP" on a board with no Liga MX column —
-     a caveat about numbers that are nowhere on the page. It is derived
-     from `columnSlugs` now, which is a no-op on the full board (that
-     set IS the keys of `leagues`, since 2026-09-09) and the whole point
-     on a narrowed one.
-     Cup columns stay excluded from the count for the older reason: a
-     knockout has no season table of its own to be rated on, and folding
-     it into "N of M leagues" would make that sentence untrue. A board
-     narrowed to a cup therefore has NO league column to caveat, and the
-     banner is correctly absent rather than borrowed from elsewhere. */
-  const leagues = Object.entries(leaguesMap).filter(
-    ([slug, m]) => m.kind !== "cup" && columnSlugs.includes(slug));
-  const priorLeagues = leagues.filter(([, m]) => m.src === "prior");
-
   /* WHAT THE PAGE SAYS IT RANKS BY MUST BE WHAT IT RANKS BY.
      The board's framing names the TABLE GAP, and on the four league
      columns that is exactly right. A single-column board whose column
@@ -580,13 +567,94 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      `columnSort` is THE authority on what a column runs, and it is the
      same call the columns themselves make, so this cannot drift from
      them: a column whose key changes changes this sentence with it. */
+  /* THE WINDOW IS A NO-OP AT FOUR COLUMNS OR FEWER, which is what keeps
+     today's board and every narrowed page (`/bet-suggester/ucl`) exactly
+     as they are: `drawnSlugs` is then `columnSlugs` and no ribbon draws. */
+  const windowed = columnSlugs.length > VIEW;
+  const drawnSlugs = windowed
+    ? Array.from({ length: VIEW },
+        (_, i) => columnSlugs[(windowStart + i) % columnSlugs.length])
+    : columnSlugs;
+
+  /* ── MATCHDAY BANDS FOLLOW THE WINDOW (operator, 2026-09-15) ───────
+     The union of day keys is taken over the rows of the columns being
+     DRAWN, not over every row the board holds. Eight leagues keep eight
+     schedules, and a Tuesday only the Bundesliga plays is still a
+     Tuesday — so while the window sat elsewhere the board drew that
+     date full-width with four "rest day" boxes beneath it, an empty
+     band announcing a day on which nothing on screen happens. A date
+     rail is a promise that the columns under it have something at that
+     date; over an undrawn league it is a promise about a column the
+     reader cannot see.
+
+     Rotating the window therefore re-cuts the bands, which is the
+     point: the dates on the rail are the dates of the four leagues in
+     front of you. `columnsOf` is the same reader the columns use to
+     claim a row, so a folded fixture counts for every column it is
+     drawn in and cannot fall out of the union while it is on screen. */
+  const drawnSet = new Set(drawnSlugs);
+  const inWindow = (r: Parameters<typeof columnsOf>[0]) =>
+    columnsOf(r).some((c) => drawnSet.has(c));
+  const dated: { kickoff: string }[] = [
+    ...rows.filter(inWindow),
+    ...refusals.filter((r): r is typeof r & { kickoff: string } =>
+      Boolean(r.kickoff) && inWindow(r)),
+  ];
+  const dayKeys = [...new Set(dated.map((r) => localDay(r.kickoff)))]
+    .filter(Boolean).sort();
+  const dayLabelFor: Record<string, string> = {};
+  for (const r of dated) {
+    const k = localDay(r.kickoff);
+    if (k && !dayLabelFor[k]) dayLabelFor[k] = dayLabel(r.kickoff);
+  }
   const runningSorts = columnSlugs.map((sl) => columnSort(sl, boardSort));
+
+  /* ARROW KEYS STEP THE WINDOW. Guarded against a form control so a
+     reader inside the matchday sort can still use them to change option,
+     and against modifier combinations so browser shortcuts survive.
+     THE STEP IS COMPUTED IN HERE, not lifted out: a `stepWindow` defined
+     in the render body was a new function every render and could not
+     honestly appear in this dependency list, which left the effect
+     claiming to read less than it did. What it genuinely reads is the
+     column COUNT — `setWindowStart` is stable, and the wrap needs
+     nothing else — so that count is the dependency, and re-binding the
+     listener when a column joins or leaves the board is exactly right. */
+  useEffect(() => {
+    if (!windowed) return;
+    const n = columnSlugs.length;
+    const step = (d: number) =>
+      setWindowStart((w) => ((w + d) % n + n) % n);
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "ArrowRight") { e.preventDefault(); step(1); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); step(-1); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [windowed, columnSlugs.length]);
+
   const oneRunningSort =
     runningSorts.length > 0
     && runningSorts.every((x) => x.mode === runningSorts[0].mode
                               && x.dir === runningSorts[0].dir)
       ? runningSorts[0]
       : null;
+
+  /* THE NULL POLICY FOLLOWS THE SORT THAT IS ACTUALLY RUNNING
+     (2026-09-15). It read the BOARD's sort, which is the one control the
+     operator removed — so the sentence explaining why a quoteless row
+     sorts last became unreachable: no band could raise it, and a board
+     key could no longer be chosen. A reader picking `ask` on a matchday
+     got the ordering and not the reason for it.
+     `runningSorts` is what every column is genuinely sorted by, so the
+     policy is derived from THAT. Where the bands disagree there is no one
+     policy to state, and none is stated — a sentence claiming one key
+     while several run would be worse than silence. */
+  const runningNullNote = oneRunningSort
+    ? nullNoteFor(modeById(oneRunningSort.mode) ?? boardMode, rows)
+    : null;
 
   if (deepLink !== null) {
     return (
@@ -642,7 +710,12 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
         <div className="relative">
           <div aria-hidden
             className="pointer-events-none absolute -inset-x-10 -top-16 h-44 bg-[radial-gradient(ellipse_45%_90%_at_18%_0%,rgba(220,235,255,0.05),transparent_72%)]" />
-          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          {/* CENTRED (operator, 2026-09-15). The eyebrow, the title and
+              the framing line share one axis now; the lede is centred as
+              a BLOCK — `mx-auto` on a capped measure — rather than having
+              its lines centred individually, which would give three
+              ragged edges instead of one shape. */}
+          <div className="flex flex-wrap items-baseline justify-center gap-x-4 gap-y-1">
             <Eyebrow tone="accent">picker · stage 1 + stage 2</Eyebrow>
             <span aria-hidden className="flex items-center gap-1.5">
               {(["mls", "epl", "laliga", "ligamx"] as const).map((s2) => (
@@ -651,7 +724,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
               ))}
             </span>
           </div>
-          <h1 className="mt-2 text-2xl font-bold uppercase tracking-[0.02em] text-ink-hi [font-family:var(--font-archivo)] [font-stretch:115%] sm:text-3xl">
+          <h1 className="mt-2 text-center text-2xl font-bold uppercase tracking-[0.02em] text-ink-hi [font-family:var(--font-archivo)] [font-stretch:115%] sm:text-3xl">
             Every fixture, ranked
           </h1>
           {/* THE ONE HONEST LINE OF FRAMING. Not "bet these".
@@ -665,7 +738,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
               decision-safety invariant, and none of it is negotiable:
               e2e/picker.spec.ts pins all four phrases. */}
           <p data-testid="board-framing"
-            className="mt-2 max-w-3xl text-[13px] leading-relaxed text-ink-low">
+            className="mx-auto mt-2 max-w-3xl text-center text-[13px] leading-relaxed text-ink-low">
             {soleOwnSort
               ? `Ranked by ${soleOwnSort.mode} — nearly every tie here pairs two different domestic tables, and the gap between them is withheld.`
               : "Ranked by how far apart the two clubs sit in their own league's table."}
@@ -678,80 +751,28 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
 
         {/* ------------------------- controls ------------------------- */}
         <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4 font-mono text-[10px] uppercase tracking-wide">
-          <label htmlFor="board-sort" className="mr-1 text-ink-faint">sort</label>
-          <select id="board-sort" data-testid="col-sort"
-            value={boardSort.mode}
-            onChange={(e) => {
-              const m = modeById(e.target.value) ?? modeById(DEFAULT_SORT.mode)!;
-              applyBoardSort({ mode: m.id, dir: m.defaultDir });
-            }}
-            className="rounded-md border border-line bg-bs px-1.5 py-1 uppercase text-ink-mid outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-accent">
-            {SORT_MODES.map((m) => (
-              <option key={m.id} value={m.id}>{m.label}</option>
-            ))}
-          </select>
-          <button data-testid="col-dir" data-dir={boardSort.dir}
-            onClick={() => applyBoardSort({ ...boardSort,
-              dir: boardSort.dir === "asc" ? "desc" : "asc" })}
-            aria-label={`sort direction ${boardSort.dir === "asc" ? "ascending" : "descending"} — press to flip`}
-            className="rounded-md border border-line px-2 py-1 text-ink-low transition-colors hover:border-line-strong hover:text-ink-hi">
-            {boardSort.dir === "asc" ? "↑ asc" : "↓ desc"}
-          </button>
-          {!isDefaultSort(boardSort) && (
-            <button data-testid="col-reset"
-              onClick={() => applyBoardSort(DEFAULT_SORT)}
-              title="back to the board's default order — |GD/g gap| descending"
-              className="rounded-md border border-line px-2 py-1 text-ink-faint transition-colors hover:border-line-strong hover:text-ink-mid">
-              reset
-            </button>
-          )}
-          {boardNullNote && (
+          {/* THE BOARD-LEVEL SORT IS GONE (operator, 2026-09-15). Every
+              matchday band carries its own sort, which is the one that
+              answers "what is worth looking at TODAY"; a second control
+              above them only ever reordered days against each other.
+              `DEFAULT_SORT` is kickoff ascending, so removing the control
+              leaves the board in the order it already opened in. */}
+          {runningNullNote && (
             <span data-testid="col-null-note" className="text-ink-faint normal-case tracking-normal">
-              {boardNullNote}
+              {runningNullNote}
             </span>
           )}
-          <span className="ml-3 mr-1 text-ink-faint">window</span>
-          {WINDOWS.map((n) => (
-            <button key={n} onClick={() => setDays(n)}
-              aria-pressed={days === n}
-              className={`rounded-md border px-2 py-1 transition-colors ${
-                days === n
-                  ? "border-accent/50 bg-accent/10 text-accent"
-                  : "border-line text-ink-faint hover:border-line-strong hover:text-ink-mid"}`}>
-              {n}d
-            </button>
-          ))}
-          {/* The FINISHED tail's own window, its own control. It opens at
-              the same 7 days as the board's forward window on purpose —
-              a column should tell one continuous story — but the two are
-              separate questions ("what is coming" / "what did I miss")
-              and a reader lengthening one must not silently lengthen the
-              other. 30 is the endpoint's own cap; it refuses beyond that
-              rather than clamping, so this list may never grow past it.
-
-              Each chip carries an EXPLICIT accessible name rather than
-              relying on the visible "3d". Two reasons, both real: "3d"
-              alone is a poor button name for anyone who cannot see the
-              row it sits in, and the forward window's chips carry the
-              same visible text — a name that says WHICH window keeps the
-              two addressable apart, by assistive tech and by tests. */}
-          <span className="ml-4 mr-1 text-ink-faint">finished</span>
-          {REVIEW_WINDOWS.map((n) => (
-            <button key={n} data-testid="review-window" data-back={n}
-              onClick={() => setBack(n)}
-              aria-pressed={back === n}
-              aria-label={`finished window, last ${n} day${n === 1 ? "" : "s"}`}
-              className={`rounded-md border px-2 py-1 transition-colors ${
-                back === n
-                  ? "border-accent/50 bg-accent/10 text-accent"
-                  : "border-line text-ink-faint hover:border-line-strong hover:text-ink-mid"}`}>
-              {n}d
-            </button>
-          ))}
-          <button onClick={() => setNonce((n) => n + 1)}
-            className="ml-2 rounded-md border border-line px-2 py-1 text-ink-faint transition-colors hover:border-line-strong hover:text-ink-mid">
-            ↻ refresh
-          </button>
+          {/* THE WINDOW CHIPS ARE GONE TOO (operator, 2026-09-15): "using
+              the default is enough since I have never touched this
+              section". Both windows open at 8 days — `DEFAULT_DAYS` and
+              `DEFAULT_BACK` — and the values behind them are plain
+              constants now rather than state nothing can set, so the
+              board asks for exactly what it asked for before. What is
+              kept is the PROVENANCE beside them: when the board was
+              built, which slate it is, and how many fixtures it holds.
+              That is not a control and was never the thing taking up the
+              row; a board about fixtures that will not say how fresh it
+              is would be the one real loss here. */}
           {/* !loading too: a previous board's "built …" line standing
               beside skeletons is exactly the stale-dressed-as-current
               state the error branch below promises never to show. */}
@@ -810,50 +831,21 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             It is deliberately ABOVE the season banner and the columns: a
             position that is live now outranks a note about which season
             rates a club. */}
-        <WatchedStrip />
+        {/* THE WATCHED-STRIP READ IS OFF THE LANDING PAGE (operator,
+            2026-09-15). It is operator-gated, and with no token held in
+            an ordinary tab it could only ever draw its own refusal —
+            a box explaining why it is empty, permanently, to a reader
+            who cannot fix it. The declaration panel above still opens
+            for whoever holds the token; what is gone is the read that
+            had nothing to say without one. */}
 
-        {/* --------------- the season-basis banner, not a footnote --------------- */}
-        {priorLeagues.length > 0 && (
-          <section data-testid="prior-banner"
-            className="mt-6 rounded-xl border border-warn/30 bg-warn/5 p-4">
-            <Eyebrow tone="warn">
-              {priorLeagues.length} of {leagues.length} leagues · rated on last season
-            </Eyebrow>
-            {/* WHAT STAYS ON ARRIVAL: the leagues and their games
-                played, and the one sentence that says what the numbers
-                below them are made of. That is the caveat; everything
-                else here was the derivation.
-                2026-09-06, PROSE CUT: the blend's arithmetic moved into
-                the disclosure under it. It is STILL IN THE ACCESSIBLE
-                TREE — a native <details>, so its text is in the document
-                whether or not it is open — and e2e/picker-blend-cup.spec
-                pins it there explicitly now rather than incidentally. */}
-            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ink-mid">
-              {priorLeagues
-                .map(([slug, m]) => `${leagueLabel(slug)} ${m.min_current_gp ?? "?"} GP`)
-                .join(" · ")}
-              {/* explicit {" "}: JSX ate the leading space of the text node
-                  after this expression and shipped "Under 8games played" */}
-              . These leagues are still early, so LAST SEASON carries most
-              of the rating.
-            </p>
-            <details data-testid="prior-banner-blend" className="mt-2">
-              <summary className="cursor-pointer list-none font-mono text-[10px] uppercase tracking-[0.14em] text-warn/80 transition-colors hover:text-warn">
-                <span aria-hidden className="mr-1.5">▸</span>
-                how the two seasons are weighed
-              </summary>
-              <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ink-mid">
-                Nothing switches at a threshold: each club is a weighted
-                average of both seasons, by that club&apos;s own games
-                played — w = GP / (GP + {SEASON_BLEND_K}), so{" "}
-                {SEASON_BLEND_K} games is the point where the two weigh the
-                same. Every row prints its own share on the chip beside the
-                rank, and rank and tiers are re-derived from the blended
-                rates.
-              </p>
-            </details>
-          </section>
-        )}
+        {/* THE SEASON-BASIS BANNER IS OFF THE LANDING PAGE (operator,
+            2026-09-15). The fact it carried is not lost: EVERY column
+            already prints its own blend on its own chip — "prior szn ·
+            23% this szn" — which is the same fact said where it applies
+            instead of a page-wide banner that has to name seven leagues
+            to say it once. A second copy of a fact is the copy that
+            rots. */}
 
         {/* --------------- the matches under way, in their own frame ---------------
             ABOVE THE RANKED COLUMNS, because a match in play outranks
@@ -1146,10 +1138,17 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   the exact widths where the dense grid inside it most
                   needs the room. The explicit xl template already said
                   `repeat(1, 1fr)`, so this only ever misfired below xl. */}
-              <div style={{ ["--cols" as string]: String(columnSlugs.length) }}
+              {windowed && (
+                <div className="mb-4">
+                  <LeagueRibbon slugs={columnSlugs} start={windowStart}
+                    view={VIEW}
+                    onJump={(slug) => setWindowStart(columnSlugs.indexOf(slug))} />
+                </div>
+              )}
+              <div style={{ ["--cols" as string]: String(drawnSlugs.length) }}
                 className={`grid grid-cols-1 gap-6 xl:gap-y-2 xl:[grid-template-columns:repeat(var(--cols),minmax(0,1fr))] ${
                   soleColumn ? "" : "md:grid-cols-2"}`}>
-                {columnSlugs.map((slug, ci) => (
+                {drawnSlugs.map((slug, ci) => (
                   <LeagueColumn key={slug} slug={slug} days={days}
                     dayKeys={dayKeys} sortFor={sortFor}
                     dayLabels={dayLabelFor} colIndex={ci + 1}

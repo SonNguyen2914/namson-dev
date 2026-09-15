@@ -939,7 +939,40 @@ export const rowHref = (row: { league: string; event_id: string }) => {
  *  the reason this constant survives at all: the operator reads the
  *  board left to right in this order every day, and which competitions
  *  are on it is a different question from what order they sit in. */
-export const PICKER_COLUMN_ORDER = ["mls", "epl", "laliga", "ligamx"];
+/** THE ORDER THE OPERATOR READS HIS BOARD IN, and the order the four
+ *  new hues were CHOSEN against — those are the same list, which is why
+ *  it is written once.
+ *
+ *  Stated by the operator on 2026-09-14: the top five European leagues
+ *  in their own order, then Eredivisie, then the two North American
+ *  leagues. It is not alphabetical, not the payload's key order, and not
+ *  a strength ranking this file computes — it is a declaration, and the
+ *  only thing that may change it is the operator saying so again.
+ *
+ *  IT ORDERS; IT NEVER ADMITS. `boardColumns` intersects it with the
+ *  board's own declaration, so a slug named here that the board does not
+ *  declare is simply not drawn (there is a guard on exactly this in
+ *  nothing-ahead-is-not-nothing).
+ *
+ *  WHY THE ORDER IS LOAD-BEARING AND NOT COSMETIC. The board holds eight
+ *  columns and draws four, so two leagues can be seen side by side
+ *  unless they sit exactly four apart in this list — those pairs are the
+ *  only ones the window can never show together. Each new league's hue
+ *  was picked as the SHADOW of its partner at distance four, which is
+ *  what let four more colours join a palette that had already spent its
+ *  separable range: under this order the shadow pairs are
+ *  epl/ligue1, laliga/eredivisie, bundesliga/mls and seriea/ligamx,
+ *  and each of those is a repeat rather than a near-miss.
+ *
+ *  Reorder this list and the pairs move, which silently makes two hues
+ *  that were designed never to be co-visible co-visible — the failure
+ *  looks like "two leagues are hard to tell apart", a long way from the
+ *  line that caused it. The pairing is restated in globals.css beside
+ *  each hue; change one and you are changing both. */
+export const PICKER_COLUMN_ORDER = [
+  "epl", "laliga", "bundesliga", "seriea", "ligue1", "eredivisie",
+  "mls", "ligamx",
+];
 
 /** THE COLUMN SET IS THE BOARD'S DECLARATION, AND NOTHING ELSE.
  *
