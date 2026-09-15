@@ -2313,7 +2313,168 @@ export const BOARD_EIGHT = {
 "gdg_gap": 0.0,
 "rank_gap": 4
 }
+},
+/* ── A SECOND MATCHDAY THAT ONE LEAGUE OWNS (2026-09-15) ──────────
+   The eight recorded columns all play the same five dates, and only
+   one of those — the Wednesday La Liga owns — is a date a single
+   league plays. The board draws four of eight columns, so a day
+   nobody on screen plays is the one shape the date rail must never
+   take, and with a single such day in the whole payload the guards
+   for it rested on one row of one column: edit that row and the
+   defect becomes invisible with nothing going red.
+
+   This gives Serie A a Thursday of its own, so two different leagues
+   each own a matchday. WHICH of them is on screen at a given window
+   position is not a fact this file may assume — the operator's
+   reading order decides it, and it changed under these guards once
+   already (PICKER_COLUMN_ORDER, 2026-09-15) — so the guards in
+   eight-column-board.spec.ts search the window for the position they
+   need rather than naming one.
+
+   IT IS A RECORDED ROW, NOT AN INVENTED ONE: the Serie A row above
+   it verbatim, with the identity fields moved — event, kickoff,
+   clubs, venue and Kalshi tickers. Every other key is still what the
+   backend emitted, which is the rule this file opens with. */
+{
+"refused": false,
+"league": "seriea",
+"column": "seriea",
+"home": "Torino",
+"away": "Juventus",
+"favourite": "Juventus",
+"opponent": "Torino",
+"fav_side": "away",
+"fav_source": "rank",
+"venue_favourite": {
+"refused": false,
+"venue_class": "DOMESTIC",
+"home_side": "home",
+"gdg_gap_abs": 1.0827067669172936,
+"threshold": 0.3289959752321979,
+"threshold_source": "derived",
+"policy": "off",
+"favourite": "Juventus",
+"side": "away",
+"agrees": true,
+"reason": "table_gap_beats_venue",
+"flipped": false
+},
+"resolution": {
+"Torino": "exact",
+"Juventus": "exact"
+},
+"ppg_gap": 0.8533834586466165,
+"gdg_gap": 1.0827067669172936,
+"rank_gap": 10,
+"gp_current": {
+"home": 4,
+"away": 4,
+"min": 4
+},
+"weights": {
+"home": 0.2857142857142857,
+"away": 0.2857142857142857,
+"min": 0.2857142857142857,
+"k": 10.0,
+"constant": null,
+"basis": {
+"home": "blend",
+"away": "blend"
 }
+},
+"src": "prior",
+"cross_league": false,
+"rated_in": {
+"home": "seriea",
+"away": "seriea"
+},
+"gap_note": null,
+"reg_time_note": null,
+"table_notes": {
+"home": null,
+"away": null
+},
+"ranks": {
+"fav": 5,
+"opp": 15
+},
+"rates": {
+"ppg": [
+1.8571428571428572,
+1.0037593984962407
+],
+"gf": [
+1.518796992481203,
+1.1278195488721803
+],
+"ga": [
+1.0338345864661653,
+1.7255639097744362
+],
+"gdg": [
+0.4849624060150377,
+-0.5977443609022559
+]
+},
+"own_gdg": {
+"diff": 1.0827067669172936,
+"basis": "EACH CLUB'S OWN GD/g, DIFFERENCED \u2014 how much more one club outscores its own league than the other does theirs. It is NOT the withheld `gdg_gap`: 2.0 GD/g in the Eredivisie is not 2.0 GD/g in La Liga, so this sets two own-league margins side by side and never says one side is this many goals a game better than the other."
+},
+"tiers": {
+"ovr": [
+2,
+5
+],
+"atk": [
+2,
+3
+],
+"def": [
+2,
+5
+]
+},
+"tier_gaps": {
+"ovr": 3,
+"atk": 1,
+"def": 3
+},
+"shape": "CLEAN",
+"event_id": "401874955",
+"competition_id": "401874955",
+"kickoff": "2026-09-17T18:45Z",
+"espn": "ita.1",
+"venue": {
+"name": "Stadio Olimpico Grande Torino",
+"city": "Torino",
+"country": "Italy"
+},
+"venue_class": {
+"class": "DOMESTIC",
+"home_side": "home"
+},
+"kalshi": {
+"event_ticker": "KXSERIEAGAME-26SEP17TORJUV",
+"ticker": "KXSERIEAGAME-26SEP17TORJUV-JUV",
+"ask_c": 43,
+"bid_c": 42,
+"spread_c": 1,
+"ask_size": 1326,
+"bid_size": 1945,
+"flags": []
+},
+"form": {
+"fav": "WLLW",
+"opp": "LLLW",
+"scope": "Serie A",
+"scope_is_cup": false
+},
+"current_only": {
+"ppg_gap": 0.75,
+"gdg_gap": 1.75,
+"rank_gap": 5
+}
+},
 ],
 "refusals": [
 {
