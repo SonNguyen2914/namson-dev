@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { leagueLabel } from "../lib/pickerApi";
+import { hueOf } from "./PickerColumn";
 
 /** THE HEADER FOR A BOARD THAT CARRIES MORE COLUMNS THAN IT DRAWS
  *  (operator, 2026-09-15).
@@ -134,12 +135,34 @@ export function LeagueRibbon({ slugs, start, view, onJump }: {
       className="flex w-full gap-1.5">
       {slots.map((slug, i) => {
         const on = i >= REST && i < REST + view;
-        const hue = `var(--lg-${slug})`;
+        /* THE SAME LOOKUP THE COLUMNS USE. This built the variable name
+           by concatenation, which silently produces `var(--lg-campeones)`
+           — a custom property nobody declared — for any column the
+           palette does not name. An undeclared `var()` with no fallback
+           paints nothing, so the Campeones Cup pill drew with no border
+           colour and an invisible dot from the day the cup joined the
+           board. `hueOf` is the column's own reader and falls back to the
+           cup ink, so a competition added tomorrow gets a colour rather
+           than a hole. */
+        const hue = hueOf(slug);
         /* THE WAVE ENTERS FROM THE SIDE THE NEW LEAGUES COME FROM, so
            the change rolls with the content rather than against it. */
         const wave = n - 1 - i;
         return (
-          <button key={slug} type="button" role="tab"
+          /* THE KEY IS THE SLOT, NOT THE LEAGUE, and the whole effect
+             turns on it. Keyed by slug, React reconciles a rotation by
+             MOVING each pill's DOM node to its new position and carrying
+             its text along — so `RevealName` never receives a `text` it
+             has not already settled on, its `target.current === text`
+             guard returns immediately, and no scramble ever runs. What
+             the reader saw was the entire ribbon sliding sideways by one
+             pill, which is the opposite of the design: the slots are
+             meant to hold still while their NAMES change in place.
+
+             Keyed by index, slot i keeps its node and is handed a new
+             slug, a new name and a new hue — which is exactly the prop
+             change the reveal animates on. */
+          <button key={i} type="button" role="tab"
             data-testid="ribbon-pill" data-slug={slug}
             aria-selected={on}
             aria-label={`${leagueLabel(slug)}${on ? ", on screen" : ""}`}
