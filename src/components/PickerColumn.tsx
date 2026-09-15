@@ -37,8 +37,8 @@ import {
 } from "../lib/providerFailure";
 import {
   BoardRefusal, BoardRow, LeagueMeta, RatePair, RowField, SEASON_BLEND_K,
-  homeBadge, leagueLabel, rowHref, seasonDisagreement, seasonSpan,
-  seasonSpanLabel, venueDisagreement,
+  homeBadge, leagueLabel, rowHref, rowIsInPlay, seasonDisagreement,
+  seasonSpan, seasonSpanLabel, venueDisagreement,
 } from "../lib/pickerApi";
 import {
   ReviewLeagueMeta, ReviewRefusal, ReviewRow,
@@ -48,7 +48,7 @@ import {
   isDefaultSort, modeById, sortRows,
 } from "../lib/pickerSort";
 import {
-  GapNote, KalshiCell, RegTimeNote, TierGaps, WITHHELD,
+  GapNote, KalshiCell, KickoffCell, RegTimeNote, TierGaps, WITHHELD,
   dec, sign,
 } from "./PickerRead";
 import { ReviewTail } from "./ReviewCard";
@@ -861,9 +861,15 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
             fav · venue rule
           </span>
         )}
-        <span className="ml-auto font-mono text-[11px] tabular-nums text-ink-faint">
-          {fmtDate(row.kickoff, "short")}
-        </span>
+        {/* THE DATE, OR THE CLOCK. Same cell, same place, same size —
+            the card does not move when the match kicks off, which is
+            precisely the ask ("still show it in its match card spot").
+            One implementation for this card and the refused one below,
+            in PickerRead, so the two cannot come to disagree about what
+            a live minute looks like. */}
+        <KickoffCell kickoff={row.kickoff} inPlay={rowIsInPlay(row)}
+          live={row.live}
+          className="ml-auto font-mono text-[11px] tabular-nums text-ink-faint" />
       </div>
 
       <RowRead row={row} modeId={modeId} clubCount={clubCount}
@@ -1170,15 +1176,28 @@ function RefusalCard({ r, dated = true, dense = false }: {
         {/* THE KICKOFF — measured, so it is drawn, in a ranked card's
             place for it. Without one the slot SAYS there is none: the
             foot block this card then sits in explains why at the block
-            level, and the card must not look like it simply forgot. */}
-        <span data-testid="refused-kickoff"
-          title={r.kickoff ? undefined
-            : "the payload carried no kickoff for this fixture, so there "
-              + "is no matchday band to draw it in"}
-          className={`flex-none font-mono text-[11px] tabular-nums ${
-            r.kickoff ? "text-ink-faint" : "text-ink-low"}`}>
-          {r.kickoff ? fmtDate(r.kickoff, "short") : "no kickoff"}
-        </span>
+            level, and the card must not look like it simply forgot.
+            AND IT IS A CLOCK ONCE THE MATCH STARTS, through the same
+            cell the ranked card uses. A refused fixture is still a
+            fixture: the refusal was of one act — placing two clubs on a
+            single scale — and it says nothing about whether the match
+            is being played. This card would otherwise be the one on the
+            board still showing a kickoff time for a match under way. */}
+        {rowIsInPlay(r) ? (
+          <span data-testid="refused-kickoff"
+            className="flex-none font-mono text-[11px] tabular-nums">
+            <KickoffCell kickoff={r.kickoff} inPlay live={r.live} />
+          </span>
+        ) : (
+          <span data-testid="refused-kickoff"
+            title={r.kickoff ? undefined
+              : "the payload carried no kickoff for this fixture, so there "
+                + "is no matchday band to draw it in"}
+            className={`flex-none font-mono text-[11px] tabular-nums ${
+              r.kickoff ? "text-ink-faint" : "text-ink-low"}`}>
+            {r.kickoff ? fmtDate(r.kickoff, "short") : "no kickoff"}
+          </span>
+        )}
       </div>
 
       {/* ── THE MATCHUP AND THE ANCHOR'S SLOT. RowRead's block, element

@@ -20,10 +20,12 @@
 //    one blank.
 import { useEffect, useId, useRef, useState } from "react";
 import {
-  BlendWeights, KalshiQuote, RowField, Shape, THIN_ASK_SIZE,
+  BlendWeights, BoardRowLive, KalshiQuote, RowField, Shape, THIN_ASK_SIZE,
   WIDE_SPREAD_C, pctThisSeason, weightIsCurrent,
 } from "../lib/pickerApi";
 import { AXIS_ORDER, tierSet } from "../lib/fieldApi";
+import { fmtDate } from "../lib/matchday";
+import { readMatchClock } from "../lib/suggesterApi";
 
 /** The word for a gap that was never measured. It is NOT "0", NOT "—"
  *  and NOT blank: a cross-league cup fixture has no ppg/GD-g/rank gap
@@ -175,6 +177,83 @@ export function SeasonWeight({ w, alt, departure }: {
 /** WHY A NUMBER IS NOT THERE, in the backend's own words. Rendered
  *  wherever a gap is withheld — the refusal is part of the read, not an
  *  omission from it. */
+/* ─── THE CARD'S DATE CELL, WHICH IS A CLOCK ONCE THE MATCH STARTS ───
+ *
+ * THE OPERATOR, 2026-09-14: "when a match is inplay: 1. if not chosen to
+ * watch live: still show it in its match card spot and instead of
+ * showing the kickoff date and time, shows live with minute just like
+ * the live cards. 2. If chosen to watch live: live both in the match
+ * cards spot and the live match section, and says live with minute just
+ * like the live cards."
+ *
+ * "JUST LIKE THE LIVE CARDS" IS LOAD-BEARING AND IS NOT A STYLE NOTE.
+ * The strip and the card printed 45' and 45'+5' for one match on one
+ * screen on 2026-09-11, because each had its own clock reader with the
+ * opposite precedence. `lib/suggesterApi.readMatchClock` is now the ONE
+ * place either learns what a clock says, and this cell reads it too —
+ * the third surface, joining rather than forking. `data-source` is the
+ * field the text came off, so a guard reads the SOURCE rather than the
+ * sentence.
+ *
+ * WHETHER THE MATCH IS UNDER WAY IS NOT READ HERE. `row.in_play` is the
+ * backend's own derivation off `board.IN_PLAY_STATES`, made in the
+ * module that owns the provider's vocabulary. This cell never compares
+ * a state against a string, and never infers liveness from having a
+ * clock: a collector that went quiet is a fact about our coverage, and
+ * treating it as "the match is not on" would put a kickoff time back on
+ * a match that started — the exact defect this whole change fixes.
+ *
+ * SO AN IN-PLAY ROW WITH NO CLOCK SAYS SO. Never a stale kickoff time,
+ * never a blank, and never minute 0. */
+
+/** The words for an in-play row whose clock could not be read. A
+ *  statement about THIS PAYLOAD, not about the provider — the reason it
+ *  is absent is the backend's to state, and rides in the title. */
+export const BOARD_CLOCK_ABSENT = "clock unavailable";
+
+export function KickoffCell({ kickoff, inPlay, live, className = "" }: {
+  kickoff: string | null | undefined;
+  inPlay: boolean;
+  live?: BoardRowLive | null;
+  className?: string;
+}) {
+  if (!inPlay) {
+    return (
+      <span data-testid="row-kickoff" data-in-play="false"
+        className={className}>
+        {kickoff ? fmtDate(kickoff, "short") : "no kickoff"}
+      </span>
+    );
+  }
+  const clock = readMatchClock(live?.clock);
+  const unread = clock.source === "unstated";
+  // The backend's OWN sentence for the absence, never a second voice on
+  // it. `absent.why` when it named one; the block's `basis` otherwise;
+  // and when the whole block is missing — a tape read that raised, named
+  // one level up as the column's `live_error` — this cell says only what
+  // it can see.
+  const why = live?.absent?.why ?? live?.basis
+    ?? ("this board carried no live block for a match its own provider "
+        + "status says is under way");
+  return (
+    <span data-testid="row-kickoff" data-in-play="true"
+      title={unread ? why : undefined}
+      className={`inline-flex items-center gap-1 ${className}`}>
+      <i aria-hidden
+        className="h-[5px] w-[5px] flex-none rounded-full bg-live" />
+      <span className="text-live">LIVE</span>
+      <span data-testid="row-clock" data-source={clock.source}
+        className={unread ? "text-warn" : "text-live"}>
+        {unread ? BOARD_CLOCK_ABSENT : clock.text}
+      </span>
+      <span className="sr-only">
+        {" — this match is under way. Every figure on this card is a "}
+        {"pre-kickoff read and was not recomputed when it kicked off."}
+      </span>
+    </span>
+  );
+}
+
 export function GapNote({ note }: { note: string }) {
   return (
     <p data-testid="gap-note"
