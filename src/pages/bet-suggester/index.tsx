@@ -55,7 +55,7 @@
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FieldRead, fetchRatings } from "../../lib/fieldApi";
 import { TZ, dayLabel, localDay } from "../../lib/matchday";
 import {
@@ -75,8 +75,8 @@ import { Eyebrow } from "../../components/ui";
 import { ArchiveMenu } from "../../components/ArchiveMenu";
 import { CompRail } from "../../components/CompRail";
 import LiveSection from "../../components/LiveCard";
-import { LeagueColumn } from "../../components/PickerColumn";
-import { LeagueRibbon } from "../../components/LeagueRibbon";
+import { LeagueColumn, NotesPanel } from "../../components/PickerColumn";
+import { LeagueRibbon, VIEW, useBoardLoop } from "../../components/LeagueRibbon";
 import {
   WatchDeclarationProvider, WatchPanel,
 } from "../../components/WatchDeclaration";
@@ -128,16 +128,21 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
 } = {}) {
   const router = useRouter();
   const days = DEFAULT_DAYS;
-  /* HOW MANY COLUMNS ARE DRAWN AT ONCE, and which four they are.
+  /* HOW MANY COLUMNS ARE ON SCREEN AT ONCE — `VIEW`, in
+     components/LeagueRibbon.tsx beside the loop that is built on it.
      Four is measured, not chosen: the board's track is `max-w-[96rem]`,
      so a card stops growing at 1536px and a wider monitor renders the
      identical one — 4 columns give 356px and an intact club name, 5 give
-     280px, 6 give 20px of name, 7 give ZERO. `windowStart` is the index
-     in the declared order of the LEFTMOST column on screen; the window
-     wraps, so past the last column comes the first again and there is no
-     end to hit in either direction. */
-  const VIEW = 4;
-  const [windowStart, setWindowStart] = useState(0);
+     280px, 6 give 20px of name, 7 give ZERO.
+
+     WHICH FOUR IS A SCROLL POSITION, NOT A RENDER DECISION (2026-09-15).
+     Every declared column is on the track; the track is a real
+     `overflow-x` scroller whose ends are removed by rotating the columns
+     and rebasing `scrollLeft` by exactly one column. There is no
+     `windowStart` any more, and nothing here re-renders when the board
+     moves — see `useBoardLoop`. */
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const stripRef = useRef<HTMLDivElement | null>(null);
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -425,7 +430,13 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   /* ONE SENTENCE PER CODE, IN THE BACKEND'S OWN WORDS. Two ties that
      kicked off share a reason; printing it against each row would read
      as two separate findings about two separate matches. */
-  const offWhy = [...new Set(offBoard.map((o) => o.why).filter(Boolean))];
+  /* Keyed by the SENTENCE and carrying the code that emitted it, so the
+     panel's heading names the departure its paragraph is about. Two
+     codes that happen to share a sentence stay one finding, which is the
+     whole point of the dedupe. */
+  const offWhy = [...new Map(offBoard
+    .filter((o) => o.why)
+    .map((o) => [o.why, o] as const)).values()];
   const offCodes = [...new Set(offBoard.map((o) => o.code))].sort();
   /* THE COLUMN SET, WHEN IT IS NARROWER THAN THE BOARD. On the full
      board `columnSlugs` already holds every slug the payload serves, so
@@ -567,38 +578,39 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      `columnSort` is THE authority on what a column runs, and it is the
      same call the columns themselves make, so this cannot drift from
      them: a column whose key changes changes this sentence with it. */
-  /* THE WINDOW IS A NO-OP AT FOUR COLUMNS OR FEWER, which is what keeps
-     today's board and every narrowed page (`/bet-suggester/ucl`) exactly
-     as they are: `drawnSlugs` is then `columnSlugs` and no ribbon draws. */
+  /* THE LOOP IS A NO-OP AT FOUR COLUMNS OR FEWER, which is what keeps
+     every narrowed page (`/bet-suggester/ucl`) exactly as it is: nothing
+     is built to page through and no ribbon draws. */
   const windowed = columnSlugs.length > VIEW;
-  const drawnSlugs = windowed
-    ? Array.from({ length: VIEW },
-        (_, i) => columnSlugs[(windowStart + i) % columnSlugs.length])
-    : columnSlugs;
+  /* EVERY DECLARED COLUMN IS ON THE TRACK (2026-09-15). It used to draw
+     four and mount no others, which is precisely why the board could not
+     move: there was nothing beside the four to scroll TO. The track now
+     carries the whole declaration and the four in front of you are a
+     scroll position. `columnSlugs` is still the operator's declaration
+     and this adds nothing to it. */
+  const drawnSlugs = columnSlugs;
 
-  /* ── MATCHDAY BANDS FOLLOW THE WINDOW (operator, 2026-09-15) ───────
-     The union of day keys is taken over the rows of the columns being
-     DRAWN, not over every row the board holds. Eight leagues keep eight
-     schedules, and a Tuesday only the Bundesliga plays is still a
-     Tuesday — so while the window sat elsewhere the board drew that
-     date full-width with four "rest day" boxes beneath it, an empty
-     band announcing a day on which nothing on screen happens. A date
-     rail is a promise that the columns under it have something at that
-     date; over an undrawn league it is a promise about a column the
-     reader cannot see.
-
-     Rotating the window therefore re-cuts the bands, which is the
-     point: the dates on the rail are the dates of the four leagues in
-     front of you. `columnsOf` is the same reader the columns use to
-     claim a row, so a folded fixture counts for every column it is
-     drawn in and cannot fall out of the union while it is on screen. */
+  /* ── MATCHDAY BANDS COVER THE WHOLE TRACK ─────────────────────────
+     RESTATED 2026-09-15, when the board became a scroller. The union was
+     briefly taken over the four columns being DRAWN, because a date
+     announcing four rest days and nothing else is a promise about a
+     column the reader cannot see. With every column on the track that
+     premise is gone twice over: there is no undrawn column to exclude,
+     and excluding one would be worse than the defect — the columns are
+     subgrids over SHARED row tracks, so a day missing from this union
+     has no row for its fixtures to sit in and those fixtures would be
+     silently dropped from the column that plays them. A date is now a
+     promise about a column you can reach by scrolling, and the rail
+     sticks to the left of the scrollport so it stays legible while you
+     do. `columnsOf` is the same reader the columns use to claim a row,
+     so a folded fixture counts for every column it is drawn in. */
   const drawnSet = new Set(drawnSlugs);
-  const inWindow = (r: Parameters<typeof columnsOf>[0]) =>
+  const onBoard = (r: Parameters<typeof columnsOf>[0]) =>
     columnsOf(r).some((c) => drawnSet.has(c));
   const dated: { kickoff: string }[] = [
-    ...rows.filter(inWindow),
+    ...rows.filter(onBoard),
     ...refusals.filter((r): r is typeof r & { kickoff: string } =>
-      Boolean(r.kickoff) && inWindow(r)),
+      Boolean(r.kickoff) && onBoard(r)),
   ];
   const dayKeys = [...new Set(dated.map((r) => localDay(r.kickoff)))]
     .filter(Boolean).sort();
@@ -609,31 +621,49 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   }
   const runningSorts = columnSlugs.map((sl) => columnSort(sl, boardSort));
 
-  /* ARROW KEYS STEP THE WINDOW. Guarded against a form control so a
-     reader inside the matchday sort can still use them to change option,
-     and against modifier combinations so browser shortcuts survive.
-     THE STEP IS COMPUTED IN HERE, not lifted out: a `stepWindow` defined
-     in the render body was a new function every render and could not
-     honestly appear in this dependency list, which left the effect
-     claiming to read less than it did. What it genuinely reads is the
-     column COUNT — `setWindowStart` is stable, and the wrap needs
-     nothing else — so that count is the dependency, and re-binding the
-     listener when a column joins or leaves the board is exactly right. */
+  /* ARROW KEYS, PILL CLICKS, THE ROTATION AND THE RIBBON, all in one
+     place (components/LeagueRibbon.tsx). They belong together because
+     the wave and the movement have to START TOGETHER: an arrow key knows
+     its direction at the instant it is pressed, and cueing the ink off
+     the scroll CROSSING instead put the wave at t=320ms — the board had
+     all but finished sliding before the header reacted.
+     `ready` gates it on the columns existing: the loop addresses the
+     track's own DOM, and a board still loading has none. */
+  const boardReady = Boolean(board) && !loading && error === "";
+  useBoardLoop({
+    trackRef, stripRef, slugs: columnSlugs,
+    enabled: windowed && boardReady,
+  });
+
+  /* THE PILLS BAR IS THE STICKY STACK'S SECOND STOREY (2026-09-15).
+     `--topbar-h` is what every column header sticks to, and it counted
+     the app's top bar ALONE — so with the pills inserted between them
+     the headers stuck at 49px, exactly where the pills sit, and every
+     league name slid underneath and was read away. The offset is the two
+     of them MEASURED TOGETHER, and measured rather than assumed because
+     the bar's height depends on a font that loads after first paint.
+     Written onto this page's own root, never `:root`: a value left on
+     the document would follow the reader to a page that has no pills
+     bar. */
+  const pageRef = useRef<HTMLDivElement | null>(null);
+  const barRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    if (!windowed) return;
-    const n = columnSlugs.length;
-    const step = (d: number) =>
-      setWindowStart((w) => ((w + d) % n + n) % n);
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === "ArrowRight") { e.preventDefault(); step(1); }
-      else if (e.key === "ArrowLeft") { e.preventDefault(); step(-1); }
+    const page = pageRef.current;
+    if (!page) return;
+    const seat = () => {
+      const bar = barRef.current;
+      const top = document.querySelector("header.topbar");
+      const th = top ? Math.round(top.getBoundingClientRect().height) : 49;
+      const bh = bar ? Math.round(bar.getBoundingClientRect().height) : 0;
+      page.style.setProperty("--bar-top", `${th}px`);
+      page.style.setProperty("--topbar-h", `${th + bh}px`);
     };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [windowed, columnSlugs.length]);
+    seat();
+    const ro = new ResizeObserver(seat);
+    if (barRef.current) ro.observe(barRef.current);
+    window.addEventListener("resize", seat);
+    return () => { ro.disconnect(); window.removeEventListener("resize", seat); };
+  }, [windowed, boardReady]);
 
   const oneRunningSort =
     runningSorts.length > 0
@@ -669,7 +699,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   }
 
   return (
-    <div className="min-h-screen bg-bs font-sans text-ink-mid">
+    <div ref={pageRef} className="min-h-screen bg-bs font-sans text-ink-mid">
       <Head><title>{pageTitle ?? "Picker board"} · namson.dev</title></Head>
       <RouteProgress />
       <TopBar left={backTo ? undefined : <ArchiveMenu />} back={backTo}
@@ -687,6 +717,35 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             a column is not deleting a competition. */}
         <CompRail />
       </TopBar>
+
+      {/* ── THE PILLS BAR, AT THE TOP OF THE PAGE (operator,
+          2026-09-15: "use the name option, but now extend it fully on
+          the header and remove everything else") ─────────────────────
+
+          FULL-BLEED, DIRECTLY UNDER THE NAV, ABOVE THE HERO. It used to
+          sit ~700px down, inside the board section below "Ranked by
+          kickoff", which put the one control that says WHICH FOUR
+          LEAGUES ARE IN FRONT OF YOU below the fold on the way in and
+          out of sight the moment you started reading a column. It is
+          the site's second storey now: the app's own top bar is the
+          master header and the pills belong under it, sticky, naming
+          the board's leagues for as long as the board is on screen.
+
+          IT IS ALSO WHAT PAYS FOR THE STICKY COLUMN HEADERS. A track
+          with `overflow-x` is a scrollport in BOTH axes, so a header
+          inside it sticks to the track's own edge rather than to the
+          viewport — 103px down its own column, which is a header that
+          has moved rather than one that follows. The headers go static
+          on the track and this bar does their job: it is genuinely
+          sticky and it names the four in view at all times. */}
+      {windowed && boardReady && (
+        <div ref={barRef} data-testid="board-pillbar"
+          className="sticky top-[var(--bar-top,calc(3rem+1px))] z-40 w-full border-b border-line bg-bs/95 backdrop-blur">
+          <div className="mx-auto max-w-[96rem] px-5 py-2">
+            <LeagueRibbon slugs={columnSlugs} view={VIEW} stripRef={stripRef} />
+          </div>
+        </div>
+      )}
 
       {/* B0c — SELECTING MATCHES TO WATCH. The provider holds the
           operator's token and name (in this tab's memory and nowhere
@@ -997,39 +1056,64 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   printed rather than restated, so a reason that changes
                   upstream cannot go on being described here in terms
                   that stopped being true. */}
+              {/* COLLAPSED TO ONE LINE (operator, 2026-09-15). It was a
+                  full panel — four named fixtures and a six-line
+                  paragraph of the backend's reasoning — standing between
+                  the reader and the board every time a match finished.
+                  The INFORMATION is untouched: every departed fixture is
+                  still named, and the backend's own sentence is still
+                  printed verbatim, once per code. What changed is the
+                  proportion. The count and the codes are the line, the
+                  names are one click behind it in the disclosure the
+                  finished tails already use, and the prose is behind the
+                  same hover `i` the cards use for everything else that
+                  explains rather than states. */}
               {offBoard.length > 0 && (
                 <div data-testid="board-off-board"
                   data-codes={offCodes.join(",")}
-                  className="mb-5 rounded-xl border border-line-strong bg-elev p-4">
-                  <Eyebrow>left the board, and where they went</Eyebrow>
-                  <ul className="mt-2 space-y-2">
-                    {offBoard.map((o) => (
-                      <li key={o.event_id}
-                        data-testid="off-board-row" data-code={o.code}
-                        className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                        <span className="text-sm text-ink-hi">
-                          {o.home} <span className="text-ink-faint">v</span>{" "}
-                          {o.away}
-                        </span>
-                        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-warn">
-                          {o.code.replace(/_/g, " ")}
-                        </span>
-                        <span className="font-mono text-[10.5px] tabular-nums text-ink-faint">
-                          {o.kickoff}
-                        </span>
-                        {/* The reason, once per code rather than once
-                            per row: two ties that kicked off share one
-                            sentence, and printing it twice would read
-                            as two different findings. */}
-                      </li>
-                    ))}
-                  </ul>
-                  {offWhy.map((w) => (
-                    <p key={w}
-                      className="mt-2 max-w-3xl text-sm leading-relaxed text-ink-mid">
-                      {w}
-                    </p>
-                  ))}
+                  className="mb-4 flex items-baseline gap-2">
+                  <details data-testid="off-board-disclosure"
+                    className="min-w-0 flex-1 rounded-lg border border-line px-3 py-1.5">
+                    <summary className="cursor-pointer list-none font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low marker:content-none hover:text-ink-hi">
+                      <span aria-hidden className="mr-2 text-ink-faint">▸</span>
+                      {offBoard.length} fixture{offBoard.length === 1 ? "" : "s"}
+                      {" left the board · "}
+                      <span className="text-warn">
+                        {offCodes.map((c) => c.replace(/_/g, " ")).join(" · ")}
+                      </span>
+                    </summary>
+                    <ul className="mt-2 space-y-1.5 border-t border-line pt-2">
+                      {offBoard.map((o) => (
+                        <li key={o.event_id}
+                          data-testid="off-board-row" data-code={o.code}
+                          className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                          <span className="text-sm text-ink-hi">
+                            {o.home} <span className="text-ink-faint">v</span>{" "}
+                            {o.away}
+                          </span>
+                          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-warn">
+                            {o.code.replace(/_/g, " ")}
+                          </span>
+                          <span className="font-mono text-[10.5px] tabular-nums text-ink-faint">
+                            {o.kickoff}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                  {/* THE BACKEND'S WORDS, NOT THIS FILE'S, and ONCE PER
+                      CODE rather than once per row: two ties that left
+                      for the same reason share one finding, and printing
+                      it twice would read as two. */}
+                  <NotesPanel
+                    label={`why ${offBoard.length} fixture`
+                      + `${offBoard.length === 1 ? "" : "s"} left the board`}
+                    idPrefix="off-board" testidOpen="off-board-why"
+                    testidPanel="off-board-why-panel"
+                    sections={offWhy.map((o) => ({
+                      id: `off-board-why-${o.code}`,
+                      head: o.code.replace(/_/g, " "),
+                      body: o.why, tone: "text-warn" }))} />
                 </div>
               )}
               {undeclared.length > 0 && (
@@ -1138,15 +1222,23 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   the exact widths where the dense grid inside it most
                   needs the room. The explicit xl template already said
                   `repeat(1, 1fr)`, so this only ever misfired below xl. */}
-              {windowed && (
-                <div className="mb-4">
-                  <LeagueRibbon slugs={columnSlugs} start={windowStart}
-                    view={VIEW}
-                    onJump={(slug) => setWindowStart(columnSlugs.indexOf(slug))} />
-                </div>
-              )}
-              <div style={{ ["--cols" as string]: String(drawnSlugs.length) }}
-                className={`grid grid-cols-1 gap-6 xl:gap-y-2 xl:[grid-template-columns:repeat(var(--cols),minmax(0,1fr))] ${
+              {/* THE TRACK. A real `overflow-x` scroller at xl, where the
+                  columns sit side by side; below xl they stack and there
+                  is nothing to scroll, so the scrollport is not created
+                  at all and the column headers keep their stickiness
+                  there.
+                  `--colw` is written by the loop — a MEASURED column
+                  width, so four fill the viewport exactly and the fifth
+                  begins off its right edge. It falls back to
+                  `minmax(0,1fr)`, which is the pre-scroll board and what
+                  every narrowed page still draws.
+                  `overscroll-x-contain` so a trackpad flick at the end of
+                  a column does not become a browser back-navigation —
+                  there IS no end here, and the gesture that looks for one
+                  must not leave the page. */}
+              <div ref={trackRef} data-testid="board-track"
+                style={{ ["--cols" as string]: String(drawnSlugs.length) }}
+                className={`grid grid-cols-1 gap-6 xl:gap-y-2 xl:overflow-x-auto xl:overscroll-x-contain xl:[grid-template-columns:repeat(var(--cols),var(--colw,minmax(0,1fr)))] ${
                   soleColumn ? "" : "md:grid-cols-2"}`}>
                 {drawnSlugs.map((slug, ci) => (
                   <LeagueColumn key={slug} slug={slug} days={days}
@@ -1191,9 +1283,24 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   const ds = sortFor(k);
                   const overridden = Boolean(daySorts[k]);
                   return (
+                    /* THE RAIL STICKS TO THE SCROLLPORT, NOT TO THE TRACK
+                       (2026-09-15). The band spans `1 / -1`, which is now
+                       every column on the track rather than the four on
+                       screen — so a date drawn at the band's left edge
+                       scrolls away with the first column and the reader
+                       is left looking at four columns under no date at
+                       all, and at a matchday sort control parked several
+                       thousand pixels to the right. The band's CONTENTS
+                       are therefore one viewport wide and pinned to the
+                       left of the scrollport: the date and its control
+                       stay over whichever four you have scrolled to.
+                       `--vieww` is the track's own measured width, so
+                       this cannot drift from the geometry the columns are
+                       laid out on. */
                     <div key={k} data-testid="day-band" data-day={k}
                       style={{ gridRow: 2 + 2 * i, gridColumn: "1 / -1" }}
-                      className="hidden items-center gap-3 pt-5 xl:flex">
+                      className="hidden pt-5 xl:block">
+                    <div className="sticky left-0 flex w-[var(--vieww,100%)] items-center gap-3">
                       <span className="whitespace-nowrap font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-mid">
                         {dayLabelFor[k] ?? k}
                       </span>
@@ -1225,6 +1332,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                         className="rounded-md border border-line px-1.5 py-0.5 font-mono text-[9.5px] text-ink-low transition-colors hover:border-line-strong hover:text-ink-hi">
                         {ds.dir === "asc" ? "↑" : "↓"}
                       </button>
+                    </div>
                     </div>
                   );
                 })}
