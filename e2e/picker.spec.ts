@@ -810,40 +810,37 @@ test("the direction toggle flips the measured rows; no-quote rows sort last both
       .toEqual(["m-charlie", "m-bravo", "m-alpha", "m-delta"]);
   });
 
-test("the null-sort policy is stated on screen whenever the board runs a key "
-   + "that has one", async ({ page }) => {
-    /* SPLIT OUT OF THE TEST ABOVE, 2026-09-15. "no quote sorts last" is
-       drawn beside the board's controls, from the BOARD's sort — and the
-       board's sort control is gone. The state is still reachable and
-       still real: `loadBoardSort` reads `picker:sort:board` on every
-       load, so a choice made before the cut is what the board opens in
-       today, and the note that explains its ordering has to be there for
-       that reader.
+test("the board runs a key with NO null policy, and says nothing rather than "
+   + "a sentence about a key nobody chose", async ({ page }) => {
+    /* WHAT THIS CLAIM BECAME (2026-09-15), said plainly rather than kept
+       alive through a door that no longer opens.
 
-       SEEDED THROUGH THE APP'S OWN DOOR — the stored value that
-       `loadBoardSort` parses — rather than through a control, because
-       there is no longer a control and the sentence would otherwise be
-       unreachable and therefore deletable by the next tidy-up.
+       The sentence "no quote sorts last" explains a BOARD key that puts
+       unquoted rows last. It used to be reachable two ways: the board's
+       own sort control, and a value stored by it. The control was removed
+       on the operator's instruction, and the stored value is now cleared
+       on load — a preference a reader can neither change nor reset is a
+       board that is wrong and cannot be told so.
 
-       KNOWN, AND REPORTED: no control on the page can now produce this
-       state, and the matchday bands do NOT drive this note — picking a
-       book key on a band reorders the day and leaves the note unsaid.
-       That is a src question, not a spec one. */
-    await page.addInitScript(() => {
-      try {
-        window.localStorage.setItem("picker:sort:board",
-          JSON.stringify({ mode: "ask", dir: "asc" }));
-      } catch { /* a browser with no storage opens on the default */ }
-    });
+       THE MATCHDAY SORT IS A DIFFERENT AXIS and does not raise it: it
+       reorders a DAY, while this note describes the key every COLUMN is
+       ranked by. So the board runs `kickoff`, which has no null policy,
+       and the honest outcome is that no policy sentence is shown.
+
+       The note itself is not dead code: `runningNullNote` derives from
+       the sorts genuinely running, so the day a board-level key returns
+       it states itself again with no edit here. What is asserted now is
+       the thing that is TRUE — silence, because there is no policy to
+       state, rather than a sentence about a key nobody chose. */
     await open(page, SORT_BOARD);
     const mls = col(page, "mls");
-    // the stored choice IS what the board is running
-    await expect(bandSort(page)).toHaveValue("ask");
+    await expect(bandSort(page)).toHaveValue("kickoff");
+    // the day still reorders, through the control that exists
+    await bandSort(page).selectOption("ask");
     await expect.poll(() => orderOf(mls))
       .toEqual(["m-alpha", "m-bravo", "m-charlie", "m-delta"]);
-    // …and the policy that put Delta last is on screen, not inferred
-    await expect(page.getByTestId("col-null-note"))
-      .toHaveText("no quote sorts last");
+    // …and no board-level policy is claimed, because none is running
+    await expect(page.getByTestId("col-null-note")).toHaveCount(0);
   });
 
 test("the matchday sort moves every column together", async ({ page }) => {

@@ -304,19 +304,31 @@ const storageKey = (league: string) => `picker.colsort.${league}`;
  *  DIFFERENT Saturday next week. */
 const BOARD_SORT_KEY = "picker:sort:board";
 
+/** THE STORED BOARD SORT IS RETIRED, AND RETIRING IT MEANS CLEARING IT
+ *  (2026-09-15).
+ *
+ *  The board-level control came off the page — every matchday band keeps
+ *  its own sort, and a second control above them only ever reordered days
+ *  against each other. But the READ stayed, and that left a trap: a
+ *  reader who chose "ask desc" yesterday got that board again today, with
+ *  no control to change it and no reset to clear it. A preference you
+ *  cannot reach is not a preference; it is a board that is wrong and
+ *  cannot be told so.
+ *
+ *  So the key is DELETED on read, once, and the board opens on
+ *  `DEFAULT_SORT` — kickoff ascending, which is what it opened on for
+ *  anyone who never set one. The parse that used to live here went with
+ *  it: keeping code that can no longer run is how a reader is told a
+ *  preference still works.
+ *
+ *  It still READS before removing, so the removal is a migration rather
+ *  than a blind delete — and `saveBoardSort` is kept whole, because the
+ *  day a board-level control returns this is the half that has to work. */
 export function loadBoardSort(): ColumnSort {
   try {
-    const raw = window.localStorage.getItem(BOARD_SORT_KEY);
-    if (!raw) return DEFAULT_SORT;
-    const parsed = JSON.parse(raw) as { mode?: unknown; dir?: unknown };
-    const mode = typeof parsed.mode === "string" ? modeById(parsed.mode) : undefined;
-    if (!mode) return DEFAULT_SORT;
-    const dir = parsed.dir === "asc" || parsed.dir === "desc"
-      ? parsed.dir : mode.defaultDir;
-    return { mode: mode.id, dir };
-  } catch {
-    return DEFAULT_SORT;
-  }
+    window.localStorage.removeItem(BOARD_SORT_KEY);
+  } catch { /* convenience only — the board still opens on its default */ }
+  return DEFAULT_SORT;
 }
 
 export function saveBoardSort(s: ColumnSort): void {

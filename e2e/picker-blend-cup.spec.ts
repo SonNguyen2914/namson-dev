@@ -635,12 +635,15 @@ test("the cross-league null policy is stated ONCE for the board, never "
        band reorders the day and leaves this sentence unsaid, so no
        control on the page can now produce the state below. That is a src
        question. */
-    await page.addInitScript(() => {
-      try {
-        window.localStorage.setItem("picker:sort:board",
-          JSON.stringify({ mode: "gdg", dir: "desc" }));
-      } catch { /* a browser with no storage opens on the default */ }
-    });
+    /* THE SEED IS GONE AND SO IS THE STATE (2026-09-15). This reached a
+       board-level key through `picker:sort:board`; that key is cleared on
+       load now, because a preference a reader can neither change nor
+       reset is a board that is wrong and cannot be told so. The matchday
+       sort is a DIFFERENT axis — it reorders a day, not the key every
+       column is ranked by — so the board runs `kickoff` and the claim
+       here is what remains TRUE of it. `runningNullNote` still derives
+       from the sorts genuinely running, so a board-level key returning
+       restates the sentence with no edit here. */
     await open(page);
     const mls = col(page, "mls");
     // WAIT FOR THE COLUMN FIRST. A "count 0" assertion fired before the
@@ -648,11 +651,9 @@ test("the cross-league null policy is stated ONCE for the board, never "
     // not on one that is deliberately absent — a mutation that printed
     // this note over every column slipped through exactly that hole.
     await expect(mls.getByTestId("picker-row")).toHaveCount(1);
-    await expect(bandSort(page)).toHaveValue("gdg");
-    // ONCE, beside the board's own furniture…
-    await expect(page.getByTestId("col-null-note"))
-      .toHaveText("no measured gap (cross-league) sorts last");
-    await expect(page.getByTestId("col-null-note")).toHaveCount(1);
+    await expect(bandSort(page)).toHaveValue("kickoff");
+    // NO board-level policy is claimed, because none is running…
+    await expect(page.getByTestId("col-null-note")).toHaveCount(0);
     /* …and never inside a column. Checked on BOTH halves of the window,
        so the fifth column is not exempted from the rule by happening to
        be off screen when the check ran. */

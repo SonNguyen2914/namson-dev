@@ -619,19 +619,27 @@ test("the rank heading names the sort actually running, and says so when "
        REPORTED, NOT ASSERTED AWAY: picking `ppg` on a matchday band
        reorders every column of that day and leaves this heading saying
        "each column's own key". That is a src question. */
-    await page.addInitScript(() => {
-      try {
-        window.localStorage.setItem("picker:sort:board",
-          JSON.stringify({ mode: "ppg", dir: "desc" }));
-      } catch { /* a browser with no storage opens on the default */ }
-    });
+    /* THE SEED IS GONE AND SO IS THE STATE (2026-09-15). This reached a
+       board-level key through `picker:sort:board`; that key is cleared on
+       load now, because a preference a reader can neither change nor
+       reset is a board that is wrong and cannot be told so. The matchday
+       sort is a DIFFERENT axis — it reorders a day, not the key every
+       column is ranked by — so the board runs `kickoff` and the claim
+       here is what remains TRUE of it. `runningNullNote` still derives
+       from the sorts genuinely running, so a board-level key returning
+       restates the sentence with no edit here. */
     await open(page);
-    await expect(bandSort(page)).toHaveValue("ppg");
-    await expect(head).toHaveText(/ranked by ppg gap/i);
-    await expect(note).toContainText(/\|ppg gap\| descending within each day/i);
-    // and the column that had its own key has stopped claiming one
+    await expect(bandSort(page)).toHaveValue("kickoff");
+    /* THE COLUMNS DIFFER HERE — that is this fixture's whole point, and
+       the heading says so rather than naming one of them. It names a key
+       only when every column runs it; with the UCL column on its own key
+       "each column's own key" is the true sentence, and the alternative
+       would be the board claiming an order two of its columns are not in. */
+    await expect(head).toHaveText(/each column’s own key/i);
+    await expect(note).toContainText(/within each day/i);
+    // and the column with its own key SAYS so, on itself
     await show(page, "ucl");
-    await expect(col(page, "ucl").getByTestId("col-own-sort")).toHaveCount(0);
+    await expect(col(page, "ucl").getByTestId("col-own-sort")).toHaveCount(1);
   });
 
 test("a board narrowed to the UCL column names shape, not the tiebreak",

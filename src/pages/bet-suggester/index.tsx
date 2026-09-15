@@ -358,7 +358,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   }
   const sortFor = (k: string): ColumnSort => daySorts[k] ?? boardSort;
   const boardMode = modeById(boardSort.mode) ?? modeById(DEFAULT_SORT.mode)!;
-  const boardNullNote = nullNoteFor(boardMode, rows);
+
 
   /* ── THE COLUMN SET IS THE BOARD'S DECLARATION (operator,
      2026-09-09) ──────────────────────────────────────────────────────
@@ -626,6 +626,20 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
       ? runningSorts[0]
       : null;
 
+  /* THE NULL POLICY FOLLOWS THE SORT THAT IS ACTUALLY RUNNING
+     (2026-09-15). It read the BOARD's sort, which is the one control the
+     operator removed — so the sentence explaining why a quoteless row
+     sorts last became unreachable: no band could raise it, and a board
+     key could no longer be chosen. A reader picking `ask` on a matchday
+     got the ordering and not the reason for it.
+     `runningSorts` is what every column is genuinely sorted by, so the
+     policy is derived from THAT. Where the bands disagree there is no one
+     policy to state, and none is stated — a sentence claiming one key
+     while several run would be worse than silence. */
+  const runningNullNote = oneRunningSort
+    ? nullNoteFor(modeById(oneRunningSort.mode) ?? boardMode, rows)
+    : null;
+
   if (deepLink !== null) {
     return (
       <div className="min-h-screen bg-bs font-sans text-ink-mid">
@@ -727,9 +741,9 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
               above them only ever reordered days against each other.
               `DEFAULT_SORT` is kickoff ascending, so removing the control
               leaves the board in the order it already opened in. */}
-          {boardNullNote && (
+          {runningNullNote && (
             <span data-testid="col-null-note" className="text-ink-faint normal-case tracking-normal">
-              {boardNullNote}
+              {runningNullNote}
             </span>
           )}
           {/* THE WINDOW CHIPS ARE GONE TOO (operator, 2026-09-15): "using
