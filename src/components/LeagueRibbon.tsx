@@ -57,6 +57,36 @@ import { hueOf } from "./PickerColumn";
 
 /** How many columns are drawn at once. Measured, not chosen — see above. */
 export const VIEW = 4;
+/** …AND HOW MANY A TABLET DRAWS (2026-09-16).
+ *
+ *  The same arithmetic run at a narrower viewport, and not a new one:
+ *  the board already put two columns side by side from `md` up via
+ *  `md:grid-cols-2`, so two is the count at which a tablet column stays
+ *  EXACTLY the width it is today — 352px at 768, 480 at 1024, 607 at
+ *  1279. What changes at that width is not the column, it is that the
+ *  other six are now reached by moving the board instead of by scrolling
+ *  past four rows of them.
+ *
+ *  Four here would be 175px a column at an iPad's 810 — narrower than
+ *  the 193px the note above measures the club name down to ZERO at. */
+export const VIEW_NARROW = 2;
+/** HOW MANY NAMES THE STRIP SHOWS AT ONCE when it cannot show them all.
+ *
+ *  The ribbon divides the width it is given by the number of COLUMNS, so
+ *  eight leagues in an iPad's 770px bar is a 91px slot holding 53px of
+ *  name — measured, four of eight names clipped, "Premier League"
+ *  wanting 84. That is the ribbon being asked to do the impossible
+ *  rather than being wrong: every league has a slot, so every slot is a
+ *  width divided by eight.
+ *
+ *  So below `xl` the strip shows this many slots and SCROLLS for the
+ *  rest. Four, because four × (name + dot + padding) is what 768px — the
+ *  narrowest width that has a ribbon at all — holds without clipping the
+ *  longest label: (728 − 3 × 6) / 4 = 177px a slot, 139px of it name,
+ *  against the 84px "Premier League" asks for.
+ *
+ *  A phone gets neither this nor the ribbon: see components/LeagueTabs.tsx. */
+const NAMES_ON_SCREEN = 4;
 /** HOW MANY COLUMNS REST TO THE LEFT of the four on screen.
  *
  *  The scroller lives in a band `REST ± 1` columns wide and a rotation
@@ -66,12 +96,13 @@ export const VIEW = 4;
  *  `REST = 2` is what eight columns give, and six give one — a board
  *  with `REST = 2` and only two columns of slack rests AGAINST its right
  *  end, where the rotation that carries it round can never fire. */
-const restFor = (n: number) => Math.max(0, Math.min(2, n - VIEW - 1));
+const restFor = (n: number, view: number) =>
+  Math.max(0, Math.min(2, n - view - 1));
 /** A LOOP NEEDS SLACK ON BOTH SIDES. Five columns give one column of
  *  scroll room in total: whichever end it is put at, the other has none,
  *  and a rotation there would be a jump rather than a seam. Such a board
  *  is a plainly bounded scroller and the rail is its position. */
-const loops = (n: number) => n - VIEW >= 2;
+const loops = (n: number, view: number) => n - view >= 2;
 /** The gap between two pills, px. */
 const RGAP = 6;
 /** The gap between two COLUMNS, px — Tailwind `gap-6` on the track. A
@@ -138,8 +169,18 @@ export function LeagueRibbon({ slugs, view, stripRef }: {
        own track pays for below), and what is out of sight here is a
        DUPLICATE of a league a visible pill already names, so nothing a
        reader needs is being quietly cut off. */
+    /* THE WINDOW SCROLLS BELOW `xl` (2026-09-16). At `xl` every league
+       has a slot in the bar and the two buffers are the only thing
+       outside it, so `overflow-clip` is right and stays: it cuts the
+       overhang without creating a scroll container in either axis.
+       Below `xl` the strip is wider than the bar on purpose — four
+       readable names instead of eight slivers — so the x axis becomes a
+       real scroller and the y axis stays clipped, which keeps the
+       scrollport one-dimensional and nothing sticky inside it. The
+       scrollbar is hidden because the strip's position is already said
+       by which pills are lit. */
     <div data-testid="league-ribbon-window"
-      className="w-full overflow-clip">
+      className="w-full overflow-x-auto overflow-y-clip [-ms-overflow-style:none] [scrollbar-width:none] xl:overflow-clip [&::-webkit-scrollbar]:hidden">
       <div ref={stripRef} data-testid="league-ribbon" role="tablist"
         aria-label={`leagues, in strength order — ${view} on screen`}
         style={{ ["--rgap" as string]: `${RGAP}px` }}
@@ -158,7 +199,15 @@ export function LeagueRibbon({ slugs, view, stripRef }: {
                 ? { "aria-hidden": true, tabIndex: -1,
                     "data-testid": "ribbon-buffer" }
                 : { role: "tab", "data-testid": "ribbon-pill" })}
-              className="flex w-[var(--slot)] min-w-0 flex-none items-center justify-center gap-2 rounded-lg border border-line bg-bs-elev2 px-2.5 py-2 font-mono text-[10px] uppercase leading-tight tracking-[0.08em] text-ink-faint transition-colors hover:border-ink-faint">
+              /* A BUFFER IS SCAFFOLDING AND CARRIES A DUPLICATE NAME.
+                 At `xl` the window clips it and nobody ever sees one;
+                 below `xl` the window scrolls, so it would be reachable
+                 — a ninth and tenth pill naming a league that already
+                 has one. `invisible`, not `hidden`: the slide needs the
+                 space it occupies. Desktop is untouched, because a
+                 clipped pill and an invisible one look the same. */
+              {...(buffer ? { "data-buffer": "yes" } : {})}
+              className={`${buffer ? "max-xl:invisible " : ""}flex w-[var(--slot)] min-w-0 flex-none items-center justify-center gap-2 rounded-lg border border-line bg-bs-elev2 px-2.5 py-2 font-mono text-[10px] uppercase leading-tight tracking-[0.08em] text-ink-faint transition-colors hover:border-ink-faint`}>
               <i aria-hidden
                 className="h-2 w-2 flex-none rounded-full transition-opacity" />
               <span data-testid="ribbon-name"
@@ -198,8 +247,8 @@ function resolveHues(slugs: readonly string[]): Record<string, string> {
  *  render for one reason: the layout change and the `scrollLeft` rebase
  *  that cancels it out MUST happen in the same frame, and a state update
  *  is a frame late — which is a visible jump of one whole column. */
-export function useBoardLoop({ trackRef, stripRef, railRef, slugs, enabled,
-  onRolling }: {
+export function useBoardLoop({ trackRef, stripRef, railRef, slugs, view,
+  enabled, onRolling }: {
   trackRef: RefObject<HTMLDivElement | null>;
   stripRef: RefObject<HTMLDivElement | null>;
   /** THE HEADER RAIL's inner grid — the columns' headers, lifted OUT of
@@ -208,6 +257,12 @@ export function useBoardLoop({ trackRef, stripRef, railRef, slugs, enabled,
    *  scroll has no rail and nothing here runs for it. */
   railRef?: RefObject<HTMLDivElement | null>;
   slugs: readonly string[];
+  /** HOW MANY COLUMNS THE SCROLLPORT HOLDS AT THIS WIDTH — `VIEW` on a
+   *  desktop, `VIEW_NARROW` on a tablet. It is a PROP rather than a
+   *  media query read in here because the page writes the track's grid
+   *  template from the same number: two answers to "how many columns fit"
+   *  is a loop stepping by one width over columns laid out at another. */
+  view: number;
   enabled: boolean;
   /** IS THE TRACK GENUINELY A HORIZONTAL SCROLLER? The page needs the
    *  answer to decide whether to build the rail at all, and this is the
@@ -240,12 +295,12 @@ export function useBoardLoop({ trackRef, stripRef, railRef, slugs, enabled,
 
     const ORDER = key.split(",");
     const N = ORDER.length;
-    /* At VIEW columns or fewer the board shows everything it has: no
+    /* At `view` columns or fewer the board shows everything it has: no
        ribbon is built and there is nothing here to drive. */
-    if (N <= VIEW) return;
-    const SLACK = N - VIEW;
-    const LOOPS = loops(N);
-    const REST = restFor(N);
+    if (N <= view) return;
+    const SLACK = N - view;
+    const LOOPS = loops(N, view);
+    const REST = restFor(N, view);
     /** The first LIT slot. Derived, never typed: slot k carries
      *  `ORDER[i - REST - 1 + k]`, so the slot holding the leftmost column
      *  on screen is the one where that expression is `i`. */
@@ -285,7 +340,7 @@ export function useBoardLoop({ trackRef, stripRef, railRef, slugs, enabled,
     let touching = false;
 
     // ── geometry ───────────────────────────────────────────────────────
-    const colW = () => (track.clientWidth - GAP * (VIEW - 1)) / VIEW;
+    const colW = () => (track.clientWidth - GAP * (view - 1)) / view;
     const oneW = () => colW() + GAP;
     /** Is the track genuinely a horizontal scroller? Below `xl` the
      *  columns stack and it is not — the rail is then a jump nav, and
@@ -377,16 +432,50 @@ export function useBoardLoop({ trackRef, stripRef, railRef, slugs, enabled,
       : track.scrollLeft / oneW();
 
     // ── the ribbon ─────────────────────────────────────────────────────
+    /** THE SLOT WIDTH, AND WHAT HAPPENS WHEN EIGHT OF THEM DO NOT FIT.
+     *
+     *  The strip divides the bar between its slots, so the slot is the
+     *  bar over the number of names ON SCREEN — every league when they
+     *  all fit, and `NAMES_ON_SCREEN` when they do not, at which point
+     *  the window carries the rest by scrolling. Measured at an iPad's
+     *  810: eight slots gave 53px of name against the 84px "Premier
+     *  League" asks for, and four give 150px.
+     *
+     *  THE DESKTOP IS UNTOUCHED, and it is told apart by the same number
+     *  everything else here is: `view` is `VIEW` only at `xl`, where the
+     *  bar is the full `max-w-[96rem]` and eight slots are 182px each —
+     *  wide enough for any label the board carries. Below it the board
+     *  draws two columns and the strip shows four names. One breakpoint,
+     *  read once, in one place. */
     const unit = () => {
       const w = (strip.parentElement as HTMLElement).clientWidth;
-      const slot = (w - RGAP * (N - 1)) / N;
+      const per = view === VIEW ? N : Math.min(N, NAMES_ON_SCREEN);
+      const slot = (w - RGAP * (per - 1)) / per;
       strip.style.setProperty("--slot", `${slot}px`);
       return slot + RGAP;
+    };
+    /** KEEP THE LIT BLOCK IN THE WINDOW when the strip is wider than the
+     *  bar. The slots hold still — that is the ribbon's whole mechanism —
+     *  so the lit block is always at the same x and this target never
+     *  changes; it is written when the CONTENT changes rather than on
+     *  every scroll frame, which leaves a reader free to browse the strip
+     *  with their thumb and puts it back the moment the board moves. */
+    const centreLit = () => {
+      const win = strip.parentElement as HTMLElement;
+      if (win.scrollWidth - win.clientWidth <= 1) return;
+      const u = Number(strip.style.getPropertyValue("--slot").replace("px", ""))
+        + RGAP;
+      if (!Number.isFinite(u) || u <= 0) return;
+      /* The strip is parked at translateX(-u), so slot k is painted at
+         (k - 1) * u inside the window's scroll box. */
+      const want = (LIT_FROM - 1) * u - (win.clientWidth - view * u) / 2;
+      const to = Math.max(0, Math.min(win.scrollWidth - win.clientWidth, want));
+      if (Math.abs(win.scrollLeft - to) > 1) win.scrollLeft = to;
     };
     const setStrip = (px: number) => {
       strip.style.transform = `translateX(${px}px)`;
     };
-    const lit = (k: number) => k >= LIT_FROM && k < LIT_FROM + VIEW;
+    const lit = (k: number) => k >= LIT_FROM && k < LIT_FROM + view;
     const slugAt = (target: number, k: number) =>
       ORDER[wrap(target - REST - 1 + k, N)];
 
@@ -456,6 +545,7 @@ export function useBoardLoop({ trackRef, stripRef, railRef, slugs, enabled,
         const cs = cells(b, text.length);
         cs.forEach((g, i) => put(g, text.charAt(i), ""));
       });
+      centreLit();
     };
 
     /** RANDOM LETTER REVEAL — the operator's chosen motion.
@@ -485,6 +575,7 @@ export function useBoardLoop({ trackRef, stripRef, railRef, slugs, enabled,
                  start: (fwd ? SLOTS - 1 - k : k) * STAGGER_MS,
                  order: idx, cells: cells(b, text.length), started: false };
       });
+      centreLit();
       const t0 = performance.now();
       let lastChurn = -1e9;
       const frame = (now: number) => {
@@ -853,9 +944,11 @@ export function useBoardLoop({ trackRef, stripRef, railRef, slugs, enabled,
        And again once the web fonts settle: the strip's slot width comes
        from its parent's measured width and the pill's height from a face
        that may not have loaded yet. */
-    requestAnimationFrame(() => { if (!dead) { layout(); ribbonUpdate(); } });
+    requestAnimationFrame(() => {
+      if (!dead) { layout(); ribbonUpdate(); centreLit(); }
+    });
     if (document.fonts?.ready) void document.fonts.ready.then(() => {
-      if (!dead) { layout(); ribbonUpdate(); }
+      if (!dead) { layout(); ribbonUpdate(); centreLit(); }
     });
 
     return () => {
@@ -880,7 +973,7 @@ export function useBoardLoop({ trackRef, stripRef, railRef, slugs, enabled,
          were never taken out of. */
       if (told !== false) rollCb.current?.(false);
     };
-  }, [key, enabled, trackRef, stripRef, railRef]);
+  }, [key, view, enabled, trackRef, stripRef, railRef]);
 
   /* No dependency list ON PURPOSE: this runs after EVERY commit and puts
      the rotation back on the grid. See `reseat` above. */
