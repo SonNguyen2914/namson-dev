@@ -198,13 +198,33 @@ function resolveHues(slugs: readonly string[]): Record<string, string> {
  *  render for one reason: the layout change and the `scrollLeft` rebase
  *  that cancels it out MUST happen in the same frame, and a state update
  *  is a frame late — which is a visible jump of one whole column. */
-export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
+export function useBoardLoop({ trackRef, stripRef, railRef, slugs, enabled,
+  onRolling }: {
   trackRef: RefObject<HTMLDivElement | null>;
   stripRef: RefObject<HTMLDivElement | null>;
+  /** THE HEADER RAIL's inner grid — the columns' headers, lifted OUT of
+   *  the scrollport so they can stick to the viewport, and carried
+   *  sideways by this loop instead. Optional: a board that does not
+   *  scroll has no rail and nothing here runs for it. */
+  railRef?: RefObject<HTMLDivElement | null>;
   slugs: readonly string[];
   enabled: boolean;
+  /** IS THE TRACK GENUINELY A HORIZONTAL SCROLLER? The page needs the
+   *  answer to decide whether to build the rail at all, and this is the
+   *  only place that MEASURES it — a second copy of the `xl` breakpoint
+   *  in a media query would be a second answer free to disagree. */
+  onRolling?: (rolling: boolean) => void;
 }): void {
   const key = slugs.join(",");
+  /** Read through a ref so the effect below does not re-run — and does
+   *  not go stale — when the page hands it a fresh closure. Refreshed in
+   *  an effect rather than during render: a ref written while rendering
+   *  is a render with a side effect, which React is free to run twice
+   *  and to throw away. The ref is SEEDED with the first closure, so the
+   *  loop below has a live callback on its very first pass whatever
+   *  order the effects run in. */
+  const rollCb = useRef(onRolling);
+  useEffect(() => { rollCb.current = onRolling; }, [onRolling]);
   /** Re-seat the grid after ANY commit. React writes `--col` from the
    *  column's DOM position and the loop overwrites it with the ROTATED
    *  one; React skips a style property whose value has not changed
@@ -276,26 +296,75 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
     const seatFor = (i: number) =>
       Math.max(0, Math.min(SLACK, i)) * oneW();
 
+    /** THE HEADER RAIL FOLLOWS THE TRACK, AND IS NOT A SECOND COPY OF IT.
+     *
+     *  The rail is a grid on the SAME template — `--cols` tracks of
+     *  `--colw`, the same 24px gutter — sitting OUTSIDE the scrollport,
+     *  and each header's slot takes its column's `--col` in the same
+     *  statement the column does, off the same `order` array. So a
+     *  header cannot be placed on a track its column is not on: there is
+     *  one rotation and both read it.
+     *
+     *  What is left is the scroll offset, and that is this one transform.
+     *  It is POSITIONAL SYNC, not an animation — no transition, no
+     *  easing, nothing for `prefers-reduced-motion` to reduce. The rail
+     *  moves exactly as much as the board moves, whenever the board
+     *  moves, which is why every `scrollLeft` write below goes through
+     *  `setScroll`. */
+    const syncRail = () => {
+      const rail = railRef?.current;
+      if (rail) rail.style.transform = `translateX(${-track.scrollLeft}px)`;
+    };
+    /** Every write to the scroller, in one place, so the rail can never
+     *  be left behind by one. */
+    const setScroll = (x: number) => { track.scrollLeft = x; syncRail(); };
+
+    /** Has the track become — or stopped being — a real scroller? Said
+     *  once per change, never per frame. */
+    let told: boolean | null = null;
+    const report = () => {
+      const r = rolling();
+      if (r !== told) { told = r; rollCb.current?.(r); }
+    };
+
     const layout = () => {
       track.style.setProperty("--cols", String(N));
       track.style.setProperty("--colw", `${colW()}px`);
       /* what the matchday rail sticks to, so a date stays legible over
          whichever four columns you have scrolled to */
       track.style.setProperty("--vieww", `${track.clientWidth}px`);
-      order.forEach((slug, i) =>
-        cols.get(slug)!.style.setProperty("--col", String(i + 1)));
+      const rail = railRef?.current ?? null;
+      if (rail) {
+        rail.style.setProperty("--cols", String(N));
+        rail.style.setProperty("--colw", `${colW()}px`);
+      }
+      order.forEach((slug, i) => {
+        cols.get(slug)!.style.setProperty("--col", String(i + 1));
+        /* THE HEADER TAKES ITS COLUMN'S TRACK IN THE SAME BREATH. A rail
+           seated from its own bookkeeping is a header free to drift a
+           whole column away from the league it names — worse than no
+           sticky header at all. */
+        rail?.querySelector<HTMLElement>(`[data-rail-slot="${slug}"]`)
+          ?.style.setProperty("--col", String(i + 1));
+      });
+      syncRail();
+      report();
     };
     reseat.current = () => { if (!dead) layout(); };
 
     /* THE LOOP. No clones: the array turns and the scroll is compensated
-       by exactly one column, so nothing under the cursor moves. */
+       by exactly one column, so nothing under the cursor moves.
+       The rail turns WITH it: `layout()` re-seats the header slots and
+       `setScroll` re-offsets the rail, both inside this one synchronous
+       pair — which is what keeps a rotation invisible in the rail as
+       well as on the board. */
     const rotL = () => {
       order.push(order.shift()!); layout();
-      track.scrollLeft -= oneW(); spins += 1;
+      setScroll(track.scrollLeft - oneW()); spins += 1;
     };
     const rotR = () => {
       order.unshift(order.pop()!); layout();
-      track.scrollLeft += oneW(); spins -= 1;
+      setScroll(track.scrollLeft + oneW()); spins -= 1;
     };
     /* WHERE THE BOARD IS, as a real number of columns from the start of
        the declared order. Three cases and one meaning: looped, the scroll
@@ -532,7 +601,7 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
       cancelGlide();
       const from = track.scrollLeft;
       if (!animate || quiet.matches || Math.abs(to - from) < 0.5) {
-        track.scrollLeft = to;
+        setScroll(to);
         ribbonUpdate();
         return;
       }
@@ -548,11 +617,11 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
            then recovered, which is the overshoot-and-return the guard in
            `the-board-scrolls-and-loops` refuses. */
         const p = Math.min(1, Math.max(0, (now - t0) / STEP_MS));
-        track.scrollLeft = from + (to - from) * easeOut(p);
+        setScroll(from + (to - from) * easeOut(p));
         if (p < 1) { glideRaf = requestAnimationFrame(frame); return; }
         glideRaf = null;
         animating = false;
-        track.scrollLeft = to;          /* land on it, not near it */
+        setScroll(to);          /* land on it, not near it */
         ribbonUpdate();
       };
       glideRaf = requestAnimationFrame(frame);
@@ -602,6 +671,14 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
     };
 
     const onScroll = () => {
+      /* THE RAIL MOVES IN THIS HANDLER, NOT IN THE rAF BELOW. A scroll
+         event is dispatched in the frame's own rendering step, BEFORE
+         requestAnimationFrame callbacks — so a transform written here
+         lands in the same painted frame as the scroll that caused it,
+         and one written in the throttled callback below would be a frame
+         late. A header trailing its column by a frame on every wheel tick
+         is the drift this rail exists to avoid. */
+      syncRail();
       /* A glide's own writes are not a free scroll and must not arm the
          settle against themselves. */
       if (!animating) scheduleSettle();
@@ -715,7 +792,7 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
       let guard = 0;
       while (order[REST] !== slug && guard++ < N * 2) order.push(order.shift()!);
       layout();
-      track.scrollLeft = REST * oneW();
+      setScroll(REST * oneW());
       spins = target;                 /* absPos must still name this league */
       if (from !== null && Math.abs(target - from) === 1) {
         /* A NEIGHBOUR IS A STEP, and a step gets the wave. Jumping four
@@ -745,7 +822,7 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
     const onResize = () => {
       cancelGlide();
       layout();
-      if (rolling() && LOOPS) track.scrollLeft = REST * oneW();
+      if (rolling() && LOOPS) setScroll(REST * oneW());
       ribbonReset();
     };
 
@@ -763,7 +840,7 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
       let g0 = 0;
       while (order[REST] !== ORDER[0] && g0++ < N * 2) order.unshift(order.pop()!);
       layout();
-      if (rolling()) track.scrollLeft = REST * oneW();
+      if (rolling()) setScroll(REST * oneW());
       spins = ORDER.indexOf(order[REST]);
     }
     ribbonReset();
@@ -797,8 +874,13 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
       pills.forEach((b) => b.removeEventListener("click", onPill));
       track.style.removeProperty("--colw");
       track.style.removeProperty("--vieww");
+      /* A BOARD WITH NO LOOP HAS NO RAIL. Said last, so the page unmounts
+         the rail and every header goes back to sticking in its own column
+         — which is the state a four-column board and every narrowed page
+         were never taken out of. */
+      if (told !== false) rollCb.current?.(false);
     };
-  }, [key, enabled, trackRef, stripRef]);
+  }, [key, enabled, trackRef, stripRef, railRef]);
 
   /* No dependency list ON PURPOSE: this runs after EVERY commit and puts
      the rotation back on the grid. See `reseat` above. */

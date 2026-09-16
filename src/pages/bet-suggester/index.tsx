@@ -55,7 +55,18 @@
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback, useEffect, useLayoutEffect, useRef, useState,
+} from "react";
+
+/** `useLayoutEffect` DOES NOTHING ON THE SERVER, and React says so in a
+ *  warning every time a server-rendered component calls one. This page is
+ *  server-rendered and the one effect that wants it is about the
+ *  browser's next paint — so on the server there is nothing to schedule
+ *  and the passive hook is the honest stand-in. Chosen once, at module
+ *  scope, so the hook order never changes between renders. */
+const useIsoLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
 import { FieldRead, fetchRatings } from "../../lib/fieldApi";
 import { TZ, dayLabel, localDay } from "../../lib/matchday";
 import {
@@ -143,6 +154,17 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      moves — see `useBoardLoop`. */
   const trackRef = useRef<HTMLDivElement | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
+  /* ── THE HEADER RAIL (operator, 2026-09-15: "make the league header
+     still going with me when I go down. It need to go too right under
+     the pills") ──────────────────────────────────────────────────────
+
+     `railRef` is the rail's inner grid — the thing the loop seats and
+     slides; `railOn` says whether to build it at all, and `headSlots`
+     maps a column's slug to the element its header is drawn into. See
+     the rail's own note further down for why any of this is needed. */
+  const railRef = useRef<HTMLDivElement | null>(null);
+  const [railOn, setRailOn] = useState(false);
+  const [headSlots, setHeadSlots] = useState<Record<string, HTMLElement>>({});
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -630,10 +652,49 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      `ready` gates it on the columns existing: the loop addresses the
      track's own DOM, and a board still loading has none. */
   const boardReady = Boolean(board) && !loading && error === "";
+  /** The declared set as one comparable string — the same key the loop
+   *  itself is rebuilt on, so the rail's slots and the rotation can never
+   *  be looking at two different boards. */
+  const declaredKey = columnSlugs.join(",");
   useBoardLoop({
-    trackRef, stripRef, slugs: columnSlugs,
+    trackRef, stripRef, railRef, slugs: columnSlugs,
     enabled: windowed && boardReady,
+    /* THE RAIL IS BUILT ON A MEASUREMENT, NOT ON A BREAKPOINT. "Is the
+       track a real horizontal scroller" is exactly the question the rail
+       answers to, and the loop already asks it of the DOM — so it says
+       so here rather than this page re-deciding it from a media query
+       that could disagree with the `xl:` class that actually creates the
+       overflow. */
+    onRolling: setRailOn,
   });
+
+  /* THE SLOTS, ONCE THE RAIL IS ON THE PAGE. A layout effect so the
+     columns learn their slot BEFORE the browser paints the rail — an
+     empty rail flashing above the board for a frame would be the board
+     jumping on load, which is the one thing the operator has already
+     rejected twice. Re-run when the declared set changes, because a
+     column that arrived has a slot nobody has handed out yet.
+     Only ever swapped for a DIFFERENT set of nodes: the rail's slots are
+     keyed by slug and survive every board re-render, so a fresh object
+     each time would re-portal all eight headers on every payload tick. */
+  useIsoLayoutEffect(() => {
+    const rail = railRef.current;
+    if (!railOn || !rail) {
+      setHeadSlots((prev) => (Object.keys(prev).length ? {} : prev));
+      return;
+    }
+    const next: Record<string, HTMLElement> = {};
+    for (const el of Array.from(
+      rail.querySelectorAll<HTMLElement>("[data-rail-slot]"))) {
+      next[el.dataset.railSlot!] = el;
+    }
+    setHeadSlots((prev) => {
+      const ks = Object.keys(next);
+      const same = ks.length === Object.keys(prev).length
+        && ks.every((k) => prev[k] === next[k]);
+      return same ? prev : next;
+    });
+  }, [railOn, declaredKey]);
 
   /* THE PILLS BAR IS THE STICKY STACK'S SECOND STOREY (2026-09-15).
      `--topbar-h` is what every column header sticks to, and it counted
@@ -650,11 +711,20 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   useEffect(() => {
     const page = pageRef.current;
     if (!page) return;
+    /* NOT ROUNDED (2026-09-15). Each height was rounded to a whole pixel
+       and the two were then added, which is a measurement that can be
+       half a pixel LONGER than the thing it measures: the pills bar is
+       47.5px tall, `--topbar-h` came out 49 + 48 = 97, and the column
+       headers parked 0.5px below the bar's bottom edge at 96.5. Half a
+       pixel of page showing between two bars that are meant to read as
+       one stack — and a hairline of a scrolling row inside it. The
+       browser is perfectly happy to stick at a fractional offset; the
+       rounding bought nothing and cost exactly that. */
     const seat = () => {
       const bar = barRef.current;
       const top = document.querySelector("header.topbar");
-      const th = top ? Math.round(top.getBoundingClientRect().height) : 49;
-      const bh = bar ? Math.round(bar.getBoundingClientRect().height) : 0;
+      const th = top ? top.getBoundingClientRect().height : 49;
+      const bh = bar ? bar.getBoundingClientRect().height : 0;
       page.style.setProperty("--bar-top", `${th}px`);
       page.style.setProperty("--topbar-h", `${th + bh}px`);
     };
@@ -731,13 +801,17 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
           master header and the pills belong under it, sticky, naming
           the board's leagues for as long as the board is on screen.
 
-          IT IS ALSO WHAT PAYS FOR THE STICKY COLUMN HEADERS. A track
-          with `overflow-x` is a scrollport in BOTH axes, so a header
-          inside it sticks to the track's own edge rather than to the
-          viewport — 103px down its own column, which is a header that
-          has moved rather than one that follows. The headers go static
-          on the track and this bar does their job: it is genuinely
-          sticky and it names the four in view at all times. */}
+          IT IS ALSO THE SHELF THE COLUMN HEADERS PARK ON. A track with
+          `overflow-x` is a scrollport in BOTH axes, so a header inside
+          it sticks to the track's own edge rather than to the viewport —
+          103px down its own column, which is a header that has moved
+          rather than one that follows. This bar first REPLACED them for
+          that reason, which is the half-clipped league name in the
+          operator's screenshot; since 2026-09-15 the headers leave the
+          scrollport instead and come to rest against the bottom edge of
+          this bar (see the header rail below). So the bar still has to
+          genuinely stick — the rail's resting place is measured off it —
+          and it still names the four in view at all times. */}
       {windowed && boardReady && (
         <div ref={barRef} data-testid="board-pillbar"
           className="sticky top-[var(--bar-top,calc(3rem+1px))] z-40 w-full border-b border-line bg-bs/95 backdrop-blur">
@@ -1239,15 +1313,95 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
               {/* THE SCROLLER IS ONLY BUILT WHEN THERE IS SOMEWHERE TO
                   SCROLL. At four columns or fewer the board shows
                   everything it has, and `overflow-x` there would buy
-                  nothing and cost the sticky column headers — which is
-                  the trade this page makes ONLY where the pills bar is
-                  there to take it over. `--head-pos` is that decision,
-                  made once, next to the overflow it follows from: the
-                  header reads it rather than guessing from a
-                  breakpoint. */}
+                  nothing and cost the column headers their scrollport —
+                  so it is not created, and those boards keep a header
+                  that sticks inside its own column exactly as it always
+                  did. */}
+              {/* ── THE BOARD FRAME: the header rail, then the track.
+                  They are wrapped together because a `sticky` element
+                  only sticks WITHIN ITS CONTAINING BLOCK — parked in the
+                  page instead, the rail would carry on past the last
+                  fixture and hang over the prose below the board. */}
+              <div data-testid="board-frame">
+              {/* ── THE COLUMN HEADERS, LIFTED OUT OF THE TRACK
+                  (operator, 2026-09-15: "make the league header still
+                  going with me when I go down. It need to go too right
+                  under the pills") ─────────────────────────────────────
+
+                  WHY THEY CANNOT STICK WHERE THEY WERE. `overflow-x:
+                  auto` on the track forces `overflow-y` to compute to
+                  `auto` as well, so the track is a scrollport in BOTH
+                  axes — and `position: sticky` sticks to the nearest
+                  scrollport, not to the viewport. A header inside it
+                  therefore measured `top` from the TRACK's own edge and
+                  parked ~103px down its own column, permanently. The
+                  answer shipped that morning was to make it `static` and
+                  let the pills bar do the wayfinding; the operator's
+                  screenshot of a league name sliced in half by the pills
+                  bar is what that looked like to read.
+
+                  SO THE HEADER LEAVES THE SCROLLPORT. Each column
+                  PORTALS its own header into a slot here (see `Slotted`
+                  in components/PickerColumn.tsx) — the same element,
+                  with the same data and the same state, drawn in a rail
+                  that is a plain child of the page and so sticks to the
+                  viewport like anything else. Nothing is duplicated and
+                  nothing is left behind: there is one header per column
+                  and this is where it is.
+
+                  IT COMES TO REST UNDER THE PILLS BAR, at
+                  `--topbar-h` — nav plus pills, MEASURED together by the
+                  effect above rather than typed, because the bar's
+                  height depends on a font that loads after first paint.
+                  z-30 puts it under the pills (z-40) and the app bar
+                  (z-50) and over the board's own rows.
+
+                  AND IT MOVES SIDEWAYS WITH THE BOARD. The rail is a
+                  grid on the track's own template — `--cols` tracks of
+                  `--colw`, the same `gap-6` gutter — and `useBoardLoop`
+                  writes each slot's `--col` in the same statement it
+                  writes its column's, then offsets the whole rail by the
+                  track's `scrollLeft`. A rotation turns both at once, so
+                  a header cannot drift from the league it names.
+
+                  CLIP, NOT HIDDEN, NOT AUTO. `overflow: hidden` would
+                  make this a scrollport too and put the headers straight
+                  back in the box they just escaped; `clip` cuts the
+                  overhang at exactly the track's edges and creates no
+                  scroll container at all. Only the x axis is clipped, so
+                  the notes panel can still hang below the rail. */}
+              {railOn && (
+                <div data-testid="board-head-rail"
+                  className="sticky top-[var(--topbar-h)] z-30 hidden overflow-x-clip bg-bs xl:block">
+                  <div ref={railRef} data-testid="board-head-track"
+                    className="grid w-max items-start gap-x-6 [grid-template-columns:repeat(var(--cols),var(--colw,minmax(0,1fr)))] will-change-transform">
+                    {drawnSlugs.map((slug) => (
+                      /* NO `style` PROP ON PURPOSE. `--col` is the
+                         loop's to write, and a style object React
+                         re-asserts on every board tick is a slot that
+                         snaps back to its render-time track mid-
+                         rotation. The fallback keeps DOM order until the
+                         first seat, which is before any header is in
+                         here to see it. */
+                      /* AND THE ROW IS EXPLICIT, for the same reason the
+                         columns' is. A slot placed on an explicit
+                         COLUMN with an auto row is still auto-placed
+                         vertically, and sparse auto-placement never
+                         moves the cursor backwards: the moment a
+                         rotation left a slot naming a lower track than
+                         the one before it in DOM order — which is every
+                         rotation, and the very first seat — the grid
+                         wrapped it onto a second row. Measured: two of
+                         eight headers 98px below the other six, each
+                         still over the right column. */
+                      <div key={slug} data-rail-slot={slug}
+                        className="min-w-0 [grid-column:var(--col,auto)] [grid-row:1]" />
+                    ))}
+                  </div>
+                </div>
+              )}
               <div ref={trackRef} data-testid="board-track"
-                style={{ ["--cols" as string]: String(drawnSlugs.length),
-                  ...(windowed ? { ["--head-pos" as string]: "static" } : {}) }}
+                style={{ ["--cols" as string]: String(drawnSlugs.length) }}
                 className={`grid grid-cols-1 gap-6 xl:gap-y-2 xl:[grid-template-columns:repeat(var(--cols),var(--colw,minmax(0,1fr)))] ${
                   windowed ? "xl:overflow-x-auto xl:overscroll-x-contain" : ""} ${
                   soleColumn ? "" : "md:grid-cols-2"}`}>
@@ -1282,7 +1436,14 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                         : null,
                       storeNote,
                     }}
-                    field={fields[slug]} />
+                    field={fields[slug]}
+                    /* WHERE THIS COLUMN'S HEADER IS DRAWN — its slot in
+                       the rail above, or nothing, in which case the
+                       header stays at the top of the column and sticks
+                       there. Absent until the rail has mounted, so the
+                       first paint (and the server's markup) is the
+                       in-column header it has always been. */
+                    headSlot={headSlots[slug] ?? null} />
                 ))}
                 {dayKeys.map((k, i) => i % 2 === 0 ? null : (
                   <div key={`tint-${k}`} aria-hidden
@@ -1347,6 +1508,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                     </div>
                   );
                 })}
+              </div>
               </div>
             </>
           )}

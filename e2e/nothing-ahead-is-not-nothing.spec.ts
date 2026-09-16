@@ -240,6 +240,21 @@ async function open(page: import("@playwright/test").Page,
 const col = (page: import("@playwright/test").Page, slug: string) =>
   page.locator(`[data-testid="league-col"][data-league="${slug}"]`);
 
+/** THIS LEAGUE'S HEADER — its name, its fixture count, its season basis,
+ *  its notes and its read failures.
+ *
+ *  RESTATED 2026-09-15. It used to be found INSIDE the column's section,
+ *  which is how these checks were written. It is still the column's own
+ *  header, rendered by the column with the column's data — but a board
+ *  whose track scrolls has `overflow-x: auto` on that track, which makes
+ *  it a scrollport in BOTH axes, and a header in there can never stick to
+ *  the viewport. So the header is drawn in the page's sticky rail
+ *  instead, and is addressed by the league it NAMES rather than by the
+ *  element that used to contain it. There is still exactly one of them
+ *  per column; see e2e/the-headers-park-under-the-pills.spec.ts. */
+const colHead = (page: import("@playwright/test").Page, slug: string) =>
+  page.locator(`[data-testid="col-head"][data-league="${slug}"]`);
+
 /** THE BOARD DRAWS FOUR OF ITS COLUMNS AT A TIME (operator, 2026-09-15).
  *
  *  Card width is arithmetic: the board's track stops growing at 96rem,
@@ -299,7 +314,7 @@ test("a column with nothing ahead counts what it HOLDS, and an empty one still s
     await open(page);
     await show(page, "leaguescup");
 
-    const cup = col(page, "leaguescup").getByTestId("col-count");
+    const cup = colHead(page, "leaguescup").getByTestId("col-count");
     await expect(cup).toHaveText("3 finished");
     await expect(cup).toHaveAttribute("data-counts", "finished");
 
@@ -307,7 +322,7 @@ test("a column with nothing ahead counts what it HOLDS, and an empty one still s
     // it, reads exactly the same way — the number means one thing on
     // this board, not one thing per column
     await show(page, "epl");
-    const epl = col(page, "epl").getByTestId("col-count");
+    const epl = colHead(page, "epl").getByTestId("col-count");
     await expect(epl).toHaveText("2 finished");
     await expect(epl).toHaveAttribute("data-counts", "finished");
 
@@ -316,14 +331,14 @@ test("a column with nothing ahead counts what it HOLDS, and an empty one still s
     // that was read, and it stays.
     for (const slug of ["laliga", "ligamx"]) {
       await show(page, slug);
-      const c = col(page, slug).getByTestId("col-count");
+      const c = colHead(page, slug).getByTestId("col-count");
       await expect(c).toHaveText("0 fixtures");
       await expect(c).toHaveAttribute("data-counts", "upcoming");
     }
 
     // and a column with fixtures counts those, in the old words
     await show(page, "mls");
-    await expect(col(page, "mls").getByTestId("col-count"))
+    await expect(colHead(page, "mls").getByTestId("col-count"))
       .toHaveText("2 fixtures");
   });
 
@@ -399,7 +414,7 @@ test("a review that FAILED is not a column with nothing finished",
     // EPL is one of the four columns the board draws first, and it has
     // nothing upcoming. Its count says the one thing that IS known.
     await show(page, "epl");
-    const epl = col(page, "epl").getByTestId("col-count");
+    const epl = colHead(page, "epl").getByTestId("col-count");
     await expect(epl).toHaveText("0 fixtures");
     await expect(epl).toHaveAttribute("data-counts", "upcoming");
     // and no box anywhere on the board claims a finished count
@@ -427,7 +442,7 @@ test("a review that FAILED is not a column with nothing finished",
     await expect(page.getByTestId("ribbon-pill"))
       .toHaveCount(Object.keys(LEAGUES).length);
     await show(page, "leaguescup");
-    await expect(col(page, "leaguescup").getByTestId("col-count"))
+    await expect(colHead(page, "leaguescup").getByTestId("col-count"))
       .toHaveAttribute("data-counts", "upcoming");
   });
 
@@ -444,7 +459,7 @@ test("one league's tail failing costs that league's count, not the board's",
       },
     });
     await show(page, "leaguescup");
-    await expect(col(page, "leaguescup").getByTestId("col-count"))
+    await expect(colHead(page, "leaguescup").getByTestId("col-count"))
       .toHaveText("0 fixtures");
     await expect(col(page, "leaguescup").getByTestId("col-empty-finished"))
       .toHaveCount(0);
@@ -453,7 +468,7 @@ test("one league's tail failing costs that league's count, not the board's",
     // the EPL tail read fine and still counts — one league's failure is
     // not the board's
     await show(page, "epl");
-    await expect(col(page, "epl").getByTestId("col-count"))
+    await expect(colHead(page, "epl").getByTestId("col-count"))
       .toHaveText("2 finished");
     await expect(col(page, "epl").getByTestId("review-toggle"))
       .toHaveAttribute("data-has", "matches");
@@ -720,7 +735,7 @@ async function rails(page: import("@playwright/test").Page,
                      declared: readonly string[]) {
   await expect(page.getByTestId("col-rail").first()).toBeAttached();
   const got = await eachColumn(page, declared, (slug) =>
-    col(page, slug).locator('[data-testid="col-rail"]')
+    colHead(page, slug).locator('[data-testid="col-rail"]')
       .evaluate((e) => getComputedStyle(e).backgroundColor));
   expect(got.size, "no rail was read — this check would pass over an "
     + "empty set").toBe(declared.length);
