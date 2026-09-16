@@ -2192,7 +2192,8 @@ function Slotted({ to, children }: {
 
 export function LeagueColumn({
   slug, meta, rows, refusals, days, dayKeys, sortFor, dayLabels, colIndex,
-  review, dense = false, field, headSlot = null,
+  review, dense = false, field, headSlot = null, sideways = false,
+  tabPanel = false,
 }: {
   slug: string;
   /** absent when the payload never mentioned this league at all */
@@ -2223,6 +2224,18 @@ export function LeagueColumn({
    *  2026-09-01). Explicitly placed items may overlap; that is the
    *  contract the whole band layout stands on. */
   colIndex: number;
+  /** IS THE BOARD'S TRACK A SIDEWAYS SCROLLER FROM `md` UP? Handed down
+   *  from the page, which writes the track's grid template from the same
+   *  condition — a column placed on an explicit `--col` at a width where
+   *  the track has no matching template lands on an implicit track, and
+   *  that is the zero-width-columns defect `colIndex` above records, one
+   *  breakpoint lower. Four-column boards and narrowed pages are `false`
+   *  and keep the stacked layout they have always had below `xl`. */
+  sideways?: boolean;
+  /** IS THIS THE LEAGUE THE PHONE'S TAB STRIP HAS SELECTED? True only
+   *  where a strip is on the page, so the `tabpanel` role always has a
+   *  `tablist` to belong to. */
+  tabPanel?: boolean;
   /** THIS COLUMN HAS THE BOARD TO ITSELF, so each matchday band lays its
    *  matches ACROSS the width instead of stacking them (see DENSE_GRID).
    *
@@ -2435,11 +2448,53 @@ export function LeagueColumn({
   return (
     <section data-testid="league-col" data-league={slug}
       id={`picker-col-${slug}`}
-      aria-label={`${leagueLabel(slug)} column`}
+      /* ON A PHONE THIS IS THE TAB STRIP'S PANEL (2026-09-16). The board
+         draws one league there and the strip is what chose it, so the
+         column has to be announced as the thing that tab controls and
+         has to be reachable from it — `tabIndex={0}` because a panel
+         whose own content is a list of links still needs a stop of its
+         own, which is what tells a keyboard reader the panel CHANGED.
+         Said only when a strip exists: elsewhere this is a plain
+         labelled section, exactly as it has always been. */
+      {...(tabPanel
+        ? { role: "tabpanel" as const, tabIndex: 0,
+            "aria-label": `${leagueLabel(slug)} — the league this board is
+ drawing`.replace(/\s+/g, " ") }
+        : { "aria-label": `${leagueLabel(slug)} column` })}
       style={{ ["--lg" as string]: hue,
         ["--tracks" as string]: String(trackCount),
         ["--col" as string]: String(colIndex) }}
-      className="min-w-0 scroll-mt-16 xl:grid xl:content-start xl:[grid-template-rows:subgrid] xl:[grid-template-columns:minmax(0,1fr)] xl:[grid-row:1/span_var(--tracks)] xl:[grid-column:var(--col)]">
+      /* `md:` PLACEMENT, ADDED 2026-09-16, and only for a board whose
+         track is a sideways scroller from `md` up. A column takes its
+         declared track and ROW 1 there: the track is a single row of
+         columns at that width, and an explicit column with an AUTO row
+         is still auto-placed vertically — sparse auto-placement never
+         moves its cursor backwards, so the first rotation that left a
+         slug naming a lower track than its DOM predecessor would wrap
+         that column onto a second row. Measured once already, in the
+         header rail, as two of eight headers 98px below the other six.
+         At `xl` the subgrid below restates both and wins, because
+         Tailwind emits `md:` before `xl:`. */
+      /* `relative`, ADDED 2026-09-16 — AND IT IS A CONTAINMENT FIX, not
+         a layout one. Tailwind's `.sr-only` is `position: absolute`, so
+         a screen-reader-only span inside a column has the BODY for a
+         containing block and a scrolling track cannot clip it: measured
+         on the eight-column board at 810px, one such span — the LIVE
+         match note in components/PickerRead.tsx — sat at x=1513 in the
+         track's scroll content and stretched `documentElement.scrollWidth`
+         to 1514 in an 810px viewport. The page could not actually be
+         scrolled sideways, which is why it had never been seen; a guard
+         that reads `scrollWidth` sees it immediately.
+         LATENT SINCE THE TRACK BECAME A SCROLLER, not new here: at `xl`
+         the same span escapes, and the document only stayed honest
+         because La Liga happens to be the second column and lands inside
+         the viewport. A column that scrolled off the right with a live
+         match in it would have done this at any width.
+         Every popover inside a column already carries its own `relative`
+         wrapper (`NotesPanel`), so nothing's positioning moves. */
+      className={`relative min-w-0 scroll-mt-16 ${
+        sideways ? "md:[grid-column:var(--col)] md:[grid-row:1]" : ""
+      } xl:grid xl:content-start xl:[grid-template-rows:subgrid] xl:[grid-template-columns:minmax(0,1fr)] xl:[grid-row:1/span_var(--tracks)] xl:[grid-column:var(--col)]`}>
       {/* THE HEADER FOLLOWS THE COLUMN (2026-09-07). Opaque ground, not a
           translucent one: rows scrolling underneath a see-through header
           is the same defect as a label that contradicts the numbers

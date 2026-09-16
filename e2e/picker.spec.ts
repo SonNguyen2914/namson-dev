@@ -425,8 +425,12 @@ test("four league columns, fixed order, each header carrying its facts",
     const laliga = col(page, "laliga");
     await expect(laliga.getByText("prior szn").first()).toBeVisible();
     await expect(laliga.getByTestId("col-count")).toHaveText("2 fixtures");
-    // the jump chips are a phone affordance — not desktop chrome
-    await expect(page.getByTestId("league-jump")).toBeHidden();
+    /* NEITHER SWITCHER IS DESKTOP CHROME (restated 2026-09-16 — the
+       jump chips were removed and the tab strip took the phone's half of
+       the claim). A four-column board draws its four columns at this
+       width and needs no control to reach any of them. */
+    await expect(page.getByTestId("league-jump")).toHaveCount(0);
+    await expect(page.getByTestId("league-tabs")).toHaveCount(0);
     /* AND THE WINDOW IS A NO-OP AT FOUR (2026-09-15). A board that
        declares more columns than it can draw carries a ribbon and shows
        four at a time; THIS board declares exactly four, so every one of
@@ -956,14 +960,31 @@ test("a browser with no usable storage still renders, and still sorts",
     await expect.poll(() => orderOf(mls)).toEqual(EXPECTED.ppg);
   });
 
-test("one column on a phone: league jump chips, and no horizontal scroll",
+test("one league on a phone: the tab strip, and no horizontal scroll",
   async ({ page }) => {
+    /* RESTATED 2026-09-16. WHAT MOVED: the phone drew all four columns
+       stacked and offered a wrapped list of `#picker-col-<slug>` anchors
+       to jump between them. It now draws ONE league, chosen from the tab
+       strip in the pills bar, and the anchors are gone — an anchor could
+       only ever move you further down a stack that is no longer there.
+       THE CLAIM IS UNCHANGED in both halves: every declared column is
+       reachable from one control at this width, and the page body never
+       scrolls sideways. What changed is which control, and that the
+       fixtures on screen are now one league's rather than four. */
     await page.setViewportSize({ width: 375, height: 812 });
     await open(page, SORT_BOARD);
-    await expect(page.getByTestId("picker-row")).toHaveCount(8);
-    const jump = page.getByTestId("league-jump");
-    await expect(jump).toBeVisible();
-    await expect(jump.locator("a")).toHaveCount(4);
+    const strip = page.getByTestId("league-tabs");
+    await expect(strip).toBeVisible();
+    await expect(strip.getByRole("tab")).toHaveCount(4);
+    /* AND THE OLD CONTROL IS NOT STILL THERE BESIDE IT. Two switchers
+       for one board is what this replaced. */
+    await expect(page.getByTestId("league-jump")).toHaveCount(0);
+    /* ONE LEAGUE'S CARDS, and it is the league the lit tab names. */
+    await expect(page.locator('[data-testid="league-col"]')).toHaveCount(1);
+    const lit = strip.locator('[role="tab"][aria-selected="true"]');
+    await expect(lit).toHaveCount(1);
+    expect(await page.locator('[data-testid="league-col"]')
+      .getAttribute("data-league")).toBe(await lit.getAttribute("data-slug"));
     const overflow = await page.evaluate(() =>
       document.documentElement.scrollWidth
       - document.documentElement.clientWidth);
@@ -2337,8 +2358,15 @@ test("the finished tail keeps no score of its own", async ({ page }) => {
 });
 
 test("the finished tail on a phone: no horizontal overflow", async ({ page }) => {
+  /* RESTATED 2026-09-16: a phone draws ONE league, and a finished tail
+     belongs to the column whose league played the matches — so the tail
+     under test is reached by selecting its league rather than by
+     scrolling to it. The claim is untouched: the widest thing the tail
+     can draw, opened, must not push the page sideways. */
   await page.setViewportSize({ width: 375, height: 812 });
   await open(page, SORT_BOARD, 200, REVIEW_SORT);
+  await page.getByTestId("league-tabs")
+    .locator('[role="tab"][data-slug="mls"]').click();
   await expect(page.getByTestId("review-row")).toHaveCount(5);
   // open the widest thing on a card — the provenance block, with its
   // absolute archive paths — before measuring

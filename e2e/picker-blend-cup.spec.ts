@@ -882,11 +882,22 @@ test("the legend defines the share, the withheld gap and regulation time",
 
 // ----------------------------------------------------- responsiveness --
 
-test("the five columns stack on a phone with no horizontal overflow",
-  async ({ page }) => {
+test("the five columns become five tabs on a phone, with no horizontal "
+  + "overflow", async ({ page }) => {
+    /* RESTATED 2026-09-16. WHAT MOVED: five columns used to STACK on a
+       phone and a wrapped list of anchors offered a way between them.
+       The board draws one league there now and the tab strip is what
+       chooses it. THE CLAIM IS THE SAME ONE: every declared column —
+       including the cup, which is the whole reason this file counts five
+       — is reachable at phone width, and the page does not scroll
+       sideways while it is. */
     await page.setViewportSize({ width: 390, height: 900 });
     await open(page);
-    await expect(page.getByTestId("league-jump").locator("a")).toHaveCount(5);
+    await expect(page.getByTestId("league-tabs").getByRole("tab"))
+      .toHaveCount(5);
+    /* AND EXACTLY ONE OF THEM IS DRAWN, which is what the stack no
+       longer does. */
+    await expect(page.locator('[data-testid="league-col"]')).toHaveCount(1);
     const overflow = await page.evaluate(() =>
       document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);

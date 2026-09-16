@@ -87,7 +87,11 @@ import { ArchiveMenu } from "../../components/ArchiveMenu";
 import { CompRail } from "../../components/CompRail";
 import LiveSection from "../../components/LiveCard";
 import { LeagueColumn, NotesPanel } from "../../components/PickerColumn";
-import { LeagueRibbon, VIEW, useBoardLoop } from "../../components/LeagueRibbon";
+import {
+  LeagueRibbon, VIEW, VIEW_NARROW, useBoardLoop,
+} from "../../components/LeagueRibbon";
+import { LeagueTabs } from "../../components/LeagueTabs";
+import { useBoardShape } from "../../lib/viewport";
 import {
   WatchDeclarationProvider, WatchPanel,
 } from "../../components/WatchDeclaration";
@@ -138,6 +142,17 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   backTo?: { href: string; label: string };
 } = {}) {
   const router = useRouter();
+  /* WHICH SHAPE THE BOARD IS IN — phone, tablet, desktop — read from
+     the same `--breakpoint-*` values Tailwind compiles `md:` and `xl:`
+     from (lib/viewport.ts). Three shapes because the board genuinely has
+     three: ONE league at a time on a phone, TWO columns on a tablet,
+     FOUR on a desktop. Answers "desktop" on the server and for the first
+     hydration pass, and the real answer lands in a LAYOUT effect, before
+     paint — so a phone never shows a frame of the desktop board. In
+     practice it has settled long before any column exists, because the
+     board arrives on a client fetch and the server renders skeletons. */
+  const shape = useBoardShape();
+  const phone = shape === "phone";
   const days = DEFAULT_DAYS;
   /* HOW MANY COLUMNS ARE ON SCREEN AT ONCE — `VIEW`, in
      components/LeagueRibbon.tsx beside the loop that is built on it.
@@ -424,6 +439,33 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      say what actually happened instead of letting the column's own empty
      state claim a fixture count nobody measured. */
   const columnSlugs = only ? [...only] : boardColumns(declaredColumns);
+
+  /* ── WHICH LEAGUE THE PHONE IS LOOKING AT (operator, 2026-09-16) ────
+
+     A board column is 356px and an iPhone 15 Pro is 393px, so exactly
+     one column is ever visible on a phone — and the board drew all eight
+     anyway, stacked, 27,000px of page with a control whose every name
+     was clipped to a sliver. The operator's choice of the two drafts:
+     one league at a time, chosen from a swipeable tab strip.
+
+     SELECTION, NOT A DECLARATION. `columnSlugs` is untouched — it is
+     still the operator's whole declared set, it is still what the strip
+     offers, what the fields are fetched for and what the narrowed-board
+     copy names. What narrows is `drawnSlugs`, which is the only thing
+     this decides. Nothing here can add a competition, and nothing here
+     can remove one from the board's own account of itself.
+
+     HELD LOOSELY: the raw value is a league the reader pressed, and the
+     board can be rebuilt under it — a competition can leave the
+     declaration between two payloads. So it is resolved against the
+     live set on every render rather than corrected in an effect, which
+     would render one frame of a column that is not there. */
+  const [pickedRaw, setPicked] = useState<string | null>(null);
+  /** Has the reader opened the framing disclosure? Phone-only in effect
+   *  — at every other width the paragraph is open regardless. */
+  const [introOpen, setIntroOpen] = useState(false);
+  const picked = pickedRaw && columnSlugs.includes(pickedRaw)
+    ? pickedRaw : (columnSlugs[0] ?? null);
   /* DID THE BOARD ANSWER THE QUESTION THIS ROUTE ASKED IT? null while
      nothing has landed — an unanswered ask and an unmade one are not the
      same fact, and only a payload can tell them apart. */
@@ -604,13 +646,41 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      every narrowed page (`/bet-suggester/ucl`) exactly as it is: nothing
      is built to page through and no ribbon draws. */
   const windowed = columnSlugs.length > VIEW;
+  /** HOW MANY COLUMNS THE SCROLLPORT HOLDS AT THIS WIDTH.
+   *
+   *  Four is the desktop's measured number and has not moved (see
+   *  components/LeagueRibbon.tsx). Two is the tablet's, and it is the
+   *  SAME ARITHMETIC run at a narrower viewport: `md:grid-cols-2` already
+   *  put two columns side by side from 768 up, so two is the count that
+   *  keeps a column exactly the width it is today — 352px at 768, 480 at
+   *  1024 — while the board becomes a scroller instead of a four-deep
+   *  stack. One is the phone, where a column is wider than the viewport.
+   *
+   *  `windowed` deliberately does NOT follow it. It asks whether the
+   *  board declares more columns than the WIDEST scrollport can draw,
+   *  which is a fact about the declaration rather than about the window
+   *  you are holding — so a four-column board and every narrowed page
+   *  build no loop, no ribbon and no rail at any width, exactly as
+   *  before. Only the eight-column board changes, and only in how many
+   *  of the eight are in front of you. */
+  const view = phone ? 1 : shape === "tablet" ? VIEW_NARROW : VIEW;
   /* EVERY DECLARED COLUMN IS ON THE TRACK (2026-09-15). It used to draw
      four and mount no others, which is precisely why the board could not
      move: there was nothing beside the four to scroll TO. The track now
      carries the whole declaration and the four in front of you are a
      scroll position. `columnSlugs` is still the operator's declaration
-     and this adds nothing to it. */
-  const drawnSlugs = columnSlugs;
+     and this adds nothing to it.
+
+     A PHONE IS THE ONE WIDTH WHERE THAT IS NOT TRUE (2026-09-16), and
+     the reason is arithmetic rather than preference: a column is 356px
+     and the viewport is 393, so a track carrying eight of them can only
+     ever be a 27,000px vertical stack — every column mounted, seven of
+     them unreachable without scrolling past the others. The phone draws
+     the league the tab strip has selected and mounts nothing else, which
+     is where the page height went. THE DECLARATION IS UNCHANGED:
+     `columnSlugs` still names every column, the strip still offers every
+     one of them, and the fields are still fetched for all of them. */
+  const drawnSlugs = phone && picked ? [picked] : columnSlugs;
 
   /* ── MATCHDAY BANDS COVER THE WHOLE TRACK ─────────────────────────
      RESTATED 2026-09-15, when the board became a scroller. The union was
@@ -642,6 +712,14 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
     if (k && !dayLabelFor[k]) dayLabelFor[k] = dayLabel(r.kickoff);
   }
   const runningSorts = columnSlugs.map((sl) => columnSort(sl, boardSort));
+  /** How many fixtures each declared column holds — the tab strip's
+   *  accessible names, off the same `columnsOf` reader the columns
+   *  themselves claim a row with, so a folded fixture counts for every
+   *  column it is drawn in and the strip cannot disagree with the board.
+   *  A column with none is NAMED as having none; it never wears a 0. */
+  const fixtureCounts: Record<string, number> = Object.fromEntries(
+    columnSlugs.map((sl) =>
+      [sl, rows.filter((r) => columnsOf(r).includes(sl)).length]));
 
   /* ARROW KEYS, PILL CLICKS, THE ROTATION AND THE RIBBON, all in one
      place (components/LeagueRibbon.tsx). They belong together because
@@ -652,13 +730,26 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      `ready` gates it on the columns existing: the loop addresses the
      track's own DOM, and a board still loading has none. */
   const boardReady = Boolean(board) && !loading && error === "";
+  /** ONE SWITCHER, NEVER TWO (operator, 2026-09-16). The board carried
+   *  both the ribbon and a wrapped list of `#picker-col-<slug>` anchors
+   *  at phone width — two accounts of where you are, one of them
+   *  unreadable and the other only able to scroll you further down the
+   *  same stack. The anchors are gone; each width now has exactly one
+   *  control, and they are different controls because the widths are
+   *  different problems. See components/LeagueTabs.tsx. */
+  const showTabs = phone && boardReady && columnSlugs.length > 1;
+  const showRibbon = !phone && windowed && boardReady;
   /** The declared set as one comparable string — the same key the loop
    *  itself is rebuilt on, so the rail's slots and the rotation can never
    *  be looking at two different boards. */
   const declaredKey = columnSlugs.join(",");
   useBoardLoop({
-    trackRef, stripRef, railRef, slugs: columnSlugs,
-    enabled: windowed && boardReady,
+    trackRef, stripRef, railRef, slugs: columnSlugs, view,
+    /* NOT ON A PHONE. The loop addresses every declared column on the
+       track and a phone mounts one, so it would refuse to run in any
+       case — said here rather than left to that, because "the phone has
+       no loop" is a decision and not a side effect of the DOM. */
+    enabled: showRibbon,
     /* THE RAIL IS BUILT ON A MEASUREMENT, NOT ON A BREAKPOINT. "Is the
        track a real horizontal scroller" is exactly the question the rail
        answers to, and the loop already asks it of the DOM — so it says
@@ -769,7 +860,12 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   }
 
   return (
-    <div ref={pageRef} className="min-h-screen bg-bs font-sans text-ink-mid">
+    /* `data-tap-floor` — EVERY CONTROL IN HERE GETS A 44px HIT AREA AT
+       PHONE WIDTH. The rule is in globals.css and it is a subtree rule
+       rather than a class per control, so a control added to this page
+       tomorrow is floored without anybody remembering to. */
+    <div ref={pageRef} data-tap-floor
+      className="min-h-screen bg-bs font-sans text-ink-mid">
       <Head><title>{pageTitle ?? "Picker board"} · namson.dev</title></Head>
       <RouteProgress />
       <TopBar left={backTo ? undefined : <ArchiveMenu />} back={backTo}
@@ -812,11 +908,21 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
           this bar (see the header rail below). So the bar still has to
           genuinely stick — the rail's resting place is measured off it —
           and it still names the four in view at all times. */}
-      {windowed && boardReady && (
+      {/* AND ON A PHONE IT HOLDS THE TAB STRIP INSTEAD (2026-09-16).
+          Same bar, same storey, same sticky offset — the column headers
+          are measured off its bottom edge whichever control is in it, so
+          the two cases cannot drift apart. What changes is the control:
+          a fixed-slot ribbon that divides its width by eight, or a strip
+          of tabs each sized by its own name. */}
+      {(showTabs || showRibbon) && (
         <div ref={barRef} data-testid="board-pillbar"
           className="sticky top-[var(--bar-top,calc(3rem+1px))] z-40 w-full border-b border-line bg-bs/95 backdrop-blur">
-          <div className="mx-auto max-w-[96rem] px-5 py-2">
-            <LeagueRibbon slugs={columnSlugs} view={VIEW} stripRef={stripRef} />
+          <div className="mx-auto max-w-[96rem] px-5 py-2 max-md:px-3 max-md:py-1.5">
+            {showTabs && picked
+              ? <LeagueTabs slugs={columnSlugs} picked={picked}
+                  onPick={setPicked} counts={fixtureCounts} />
+              : <LeagueRibbon slugs={columnSlugs} view={view}
+                  stripRef={stripRef} />}
           </div>
         </div>
       )}
@@ -832,7 +938,13 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
       {/* max-w-[96rem], not the app's usual 5xl: four columns of match
           cards need the width, and each column stays a readable ~22rem.
           The intro copy below keeps its own measure (max-w-2xl). */}
-      <main className="mx-auto max-w-[96rem] px-5 pb-24 pt-10 sm:pt-12">
+      {/* `max-md:` — THE PAGE'S OWN MARGINS, ON A PHONE (2026-09-16).
+          Not a redesign: the same layout with the gutters and the top
+          padding a 393px viewport can afford. The hero was measured at
+          ~900px before the first fixture on an 844px screen; folding the
+          paragraph took most of that, and this takes the rest of what
+          was chrome rather than content. */}
+      <main className="mx-auto max-w-[96rem] px-5 pb-24 pt-10 max-md:px-3 max-md:pb-12 max-md:pt-4 sm:pt-12">
         {/* THE HERO IS A COMMAND BAR (2026-09-01). The old masthead spent
             ~40% of the first viewport on a title the operator has read a
             hundred times; the wordmark now sits at reading size in the
@@ -870,8 +982,41 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
               key (what the big number on each card MEANS) or a
               decision-safety invariant, and none of it is negotiable:
               e2e/picker.spec.ts pins all four phrases. */}
+          {/* ── AND ON A PHONE IT IS BEHIND A DISCLOSURE (operator,
+              2026-09-16) ─────────────────────────────────────────────
+
+              MEASURED at 393px: the eyebrow, the title, this paragraph's
+              six lines, the built stamp and the timezone note together
+              spent ~900px of an 844px screen before a single fixture.
+              Every word of it is still here and none of it may go — four
+              of these phrases are decision-safety invariants pinned by
+              e2e/picker.spec.ts and e2e/picker-prose.spec.ts — so the
+              paragraph is not cut, it is FOLDED, behind a summary that
+              says what opening it gets you.
+
+              ONE ELEMENT, NOT TWO. The obvious shape is a short version
+              for the phone and the full one for everything else, and
+              that is two copies of a charter sentence free to drift
+              apart. This is the same `<p>`, in the same place, in a
+              `<details>` that is open at every width but this one — so
+              the desktop and the tablet render exactly the markup they
+              rendered before, a `<summary>` with `display:none` and an
+              open disclosure being indistinguishable from a paragraph.
+
+              `open` is forced by the shape and remembered by the reader:
+              once opened on a phone it stays open, because a reader who
+              asked for the framing did not ask for it once. */}
+          <details data-testid="board-intro" open={introOpen || !phone}
+            onToggle={(e) => setIntroOpen(e.currentTarget.open)}
+            className="mx-auto mt-2 max-w-3xl">
+            <summary data-testid="board-intro-summary"
+              className="mx-auto hidden w-fit cursor-pointer list-none items-center justify-center gap-1.5 rounded-md border border-line px-3 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low marker:content-none hover:text-ink-hi max-md:flex"
+              style={{ minHeight: "var(--tap-floor)" }}>
+              <span aria-hidden className="text-ink-faint">?</span>
+              what is this
+            </summary>
           <p data-testid="board-framing"
-            className="mx-auto mt-2 max-w-3xl text-center text-[13px] leading-relaxed text-ink-low">
+            className="text-center text-[13px] leading-relaxed text-ink-low max-md:pt-2">
             {soleOwnSort
               ? `Ranked by ${soleOwnSort.mode} — nearly every tie here pairs two different domestic tables, and the gap between them is withheld.`
               : "Ranked by how far apart the two clubs sit in their own league's table."}
@@ -880,10 +1025,29 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             recommendation — the ranking says where to look, and you are the
             one who picks.
           </p>
+          </details>
         </div>
 
         {/* ------------------------- controls ------------------------- */}
-        <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4 font-mono text-[10px] uppercase tracking-wide">
+        {/* ── THE PROVENANCE, ONE LINE ON A PHONE (operator,
+            2026-09-16) ──────────────────────────────────────────────
+
+            Two blocks — the built/slate/count stamp and the timezone
+            note — cost five lines at 393px before the board. They are
+            now ONE ROW that truncates at the viewport's edge, and that
+            is the whole change: `max-md:contents` dissolves the flex row
+            so both become inline runs of a single truncating block.
+
+            NOTHING IS DELETED AND NOTHING IS HIDDEN. Every word is still
+            in the element, so a screen reader reads the sentence whole
+            and the legend at the foot of the page still carries the
+            reasoning behind it. Truncation is a decision about the
+            ellipsis, not about the text — which is the distinction
+            e2e/layout-audit.spec.ts already draws between a clip that
+            says so and one that eats a word. */}
+        <div data-testid="board-provenance"
+          className="mt-5 border-t border-line pt-4 max-md:mt-3 max-md:truncate max-md:pt-2.5">
+        <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-wide max-md:contents">
           {/* THE BOARD-LEVEL SORT IS GONE (operator, 2026-09-15). Every
               matchday band carries its own sort, which is the one that
               answers "what is worth looking at TODAY"; a second control
@@ -919,6 +1083,10 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             </span>
           )}
         </div>
+        <span aria-hidden
+          className="hidden font-mono text-[10px] text-ink-faint max-md:inline">
+          {" · "}
+        </span>
         {/* 2026-09-06, PROSE CUT. This was two lines of mechanics above
             the board. What SURVIVES is the pair of facts a reader needs
             in order to read the numbers beside them — which zone the
@@ -929,10 +1097,11 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             under "times · caching", where a reader who wants them can
             open them. No assertion pinned either sentence. */}
         <p data-testid="board-times"
-          className="mt-2 font-mono text-[10px] tracking-wide text-ink-faint">
+          className="mt-2 font-mono text-[10px] tracking-wide text-ink-faint max-md:mt-0 max-md:inline">
           kickoffs in {TZ} · cached 90s · “built” is when the board was
           assembled, not when you asked for it
         </p>
+        </div>
 
         {/* B0c's operator panel — one closed line until it is wanted.
             It sits directly above the strip because the strip renders
@@ -1003,8 +1172,8 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
           columns={narrowedTo} />
 
         {/* ---------------------------- the board ---------------------------- */}
-        <section className="mt-8">
-          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2 border-t border-line pt-6">
+        <section className="mt-8 max-md:mt-4">
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2 border-t border-line pt-6 max-md:mb-2 max-md:pt-3">
             <h2 data-testid="board-rank-heading"
               className="text-lg font-medium text-ink-hi">
               {oneRunningSort
@@ -1249,18 +1418,18 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   {" "}— the same ranking, built on request.
                 </p>
               )}
-              {/* On a phone the four columns stack — these chips are the
-                  way to a league without scrolling through the ones above
-                  it. Hidden from md up, where the grid says it itself. */}
-              <nav data-testid="league-jump" aria-label="jump to a league"
-                className="mb-4 flex flex-wrap gap-1.5 md:hidden">
-                {columnSlugs.map((s) => (
-                  <a key={s} href={`#picker-col-${s}`}
-                    className="rounded-md border border-line px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low transition-colors hover:border-line-strong hover:text-ink-hi">
-                    {leagueLabel(s)}
-                  </a>
-                ))}
-              </nav>
+              {/* THE JUMP NAV IS GONE (operator, 2026-09-16). It was a
+                  wrapped list of `#picker-col-<slug>` anchors, phone-only,
+                  and for as long as the phone stacked every column it was
+                  the only READABLE switcher the board had — the ribbon
+                  above it clipped all eight names to a sliver. Two
+                  controls for one board is two accounts of where you are,
+                  and an anchor could only ever move you down a 27,000px
+                  stack: it named the place without shortening the journey.
+                  The tab strip in the pills bar SELECTS, so the stack is
+                  not there to be jumped through. The addresses survive it
+                  — `id="picker-col-<slug>"` is still on every section, and
+                  is what each tab's `aria-controls` names. */}
               {/* Every column's content flows at its natural height — no
                   inner scrollers: a row below a fold that only scrolls
                   inside a box is a row most readers never see. */}
@@ -1370,9 +1539,15 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   overhang at exactly the track's edges and creates no
                   scroll container at all. Only the x axis is clipped, so
                   the notes panel can still hang below the rail. */}
+              {/* `md:block`, RESTATED 2026-09-16: the rail follows the
+                  scrollport, and the scrollport now starts at `md`. It is
+                  still built on a MEASUREMENT — `railOn` comes from the
+                  loop asking the DOM whether the track genuinely
+                  overflows — so this class says where the rail MAY be
+                  drawn and never decides that it should be. */}
               {railOn && (
                 <div data-testid="board-head-rail"
-                  className="sticky top-[var(--topbar-h)] z-30 hidden overflow-x-clip bg-bs xl:block">
+                  className="sticky top-[var(--topbar-h)] z-30 hidden overflow-x-clip bg-bs md:block">
                   <div ref={railRef} data-testid="board-head-track"
                     className="grid w-max items-start gap-x-6 [grid-template-columns:repeat(var(--cols),var(--colw,minmax(0,1fr)))] will-change-transform">
                     {drawnSlugs.map((slug) => (
@@ -1400,16 +1575,56 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   </div>
                 </div>
               )}
+              {/* ── THE TRACK, AND THE TWO WIDTHS IT IS A SCROLLER AT
+                  (2026-09-16) ────────────────────────────────────────
+
+                  It was a scroller at `xl` and a four-deep stack of
+                  two-wide rows from `md` to `xl` — which is the same
+                  board asking the reader to scroll past six columns to
+                  reach the seventh, on a device where two of them fit
+                  side by side perfectly well. The scrollport starts at
+                  `md` now. A COLUMN DOES NOT CHANGE WIDTH: `md:grid-cols-2`
+                  already gave two columns of (width − 24px gutter) / 2,
+                  and `--colw` at `VIEW_NARROW = 2` is that same
+                  arithmetic — 352px at 768, 480 at 1024 — so what moved
+                  is how you reach the other six, not what any of them
+                  looks like.
+
+                  ONLY A WINDOWED BOARD. Four columns or fewer have
+                  nothing to scroll to, so they keep `md:grid-cols-2` and
+                  the `xl` template exactly as they had them; a narrowed
+                  page keeps its single full-width column. Those boards
+                  are untouched at every width.
+
+                  BELOW `md` THE TRACK HOLDS ONE COLUMN, so `grid-cols-1`
+                  is the whole layout and there is nothing to overflow —
+                  which is also why the headers go back to sticking
+                  inside their own column there. */}
               <div ref={trackRef} data-testid="board-track"
                 style={{ ["--cols" as string]: String(drawnSlugs.length) }}
-                className={`grid grid-cols-1 gap-6 xl:gap-y-2 xl:[grid-template-columns:repeat(var(--cols),var(--colw,minmax(0,1fr)))] ${
-                  windowed ? "xl:overflow-x-auto xl:overscroll-x-contain" : ""} ${
-                  soleColumn ? "" : "md:grid-cols-2"}`}>
+                className={`grid grid-cols-1 gap-6 ${
+                  windowed
+                    ? "md:gap-y-2 md:overflow-x-auto md:overscroll-x-contain md:[grid-template-columns:repeat(var(--cols),var(--colw,minmax(0,1fr)))]"
+                    : `xl:gap-y-2 xl:[grid-template-columns:repeat(var(--cols),var(--colw,minmax(0,1fr)))] ${
+                        soleColumn ? "" : "md:grid-cols-2"}`}`}>
                 {drawnSlugs.map((slug, ci) => (
                   <LeagueColumn key={slug} slug={slug} days={days}
                     dayKeys={dayKeys} sortFor={sortFor}
                     dayLabels={dayLabelFor} colIndex={ci + 1}
                     dense={Boolean(soleColumn)}
+                    /* IS THIS COLUMN ON A SIDEWAYS TRACK FROM `md` UP?
+                       The same condition the track's own template is
+                       written from, handed down rather than re-decided:
+                       a column placed on `--col` at a width where the
+                       track has no `--cols` template lands on an
+                       IMPLICIT grid track, which is the zero-width-
+                       columns defect the track's note above records. */
+                    sideways={windowed}
+                    /* AND ON A PHONE IT IS THE TAB STRIP'S PANEL. Said
+                       only where a strip exists to point at it: a
+                       `tabpanel` with no `tablist` is a role that lies
+                       about the page. */
+                    tabPanel={showTabs && slug === picked}
                     meta={leaguesMap[slug]}
                     rows={rows.filter((r) => columnsOf(r).includes(slug))}
                     refusals={refusals.filter((r) => columnsOf(r).includes(slug))}
