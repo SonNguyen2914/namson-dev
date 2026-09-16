@@ -249,6 +249,35 @@
   [data-tap-floor] :where(input, select, textarea) {
     min-height: var(--tap-floor);
   }
+
+  /* A HIT AREA A SCROLLER CLIPS AWAY IS NOT A HIT AREA, and computed
+     style cannot tell you so. The league ribbon's window scrolls
+     sideways below `xl`, and a box that scrolls in one axis cannot show
+     overflow in the other — `overflow-y` clips. Its pills are 31px tall
+     in a 31px window, so each pill's 44px `::after` was drawn and then
+     clipped back to 31: the audit read 44 off the computed style while a
+     press 13px above the pill answered NOTHING. It is the tablet's
+     primary board control and it was the only thing on the page the
+     floor was decorative for.
+
+     THE WINDOW TAKES THE FLOOR, NOT THE PILL, so that no ink changes
+     size — which is the whole principle here. The pill keeps its 31px
+     border box, its radius and its type; what grows is the room around
+     it, and the `::after` it already had now fits. `align-items` centres
+     the strip in that room, which is where a 44px box centred on a 31px
+     pill needs it to be.
+
+     `min-height` off `--tap-floor` rather than a number, so there is
+     still ONE definition of the floor: raise it to 48 and the bar
+     follows. Coarse pointers only — the desktop ribbon stays 31px, which
+     is what the letter reveal and the parked headers were measured
+     against. `--topbar-h` is measured from this bar at runtime rather
+     than declared, so the headers re-park under it wherever it lands. */
+  [data-tap-floor] .tap-floor-room {
+    min-height: var(--tap-floor);
+    display: flex;
+    align-items: center;
+  }
 }
 
 /* ── THE TWO WIDTHS THE BOARD CHANGES SHAPE AT ─────────────────────────
