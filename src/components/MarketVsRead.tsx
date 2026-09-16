@@ -14,6 +14,8 @@
 // bet: our read beats a coin flip only narrowly, the market's own accuracy
 // here is unmeasured, and priors favour the exchange with money on it. The
 // label under the bar says exactly that, in the UI, not just in a comment.
+import { shortClub } from "../lib/clubName";
+
 type Pick = {
   has_pick?: boolean; side?: string; confidence?: string;
   agreement?: string; reasoning?: string; not_advice?: string;
@@ -47,18 +49,6 @@ function tone(d?: string) {
   if (d === "read_higher_on_home") return "text-emerald-400";
   if (d === "read_lower_on_home") return "text-rose-400";
   return "text-ink-faint";
-}
-
-/** The most DISTINCTIVE word of a club name, so the three legs fit on one
- *  row without collapsing onto a shared prefix. */
-function shortClub(name?: string) {
-  if (!name) return "";
-  const drop = new Set(["fc", "cf", "afc", "sc", "ac", "as", "ss", "ssc",
-    "club", "cd", "sd", "ca", "fk", "sk", "bk", "if", "ks", "de", "the"]);
-  const words = name.split(/[\s.]+/).filter((w) => w
-    && !drop.has(w.toLowerCase().replace(/[^a-z]/g, "")));
-  return (words.sort((a, b) => b.length - a.length)[0] || name)
-    .slice(0, 8).toUpperCase();
 }
 
 /** The compact form for a fixture row.
@@ -113,9 +103,9 @@ export function MarketVsReadInline({ d }: { d?: MarketVsReadData | null }) {
     <span className="ml-2 grid shrink-0 grid-cols-[auto_3.1rem_3.1rem_3.1rem_1.7rem] font-mono text-[10px] leading-[1.35]"
       title={d.note}>
       <span />
-      <span className="text-right text-accent">{shortClub(tw.home?.club)}</span>
+      <span className="text-right text-accent">{shortClub(tw.home?.club, 8)}</span>
       <span className="text-right text-ink-faint">TIE</span>
-      <span className="text-right text-sky-400">{shortClub(tw.away?.club)}</span>
+      <span className="text-right text-sky-400">{shortClub(tw.away?.club, 8)}</span>
       <span />
       <GridRow label="kalshi win" home={tw.home?.p} tie={tw.tie?.p} away={tw.away?.p} />
       {/* our own win/draw/loss, where a draw rate has been MEASURED for

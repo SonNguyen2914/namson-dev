@@ -29,6 +29,7 @@ import { Eyebrow, Reveal } from "../../../components/ui";
 import MarketVsRead, { MarketVsReadInline, type MarketVsReadData }
   from "../../../components/MarketVsRead";
 import TournamentView from "../../../components/TournamentView";
+import { shortClub } from "../../../lib/clubName";
 import { TZ, dayLabel, groupByDay } from "../../../lib/matchday";
 
 type SideRating = {
@@ -84,18 +85,6 @@ type Markets = {
   status?: string; series?: string; means?: string;
   listed_events?: number; tradeable_events?: number;
 };
-
-/** A compact club label: the most DISTINCTIVE word, so "Borussia Dortmund"
- *  reads DORTMUND rather than collapsing onto a common prefix. */
-function shortClub(name?: string) {
-  if (!name) return "";
-  const drop = new Set(["fc", "cf", "afc", "sc", "ac", "as", "ss", "ssc",
-    "club", "cd", "sd", "ca", "fk", "sk", "bk", "if", "ks", "de", "the"]);
-  const words = name.split(/[\s.]+/).filter((w) => w
-    && !drop.has(w.toLowerCase().replace(/[^a-z]/g, "")));
-  return (words.sort((a, b) => b.length - a.length)[0] || name)
-    .slice(0, 9).toUpperCase();
-}
 
 function when(f: Fixture) {
   if (f.status === "1H" || f.status === "2H" || f.status === "HT") {
