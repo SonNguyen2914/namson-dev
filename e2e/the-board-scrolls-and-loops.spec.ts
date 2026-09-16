@@ -311,20 +311,54 @@ async function traceKey(page: Page, key: string, ms: number): Promise<Sample[]> 
 
 const wrapIdx = (x: number, n: number) => ((x % n) + n) % n;
 
+/** THE RENDERED POSITION, BUILT FROM PIXELS ALONE.
+ *
+ *  `strip.dataset.pos` is the loop's OWN published position, and it is
+ *  written one animation frame AFTER the scroll it describes: on a loaded
+ *  CI runner it read 0.000 while the board was already 46px along. That
+ *  is a stale witness rather than a defect, and the ribbon cannot be the
+ *  witness for the board anyway.
+ *
+ *  So the position under test is reconstructed from geometry read in the
+ *  same frame — which league is drawn against the scrollport's left edge,
+ *  and how far into it the board is — and walked into a continuous number
+ *  of columns travelled. It never consults the thing it is measuring.
+ *
+ *  It is also what makes the atomicity claim measurable. A rotation whose
+ *  `scrollLeft` rebase lands a paint LATE draws the columns one place over
+ *  with the scroll unchanged, so the league at the left edge advances a
+ *  whole place while its offset does not move — a one-frame discontinuity
+ *  of exactly one column in this number, and invisible in every other. */
+function rendered(fs: Sample[], oneW: number, cols: readonly string[]) {
+  const n = cols.length;
+  const walk = (a: string, b: string) => {
+    const d = wrapIdx(cols.indexOf(b) - cols.indexOf(a), n);
+    return d > n / 2 ? d - n : d;          /* the nearer way round */
+  };
+  const out = [-fs[0].leadX / oneW];
+  for (let i = 1; i < fs.length; i++) {
+    out.push(out[i - 1] + walk(fs[i - 1].lead, fs[i].lead)
+             - (fs[i].leadX - fs[i - 1].leadX) / oneW);
+  }
+  return out;
+}
+
 test.describe("one keypress is one movement", () => {
   /** Assert the whole shape of one step over a frame-by-frame trace. */
   function pinStep(fs: Sample[], dir: number, oneW: number, what: string) {
-    const N = COLUMNS.length;
+    const r = rendered(fs, oneW, COLUMNS);
     const still = (a: number, b: number) => Math.abs(a - b) * oneW <= 0.5;
 
     /* Drop the frames before the keypress reached the page — the sampler
        is started first, and that head of stillness is not the board
-       having settled. */
-    const moved = fs.findIndex((f) => !still(f.pos, fs[0].pos));
-    expect(moved, `${what}: the board never moved at all, so everything `
-      + "below would pass for the wrong reason").toBeGreaterThan(0);
-    const frames = fs.slice(moved - 1);
-    const first = frames[0], last = frames[frames.length - 1];
+       having settled. The board turning its ORDER is not movement either:
+       a step rotates first, and that is a no-op on screen by design. */
+    const off = r.findIndex((v) => !still(v, r[0]));
+    expect(off, `${what}: the board never moved at all, so everything below `
+      + "would pass for the wrong reason").toBeGreaterThan(0);
+    const fr = fs.slice(off - 1);
+    const pos = r.slice(off - 1);
+    const last = pos.length - 1;
 
     /* (a) IT ARRIVES AT THE NEXT WHOLE COLUMN IN THE DIRECTION PRESSED.
        Stated against where it STARTED, so a step taken from a board that
@@ -332,69 +366,68 @@ test.describe("one keypress is one movement", () => {
        column, landing on an edge. A rebase that aborts the animation
        under-delivers and a rebase the animation outruns over-delivers;
        this refuses both. */
-    const arrive = Math.round(first.pos) + dir;
-    expect(Math.abs(last.pos - arrive) * oneW,
+    const arrive = Math.round(pos[0]) + dir;
+    expect(Math.abs(pos[last] - arrive) * oneW,
       `${what}: one ${dir > 0 ? "ArrowRight" : "ArrowLeft"} from `
-      + `${first.pos.toFixed(3)} left the board at ${last.pos.toFixed(3)}, `
-      + `and the next whole column that way is ${arrive}`).toBeLessThan(2);
-    expect(Math.abs(last.leadX),
-      `${what}: the board came to rest ${last.leadX.toFixed(1)}px into a `
+      + `${pos[0].toFixed(3)} columns left the board at `
+      + `${pos[last].toFixed(3)}, and the next whole column that way is `
+      + `${arrive}`).toBeLessThan(2);
+    expect(Math.abs(fr[last].leadX),
+      `${what}: the board came to rest ${fr[last].leadX.toFixed(1)}px into a `
       + "column — a sliver clipped at one edge and a cut header at the "
       + "other").toBeLessThan(2);
-    expect(last.on, `${what}: ${last.on} columns fit the scrollport`)
+    expect(fr[last].on, `${what}: ${fr[last].on} columns fit the scrollport`)
       .toBe(VIEW);
 
     /* (b) IT ONLY EVER GOES THAT WAY. An overshoot that comes back is two
        movements the reader has to watch, whatever it nets out to. */
-    for (let i = 1; i < frames.length; i++) {
-      const step = (frames[i].pos - frames[i - 1].pos) * dir;
-      expect(step * oneW, `${what}: at t=${frames[i].t | 0}ms the board went `
-        + `${(-step * oneW).toFixed(1)}px AGAINST the key pressed, from `
-        + `${frames[i - 1].pos.toFixed(3)} to ${frames[i].pos.toFixed(3)}`)
-        .toBeGreaterThan(-1);
+    for (let i = 1; i <= last; i++) {
+      expect((pos[i] - pos[i - 1]) * dir * oneW,
+        `${what}: at t=${fr[i].t | 0}ms the board went `
+        + `${((pos[i - 1] - pos[i]) * dir * oneW).toFixed(1)}px AGAINST the `
+        + `key pressed, from ${pos[i - 1].toFixed(3)} to `
+        + `${pos[i].toFixed(3)} columns`).toBeGreaterThan(-1);
     }
 
     /* (c) IT DOES NOT SETTLE AND THEN MOVE AGAIN — the live 200/400ms
        shape. The first place the board holds for 150ms is the place it
        has arrived at, and it must hold it for the rest of the trace. */
-    for (let i = 0; i < frames.length; i++) {
+    for (let i = 0; i <= last; i++) {
       let j = i;
-      while (j + 1 < frames.length && still(frames[j + 1].pos, frames[i].pos)) {
-        j += 1;
-      }
-      if (frames[j].t - frames[i].t < 150) continue;
-      expect(j, `${what}: the board held ${frames[i].pos.toFixed(3)} for `
-        + `${(frames[j].t - frames[i].t) | 0}ms and then moved again at `
-        + `t=${(frames[j + 1]?.t ?? 0) | 0}ms, to `
-        + `${frames[j + 1]?.pos.toFixed(3)} — one keypress, two movements`)
-        .toBe(frames.length - 1);
+      while (j + 1 <= last && still(pos[j + 1], pos[i])) j += 1;
+      if (fr[j].t - fr[i].t < 150) continue;
+      expect(j, `${what}: the board held ${pos[i].toFixed(3)} columns for `
+        + `${(fr[j].t - fr[i].t) | 0}ms and then moved again at `
+        + `t=${(fr[j + 1]?.t ?? 0) | 0}ms, to `
+        + `${pos[j + 1]?.toFixed(3)} — one keypress, two movements`)
+        .toBe(last);
       break;
     }
 
-    /* (d) AND EVERY FRAME'S PIXELS AGREE WITH THE POSITION IT PUBLISHES.
-       The rotation and the `scrollLeft` that cancels it have to land in
-       the SAME paint; a frame in which the order has turned and the scroll
-       has not is a whole column of visible jump. So on every frame where
-       the leading column is unambiguous, the league drawn against the
-       scrollport's left edge must be the one the position names, at the
-       offset the position implies. */
+    /* (d) AND IT IS CONTINUOUS. The rotation and the `scrollLeft` that
+       cancels it have to land in the SAME paint; a frame in which the
+       order has turned and the scroll has not moves the board a WHOLE
+       column at once. The glide's cubic opens at three times its average
+       speed and so covers at most 0.31 of a column in 34ms — anything
+       past half a column inside one short frame is not the animation.
+       Long frames are skipped rather than given a wider bound: a runner
+       that stalled for 200ms legitimately has a lot of ground to make up,
+       and a bound loose enough to allow that would allow the defect. */
     let checked = 0;
-    for (const f of frames) {
-      const near = Math.round(f.pos);
-      if (Math.abs(f.pos - near) > 0.4) continue;      /* lead is a tie */
+    for (let i = 1; i <= last; i++) {
+      const dt = fr[i].t - fr[i - 1].t;
+      if (dt > 34) continue;
       checked += 1;
-      expect(f.lead, `${what}: at t=${f.t | 0}ms the board reads `
-        + `${f.pos.toFixed(3)}, which names ${COLUMNS[wrapIdx(near, N)]} — `
-        + `but ${f.lead} is the column drawn against the left edge`)
-        .toBe(COLUMNS[wrapIdx(near, N)]);
-      expect(Math.abs(f.leadX + (f.pos - near) * oneW),
-        `${what}: at t=${f.t | 0}ms ${f.lead} is drawn at `
-        + `${f.leadX.toFixed(1)}px while the board reads ${f.pos.toFixed(3)} `
-        + "— the order turned in one paint and the scroll that cancels it "
-        + "in another").toBeLessThan(2.5);
+      expect(Math.abs(pos[i] - pos[i - 1]),
+        `${what}: the board moved `
+        + `${Math.abs((pos[i] - pos[i - 1]) * oneW).toFixed(1)}px in the `
+        + `${dt | 0}ms to t=${fr[i].t | 0}ms, jumping from `
+        + `${pos[i - 1].toFixed(3)} to ${pos[i].toFixed(3)} columns — the `
+        + "order turned in one paint and the scroll that cancels it in "
+        + "another").toBeLessThan(0.5);
     }
-    expect(checked, `${what}: no frame had an unambiguous leading column`)
-      .toBeGreaterThan(3);
+    expect(checked, `${what}: every frame of the trace was longer than 34ms, `
+      + "so the continuity check never ran").toBeGreaterThan(3);
   }
 
   test("a step arrives ONCE and lands on a whole column — from a settled "
