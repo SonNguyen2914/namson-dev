@@ -140,7 +140,16 @@ export async function auditFloor(page: Page): Promise<FloorAudit> {
       // ── and now the part a box cannot tell you ──
       if (b0.left < 2 || b0.right > innerWidth - 2) continue;
       e.scrollIntoView({ block: "center", inline: "nearest" });
-      await new Promise((done) => requestAnimationFrame(() => done(null)));
+      /* AND WAIT FOR IT TO ARRIVE. `html` sets `scroll-behavior: smooth`,
+         so this scroll travels; a rect read while it is still moving and
+         a hit test taken after it lands are two different pages, and that
+         disagreement reported a healthy control as unreachable. Under
+         `reducedMotion: "reduce"` the scroll is instant and this exits on
+         the second read. */
+      for (let i = 0, last = -1; i < 40 && last !== window.scrollY; i++) {
+        last = window.scrollY;
+        await new Promise((done) => setTimeout(done, 25));
+      }
       const b = e.getBoundingClientRect();
       if (b.left < 2 || b.right > innerWidth - 2) continue;
       /* THE BARS THEMSELVES ARE NOT "UNDER THE BARS". A control with a
