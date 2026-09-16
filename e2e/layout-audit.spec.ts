@@ -1,24 +1,55 @@
 import { test, expect } from "@playwright/test";
+import {
+  ARCHIVED_COUNT, COMPETITION_PAGES, COMPETITIONS, LIVE_COMPETITION_COUNT,
+} from "./liveCompetitions";
 
-const ROUTES = [
+/* THE ROUTES THIS SWEEP WALKS, and how it stopped being a hand-typed
+   list of them.
+ *
+ * It was one, and the list said so out loud: "ADDED 2026-09-08, and it
+ * was missing from the day it shipped" over /bet-suggester/ucl, then
+ * "ADDED 2026-09-09 with the route, not after it — this list is the
+ * hand-typed subset the note above already confesses to". Both notes
+ * were right and neither could fix the shape. On 2026-09-15 the EFL
+ * Cup shipped a board at /bet-suggester/efl-cup and this sweep never
+ * saw it, exactly as the Champions League had not been seen the week
+ * before.
+ *
+ * THE COMPETITION HALF IS DERIVED NOW, from the app's own two
+ * declarations of which competitions have a page: LIVE_COMPETITIONS in
+ * the chip rail and ARCHIVE in the menu. Deriving it added two routes
+ * nobody had listed — /bet-suggester/efl-cup, and
+ * /bet-suggester/comp/asean, which has been in the Archive dropdown
+ * since 2026-08-30 and had never been walked at any width.
+ *
+ * THE REST ARE STILL DECLARED, because they are not competitions and
+ * nothing derives them: the landing page, the carousel, the bots and
+ * hunter panels, the friendlies hub. A page added there joins this
+ * sweep the honest way, by somebody adding it.
+ *
+ * The count is asserted below, so a competition joining either registry
+ * changes what this walks and says so. */
+const STATIC_ROUTES = [
   "/", "/bet-suggester", "/bet-suggester/leagues", "/bet-suggester/bots",
-  "/bet-suggester/hunter", "/bet-suggester/wc26", "/bet-suggester/friendlies",
-  // ADDED 2026-09-08, and it was missing from the day it shipped. The
-  // Champions League board is the one route that lays a matchday ACROSS
-  // the band — six ~196px tracks, the narrowest card this board has
-  // ever drawn — so it is the route this sweep has the most to say
-  // about, and it was the only board route no geometry test walked.
-  "/bet-suggester/ucl",
-  // ADDED 2026-09-09 with the route, not after it — this list is the
-  // hand-typed subset the note above already confesses to, and the
-  // Champions League board sat outside it "from the day it shipped".
-  // The Leagues Cup archive is the densest page in the tree: 2024's
-  // knockout is 32 cards over five rounds plus a 45-row fixture table,
-  // and its first draft DID have two layout defects a text assertion
-  // could not see — club names truncated to initials at 1440, and the
-  // whole bracket invisible at 390 behind an IntersectionObserver.
-  "/bet-suggester/leagues-cup",
+  "/bet-suggester/hunter", "/bet-suggester/friendlies",
+  "/bet-suggester/ratings",
 ];
+
+const ROUTES = [...STATIC_ROUTES, ...COMPETITION_PAGES];
+
+test("this sweep walks every competition surface the app declares", () => {
+  /* NON-VACUOUS AND COMPLETE, in one assertion each. The derived half
+     must be the size the two registries say it is — a competition added
+     to either without this being looked at turns the sweep red instead
+     of quietly leaving its page unmeasured — and every route must be
+     distinct, because a duplicate is five wasted page loads reported as
+     coverage. */
+  expect(COMPETITIONS.length).toBe(LIVE_COMPETITION_COUNT);
+  expect(COMPETITION_PAGES.length)
+    .toBe(LIVE_COMPETITION_COUNT + ARCHIVED_COUNT);
+  expect(new Set(ROUTES).size).toBe(ROUTES.length);
+});
+
 const WIDTHS = [390, 768, 1100, 1440, 1920];
 
 /* THE GUARD CLASS THAT WAS MISSING (2026-09-07).
@@ -41,16 +72,18 @@ const WIDTHS = [390, 768, 1100, 1440, 1920];
  * as its own sentence in the failure. */
 test("no route scrolls sideways, hides a sticky header, or cuts text",
   async ({ page }) => {
-  // this sweep walks 9 routes x 5 widths against a live backend; the
-  // default per-test budget is not sized for that
-  test.setTimeout(180_000);
+  // this sweep walks every declared route at five widths against a
+  // live backend; the default per-test budget is not sized for that,
+  // and the budget scales with the route list rather than being a
+  // number that silently stops covering it
+  test.setTimeout(20_000 * ROUTES.length);
   const findings: string[] = [];
   const unreachable: string[] = [];
   for (const route of ROUTES) {
     for (const w of WIDTHS) {
       await page.setViewportSize({ width: w, height: 900 });
       /* A ROUTE THAT WILL NOT LOAD IS NOT A LAYOUT DEFECT, and this
-         sweep must not go red for one. These eight routes are walked
+         sweep must not go red for one. Every route here is walked
          UNMOCKED — that is the point, it is the real chrome — so they
          reach a live backend, and on 2026-09-08 a slow
          /bet-suggester/friendlies ate the whole test's budget and this
@@ -92,6 +125,20 @@ test("no route scrolls sideways, hides a sticky header, or cuts text",
           // sr-only text is clipped to 1px BY DESIGN (clip-path inset)
           if (cs.clipPath && cs.clipPath !== "none") return;
           if (/\bsr-only\b/.test(String((el as HTMLElement).className))) return;
+          /* AND THE LEGACY SPELLING OF THE SAME DECISION. `position:
+             absolute` + `clip: rect(0 0 0 0)` is the older visually-
+             hidden idiom, and the zero-box pass below has always
+             exempted it — this pass did not, so the two halves of one
+             file disagreed about what an intentional clip looks like.
+             Found the day this sweep started walking the competition
+             viewer (2026-09-15): the offender is NEXT'S OWN route
+             announcer, `<p id="__next-route-announcer__">`, the live
+             region that reads the page title to a screen reader. It is
+             clipped to 1px on purpose, it is not ours to fix, and it is
+             on every page in the tree — so the only thing this finding
+             could ever have taught a reader is to stop reading the
+             findings. */
+          if (cs.position === "absolute" && cs.clip !== "auto") return;
           if (!el.textContent || !el.textContent.trim()) return;
           if (!(el as HTMLElement).checkVisibility?.()) return;
           if (el.children.length > 2) return;

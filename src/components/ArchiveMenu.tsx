@@ -32,6 +32,32 @@
 // viewer, and that viewer is still linked from the board's rail. Filing
 // the competition did not retire the route.
 //
+// 2026-09-15 — THE EFL CUP IS NOT ARCHIVED, AND THE CHECK IS RECORDED.
+// This file is where "is this competition finished?" gets ASKED, and
+// the answer is only worth anything if it is asked of the data every
+// time. The EFL Cup joined the rail that day and was never put to this
+// list at all — the one competition on the site with no line here, and
+// therefore the one whose filing was a guess either way.
+//
+//   /api/comp/eflcup/fixtures   5 upcoming (2026-09-16 x4,
+//                               09-17 x1), 5 finished that day
+//                                                        -> stays a chip
+//
+// THIRD ROUND, with the fourth round, quarter-finals, semi-finals and a
+// final still to come. Filing that under "finished competitions" would
+// be a claim about the world, made by a menu — the same sentence this
+// list has refused twice already, once for the Leagues Cup at two
+// matches from its final and once for the Champions League before it
+// had kicked off. So the EFL Cup is REACHED THE WAY A LIVE COMPETITION
+// IS REACHED: by its chip in the rail, which since that day glows when
+// it plays today or tomorrow (components/CompRail.tsx).
+//
+// IT WILL BELONG HERE, and the test that decides when is the one above:
+// when its own fixture feed has nothing upcoming left. That feed is
+// GET /api/comp/eflcup/fixtures, which serves this competition a
+// SCHEDULE and no market — so the check is the same query, run the same
+// way, on a day the answer may have changed.
+//
 // The control itself is a real <button> with aria-expanded and a
 // role="menu" panel: Enter/Space open, Escape closes and returns focus,
 // arrows/Home/End move through the items, Tab and an outside click close
