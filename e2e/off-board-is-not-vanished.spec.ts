@@ -81,8 +81,8 @@ const BOARD = (key: string, offBoard: unknown[] | null | undefined) => ({
   narrowed_to: [key],
 });
 
-const json = (b: unknown) => ({
-  status: 200, contentType: "application/json", body: JSON.stringify(b) });
+const json = (b: unknown, status = 200) => ({
+  status, contentType: "application/json", body: JSON.stringify(b) });
 
 type Comp = (typeof COMPETITIONS)[number];
 
