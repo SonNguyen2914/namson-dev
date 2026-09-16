@@ -180,7 +180,12 @@ export function LeagueRibbon({ slugs, view, stripRef }: {
        scrollbar is hidden because the strip's position is already said
        by which pills are lit. */
     <div data-testid="league-ribbon-window"
-      className="w-full overflow-x-auto overflow-y-clip [-ms-overflow-style:none] [scrollbar-width:none] xl:overflow-clip [&::-webkit-scrollbar]:hidden">
+      /* `tap-floor-room` — THE Y AXIS CLIPS HERE, so the floor's
+         pseudo-element has nowhere to go unless this window leaves it
+         room. The rule is in globals.css beside the floor itself, gated
+         on the same coarse pointer: a media query repeated here would be
+         the second copy of the gate. No pill changes size. */
+      className="tap-floor-room w-full overflow-x-auto overflow-y-clip [-ms-overflow-style:none] [scrollbar-width:none] xl:overflow-clip [&::-webkit-scrollbar]:hidden">
       <div ref={stripRef} data-testid="league-ribbon" role="tablist"
         aria-label={`leagues, in strength order — ${view} on screen`}
         style={{ ["--rgap" as string]: `${RGAP}px` }}

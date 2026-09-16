@@ -199,11 +199,39 @@
    INPUTS AND SELECTS TAKE THE PADDED VERSION, because a replaced element
    has no `::after` to give. There are three of them on this page.
 
-   PHONE ONLY. A mouse is not a thumb, and 44px boxes around inline links
-   on a desktop would overlap each other. */
+   WHAT DECIDES WHETHER IT APPLIES IS THE POINTER, NOT THE WIDTH
+   (second pass, same day). This shipped gated at `width < 48rem`, which
+   is the line the BOARD changes shape at — and a finger is not a width.
+   MEASURED on the live board hours later: 210 of 279 controls under 44px
+   on an iPad at 810 portrait, and the same 210 at 1080 landscape,
+   because an iPad is a touch device that sits above the phone line.
+
+   `any-pointer` AND NOT `pointer`. `pointer` describes the PRIMARY
+   pointer only, and the device it gets wrong is the one this floor most
+   needs: attach a Magic Keyboard to an iPad and iPadOS begins reporting
+   `pointer: fine` and `hover: hover`, so a tablet would lose its touch
+   floor the moment a trackpad came within reach of the same screen, and
+   get it back when the keyboard came off — a layout changing shape under
+   the reader's hands. A Windows or ChromeOS touch laptop reads the same
+   way, its trackpad primary and its screen ignored. `any-pointer: coarse`
+   asks whether ANY available input is coarse, which is the question worth
+   asking: there is a finger on this screen. A mouse-only desktop answers
+   no and keeps exactly the layout that shipped.
+
+   HOVER WAS CONSIDERED AND IS NOT THE GATE. `hover: none` says whether a
+   tooltip can ever be shown, not how precisely the reader can aim, and it
+   gets that same iPad-with-a-trackpad wrong in the same direction.
+
+   THE COST ON A HYBRID IS AN OVERLAP, AND IT IS MEASURED RATHER THAN
+   ASSUMED. The ink never changes size, so a trackpad user sees the
+   desktop layout down to the pixel; what grows is an invisible box that
+   may reach over a neighbour's. A floor that answered a press aimed at
+   the control NEXT to it would be worse than no floor, so the guard reads
+   `elementFromPoint` at every control's own centre and requires that
+   control to answer. */
 :root { --tap-floor: 44px; }
 
-@media (width < 48rem) {
+@media (any-pointer: coarse) {
   [data-tap-floor] :where(a[href], button, summary, [role="tab"],
                           [role="button"]) {
     position: relative;
@@ -220,6 +248,35 @@
   }
   [data-tap-floor] :where(input, select, textarea) {
     min-height: var(--tap-floor);
+  }
+
+  /* A HIT AREA A SCROLLER CLIPS AWAY IS NOT A HIT AREA, and computed
+     style cannot tell you so. The league ribbon's window scrolls
+     sideways below `xl`, and a box that scrolls in one axis cannot show
+     overflow in the other — `overflow-y` clips. Its pills are 31px tall
+     in a 31px window, so each pill's 44px `::after` was drawn and then
+     clipped back to 31: the audit read 44 off the computed style while a
+     press 13px above the pill answered NOTHING. It is the tablet's
+     primary board control and it was the only thing on the page the
+     floor was decorative for.
+
+     THE WINDOW TAKES THE FLOOR, NOT THE PILL, so that no ink changes
+     size — which is the whole principle here. The pill keeps its 31px
+     border box, its radius and its type; what grows is the room around
+     it, and the `::after` it already had now fits. `align-items` centres
+     the strip in that room, which is where a 44px box centred on a 31px
+     pill needs it to be.
+
+     `min-height` off `--tap-floor` rather than a number, so there is
+     still ONE definition of the floor: raise it to 48 and the bar
+     follows. Coarse pointers only — the desktop ribbon stays 31px, which
+     is what the letter reveal and the parked headers were measured
+     against. `--topbar-h` is measured from this bar at runtime rather
+     than declared, so the headers re-park under it wherever it lands. */
+  [data-tap-floor] .tap-floor-room {
+    min-height: var(--tap-floor);
+    display: flex;
+    align-items: center;
   }
 }
 

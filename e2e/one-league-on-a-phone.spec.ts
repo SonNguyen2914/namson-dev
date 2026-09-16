@@ -43,6 +43,7 @@
 import { expect, test, devices, type Browser, type Page } from "@playwright/test";
 import { BOARD_EIGHT, REVIEW_EIGHT } from "./eight-columns";
 import { boardColumns, leagueLabel } from "../src/lib/pickerApi";
+import { auditFloor } from "./the-touch-floor";
 
 const COLUMNS = boardColumns(Object.keys(BOARD_EIGHT.leagues));
 
@@ -252,66 +253,62 @@ test.describe("a phone draws one league, and its name fits", () => {
 
   test("every control has a thumb — 44x44, and it is a real hit area",
     async ({ browser }) => {
+      /* RESTATED 2026-09-16, SAME DAY, AND WHAT MOVED IS THE GATE, not
+         the claim. This test still says exactly what it said: at phone
+         size every control carries a 44px hit area and the hit area is
+         real. What changed underneath it is WHY it applies here — the
+         floor was gated on `width < 48rem` and is now gated on
+         `any-pointer: coarse`, because an iPad is a touch device that
+         sits above the phone line and kept the mouse-sized controls.
+         This device emulates touch, so it is still floored, and it is
+         the phone half of the same claim that
+         `e2e/the-floor-is-the-pointer-not-the-width.spec.ts` makes at
+         810, 1080 and 1680.
+
+         THE AUDIT ITSELF MOVED TO `e2e/the-touch-floor.ts` and is no
+         longer written out here. It was the second copy the moment a
+         tablet needed the same question asked, and a copy of a
+         measurement is the copy that rots — this one had already drifted
+         from the truth in two places a rect cannot see: it counted
+         controls inside a closed `<details>`, which report a healthy box
+         and are not rendered, and disabled ones, which Chromium will not
+         hit-test at all. */
       const { ctx, page } = await open(browser, "iPhone 15 Pro");
+      const a = await auditFloor(page);
+
       /* THE FLOOR IS READ OFF THE STYLESHEET, not typed here: one
          `--tap-floor`, declared in globals.css, used by the rule that
          grows the hit areas and by the tab strip's own min size. */
-      const floor = await page.evaluate(() => parseFloat(
-        getComputedStyle(document.documentElement)
-          .getPropertyValue("--tap-floor")));
-      expect(floor, "--tap-floor is declared").toBeGreaterThanOrEqual(44);
+      expect(a.floor, "--tap-floor is declared").toBeGreaterThanOrEqual(44);
 
-      const audit = await settled(page, () => page.evaluate((min) => {
-        /* THE SET IS DERIVED, never listed. Everything a reader can
-           press, focus or type into — so a control added to this page
-           tomorrow is measured without anybody remembering to add it. */
-        const sel = 'a[href],button,select,input,textarea,summary,'
-          + '[role="tab"],[role="button"],[tabindex]:not([tabindex="-1"])';
-        const small: string[] = [];
-        let seen = 0;
-        document.querySelectorAll<HTMLElement>(sel).forEach((e) => {
-          const b = e.getBoundingClientRect();
-          if (b.width === 0 || b.height === 0) return;
-          if (getComputedStyle(e).visibility === "hidden") return;
-          seen += 1;
-          /* THE THUMB IS THE UNION OF THE INK AND ITS HIT AREA. The
-             floor is an `::after` rather than padding, because padding
-             would add ~29px to every chip row on every card — the ink
-             may stay small, the target may not. */
-          const a = getComputedStyle(e, "::after");
-          const grown = a.content !== "none" && a.content !== "";
-          const w = Math.max(b.width, grown ? parseFloat(a.width) || 0 : 0);
-          const h = Math.max(b.height, grown ? parseFloat(a.height) || 0 : 0);
-          if (w < min - 0.5 || h < min - 0.5) {
-            small.push(`<${e.tagName.toLowerCase()}`
-              + `${e.dataset.testid ? ` data-testid="${e.dataset.testid}"` : ""}>`
-              + ` "${(e.textContent || "").trim().slice(0, 24)}" `
-              + `— ${Math.round(w)}x${Math.round(h)}`);
-          }
-        });
-        return { seen, small };
-      }, floor));
-
-      /* NON-VACUITY: this page really is full of controls. An empty
-         `small` list over an empty control list is the shape this
-         refuses. */
-      expect(audit.seen, "the audit found the page's controls")
+      /* NON-VACUITY: this page really is full of controls, and they are
+         really still small ink. An empty list over an empty control set
+         is the shape this refuses, and so is a floor that grew the ink. */
+      expect(a.census, "the audit found the page's controls")
         .toBeGreaterThan(20);
-      expect(audit.small,
-        `these controls are under ${floor}px at phone width`).toEqual([]);
+      expect(a.smallInk, "the ink is still small — the floor is a hit area "
+        + "and not the padding it was written not to be")
+        .toBeGreaterThan(a.census / 3);
+      expect(a.examples,
+        `these controls are under ${a.floor}px at phone width`).toEqual([]);
+      expect(a.small).toBe(0);
+      expect(a.pressFail, "every control answered a press at the floor")
+        .toBe(0);
+      expect(a.theft, "and none of them answered for a neighbour").toBe(0);
 
       /* AND THE HIT AREA IS REAL, not a computed style that happens to
          exist. A 15x15 `i` must answer a press well outside its ink —
-         which is the only reading that tells a floor from a decoration. */
+         which is the only reading that tells a floor from a decoration.
+         Kept as a named, readable case on top of the derived audit. */
       const i = page.getByTestId("tier-read").first();
       await i.scrollIntoViewIfNeeded();
       const box = await settled(page, async () => (await i.boundingBox())!);
       expect(box.height, "the tier-read glyph is still small ink — if it "
         + "had grown to 44px this would no longer be testing the hit area")
-        .toBeLessThan(floor);
+        .toBeLessThan(a.floor);
       await expect(i).toHaveAttribute("aria-expanded", "false");
       await page.mouse.click(box.x + box.width / 2,
-        box.y + box.height / 2 - (floor / 2 - 4));
+        box.y + box.height / 2 - (a.floor / 2 - 4));
       await expect(i).toHaveAttribute("aria-expanded", "true");
       await ctx.close();
     });
