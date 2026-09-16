@@ -938,7 +938,13 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
       {/* max-w-[96rem], not the app's usual 5xl: four columns of match
           cards need the width, and each column stays a readable ~22rem.
           The intro copy below keeps its own measure (max-w-2xl). */}
-      <main className="mx-auto max-w-[96rem] px-5 pb-24 pt-10 sm:pt-12">
+      {/* `max-md:` — THE PAGE'S OWN MARGINS, ON A PHONE (2026-09-16).
+          Not a redesign: the same layout with the gutters and the top
+          padding a 393px viewport can afford. The hero was measured at
+          ~900px before the first fixture on an 844px screen; folding the
+          paragraph took most of that, and this takes the rest of what
+          was chrome rather than content. */}
+      <main className="mx-auto max-w-[96rem] px-5 pb-24 pt-10 max-md:px-3 max-md:pb-12 max-md:pt-4 sm:pt-12">
         {/* THE HERO IS A COMMAND BAR (2026-09-01). The old masthead spent
             ~40% of the first viewport on a title the operator has read a
             hundred times; the wordmark now sits at reading size in the
@@ -1004,7 +1010,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             onToggle={(e) => setIntroOpen(e.currentTarget.open)}
             className="mx-auto mt-2 max-w-3xl">
             <summary data-testid="board-intro-summary"
-              className="mx-auto hidden w-fit cursor-pointer list-none items-center gap-1.5 rounded-md border border-line px-3 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low marker:content-none hover:text-ink-hi max-md:inline-flex"
+              className="mx-auto hidden w-fit cursor-pointer list-none items-center justify-center gap-1.5 rounded-md border border-line px-3 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low marker:content-none hover:text-ink-hi max-md:flex"
               style={{ minHeight: "var(--tap-floor)" }}>
               <span aria-hidden className="text-ink-faint">?</span>
               what is this
@@ -1166,8 +1172,8 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
           columns={narrowedTo} />
 
         {/* ---------------------------- the board ---------------------------- */}
-        <section className="mt-8">
-          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2 border-t border-line pt-6">
+        <section className="mt-8 max-md:mt-4">
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2 border-t border-line pt-6 max-md:mb-2 max-md:pt-3">
             <h2 data-testid="board-rank-heading"
               className="text-lg font-medium text-ink-hi">
               {oneRunningSort
