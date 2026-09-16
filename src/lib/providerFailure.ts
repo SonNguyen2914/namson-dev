@@ -103,6 +103,27 @@ const QUERY_STRING = /[?&][A-Za-z_][\w.-]*=/;
  *  and carries another one. `/trade-api/v2/markets` matches; the two
  *  ordinary uses of a slash in English do not. */
 const PATHISH = /(?:^|\s)\/[\w.~%-]+(?:\/[\w.~%-]*)+/;
+/** HOW `OSError` NAMES THE FILE IT COULD NOT OPEN, and the one shape
+ *  that was walking past every test above (found 2026-09-16, not in the
+ *  audit that prompted this file's other change).
+ *
+ *      FileNotFoundError: [Errno 2] No such file or directory:
+ *      'research_archive/goals_cross_league_2026-09-09/league_levels.json'
+ *
+ *  Strip the exception class and what is left has spaces, no braces, no
+ *  query string, no host, and a path that PATHISH does not see because
+ *  it is RELATIVE and opens against a quote rather than a space. So the
+ *  whole line survived the prose test and an internal repository path
+ *  and a C errno went onto the page — the same defect this module was
+ *  written for, arriving through the one door it had left open.
+ *
+ *  Two shapes rather than one broadened PATHISH, because they are two
+ *  facts: a quoted token carrying a slash is a path wherever it appears,
+ *  and `[Errno 12]` is a number out of errno.h that no reader can act
+ *  on. Neither can occur in a sentence the backend composed — those are
+ *  screened by `provider_failure` before they are served. */
+const QUOTED_PATH = /['"][^'"\s]*\/[^'"\s]*['"]/;
+const ERRNO = /\[Errno \d+\]/i;
 
 /** An HTTP reason phrase is NOT a sentence. "Too Many Requests" is the
  *  wire's word for 429 — it survives every strip above intact and looks
@@ -133,11 +154,65 @@ function statusIn(s: string): number | null {
   return n >= 100 && n <= 599 ? n : null;
 }
 
+/* ── the four failures with no status, and what each one is called ────
+ *
+ * THE BACKEND IS THE PRODUCER AND ITS SPELLING WINS. These are
+ * `src/picker/provider_failure._NO_STATUS`'s `reason()` column, word for
+ * word — that module's own header says this file is "word for word the
+ * frontend's `classify()`", and until 2026-09-16 it was not: this file
+ * had THREE of the four and spelt one of those differently. A sentence
+ * composed there and a sentence composed here are shown in the same
+ * places, so two dialects read as two different failures.
+ *
+ * WHY THIS COPY CANNOT BE DERIVED AWAY. `classify` runs exactly when the
+ * backend's sentence did NOT survive the prose test above — there is no
+ * payload left to read the words off. A process boundary and two
+ * languages sit between the two lists, and the frontend is a static
+ * build that cannot import Python. So the copy stays and is pinned
+ * instead: `e2e/a-missing-file-is-not-an-answer.spec.ts` on this side,
+ * and the backend's own cross-repo suite is where the two files can
+ * actually be read against each other. */
+const NO_STATUS = {
+  timeout: "no answer in time",
+  /** NOT "the provider could not be reached". The subject came off on
+   *  2026-09-16: the backend carries none here, every caller already
+   *  names what it was reading, and a sentence that names the provider
+   *  itself says it twice — or names the wrong one on `api/main.py`'s
+   *  four-provider column, which passes "its upstream" precisely
+   *  because it does not know which provider failed. */
+  unreachable: "could not be reached",
+  /** MISSING IS NOT UNREACHABLE, AND THAT DISTINCTION IS THE WHOLE
+   *  BRANCH. A frozen artifact that is simply not on disk is not a
+   *  provider that would not answer: one is a file to go and put back,
+   *  the other is a network to go and look at, and they send an
+   *  operator to different places. The backend learnt this inside the
+   *  fix for the same class of bug; this file did not learn it at all,
+   *  and reported a file that was never there as "no answer we could
+   *  read" — which ASSERTS the provider answered. */
+  missing: "nothing was there to read",
+  unreadable: "no answer we could read",
+} as const;
+
+/** A file that was never there, in the words the messages use. The
+ *  backend decides this from the exception TYPE (`FileNotFoundError`,
+ *  `NotADirectoryError`); nothing crosses the wire but text, so this
+ *  side reads the type NAME and the phrase those types carry. */
+const MISSING_WORDS =
+  /\bFileNotFoundError\b|\bNotADirectoryError\b|\bno such file or directory\b|\bnot a directory\b/i;
+/** A provider that would not answer. Deliberately tested AFTER
+ *  `MISSING_WORDS`: this list is broad enough for a filesystem message
+ *  to wander into it — a path under `/Volumes/network-share/` carries
+ *  "network" — and folding a missing file into a network outage is the
+ *  exact mistake the branch above exists to stop. */
+const UNREACHABLE_WORDS =
+  /\b(?:connection|unreachable|refused|resolve|dns|network|max retries|ssl|certificate)\b/i;
+const TIMEOUT_WORDS = /\btimed?\s*out\b|\btimeout\b/i;
+
 /** THIS MODULE'S OWN WORDS FOR A FAILURE IT COULD NOT READ A SENTENCE
- *  OUT OF. Subject-less on purpose: every caller already names the
- *  provider it was talking to ("Kalshi prices could not be read — …"),
- *  and a reason that named one too would say it twice or, worse, name
- *  the wrong one. */
+ *  OUT OF. Subject-less wherever the backend's is: every caller already
+ *  names the provider it was talking to ("Kalshi prices could not be
+ *  read — …"), and a reason that named one too would say it twice or,
+ *  worse, name the wrong one. */
 function classify(status: number | null, raw: string): string {
   if (status === 429) return "too many requests too quickly";
   if (status === 401 || status === 403) return "our credentials were refused";
@@ -145,11 +220,17 @@ function classify(status: number | null, raw: string): string {
   if (status === 408 || status === 504) return "no answer in time";
   if (status != null && status >= 500) return "the provider's own service failed";
   if (status != null && status >= 400) return "the request was refused";
-  if (/\btimed?\s*out\b|\btimeout\b/i.test(raw)) return "no answer in time";
-  if (/\b(?:connection|unreachable|refused|resolve|dns|network|max retries|ssl|certificate)\b/i
-    .test(raw)) return "the provider could not be reached";
-  return "no answer we could read";
+  if (TIMEOUT_WORDS.test(raw)) return NO_STATUS.timeout;
+  if (MISSING_WORDS.test(raw)) return NO_STATUS.missing;
+  if (UNREACHABLE_WORDS.test(raw)) return NO_STATUS.unreachable;
+  return NO_STATUS.unreadable;
 }
+
+/** The four no-status sentences, for a guard that has to name them.
+ *  Exported so `e2e/a-missing-file-is-not-an-answer.spec.ts` asserts the
+ *  SET rather than a hand-typed subset of it — a guard that enumerates
+ *  three of four is how this drift survived in the first place. */
+export const NO_STATUS_REASONS = NO_STATUS;
 
 /** Read a provider failure into something a reader may be shown.
  *
@@ -198,6 +279,8 @@ export function readFailure(
     || JSONISH.test(stripped)
     || QUERY_STRING.test(stripped)
     || PATHISH.test(stripped)
+    || QUOTED_PATH.test(stripped)
+    || ERRNO.test(stripped)
     || BARE_REASON.has(stripped.toLowerCase());
   return {
     said: machine ? classify(status, raw) : stripped,
