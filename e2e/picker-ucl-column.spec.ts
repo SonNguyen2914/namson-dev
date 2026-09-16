@@ -391,18 +391,54 @@ const VIEW = 4;                       // src/pages/bet-suggester/index.tsx
 const drawnOrder = (columns: readonly string[] = COLUMNS) =>
   boardColumns(columns);
 
+
+/** THE COLUMNS IN THE SCROLLPORT — RESTATED 2026-09-15.
+ *
+ *  "Drawn" used to mean "mounted": the page rendered four columns and no
+ *  others. The board is a scrolling track now and every declared column
+ *  is mounted, so which four you are looking at is a SCROLL POSITION and
+ *  has to be asked of the track rather than counted off the DOM. */
+const onScreenCols = (page: import("@playwright/test").Page) =>
+  page.evaluate(() => {
+    const t = document.querySelector<HTMLElement>('[data-testid="board-track"]');
+    if (!t) return [] as string[];
+    const box = t.getBoundingClientRect();
+    return [...t.querySelectorAll<HTMLElement>('[data-testid="league-col"]')]
+      .map((c) => ({ slug: c.dataset.league!,
+                     x: c.getBoundingClientRect().left - box.left }))
+      .filter((c) => c.x > -4 && c.x < box.width - 4)
+      .sort((a, b) => a.x - b.x).map((c) => c.slug);
+  });
+
 async function show(page: import("@playwright/test").Page, slug: string,
                     columns: readonly string[] = COLUMNS) {
   const order = drawnOrder(columns);
   const i = order.indexOf(slug);
   expect(i, `${slug} is not a declared column of this board`)
     .toBeGreaterThanOrEqual(0);
+  await expect(col(page, slug)).toHaveCount(1);
   if (order.length > VIEW) {
     const lead = order[i < VIEW ? 0 : Math.min(i, order.length - VIEW)];
     await page.locator(
       `[data-testid="ribbon-pill"][data-slug="${lead}"]`).click();
+    /* AND WAIT FOR IT TO ARRIVE. Every declared column is mounted since
+       2026-09-15, so `col(page, slug)` is satisfied before the board has
+       moved a pixel — the jump is a SMOOTH SCROLL now, and a read taken
+       on the click describes the layout the click was meant to change.
+       "Shown" means in the scrollport, and that is what is waited on.
+
+       TWO AGREEING READS, not just a passing one: `expect.poll` returns
+       the instant its assertion holds, and mid-scroll the arriving column
+       is already inside the box while the one leaving has not yet left.
+       A set read there is a frame nobody was ever shown. */
+    await expect.poll(async () => {
+      const a = await onScreenCols(page);
+      await page.waitForTimeout(60);
+      const b = await onScreenCols(page);
+      return a.join() === b.join() && b.includes(slug) ? b.join() : "moving";
+    }, { message: `${slug} never came to rest in the scrollport` })
+      .toContain(slug);
   }
-  await expect(col(page, slug)).toHaveCount(1);
 }
 
 /** The full board with the Champions League column on screen — which is
@@ -1862,7 +1898,14 @@ test("the season basis is said by a column, so it can only ever name a "
     // of the window, so a paged-off column is not quietly exempted.
     for (const jump of ["mls", "ucl"]) {
       await show(page, jump);
-      await expect(page.getByTestId("league-col")).toHaveCount(VIEW);
+      /* RESTATED 2026-09-15: the board is a looped scroller and every
+         declared column is MOUNTED on the track, so the count read here
+         is the DECLARATION rather than `VIEW`. The claim below is
+         unchanged and is the one that matters — every season chip on the
+         page belongs to a column the page draws — and it now covers the
+         whole declaration at once rather than four of it at a time. */
+      await expect(page.getByTestId("league-col"))
+        .toHaveCount(COLUMNS.length);
       const said = await page.getByTestId("league-col")
         .evaluateAll((els) => els
           .filter((e) => e.querySelector('[data-testid="col-season"]'))

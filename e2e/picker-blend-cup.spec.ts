@@ -248,6 +248,26 @@ const orderOf = (c: ReturnType<typeof col>) =>
 const COLUMNS = ["mls", "epl", "laliga", "ligamx", "leaguescup"];
 const VIEW = 4;                       // src/pages/bet-suggester/index.tsx
 
+/** THE COLUMNS IN THE SCROLLPORT — RESTATED 2026-09-15.
+ *
+ *  "Drawn" used to mean "mounted": the page rendered four columns and no
+ *  others. The board is a scrolling track now and every declared column
+ *  is mounted, so which four you are looking at is a SCROLL POSITION and
+ *  has to be asked of the track rather than counted off the DOM. A board
+ *  that mounted four columns and never moved satisfied the old count
+ *  perfectly, which is how the motion came to be missing. */
+const onScreenCols = (page: import("@playwright/test").Page) =>
+  page.evaluate(() => {
+    const t = document.querySelector<HTMLElement>('[data-testid="board-track"]');
+    if (!t) return [] as string[];
+    const box = t.getBoundingClientRect();
+    return [...t.querySelectorAll<HTMLElement>('[data-testid="league-col"]')]
+      .map((c) => ({ slug: c.dataset.league!,
+                     x: c.getBoundingClientRect().left - box.left }))
+      .filter((c) => c.x > -4 && c.x < box.width - 4)
+      .sort((a, b) => a.x - b.x).map((c) => c.slug);
+  });
+
 /* DECLARED IS NOT DRAWN. `COLUMNS` is this fixture's DECLARATION — the
    keys of `board.leagues` — which decides WHICH columns exist and
    nothing about their order. The order is the operator's, written once
@@ -267,12 +287,29 @@ async function show(page: import("@playwright/test").Page, slug: string,
   const i = order.indexOf(slug);
   expect(i, `${slug} is not a declared column of this board`)
     .toBeGreaterThanOrEqual(0);
+  await expect(col(page, slug)).toHaveCount(1);
   if (order.length > VIEW) {
     const lead = order[i < VIEW ? 0 : Math.min(i, order.length - VIEW)];
     await page.locator(
       `[data-testid="ribbon-pill"][data-slug="${lead}"]`).click();
+    /* AND WAIT FOR IT TO ARRIVE. Every declared column is mounted since
+       2026-09-15, so `col(page, slug)` is satisfied before the board has
+       moved a pixel — the jump is a SMOOTH SCROLL now, and a read taken
+       on the click describes the layout the click was meant to change.
+       "Shown" means in the scrollport, and that is what is waited on.
+
+       TWO AGREEING READS, not just a passing one: `expect.poll` returns
+       the instant its assertion holds, and mid-scroll the arriving column
+       is already inside the box while the one leaving has not yet left.
+       A set read there is a frame nobody was ever shown. */
+    await expect.poll(async () => {
+      const a = await onScreenCols(page);
+      await page.waitForTimeout(60);
+      const b = await onScreenCols(page);
+      return a.join() === b.join() && b.includes(slug) ? b.join() : "moving";
+    }, { message: `${slug} never came to rest in the scrollport` })
+      .toContain(slug);
   }
-  await expect(col(page, slug)).toHaveCount(1);
 }
 
 /* SORTING IS THE MATCHDAY'S ALONE since 2026-09-15: the board-level
@@ -296,7 +333,9 @@ test("the Leagues Cup gets its own column, after the four leagues",
        readable when only four of them fit; a declared column with no
        pill would be absent-by-design reading as vanished. */
     const cols = page.getByTestId("league-col");
-    await expect(cols).toHaveCount(4);
+    // RESTATED: five MOUNTED on the track, four in the scrollport.
+    await expect(cols).toHaveCount(COLUMNS.length);
+    expect(await onScreenCols(page)).toHaveLength(VIEW);
     const ribbon = page.getByTestId("league-ribbon");
     await expect(ribbon).toHaveCount(1);
     await expect(page.getByTestId("ribbon-pill")).toHaveCount(5);
@@ -311,8 +350,7 @@ test("the Leagues Cup gets its own column, after the four leagues",
     const lit = () => page.getByTestId("ribbon-pill")
       .and(page.locator('[aria-selected="true"]'))
       .evaluateAll((els) => els.map((e) => e.getAttribute("data-slug")));
-    const drawn = () => cols.evaluateAll(
-      (els) => els.map((e) => e.getAttribute("data-league")));
+    const drawn = () => onScreenCols(page);
     expect(await lit()).toEqual(drawnOrder().slice(0, VIEW));
     expect(await drawn()).toEqual(await lit());
 
@@ -322,12 +360,18 @@ test("the Leagues Cup gets its own column, after the four leagues",
        `PICKER_COLUMN_ORDER` at all, so "after the leagues" is a property
        of that list rather than of this fixture's five slugs. */
     await show(page, "leaguescup");
-    await expect(cols).toHaveCount(VIEW);
+    await expect(cols).toHaveCount(COLUMNS.length);
     const withCup = await drawn();
     expect(withCup[withCup.length - 1]).toBe("leaguescup");
     expect(withCup).toEqual(drawnOrder().slice(-VIEW));
-    // …and the ribbon agrees about the move, so the two readings of the
-    // window cannot drift apart
+    /* …and the ribbon agrees about the move, so the two readings of the
+       window cannot drift apart. WAITED OUT, not polled: the wave that
+       carries the names across the slots is staggered — the furthest is
+       `SLOTS-1` × 26ms behind the first, on top of a 430ms reveal — and a
+       pill takes its new identity when its own leg STARTS, so a read
+       taken on arrival compares a half-arrived rail. The agreement is
+       what this asserts; the latency is not. */
+    await page.waitForTimeout(800);
     expect(await lit()).toEqual(withCup);
     const cup = col(page, "leaguescup");
     await expect(cup.getByRole("heading", { name: "Leagues Cup" }))
@@ -596,14 +640,20 @@ test("the season basis is a chip on its own column, and the blend rather "
   // A BLEND, NEVER A THRESHOLD — the wording the 2026-09 change killed.
   await expect(page.locator("body")).not.toContainText(/Under 8/i);
 
-  /* THREE OF THE FOUR LEAGUES, AND NOT THE CUP. The four leagues are the
-     opening window, so their chips are all on screen together; the cup's
-     needs the ribbon, and when it arrives it carries a basis and NO
-     percentage, because one number over a column of clubs rated on
-     several different tables belongs to no table. */
-  const leagueChips = await page.getByTestId("league-col")
-    .getByTestId("col-season")
-    .evaluateAll((els) => els.map((e) => (e.textContent ?? "").trim()));
+  /* THREE OF THE FOUR LEAGUES, AND NOT THE CUP. The cup carries a basis
+     and NO percentage, because one number over a column of clubs rated
+     on several different tables belongs to no table.
+     RESTATED 2026-09-15: every declared column is mounted on the track,
+     so the chips are read from all five and the cup's is separated by
+     its SLUG rather than by whether the window happened to be showing
+     it. The claim is about the cup, and it never was about the window
+     position. */
+  const chips = await page.getByTestId("league-col").evaluateAll((els) =>
+    els.map((e) => ({ slug: e.getAttribute("data-league"),
+      text: (e.querySelector('[data-testid="col-season"]')?.textContent
+             ?? "").trim() })));
+  const leagueChips = chips.filter((c) => c.slug !== "leaguescup")
+    .map((c) => c.text);
   expect(leagueChips).toHaveLength(4);
   expect(leagueChips.filter((t) => /prior szn/.test(t))).toHaveLength(3);
   await show(page, "leaguescup");
@@ -692,8 +742,10 @@ test("the cross-league null policy is stated ONCE for the board, never "
        be off screen when the check ran. */
     for (const jump of ["mls", "leaguescup"]) {
       await show(page, jump);
+      // RESTATED: the whole declaration is mounted, so this covers every
+      // column at once rather than four of five at a time.
       await expect(page.getByTestId("league-col"))
-        .toHaveCount(VIEW);
+        .toHaveCount(COLUMNS.length);
       await expect(page.getByTestId("league-col")
         .getByTestId("col-null-note")).toHaveCount(0);
     }
@@ -755,24 +807,35 @@ test("no sort mode drops a cup row — ranks, never cuts", async ({ page }) => {
     await expect(cup.getByTestId("picker-row")).toHaveCount(3);
     await bandDir(page).click();
   }
-  /* SIX SERVED, FIVE DRAWN — and the row that is not drawn belongs to
-     the ONE column this jump pages off screen, not to any sort's cut.
+  /* SIX SERVED, SIX ON THE BOARD — and the one whose column this jump
+     pages off SCREEN is still on the track, one scroll away, rather than
+     unmounted.
+
+     RESTATED 2026-09-15, and the restatement is the stronger claim. The
+     board used to render four of its five columns, so the sixth row was
+     genuinely absent from the page and this guard could only say "absent
+     because its column is not drawn, not because a sort cut it" — a
+     distinction the reader could not see. Every declared column is
+     mounted now, so RANKS-NEVER-CUTS is asserted as it reads: every
+     served row is on the board under every sort mode, and the column
+     that is off screen is off SCREEN and not gone.
+
      WHICH league that is follows the operator's reading order and is
-     therefore not typed here: it is the declared column the board is
-     not currently drawing, named by subtraction. (It was MLS until
-     2026-09-15 and is EPL now; the claim never was about either of
-     them.) Counted per COLUMN as well, so the difference is stated
-     rather than absorbed. */
-  const onScreen = await page.getByTestId("league-col")
-    .evaluateAll((els) => els.map((e) => e.getAttribute("data-league")));
-  const paged = drawnOrder().filter((s) => !onScreen.includes(s));
-  expect(paged, "five declared and four drawn leaves exactly one off")
-    .toHaveLength(1);
-  await expect(col(page, paged[0])).toHaveCount(0);
-  await expect(page.getByTestId("picker-row")).toHaveCount(5);
+     therefore not typed here: it is the declared column the board is not
+     currently showing, named by subtraction. */
+  const shown = await onScreenCols(page);
+  const paged = drawnOrder().filter((s) => !shown.includes(s));
+  expect(paged, "five declared and four in the scrollport leaves exactly "
+    + "one off").toHaveLength(1);
+  // off screen, and NOT dropped: the column is on the track with its row
+  await expect(col(page, paged[0])).toHaveCount(1);
+  await expect(col(page, paged[0]).getByTestId("picker-row"))
+    .toHaveCount(1);
+  await expect(page.getByTestId("picker-row")).toHaveCount(6);
   await expect(col(page, "ligamx").getByTestId("picker-row")).toHaveCount(1);
   await show(page, "mls");
-  await expect(page.getByTestId("picker-row")).toHaveCount(3);
+  expect(await onScreenCols(page)).toContain("mls");
+  await expect(page.getByTestId("picker-row")).toHaveCount(6);
   await expect(col(page, "mls").getByTestId("picker-row")).toHaveCount(1);
 });
 
@@ -1473,11 +1536,18 @@ test("every league column gets a real track, whatever the payload names",
     };
     for (const jump of COLUMNS) {
       await show(page, jump);
-      await expect(cols).toHaveCount(VIEW);
+      /* RESTATED 2026-09-15: the window pages by SCROLLING a track that
+         carries every declared column, so the track count is the
+         declaration's and the collapse this guard exists for — a typed
+         count laying one number of tracks while the board draws another
+         — is measured over all of them at once. Every position of the
+         window is still walked, because a column's width must hold
+         wherever the scroll rests. */
+      await expect(cols).toHaveCount(COLUMNS.length);
       const tracks = await settled();
       const say = `with ${jump} on screen: `
         + tracks.map((t) => `${t.lg}=${t.w}`).join(" ");
-      expect(tracks.length, say).toBe(VIEW);
+      expect(tracks.length, say).toBe(COLUMNS.length);
       for (const t of tracks) {
         expect(t.w, `${t.lg} collapsed — ${say}`).toBeGreaterThan(150);
       }

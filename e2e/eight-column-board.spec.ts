@@ -15,23 +15,50 @@ import { dayLabel, localDay as localDayOf } from "../src/lib/matchday";
 // through, so a reordering of the board moves these guards with it
 import { boardColumns } from "../src/lib/pickerApi";
 
-test.describe("eight columns on a four-column board", () => {
-  test("draws four of eight, and every league keeps a pill", async ({ page }) => {
-    await serveEight(page);
-    const cols = page.locator('[data-testid="league-col"]');
-    await expect(cols).toHaveCount(4);
-    await expect(page.locator('[data-testid="ribbon-pill"]')).toHaveCount(8);
-    const lit = page.locator('[data-testid="ribbon-pill"][aria-selected="true"]');
-    await expect(lit).toHaveCount(4);
-  });
+/** THE FOUR COLUMNS IN FRONT OF YOU — RESTATED 2026-09-15.
+ *
+ *  "Drawn" used to mean "mounted": the page rendered four columns and no
+ *  others. The board the operator approved is a continuously scrolling
+ *  looped TRACK, so every declared column is mounted and which four you
+ *  are looking at is a SCROLL POSITION. Every guard below that meant
+ *  "the four on screen" now asks the track where it is, rather than
+ *  counting elements — and that is a stricter question, not a looser
+ *  one: a board that mounted four columns and never moved satisfied the
+ *  old count perfectly, which is how it shipped. */
+const onScreen = (page: Page) => page.evaluate(() => {
+  const t = document.querySelector<HTMLElement>('[data-testid="board-track"]')!;
+  const box = t.getBoundingClientRect();
+  return [...t.querySelectorAll<HTMLElement>('[data-testid="league-col"]')]
+    .map((c) => ({ slug: c.dataset.league!,
+                   x: c.getBoundingClientRect().left - box.left }))
+    .filter((c) => c.x > -4 && c.x < box.width - 4)
+    .sort((a, b) => a.x - b.x).map((c) => c.slug);
+});
 
-  test("the header names exactly what the board draws", async ({ page }) => {
+test.describe("eight columns on a four-column board", () => {
+  test("mounts all eight, shows four, and every league keeps a pill",
+    async ({ page }) => {
+      await serveEight(page);
+      const cols = page.locator('[data-testid="league-col"]');
+      /* RESTATED: eight on the track, four in the scrollport. The old
+         `toHaveCount(4)` was a claim about the RENDER, and the render is
+         no longer where the answer lives. */
+      await expect(cols).toHaveCount(8);
+      expect(await onScreen(page)).toHaveLength(4);
+      await expect(page.locator('[data-testid="ribbon-pill"]')).toHaveCount(8);
+      const lit = page.locator('[data-testid="ribbon-pill"][aria-selected="true"]');
+      await expect(lit).toHaveCount(4);
+    });
+
+  test("the header names exactly what the board shows", async ({ page }) => {
     await serveEight(page);
-    const drawn = await page.locator('[data-testid="league-col"]')
-      .evaluateAll((es) => es.map((e) => e.getAttribute("data-league")));
+    // RESTATED: against the four in the SCROLLPORT rather than the eight
+    // on the track — the rail's claim is "these are on screen".
+    const shown = await onScreen(page);
+    expect(shown).toHaveLength(4);
     const litNames = await page.locator('[data-testid="ribbon-pill"][aria-selected="true"]')
       .evaluateAll((es) => es.map((e) => (e as HTMLElement).dataset.slug));
-    expect(litNames.slice().sort()).toEqual(drawn.slice().sort());
+    expect(litNames.slice().sort()).toEqual(shown.slice().sort());
   });
 
   test("it LOOPS — stepping past the last column reaches the first", async ({ page }) => {
@@ -41,9 +68,17 @@ test.describe("eight columns on a four-column board", () => {
     const start = await lit();
     for (let i = 0; i < 8; i++) {
       await page.keyboard.press("ArrowRight");
-      await page.waitForTimeout(90);
+      await page.waitForTimeout(140);
     }
-    // eight columns, eight steps: all the way round and back
+    /* eight columns, eight steps: all the way round and back.
+       RESTATED: the wave now takes real time. The reveal is staggered
+       across the slots — the furthest is `SLOTS-1` × 26ms behind the
+       first — and a pill takes its new identity when its own leg of the
+       wave STARTS. Reading 90ms after the last keypress caught the rail
+       mid-wave and compared a half-arrived set. The LOOP is what this
+       guard is about; the latency is not, so it is waited out rather
+       than asserted away. */
+    await page.waitForTimeout(700);
     expect(await lit()).toBe(start);
   });
 
@@ -51,10 +86,11 @@ test.describe("eight columns on a four-column board", () => {
     await serveEight(page);
     for (const slug of ["eredivisie", "ligamx", "epl"]) {
       await page.locator(`[data-testid="ribbon-pill"][data-slug="${slug}"]`).click();
-      await page.waitForTimeout(150);
-      const first = await page.locator('[data-testid="league-col"]').first()
-        .getAttribute("data-league");
-      expect(first).toBe(slug);
+      await page.waitForTimeout(250);
+      /* RESTATED: the LEFTMOST ON SCREEN, not the first in the DOM. All
+         eight are mounted and their DOM order never changes — what the
+         jump moves is the grid position and the scroll. */
+      expect((await onScreen(page))[0]).toBe(slug);
     }
   });
 
@@ -170,7 +206,14 @@ function loneDay() {
 }
 
 interface BoardState {
+  /** every column MOUNTED on the track, in DOM order — which since
+   *  2026-09-15 is all of them and never changes. The bands below are the
+   *  union over these, because a shared row track that omitted a day
+   *  would leave that day's fixtures nowhere to sit. */
   cols: string[];
+  /** the four in the SCROLLPORT, left to right. This is what "drawn"
+   *  used to mean when the page mounted four columns and no others. */
+  onScreen: string[];
   bands: { day: string; label: string }[];
   tracks: { col: string; day: string; cards: number }[];
   rests: { col: string; day: string }[];
@@ -180,9 +223,16 @@ const readBoard = (page: Page): Promise<BoardState> => page.evaluate(() => {
   const colOf = (e: Element) => e.closest('[data-testid="league-col"]')
     ?.getAttribute("data-league") ?? "";
   const all = (sel: string) => [...document.querySelectorAll(sel)];
+  const track = document.querySelector('[data-testid="board-track"]');
+  const box = track?.getBoundingClientRect();
   return {
     cols: all('[data-testid="league-col"]')
       .map((e) => e.getAttribute("data-league") ?? ""),
+    onScreen: !box ? [] : all('[data-testid="league-col"]')
+      .map((e) => ({ slug: e.getAttribute("data-league") ?? "",
+                     x: e.getBoundingClientRect().left - box.left }))
+      .filter((c) => c.x > -4 && c.x < box.width - 4)
+      .sort((a, b) => a.x - b.x).map((c) => c.slug),
     bands: all('[data-testid="day-band"]').map((e) => ({
       day: e.getAttribute("data-day") ?? "",
       label: e.querySelector("span")?.textContent?.trim() ?? "",
@@ -243,10 +293,13 @@ async function windowWhere(
     state = await stepRight(page);
   }
   throw new Error(`no position in one lap of the window ${what} — the last `
-    + `four tried were ${state.cols.join(", ")}`);
+    + `four tried were ${state.onScreen.join(", ")}`);
 }
 
-const drawing = (slug: string) => (s: BoardState) => s.cols.includes(slug);
+/** RESTATED 2026-09-15: "drawn" is now "in the scrollport". Every column
+ *  is mounted, so `cols.includes` would be true at every position and
+ *  every search built on it would return at step 0 without moving. */
+const drawing = (slug: string) => (s: BoardState) => s.onScreen.includes(slug);
 
 const band = (page: Page, day: string) =>
   page.locator(`[data-testid="day-band"][data-day="${day}"]`);
@@ -258,18 +311,31 @@ const eventsIn = (page: Page, col: string, day: string) =>
     .evaluateAll((es) => es.map((e) => e.getAttribute("data-event") ?? ""));
 
 test.describe("the date rail keeps the window's promise", () => {
-  test("every band on the rail is a day one of the FOUR drawn columns plays",
+  test("every band on the rail is a day a column ON THE TRACK plays",
     async ({ page }) => {
-      /* THE DEFECT ITSELF. A rail entry whose every drawn column shows a
-         rest-day box is a date announcing that nothing on screen
-         happens. Checked at ALL eight positions, because the bands
-         re-cut on every step and only some positions are wrong. */
+      /* THE DEFECT ITSELF. A rail entry with a rest-day box under EVERY
+         column is a date announcing that nothing happens anywhere — a
+         promise about a fixture that is not on this board at all.
+         RESTATED 2026-09-15: the qualifier used to be "the four DRAWN
+         columns", which was a question about the render. It is a
+         question about the TRACK now, because every declared column is
+         mounted and the bands are the union over all of them — and a
+         band the reader can scroll to is still a kept promise, while a
+         band over nothing is still the defect. Checked at all eight
+         positions of the loop, because the board is a different four
+         columns at each and a rail that is right at the opening
+         position and wrong elsewhere is what a single read cannot
+         see. */
       await serveEight(page);
-      await expect(page.locator('[data-testid="league-col"]')).toHaveCount(VIEW);
+      /* RESTATED 2026-09-15: every declared column is MOUNTED on the
+         track now, and four of them are in the scrollport. `VIEW` is
+         still what the scrollport holds — see `onScreen` above. */
+      await expect(page.locator('[data-testid="league-col"]'))
+        .toHaveCount(COLUMNS.length);
       const seen = new Set<string>();
       for (let i = 0; i < COLUMNS.length; i++) {
         const s = i === 0 ? await settledBoard(page) : await stepRight(page);
-        const where = `window on ${s.cols.join(", ")}`;
+        const where = `board showing ${s.onScreen.join(", ")}`;
         // NON-VACUOUS: a board drawing no bands at all would satisfy
         // every claim below without meaning any of them.
         expect(s.bands.length, `${where}: no bands drawn at all`)
@@ -279,9 +345,9 @@ test.describe("the date rail keeps the window's promise", () => {
           const carrying = s.tracks.filter((t) => t.day === b.day && t.cards > 0);
           const resting = s.rests.filter((r) => r.day === b.day).map((r) => r.col);
           expect(carrying.map((t) => t.col),
-            `${where}: "${b.label}" heads a full-width band, but no drawn `
-            + `column has a fixture under it — ${resting.join(", ")} all show `
-            + "a rest day")
+            `${where}: "${b.label}" heads a full-width band, but no column `
+            + `on the track has a fixture under it — `
+            + `${resting.join(", ")} all show a rest day`)
             .not.toEqual([]);
         }
       }
@@ -290,35 +356,41 @@ test.describe("the date rail keeps the window's promise", () => {
       expect([...seen].sort()).toEqual([...bandsOf(COLUMNS).keys()].sort());
     });
 
-  test("a day only an UNDRAWN league plays draws no band — and draws one the moment it is drawn",
-    async ({ page }) => {
-      /* THE NON-VACUITY HALF. The guard above is an absence, and an
-         absence passes for free on a board that never draws the thing.
-         So one date is followed around the window: missing while the one
-         league that plays it is out of view, present — with its own
-         label, over its own fixture — as soon as the window reaches it.
-         Which way round that is depends on where the league sits in the
-         operator's order, so both positions are searched for rather than
-         assumed. */
+  test("a day ONE league plays keeps its band, its own label, and the league "
+    + "that plays it can be scrolled to", async ({ page }) => {
+      /* RESTATED 2026-09-15, and this is the one guard the scroller
+         genuinely moved rather than merely renamed.
+
+         WHAT IT USED TO SAY. A date played only by an UNDRAWN league
+         drew no band, because a rail entry with four rest-day boxes
+         under it announces a day on which nothing on screen happens.
+         That held while the page MOUNTED four columns and no others.
+
+         WHY IT CANNOT SAY IT ANY MORE. Every declared column is on the
+         track, so there is no undrawn league to exclude — and excluding
+         one would now be WORSE than the defect it prevented: the columns
+         are subgrids over SHARED row tracks, so a day missing from the
+         union has no row for its fixtures to sit in and the column that
+         plays it would silently lose them. A fixture dropped is the one
+         outcome this whole surface refuses.
+
+         WHAT SURVIVES, AND IS ASSERTED. A date is still a promise about
+         a column the reader can REACH: the band is there, it carries
+         that league's own day label over that league's own fixture, and
+         the league is brought into the scrollport by the loop rather
+         than being a rumour about somewhere off the page. The
+         rest-of-the-board half is asserted too — every OTHER column
+         genuinely rests that day, so this remains a claim about a lone
+         fixture and not about a busy one. */
       const lone = loneDay();
       await serveEight(page);
-      await expect(page.locator('[data-testid="league-col"]')).toHaveCount(VIEW);
+      await expect(page.locator('[data-testid="league-col"]'))
+        .toHaveCount(COLUMNS.length);
 
-      // …absent, and absent because that league is genuinely undrawn
-      // rather than because nothing is drawn at all
-      const away = await windowWhere(page, (s) => !s.cols.includes(lone.league),
-        `left ${lone.league} undrawn`);
-      expect(away.state.cols).not.toContain(lone.league);
-      expect(away.state.bands.length).toBeGreaterThan(0);
-      expect(away.state.bands.map((b) => b.day),
-        `${lone.day} is played only by ${lone.league}, which is not drawn`)
-        .not.toContain(lone.day);
-      await expect(band(page, lone.day)).toHaveCount(0);
-
-      // …and present once the window reaches it
-      const home = await windowWhere(page, drawing(lone.league),
-        `drew ${lone.league}`);
-      expect(home.state.cols).toContain(lone.league);
+      const state = await settledBoard(page);
+      expect(state.bands.map((b) => b.day),
+        `${lone.day} is played by ${lone.league} and belongs on the rail`)
+        .toContain(lone.day);
       await expect(band(page, lone.day)).toHaveCount(1);
       await expect(band(page, lone.day).locator("span").first())
         .toHaveText(dayLabel(lone.fixtures[0].kickoff!));
@@ -326,6 +398,21 @@ test.describe("the date rail keeps the window's promise", () => {
       await expect(trackIn(page, lone.league, lone.day)
         .locator('[data-testid="picker-row"],[data-testid="picker-refusal"]'))
         .not.toHaveCount(0);
+      // …and it is genuinely LONE: every other column rests that day
+      expect(state.tracks.filter((t) => t.day === lone.day && t.cards > 0)
+        .map((t) => t.col)).toEqual([lone.league]);
+      expect(state.rests.filter((r) => r.day === lone.day).map((r) => r.col)
+        .sort(), `${lone.day} must be a rest day in every other column`)
+        .toEqual(COLUMNS.filter((c) => c !== lone.league).slice().sort());
+
+      /* AND THE READER CAN GET TO IT. The promise the rail makes is only
+         honest if the column is reachable, so the loop is stepped until
+         that league is in the scrollport — bounded by one lap, and loud
+         when it cannot. */
+      const home = await windowWhere(page, drawing(lone.league),
+        `brought ${lone.league} on screen`);
+      expect(home.state.onScreen).toContain(lone.league);
+      await expect(band(page, lone.day)).toHaveCount(1);
     });
 
   test("the rail and the tracks agree — no date over nothing, no fixture under no date",
@@ -335,7 +422,11 @@ test.describe("the date rail keeps the window's promise", () => {
          the empty band. They are one property read from two ends, and
          the second end is the one the fix was for. */
       await serveEight(page);
-      await expect(page.locator('[data-testid="league-col"]')).toHaveCount(VIEW);
+      /* RESTATED 2026-09-15: every declared column is MOUNTED on the
+         track now, and four of them are in the scrollport. `VIEW` is
+         still what the scrollport holds — see `onScreen` above. */
+      await expect(page.locator('[data-testid="league-col"]'))
+        .toHaveCount(COLUMNS.length);
       for (let i = 0; i < COLUMNS.length; i++) {
         const s = i === 0 ? await settledBoard(page) : await stepRight(page);
         const where = `window on ${s.cols.join(", ")}`;
@@ -369,37 +460,46 @@ test.describe("the date rail keeps the window's promise", () => {
          LOCAL day, never under the ISO date, and the heading over a band
          has to be the same day the cards under it were filed by.
 
-         MEASURED WHERE THE TWO CANNOT AGREE BY LUCK: the window is
-         stepped to a position drawing a band whose every fixture kicks
-         off after midnight UTC, so its heading has no same-day kickoff
-         it could have been copied from. A board reading
-         `kickoff.slice(0, 10)` would file that band a day late under a
+         MEASURED WHERE THE TWO CANNOT AGREE BY LUCK: on a ranked row
+         that kicks off after midnight UTC, so its wire date and its LA
+         day are two different dates. A board reading
+         `kickoff.slice(0, 10)` would file that card a day late under a
          matching heading and look perfectly consistent doing it.
 
          Every expectation is DERIVED — from the ISO the board was served
          and the `dayLabel` the page renders with. A typed "Friday, Sep
          18" would go quietly wrong the day `TZ` changes, which is a
          thing that has happened on this site. */
-      const crossingBand = (s: BoardState) => {
-        for (const [day, fs] of bandsOf(s.cols)) {
-          if (!s.bands.some((b) => b.day === day)) continue;
-          if (fs.every((f) => f.kickoff!.slice(0, 10) !== day)) return { day, fs };
-        }
-        return null;
-      };
-      // a ROW (not a refusal) that crosses, so the card is addressable
-      // by event and the PLACEMENT can be pinned as well as the wording
-      const crossingRow = (s: BoardState) => BOARD_EIGHT.rows.find((r) =>
-        s.cols.includes(r.column) && localDayOf(r.kickoff) !== r.kickoff.slice(0, 10));
+      /* RESTATED 2026-09-15. The isolation used to be a BAND made
+         entirely of crossing kickoffs, found by stepping the window
+         until one was drawn. With every column on the track the bands
+         are the union over all eight, and this payload has no band whose
+         every fixture crosses — the premise evaporated, and a guard
+         whose premise has evaporated must be re-derived rather than left
+         to pass for the wrong reason.
+
+         SO THE ISOLATION MOVED TO THE ROW, which is where it was always
+         strongest. A crossing row's card is required to sit under its
+         LOCAL day; a board reading `kickoff.slice(0, 10)` would file it
+         under the WIRE's date, which is a different band, and the
+         placement assertion below catches that directly rather than
+         inferring it from a heading. The heading is then required to be
+         the LOCAL day's label and NOT the wire date's — two different
+         dates for this row — so the "could have been copied from a
+         same-day kickoff" loophole is closed on the row rather than on
+         the band. */
+      const crossingRow = BOARD_EIGHT.rows.find((r) =>
+        COLUMNS.includes(r.column)
+        && localDayOf(r.kickoff) !== r.kickoff.slice(0, 10));
 
       await serveEight(page);
-      await expect(page.locator('[data-testid="league-col"]')).toHaveCount(VIEW);
-      const { state } = await windowWhere(page,
-        (s) => Boolean(crossingBand(s)) && Boolean(crossingRow(s)),
-        "drew a band made ENTIRELY of kickoffs whose wire date differs from "
-        + "their LA day, alongside a ranked row that crosses too");
-      const cross = crossingBand(state)!;
-      const row = crossingRow(state)!;
+      await expect(page.locator('[data-testid="league-col"]'))
+        .toHaveCount(COLUMNS.length);
+      expect(crossingRow, "BOARD_EIGHT no longer holds a ranked row whose "
+        + "wire date differs from its LA day — this guard has nothing to "
+        + "measure and must not be read as green").toBeTruthy();
+      const state = await settledBoard(page);
+      const row = crossingRow!;
       const day = localDayOf(row.kickoff);
       const label = dayLabel(row.kickoff);
 
@@ -415,20 +515,19 @@ test.describe("the date rail keeps the window's promise", () => {
       expect(state.bands.length).toBeGreaterThan(0);
       for (const b of state.bands) {
         const fs = drawn.get(b.day);
-        expect(fs, `the rail carries ${b.day}, which the drawn columns `
-          + `(${state.cols.join(", ")}) play nothing on`).toBeTruthy();
+        expect(fs, `the rail carries ${b.day}, which no column on the track `
+          + `(${state.cols.join(", ")}) plays anything on`).toBeTruthy();
         expect(b.label, `the band over ${b.day}`)
           .toBe(dayLabel(fs![0].kickoff!));
         expect(b.label).toMatch(/^[A-Z][a-z]+, [A-Z][a-z]{2} \d{1,2}$/);
       }
 
-      // …and the all-crossing band says the LOCAL day rather than the
-      // wire's, which for that band are two different dates
-      const crossLabel = dayLabel(cross.fs[0].kickoff!);
-      await expect(band(page, cross.day).locator("span").first())
-        .toHaveText(crossLabel);
-      expect(crossLabel)
-        .not.toBe(dayLabel(`${cross.fs[0].kickoff!.slice(0, 10)}T12:00Z`));
+      // …and the band this crossing row sits under says its LOCAL day
+      // rather than the wire's, which for this row are two different
+      // dates: a `slice(0, 10)` board would agree with itself and be a
+      // day out
+      await expect(band(page, day).locator("span").first()).toHaveText(label);
+      expect(label).not.toBe(dayLabel(`${row.kickoff.slice(0, 10)}T12:00Z`));
 
       // …and below xl, where the full-width rail does not exist, the
       // column's own compact divider carries the same date
@@ -471,7 +570,11 @@ test.describe("the date rail keeps the window's promise", () => {
       };
 
       await serveEight(page);
-      await expect(page.locator('[data-testid="league-col"]')).toHaveCount(VIEW);
+      /* RESTATED 2026-09-15: every declared column is MOUNTED on the
+         track now, and four of them are in the scrollport. `VIEW` is
+         still what the scrollport holds — see `onScreen` above. */
+      await expect(page.locator('[data-testid="league-col"]'))
+        .toHaveCount(COLUMNS.length);
 
       // a window drawing two matchdays that each hold more than one card
       // in some column, so "order" means something on both
@@ -539,7 +642,11 @@ test.describe("the date rail keeps the window's promise", () => {
       const moved = await windowWhere(page, drawing(lone.league),
         `drew ${lone.league}`);
       expect(moved.state.cols).toContain(lone.league);
-      await expect(page.locator('[data-testid="league-col"]')).toHaveCount(VIEW);
+      /* RESTATED 2026-09-15: every declared column is MOUNTED on the
+         track now, and four of them are in the scrollport. `VIEW` is
+         still what the scrollport holds — see `onScreen` above. */
+      await expect(page.locator('[data-testid="league-col"]'))
+        .toHaveCount(COLUMNS.length);
       expect(moved.state.bands.map((b) => b.day)).toContain(lone.day);
       for (const b of moved.state.bands) {
         expect(moved.state.tracks.filter((t) => t.day === b.day && t.cards > 0)
