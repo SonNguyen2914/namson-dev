@@ -46,17 +46,25 @@ const trackState = (page: Page) => page.evaluate(() => {
   };
 });
 
-/** TWO AGREEING READS BEFORE A VALUE IS BELIEVED. `page.evaluate` does
- *  not auto-wait, and a smooth scroll plus a 430ms reveal means a single
- *  read lands mid-flight and describes a state nobody was ever shown. */
+/** AGREEING READS BEFORE A VALUE IS BELIEVED. `page.evaluate` does not
+ *  auto-wait, and a step's 300ms glide plus a 430ms reveal means a single
+ *  read lands mid-flight and describes a state nobody was ever shown.
+ *
+ *  THREE OF THEM, NOT TWO (2026-09-15). A free scroll is now corrected to
+ *  the nearest whole column 120ms after the last scroll event, so a board
+ *  that has been still for 140ms is not necessarily a board that has
+ *  finished: two agreeing 70ms reads could be taken entirely inside that
+ *  debounce and call a position "rest" that the loop was about to leave.
+ *  Three span 210ms, which is past it. */
 async function settled(page: Page) {
-  let prev = await trackState(page);
-  for (let i = 0; i < 30; i++) {
+  const reads = [await trackState(page)];
+  for (let i = 0; i < 40; i++) {
     await page.waitForTimeout(70);
-    const next = await trackState(page);
-    if (next.lead === prev.lead
-        && Math.abs(next.scrollLeft - prev.scrollLeft) < 0.5) return next;
-    prev = next;
+    reads.push(await trackState(page));
+    const [a, b, c] = reads.slice(-3);
+    if (reads.length >= 3 && a.lead === c.lead && b.lead === c.lead
+        && Math.abs(a.scrollLeft - c.scrollLeft) < 0.5
+        && Math.abs(b.scrollLeft - c.scrollLeft) < 0.5) return c;
   }
   throw new Error("the board never came to rest");
 }
@@ -228,6 +236,274 @@ test.describe("the board is a looped scroller", () => {
         // empty box that would satisfy this for the wrong reason
         expect(COLUMNS).toContain(b.slug);
       }
+    });
+});
+
+/** ONE KEYPRESS IS ONE MOVEMENT, AND NOTHING RESTS BETWEEN TWO COLUMNS.
+ *
+ *  Two defects the operator was looking at on the live board, and the
+ *  lit-set guards above cannot see either: the lit SET is identical
+ *  whether the board arrives in one movement or in two, and identical
+ *  whether it rests on a column or halfway across one.
+ *
+ *  1. THE STEP THAT ARRIVED TWICE. A step was handed to the browser as
+ *     `scrollBy({behavior:"smooth"})`, so the loop's rebase had to fire
+ *     INSIDE that animation. Instrumented on the live board at 200ms:
+ *
+ *         t=  0ms scrollLeft= 760 pos=0.000
+ *         t=200ms scrollLeft=1116 pos=0.937
+ *         t=400ms scrollLeft= 759 pos=0.997
+ *
+ *     — the board slid, settled, and then moved again. Reproduced here
+ *     off a board parked mid-column, where it is worse: the threshold is
+ *     crossed at 92ms rather than at 99.7% of the way, the `scrollLeft`
+ *     write that rebases the loop ABORTS the browser's animation where it
+ *     stands, and one ArrowRight delivered 0.611 of a column.
+ *
+ *  2. THE BOARD THAT RESTED MID-COLUMN. Nothing settled a free scroll, so
+ *     a wheel or trackpad flick stopped wherever momentum ran out —
+ *     measured resting at 0.316, 0.632 and 0.947 of a column, which is
+ *     the board in the operator's screenshot: a sliver clipped at the
+ *     left, Serie A clipped at the right, headers cut in half.
+ *
+ *  They are the same defect said twice, so they are guarded together: the
+ *  board must never REST at a fractional position, and the correction
+ *  that keeps it there must never be visible. */
+
+type Sample = { t: number; pos: number; lead: string; leadX: number; on: number };
+
+/** SAMPLE EVERY FRAME, FROM INSIDE THE PAGE. A `page.evaluate` round-trip
+ *  is ~10ms of its own and coalesces with the compositor, so a Playwright
+ *  polling loop cannot see a one-frame artefact — and one frame is
+ *  exactly what a rotation whose rebase lands a paint late looks like. */
+async function traceKey(page: Page, key: string, ms: number): Promise<Sample[]> {
+  await page.evaluate(() => {
+    const w = window as unknown as { __tr: Sample[]; __trRaf: number };
+    const t = document.querySelector<HTMLElement>('[data-testid="board-track"]')!;
+    const strip = document.querySelector<HTMLElement>(
+      '[data-testid="league-ribbon"]')!;
+    const t0 = performance.now();
+    w.__tr = [];
+    const take = () => {
+      const box = t.getBoundingClientRect();
+      const cols = [...t.querySelectorAll<HTMLElement>(
+        '[data-testid="league-col"]')]
+        .map((c) => ({ slug: c.dataset.league!,
+                       x: c.getBoundingClientRect().left - box.left }));
+      const lead = cols.slice().sort((a, b) => Math.abs(a.x) - Math.abs(b.x))[0];
+      w.__tr.push({
+        t: performance.now() - t0, pos: Number(strip.dataset.pos),
+        lead: lead.slug, leadX: lead.x,
+        on: cols.filter((c) => c.x > -4 && c.x < box.width - 4).length,
+      });
+      w.__trRaf = requestAnimationFrame(take);
+    };
+    take();
+  });
+  await page.keyboard.press(key);
+  await page.waitForTimeout(ms);
+  return page.evaluate(() => {
+    const w = window as unknown as { __tr: Sample[]; __trRaf: number };
+    cancelAnimationFrame(w.__trRaf);
+    return w.__tr;
+  });
+}
+
+const wrapIdx = (x: number, n: number) => ((x % n) + n) % n;
+
+/** THE RENDERED POSITION, BUILT FROM PIXELS ALONE.
+ *
+ *  `strip.dataset.pos` is the loop's OWN published position, and it is
+ *  written one animation frame AFTER the scroll it describes: on a loaded
+ *  CI runner it read 0.000 while the board was already 46px along. That
+ *  is a stale witness rather than a defect, and the ribbon cannot be the
+ *  witness for the board anyway.
+ *
+ *  So the position under test is reconstructed from geometry read in the
+ *  same frame — which league is drawn against the scrollport's left edge,
+ *  and how far into it the board is — and walked into a continuous number
+ *  of columns travelled. It never consults the thing it is measuring.
+ *
+ *  It is also what makes the atomicity claim measurable. A rotation whose
+ *  `scrollLeft` rebase lands a paint LATE draws the columns one place over
+ *  with the scroll unchanged, so the league at the left edge advances a
+ *  whole place while its offset does not move — a one-frame discontinuity
+ *  of exactly one column in this number, and invisible in every other. */
+function rendered(fs: Sample[], oneW: number, cols: readonly string[]) {
+  const n = cols.length;
+  const walk = (a: string, b: string) => {
+    const d = wrapIdx(cols.indexOf(b) - cols.indexOf(a), n);
+    return d > n / 2 ? d - n : d;          /* the nearer way round */
+  };
+  const out = [-fs[0].leadX / oneW];
+  for (let i = 1; i < fs.length; i++) {
+    out.push(out[i - 1] + walk(fs[i - 1].lead, fs[i].lead)
+             - (fs[i].leadX - fs[i - 1].leadX) / oneW);
+  }
+  return out;
+}
+
+test.describe("one keypress is one movement", () => {
+  /** Assert the whole shape of one step over a frame-by-frame trace. */
+  function pinStep(fs: Sample[], dir: number, oneW: number, what: string) {
+    const r = rendered(fs, oneW, COLUMNS);
+    const still = (a: number, b: number) => Math.abs(a - b) * oneW <= 0.5;
+
+    /* Drop the frames before the keypress reached the page — the sampler
+       is started first, and that head of stillness is not the board
+       having settled. The board turning its ORDER is not movement either:
+       a step rotates first, and that is a no-op on screen by design. */
+    const off = r.findIndex((v) => !still(v, r[0]));
+    expect(off, `${what}: the board never moved at all, so everything below `
+      + "would pass for the wrong reason").toBeGreaterThan(0);
+    const fr = fs.slice(off - 1);
+    const pos = r.slice(off - 1);
+    const last = pos.length - 1;
+
+    /* (a) IT ARRIVES AT THE NEXT WHOLE COLUMN IN THE DIRECTION PRESSED.
+       Stated against where it STARTED, so a step taken from a board that
+       is already mid-column is held to the same thing: one keypress, one
+       column, landing on an edge. A rebase that aborts the animation
+       under-delivers and a rebase the animation outruns over-delivers;
+       this refuses both. */
+    const arrive = Math.round(pos[0]) + dir;
+    expect(Math.abs(pos[last] - arrive) * oneW,
+      `${what}: one ${dir > 0 ? "ArrowRight" : "ArrowLeft"} from `
+      + `${pos[0].toFixed(3)} columns left the board at `
+      + `${pos[last].toFixed(3)}, and the next whole column that way is `
+      + `${arrive}`).toBeLessThan(2);
+    expect(Math.abs(fr[last].leadX),
+      `${what}: the board came to rest ${fr[last].leadX.toFixed(1)}px into a `
+      + "column — a sliver clipped at one edge and a cut header at the "
+      + "other").toBeLessThan(2);
+    expect(fr[last].on, `${what}: ${fr[last].on} columns fit the scrollport`)
+      .toBe(VIEW);
+
+    /* (b) IT ONLY EVER GOES THAT WAY. An overshoot that comes back is two
+       movements the reader has to watch, whatever it nets out to. */
+    for (let i = 1; i <= last; i++) {
+      expect((pos[i] - pos[i - 1]) * dir * oneW,
+        `${what}: at t=${fr[i].t | 0}ms the board went `
+        + `${((pos[i - 1] - pos[i]) * dir * oneW).toFixed(1)}px AGAINST the `
+        + `key pressed, from ${pos[i - 1].toFixed(3)} to `
+        + `${pos[i].toFixed(3)} columns`).toBeGreaterThan(-1);
+    }
+
+    /* (c) IT DOES NOT SETTLE AND THEN MOVE AGAIN — the live 200/400ms
+       shape. The first place the board holds for 150ms is the place it
+       has arrived at, and it must hold it for the rest of the trace. */
+    for (let i = 0; i <= last; i++) {
+      let j = i;
+      while (j + 1 <= last && still(pos[j + 1], pos[i])) j += 1;
+      if (fr[j].t - fr[i].t < 150) continue;
+      expect(j, `${what}: the board held ${pos[i].toFixed(3)} columns for `
+        + `${(fr[j].t - fr[i].t) | 0}ms and then moved again at `
+        + `t=${(fr[j + 1]?.t ?? 0) | 0}ms, to `
+        + `${pos[j + 1]?.toFixed(3)} — one keypress, two movements`)
+        .toBe(last);
+      break;
+    }
+
+    /* (d) AND IT IS CONTINUOUS. The rotation and the `scrollLeft` that
+       cancels it have to land in the SAME paint; a frame in which the
+       order has turned and the scroll has not moves the board a WHOLE
+       column at once. The glide's cubic opens at three times its average
+       speed and so covers at most 0.31 of a column in 34ms — anything
+       past half a column inside one short frame is not the animation.
+       Long frames are skipped rather than given a wider bound: a runner
+       that stalled for 200ms legitimately has a lot of ground to make up,
+       and a bound loose enough to allow that would allow the defect. */
+    let checked = 0;
+    for (let i = 1; i <= last; i++) {
+      const dt = fr[i].t - fr[i - 1].t;
+      if (dt > 34) continue;
+      checked += 1;
+      expect(Math.abs(pos[i] - pos[i - 1]),
+        `${what}: the board moved `
+        + `${Math.abs((pos[i] - pos[i - 1]) * oneW).toFixed(1)}px in the `
+        + `${dt | 0}ms to t=${fr[i].t | 0}ms, jumping from `
+        + `${pos[i - 1].toFixed(3)} to ${pos[i].toFixed(3)} columns — the `
+        + "order turned in one paint and the scroll that cancels it in "
+        + "another").toBeLessThan(0.5);
+    }
+    expect(checked, `${what}: every frame of the trace was longer than 34ms, `
+      + "so the continuity check never ran").toBeGreaterThan(3);
+  }
+
+  test("a step arrives ONCE and lands on a whole column — from a settled "
+    + "board and from one left mid-column", async ({ page }) => {
+      const s0 = await openBoard(page);
+      const oneW = (s0.clientWidth + 24) / VIEW;
+
+      pinStep(await traceKey(page, "ArrowRight", 2600), 1, oneW,
+        "from a settled board");
+      await settled(page);
+      pinStep(await traceKey(page, "ArrowLeft", 2600), -1, oneW,
+        "back the other way");
+
+      /* AND FROM THE BROKEN BOARD ITSELF. Park it mid-column the way a
+         trackpad flick used to leave it — this is where the rebase fires
+         early enough to abort the animation, and where the step measured
+         0.611 of a column. The settle is suppressed for the duration by
+         holding the scroll offset there directly. */
+      await settled(page);
+      await page.evaluate((d) => {
+        const t = document.querySelector<HTMLElement>(
+          '[data-testid="board-track"]')!;
+        t.scrollBy({ left: d, behavior: "auto" });
+      }, oneW * 0.45);
+      await page.waitForTimeout(90);           /* inside the settle debounce */
+      pinStep(await traceKey(page, "ArrowRight", 2600), 1, oneW,
+        "from a board left mid-column");
+    });
+
+  test("a free scroll comes to REST on a whole column", async ({ page }) => {
+    const s0 = await openBoard(page);
+    const oneW = (s0.clientWidth + 24) / VIEW;
+    const box = (await page.getByTestId("board-track").boundingBox())!;
+    /* Fractions chosen so momentum cannot land on an edge by luck: each
+       leaves the board well inside a column, which is exactly where it
+       used to stay. */
+    for (const frac of [0.45, 0.8, -0.35, 1.55, 0.6]) {
+      await page.mouse.move(box.x + box.width / 2, box.y + 120);
+      await page.mouse.wheel(Math.round(frac * oneW), 0);
+      const s = await settled(page);
+      expect(Math.abs(s.pos - Math.round(s.pos)) * oneW,
+        `a ${frac} column wheel left the board resting at ${s.pos} — `
+        + "between two columns, with a sliver clipped at each edge")
+        .toBeLessThan(2);
+      expect(Math.abs(s.leadOffset),
+        `a ${frac} column wheel left ${s.lead} ${s.leadOffset.toFixed(1)}px `
+        + "into the scrollport").toBeLessThan(2);
+      expect(s.onScreen.length,
+        `a ${frac} column wheel left ${s.onScreen.length} columns on screen, `
+        + `not ${VIEW}: ${s.onScreen.join(", ")}`).toBe(VIEW);
+      expect(s.scrollLeft, "the track pinned at an end").toBeGreaterThan(0.5);
+      expect(s.scrollLeft, "the track pinned at its end")
+        .toBeLessThan(s.max - 0.5);
+    }
+  });
+
+  test("a reader who asked for less motion still lands on a column, with no "
+    + "animation to watch", async ({ page }) => {
+      /* The settle is a correction, and a correction is still motion. It
+         has to happen — a board resting mid-column is the defect — but it
+         must arrive rather than travel. */
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      const s0 = await openBoard(page);
+      const oneW = (s0.clientWidth + 24) / VIEW;
+      const box = (await page.getByTestId("board-track").boundingBox())!;
+      await page.mouse.move(box.x + box.width / 2, box.y + 120);
+      await page.mouse.wheel(Math.round(0.45 * oneW), 0);
+      await page.waitForTimeout(450);
+      const a = await trackState(page);
+      await page.waitForTimeout(120);
+      const b = await trackState(page);
+      expect(Math.abs(a.pos - Math.round(a.pos)) * oneW,
+        `the board rests at ${a.pos} — between two columns`).toBeLessThan(2);
+      expect(b.scrollLeft, "the board was still travelling 450ms after the "
+        + "wheel stopped, which is an animation a reader asked not to see")
+        .toBeCloseTo(a.scrollLeft, 0);
     });
 });
 

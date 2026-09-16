@@ -91,6 +91,22 @@ const STAGGER_MS = 26;
  *  finishes delivering must not leave the ribbon deaf to the next one. */
 const ARM_MS = 900;
 
+/** A STEP'S OWN ANIMATION, ms — see `glideTo` for why the loop drives it
+ *  rather than `scrollTo({behavior:"smooth"})`. Measured off what the
+ *  browser was doing before, so the board still moves at the speed the
+ *  operator approved: Chrome's native smooth scroll covered this
+ *  distance in ~310ms. */
+const STEP_MS = 300;
+/** How long after the last scroll event a free scroll counts as over.
+ *  Momentum reports every frame, so any gap this wide is a hand that has
+ *  let go — and short enough that the board is not visibly adrift first. */
+const SETTLE_MS = 120;
+/** Near enough to a column edge to leave alone, px. */
+const SNAP_EPS = 1;
+/** Decelerating, and it ARRIVES: the cubic is at 0.999 of the distance
+ *  with a tenth of the duration left, so nothing depends on the tail. */
+const easeOut = (t: number) => 1 - (1 - t) ** 3;
+
 const rnd = () => CHURN.charAt(Math.floor(Math.random() * CHURN.length));
 
 const wrap = (x: number, n: number) => ((x % n) + n) % n;
@@ -241,6 +257,12 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
     let raf: number | null = null;
     let ticking = false;
     let dead = false;
+    /** The step/settle animation this file drives itself, and the flag
+     *  that tells the scroll handler to keep its hands off while it runs. */
+    let glideRaf: number | null = null;
+    let animating = false;
+    let settleTimer: number | null = null;
+    let touching = false;
 
     // ── geometry ───────────────────────────────────────────────────────
     const colW = () => (track.clientWidth - GAP * (VIEW - 1)) / VIEW;
@@ -424,12 +446,12 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
     };
 
     /* ── the position, and what the ribbon does with it ────────────────
-       `absPos` is a REAL number. `Math.floor` of a value that rests a
-       hair BELOW its integer reads one column early, and it does rest
-       there: the rebase subtracts a whole column from a `scrollLeft` the
-       smooth scroll had not QUITE finished moving — it fires inside the
-       2px tolerance below — so the resting offset is up to 2px short.
-       EPS is that tolerance expressed as a fraction of a column. */
+       `absPos` is a REAL number, and `Math.floor` of a value resting a
+       hair BELOW its integer reads one column early. The board no longer
+       rests short by design — it is seated on an exact multiple of a
+       column by `seatAbs` (2026-09-15) — but `scrollLeft` is read back
+       off a device-pixel grid the float never lands on, so the tolerance
+       stays. EPS is it, expressed as a fraction of a column. */
     const ribbonUpdate = () => {
       const u = unit();
       const a = absPos();
@@ -457,21 +479,148 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
       ribbonUpdate();
     };
 
+    /* ── MOTION: the board is moved from here, and only from here ──────
+       (2026-09-15, the two defects the operator was looking at)
+
+       BOTH OF THEM ARE THE SAME SENTENCE: the board was allowed to be at
+       a FRACTIONAL position, and the correction for that was visible.
+
+       A step used to be `scrollBy({behavior:"smooth"})`, which hands the
+       animation to the browser — and the loop's rebase then has to fire
+       INSIDE it. From a whole column that is survivable, because the
+       threshold is not crossed until the animation is 99.7% done. From a
+       fractional one it is not: measured on the eight-league board, a
+       board parked at 0.449 of a column answered one ArrowRight by
+       crossing the threshold at 92ms, and the `scrollLeft` write that
+       rebases it ABORTED the browser's animation where it stood. The
+       step delivered 0.611 of a column instead of one and left the board
+       at 1.060 — three columns on screen and a sliver clipped at each
+       edge, which is the broken board in the operator's screenshot.
+
+       And the board got to 0.449 in the first place because NOTHING ever
+       settled a free scroll: `scrollTo` ran for explicit steps only, so a
+       wheel or trackpad flick rested wherever its momentum stopped.
+
+       So: the loop owns the animation. A step turns the order FIRST, at
+       rest, where the turn and the `scrollLeft` that cancels it are one
+       synchronous pair with nothing in flight between them; the glide
+       then runs entirely inside the safe band and ends on the canonical
+       seat, a whole column, exactly. No rebase ever lands mid-animation
+       again, because during a glide there is nothing to rebase. */
+
+    const cancelGlide = () => {
+      if (glideRaf !== null) { cancelAnimationFrame(glideRaf); glideRaf = null; }
+      animating = false;
+    };
+
+    /** Put the scroller back inside the band `REST ± 1` by turning the
+     *  order. Invisible by construction: each turn moves every column one
+     *  place and takes exactly one column back off `scrollLeft`, so what
+     *  is under the scrollport does not move. */
+    const normalize = () => {
+      if (!LOOPS) return;
+      const one = oneW();
+      let guard = 0;
+      while (track.scrollLeft > (REST + 1) * one - 2 && guard++ < N) rotL();
+      while (track.scrollLeft < (REST - 1) * one + 2 && guard++ < N) rotR();
+    };
+
+    /** Move the scroller to `to` over `STEP_MS`, or land on it at once.
+     *  `prefers-reduced-motion` takes the second branch, which is the
+     *  settled state and no animation at all. */
+    const glideTo = (to: number, animate: boolean) => {
+      cancelGlide();
+      const from = track.scrollLeft;
+      if (!animate || quiet.matches || Math.abs(to - from) < 0.5) {
+        track.scrollLeft = to;
+        ribbonUpdate();
+        return;
+      }
+      animating = true;
+      const t0 = performance.now();
+      const frame = (now: number) => {
+        /* CLAMPED AT BOTH ENDS. A rAF callback is handed the timestamp of
+           the frame it belongs to, and a keypress is dispatched DURING
+           that frame's input handling — so `t0`, taken in the handler, can
+           be LATER than the first `now`. Unclamped that is a negative `p`,
+           and the cubic answers a negative fraction of the distance:
+           measured, the board stepped 31px the WRONG WAY on frame one and
+           then recovered, which is the overshoot-and-return the guard in
+           `the-board-scrolls-and-loops` refuses. */
+        const p = Math.min(1, Math.max(0, (now - t0) / STEP_MS));
+        track.scrollLeft = from + (to - from) * easeOut(p);
+        if (p < 1) { glideRaf = requestAnimationFrame(frame); return; }
+        glideRaf = null;
+        animating = false;
+        track.scrollLeft = to;          /* land on it, not near it */
+        ribbonUpdate();
+      };
+      glideRaf = requestAnimationFrame(frame);
+    };
+
+    /** SEAT THE BOARD ON A WHOLE COLUMN. `abs` is in `absPos`'s units —
+     *  columns from the start of the declared order — and the board ends
+     *  naming exactly that column, with its left edge on the
+     *  scrollport's.
+     *
+     *  A looped board turns the order until the canonical seat IS `abs`
+     *  and then glides to that one fixed offset, so every step animates
+     *  between the same two places and can never cross a threshold. A
+     *  bounded one has no seam to rebase and simply glides to the column. */
+    const seatAbs = (abs: number, animate: boolean) => {
+      if (LOOPS) {
+        let k = abs - spins;
+        let guard = 0;
+        while (k > 0 && guard++ < N * 2) { rotL(); k -= 1; }
+        while (k < 0 && guard++ < N * 2) { rotR(); k += 1; }
+        glideTo(REST * oneW(), animate);
+        return;
+      }
+      glideTo(seatFor(abs), animate);
+    };
+
+    /** WHERE A FREE SCROLL COMES TO REST — the nearest whole column.
+     *
+     *  This is JS and not `scroll-snap-type: x mandatory` because
+     *  mandatory snapping snaps PROGRAMMATIC writes too: measured on this
+     *  board, `track.scrollLeft += oneW()/2` read back as the offset it
+     *  started from, in the same statement. A snapping scrollport cannot
+     *  be animated from script at all, and the loop's own rebase is a
+     *  script write — so the declarative answer would have taken the
+     *  mechanism this board is built on with it. */
+    const settle = () => {
+      settleTimer = null;
+      if (dead || animating || touching || !rolling()) return;
+      const a = absPos();
+      const q = Math.round(a);
+      if (Math.abs(a - q) * oneW() <= SNAP_EPS) return;
+      seatAbs(q, true);
+    };
+    const scheduleSettle = () => {
+      if (settleTimer !== null) window.clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(settle, SETTLE_MS);
+    };
+
     const onScroll = () => {
+      /* A glide's own writes are not a free scroll and must not arm the
+         settle against themselves. */
+      if (!animating) scheduleSettle();
       if (ticking) return;
       ticking = true;
       requestAnimationFrame(() => {
         ticking = false;
         if (dead) return;
-        if (LOOPS) {
-          const one = oneW();
-          let guard = 0;
-          while (track.scrollLeft > (REST + 1) * one - 2 && guard++ < N) rotL();
-          while (track.scrollLeft < (REST - 1) * one + 2 && guard++ < N) rotR();
-        }
+        if (!animating) normalize();
         ribbonUpdate();
       });
     };
+
+    /** A HAND ON THE BOARD OUTRANKS THE GLIDE. A horizontal wheel is the
+     *  reader taking over; a vertical one is them reading the page, and
+     *  must not stop a step half-way down a column. */
+    const onWheel = (e: WheelEvent) => { if (e.deltaX !== 0) cancelGlide(); };
+    const onTouchStart = () => { touching = true; cancelGlide(); };
+    const onTouchEnd = () => { touching = false; scheduleSettle(); };
 
     /** BOTH AT ONCE: the ink leaves with the cards, not after them.
      *  Position-driven cueing can only fire once the scroll has CROSSED,
@@ -480,30 +629,37 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
      *  their direction at the instant they are called; free scrolling
      *  still falls back to the crossing, which is the only cue it has. */
     const step = (d: number) => {
-      /* A BOUNDED SCROLLER CAN REFUSE A STEP. The loop never can — that
+      /* Below xl there is no scroller: the rail is a jump nav. */
+      if (!rolling()) { spins = wrap(spins + d, N); seatColumn(); return; }
+      cancelGlide();
+      if (settleTimer !== null) {
+        window.clearTimeout(settleTimer); settleTimer = null;
+      }
+      normalize();
+      /* THE ARRIVAL IS A WHOLE COLUMN, READ OFF THE BOARD. Not
+         `shown + d`: a step taken while the board sits between two
+         columns — mid-flick, or from the fractional rest this used to
+         leave behind — has to say which column it is leaving before it
+         can say which one it is going to, and the rail's idea of that is
+         a consequence rather than the source.
+         A BOUNDED SCROLLER CAN REFUSE A STEP. The loop never can — that
          is its whole point — but a board with a column of slack and no
          more runs out, and advancing `shown` for a movement that will not
          happen leaves the rail naming a column the reader is not looking
-         at. So the arrival is computed first where it can be, and the
-         wave only leaves if the board is going to. */
-      const bounded = rolling() && !LOOPS;
-      let next: number | null = null;
-      if (bounded) {
-        const here = Math.floor(absPos() + 2 / oneW());
-        next = Math.max(0, Math.min(SLACK, here + d));
-        if (next === here) return;
-      }
+         at. So the arrival is computed first, and the wave only leaves if
+         the board is going to. */
+      const here = Math.round(absPos());
+      const arrive = LOOPS
+        ? here + d : Math.max(0, Math.min(SLACK, here + d));
+      if (arrive === here) return;
       if (shown !== null) {
-        shown = next ?? shown + d;
-        armed = shown;
-        revealTo(shown, d > 0);
+        shown = arrive;
+        armed = arrive;
+        revealTo(arrive, d > 0);
         const want = armed;
         window.setTimeout(() => { if (armed === want) armed = null; }, ARM_MS);
       }
-      const behavior = quiet.matches ? "auto" as const : "smooth" as const;
-      if (!rolling()) { spins = wrap(spins + d, N); seatColumn(); return; }
-      if (bounded) { track.scrollTo({ left: seatFor(next!), behavior }); return; }
-      track.scrollBy({ left: d * oneW(), behavior });
+      seatAbs(arrive, true);
     };
 
     /** Where the loop cannot roll — the stacked board below `xl` — the
@@ -519,6 +675,12 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
     const goto = (slug: string) => {
       const target = ORDER.indexOf(slug);
       if (target < 0) return;
+      /* A jump owns the board outright — nothing half-finished may still
+         be writing `scrollLeft` underneath it. */
+      cancelGlide();
+      if (settleTimer !== null) {
+        window.clearTimeout(settleTimer); settleTimer = null;
+      }
       const from = shown;
       if (!rolling()) {
         spins = target;
@@ -537,8 +699,7 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
            as it goes, which is far enough to have it on screen. Lighting
            it while it sat off the edge is the lie this avoids. */
         const seat = Math.max(0, Math.min(SLACK, target));
-        track.scrollTo({ left: seatFor(seat),
-          behavior: quiet.matches ? "auto" : "smooth" });
+        seatAbs(seat, true);
         if (from !== null && Math.abs(seat - from) === 1) {
           shown = seat; armed = seat;
           revealTo(seat, seat > from);
@@ -582,6 +743,7 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
     };
 
     const onResize = () => {
+      cancelGlide();
       layout();
       if (rolling() && LOOPS) track.scrollLeft = REST * oneW();
       ribbonReset();
@@ -589,6 +751,10 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
 
     document.addEventListener("keydown", onKey);
     track.addEventListener("scroll", onScroll, { passive: true });
+    track.addEventListener("wheel", onWheel, { passive: true });
+    track.addEventListener("touchstart", onTouchStart, { passive: true });
+    track.addEventListener("touchend", onTouchEnd, { passive: true });
+    track.addEventListener("touchcancel", onTouchEnd, { passive: true });
     window.addEventListener("resize", onResize);
 
     // ── seat it ────────────────────────────────────────────────────────
@@ -619,8 +785,14 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
       dead = true;
       reseat.current = () => {};
       if (raf !== null) cancelAnimationFrame(raf);
+      if (glideRaf !== null) cancelAnimationFrame(glideRaf);
+      if (settleTimer !== null) window.clearTimeout(settleTimer);
       document.removeEventListener("keydown", onKey);
       track.removeEventListener("scroll", onScroll);
+      track.removeEventListener("wheel", onWheel);
+      track.removeEventListener("touchstart", onTouchStart);
+      track.removeEventListener("touchend", onTouchEnd);
+      track.removeEventListener("touchcancel", onTouchEnd);
       window.removeEventListener("resize", onResize);
       pills.forEach((b) => b.removeEventListener("click", onPill));
       track.style.removeProperty("--colw");
