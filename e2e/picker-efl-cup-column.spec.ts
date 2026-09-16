@@ -104,6 +104,11 @@ test("the rated tie is drawn as a row and the unscaled ones as refusals",
 test("the column is lit by its OWN hue, not by the cup fallback",
   async ({ page }) => {
     await open(page);
+    /* `evaluate` DOES NOT AUTO-WAIT — the trap this repo names
+       explicitly. Reading the column straight after `goto` races the
+       render and hands back null, which throws inside the browser and
+       reads like a missing token rather than a missing await. */
+    await expect(col(page)).toHaveCount(1);
     const read = await page.evaluate(() => {
       const root = getComputedStyle(document.documentElement);
       const el = document.querySelector(
@@ -168,14 +173,28 @@ test("the four tiers it is rated on are NAMED, never printed as slugs",
     const ratedOn = RECORDED.leagues.eflcup.rated_on as readonly string[];
     expect([...ratedOn].sort())
       .toEqual(["championship", "epl", "leagueone", "leaguetwo"]);
-    for (const slug of ["championship", "leagueone", "leaguetwo"]) {
+
+    /* THE NAMES ARE ON SCREEN. This is the half that catches a missing
+       LEAGUE_LABEL entry, because `leagueLabel` falls through to the
+       slug and "leagueone" is not "League One". */
+    for (const name of ["championship", "league one", "league two"]) {
+      expect(text, `${name} is not named on the card`).toContain(name);
+    }
+
+    /* AND THE SLUG SPELLINGS ARE NOT. Only two of the three can be
+       checked this way and the third is worth a sentence rather than a
+       fake assertion: the Championship's slug IS its display name once
+       case is folded away, so "championship" appearing in the text is
+       not evidence of anything. `leagueone` and `leaguetwo` have no
+       space and no label collision, so they are the two that can only
+       arrive here by falling through the label map — which is exactly
+       the defect. */
+    for (const slug of ["leagueone", "leaguetwo"]) {
       expect(ratedOn).toContain(slug);
       expect(text, `${slug} reached the reader as a raw slug`)
         .not.toContain(slug);
     }
-    for (const name of ["championship", "league one", "league two"]) {
-      expect(text).toContain(name);
-    }
+    expect(ratedOn).toContain("championship");
   });
 
 // ══ 4. A REFUSAL IS A REASON, NEVER A ZERO AND NEVER A BLANK ═════════
@@ -187,20 +206,34 @@ test("every refused tie names a reason, and none of them renders as zero",
     const refusals = c.getByTestId("picker-refusal");
     await expect(refusals).toHaveCount(RECORDED.refusals.length);
 
+    /* MISSING IS NEVER ZERO — AND NEVER A ZERO-SHAPED TEST EITHER.
+       This first banned "0.00" anywhere on a refusal card and failed
+       against the real payload, because Coventry City genuinely have
+       0.00 ppg: four games, no points. A measured zero and a withheld
+       figure are exactly the two things this rule exists to keep apart,
+       so a guard that cannot tell them apart is the rule's own mistake.
+       What the component actually promises is narrower and checkable:
+       `refused-cell` prints the WORD, and `figure()` prints "not
+       stated" rather than "—" or 0.00 for a null. */
     for (let i = 0; i < RECORDED.refusals.length; i += 1) {
       const card = refusals.nth(i);
-      /* THE WITHHELD FIGURES ARE MARKED WITHHELD. `refused-cell` carries
-         the word for it; a card that simply omitted them would read as a
-         fixture nobody looked at. */
-      await expect(card.getByTestId("refused-cell").first()).toBeVisible();
-      const t = await card.innerText();
-      /* MISSING IS NEVER ZERO. An absent gap must not arrive as 0, 0.00
-         or a bare dash standing where a number goes — all three read as
-         "measured, and it came out level". */
-      expect(t, "a withheld figure rendered as a zero")
-        .not.toMatch(/(^|[^\d.])0\.00([^\d]|$)/);
-      expect(t.trim().length).toBeGreaterThan(0);
+      const cells = card.getByTestId("refused-cell");
+      await expect(cells.first()).toBeVisible();
+      for (const t of await cells.allInnerTexts()) {
+        expect(t.trim()).toBe("refused");
+      }
+      const text = await card.innerText();
+      /* THE EM DASH IS THE OTHER WAY AN ABSENCE HIDES — it occupies the
+         slot a number would and claims nothing, which is how a reader
+         comes to think something was measured. */
+      expect(text, "an absence rendered as a bare dash").not.toContain("—");
     }
+
+    /* NON-VACUOUS: the named-absence path has to be LIVE on this
+       payload, or every assertion above is satisfied by a card that
+       simply has every figure. */
+    const colText = await c.innerText();
+    expect(colText).toMatch(/not stated|no rank/);
   });
 
 test("the column carries the corpus reason it can name no favourite",
