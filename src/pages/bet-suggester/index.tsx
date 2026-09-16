@@ -1236,9 +1236,20 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   a column does not become a browser back-navigation —
                   there IS no end here, and the gesture that looks for one
                   must not leave the page. */}
+              {/* THE SCROLLER IS ONLY BUILT WHEN THERE IS SOMEWHERE TO
+                  SCROLL. At four columns or fewer the board shows
+                  everything it has, and `overflow-x` there would buy
+                  nothing and cost the sticky column headers — which is
+                  the trade this page makes ONLY where the pills bar is
+                  there to take it over. `--head-pos` is that decision,
+                  made once, next to the overflow it follows from: the
+                  header reads it rather than guessing from a
+                  breakpoint. */}
               <div ref={trackRef} data-testid="board-track"
-                style={{ ["--cols" as string]: String(drawnSlugs.length) }}
-                className={`grid grid-cols-1 gap-6 xl:gap-y-2 xl:overflow-x-auto xl:overscroll-x-contain xl:[grid-template-columns:repeat(var(--cols),var(--colw,minmax(0,1fr)))] ${
+                style={{ ["--cols" as string]: String(drawnSlugs.length),
+                  ...(windowed ? { ["--head-pos" as string]: "static" } : {}) }}
+                className={`grid grid-cols-1 gap-6 xl:gap-y-2 xl:[grid-template-columns:repeat(var(--cols),var(--colw,minmax(0,1fr)))] ${
+                  windowed ? "xl:overflow-x-auto xl:overscroll-x-contain" : ""} ${
                   soleColumn ? "" : "md:grid-cols-2"}`}>
                 {drawnSlugs.map((slug, ci) => (
                   <LeagueColumn key={slug} slug={slug} days={days}

@@ -116,10 +116,14 @@ export function LeagueRibbon({ slugs, view, stripRef }: {
 }) {
   const slots = slugs.length + 2;
   return (
-    /* The window the strip slides inside. `overflow-hidden` is what makes
-       the buffers buffers. */
+    /* The window the strip slides inside — what makes the buffers
+       buffers. CLIP, NOT HIDDEN, on both counts: `overflow: hidden`
+       creates a scroll container in BOTH axes (the same trap the board's
+       own track pays for below), and what is out of sight here is a
+       DUPLICATE of a league a visible pill already names, so nothing a
+       reader needs is being quietly cut off. */
     <div data-testid="league-ribbon-window"
-      className="w-full overflow-hidden">
+      className="w-full overflow-clip">
       <div ref={stripRef} data-testid="league-ribbon" role="tablist"
         aria-label={`leagues, in strength order — ${view} on screen`}
         style={{ ["--rgap" as string]: `${RGAP}px` }}
@@ -200,8 +204,8 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
 
     const ORDER = key.split(",");
     const N = ORDER.length;
-    /* Fewer than VIEW + 2 and there is nothing to slide from: the board
-       draws everything it has and the loop has no work. */
+    /* At VIEW columns or fewer the board shows everything it has: no
+       ribbon is built and there is nothing here to drive. */
     if (N <= VIEW) return;
     const SLACK = N - VIEW;
     const LOOPS = loops(N);
@@ -597,9 +601,16 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
       spins = ORDER.indexOf(order[REST]);
     }
     ribbonReset();
-    /* The strip's slot width comes from the parent's measured width, and
-       the pill's height from a font that may not have loaded yet. Re-seat
-       once the faces settle rather than trusting the first read. */
+    /* A COLUMN'S WIDTH IS MEASURED OFF A TRACK THAT HAS JUST CHANGED
+       SHAPE. Before `--colw` is written the grid is four 1fr tracks and
+       does not overflow, so on a platform with classic scrollbars there
+       is none — and the first `clientWidth` is a scrollbar wider than
+       the one the board ends up with. Re-seat on the next frame, once
+       the overflow it created is real.
+       And again once the web fonts settle: the strip's slot width comes
+       from its parent's measured width and the pill's height from a face
+       that may not have loaded yet. */
+    requestAnimationFrame(() => { if (!dead) { layout(); ribbonUpdate(); } });
     if (document.fonts?.ready) void document.fonts.ready.then(() => {
       if (!dead) { layout(); ribbonUpdate(); }
     });

@@ -2399,20 +2399,25 @@ export function LeagueColumn({
           the rows. `scroll-mt-16` on the section still owns where a
           jump-nav landing comes to rest.
 
-          AND IT GOES STATIC ON THE TRACK (2026-09-15). At xl the board
-          is a horizontal scroller, and `overflow-x` forces `overflow-y`
-          — so this header's scrollport is the TRACK, not the viewport,
-          and `top: var(--topbar-h)` measures from the track's own edge.
-          It pushed every column header ~103px down its own column and
-          left it there: a header that has MOVED, permanently, rather
-          than one that follows. The page's pills bar is what does this
-          job at xl — it is genuinely sticky and it names the four
-          columns in view at all times — so the trade is made
-          deliberately and in one place. Below xl the columns stack,
-          there is no scrollport, and this header sticks exactly as it
-          always did. */}
+          AND IT GOES STATIC ON A SCROLLING TRACK (2026-09-15). A board
+          carrying more columns than it draws is a horizontal scroller at
+          xl, and `overflow-x` forces `overflow-y` — so this header's
+          scrollport is the TRACK, not the viewport, and
+          `top: var(--topbar-h)` measures from the track's own edge. It
+          pushed every column header ~103px down its own column and left
+          it there: a header that has MOVED, permanently, rather than one
+          that follows. The page's pills bar is what does this job on
+          such a board — it is genuinely sticky, full-bleed under the
+          nav, and it names the four columns in view at all times — so
+          the trade is made deliberately, and stated ONCE where the
+          overflow is decided.
+          `--head-pos` is that decision, set by the page on the track and
+          read here; it is absent on a board that fits, so a four-column
+          board and every narrowed page keep the sticky header exactly as
+          they always had it. Below xl the columns stack, there is no
+          scrollport anywhere, and so does everything else. */}
       <header data-testid="col-head"
-        className="sticky top-[var(--topbar-h)] z-20 self-start border-b border-line bg-bs pb-3 pt-2 xl:static xl:[grid-row:1]">
+        className="sticky top-[var(--topbar-h)] z-20 self-start border-b border-line bg-bs pb-3 pt-2 xl:[position:var(--head-pos,sticky)] xl:[grid-row:1]">
         {/* the league's own light — a 2px rail, wayfinding only. It is
             addressable because it is where a hue COLLISION is visible:
             two columns whose rails resolve to one colour is the defect

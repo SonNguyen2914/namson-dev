@@ -391,18 +391,44 @@ const VIEW = 4;                       // src/pages/bet-suggester/index.tsx
 const drawnOrder = (columns: readonly string[] = COLUMNS) =>
   boardColumns(columns);
 
+
+/** THE COLUMNS IN THE SCROLLPORT — RESTATED 2026-09-15.
+ *
+ *  "Drawn" used to mean "mounted": the page rendered four columns and no
+ *  others. The board is a scrolling track now and every declared column
+ *  is mounted, so which four you are looking at is a SCROLL POSITION and
+ *  has to be asked of the track rather than counted off the DOM. */
+const onScreenCols = (page: import("@playwright/test").Page) =>
+  page.evaluate(() => {
+    const t = document.querySelector<HTMLElement>('[data-testid="board-track"]');
+    if (!t) return [] as string[];
+    const box = t.getBoundingClientRect();
+    return [...t.querySelectorAll<HTMLElement>('[data-testid="league-col"]')]
+      .map((c) => ({ slug: c.dataset.league!,
+                     x: c.getBoundingClientRect().left - box.left }))
+      .filter((c) => c.x > -4 && c.x < box.width - 4)
+      .sort((a, b) => a.x - b.x).map((c) => c.slug);
+  });
+
 async function show(page: import("@playwright/test").Page, slug: string,
                     columns: readonly string[] = COLUMNS) {
   const order = drawnOrder(columns);
   const i = order.indexOf(slug);
   expect(i, `${slug} is not a declared column of this board`)
     .toBeGreaterThanOrEqual(0);
+  await expect(col(page, slug)).toHaveCount(1);
   if (order.length > VIEW) {
     const lead = order[i < VIEW ? 0 : Math.min(i, order.length - VIEW)];
     await page.locator(
       `[data-testid="ribbon-pill"][data-slug="${lead}"]`).click();
+    /* AND WAIT FOR IT TO ARRIVE. Every declared column is mounted since
+       2026-09-15, so `col(page, slug)` is satisfied before the board has
+       moved a pixel — the jump is a SMOOTH SCROLL now, and a read taken
+       on the click describes the layout the click was meant to change.
+       "Shown" means in the scrollport, and that is what is waited on. */
+    await expect.poll(() => onScreenCols(page),
+      { message: `${slug} never reached the scrollport` }).toContain(slug);
   }
-  await expect(col(page, slug)).toHaveCount(1);
 }
 
 /** The full board with the Champions League column on screen — which is
