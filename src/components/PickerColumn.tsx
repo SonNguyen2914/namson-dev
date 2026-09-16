@@ -2475,7 +2475,24 @@ export function LeagueColumn({
          header rail, as two of eight headers 98px below the other six.
          At `xl` the subgrid below restates both and wins, because
          Tailwind emits `md:` before `xl:`. */
-      className={`min-w-0 scroll-mt-16 ${
+      /* `relative`, ADDED 2026-09-16 — AND IT IS A CONTAINMENT FIX, not
+         a layout one. Tailwind's `.sr-only` is `position: absolute`, so
+         a screen-reader-only span inside a column has the BODY for a
+         containing block and a scrolling track cannot clip it: measured
+         on the eight-column board at 810px, one such span — the LIVE
+         match note in components/PickerRead.tsx — sat at x=1513 in the
+         track's scroll content and stretched `documentElement.scrollWidth`
+         to 1514 in an 810px viewport. The page could not actually be
+         scrolled sideways, which is why it had never been seen; a guard
+         that reads `scrollWidth` sees it immediately.
+         LATENT SINCE THE TRACK BECAME A SCROLLER, not new here: at `xl`
+         the same span escapes, and the document only stayed honest
+         because La Liga happens to be the second column and lands inside
+         the viewport. A column that scrolled off the right with a live
+         match in it would have done this at any width.
+         Every popover inside a column already carries its own `relative`
+         wrapper (`NotesPanel`), so nothing's positioning moves. */
+      className={`relative min-w-0 scroll-mt-16 ${
         sideways ? "md:[grid-column:var(--col)] md:[grid-row:1]" : ""
       } xl:grid xl:content-start xl:[grid-template-rows:subgrid] xl:[grid-template-columns:minmax(0,1fr)] xl:[grid-row:1/span_var(--tracks)] xl:[grid-column:var(--col)]`}>
       {/* THE HEADER FOLLOWS THE COLUMN (2026-09-07). Opaque ground, not a

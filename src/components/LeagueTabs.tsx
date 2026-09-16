@@ -60,12 +60,6 @@ import { hueOf } from "./PickerColumn";
  *  it, rather than walking eight stops.
  */
 
-/** THE TOUCH FLOOR, px. Apple's HIG and WCAG 2.5.5 both land here, and
- *  the board's own audit at 393px is what makes it a number rather than
- *  a principle: 90 of 107 controls were under it. Exported so the guard
- *  and the control read the same one. */
-export const TAP = 44;
-
 export function LeagueTabs({ slugs, picked, onPick, counts }: {
   /** every declared column, in the operator's order */
   slugs: readonly string[];
@@ -135,8 +129,13 @@ export function LeagueTabs({ slugs, picked, onPick, counts }: {
             /* ROVING TABINDEX: one stop for the whole strip. */
             tabIndex={on ? 0 : -1}
             onClick={() => onPick(slug)}
+            /* THE TOUCH FLOOR IS `--tap-floor`, declared once in
+               globals.css beside the rule that gives every other control
+               on this page the same 44px. A number typed here would be
+               the second copy of it. */
             style={{ ["--h" as string]: hueOf(slug),
-              minHeight: `${TAP}px`, minWidth: `${TAP}px` }}
+              minHeight: "var(--tap-floor)",
+              minWidth: "var(--tap-floor)" }}
             className={`flex flex-none snap-center items-center gap-2 rounded-full border px-4 font-mono text-[11.5px] uppercase leading-none tracking-[0.06em] whitespace-nowrap transition-colors ${
               on
                 ? "border-[var(--h)] bg-[color-mix(in_srgb,var(--h)_12%,transparent)] text-ink-hi"

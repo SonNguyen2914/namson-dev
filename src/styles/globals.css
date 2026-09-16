@@ -173,6 +173,56 @@
   }
 }
 
+/* ── THE TOUCH FLOOR (operator, 2026-09-16) ────────────────────────────
+
+   MEASURED on the live board at 393px: 90 of 107 controls smaller than
+   44px in one dimension or both — the `i` that opens a tier read at
+   15x15, a watch toggle 20px tall, the nav chips at 25. 44 is where
+   Apple's HIG and WCAG 2.5.5 both land, and it is a number rather than a
+   principle here because the audit counted against it.
+
+   WHY A PSEUDO-ELEMENT AND NOT PADDING. Padding would be honest and
+   would also add ~29px to every chip row on every card, which on a board
+   of fixtures is most of the page height this redesign just won back.
+   The hit area is what has to be 44px; the ink does not. So each control
+   grows an `::after` centred on it, `max(100%, 44px)` in each axis — the
+   deficient axis only, and no visual change at all.
+
+   WHY IT IS A SUBTREE RULE AND NOT A CLASS ON EACH CONTROL. A class is a
+   hand-typed subset, and the next control added to the board is the one
+   that forgets it. This floors every control inside the marked subtree,
+   including ones nobody has written yet. `:where()` so it carries NO
+   specificity: a control Tailwind has positioned keeps its own
+   positioning, and a positioned element is already the containing block
+   for its own pseudo-element, so the floor lands correctly either way.
+
+   INPUTS AND SELECTS TAKE THE PADDED VERSION, because a replaced element
+   has no `::after` to give. There are three of them on this page.
+
+   PHONE ONLY. A mouse is not a thumb, and 44px boxes around inline links
+   on a desktop would overlap each other. */
+:root { --tap-floor: 44px; }
+
+@media (width < 48rem) {
+  [data-tap-floor] :where(a[href], button, summary, [role="tab"],
+                          [role="button"]) {
+    position: relative;
+  }
+  [data-tap-floor] :where(a[href], button, summary, [role="tab"],
+                          [role="button"])::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    translate: -50% -50%;
+    width: max(100%, var(--tap-floor));
+    height: max(100%, var(--tap-floor));
+  }
+  [data-tap-floor] :where(input, select, textarea) {
+    min-height: var(--tap-floor);
+  }
+}
+
 /* ── THE TWO WIDTHS THE BOARD CHANGES SHAPE AT ─────────────────────────
    Restated here, at Tailwind's own default values, for ONE reason: a
    NON-inline `@theme` block emits its variables onto `:root`, so

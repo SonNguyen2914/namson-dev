@@ -90,7 +90,7 @@ import { LeagueColumn, NotesPanel } from "../../components/PickerColumn";
 import {
   LeagueRibbon, VIEW, VIEW_NARROW, useBoardLoop,
 } from "../../components/LeagueRibbon";
-import { LeagueTabs, TAP } from "../../components/LeagueTabs";
+import { LeagueTabs } from "../../components/LeagueTabs";
 import { useBoardShape } from "../../lib/viewport";
 import {
   WatchDeclarationProvider, WatchPanel,
@@ -860,7 +860,12 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   }
 
   return (
-    <div ref={pageRef} className="min-h-screen bg-bs font-sans text-ink-mid">
+    /* `data-tap-floor` — EVERY CONTROL IN HERE GETS A 44px HIT AREA AT
+       PHONE WIDTH. The rule is in globals.css and it is a subtree rule
+       rather than a class per control, so a control added to this page
+       tomorrow is floored without anybody remembering to. */
+    <div ref={pageRef} data-tap-floor
+      className="min-h-screen bg-bs font-sans text-ink-mid">
       <Head><title>{pageTitle ?? "Picker board"} · namson.dev</title></Head>
       <RouteProgress />
       <TopBar left={backTo ? undefined : <ArchiveMenu />} back={backTo}
@@ -1000,7 +1005,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             className="mx-auto mt-2 max-w-3xl">
             <summary data-testid="board-intro-summary"
               className="mx-auto hidden w-fit cursor-pointer list-none items-center gap-1.5 rounded-md border border-line px-3 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low marker:content-none hover:text-ink-hi max-md:inline-flex"
-              style={{ minHeight: `${TAP}px` }}>
+              style={{ minHeight: "var(--tap-floor)" }}>
               <span aria-hidden className="text-ink-faint">?</span>
               what is this
             </summary>
