@@ -425,9 +425,19 @@ async function show(page: import("@playwright/test").Page, slug: string,
        2026-09-15, so `col(page, slug)` is satisfied before the board has
        moved a pixel — the jump is a SMOOTH SCROLL now, and a read taken
        on the click describes the layout the click was meant to change.
-       "Shown" means in the scrollport, and that is what is waited on. */
-    await expect.poll(() => onScreenCols(page),
-      { message: `${slug} never reached the scrollport` }).toContain(slug);
+       "Shown" means in the scrollport, and that is what is waited on.
+
+       TWO AGREEING READS, not just a passing one: `expect.poll` returns
+       the instant its assertion holds, and mid-scroll the arriving column
+       is already inside the box while the one leaving has not yet left.
+       A set read there is a frame nobody was ever shown. */
+    await expect.poll(async () => {
+      const a = await onScreenCols(page);
+      await page.waitForTimeout(60);
+      const b = await onScreenCols(page);
+      return a.join() === b.join() && b.includes(slug) ? b.join() : "moving";
+    }, { message: `${slug} never came to rest in the scrollport` })
+      .toContain(slug);
   }
 }
 

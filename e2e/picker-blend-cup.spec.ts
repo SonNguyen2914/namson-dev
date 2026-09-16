@@ -296,9 +296,19 @@ async function show(page: import("@playwright/test").Page, slug: string,
        2026-09-15, so `col(page, slug)` is satisfied before the board has
        moved a pixel — the jump is a SMOOTH SCROLL now, and a read taken
        on the click describes the layout the click was meant to change.
-       "Shown" means in the scrollport, and that is what is waited on. */
-    await expect.poll(() => onScreenCols(page),
-      { message: `${slug} never reached the scrollport` }).toContain(slug);
+       "Shown" means in the scrollport, and that is what is waited on.
+
+       TWO AGREEING READS, not just a passing one: `expect.poll` returns
+       the instant its assertion holds, and mid-scroll the arriving column
+       is already inside the box while the one leaving has not yet left.
+       A set read there is a frame nobody was ever shown. */
+    await expect.poll(async () => {
+      const a = await onScreenCols(page);
+      await page.waitForTimeout(60);
+      const b = await onScreenCols(page);
+      return a.join() === b.join() && b.includes(slug) ? b.join() : "moving";
+    }, { message: `${slug} never came to rest in the scrollport` })
+      .toContain(slug);
   }
 }
 
@@ -354,8 +364,14 @@ test("the Leagues Cup gets its own column, after the four leagues",
     const withCup = await drawn();
     expect(withCup[withCup.length - 1]).toBe("leaguescup");
     expect(withCup).toEqual(drawnOrder().slice(-VIEW));
-    // …and the ribbon agrees about the move, so the two readings of the
-    // window cannot drift apart
+    /* …and the ribbon agrees about the move, so the two readings of the
+       window cannot drift apart. WAITED OUT, not polled: the wave that
+       carries the names across the slots is staggered — the furthest is
+       `SLOTS-1` × 26ms behind the first, on top of a 430ms reveal — and a
+       pill takes its new identity when its own leg STARTS, so a read
+       taken on arrival compares a half-arrived rail. The agreement is
+       what this asserts; the latency is not. */
+    await page.waitForTimeout(800);
     expect(await lit()).toEqual(withCup);
     const cup = col(page, "leaguescup");
     await expect(cup.getByRole("heading", { name: "Leagues Cup" }))

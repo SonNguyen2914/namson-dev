@@ -281,3 +281,67 @@ test.describe("the pills bar is the page's own header", () => {
       await expect(head).toBeVisible();
     });
 });
+
+test.describe("a reader who asked for less motion gets less motion", () => {
+  /** Every name on the rail, in slot order, as one string. */
+  const say = (page: Page) => page.getByTestId("ribbon-pill")
+    .evaluateAll((es) => es.map((e) => (e.textContent || "").trim()).join("|"));
+
+  /** Sample the rail across a step, fast enough to catch a ~430ms reveal
+   *  with a ~77ms churn, and return the frames that are neither the
+   *  before nor the after. */
+  async function between(page: Page) {
+    const before = await say(page);
+    const seen: string[] = [];
+    await page.keyboard.press("ArrowRight");
+    for (let i = 0; i < 14; i++) {
+      seen.push(await say(page));
+      await page.waitForTimeout(55);
+    }
+    await page.waitForTimeout(900);
+    const after = await say(page);
+    return { before, after, seen };
+  }
+
+  test("no churn and no slide — it lands on the settled state", async ({ page }) => {
+    /* BOTH HALVES IN ONE FILE. The reduced-motion branch is an ABSENCE,
+       and an absence passes on a board whose ribbon never animates at
+       all — which is the board this whole rewrite is about. So the
+       churn is proved PRESENT under the default setting first, with the
+       same sampler, and only then required to be gone. */
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await openBoard(page);
+    const loud = await between(page);
+    expect(loud.after, "the board did not move at all").not.toBe(loud.before);
+    const finals = new Set(loud.after.replace(/\|/g, "").split(""));
+    expect(loud.seen.some((s) => s.replace(/\|/g, "").split("")
+      .some((c) => !finals.has(c))),
+      "no churn ran even with motion allowed, so the assertion below "
+      + "would pass for the wrong reason").toBe(true);
+
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await openBoard(page);
+    const quiet = await between(page);
+    expect(quiet.after, "the board did not move at all").not.toBe(quiet.before);
+
+    /* NO CHURN: every sampled frame is one of the two settled states.
+       A glyph the final names do not contain is the churn, and there
+       must not be one. */
+    const settledNames = new Set(
+      (quiet.before + quiet.after).replace(/\|/g, "").split(""));
+    for (const frame of quiet.seen) {
+      for (const c of frame.replace(/\|/g, "").split("")) {
+        expect(settledNames, `"${frame}" holds ${JSON.stringify(c)}, which `
+          + "belongs to neither the old names nor the new — a reader who "
+          + "asked for less motion is watching letters churn")
+          .toContain(c);
+      }
+    }
+    /* NO SLIDE: the board arrived. A smooth scroll is still running two
+       frames in; an instant one has already landed on a whole column. */
+    const s = await trackState(page);
+    expect(Math.abs(s.pos - Math.round(s.pos)),
+      `the board rests at ${s.pos} — part-way between two columns`)
+      .toBeLessThan(0.02);
+  });
+});
