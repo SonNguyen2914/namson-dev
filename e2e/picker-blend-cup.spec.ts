@@ -388,7 +388,6 @@ test("the Leagues Cup gets its own column, after the four leagues",
        what this asserts; the latency is not. */
     await page.waitForTimeout(800);
     expect(await lit()).toEqual(withCup);
-    const cup = col(page, "leaguescup");
     await expect(colHead(page, "leaguescup")
       .getByRole("heading", { name: "Leagues Cup" }))
       .toBeVisible();
@@ -472,7 +471,6 @@ test("a cross-league cup fixture withholds its gaps, says why, and keeps its tie
     await expect(cross.getByTestId("shape-read"))
       .toContainText("T2 v T1 −1");
     // the note's new home, opened from the column header
-    const cupCol = col(page, "leaguescup");
     await colHead(page, "leaguescup").getByTestId("col-notes-open").click();
     await expect(colHead(page, "leaguescup").getByTestId("col-notes").getByTestId("gap-note"))
       .toContainText("2.0 ppg in MLS is not 2.0 ppg in Liga MX");
@@ -532,7 +530,6 @@ test("the column note opens on hover, on focus and on tap, and Escape shuts it",
     // hover-only would make it unreachable rather than tidy.
     await open(page);
     await show(page, "leaguescup");
-    const cup = col(page, "leaguescup");
     const trigger = colHead(page, "leaguescup").getByTestId("col-notes-open");
     const panel = colHead(page, "leaguescup").getByTestId("col-notes");
 

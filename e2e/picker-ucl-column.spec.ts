@@ -1005,7 +1005,6 @@ test("a member table that failed is named, and rated_on does not shrink",
         },
       },
     });
-    const ucl = col(page, "ucl");
     const block = colHead(page, "ucl").getByTestId("col-member-errors");
     await expect(block).toContainText("1 of 7 member tables did not load");
     /* THE FAILURE IS STILL NAMED, AND THE EXCEPTION CLASS IS NOT

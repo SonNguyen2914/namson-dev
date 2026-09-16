@@ -217,9 +217,14 @@ export function useBoardLoop({ trackRef, stripRef, railRef, slugs, enabled,
 }): void {
   const key = slugs.join(",");
   /** Read through a ref so the effect below does not re-run — and does
-   *  not go stale — when the page hands it a fresh closure. */
+   *  not go stale — when the page hands it a fresh closure. Refreshed in
+   *  an effect rather than during render: a ref written while rendering
+   *  is a render with a side effect, which React is free to run twice
+   *  and to throw away. The ref is SEEDED with the first closure, so the
+   *  loop below has a live callback on its very first pass whatever
+   *  order the effects run in. */
   const rollCb = useRef(onRolling);
-  rollCb.current = onRolling;
+  useEffect(() => { rollCb.current = onRolling; }, [onRolling]);
   /** Re-seat the grid after ANY commit. React writes `--col` from the
    *  column's DOM position and the loop overwrites it with the ROTATED
    *  one; React skips a style property whose value has not changed
