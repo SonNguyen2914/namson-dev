@@ -350,14 +350,19 @@ test("EVERY SENTENCE IN THE PANEL IS THE PAYLOAD'S — the card authors no "
        here, so a key the backend adds is inside this check on the day it
        is written. */
     const flat = (s: string) => s.replace(/\s+/g, " ").trim();
-    const fromTheWire = [
+    /* `flatMap` RATHER THAN A FILTERING TYPE PREDICATE: the fixture is
+       `as const`, so every one of these is its own string LITERAL type
+       and `s is string` widens the parameter, which tsc rejects
+       (TS2677). Widening to `unknown[]` first would work too and would
+       throw away the very thing the `as const` is for. */
+    const fromTheWire: string[] = ([
       ROW.refusal.withheld,
       ROW.refusal.why,
       ...Object.values(ROW.refusal.absent ?? {}),
       ...Object.values(ROW.refusal.detail ?? {}),
       ...(ROW.reg_time_note ? [ROW.reg_time_note] : []),
-    ].filter((s): s is string => typeof s === "string" && s.length > 0)
-      .map(flat);
+    ] as unknown[]).flatMap((s) =>
+      typeof s === "string" && s.length > 0 ? [flat(s)] : []);
     expect(fromTheWire.length,
       "the payload carries no prose — this check would pass over nothing")
       .toBeGreaterThan(2);
