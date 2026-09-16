@@ -125,6 +125,20 @@ test("no route scrolls sideways, hides a sticky header, or cuts text",
           // sr-only text is clipped to 1px BY DESIGN (clip-path inset)
           if (cs.clipPath && cs.clipPath !== "none") return;
           if (/\bsr-only\b/.test(String((el as HTMLElement).className))) return;
+          /* AND THE LEGACY SPELLING OF THE SAME DECISION. `position:
+             absolute` + `clip: rect(0 0 0 0)` is the older visually-
+             hidden idiom, and the zero-box pass below has always
+             exempted it — this pass did not, so the two halves of one
+             file disagreed about what an intentional clip looks like.
+             Found the day this sweep started walking the competition
+             viewer (2026-09-15): the offender is NEXT'S OWN route
+             announcer, `<p id="__next-route-announcer__">`, the live
+             region that reads the page title to a screen reader. It is
+             clipped to 1px on purpose, it is not ours to fix, and it is
+             on every page in the tree — so the only thing this finding
+             could ever have taught a reader is to stop reading the
+             findings. */
+          if (cs.position === "absolute" && cs.clip !== "auto") return;
           if (!el.textContent || !el.textContent.trim()) return;
           if (!(el as HTMLElement).checkVisibility?.()) return;
           if (el.children.length > 2) return;
