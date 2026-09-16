@@ -823,6 +823,18 @@ export const LEAGUE_LABEL: Record<string, string> = {
   // `campeones` at the operator exactly as the four league slugs did
   // above. Taken from the backend registry's own `display`.
   campeones: "Campeones Cup",
+  // 2026-09-15, and the three tiers below it are here for exactly the
+  // reason the Champions League's table-only members are: they serve no
+  // page, they exist so an EFL Cup club has a real ppg, GD/g, rank and
+  // tier, and their names are still PRINTED — on the cup column's
+  // "rated on" chip, and on every row that says which table it was
+  // rated in. Without them that chip reads "championship + leagueone +
+  // leaguetwo", which is the raw-slug defect this map has now shipped
+  // twice. Names taken from the backend registry's own `display`.
+  eflcup: "EFL Cup",
+  championship: "Championship",
+  leagueone: "League One",
+  leaguetwo: "League Two",
 };
 
 /** THE BADGE BESIDE THE FAVOURITE, and what it is allowed to claim.

@@ -96,11 +96,22 @@ import { Eyebrow } from "./ui";
 // columns (and that pair is mls/ligamx, which already existed), 45.3
 // clearance from the brand gold. Placing them by hue angle alone scored
 // 24-39 and kept stacking greens.
+// THE EFL CUP (2026-09-15) IS THE FIRST ENTRY HERE THAT IS NOT A BOARD
+// COLUMN, and the reasoning above does not reach it. It has no shadow to
+// hide in — a CompRail chip can sit above whatever the board is scrolled
+// to — so its blue was measured against all ten lights at once and
+// clears 34.3 (nearest epl), against the 30.6 that --lg-ucl, the chip
+// beside it, manages against those same columns. Its clearance from the
+// brand gold is 126.5 and that is the one that matters most: three of
+// the four tiers it is rated on have no hue, so `hueOf` answers
+// --lg-cup for them and the gold is on the SAME CARD as this blue.
+// Full derivation in globals.css beside the token.
 const LEAGUE_HUE: Record<string, string> = {
   mls: "var(--lg-mls)", epl: "var(--lg-epl)", laliga: "var(--lg-laliga)",
   ligamx: "var(--lg-ligamx)", ucl: "var(--lg-ucl)",
   bundesliga: "var(--lg-bundesliga)", seriea: "var(--lg-seriea)",
   ligue1: "var(--lg-ligue1)", eredivisie: "var(--lg-eredivisie)",
+  eflcup: "var(--lg-eflcup)",
 };
 export const hueOf = (slug: string) => LEAGUE_HUE[slug] ?? "var(--lg-cup)";
 

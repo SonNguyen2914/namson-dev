@@ -86,9 +86,33 @@ export type LiveCompetition = {
    So the chip names the page with the MATCHES on it. The ranked field
    has its own door — `FieldLink`, top-left of every page — and the
    market viewer stays reachable from the Archive menu. */
+/* THE EFL CUP JOINS 2026-09-15 (operator: "EFL Cup is ongoing, copy
+   exactly every detail of what UCL having, the only difference is the
+   theme color"). It passes the test above with room to spare: the
+   competition was in its THIRD ROUND that day, with five ties that
+   night and four rounds plus a final still to come.
+
+   ITS CHIP WILL NOT GLOW, AND THAT IS NAMED HERE RATHER THAN LEFT TO BE
+   FOUND. The glow is a read of `/api/comp/{key}/fixtures`, which is the
+   COMPETITION VIEWER's surface (`src.competitions.VIEWERS` in the
+   backend) and not the picker's — and the EFL Cup deliberately has no
+   viewer, because a viewer is a different product from a board: it
+   prices a market and shows the model's share of it, and no model in
+   that repository covers the three English tiers below the Premier
+   League. So that route answers 404 for this key, `fetchSoon` reads it
+   as UNKNOWN, and the chip renders as an ORDINARY chip forever.
+
+   WHICH IS A SUPPORTED STATE, NOT A BROKEN ONE, and the distinction is
+   the component's own: an unlit chip is silence, never the claim that
+   nothing is on. The chip still does the job the Champions League's
+   chip was moved back to doing — it names the page with the MATCHES on
+   it. What would light it is a `Viewer` for this competition, which is
+   a decision about a second product and not a line in this file. */
 export const LIVE_COMPETITIONS: readonly LiveCompetition[] = [
   { key: "ucl", href: "/bet-suggester/ucl", label: "UCL",
     hue: "--lg-ucl" },
+  { key: "eflcup", href: "/bet-suggester/efl-cup", label: "EFL Cup",
+    hue: "--lg-eflcup" },
 ];
 
 /** ONE COMPETITION'S NEXT-TWO-DAYS READ, on the client only.
