@@ -711,11 +711,20 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   useEffect(() => {
     const page = pageRef.current;
     if (!page) return;
+    /* NOT ROUNDED (2026-09-15). Each height was rounded to a whole pixel
+       and the two were then added, which is a measurement that can be
+       half a pixel LONGER than the thing it measures: the pills bar is
+       47.5px tall, `--topbar-h` came out 49 + 48 = 97, and the column
+       headers parked 0.5px below the bar's bottom edge at 96.5. Half a
+       pixel of page showing between two bars that are meant to read as
+       one stack — and a hairline of a scrolling row inside it. The
+       browser is perfectly happy to stick at a fractional offset; the
+       rounding bought nothing and cost exactly that. */
     const seat = () => {
       const bar = barRef.current;
       const top = document.querySelector("header.topbar");
-      const th = top ? Math.round(top.getBoundingClientRect().height) : 49;
-      const bh = bar ? Math.round(bar.getBoundingClientRect().height) : 0;
+      const th = top ? top.getBoundingClientRect().height : 49;
+      const bh = bar ? bar.getBoundingClientRect().height : 0;
       page.style.setProperty("--bar-top", `${th}px`);
       page.style.setProperty("--topbar-h", `${th + bh}px`);
     };
@@ -1374,8 +1383,19 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                          rotation. The fallback keeps DOM order until the
                          first seat, which is before any header is in
                          here to see it. */
+                      /* AND THE ROW IS EXPLICIT, for the same reason the
+                         columns' is. A slot placed on an explicit
+                         COLUMN with an auto row is still auto-placed
+                         vertically, and sparse auto-placement never
+                         moves the cursor backwards: the moment a
+                         rotation left a slot naming a lower track than
+                         the one before it in DOM order — which is every
+                         rotation, and the very first seat — the grid
+                         wrapped it onto a second row. Measured: two of
+                         eight headers 98px below the other six, each
+                         still over the right column. */
                       <div key={slug} data-rail-slot={slug}
-                        className="min-w-0 [grid-column:var(--col,auto)]" />
+                        className="min-w-0 [grid-column:var(--col,auto)] [grid-row:1]" />
                     ))}
                   </div>
                 </div>

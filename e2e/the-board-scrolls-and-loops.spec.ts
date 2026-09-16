@@ -532,13 +532,29 @@ test.describe("the pills bar is the page's own header", () => {
       .toBeLessThan(620);
   });
 
-  test("it STAYS while the board is read, which is what pays for the "
-    + "column headers", async ({ page }) => {
-      /* The trade the draft makes: a track with `overflow-x` is a
-         scrollport in both axes, so a column header inside it sticks to
-         the TRACK and not to the viewport. The pills bar does that job
-         instead — so it has to genuinely stick, and the headers must be
-         `static` rather than parked 103px down their own columns. */
+  test("it STAYS while the board is read, and the column headers park on "
+    + "it", async ({ page }) => {
+      /* RESTATED 2026-09-15 — the second half of this test was written
+         against an arrangement that has since been replaced.
+         WHAT IT SAID. A track with `overflow-x` is a scrollport in both
+         axes, so a column header inside it sticks to the TRACK and not
+         to the viewport; the trade was to make the headers `static` and
+         let the pills bar carry the wayfinding alone, and this asserted
+         that `static` as the shape of the trade.
+         WHAT MOVED. The operator's screenshot of a league name sliced in
+         half by this bar is what that trade looked like to read — "make
+         the league header still going with me when I go down. It need to
+         go too right under the pills." The headers now LEAVE the
+         scrollport (portalled into the board's own sticky rail) and come
+         to rest against this bar's bottom edge, so `static` is no longer
+         the point: a header can follow the reader again, and it is this
+         bar that says where it stops.
+         WHAT SURVIVES UNCHANGED is the reason that clause was here at
+         all — the bar has to genuinely stick. It is now load-bearing
+         twice over: it is the wayfinding AND it is the shelf the headers
+         park on, measured. The header's own behaviour is pinned in
+         e2e/the-headers-park-under-the-pills.spec.ts, which is where the
+         detail belongs. */
       await openBoard(page);
       const before = await page.getByTestId("board-pillbar").boundingBox();
       await page.mouse.wheel(0, 1200);
@@ -547,14 +563,23 @@ test.describe("the pills bar is the page's own header", () => {
       expect(after!.y, "the pills bar scrolled away with the page")
         .toBeCloseTo(before!.y, 0);
 
+      /* AND NOT ONE OF THEM IS STILL IN THE SCROLLPORT. That is the
+         original defect stated as a place rather than as a CSS value: a
+         header inside the track has the track for a scrollport and
+         cannot reach the viewport from there, whatever `position` says.
+         Read off the track itself, so a header that quietly moved back
+         inside it fails here. */
+      await expect(page.getByTestId("board-track")
+        .locator('[data-testid="col-head"]'),
+      "a column header inside the track has the TRACK for a scrollport "
+      + "and parks itself `--topbar-h` down its own column — the known "
+      + "regression the rail exists to escape").toHaveCount(0);
+
       const head = page.getByTestId("col-head").first();
-      const pos = await head.evaluate((e) => getComputedStyle(e).position);
-      expect(pos, "a column header left half-sticky inside the track parks "
-        + "itself `--topbar-h` down its own column and stays there — the "
-        + "known regression this trade is made against").toBe("static");
-      /* NON-VACUITY: the header is still THERE and still readable, it
-         has simply stopped following. */
       await expect(head).toBeVisible();
+      const box = await head.boundingBox();
+      expect(box!.y, "the header came to rest on this bar's bottom edge")
+        .toBeCloseTo(after!.y + after!.height, 1);
     });
 });
 
