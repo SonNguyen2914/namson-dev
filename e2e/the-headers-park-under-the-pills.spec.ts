@@ -27,10 +27,27 @@
  *  ends up naming a league one column away from the one underneath it.
  *
  *  And the third half is that none of this reaches a board that never
- *  had the problem: below xl the columns stack, at four columns or fewer
- *  there is no overflow, and a narrowed page draws one column. Those all
- *  keep the sticky-inside-the-column header they always had, and a rail
- *  built for them would be a regression dressed as a feature.
+ *  had the problem: at four columns or fewer there is no overflow, a
+ *  narrowed page draws one column, and below `md` the board draws the
+ *  one league its tab strip has selected. Those all keep the
+ *  sticky-inside-the-column header they always had, and a rail built for
+ *  them would be a regression dressed as a feature.
+ *
+ *  ── WHERE THAT LINE IS, RESTATED 2026-09-16 ─────────────────────────
+ *
+ *  It was `xl`. The board became a sideways scroller from `md` up on
+ *  2026-09-16 — two columns at a time instead of a four-deep stack of
+ *  two-wide rows — so the scrollport, and therefore the rail, now start
+ *  there. A tablet is on the RAIL side of the line and gets the same
+ *  eight tests below; the only width with no rail is the phone, which
+ *  has no scrollport because it draws one column.
+ *
+ *  Nothing about the claim moved. "A header sticks to the viewport and
+ *  stays over its own column" is asserted at exactly the widths where a
+ *  header is in a rail, and "a board that fits keeps its header inside
+ *  its column" at exactly the widths where one is. What moved is which
+ *  widths those are, and this file now says so in both directions
+ *  rather than only one.
  */
 import { expect, test, type Page } from "@playwright/test";
 import { BOARD_EIGHT, serveEight } from "./eight-columns";
@@ -329,14 +346,53 @@ test.describe("nothing is done to a board that fits", () => {
     await expect(head).toBeVisible();
   };
 
-  test("below xl the columns stack, and the header sticks where it is",
-    async ({ page }) => {
+  test("below md the board draws ONE league, and its header sticks where "
+    + "it is", async ({ page }) => {
+      /* RESTATED 2026-09-16 — this ran at 1100px and said "below xl the
+         columns stack". Both halves of that moved on the same day: the
+         stack became a sideways scroller from `md` up (so 1100 now
+         RAILS, asserted in the test below), and below `md` the board
+         stopped stacking at all and started drawing the one league its
+         tab strip names. 393px is where "a board with nothing to scroll
+         sideways" now lives, and the property under test — a header that
+         sticks inside its own column, with no rail built for it — is the
+         one this test always asserted. */
+      await page.setViewportSize({ width: 393, height: 780 });
+      await serveEight(page);
+      await expect(page.locator('[data-testid="league-col"]')).toHaveCount(1);
+      await page.waitForTimeout(400);
+      await staysSticky(page, "a phone drawing one league");
+    });
+
+  test("…and a tablet is on the OTHER side of that line: two columns, a "
+    + "scrollport, and the rail that goes with one", async ({ page }) => {
+      /* THE OTHER HALF OF THE SAME CHANGE, asserted rather than assumed.
+         The test above used to cover 1100px and claimed no rail is built
+         there; a restatement that simply moved to 393 would leave the
+         tablet unasserted in either direction, which is how a guard
+         quietly stops covering the case it was written for. */
       await page.setViewportSize({ width: 1100, height: 780 });
       await serveEight(page);
       await expect(page.locator('[data-testid="league-col"]'))
         .toHaveCount(COLUMNS.length);
-      await page.waitForTimeout(400);
-      await staysSticky(page, "a stacked board");
+      await expect(page.getByTestId("board-head-rail")).toBeVisible();
+      const g = await still(page);
+      expect(g.hasRail, "a tablet builds the header rail").toBe(true);
+      /* AND EVERY HEADER IS IN IT, over its own column — the same two
+         claims the eight-column desktop board makes, at a width where
+         the board shows two of the eight. */
+      expect(Object.keys(g.heads).sort()).toEqual([...COLUMNS].sort());
+      for (const [league, h] of Object.entries(g.heads)) {
+        expect(h.railed, `${league}'s header is in the rail`).toBe(true);
+        expect(Math.abs(h.centre - g.columns[league]),
+          `${league}'s header is over ${league}'s column at 1100px`)
+          .toBeLessThan(3);
+      }
+      const down = await readDown(page);
+      for (const [league, h] of Object.entries(down.heads)) {
+        expect(h.top, `${league}'s header rests on the pills bar's bottom `
+          + "edge at 1100px too").toBeCloseTo(down.barBottom!, 1);
+      }
     });
 
   test("a four-column board has nothing to scroll and keeps its headers "

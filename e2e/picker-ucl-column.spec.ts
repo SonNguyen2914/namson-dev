@@ -1547,6 +1547,35 @@ const BOTH_BOARDS: [string, (p: import("@playwright/test").Page)
   ["the UCL board", (p) => openUcl(p, GRID_BOARD)],
 ];
 
+/** RESIZE, AND KEEP THE COLUMN UNDER TEST ON SCREEN (2026-09-16).
+ *
+ *  WHAT MOVED: below `md` the board draws ONE league — the one the tab
+ *  strip has selected — instead of stacking every column. So a width
+ *  sweep that ran down to 390px and then read "the Champions League
+ *  column" was reading a column the phone no longer mounts. It is not
+ *  that the card changed; it is that the board narrowed under it.
+ *
+ *  So the sweep SAYS which league it is measuring, which it always meant
+ *  and never had to write down. Above `md` that is a no-op and the
+ *  assertions below are the ones they always were. */
+const atWidth = async (page: import("@playwright/test").Page,
+                       width: number, slug: string) => {
+  await page.setViewportSize({ width, height: 900 });
+  if (width < 768) {
+    /* SETTLE FIRST. A phone draws exactly one column whatever happens,
+       so this is the wait — and `count()` does not auto-wait, which is
+       why the strip is only asked about afterwards. */
+    await expect(page.locator('[data-testid="league-col"]')).toHaveCount(1);
+    const tab = page.getByTestId("league-tabs")
+      .locator(`[role="tab"][data-slug="${slug}"]`);
+    /* A board narrowed to one column has no strip and is already drawing
+       this league; a windowed one has to be told. */
+    if (await tab.count()) await tab.click();
+  }
+  await expect(page.locator(
+    `[data-testid="league-col"][data-league="${slug}"]`)).toHaveCount(1);
+};
+
 for (const [board, openIt] of BOTH_BOARDS) {
   test(`the kickoff is the card's top-right ink on ${board}, at every step `
      + "of the ladder", async ({ page }) => {
@@ -1561,7 +1590,7 @@ for (const [board, openIt] of BOTH_BOARDS) {
       await expect(card).toBeVisible();
 
       for (const width of [390, 820, 1024, 1280, 1440]) {
-        await page.setViewportSize({ width, height: 900 });
+        await atWidth(page, width, "ucl");
         const g = await topRegion(card);
         const at = `${board} at ${width}px`;
         expect(g.date!.r, `${at}: the kickoff is at the card's right edge`)
@@ -1594,7 +1623,7 @@ for (const [board, openIt] of BOTH_BOARDS) {
       await expect(card).toBeVisible();
 
       for (const width of [390, 820, 1024, 1280, 1440]) {
-        await page.setViewportSize({ width, height: 900 });
+        await atWidth(page, width, "ucl");
         const g = await topRegion(card);
         const at = `${board} at ${width}px`;
         expect(g.block, `${at}: the card draws no anchor block at all`)
@@ -1656,7 +1685,7 @@ for (const [board, openIt] of BOTH_BOARDS) {
       await expect(card.getByTestId("home-badge")).toHaveCount(1);
 
       for (const width of [390, 820, 1024, 1280, 1440]) {
-        await page.setViewportSize({ width, height: 900 });
+        await atWidth(page, width, "ucl");
         const read = () => card.evaluate((el) => {
           const out: { row: number; slack: number }[] = [];
           el.querySelectorAll('[data-testid="form-strip"]')

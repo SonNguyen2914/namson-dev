@@ -605,9 +605,15 @@ test("the frontend's own reading order cannot ADMIT a column — a league it nam
       .evaluateAll((els) => els.map((e) => e.getAttribute("data-slug")!));
     expect([...pills].sort()).toEqual(Object.keys(withoutLigamx).sort());
 
-    // the phone jump-nav is built from the same set, so it cannot offer
-    // a link to a column that is not there
-    await expect(page.getByTestId("league-jump")
+    /* …and so is the phone's tab strip, so it cannot offer a tab for a
+       column that is not there. RESTATED 2026-09-16: this was the
+       jump-nav's anchors until the phone stopped stacking every column
+       and started drawing one. Same claim, same source — `columnSlugs`
+       — read through whichever control the width is given. */
+    await page.setViewportSize({ width: 390, height: 900 });
+    await expect(page.getByTestId("league-tabs").getByRole("tab"))
+      .toHaveCount(Object.keys(withoutLigamx).length);
+    await expect(page.getByTestId("league-tabs")
       .getByText("Liga MX")).toHaveCount(0);
   });
 
