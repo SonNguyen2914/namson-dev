@@ -1083,6 +1083,29 @@ export const weightIsCurrent = (w: number | null | undefined) =>
 export const WIDE_SPREAD_C = 3;    // spread > 3c
 export const THIN_ASK_SIZE = 100;  // ask size < 100
 
+/** THE BOARD'S FORWARD WINDOW, IN DAYS — the ONE window constant.
+ *
+ *  8, not the endpoint's own 2: four league columns deserve a fuller
+ *  slate than a two-day sliver, and a column that is usually empty
+ *  teaches the reader to stop looking at it. The chips that offered the
+ *  shorter reads came off on 2026-09-15 — "using the default is enough
+ *  since I have never touched this section" (operator) — so this number
+ *  is the whole contract; nothing is left that can ask for another
+ *  length.
+ *
+ *  IT LIVES HERE, IN THE LIB, SINCE 2026-09-16, and that move is the
+ *  point. It was a private constant of pages/bet-suggester/index.tsx,
+ *  and `pickerReview.DEFAULT_BACK` was a SECOND literal with a comment
+ *  saying it matched this one. The comment had already gone false — it
+ *  read "7 is the default because it MATCHES THE BOARD'S FORWARD WINDOW"
+ *  above the number 8 — which is what a second copy of a fact does and
+ *  why the fix is not to correct the comment. A page may import from a
+ *  lib and a lib may not import from a page, so the number moved down
+ *  here where the back window can be DERIVED from it rather than told
+ *  about it. `e2e/one-window-two-directions.spec.ts` pins that it is
+ *  derived and not merely equal today. */
+export const DEFAULT_DAYS = 8;
+
 /** THE BOARD, OPTIONALLY ASKED FOR COMPETITIONS BY NAME.
  *
  *  `leagues` is the ASK and it is optional in the strongest sense: when

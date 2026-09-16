@@ -46,8 +46,11 @@
 //     FINISHED TAIL under its upcoming rows, on a second, independent
 //     request to GET /api/picker/review. Two things that page owes the
 //     reader and that this file is responsible for: the BACK WINDOW
-//     control (default 7 days, matching the forward window, so a league
-//     column tells one continuous story), and the STORE NOTE — when no
+//     (`pickerReview.DEFAULT_BACK`, DERIVED from the forward window so a
+//     league column tells one continuous story — it had its own control
+//     until 2026-09-15 and its own copy of the number until 2026-09-16,
+//     and the copy's comment said 7 while both windows held 8), and the
+//     STORE NOTE — when no
 //     snapshot store is configured, nothing is being frozen anywhere and
 //     every read in every tail is a reconstruction. That is a property of
 //     the deployment, not a coincidence, and it belongs at the top of the
@@ -70,9 +73,9 @@ const useIsoLayoutEffect =
 import { FieldRead, fetchRatings } from "../../lib/fieldApi";
 import { TZ, dayLabel, localDay } from "../../lib/matchday";
 import {
-  Board, CUP_COMP_KEY, SEASON_BLEND_K, THIN_ASK_SIZE, WIDE_SPREAD_C,
-  askHonoured, boardColumns, columnsOf, declarationOf, fetchBoard,
-  leagueLabel,
+  Board, CUP_COMP_KEY, DEFAULT_DAYS, SEASON_BLEND_K, THIN_ASK_SIZE,
+  WIDE_SPREAD_C, askHonoured, boardColumns, columnsOf, declarationOf,
+  fetchBoard, leagueLabel,
 } from "../../lib/pickerApi";
 import {
   DEFAULT_BACK, Review, fetchReview, readHere, reviewAskHonoured,
@@ -99,12 +102,15 @@ import {
   Collapse, NavChip, RouteProgress, SkeletonRows, TopBar,
 } from "../../components/chrome";
 
-// 8, not the endpoint's own 2: four league columns deserve a fuller
-// slate than a two-day sliver — a column that is usually empty teaches
-// the reader to stop looking at it. The chips that offered the shorter
-// reads came off on 2026-09-15, so this number is now the whole
-// contract — there is nothing left that can ask for another length.
-const DEFAULT_DAYS = 8;
+// THE FORWARD WINDOW MOVED TO src/lib/pickerApi.ts ON 2026-09-16, and
+// `pickerReview.DEFAULT_BACK` is now derived from it rather than being a
+// second literal that agreed by hand. It was a private constant of this
+// page, so the tail's window could only "match" it by copying the number
+// — and the copy's comment had already gone false, reading "7 is the
+// default because it MATCHES THE BOARD'S FORWARD WINDOW" above an 8. A
+// page may import from a lib and a lib may not import from a page, which
+// is why the number went down rather than the other one coming up.
+// Everything the constant means is written beside it there.
 
 /** The board's own ET date key, YYYYMMDD, made readable. Left as the raw
  *  key if it is ever any other shape — inventing a date from a string we
