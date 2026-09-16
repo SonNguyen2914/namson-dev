@@ -90,6 +90,54 @@
   --lg-ligue1:     #c86ef5;   /* orchid    — shadow of the EPL  */
   --lg-eredivisie: #ff7a2e;   /* orange    — shadow of La Liga  */
 
+  /* ── THE EFL CUP'S OWN LIGHT (operator, 2026-09-15) ─────────────────
+     "EFL Cup is ongoing, copy exactly every detail of what UCL having,
+     the only difference is the theme color." So: one new hue, and the
+     rest of that competition is the Champions League's build.
+
+     hsl(204 97% 52%). THE ARC IT SITS IN IS EMPTY AND IS THE ONLY EMPTY
+     ONE LEFT. The ten lights in this file sit at 4° 22° 44°(gold) 98°
+     150° 193° 197° 255° 280° 318°, and the widest gap between any two
+     is 197°→255° — 58° of blue with nothing in it. It is also the right
+     family for this competition, the EFL's own, which is a happy
+     accident and not the argument.
+
+     WHAT IT HAD TO CLEAR, AND WHY THAT IS NOT THE COLUMN BAR. The four
+     above were placed against CO-VISIBLE COLUMNS and cleared 57.0,
+     which they could only do by hiding in a shadow: a four-wide window
+     over eight columns makes four pairs impossible. THE EFL CUP HAS NO
+     SHADOW — it is not a column at all (see tables.OFF_BOARD_BY_DECISION
+     in the backend), it reaches the reader as a CompRail chip in the top
+     bar, and a chip can sit above any column the board happens to be
+     scrolled to. So it was measured against all ten, and the honest bar
+     is the one the existing rail chip actually meets: --lg-ucl, the chip
+     it sits NEXT TO, clears the eight columns by only 30.6 (its nearest
+     is ligue1). That is the precedent for a hue in this position, and
+     holding this one to 57.0 would hold it to a bar nothing in the top
+     bar has ever met.
+
+     MEASURED IN CIELAB (dE*ab, the metric the block above uses — its
+     three published figures reproduce exactly from these hex values):
+       min dE vs all nine hues + gold   34.3  (nearest: epl)
+       next nearest                     34.4  (mls), then 37.7 (bundesliga)
+       vs --lg-ucl, the adjacent chip   66.7
+       vs brand gold --lg-cup          126.5  (the palette's bar is 45.3)
+       vs the traffic light             92.6  (nearest: --up)
+     34.3 is 2.8 short of the best any hue in this lightness and chroma
+     band can do against all ten (37.1, a ceiling two colours reach: a
+     peach that
+     lands on gold, and a magenta that lands in the UCL's family —
+     both of them nearest the two things this hue most needs to be
+     unlike). L* 62.4 and C* 56.4 put it inside the set's own band
+     (L* 61.7–81.7), so it reads as one more broadcast light.
+
+     THE CLEARANCE FROM GOLD IS THE LOAD-BEARING ONE, and it is the
+     largest of them by design rather than by luck. Three of this cup's
+     four member tiers are table-only leagues with no hue of their own,
+     so `hueOf` answers --lg-cup for them and the brand gold appears ON
+     THE SAME CARD as this blue, not merely on the same screen. */
+  --lg-eflcup: #0e9cfb;       /* azure — the last empty arc */
+
   /* the board's display voice (bundled via @fontsource-variable) */
   --font-archivo: "Archivo Variable", var(--font-geist-sans), ui-sans-serif,
     system-ui, sans-serif;
@@ -154,6 +202,7 @@
   --color-lg-seriea: var(--lg-seriea);
   --color-lg-ligue1: var(--lg-ligue1);
   --color-lg-eredivisie: var(--lg-eredivisie);
+  --color-lg-eflcup: var(--lg-eflcup);
   --color-warn: var(--warn);
   --color-skylive: var(--skylive);
   --color-neg: var(--neg);
