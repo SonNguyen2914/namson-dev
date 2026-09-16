@@ -57,14 +57,21 @@ import { hueOf } from "./PickerColumn";
 
 /** How many columns are drawn at once. Measured, not chosen — see above. */
 export const VIEW = 4;
-/** How many columns rest to the LEFT of the four on screen. The scroller
- *  lives in a band `REST ± 1` columns wide and is rebased back into it by
- *  a rotation, which is why it never reaches either end. */
-const REST = 2;
-/** The first LIT slot. Derived, never typed: slot k carries
- *  `ORDER[i - REST - 1 + k]`, so the slot holding the leftmost column on
- *  screen is the one where that expression is `i`. */
-const LIT_FROM = REST + 1;
+/** HOW MANY COLUMNS REST TO THE LEFT of the four on screen.
+ *
+ *  The scroller lives in a band `REST ± 1` columns wide and a rotation
+ *  rebases it back into that band, which is why it never reaches either
+ *  end. That only works while there is a column of SLACK on each side,
+ *  so this is derived from the board rather than typed: the draft's own
+ *  `REST = 2` is what eight columns give, and six give one — a board
+ *  with `REST = 2` and only two columns of slack rests AGAINST its right
+ *  end, where the rotation that carries it round can never fire. */
+const restFor = (n: number) => Math.max(0, Math.min(2, n - VIEW - 1));
+/** A LOOP NEEDS SLACK ON BOTH SIDES. Five columns give one column of
+ *  scroll room in total: whichever end it is put at, the other has none,
+ *  and a rotation there would be a jump rather than a seam. Such a board
+ *  is a plainly bounded scroller and the rail is its position. */
+const loops = (n: number) => n - VIEW >= 2;
 /** The gap between two pills, px. */
 const RGAP = 6;
 /** The gap between two COLUMNS, px — Tailwind `gap-6` on the track. A
@@ -195,7 +202,14 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
     const N = ORDER.length;
     /* Fewer than VIEW + 2 and there is nothing to slide from: the board
        draws everything it has and the loop has no work. */
-    if (N < VIEW + 2) return;
+    if (N <= VIEW) return;
+    const SLACK = N - VIEW;
+    const LOOPS = loops(N);
+    const REST = restFor(N);
+    /** The first LIT slot. Derived, never typed: slot k carries
+     *  `ORDER[i - REST - 1 + k]`, so the slot holding the leftmost column
+     *  on screen is the one where that expression is `i`. */
+    const LIT_FROM = REST + 1;
 
     const cols = new Map<string, HTMLElement>();
     for (const el of Array.from(track.querySelectorAll<HTMLElement>(
@@ -232,6 +246,9 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
      *  saying otherwise would light four columns that are not "on
      *  screen" in any sense a reader would recognise. */
     const rolling = () => track.scrollWidth - track.clientWidth > 4;
+    /** The bounded scroller's resting offset for a leftmost column `i`. */
+    const seatFor = (i: number) =>
+      Math.max(0, Math.min(SLACK, i)) * oneW();
 
     const layout = () => {
       track.style.setProperty("--cols", String(N));
@@ -254,8 +271,15 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
       order.unshift(order.pop()!); layout();
       track.scrollLeft += oneW(); spins -= 1;
     };
+    /* WHERE THE BOARD IS, as a real number of columns from the start of
+       the declared order. Three cases and one meaning: looped, the scroll
+       offset plus the turns it has taken; bounded, the scroll offset
+       alone; stacked — below xl, where the columns are one above another
+       and nothing scrolls sideways — the rail's own jump position. */
     const absPos = () =>
-      rolling() ? spins + track.scrollLeft / oneW() - REST : spins;
+      !rolling() ? spins
+      : LOOPS ? spins + track.scrollLeft / oneW() - REST
+      : track.scrollLeft / oneW();
 
     // ── the ribbon ─────────────────────────────────────────────────────
     const unit = () => {
@@ -435,10 +459,12 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
       requestAnimationFrame(() => {
         ticking = false;
         if (dead) return;
-        const one = oneW();
-        let guard = 0;
-        while (track.scrollLeft > (REST + 1) * one - 2 && guard++ < N) rotL();
-        while (track.scrollLeft < (REST - 1) * one + 2 && guard++ < N) rotR();
+        if (LOOPS) {
+          const one = oneW();
+          let guard = 0;
+          while (track.scrollLeft > (REST + 1) * one - 2 && guard++ < N) rotL();
+          while (track.scrollLeft < (REST - 1) * one + 2 && guard++ < N) rotR();
+        }
         ribbonUpdate();
       });
     };
@@ -450,16 +476,30 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
      *  their direction at the instant they are called; free scrolling
      *  still falls back to the crossing, which is the only cue it has. */
     const step = (d: number) => {
+      /* A BOUNDED SCROLLER CAN REFUSE A STEP. The loop never can — that
+         is its whole point — but a board with a column of slack and no
+         more runs out, and advancing `shown` for a movement that will not
+         happen leaves the rail naming a column the reader is not looking
+         at. So the arrival is computed first where it can be, and the
+         wave only leaves if the board is going to. */
+      const bounded = rolling() && !LOOPS;
+      let next: number | null = null;
+      if (bounded) {
+        const here = Math.floor(absPos() + 2 / oneW());
+        next = Math.max(0, Math.min(SLACK, here + d));
+        if (next === here) return;
+      }
       if (shown !== null) {
-        shown += d;
+        shown = next ?? shown + d;
         armed = shown;
         revealTo(shown, d > 0);
         const want = armed;
         window.setTimeout(() => { if (armed === want) armed = null; }, ARM_MS);
       }
-      if (!rolling()) { spins += d; seatColumn(); return; }
-      track.scrollBy({ left: d * oneW(),
-                       behavior: quiet.matches ? "auto" : "smooth" });
+      const behavior = quiet.matches ? "auto" as const : "smooth" as const;
+      if (!rolling()) { spins = wrap(spins + d, N); seatColumn(); return; }
+      if (bounded) { track.scrollTo({ left: seatFor(next!), behavior }); return; }
+      track.scrollBy({ left: d * oneW(), behavior });
     };
 
     /** Where the loop cannot roll — the stacked board below `xl` — the
@@ -485,6 +525,26 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
           window.setTimeout(() => { if (armed === want) armed = null; }, ARM_MS);
         }
         seatColumn();
+        return;
+      }
+      if (!LOOPS) {
+        /* A BOUNDED SCROLLER CANNOT ALWAYS PUT A COLUMN LEFTMOST — the
+           last one is already against the end — so it is scrolled as far
+           as it goes, which is far enough to have it on screen. Lighting
+           it while it sat off the edge is the lie this avoids. */
+        const seat = Math.max(0, Math.min(SLACK, target));
+        track.scrollTo({ left: seatFor(seat),
+          behavior: quiet.matches ? "auto" : "smooth" });
+        if (from !== null && Math.abs(seat - from) === 1) {
+          shown = seat; armed = seat;
+          revealTo(seat, seat > from);
+          const want = armed;
+          window.setTimeout(() => { if (armed === want) armed = null; }, ARM_MS);
+        } else if (seat !== from) {
+          shown = seat; armed = seat; fill(seat);
+          const want = armed;
+          window.setTimeout(() => { if (armed === want) armed = null; }, ARM_MS);
+        }
         return;
       }
       let guard = 0;
@@ -519,7 +579,7 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
 
     const onResize = () => {
       layout();
-      if (rolling()) track.scrollLeft = REST * oneW();
+      if (rolling() && LOOPS) track.scrollLeft = REST * oneW();
       ribbonReset();
     };
 
@@ -529,11 +589,13 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
 
     // ── seat it ────────────────────────────────────────────────────────
     layout();
-    let g0 = 0;
-    while (order[REST] !== ORDER[0] && g0++ < N * 2) order.unshift(order.pop()!);
-    layout();
-    if (rolling()) track.scrollLeft = REST * oneW();
-    spins = ORDER.indexOf(order[REST]);
+    if (LOOPS) {
+      let g0 = 0;
+      while (order[REST] !== ORDER[0] && g0++ < N * 2) order.unshift(order.pop()!);
+      layout();
+      if (rolling()) track.scrollLeft = REST * oneW();
+      spins = ORDER.indexOf(order[REST]);
+    }
     ribbonReset();
     /* The strip's slot width comes from the parent's measured width, and
        the pill's height from a font that may not have loaded yet. Re-seat

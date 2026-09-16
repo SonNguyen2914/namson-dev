@@ -566,14 +566,22 @@ test("the frontend's own reading order cannot ADMIT a column — a league it nam
        serves — a literal here would be a second copy of the operator's
        list, and it is the copy that rots (this line read "MLS first"
        for as long as the reading order named four leagues, and was
-       wrong the day it named eight). The window is open at its start,
-       so the drawn columns are its first four. */
+       wrong the day it named eight).
+
+       RESTATED 2026-09-15: the board is a looped scroller now and every
+       declared column is MOUNTED on the track, so the columns read off
+       the page are all five rather than the first four. The claim is
+       unchanged and is still about the ORDER — the track is laid out
+       left to right in the operator's reading order, and it opens with
+       the first column at rest — so the whole sequence is asserted
+       rather than a four-long prefix of it. That is more of the
+       property, not less. */
     const order = boardColumns(Object.keys(withoutLigamx));
-    expect(order, "four drawn of five declared — this board must be windowed")
+    expect(order, "five declared — this board must build a ribbon")
       .toHaveLength(5);
     const drawn = await page.getByTestId("league-col")
       .evaluateAll((els) => els.map((e) => e.getAttribute("data-league")!));
-    expect(drawn).toEqual(order.slice(0, 4));
+    expect(drawn).toEqual(order);
     // NON-VACUITY: the surviving order is NOT simply the payload's key
     // order, so this is a claim about the reading order and not about
     // the object literal above.

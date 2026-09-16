@@ -101,14 +101,35 @@ test("the reason is the BACKEND'S sentence, printed once per code",
     /* Printed, not restated: a reason that changes upstream must not go
        on being described here in words that stopped being true. And
        once — two matches that left for the same reason share one
-       finding; twice would read as two. */
+       finding; twice would read as two.
+
+       RESTATED 2026-09-15. The strip was a full panel — four named
+       fixtures and a six-line paragraph — standing between the reader
+       and the board every time a match finished; the operator collapsed
+       it to one line, with the names in a disclosure and the prose
+       behind the hover `i` the cards already use. The SENTENCE has not
+       moved and the once-per-code rule has not moved; what moved is
+       whether it is rendered before anyone asks for it. So the count is
+       taken over the strip's text rather than over its rendered ink —
+       and the half that keeps that honest is asserted right after it:
+       the affordance is opened and the sentence must actually arrive. A
+       fact behind a door nobody can open is a fact that is gone. */
     await open(page, [off("1", "Fenerbahce", "AS Roma"),
                       off("2", "PSV Eindhoven", "Shakhtar Donetsk")]);
     const strip = page.getByTestId("board-off-board");
     await expect(strip).toContainText("the picker REVIEW surface");
-    expect((await strip.innerText()).split("the picker REVIEW surface")
-      .length - 1, "one sentence, not one per row").toBe(1);
+    expect(((await strip.textContent()) ?? "")
+      .split("the picker REVIEW surface").length - 1,
+      "one sentence, not one per row").toBe(1);
     await expect(strip).toHaveAttribute("data-codes", "finished");
+
+    // …and it is REACHABLE: the panel is shut until it is asked for, and
+    // says the backend's words when it is
+    const panel = page.getByTestId("off-board-why-panel");
+    await expect(panel).toBeHidden();
+    await page.getByTestId("off-board-why").click();
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText("the picker REVIEW surface");
   });
 
 test("different codes each keep their own words", async ({ page }) => {
@@ -140,4 +161,50 @@ test("a payload with NO off_board key draws nothing either, and does not "
        asked. Absent stays absent. */
     await open(page, undefined);
     await expect(page.getByTestId("board-off-board")).toHaveCount(0);
+  });
+
+test("it is ONE LINE until it is asked for, and every departed fixture is "
+   + "named behind it", async ({ page }) => {
+    /* THE PROPORTION CHANGED, THE INFORMATION DID NOT (operator,
+       2026-09-15). Live drew this as a large panel with four fixtures
+       and a six-line paragraph, above the board; the approved draft has
+       nothing there at all. A one-line disclosure is the middle: the
+       COUNT and the CODES are permanently on the page, so a reader
+       cannot miss that something left, and the names are one click
+       away rather than one paragraph in the way.
+
+       BOTH HALVES. Collapsed-by-default is an absence and would pass on
+       a strip that rendered nothing at all, so the same test opens it
+       and requires all four names to arrive. */
+    await open(page, [off("1", "Fenerbahce", "AS Roma"),
+                      off("2", "PSV Eindhoven", "Shakhtar Donetsk"),
+                      off("3", "Lens", "Slavia Prague"),
+                      off("4", "Ajax", "Inter Milan")]);
+    const strip = page.getByTestId("board-off-board");
+    const rows = page.getByTestId("off-board-row");
+    const disclosure = page.getByTestId("off-board-disclosure");
+
+    // the line itself says how many left and why, in one row of text
+    await expect(strip).toBeVisible();
+    await expect(strip).toContainText("4 fixtures left the board");
+    await expect(strip).toContainText("finished");
+    const box = await strip.boundingBox();
+    expect(box!.height, "the strip is a panel again, not a line")
+      .toBeLessThan(72);
+
+    // shut: the names are in the page but none of them is drawn
+    await expect(disclosure).not.toHaveAttribute("open", /.*/);
+    await expect(rows).toHaveCount(4);
+    await expect(rows.first()).toBeHidden();
+
+    // opened: every one of them is drawn, by name
+    await disclosure.locator("summary").click();
+    await expect(rows.first()).toBeVisible();
+    for (const club of ["Fenerbahce", "AS Roma", "PSV Eindhoven",
+                        "Shakhtar Donetsk", "Lens", "Slavia Prague",
+                        "Ajax", "Inter Milan"]) {
+      await expect(disclosure, `${club} left the board and is not named`)
+        .toContainText(club);
+    }
+    await expect(rows).toHaveCount(4);
   });

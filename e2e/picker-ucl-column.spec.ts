@@ -1862,7 +1862,14 @@ test("the season basis is said by a column, so it can only ever name a "
     // of the window, so a paged-off column is not quietly exempted.
     for (const jump of ["mls", "ucl"]) {
       await show(page, jump);
-      await expect(page.getByTestId("league-col")).toHaveCount(VIEW);
+      /* RESTATED 2026-09-15: the board is a looped scroller and every
+         declared column is MOUNTED on the track, so the count read here
+         is the DECLARATION rather than `VIEW`. The claim below is
+         unchanged and is the one that matters — every season chip on the
+         page belongs to a column the page draws — and it now covers the
+         whole declaration at once rather than four of it at a time. */
+      await expect(page.getByTestId("league-col"))
+        .toHaveCount(COLUMNS.length);
       const said = await page.getByTestId("league-col")
         .evaluateAll((els) => els
           .filter((e) => e.querySelector('[data-testid="col-season"]'))
