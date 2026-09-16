@@ -92,22 +92,43 @@ export type LiveCompetition = {
    competition was in its THIRD ROUND that day, with five ties that
    night and four rounds plus a final still to come.
 
-   ITS CHIP WILL NOT GLOW, AND THAT IS NAMED HERE RATHER THAN LEFT TO BE
-   FOUND. The glow is a read of `/api/comp/{key}/fixtures`, which is the
-   COMPETITION VIEWER's surface (`src.competitions.VIEWERS` in the
-   backend) and not the picker's — and the EFL Cup deliberately has no
-   viewer, because a viewer is a different product from a board: it
-   prices a market and shows the model's share of it, and no model in
-   that repository covers the three English tiers below the Premier
-   League. So that route answers 404 for this key, `fetchSoon` reads it
-   as UNKNOWN, and the chip renders as an ORDINARY chip forever.
+   ITS CHIP GLOWS ON THE SAME RULE AS THE CHAMPIONS LEAGUE'S, and this
+   records what had to change for that to be true, because for one day
+   it was not.
 
-   WHICH IS A SUPPORTED STATE, NOT A BROKEN ONE, and the distinction is
-   the component's own: an unlit chip is silence, never the claim that
-   nothing is on. The chip still does the job the Champions League's
-   chip was moved back to doing — it names the page with the MATCHES on
-   it. What would light it is a `Viewer` for this competition, which is
-   a decision about a second product and not a line in this file. */
+   THE GLOW IS A READ OF `/api/comp/{key}/fixtures`, and that route
+   resolved through the COMPETITION VIEWERS (`src.competitions.VIEWERS`
+   in the backend) alone. The EFL Cup deliberately has no viewer, and
+   that reasoning is SOUND AND UNCHANGED: a viewer is a different
+   product from a board — it prices a market and shows a model's share
+   of it — and no approved model in that repository covers the three
+   English tiers below the Premier League. Registering one to light a
+   chip would have implied a model that does not exist. So the route
+   answered `404 unknown competition` for this key on every page load,
+   `fetchSoon` read it as UNKNOWN, and the chip could not light.
+
+   WHAT CHANGED IS THAT A KICKOFF TIME IS NOT A PRICE. It needs no
+   model, no market and no share of one; it is a SCHEDULE fact, the same
+   fact a printed fixture list carries. The backend now serves exactly
+   that and exactly nothing else for this competition — see the SCHEDULE
+   ONLY section in `src/competitions.py`: the payload is marked
+   `serves: "schedule_only"`, carries no price, no strength read and no
+   model block, and every other route under /api/comp still refuses this
+   key BY NAME, saying it is a schedule and that there is nothing here
+   to price it with. The chip says WHEN. It still does not say WHETHER,
+   and nothing behind it has acquired an opinion.
+
+   SO THE CHIP NEEDED NO EDIT AT ALL — which is the property this file
+   is built on and the reason the entry above is four fields long. The
+   component knows no competition by name: it asks each key's own
+   fixture feed and buckets the kickoffs by `localDay`. What was missing
+   was a feed to ask, not a branch to add.
+
+   AND AN UNLIT CHIP REMAINS SILENCE. The route can still fail — a dead
+   provider answers 502 here rather than an empty fixture list, exactly
+   so that it cannot arrive as "nothing on" — and the chip degrades to
+   an ORDINARY chip, which asserts nothing. That is a supported state,
+   not a broken one; see `SoonRead` and `NavChip`'s `data-soon`. */
 export const LIVE_COMPETITIONS: readonly LiveCompetition[] = [
   { key: "ucl", href: "/bet-suggester/ucl", label: "UCL",
     hue: "--lg-ucl" },
