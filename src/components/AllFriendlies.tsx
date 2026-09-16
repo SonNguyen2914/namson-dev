@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 
 import MarketVsRead, { MarketVsReadInline, type MarketVsReadData }
   from "./MarketVsRead";
+import { shortClub } from "../lib/clubName";
 import { TZ, dayLabel, groupByDay } from "../lib/matchday";
 import { Eyebrow } from "./ui";
 
@@ -72,19 +73,6 @@ function when(r: Row) {
 // The strength read, or the NAMED reason there isn't one. Never a blank,
 // never a dash standing in for a number, and never a 50% default — an
 // unreadable pairing has to look different from an even one.
-
-/** A compact club label for a narrow row: the most distinctive word, so
- *  "Borussia Dortmund" reads DORTMUND and "FC Augsburg" reads AUGSBURG
- *  rather than both collapsing to a generic prefix. */
-function shortClub(name?: string) {
-  if (!name) return "";
-  const drop = new Set(["fc", "cf", "afc", "sc", "ac", "as", "ss", "ssc",
-    "club", "cd", "sd", "ca", "fk", "sk", "bk", "if", "ks", "de", "the"]);
-  const words = name.split(/[\s.]+/).filter((w) => w
-    && !drop.has(w.toLowerCase().replace(/[^a-z]/g, "")));
-  const pick = words.sort((a, b) => b.length - a.length)[0] || name;
-  return pick.slice(0, 9).toUpperCase();
-}
 
 // The strength read, or the NAMED reason there isn't one. Never a blank,
 // never a dash standing in for a number, and never a 50% default — an
