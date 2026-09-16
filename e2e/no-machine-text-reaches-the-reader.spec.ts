@@ -337,3 +337,130 @@ test("a healthy column says none of this at all — the control",
     await expect(column(page).getByTestId("picker-row")).toHaveCount(1);
     assertNoMachineText("a healthy column", await columnText(page));
   });
+
+// ── 5. THE SURFACE THIS RULE DID NOT COVER ──────────────────────────
+//
+// Every test above is about a PROVIDER's exception — Kalshi, ESPN, a
+// member table — which is where the defect was found and where
+// `provider_failure.py` screens. The finished tail's "no pre-kickoff
+// read" banner is a second door and nothing screened it: it drew
+// `pre_kickoff.unavailable_reason` raw, in a mono span, on a public page.
+//
+// `picker/replay.py:301` returns `f"table_error: {exc}"`. So a rebuild
+// that fails on a malformed season table puts a PYTHON EXCEPTION REPR on
+// that key, and everything the exception's message happens to carry — a
+// path, a parser's internals — went onto the page with it. Same defect,
+// different surface, found by a cross-repo duplicate audit 2026-09-16.
+//
+// THE BACKEND IS CLOSING IT AT SOURCE IN PARALLEL. This half is needed
+// either way: a fix that lives only in the emitter is undone by the next
+// emitter, and this card is deployed in front of backends older than it.
+
+/** What `replay.py` puts on that key when `tables.league_table` raises.
+ *  The exception is a real `ValueError` message from that module, not an
+ *  error-looking string invented here. */
+const TABLE_ERROR =
+  "table_error: ValueError(\"standings row for 'Real Betis' carries no "
+  + "played count: {'team': {'id': '244'}, 'stats': []}\")";
+
+/** A finished fixture with NO pre-kickoff read at all, which is the only
+ *  shape that draws the banner. */
+const noReadRow = (reason: string | null) => ({
+  league: "ucl", espn: "uefa.champions",
+  event_id: "f-1", competition_id: "f-1", kickoff: inHours(-20),
+  home: "Arsenal", away: "Feyenoord", status_detail: "FT",
+  result: { home: 2, away: 1, winner: "home", source: "espn_scoreboard" },
+  pre_kickoff: {
+    origin: "reconstructed", origin_label: "NOT AVAILABLE",
+    origin_note: "no stored read, and the archive cannot rebuild one",
+    captured_at: null, captured_seconds_before_kickoff: null,
+    board_date: null, reconstructed_from: null,
+    unavailable_reason: reason, state: null,
+  },
+  shot_state: { at_20: null, before_first_goal: null, full_time: null,
+                first_goal_minute: null, error: null },
+  fit: { favourite_won: null, favourite_won_reason: "no_pre_kickoff_favourite",
+         confirmed_at_20: null, confirm_reason: "no_shot_state",
+         confirm_rule: "tilt_fav_and_on_target_lead",
+         confirm_note: "EXPLORATORY", checkpoint_minute: 20 },
+});
+
+const reviewWith = (reason: string | null) => ({
+  ...REVIEW,
+  leagues: { ucl: { finished: 1, captured: 0, reconstructed: 0,
+                    unavailable: 1, error: null } },
+  finished: [noReadRow(reason)],
+});
+
+/** The banner, with the tail opened. */
+async function openBanner(page: Page, reason: string | null) {
+  await open(page, { review: reviewWith(reason) });
+  await openTail(page);
+  const slot = column(page).getByTestId("unavailable-reason");
+  await expect(slot).toBeVisible();
+  return slot;
+}
+
+test("a Python exception on the rebuild's reason key does not reach the "
+   + "reader — and the absence is still NAMED", async ({ page }) => {
+    const warnings: string[] = [];
+    page.on("console", (m) => {
+      if (m.type() === "warning") warnings.push(m.text());
+    });
+    const slot = await openBanner(page, TABLE_ERROR);
+
+    /* NOT THE REPR. Neither whole nor in pieces: the class name, the
+       message and the dict literal are each checked, because a card that
+       stripped only the prefix would pass a test that looked for the
+       whole string. */
+    assertNoMachineText("the pre-kickoff banner",
+      (await slot.textContent()) ?? "");
+    assertNoMachineText("the finished tail", await columnText(page));
+    const tailText = await columnText(page);
+    for (const fragment of ["ValueError", "table_error", "Real Betis",
+                            "'stats'", "244"]) {
+      expect(tailText, `"${fragment}" reached the reader`)
+        .not.toContain(fragment);
+    }
+
+    /* AND IT IS NOT HIDDEN EITHER, which is the half a forbidding guard
+       would be satisfied by deleting. The slot is there, it says the
+       reason could not be put into words, and it says where the words
+       went. */
+    await expect(slot).toHaveAttribute("data-reason", "unnamed");
+    await expect(slot).toContainText(/not one this page can put into words/i);
+    await expect(slot).toContainText(/console/i);
+    await expect(column(page).getByTestId("origin-chip"))
+      .toContainText(/no pre-kickoff read/i);
+
+    /* THE RAW TEXT IS NOT LOST — it is what an operator needs, and it
+       goes where `ErrorBoundary` already sends what it catches. */
+    await expect.poll(() => warnings.some((w) => w.includes("ValueError")),
+      { message: "the backend's own string reached neither the page nor "
+        + "the console — it was simply lost" }).toBe(true);
+  });
+
+test("a REASON CODE is still printed as itself — the control that keeps "
+   + "this from being a blanket gag", async ({ page }) => {
+    /* NON-VACUOUS, AND THIS IS THE ONE THAT MATTERS. "Do not print
+       machine text" is trivially satisfied by printing nothing, and
+       `fixture_not_in_archive` is the reason a reader most often needs:
+       it nearly always means the archive stops before this match, which
+       is fixable and invisible otherwise. It is `replay.py`'s own
+       vocabulary and it survives untouched. */
+    const slot = await openBanner(page, "fixture_not_in_archive");
+    await expect(slot).toHaveAttribute("data-reason", "code");
+    await expect(slot).toContainText("fixture_not_in_archive");
+  });
+
+test("no reason at all is SAID, never left as a sentence that stops",
+  async ({ page }) => {
+    /* MISSING IS NEVER ZERO, and it is never an empty slot either. The
+       banner used to render nothing here and close the clause, so "the
+       backend sent no reason" and "there was nothing to say" read
+       alike. */
+    const slot = await openBanner(page, null);
+    await expect(slot).toHaveAttribute("data-reason", "absent");
+    await expect(slot).toContainText(/no reason came back/i);
+    await expect(slot).not.toHaveText("");
+  });
