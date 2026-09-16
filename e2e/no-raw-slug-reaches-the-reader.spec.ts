@@ -28,9 +28,11 @@ import { RECORDED } from "./efl-cup-recorded";
 // about instead of lingering as a check of nothing.
 //
 // AND THE EFL CUP'S FIXTURE IS A RECORDING. Its `rated_on` is the one
-// the backend actually emitted (e2e/efl-cup-recorded.ts, off
-// assemble_board against live ESPN and Kalshi), which is the difference
-// between guarding the competition and guarding a payload written from
+// the backend actually emitted (e2e/efl-cup-recorded.ts — off
+// GET /api/picker/board on production against live ESPN and Kalshi,
+// re-taken 2026-09-16 when the cross-tier field landed), which is the
+// difference between guarding the competition and guarding a payload
+// written from
 // a brief — the failure that certified a venue bug with twelve green
 // tests because the fixture said "ESP" where the feed says "Spain".
 
