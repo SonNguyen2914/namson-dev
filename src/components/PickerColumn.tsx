@@ -27,7 +27,8 @@
 // to components/PickerRead.tsx so the tail renders THE SAME READ this
 // column does, rather than a hand-copied one free to drift from it.
 import Link from "next/link";
-import { useEffect, useId, useState } from "react";
+import { ReactNode, useEffect, useId, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   AXIS_ORDER, Axis, FieldRead, Ratings, fieldFor,
 } from "../lib/fieldApi";
@@ -2170,9 +2171,28 @@ export function columnCountLabel(
   return `${upcoming} fixture${upcoming === 1 ? "" : "s"}`;
 }
 
+/** DRAW THESE CHILDREN SOMEWHERE ELSE IN THE DOCUMENT, or here if there
+ *  is no somewhere else.
+ *
+ *  A portal moves the NODES and keeps the React tree: the children stay
+ *  this component's children, with its data, its state and its effects,
+ *  and they exist exactly once. That is the whole reason the board's
+ *  header rail is not a duplicate of the column headers — it is not a
+ *  rail OF headers at all, it is where the headers went.
+ *
+ *  `to` is null until the rail has mounted and measured, which is also
+ *  what the server renders — so the first client render matches the
+ *  markup it is hydrating and the header simply relocates afterwards. */
+function Slotted({ to, children }: {
+  to: HTMLElement | null;
+  children: ReactNode;
+}) {
+  return to ? createPortal(children, to) : <>{children}</>;
+}
+
 export function LeagueColumn({
   slug, meta, rows, refusals, days, dayKeys, sortFor, dayLabels, colIndex,
-  review, dense = false, field,
+  review, dense = false, field, headSlot = null,
 }: {
   slug: string;
   /** absent when the payload never mentioned this league at all */
@@ -2245,6 +2265,21 @@ export function LeagueColumn({
    *  a cup whose clubs come from tables that cannot be compared, and a
    *  league column's own table already does that job. */
   field?: FieldRead;
+  /** WHERE THIS COLUMN'S HEADER IS DRAWN — its slot in the board's
+   *  sticky header rail, or null to draw it at the top of the column as
+   *  it always was.
+   *
+   *  IT IS THE SAME HEADER EITHER WAY. Not a copy rendered twice: the
+   *  element below is PORTALLED into the slot, so it keeps this
+   *  component's own data, its own state and its own hooks, and nothing
+   *  is left behind in the column. A rail holding a second, hand-kept
+   *  header would be a second account of the fixture count, the season
+   *  basis and the read failures — the copy that rots.
+   *
+   *  The page hands it over only for a board whose track is a real
+   *  horizontal scroller, which is the one case where sticking inside
+   *  the column cannot work (see pages/bet-suggester/index.tsx). */
+  headSlot?: HTMLElement | null;
 }) {
   /* THE SEASON BASIS, DERIVED ONCE FOR THE WHOLE COLUMN. Off the rows
      this column actually holds, not off `meta` — a league whose payload
@@ -2382,14 +2417,26 @@ export function LeagueColumn({
   }, [announcements]);
 
   // the subgrid track plan, shared with the page: row 1 header, then
-  // per day a label track + a content track, then refusals, then tail
+  // per day a label track + a content track, then refusals, then tail.
+  // ROW 1 IS STILL THE HEADER'S even when the header has been lifted into
+  // the board's rail: the day bands and the rest-day ghosts are placed by
+  // explicit row number off this count, and renumbering them to reclaim
+  // an 8px gap would be a change to every band in every column for it.
   const trackCount = 2 * dayKeys.length + 3;
+
+  /* ONE HUE LOOKUP FOR THE COLUMN AND ITS HEADER. `hueOf` is the single
+     place a slug becomes a colour; what matters here is that the ANSWER
+     is written onto the header too. A custom property inherits down the
+     DOM, and a headSlot header is a child of the board's rail rather
+     than of this section — so a header relying on the section's `--lg`
+     would draw its league rail in nothing at all the moment it moved. */
+  const hue = hueOf(slug);
 
   return (
     <section data-testid="league-col" data-league={slug}
       id={`picker-col-${slug}`}
       aria-label={`${leagueLabel(slug)} column`}
-      style={{ ["--lg" as string]: hueOf(slug),
+      style={{ ["--lg" as string]: hue,
         ["--tracks" as string]: String(trackCount),
         ["--col" as string]: String(colIndex) }}
       className="min-w-0 scroll-mt-16 xl:grid xl:content-start xl:[grid-template-rows:subgrid] xl:[grid-template-columns:minmax(0,1fr)] xl:[grid-row:1/span_var(--tracks)] xl:[grid-column:var(--col)]">
@@ -2410,25 +2457,38 @@ export function LeagueColumn({
           the rows. `scroll-mt-16` on the section still owns where a
           jump-nav landing comes to rest.
 
-          AND IT GOES STATIC ON A SCROLLING TRACK (2026-09-15). A board
-          carrying more columns than it draws is a horizontal scroller at
-          xl, and `overflow-x` forces `overflow-y` — so this header's
-          scrollport is the TRACK, not the viewport, and
-          `top: var(--topbar-h)` measures from the track's own edge. It
-          pushed every column header ~103px down its own column and left
-          it there: a header that has MOVED, permanently, rather than one
-          that follows. The page's pills bar is what does this job on
-          such a board — it is genuinely sticky, full-bleed under the
-          nav, and it names the four columns in view at all times — so
-          the trade is made deliberately, and stated ONCE where the
-          overflow is decided.
-          `--head-pos` is that decision, set by the page on the track and
-          read here; it is absent on a board that fits, so a four-column
+          AND ON A SCROLLING TRACK IT LEAVES THE COLUMN ALTOGETHER
+          (2026-09-15, restated). A board carrying more columns than it
+          draws is a horizontal scroller at xl, and `overflow-x` forces
+          `overflow-y` — so a header INSIDE the track has the TRACK for a
+          scrollport, and `top: var(--topbar-h)` then measures from the
+          track's own edge. It pushed every column header ~103px down its
+          own column and left it there: a header that has MOVED,
+          permanently, rather than one that follows.
+          The first answer to that was to make it `static` and let the
+          pills bar carry the wayfinding alone. The operator's answer is
+          the header itself: "make the league header still going with me
+          when I go down. It need to go too right under the pills." So on
+          such a board the header is PORTALLED out of the scrollport into
+          the page's own sticky rail (`headSlot`), where it sticks to the
+          viewport like anything else and comes to rest against the
+          bottom of the pills bar. The rail carries it sideways with its
+          column; see useBoardLoop.
+          `headSlot` is absent on a board that fits, so a four-column
           board and every narrowed page keep the sticky header exactly as
           they always had it. Below xl the columns stack, there is no
-          scrollport anywhere, and so does everything else. */}
-      <header data-testid="col-head"
-        className="sticky top-[var(--topbar-h)] z-20 self-start border-b border-line bg-bs pb-3 pt-2 xl:[position:var(--head-pos,sticky)] xl:[grid-row:1]">
+          scrollport anywhere, and so does everything else.
+
+          THE STICKY IS WHEREVER THE HEADER ACTUALLY IS. Railed, the RAIL
+          sticks and this is plain flow inside it — a second sticky here
+          would be measuring from a box that is already parked. */}
+      <Slotted to={headSlot}>
+      <header data-testid="col-head" data-railed={headSlot ? "yes" : "no"}
+        style={{ ["--lg" as string]: hue }}
+        className={`self-start border-b border-line bg-bs pb-3 pt-2 ${
+          headSlot
+            ? "min-w-0"
+            : "sticky top-[var(--topbar-h)] z-20 xl:[grid-row:1]"}`}>
         {/* the league's own light — a 2px rail, wayfinding only. It is
             addressable because it is where a hue COLLISION is visible:
             two columns whose rails resolve to one colour is the defect
@@ -2633,6 +2693,7 @@ export function LeagueColumn({
             and `columnSort` is where the rule lives. */}
 
       </header>
+      </Slotted>
 
       {/* ── MATCHDAY BANDS. Each day owns a shared subgrid track, so a
           date's fixtures sit at the same height in every column — the
