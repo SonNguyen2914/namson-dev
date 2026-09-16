@@ -667,17 +667,49 @@ test("a refused fixture is drawn on its OWN kickoff date, not swept to the foot"
     /* THE REASON A REFUSAL EXISTS IS STILL SAID, ONCE — and since
        2026-09-15 it is said ON THE CARD rather than as a paragraph under
        the column: "remove the paragraph below it and put it into the
-       same hovering i symbol" (operator). The claim is unchanged and the
-       words are the same words; what moved is where a reader meets them,
-       which is now beside the card they explain instead of one of eight
-       columns away on a board that pages sideways. */
+       same hovering i symbol" (operator). What moved is where a reader
+       meets it, which is now beside the card it explains instead of one
+       of eight columns away on a board that pages sideways.
+
+       RESTATED 2026-09-16, BECAUSE THE WORDS MOVED TOO. This asserted
+       `refusal-rule-general` — a paragraph PickerColumn.tsx wrote —
+       contained "refuses it by name instead of imputing". That paragraph
+       is deleted: it claimed unconditionally that one club had no row,
+       which is FALSE of the `no_shared_scale` refusal added on
+       2026-09-14, where both clubs are rated and their two orderings
+       have never met. The backend rewrote its own general sentence that
+       same day for that same reason, and that rewrite has been on the
+       payload — `refusal.withheld`, the panel's first section — since
+       2026-09-11.
+
+       So the CLAIM this guard makes is unchanged and is if anything
+       stronger: a reader who opens the i still meets a general account
+       of why the fixture is refused, and it is now the one written by
+       the module that refused it. The panel's first section is asserted
+       rather than the deleted one, and its text is read off the payload
+       so this cannot drift again in the same way.
+       `one-fixture-two-columns.spec.ts` pins the property directly:
+       every section body must be traceable to a string the wire sent. */
     await expect(epl.getByTestId("refusal-why")).toHaveCount(0);
     await expect(card.getByTestId("refusal-why-open")).toHaveCount(1);
     await card.getByTestId("refusal-why-open").click();
     const why = card.getByTestId("refusal-notes");
     await expect(why).toBeVisible();
-    await expect(why.getByTestId("refusal-rule-general"))
-      .toContainText(/refuses it by name instead of imputing/i);
+    await expect(why.getByTestId("refusal-rule-general")).toHaveCount(0);
+    /* THIS FIXTURE CARRIES NO `refusal` BLOCK — it is a board of the
+       shape that shipped before 2026-09-11 — so what the panel draws
+       here is the file's NAMED FALLBACK, which opens "REFUSED, not
+       missing" and is the one general sentence this frontend still
+       authors. It is kept, and it is safe where the deleted one was not,
+       for a reason about WHEN it can render: a payload with no `refusal`
+       block predates `no_shared_scale` by three days, so every refusal
+       it can be shown over really is a one-club refusal. The card that
+       DOES carry a block quotes the wire instead — asserted in
+       refused-card.spec.ts and one-fixture-two-columns.spec.ts. */
+    await expect(why.getByTestId("refused-rule"))
+      .toContainText("REFUSED, not missing");
+    await expect(why.getByTestId("refused-rule"))
+      .toContainText(/declines it rather than imputing/i);
   });
 
 test("a refusal with NO kickoff keeps a named place, and says why it is there",

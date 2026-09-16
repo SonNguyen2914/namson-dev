@@ -955,7 +955,16 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
  *  failure `refusal-reason` two blocks down already avoids by quoting.
  *
  *  It stays ONLY as the named fallback for a board built before the
- *  block, and every slot that uses it says which of the two it drew. */
+ *  block, and every slot that uses it says which of the two it drew.
+ *
+ *  AND IT NAMES A PROMOTED CLUB, WHICH `REFUSAL_GENERAL` WAS DELETED FOR
+ *  DOING — so why does this one stay? Because of WHEN it can render.
+ *  This text is drawn only when the payload carries no `refusal` block
+ *  at all, which means a board built before 2026-09-11; `no_shared_scale`
+ *  was added on 2026-09-14 and no such board can emit one. Every refusal
+ *  this sentence can ever be shown over is a one-club refusal, which is
+ *  what it describes. `REFUSAL_GENERAL` had no such guard: it rode every
+ *  card unconditionally, including the reason it was false of. */
 const REFUSED_RULE =
   "REFUSED, not missing. This figure compares two clubs that are not on "
   + "one scale: the promoted club has no row in the table the other club "
@@ -1587,11 +1596,38 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
             testidOpen="refusal-why-open" testidPanel="refusal-notes"
             label={`why ${r.club ?? pairing} is refused, and what is withheld`}
             sections={([
-              { id: "refusal-rule-general", tone: "text-ink-low",
-                head: "why a fixture is refused",
-                body: REFUSAL_GENERAL },
+              /* THE GENERAL SENTENCE IS THE PAYLOAD'S, AND THERE IS ONLY
+                 ONE OF IT (2026-09-16). A second general section sat
+                 above this one — `REFUSAL_GENERAL`, this file's own
+                 paragraph, hung UNCONDITIONALLY as the first thing a
+                 reader met on every refused card. It said a club with no
+                 row in the table in use cannot be ranked against one
+                 that has a row.
+
+                 THAT IS FALSE ON A `no_shared_scale` CARD, where BOTH
+                 clubs have rows and it is the two orderings that have
+                 never met — so a reader was shown a false general
+                 sentence directly above the true specific one. The
+                 backend hit the identical problem on 2026-09-14 and
+                 rewrote `stages.REFUSAL_WITHHELD` for it, in its own
+                 words: "a sentence that has to be true under every
+                 reason must be rewritten when a reason it is false of
+                 arrives". That rewrite has been on the payload, in this
+                 very section, ever since; the copy above it was never
+                 touched, and had no way to be.
+
+                 SO THE COPY IS GONE RATHER THAN SYNCED. `withheld` is
+                 already the general rule — it names the figures no
+                 refusal carries AND both shapes a refusal can take, and
+                 points at `case` for which one applies — and
+                 `refused-case` below is the specific one. The operator's
+                 2026-09-15 ask ("remove the paragraph below it and put
+                 it into the same hovering i symbol") is what put a
+                 general sentence in this panel, and it still opens with
+                 one. It is now the sentence written by the module that
+                 made the decision. */
               { id: "refused-rule", tone: "text-warn",
-                head: "what is withheld",
+                head: "what is withheld, and which rule refused it",
                 body: ref ? `Withheld — ${ref.withheld}` : REFUSED_RULE },
               { id: "refused-case", tone: "text-ink-low",
                 head: "why this case", body: ref?.why ?? "" },
@@ -1700,23 +1736,30 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
 const DENSE_GRID = "grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 "
   + "lg:grid-cols-4";
 
-/** THE GENERAL RULE, NOW ON THE CARD RATHER THAN UNDER THE COLUMN
- *  (operator, 2026-09-15): "remove the paragraph below it and put it
- *  into the same hovering i symbol".
+/*  `REFUSAL_GENERAL` STOOD HERE AND WAS DELETED ON 2026-09-16.
  *
- *  It used to be a paragraph printed once per column, under the first
- *  refused card a reader met. Two things were wrong with that: it was
- *  four lines of prose for a reader who already knew, and it sat at a
- *  distance from the card it explained — one of eight columns away, on
- *  a board that scrolls sideways. As the first section of each refused
- *  card's own panel it is in the same place as every other sentence
- *  about that refusal, and costs nothing until asked for. */
-const REFUSAL_GENERAL =
-  "A club with no row in the table in use — a promoted side, most often "
-  + "— cannot be ranked against one that has a row, and its lower-division "
-  + "numbers were measured as no help at all. The picker refuses it by name "
-  + "instead of imputing a number, and the fixture is listed here rather "
-  + "than quietly dropped.";
+ *  It was this file's own paragraph about why a fixture is refused,
+ *  moved onto the card on 2026-09-15 at the operator's ask ("remove the
+ *  paragraph below it and put it into the same hovering i symbol") and
+ *  hung UNCONDITIONALLY as the first section of every refused card's
+ *  panel. Its words: a club with no row in the table in use — a promoted
+ *  side, most often — cannot be ranked against one that has a row.
+ *
+ *  THAT WAS TRUE OF EVERY REFUSAL THERE WAS UNTIL 2026-09-14, and false
+ *  from that day: `no_shared_scale` refuses a pairing in which BOTH
+ *  clubs are rated and it is their two orderings that have never met. On
+ *  such a card the reader met a false general sentence sitting directly
+ *  above the true specific one. The backend rewrote its own copy that
+ *  same day, for that same reason, and said so beside it; nothing
+ *  carried the rewrite across the process boundary, because nothing
+ *  could.
+ *
+ *  The sentence is not missing — it is on the payload, where it has been
+ *  since 2026-09-11 (`stages.REFUSAL_WITHHELD`, `refusal.withheld`), and
+ *  the panel's first section quotes it. The operator's ask is still
+ *  honoured; what changed is whose voice answers it. See the section
+ *  list in `RefusedCard` for the whole account.
+ */
 
 /** WHAT A COLUMN'S NOTES ARE, AS OPPOSED TO A CARD'S (operator,
  *  2026-09-09 — the THIRD time this rule has been given).
