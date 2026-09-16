@@ -539,7 +539,15 @@ export function useBoardLoop({ trackRef, stripRef, slugs, enabled }: {
       animating = true;
       const t0 = performance.now();
       const frame = (now: number) => {
-        const p = Math.min(1, (now - t0) / STEP_MS);
+        /* CLAMPED AT BOTH ENDS. A rAF callback is handed the timestamp of
+           the frame it belongs to, and a keypress is dispatched DURING
+           that frame's input handling — so `t0`, taken in the handler, can
+           be LATER than the first `now`. Unclamped that is a negative `p`,
+           and the cubic answers a negative fraction of the distance:
+           measured, the board stepped 31px the WRONG WAY on frame one and
+           then recovered, which is the overshoot-and-return the guard in
+           `the-board-scrolls-and-loops` refuses. */
+        const p = Math.min(1, Math.max(0, (now - t0) / STEP_MS));
         track.scrollLeft = from + (to - from) * easeOut(p);
         if (p < 1) { glideRaf = requestAnimationFrame(frame); return; }
         glideRaf = null;
