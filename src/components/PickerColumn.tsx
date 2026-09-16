@@ -2483,7 +2483,12 @@ export function LeagueColumn({
           sticks and this is plain flow inside it — a second sticky here
           would be measuring from a box that is already parked. */}
       <Slotted to={headSlot}>
-      <header data-testid="col-head" data-railed={headSlot ? "yes" : "no"}
+      {/* `data-league` SO THE HEADER CAN BE FOUND BY WHAT IT NAMES. It
+          used to be found by what CONTAINED it — inside this column's
+          section — and on a railed board nothing contains it but a slot.
+          The league is the fact that did not move. */}
+      <header data-testid="col-head" data-league={slug}
+        data-railed={headSlot ? "yes" : "no"}
         style={{ ["--lg" as string]: hue }}
         className={`self-start border-b border-line bg-bs pb-3 pt-2 ${
           headSlot

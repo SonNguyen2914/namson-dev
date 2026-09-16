@@ -230,6 +230,21 @@ async function open(page: import("@playwright/test").Page,
 const col = (page: import("@playwright/test").Page, slug: string) =>
   page.locator(`[data-testid="league-col"][data-league="${slug}"]`);
 
+/** THIS LEAGUE'S HEADER — its name, its fixture count, its season basis,
+ *  its notes and its read failures.
+ *
+ *  RESTATED 2026-09-15. It used to be found INSIDE the column's section,
+ *  which is how these checks were written. It is still the column's own
+ *  header, rendered by the column with the column's data — but a board
+ *  whose track scrolls has `overflow-x: auto` on that track, which makes
+ *  it a scrollport in BOTH axes, and a header in there can never stick to
+ *  the viewport. So the header is drawn in the page's sticky rail
+ *  instead, and is addressed by the league it NAMES rather than by the
+ *  element that used to contain it. There is still exactly one of them
+ *  per column; see e2e/the-headers-park-under-the-pills.spec.ts. */
+const colHead = (page: import("@playwright/test").Page, slug: string) =>
+  page.locator(`[data-testid="col-head"][data-league="${slug}"]`);
+
 const orderOf = (c: ReturnType<typeof col>) =>
   c.getByTestId("picker-row")
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-event")));
@@ -374,13 +389,14 @@ test("the Leagues Cup gets its own column, after the four leagues",
     await page.waitForTimeout(800);
     expect(await lit()).toEqual(withCup);
     const cup = col(page, "leaguescup");
-    await expect(cup.getByRole("heading", { name: "Leagues Cup" }))
+    await expect(colHead(page, "leaguescup")
+      .getByRole("heading", { name: "Leagues Cup" }))
       .toBeVisible();
     // and it says what it is: a tournament with no table of its own,
     // whose clubs were rated on the leagues named here
-    await expect(cup.getByTestId("col-cup"))
+    await expect(colHead(page, "leaguescup").getByTestId("col-cup"))
       .toHaveText(/cup · rated on MLS \+ Liga MX/);
-    await expect(cup.getByTestId("col-count")).toHaveText("3 fixtures");
+    await expect(colHead(page, "leaguescup").getByTestId("col-count")).toHaveText("3 fixtures");
   });
 
 test("every cup row served is drawn, and Wednesday's two semis carry the full card",
@@ -457,8 +473,8 @@ test("a cross-league cup fixture withholds its gaps, says why, and keeps its tie
       .toContainText("T2 v T1 −1");
     // the note's new home, opened from the column header
     const cupCol = col(page, "leaguescup");
-    await cupCol.getByTestId("col-notes-open").click();
-    await expect(cupCol.getByTestId("col-notes").getByTestId("gap-note"))
+    await colHead(page, "leaguescup").getByTestId("col-notes-open").click();
+    await expect(colHead(page, "leaguescup").getByTestId("col-notes").getByTestId("gap-note"))
       .toContainText("2.0 ppg in MLS is not 2.0 ppg in Liga MX");
   });
 
@@ -472,7 +488,7 @@ test("a league row never claims a cross-league caveat it does not have",
       await expect(c.getByTestId("reg-time-note")).toHaveCount(0);
       // …and no affordance offering either of them, which is the same
       // claim one level up: a league column has no caveat to hide.
-      await expect(c.getByTestId("col-notes-open")).toHaveCount(0);
+      await expect(colHead(page, slug).getByTestId("col-notes-open")).toHaveCount(0);
     }
   });
 
@@ -493,13 +509,13 @@ test("the Leagues Cup column says ONCE what its market settles on",
     await expect(cup.getByTestId("picker-row")).toHaveCount(3);
     await expect(cup.getByTestId("reg-time-note")).toHaveCount(0);
 
-    const trigger = cup.getByTestId("col-notes-open");
+    const trigger = colHead(page, "leaguescup").getByTestId("col-notes-open");
     await expect(trigger).toHaveCount(1);        // one circle, not three
     await expect(trigger).toHaveAttribute("data-notes", "gap+reg-time");
-    await expect(cup.getByTestId("col-notes")).toHaveCount(0);
+    await expect(colHead(page, "leaguescup").getByTestId("col-notes")).toHaveCount(0);
 
     await trigger.click();
-    const note = cup.getByTestId("col-notes").getByTestId("reg-time-note");
+    const note = colHead(page, "leaguescup").getByTestId("col-notes").getByTestId("reg-time-note");
     await expect(note).toContainText(/regulation time only/i);
     await expect(note).toContainText(/90 minutes/i);
     await expect(note).toContainText(/penalties/i);
@@ -517,8 +533,8 @@ test("the column note opens on hover, on focus and on tap, and Escape shuts it",
     await open(page);
     await show(page, "leaguescup");
     const cup = col(page, "leaguescup");
-    const trigger = cup.getByTestId("col-notes-open");
-    const panel = cup.getByTestId("col-notes");
+    const trigger = colHead(page, "leaguescup").getByTestId("col-notes-open");
+    const panel = colHead(page, "leaguescup").getByTestId("col-notes");
 
     // a real accessible name, naming what is behind the circle
     await expect(trigger).toHaveAccessibleName(
@@ -529,7 +545,7 @@ test("the column note opens on hover, on focus and on tap, and Escape shuts it",
     await expect(panel).toBeVisible();
     await expect(trigger).toHaveAttribute("aria-expanded", "true");
     // move the pointer off it and it closes again
-    await cup.getByTestId("col-count").hover();
+    await colHead(page, "leaguescup").getByTestId("col-count").hover();
     await expect(panel).toHaveCount(0);
 
     // KEYBOARD: focus alone opens it, Escape shuts it
@@ -542,7 +558,7 @@ test("the column note opens on hover, on focus and on tap, and Escape shuts it",
     // and a second click is the way out on a touch screen
     await trigger.click();
     await expect(panel).toBeVisible();
-    await cup.getByTestId("col-count").hover();
+    await colHead(page, "leaguescup").getByTestId("col-count").hover();
     await expect(panel).toBeVisible();
     await trigger.click();
     await expect(panel).toHaveCount(0);
@@ -596,7 +612,8 @@ test("a late-season fixture reads as this season's, and a promoted side as its o
     const late = col(page, "mls").getByTestId("picker-row").first();
     await expect(late.getByTestId("season-weight")).toHaveCount(0);
     // the header carries it once, for every row beneath it
-    await expect(col(page, "mls").getByText(/this szn · min/i)).toBeVisible();
+    await expect(colHead(page, "mls").getByText(/this szn · min/i))
+      .toBeVisible();
     await expect(late).not.toHaveAttribute("data-season-departure", /./);
     // a club with no last-season row at all is rated on this season
     // alone — a different basis from its column, carried as data on the
@@ -633,7 +650,7 @@ test("the season basis is a chip on its own column, and the blend rather "
   await expect(page.getByTestId("prior-banner-blend")).toHaveCount(0);
 
   // ON ARRIVAL, on the column: the basis, and the share that is why.
-  const mx = col(page, "ligamx").getByTestId("col-season");
+  const mx = colHead(page, "ligamx").getByTestId("col-season");
   await expect(mx).toBeVisible();
   await expect(mx).toHaveText(/prior szn · 3[0-9]% this szn/);
   await expect(mx).toHaveAttribute("title", /6 GP/);
@@ -648,7 +665,13 @@ test("the season basis is a chip on its own column, and the blend rather "
      its SLUG rather than by whether the window happened to be showing
      it. The claim is about the cup, and it never was about the window
      position. */
-  const chips = await page.getByTestId("league-col").evaluateAll((els) =>
+  /* RESTATED AGAIN 2026-09-15: the chip is in the column's HEADER, and
+     on a scrolling board the header is drawn in the page's sticky rail
+     rather than inside the section — so the chips are read off the
+     headers and separated by the league each one names. Which is the
+     same separation this already made; only where the chip is found has
+     moved. */
+  const chips = await page.getByTestId("col-head").evaluateAll((els) =>
     els.map((e) => ({ slug: e.getAttribute("data-league"),
       text: (e.querySelector('[data-testid="col-season"]')?.textContent
              ?? "").trim() })));
@@ -657,7 +680,7 @@ test("the season basis is a chip on its own column, and the blend rather "
   expect(leagueChips).toHaveLength(4);
   expect(leagueChips.filter((t) => /prior szn/.test(t))).toHaveLength(3);
   await show(page, "leaguescup");
-  const cupChip = col(page, "leaguescup").getByTestId("col-season");
+  const cupChip = colHead(page, "leaguescup").getByTestId("col-season");
   await expect(cupChip).toHaveText(/prior szn/);
   await expect(cupChip).not.toHaveText(/%/);
 
@@ -1174,7 +1197,7 @@ test("a folded cup card keeps its OWN settlement note — the league header "
     await expect(mx.getByTestId("picker-row").first())
       .toHaveAttribute("data-league", "leaguescup");
     // no header affordance — this column has no note of its own to give
-    await expect(mx.getByTestId("col-notes-open")).toHaveCount(0);
+    await expect(colHead(page, "ligamx").getByTestId("col-notes-open")).toHaveCount(0);
     // and the note is still on each folded card, in the backend's words
     await expect(mx.getByTestId("reg-time-note")).toHaveCount(2);
     await expect(mx.getByTestId("reg-time-note").first())
@@ -1385,8 +1408,7 @@ const spanBoard = (ws: ([number, number] | null)[]) => ({
 });
 
 const headOf = (page: import("@playwright/test").Page, league: string) =>
-  page.locator(`[data-testid="league-col"][data-league="${league}"]`)
-      .getByTestId("col-season");
+  colHead(page, league).getByTestId("col-season");
 
 test("the league header says the season basis as a span over its clubs",
   async ({ page }) => {
@@ -1466,14 +1488,14 @@ test("the league header follows the column when the rows scroll under it",
        header near the top — a guard that cannot fail is not a guard. */
     await page.setViewportSize({ width: 1440, height: 520 });
     await open(page, FOUR);
-    const col = page.locator('[data-testid="league-col"][data-league="mls"]');
-    const head = col.getByTestId("col-head");
+    const head = colHead(page, "mls");
+    const mlsCol = col(page, "mls");
     await expect(head).toBeVisible();
     await page.waitForTimeout(1200);            // let the live section settle
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     await page.waitForTimeout(400);
     const after = await head.boundingBox();
-    const colBox = await col.boundingBox();
+    const colBox = await mlsCol.boundingBox();
     expect(after).not.toBeNull(); expect(colBox).not.toBeNull();
     // the column really did travel out of the top of the viewport
     expect(colBox!.y).toBeLessThan(-100);
@@ -1621,8 +1643,18 @@ test("the board lays out with content in it, at every width",
           const lg = el.getAttribute("data-league");
           const box = el.getBoundingClientRect();
           if (box.width < 120) out.push(`COLUMN-COLLAPSED ${lg} w=${Math.round(box.width)}`);
-          const head = el.querySelector('[data-testid="col-head"]') as HTMLElement;
-          const top = parseFloat(getComputedStyle(head).top);
+          /* RESTATED 2026-09-15: a column's header is drawn in the
+             page's sticky rail on a board whose track scrolls, so it is
+             found by the league it names rather than inside the section.
+             And what PARKS is the rail on such a board and the header
+             itself on every other — either way the claim is the one this
+             always made: the thing that stops does not stop underneath
+             the bar that is already there. */
+          const head = document.querySelector(
+            `[data-testid="col-head"][data-league="${lg}"]`) as HTMLElement;
+          const parks = (head.closest('[data-testid="board-head-rail"]')
+            ?? head) as HTMLElement;
+          const top = parseFloat(getComputedStyle(parks).top);
           if (!Number.isNaN(top) && top < barH - 0.5) {
             out.push(`HEAD-UNDER-BAR ${lg} top=${top} bar=${Math.round(barH)}`);
           }
@@ -1637,8 +1669,9 @@ test("the board lays out with content in it, at every width",
                - the count sits BELOW the name, never beside or above it;
                - both are centred on the column's own axis, so a long
                  name and a short one produce the same shape. */
-          const name = el.querySelector("h3") as HTMLElement;
-          const cnt = el.querySelector('[data-testid="col-count"]') as HTMLElement;
+          const name = head.querySelector("h3") as HTMLElement;
+          const cnt = head.querySelector(
+            '[data-testid="col-count"]') as HTMLElement;
           if (name && cnt) {
             const nb = name.getBoundingClientRect(), cb = cnt.getBoundingClientRect();
             if (cb.top < nb.bottom - 0.5) {
@@ -1707,10 +1740,14 @@ test("a long league name truncates — it never squeezes or displaces the "
     await expect(col).toHaveCount(1);
     // the column exists before the board has finished laying out; read
     // boxes only once it has settled, or this measures a mid-render frame
-    await expect(col.getByTestId("col-count")).toBeVisible();
+    await expect(colHead(page, LONG).getByTestId("col-count")).toBeVisible();
     await page.waitForTimeout(400);
-    const name = col.locator("h3");
-    const count = col.getByTestId("col-count");
+    /* THE NAME AND THE COUNT ARE THE HEADER's, and the header is drawn
+       in the board's sticky rail on a board this wide — the column on
+       the track is its rows. Both are still one column wide, which is
+       the whole claim here. */
+    const name = colHead(page, LONG).locator("h3");
+    const count = colHead(page, LONG).getByTestId("col-count");
     const nb = (await name.boundingBox())!;
     const cb = (await count.boundingBox())!;
     expect(nb).not.toBeNull(); expect(cb).not.toBeNull();
@@ -1730,7 +1767,7 @@ test("a long league name truncates — it never squeezes or displaces the "
     // and the NAME is what gave way — over the whole track, not a share
     expect(await name.evaluate((el) => el.scrollWidth > el.clientWidth + 1))
       .toBe(true);
-    const headBox = (await col.getByTestId("col-head").boundingBox())!;
+    const headBox = (await colHead(page, LONG).boundingBox())!;
     expect(nb.width).toBeGreaterThan(headBox.width - 40);
   });
 
@@ -1740,9 +1777,7 @@ test("the sticky header is opaque — rows never show through it",
        contradicts the numbers beside it: the reader sees two things at
        once and believes the wrong one. */
     await open(page, FOUR);
-    const bg = await page
-      .locator('[data-testid="league-col"][data-league="mls"]')
-      .getByTestId("col-head")
+    const bg = await colHead(page, "mls")
       .evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(bg).not.toBe("rgba(0, 0, 0, 0)");
     expect(bg).not.toMatch(/rgba\([^)]*,\s*0?\.\d+\)$/);

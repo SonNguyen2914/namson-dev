@@ -349,6 +349,21 @@ async function openUcl(page: import("@playwright/test").Page,
 const col = (page: import("@playwright/test").Page, slug: string) =>
   page.locator(`[data-testid="league-col"][data-league="${slug}"]`);
 
+/** THIS LEAGUE'S HEADER — its name, its fixture count, its season basis,
+ *  its notes and its read failures.
+ *
+ *  RESTATED 2026-09-15. It used to be found INSIDE the column's section,
+ *  which is how these checks were written. It is still the column's own
+ *  header, rendered by the column with the column's data — but a board
+ *  whose track scrolls has `overflow-x: auto` on that track, which makes
+ *  it a scrollport in BOTH axes, and a header in there can never stick to
+ *  the viewport. So the header is drawn in the page's sticky rail
+ *  instead, and is addressed by the league it NAMES rather than by the
+ *  element that used to contain it. There is still exactly one of them
+ *  per column; see e2e/the-headers-park-under-the-pills.spec.ts. */
+const colHead = (page: import("@playwright/test").Page, slug: string) =>
+  page.locator(`[data-testid="col-head"][data-league="${slug}"]`);
+
 /** `evaluateAll` reads the DOM as it stands and does NOT auto-wait, so
  *  every caller waits on the count first — a bare read races the render
  *  and returns [], which reads exactly like a column that sorted wrong. */
@@ -623,7 +638,7 @@ test("the UCL column ranks on shape while the board control is untouched, "
     // would be hollow(6) → clean(8) → same(10)
     expect(await orderOf(ucl, 3))
       .toEqual(["ucl-clean", "ucl-same", "ucl-hollow"]);
-    const chip = ucl.getByTestId("col-own-sort");
+    const chip = colHead(page, "ucl").getByTestId("col-own-sort");
     await expect(chip).toHaveAttribute("data-mode", "shape");
     await expect(chip).toHaveText(/sorted on shape · this column/);
   });
@@ -646,7 +661,7 @@ test("the four league columns are untouched by it", async ({ page }) => {
       .toBe(4);
     for (const slug of leagues) {
       await show(page, slug);                    // …and it is drawn
-      await expect(col(page, slug).getByTestId("col-own-sort"),
+      await expect(colHead(page, slug).getByTestId("col-own-sort"),
         `${slug} is a league column and runs the board's key`)
         .toHaveCount(0);
     }
@@ -654,7 +669,7 @@ test("the four league columns are untouched by it", async ({ page }) => {
        makes the four absences above a fact about league columns rather
        than a chip nothing renders any more. */
     await show(page, "ucl");
-    await expect(col(page, "ucl").getByTestId("col-own-sort")).toHaveCount(1);
+    await expect(colHead(page, "ucl").getByTestId("col-own-sort")).toHaveCount(1);
   });
 
 // ------ 2c. THE HEADING NAMES THE SORT THAT IS RUNNING (2026-09-09) ----
@@ -720,7 +735,7 @@ test("the rank heading names the sort actually running, and says so when "
     await expect(note).toContainText(/within each day/i);
     // and the column with its own key SAYS so, on itself
     await show(page, "ucl");
-    await expect(col(page, "ucl").getByTestId("col-own-sort")).toHaveCount(1);
+    await expect(colHead(page, "ucl").getByTestId("col-own-sort")).toHaveCount(1);
   });
 
 test("a board narrowed to the UCL column names shape, not the tiebreak",
@@ -836,10 +851,16 @@ test("the Champions League column states its withheld gaps ONCE, in the "
     await expect(first).toContainText(/rank\s*n\/a/);
 
     // ONE circle, in the header's chip row beside the season basis
-    const trigger = ucl.getByTestId("col-notes-open");
+    const trigger = colHead(page, "ucl").getByTestId("col-notes-open");
     await expect(trigger).toHaveCount(1);
-    await expect(ucl.getByTestId("col-head")
-      .getByTestId("col-notes-open")).toHaveCount(1);
+    /* AND NO CARD REPEATS IT, which is the half of "ONCE" that the old
+       nesting carried: the query used to be `col-head` inside the
+       column, and a header drawn in the board's sticky rail is no longer
+       inside anything the column contains. So the claim is made against
+       the thing it was ever about — the eighteen cards below, none of
+       which may carry a second circle. */
+    await expect(page.getByTestId("picker-row")
+      .getByTestId("col-notes-open")).toHaveCount(0);
     // this payload carries no regulation-time note, so the panel must
     // not offer a section for one — an affordance never promises a note
     // the column does not have
@@ -847,7 +868,7 @@ test("the Champions League column states its withheld gaps ONCE, in the "
 
     // and the words are the backend's, whole
     await trigger.click();
-    const panel = ucl.getByTestId("col-notes");
+    const panel = colHead(page, "ucl").getByTestId("col-notes");
     await expect(panel.getByTestId("gap-note")).toHaveText(CROSS_NOTE);
     await expect(panel.getByTestId("reg-time-note")).toHaveCount(0);
   });
@@ -873,14 +894,14 @@ test("the notes attribute lists what the column HAS — a field adds its "
     // a MEASURED field: two notes, and the field's is one of them
     await openUcl(page, GRID_BOARD,
       { body: { competition: "ucl", axes: AXES }, status: 200 });
-    await expect(col(page, "ucl").getByTestId("col-notes-open"))
+    await expect(colHead(page, "ucl").getByTestId("col-notes-open"))
       .toHaveAttribute("data-notes", /(^|\+)field($|\+)/);
 
     // a FAILED read is a different fact and gets a different note —
     // never folded into "there is no field"
     await openUcl(page, GRID_BOARD,
       { body: { detail: "the field read failed" }, status: 503 });
-    await expect(col(page, "ucl").getByTestId("col-notes-open"))
+    await expect(colHead(page, "ucl").getByTestId("col-notes-open"))
       .toHaveAttribute("data-notes", /field-error/);
   });
 
@@ -895,9 +916,9 @@ test("the note's panel opens inside its own column at the narrowest track",
     await page.setViewportSize({ width: 1280, height: 900 });
     await openWide(page);
     const ucl = col(page, "ucl");
-    const trigger = ucl.getByTestId("col-notes-open");
+    const trigger = colHead(page, "ucl").getByTestId("col-notes-open");
     await trigger.click();
-    const panel = ucl.getByTestId("col-notes");
+    const panel = colHead(page, "ucl").getByTestId("col-notes");
     await expect(panel).toBeVisible();
     // A LAYOUT READ MUST WAIT FOR THE LAYOUT — boundingBox() does not
     // auto-wait and a viewport resize is not synchronous with reflow, so
@@ -935,7 +956,7 @@ test("the Leagues Cup is a cup with a cross-league row too, and keeps the "
    + "board default", async ({ page }) => {
     await openWide(page);
     const lc = col(page, "leaguescup");
-    await expect(lc.getByTestId("col-own-sort")).toHaveCount(0);
+    await expect(colHead(page, "leaguescup").getByTestId("col-own-sort")).toHaveCount(0);
     // its cross-league row therefore still anchors the way the board
     // does everywhere else — the anchor rule is per ROW and applies
     // here as well, which is why this is a sort assertion, not an
@@ -958,12 +979,12 @@ test("choosing a sort takes the UCL column back onto the board's",
        control left on the board. */
     await openWide(page);
     const ucl = col(page, "ucl");
-    await expect(ucl.getByTestId("col-own-sort")).toHaveCount(1);
+    await expect(colHead(page, "ucl").getByTestId("col-own-sort")).toHaveCount(1);
 
     await bandSort(page).selectOption("rank");
     // the operator asked for rank: this column obeys, and stops
     // claiming a sort of its own
-    await expect(ucl.getByTestId("col-own-sort")).toHaveCount(0);
+    await expect(colHead(page, "ucl").getByTestId("col-own-sort")).toHaveCount(0);
     await expect(ucl.getByTestId("picker-row").first()
       .getByTestId("row-anchor")).toHaveAttribute("data-anchor", "rank");
   });
@@ -985,7 +1006,7 @@ test("a member table that failed is named, and rated_on does not shrink",
       },
     });
     const ucl = col(page, "ucl");
-    const block = ucl.getByTestId("col-member-errors");
+    const block = colHead(page, "ucl").getByTestId("col-member-errors");
     await expect(block).toContainText("1 of 7 member tables did not load");
     /* THE FAILURE IS STILL NAMED, AND THE EXCEPTION CLASS IS NOT
        (2026-09-14). This used to assert `toContainText("HTTPError: 503
@@ -999,13 +1020,13 @@ test("a member table that failed is named, and rated_on does not shrink",
     await expect(block).not.toContainText("HTTPError");
     // the SPEC is unchanged — what the column is defined on must not
     // quietly become what it managed to fetch
-    await expect(ucl.getByTestId("col-cup")).toContainText("Eredivisie");
+    await expect(colHead(page, "ucl").getByTestId("col-cup")).toContainText("Eredivisie");
   });
 
 test("a healthy column draws no member-failure block at all",
   async ({ page }) => {
     await openWide(page);
-    await expect(col(page, "ucl").getByTestId("col-member-errors"))
+    await expect(colHead(page, "ucl").getByTestId("col-member-errors"))
       .toHaveCount(0);
   });
 
@@ -1906,10 +1927,15 @@ test("the season basis is said by a column, so it can only ever name a "
          whole declaration at once rather than four of it at a time. */
       await expect(page.getByTestId("league-col"))
         .toHaveCount(COLUMNS.length);
-      const said = await page.getByTestId("league-col")
-        .evaluateAll((els) => els
-          .filter((e) => e.querySelector('[data-testid="col-season"]'))
-          .map((e) => e.getAttribute("data-league")));
+      /* RESTATED 2026-09-15: a column's season chip is in its HEADER,
+         and on a scrolling board the header is drawn in the page's
+         sticky rail rather than inside the section — so the chips are
+         gathered by the league each one names. The claim is unchanged:
+         every season basis stated on this page belongs to a column the
+         page draws. */
+      const said = await page.getByTestId("col-season")
+        .evaluateAll((els) => els.map((e) =>
+          e.closest("[data-league]")!.getAttribute("data-league")));
       const drawn = await page.getByTestId("league-col")
         .evaluateAll((els) => els.map((e) => e.getAttribute("data-league")));
       expect(said.length).toBeGreaterThan(0);
@@ -1917,7 +1943,7 @@ test("the season basis is said by a column, so it can only ever name a "
     }
     // and Liga MX, the league the screenshot caught, states its own
     await show(page, "mls");
-    await expect(col(page, "ligamx").getByTestId("col-season"))
+    await expect(colHead(page, "ligamx").getByTestId("col-season"))
       .toHaveText(/prior szn/);
 
     /* ...and on the narrowed board there is no Liga MX COLUMN, so no
@@ -1988,7 +2014,7 @@ test("with the competition off the board, the narrowed page reports NO RANKING �
 
     /* THE COUNT DOES NOT COUNT. "0 fixtures" here would be a number
        measured over a window the board never looked at. */
-    const count = ucl.getByTestId("col-count");
+    const count = colHead(page, "ucl").getByTestId("col-count");
     await expect(count).toHaveText("not ranked");
     await expect(count).toHaveAttribute("data-counts", "unasked");
     await expect(count).not.toHaveText(/fixtures/);
@@ -1996,14 +2022,14 @@ test("with the competition off the board, the narrowed page reports NO RANKING �
     /* NOR DOES THE EMPTY BOX. The measured sentence — "No X fixtures in
        the next N days" — belongs to a column the board ranked and found
        nothing in, and it must not appear on one it never ranked. */
-    const empty = ucl.getByTestId("col-empty");
+    const empty = col(page, "ucl").getByTestId("col-empty");
     await expect(empty).toHaveAttribute("data-holds", "unasked");
     await expect(empty).toContainText("carries no column for");
     await expect(empty).toContainText("not a count");
     await expect(empty).not.toContainText("in the next 7 days");
 
     // and the chip that says why there are no chips
-    await expect(ucl.getByTestId("col-no-board-entry")).toHaveCount(1);
+    await expect(colHead(page, "ucl").getByTestId("col-no-board-entry")).toHaveCount(1);
   });
 
 test("and it names the page the competition DOES have — removing a column is not deleting a competition",
@@ -2030,8 +2056,8 @@ test("a DECLARED narrowed column says none of that — the control",
        its whole length asserting against: `ucl` declared, rows served. */
     await openUcl(page);
     await expect(page.getByTestId("board-undeclared")).toHaveCount(0);
-    await expect(col(page, "ucl").getByTestId("col-no-board-entry"))
+    await expect(colHead(page, "ucl").getByTestId("col-no-board-entry"))
       .toHaveCount(0);
-    await expect(col(page, "ucl").getByTestId("col-count"))
+    await expect(colHead(page, "ucl").getByTestId("col-count"))
       .not.toHaveText("not ranked");
   });
