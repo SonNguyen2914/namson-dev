@@ -116,6 +116,30 @@ export function soonLabel(r: SoonRead): string | null {
   return null;
 }
 
+/** WHAT A CHIP SAYS WHEN THE FEED BEHIND IT DOES NOT EXIST.
+ *
+ *  A FOURTH STATE, AND IT IS NOT A FAILED READ. `SoonRead` has three
+ *  answers and all of them describe a REQUEST: it landed and counted,
+ *  it landed and counted none, it did not land. A competition with no
+ *  competition viewer is none of those — there is nothing to request
+ *  and there never will be, so the honest state is decided before the
+ *  fetch rather than recovered from its 404.
+ *
+ *  WHY IT SPEAKS WHEN "none" AND "unknown" DO NOT. Those two must stay
+ *  silent because the one thing neither may claim is that nothing is
+ *  on. This one is not a claim about matches at all: the EFL Cup was in
+ *  its third round with four rounds and a final to come on the day this
+ *  was written. It is a claim about the CHIP — that the sentence naming
+ *  a day can never arrive here — and leaving that to be inferred from a
+ *  chip that is permanently unlit is exactly how absent-by-decision
+ *  comes to read as broken.
+ *
+ *  It names where the matches are, because a refusal that points
+ *  nowhere is a dead end. And it says nothing a reader could act on:
+ *  the vocabulary rule that binds `soonLabel` binds this too. */
+export const NO_FEED_NOTE =
+  "no fixture feed for this competition — its matches are on the page";
+
 /** The one request. Separated from React so a caller can await it and a
  *  test can drive it; the hook is in components/CompRail.tsx. */
 export async function fetchSoon(

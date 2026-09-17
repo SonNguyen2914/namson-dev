@@ -142,13 +142,27 @@ export function NavChip({ href, onClick, active, soon, children }: {
    *  into a measured "nothing on". MISSING IS NEVER ZERO needs somewhere
    *  to be observable, and this is it.
    *
+   *  A FOURTH STATE, ADDED 2026-09-15: "no-feed", a competition whose
+   *  fixture feed does not exist and is not going to. It is not a read
+   *  — no request is made for it — and it is the one unlit state that
+   *  SPEAKS, because the others are silent for reasons that do not
+   *  apply to it. "none" says nothing because a measured empty window
+   *  is not worth a sentence, and "unknown" says nothing because it has
+   *  measured nothing at all; both are temporary and both would be
+   *  making a claim about MATCHES. This one is permanent and its
+   *  sentence is about the CHIP — that the day can never be named here
+   *  — which is a fact the reader cannot otherwise get, and which a
+   *  permanently ordinary chip would leave looking like a feed that has
+   *  been broken for a very long time.
+   *
    *  `hue` is a CSS custom property NAME, so the chip is lit in the
    *  competition's own wayfinding light rather than in a colour typed
    *  here — league hues say WHICH, the traffic light says GOOD or BAD,
    *  and this is emphatically the first kind. `note` is the words: it
    *  names a day and nothing else, and it is written into the
    *  accessible name rather than left to the colour. */
-  soon?: { state: "soon" | "none" | "unknown"; hue?: string; note?: string };
+  soon?: { state: "soon" | "none" | "unknown" | "no-feed"; hue?: string;
+           note?: string };
   children: ReactNode;
 }) {
   const lit = soon?.state === "soon";
@@ -180,11 +194,13 @@ export function NavChip({ href, onClick, active, soon, children }: {
           duplicated — it is the only copy of the fact that survives
           everywhere, and it is deliberately a day and not an
           instruction.
-          ONLY THE LIT STATE SPEAKS. "none" and "unknown" add no words,
-          because the one thing neither may say is that nothing is on:
-          one has not been measured and the other is not worth a
-          sentence. */}
-      {lit && soon?.note && <span className="sr-only"> — {soon.note}</span>}
+          "none" AND "unknown" ADD NO WORDS, because the one thing
+          neither may say is that nothing is on: one has not been
+          measured and the other is not worth a sentence. "no-feed"
+          does speak, and what it says is not about matches at all —
+          see the `soon` prop above. */}
+      {(lit || soon?.state === "no-feed") && soon?.note
+        && <span className="sr-only"> — {soon.note}</span>}
     </>
   );
   // Link, not <a>: a plain anchor made every chip hop a full document
@@ -195,7 +211,8 @@ export function NavChip({ href, onClick, active, soon, children }: {
   const attrs = {
     className: cls, style,
     ...(soon ? { "data-soon": soon.state } : {}),
-    ...(lit && soon?.note ? { title: soon.note } : {}),
+    ...((lit || soon?.state === "no-feed") && soon?.note
+      ? { title: soon.note } : {}),
   };
   return onClick
     ? <button onClick={onClick} {...attrs}>{body}</button>

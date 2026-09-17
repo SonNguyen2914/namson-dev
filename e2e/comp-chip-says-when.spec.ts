@@ -1,4 +1,8 @@
 import { expect, test } from "@playwright/test";
+import { BACKEND_URL } from "./backend";
+import { EXPECT_LIVE_PAGES } from "./competition-pages";
+import { LIVE_COMPETITIONS } from "../src/components/CompRail";
+import { NO_FEED_NOTE } from "../src/lib/compSoon";
 
 // THE NAV CHIP THAT GLOWS WHEN A COMPETITION PLAYS TODAY OR TOMORROW.
 //
@@ -36,8 +40,22 @@ import { expect, test } from "@playwright/test";
 //  7. IT IS ON EVERY PAGE THAT DRAWS THE RAIL. The rail was two identical
 //     literals in two pages; the day one of them gained a glow, the other
 //     had a chip that could not.
+//  8. IT IS ON EVERY CHIP IN THE RAIL. Added 2026-09-15, and it is the
+//     reason the seven above shipped covering one competition. This file
+//     typed `ucl` nine times: the href, the fixture route, the
+//     accessible name. So when the EFL Cup joined the rail that day it
+//     joined a guard that could not see it — and the thing it would have
+//     caught was live on every page of the site, a chip firing a request
+//     that could only 404 and rendering the answer as an ordinary chip
+//     forever. Now the rail's OWN registry is the loop, and its length
+//     is asserted: a competition cannot join the top bar without joining
+//     this file.
 //
-// Hermetic: every payload is served by page.route.
+// Hermetic for behaviour: every payload is served by page.route. ONE
+// test is deliberately not — the declaration pin at the bottom reads the
+// real backend's competition registry, because the fact it checks lives
+// in the other repository and a mock of it would only ever agree with
+// itself.
 
 const json = (body: unknown, status = 200) => ({
   status, contentType: "application/json", body: JSON.stringify(body),
@@ -84,9 +102,38 @@ const fixture = (id: number, day: string) => ({
 });
 
 const feed = (...days: string[]) => ({
-  competition: "ucl", display: "UEFA Champions League",
+  competition: "any", display: "whatever the registry named",
   fixtures: days.map((d, i) => fixture(1000 + i, d)),
 });
+
+/* ─── THE RAIL'S OWN REGISTRY IS THE LOOP ────────────────────────────
+   Split by the ONE property that decides what a chip can ever say: does
+   `/api/comp/{key}/fixtures` exist for it. A competition with a viewer
+   can glow and every test in sections 1-7 applies to it; a competition
+   without one can never glow, and its correct behaviour is a different
+   set of claims entirely (section 8).
+
+   BOTH HALVES ARE COUNTED, not just the total. A registry that grew by
+   one viewerless competition while losing a viewer-backed one would
+   keep the total and silently empty the glow tests — which is the
+   La Liga failure with the arithmetic done for it. */
+const GLOWING = LIVE_COMPETITIONS.filter((c) => c.viewer);
+const NO_FEED = LIVE_COMPETITIONS.filter((c) => !c.viewer);
+
+test("every competition in the rail is covered by this file, and counted",
+  async () => {
+    expect(LIVE_COMPETITIONS.length,
+      "the chip rail changed. Every test below runs per competition, so "
+      + "read what the suite now says about the new one and then move "
+      + "EXPECT_LIVE_PAGES in e2e/competition-pages.ts")
+      .toBe(EXPECT_LIVE_PAGES);
+    expect(GLOWING.length + NO_FEED.length).toBe(LIVE_COMPETITIONS.length);
+    // neither half may empty out and leave its section vacuous
+    expect(GLOWING.length, "no competition can glow — sections 1-7 assert "
+      + "nothing").toBeGreaterThan(0);
+    expect(NO_FEED.length, "no viewerless competition — section 8 asserts "
+      + "nothing").toBeGreaterThan(0);
+  });
 
 /* The board's own payloads, cut to the bone: this file is about the top
    bar, and a real board below it would only add requests that can fail
@@ -105,11 +152,15 @@ const REVIEW = {
   leagues: {}, finished: [], refusals: [],
 };
 
-/** `comp` is the fixture feed, or a status code to fail it with. */
+/** `comp` is the fixture feed, or a status code to fail it with. `key`
+ *  is the competition whose feed is being served — it comes from the
+ *  registry, never typed, so the route the app asks for and the route
+ *  this mock answers cannot drift apart. */
 async function open(
   page: import("@playwright/test").Page,
   comp: unknown | number,
   where = "/bet-suggester",
+  key = GLOWING[0].key,
 ) {
   /* ORDER MATTERS AND IT IS BACKWARDS. Playwright tries the MOST
      RECENTLY registered handler first, so the catch-all goes on FIRST
@@ -119,7 +170,7 @@ async function open(
   await page.route("**/api/**", (r) => r.fulfill(json({}, 503)));
   await page.route("**/api/picker/board**", (r) => r.fulfill(json(BOARD)));
   await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW)));
-  await page.route("**/api/comp/ucl/fixtures**", (r) =>
+  await page.route(`**/api/comp/${key}/fixtures**`, (r) =>
     typeof comp === "number"
       ? r.fulfill(json({ detail: "upstream unavailable" }, comp))
       : r.fulfill(json(comp)));
