@@ -120,8 +120,23 @@ const STRADDLE_AXES = {
   def: { ...AXES.def, fav: side(2, 0.4516, 0.42, [4, 5], 4) },
 } as const;
 
+/* THE BLOCK AS THE WIRE SHAPES IT, not as `RowField` declares it.
+   `stages.field_block` emits `axes_measured`, `basis`, `clubs` and
+   `field_basis` too, and the card reads none of them — but a fixture
+   written in the TYPE's vocabulary rather than the payload's is the
+   defect `test-fixtures-speak-the-providers-language` records, so the
+   keys are carried here. Checked against a real `ucl` block rather than
+   copied from the interface. */
 const FIELD = (axes: unknown = AXES) => ({
   competition: "ucl", size: 36, axes, shape: "CLEAN",
+  axes_measured: ["ovr", "atk", "def"],
+  clubs: { fav: "Feyenoord", opp: "Barcelona" },
+  basis: "rated on the competition's own FIELD — its whole entrant set "
+    + "on one cross-league scale — and not on either club's domestic "
+    + "league.",
+  field_basis: "the 36 entrants of the 2026-27 league phase, on three "
+    + "axes: overall from the Elo measurement, attack and defence from "
+    + "the goals measurement.",
 });
 
 const meta = { src: "current", min_current_gp: 4, clubs: 36, kind: "cup",
@@ -244,6 +259,17 @@ test("the fixture speaks the wire's language, not the card's",
     // and the block the board sends carries no prose of its own — the
     // storage rule, checked on the fixture that claims to be the wire
     expect(JSON.stringify(FIELD())).not.toContain("REFUSED BY THE");
+    // THE SIDE IS THE WIRE'S SIDE, key for key. Read off a real `ucl`
+    // block from `stages.field_block`, so a fixture that quietly grew
+    // a key the backend does not send — `floor_note` above all — fails
+    // here rather than certifying a card against a payload that cannot
+    // occur.
+    expect(Object.keys(AXES.ovr.fav).sort()).toEqual([
+      "below_floor", "half_width_95", "interval", "rank", "straddles",
+      "tier", "tier_set", "value",
+    ]);
+    expect(Object.keys(AXES.ovr).sort()).toEqual(
+      ["fav", "label", "opp", "tier_gap", "unit"]);
   });
 
 // ──────────────────────────── 1. the board-fed dagger says why at all ─
