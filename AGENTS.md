@@ -77,9 +77,33 @@ and honours `SUGGESTER_BACKEND_URL`.
 **But Playwright defaults to production too.** `playwright.config.ts`
 falls back to the production Railway URL when `SUGGESTER_BACKEND_URL` is
 unset, so the bare command is not the local-only run it reads as. The
-requests are read-only GETs against the public shadow API — nothing is
-written — but the results depend on a live service and on volatile data,
-which is precisely the rot §6 below warns about.
+results depend on a live service and on volatile data, which is
+precisely the rot §6 below warns about.
+
+**And one of those GETs was never a read.** `GET /api/picker/board`
+calls `snapshots.capture_rows` on every assembly: it freezes a
+pre-kickoff row for every fixture on the board, first-write-wins, on a
+table with no delete path. A capture taken at the wrong moment is that
+fixture's pre-kickoff read for ever — three stray requests once froze
+Champions League matchday 2 twenty-nine days out and it took a migration
+to correct. Measured on 2026-09-17, three spec files alone sent 23 of
+them per run.
+
+So the suite no longer talks to the backend directly. It talks to
+`e2e/board-holdout.mjs`, which forwards every path upstream untouched
+and refuses that one. Nothing about live reads changes; the one route
+that writes cannot be reached. `e2e/the-board-writes-nothing.spec.ts`
+probes on every run that the app is actually wired to the hold-out —
+a stale `npm start` adopted by `reuseExistingServer` keeps the backend
+it booted with, and that is the way this protection fails silently.
+
+**Pointing CI at a non-production backend instead was considered and
+is not the answer.** There is no staging Railway service, and the
+specs that earn their keep against a live backend — `proxy-allowlists`,
+the "unmocked on purpose" proxy tests — are checking the route table of
+the *deployed* server, which is exactly what a local stand-in would
+stop testing. Holding out the single writing route keeps that value and
+removes the harm.
 
 Set it explicitly unless you mean to smoke-test live:
 
@@ -93,9 +117,16 @@ live backend — `decision-safety`, `lineups` and `scouting-consistency`
 — and each skips with a stated reason when the backend it reaches lacks
 the data. `picker.spec.ts` and `asean.spec.ts` also carry tests named
 "unmocked on purpose" that exercise the real proxy allowlist and
-tolerate any backend answer. That list is as of 2026-09-03; the durable
-check is `grep -L 'page.route' e2e/*.spec.ts`, which names the specs
-with no mocks at all.
+tolerate any backend answer.
+
+`grep -L 'page.route' e2e/*.spec.ts` used to be described here as the
+durable check. It is a useful glance and it is **not** a check: it
+names files with no mocks *at all*, so it misses the case that matters
+— a spec that mocks nine endpoints and not the tenth — and it reports
+files that delegate their mocking to a helper (`serveEight`) as if they
+mocked nothing. The durable check is `e2e/the-board-writes-nothing.spec.ts`,
+which parses the specs, follows the calls into helper modules, and
+reports per test.
 
 ## 5. Hydration
 

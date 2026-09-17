@@ -61,6 +61,14 @@ const BOARDS = [
   { path: "/bet-suggester/ucl", ask: "ucl" },
 ] as const;
 
+// board-live-read: this test's whole claim is that the BUILT app and the
+// real proxy route still ask for a board on mount — a page.route mock
+// would answer that request on the app's behalf and turn the assertion
+// into a tautology. The read is safe because e2e/board-holdout.mjs
+// refuses it before it can reach a backend and write a snapshot; what
+// arrives is the hold-out's named 503, which is exactly the non-2xx case
+// this file already says it must render as a NAMED refusal rather than a
+// skeleton.
 for (const { path, ask } of BOARDS) {
   test(`${path} asks for its board ON MOUNT and settles — nothing touched`,
     async ({ page }) => {

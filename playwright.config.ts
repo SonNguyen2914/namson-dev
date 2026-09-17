@@ -1,5 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
-import { BACKEND_URL as BACKEND } from "./e2e/backend";
+import {
+  BACKEND_URL as BACKEND, UPSTREAM_URL, HOLDOUT_PORT, HOLDOUT_URL,
+  BOARD_HOLDOUT,
+} from "./e2e/backend";
 
 // V8.1 evaluation Phase 9/10 — decision-safety E2E. Builds and starts
 // the app, proxying to the live shadow backend (read-only GETs), and
@@ -55,11 +58,45 @@ export default defineConfig({
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
   ],
-  webServer: {
-    command: `npm run start -- --port ${PORT}`,
-    url: `http://localhost:${PORT}`,
-    timeout: 120_000,
-    reuseExistingServer: !process.env.CI,
-    env: { SUGGESTER_BACKEND_URL: BACKEND },
-  },
+  // TWO SERVERS, AND THE ORDER MATTERS. Playwright starts these in the
+  // listed order and waits for each `url` to answer, so the hold-out is
+  // listening before the app that will be pointed at it ever boots.
+  //
+  // THE HOLD-OUT IS NOT AN OPTIMISATION. `GET /api/picker/board` WRITES
+  // — it freezes a permanent, first-write-wins pre-kickoff snapshot for
+  // every fixture on the board, on a table with no delete path. Measured
+  // on 2026-09-17, three spec files alone sent 23 of them in one run,
+  // against production, on every PR. e2e/board-holdout.mjs forwards
+  // everything else untouched and refuses that one path. See its header.
+  webServer: [
+    ...(BOARD_HOLDOUT ? [{
+      command: "node e2e/board-holdout.mjs",
+      url: `${HOLDOUT_URL}/__holdout/ledger`,
+      timeout: 30_000,
+      // NEVER REUSED, EVEN LOCALLY. A hold-out already on the port was
+      // started with some other upstream, and adopting it would point
+      // this run at a backend nobody chose — the same trap the app
+      // server's comment below is about, on the one server whose whole
+      // job is to be trusted.
+      reuseExistingServer: false,
+      env: {
+        SUGGESTER_E2E_UPSTREAM: UPSTREAM_URL,
+        SUGGESTER_E2E_HOLDOUT_PORT: String(HOLDOUT_PORT),
+      },
+    }] : []),
+    {
+      command: `npm run start -- --port ${PORT}`,
+      url: `http://localhost:${PORT}`,
+      timeout: 120_000,
+      // A SERVER ADOPTED HERE MAY BE POINTED ANYWHERE. `reuseExistingServer`
+      // keeps whatever `SUGGESTER_BACKEND_URL` the running process booted
+      // with, which for any server started before 2026-09-17 is production
+      // DIRECT — hold-out bypassed, board GETs landing in the store. That
+      // is not left to discipline: `the-board-writes-nothing.spec.ts`
+      // probes the app for the hold-out's sentinel on every run and fails
+      // when the app is talking to anything else.
+      reuseExistingServer: !process.env.CI,
+      env: { SUGGESTER_BACKEND_URL: BACKEND },
+    },
+  ],
 });
