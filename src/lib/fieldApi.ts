@@ -17,7 +17,8 @@
 // nothing.
 
 import type {
-  BoardRow, FieldSide, RowField,
+  BoardRow, FieldAxisKey, FieldBlockLike, FieldSide, RowField,
+  RowFieldPartial,
 } from "./pickerApi";
 
 /** One club on one axis. */
@@ -125,8 +126,30 @@ export interface Ratings {
 
 /** The reading order of the axes. Overall first because it is the one
  *  ladder a reader already has a question about; attack and defence
- *  after it because they are the pair that CROSS in a fixture. */
-export const AXIS_ORDER = ["ovr", "atk", "def"] as const;
+ *  after it because they are the pair that CROSS in a fixture.
+ *
+ *  `satisfies` RATHER THAN A BARE `as const`: this list is the READING
+ *  ORDER, `pickerApi.FieldAxisKey` is the SET, they are maintained in
+ *  two files, and an order naming an axis the set has never heard of
+ *  would put a column on a card that no block can fill. The tuple type
+ *  survives, so every `typeof AXIS_ORDER[number]` is unchanged. */
+export const AXIS_ORDER = ["ovr", "atk", "def"] as const satisfies
+  readonly FieldAxisKey[];
+
+/** THE AXES A BLOCK ACTUALLY CARRIES, in reading order.
+ *
+ *  THE ONE PLACE A RENDERER ASKS "WHICH AXES ARE THERE", and it asks
+ *  the BLOCK rather than assuming AXIS_ORDER. `field` carries all three
+ *  and gets all three back, so every surface that had walked the order
+ *  directly renders exactly what it rendered before; `field_partial`
+ *  carries fewer and gets fewer, and the axes nobody measured are drawn
+ *  NOWHERE rather than drawn empty. Those two are different facts — a
+ *  club with no row on a measured axis is "no band", an axis nobody
+ *  measured is not a cell at all — and this is the line that keeps them
+ *  apart. */
+export function axesPresent(block: FieldBlockLike): FieldAxisKey[] {
+  return AXIS_ORDER.filter((k) => block.axes[k] != null);
+}
 
 /** THE THREE STATES OF A FIELD READ, kept apart because they are three
  *  different facts and only one of them is a blank space.
@@ -352,6 +375,36 @@ export function fieldFor(
     axes,
     shape: null,
   };
+}
+
+/** THE ROW'S PARTIAL FIELD READING — `field_partial`, and only where
+ *  there is no whole one.
+ *
+ *  THE TWO KEYS ARE NOT MERGED, HERE OR ANYWHERE. This does not fold
+ *  `field_partial` into a `RowField`, does not pad it with nulls and
+ *  does not hand a caller one value that has forgotten which key it
+ *  came off — it answers a different question from `fieldFor` and
+ *  returns a differently-typed object, whose `axes` is PARTIAL. See
+ *  `RowFieldPartial.why_not_field`, which is the backend's own account
+ *  of why the key is separate.
+ *
+ *  THE WHOLE READING WINS, and the two are never both. The backend
+ *  picks the key off the block's own axis set — three axes go under
+ *  `field`, fewer under `field_partial` — so a row carrying both is a
+ *  state the emitter cannot reach. It is ordered anyway rather than
+ *  asserted: if one ever arrived, the card would draw the three-axis
+ *  block, which is the one every other mark on it was written for.
+ *
+ *  NO RATINGS JOIN. `fieldFor` can build a block out of the field
+ *  ENDPOINT when the row carries none; there is no such fallback here,
+ *  because that endpoint answers with a whole field or with none and
+ *  the partial reading exists only as a row key. */
+export function partialFieldFor(
+  row: Pick<BoardRow, "field_partial">,
+  whole: RowField | null | undefined,
+): RowFieldPartial | null {
+  if (whole) return null;
+  return row.field_partial ?? null;
 }
 
 /** THE COMPETITION'S FIELD, FETCHED — with every failure NAMED.

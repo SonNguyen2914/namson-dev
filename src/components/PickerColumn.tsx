@@ -30,14 +30,16 @@ import Link from "next/link";
 import { ReactNode, useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  AXIS_ORDER, Axis, FieldRead, Ratings, fieldFor,
+  AXIS_ORDER, Axis, FieldRead, Ratings, axesPresent, fieldFor,
+  partialFieldFor,
 } from "../lib/fieldApi";
 import { dayLabel, fmtDate, localDay } from "../lib/matchday";
 import {
   ProviderFailure, announceFailure, failureSentence, readFailure,
 } from "../lib/providerFailure";
 import {
-  BoardRefusal, BoardRow, LeagueMeta, RatePair, RowField, SEASON_BLEND_K,
+  BoardRefusal, BoardRow, FieldBlockLike, LeagueMeta, RatePair, RowField,
+  RowFieldPartial, SEASON_BLEND_K,
   columnsOf, homeBadge, leagueLabel, rowHref, rowIsInPlay,
   seasonDisagreement,
   seasonSpan, seasonSpanLabel, venueDisagreement,
@@ -261,14 +263,23 @@ function OwnRates({ gap, pair, metric }: {
  *  instrument draws can never come from different tables.
  *
  *  `n` IS NULL WHEN THERE IS NO SHARED LADDER — a cross-league tie with
- *  no field — and that null is the dumbbell's refusal, below. */
-function rankPair(row: BoardRow, field: RowField | null | undefined,
+ *  no field — and that null is the dumbbell's refusal, below.
+ *
+ *  IT ASKS THE BLOCK FOR ITS OVERALL AXIS RATHER THAN ASSUMING ONE
+ *  (backend #141, 2026-09-15). `field.axes.ovr.fav.rank` was indexed
+ *  unguarded, and a field may now carry fewer than three axes; the
+ *  MLS + Liga MX field carries `ovr` and nothing else, so this reads
+ *  it, but a field measured on the GOALS axes alone would have no
+ *  overall rank to pair and must fall back to the two league positions
+ *  rather than throw inside the card. */
+function rankPair(row: BoardRow, field: FieldBlockLike | null | undefined,
                   clubCount: number): {
   fav: number; opp: number; n: number | null; basis: "field" | "league";
   title: string;
 } {
-  if (field) {
-    const fav = field.axes.ovr.fav.rank, opp = field.axes.ovr.opp.rank;
+  const ovr = field?.axes.ovr;
+  if (field && ovr) {
+    const fav = ovr.fav.rank, opp = ovr.opp.rank;
     const n = Math.max(field.size, fav, opp, 2);
     return { fav, opp, n, basis: "field",
       title: `ranks in this competition's own field of ${n} — favourite `
@@ -490,7 +501,7 @@ export function seasonDeparture(
  *  RowCard's output is unchanged — which e2e/picker.spec.ts and
  *  e2e/picker-blend-cup.spec.ts prove, unedited, on every run. */
 export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
-                         field }: {
+                         field, partial }: {
   row: BoardRow; modeId: SortModeId; clubCount: number;
   /** WHERE THESE TWO CLUBS STAND IN THE COMPETITION'S OWN FIELD, when
    *  one has been measured — see pickerApi.RowField and fieldApi.fieldFor.
@@ -500,6 +511,12 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
    *  the field's three rank pairs. Absent everywhere else, and the read
    *  below is then what it has always been. */
   field?: RowField | null;
+  /** THE SAME STANDING WHERE THE FIELD IS MEASURED ON FEWER AXES — see
+   *  pickerApi.RowFieldPartial and fieldApi.partialFieldFor. A separate
+   *  prop because it is a separate key: the axes it carries are drawn
+   *  exactly as `field`'s are and the axes it does not carry are drawn
+   *  nowhere, which is a distinction one merged value could not keep. */
+  partial?: RowFieldPartial | null;
   /** what this row's COLUMN header already states — see columnNotes. A
    *  note whose text the header carries is not drawn again down here.
    *  Absent off the board (LiveCard), where there is no header. */
@@ -531,7 +548,7 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
   const badge = homeBadge(row);
   const anchor = anchorFor(row, modeId);
   const alt = seasonDisagreement(row);
-  const ranks = rankPair(row, field, clubCount);
+  const ranks = rankPair(row, field ?? partial, clubCount);
   /* THE VENUE RULE'S DISAGREEMENT, ON THE BADGE THAT IS ABOUT THE VENUE
      (2026-09-08). The backend has carried `venue_favourite` on every
      rated row since 2026-09-03 so the disagreement is countable before
@@ -756,7 +773,7 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
           with the finished tail (components/PickerRead.tsx), so a read
           below the divider is THE SAME READ as one above it. */}
       <div className="mt-3">
-        <TierGaps read={row} dense={dense} field={field} />
+        <TierGaps read={row} dense={dense} field={field} partial={partial} />
       </div>
 
       {/* A WITHHELD GAP SAYS WHY, in the backend's own words — HERE only
@@ -796,6 +813,20 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
      hold — and in every one of those the card draws its league read
      whole, exactly as it did before this key existed. */
   const fld = fieldFor(row, field?.error ? null : field?.data);
+  /* THE SAME STANDING WHERE THE FIELD MEASURES FEWER AXES — its own
+     row key, kept its own thing (backend #141, 2026-09-15). The MLS +
+     Liga MX field is measured on Elo alone, so the Campeones Cup and
+     Leagues Cup fixtures that ride in the MLS and Liga MX columns
+     carry `field_partial` and never `field`. Null for every card that
+     has a whole field and for every card that has none. */
+  const partial = partialFieldFor(row, fld);
+  /* WHAT THE CARD IS ACTUALLY DRAWING FROM, for the two attributes
+     below and for nothing else: they say WHICH LADDER, and a card
+     reading one axis of a field is still reading that field. Which of
+     the two keys it came off is `data-field-axes`'s job — three axes
+     is a whole field, fewer is a partial one — so the guard reads the
+     axis list rather than inferring it from a competition name. */
+  const blk: FieldBlockLike | null = fld ?? partial;
   const alt = seasonDisagreement(row);
   const departure = seasonDeparture(row, colSrc, alt);
   /* WHICH RULE NAMED THE FAVOURITE THIS CARD IS SIGNED FROM. "rank" on
@@ -826,8 +857,13 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
          reads it, and a card with no field carries no such attribute at
          all rather than one asserting a league basis it shares with
          every other card on the board. */
-      data-field={fld ? (fld.competition ?? "field") : undefined}
-      data-field-size={fld ? fld.size : undefined}
+      data-field={blk ? (blk.competition ?? "field") : undefined}
+      data-field-size={blk ? blk.size : undefined}
+      /* THE AXES THIS CARD'S FIELD ACTUALLY HOLDS. Absent with no
+         field; `ovr,atk,def` on a whole one; fewer where nobody has
+         measured the rest, which is the fact that decides how many
+         tier cells the card draws at all. */
+      data-field-axes={blk ? axesPresent(blk).join(",") : undefined}
       className={`rounded-xl border transition-colors bg-gradient-to-b from-elev2/60 to-elev/40 ${
         dense ? "p-4 md:p-3" : "p-4"} ${
         rank === 1
@@ -913,7 +949,7 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
       </div>
 
       <RowRead row={row} modeId={modeId} clubCount={clubCount}
-        dense={dense} hoisted={hoisted} field={fld} />
+        dense={dense} hoisted={hoisted} field={fld} partial={partial} />
 
       <div className="mt-3 border-t border-line pt-3">
         <KalshiCell quote={row.kalshi} />
