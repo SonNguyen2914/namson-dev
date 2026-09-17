@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { routeEight } from "./eight-columns";
 
 // The five viewer competitions the operator retired on 2026-08-24 —
 // Conference League (ecl), Europa League (uel), Brasileirão, Liga
@@ -69,6 +70,14 @@ const GONE_DETAIL =
 
 test("the board offers none of the five, and still offers the three",
   async ({ page }) => {
+    // A RECORDED BOARD, FOR THE ASSERTION'S SAKE AS MUCH AS THE STORE'S.
+    // Every claim below is `toHaveCount(0)` — which a page that failed
+    // to render passes perfectly. Unmocked, this read reached a live
+    // backend (a board assembly WRITES a permanent pre-kickoff snapshot;
+    // see e2e/board-holdout.mjs) and a slow or refusing one would have
+    // turned "the rail does not offer these five" into "there is no
+    // rail". The rail is drawn from a payload this file controls.
+    await routeEight(page);
     await page.goto("/bet-suggester");
     for (const k of RETIRED) {
       await expect(

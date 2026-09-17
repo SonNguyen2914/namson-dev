@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { routeEight } from "./eight-columns";
 import {
   ARCHIVED_COUNT, COMPETITION_PAGES, COMPETITIONS, LIVE_COMPETITION_COUNT,
 } from "./liveCompetitions";
@@ -77,6 +78,14 @@ test("no route scrolls sideways, hides a sticky header, or cuts text",
   // and the budget scales with the route list rather than being a
   // number that silently stops covering it
   test.setTimeout(20_000 * ROUTES.length);
+  // THE LANDING BOARD IS SERVED FROM A RECORDING, and that makes this
+  // sweep stricter rather than weaker. The defect this test exists for
+  // is "four league columns collapsed to 0px whenever a fifth
+  // competition appeared" — a geometry that only exists when the board
+  // is FULL. Live, this route's layout depended on whatever fixtures
+  // happened to be on today's slate, and an unmocked read is also a
+  // board assembly, which writes a permanent snapshot upstream.
+  await routeEight(page);
   const findings: string[] = [];
   const unreachable: string[] = [];
   for (const route of ROUTES) {
