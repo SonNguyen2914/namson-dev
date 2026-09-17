@@ -27,7 +27,9 @@
 // NOTHING HERE IS A RECOMMENDATION. The ordering says where to look.
 
 import { useState } from "react";
-import { AXIS_ORDER, Axis, Ratings } from "../lib/fieldApi";
+import {
+  AXIS_ORDER, Axis, axisDecimals, Ratings, unitLabel,
+} from "../lib/fieldApi";
 import { failureSentence, readFailure } from "../lib/providerFailure";
 
 /* THE SHAPE OF A FIELD IS NOT THIS COMPONENT'S PROPERTY. It moved to
@@ -190,7 +192,11 @@ function AxisTable({ a }: { a: Axis }) {
   const LO = Math.min(lo0 - pad, ...a.rows.map((r) => r.interval[0]));
   const HI = Math.max(hi0 + pad, ...a.rows.map((r) => r.interval[1]));
   const pc = (v: number) => ((v - LO) / (HI - LO)) * 100;
-  const dec = a.unit === "elo" ? 0 : 2;
+  /* HOW THIS SCALE IS WRITTEN — asked of lib/fieldApi rather than
+     decided here since 2026-09-16, because the board card now draws the
+     same figure and the two must not round it differently. This page is
+     where the rule came from; it is no longer where it lives. */
+  const dec = axisDecimals(a.unit);
 
   return (
     <div data-testid="axis-table" data-axis={a.axis}>
@@ -202,7 +208,7 @@ function AxisTable({ a }: { a: Axis }) {
         <table className="w-full min-w-[620px] border-collapse text-[13px]">
           <thead>
             <tr className="bg-elev2">
-              {["#", "club", "", a.unit === "elo" ? "elo" : "log-goals",
+              {["#", "club", "", unitLabel(a.unit) ?? a.unit,
                 RATE_LABEL[a.axis], "tier"].map((h, i) => (
                 <th key={i}
                   className="border-b border-line px-3 py-2 text-left font-mono text-[9px] uppercase tracking-[0.12em] font-medium text-ink-faint">

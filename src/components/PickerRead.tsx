@@ -20,10 +20,14 @@
 //    one blank.
 import { useEffect, useId, useRef, useState } from "react";
 import {
-  BlendWeights, BoardRowLive, KalshiQuote, RowField, Shape, THIN_ASK_SIZE,
+  BlendWeights, BoardRowLive, FieldAxis, KalshiQuote, RowField, Shape,
+  THIN_ASK_SIZE,
   WIDE_SPREAD_C, pctThisSeason, weightIsCurrent,
 } from "../lib/pickerApi";
-import { AXIS_ORDER, tierSet } from "../lib/fieldApi";
+import {
+  AXIS_ORDER, axisDecimals, measurementOf, tierSet, unitLabel,
+  writeMeasurement,
+} from "../lib/fieldApi";
 import { fmtDate } from "../lib/matchday";
 import { readMatchClock } from "../lib/suggesterApi";
 
@@ -629,6 +633,63 @@ function FieldRanks({ field }: { field: RowField }) {
  *  popover is the same shapeRead(), word for word — it just stops
  *  costing 70px on every card. Shared by the board card and the
  *  finished tail, so both surfaces converge together. */
+/** ONE CLUB'S MEASUREMENT, PRESENT — the type `measurementOf` hands
+ *  back when it has both halves. */
+type Measured = NonNullable<ReturnType<typeof measurementOf>>;
+
+/** BOTH SIDES' MEASUREMENTS, OR NEITHER — never one of the two.
+ *
+ *  The trio's whole job is to put two clubs beside each other, and half
+ *  a comparison is worse than none: a lone `1964` under a `1v3` reads
+ *  as a fact about the pair when it is a fact about one club. The
+ *  backend emits the two together or refuses, so a payload with one is
+ *  one this frontend does not understand — and it degrades to the card
+ *  that has no numbers rather than to a card with half of them.
+ *
+ *  `measurementOf` is where the value-and-half-width check itself
+ *  lives; this only says that a PAIR is needed. */
+function bothMeasured(side: FieldAxis | undefined) {
+  if (!side) return null;
+  const fav = measurementOf(side.fav), opp = measurementOf(side.opp);
+  return fav && opp ? { fav, opp } : null;
+}
+
+/** THE WHOLE READING OF ONE AXIS, FOR THE HOVER — the two figures, the
+ *  scale they are on, and each one's 95% interval in full.
+ *
+ *  WHY THE INTERVAL IS SPELLED OUT HERE AND NOT ON THE FACE. The face
+ *  carries `value±half_width`, which is the same fact written shorter;
+ *  this is where there is room to write the bounds the backend actually
+ *  sent, and to NAME the scale, which is the one thing the digits
+ *  cannot say for themselves. `1964` and `1.14` sit six pixels apart on
+ *  one card and are not comparable quantities.
+ *
+ *  IT SHOWS; IT DOES NOT DECIDE. No sentence here tells anybody what to
+ *  do about the numbers. */
+function measureTitle(
+  axis: string,
+  side: FieldAxis | undefined,
+  m: { fav: Measured; opp: Measured },
+): string {
+  const unit = unitLabel(side?.unit);
+  /* THE SAME ROUNDING AS THE FACE AND AS THE FIELD'S OWN PAGE. Written
+     out longhand here it would be a third copy of a rule that exists
+     precisely because there were two. */
+  const d = axisDecimals(side?.unit);
+  const line = (which: "fav" | "opp", mm: Measured) =>
+    `${which === "fav" ? "favourite" : "opponent"} `
+    + `${mm.value.toFixed(d)} ±${mm.half_width_95.toFixed(d)} `
+    + `(95%: ${mm.interval[0].toFixed(d)} to ${mm.interval[1].toFixed(d)})`;
+  const head = side?.label ?? axis;
+  return [
+    unit ? `${head}, in ${unit}` : head,
+    line("fav", m.fav),
+    line("opp", m.opp),
+    "the tier above is where the estimate falls; the width is what the"
+    + " evidence will not narrow",
+  ].filter(Boolean).join(" · ");
+}
+
 export function TierGaps({ read, dense = false, field }: {
   read: ReadLike;
   /** WHERE THESE TWO CLUBS STAND IN THE COMPETITION'S OWN FIELD, when
@@ -706,6 +767,7 @@ export function TierGaps({ read, dense = false, field }: {
           {AXIS_ORDER.map((lbl) => {
             const gap = r.tier_gaps[lbl], pr = r.tiers[lbl];
             const side = field?.axes[lbl];
+            const m = bothMeasured(side);
             return (
             <span key={lbl} data-tier={lbl} data-dissent={dissents(gap)}
               data-fav-set={side ? side.fav.tier_set.join(",") : undefined}
@@ -745,7 +807,15 @@ export function TierGaps({ read, dense = false, field }: {
                   fires on 36 of 36 there and 35 of 36 on atk.
                   Below-floor keeps its own sentence; a straddle gets
                   the plain one. */}
-              <span className="whitespace-nowrap">
+              {/* `data-tier-pair` MARKS THE PAIR ITSELF (2026-09-16).
+                  The cell used to hold one line, so a test could read
+                  the whole cell's text and get the pair; the
+                  measurement below is inside the same cell, and a
+                  whole-cell read now returns the pair AND the figures
+                  run together. The pair is what "one number per side"
+                  is a claim about, so it is addressable rather than
+                  inferred from everything the cell happens to contain. */}
+              <span data-tier-pair={lbl} className="whitespace-nowrap">
                 {pr[0]}{side && (side.fav.below_floor || side.fav.straddles)
                   && <FloorMark note={side.fav.below_floor
                     ? side.fav.floor_note
@@ -755,6 +825,46 @@ export function TierGaps({ read, dense = false, field }: {
                     ? side.opp.floor_note
                     : `the 95% interval touches bands ${side.opp.tier_set.join("·")} — ${side.opp.tier} is where the estimate falls, not a band the evidence will narrow to`} />}
               </span>
+              {/* THE NUMBER THE TIER ABOVE WAS READ OFF (2026-09-16).
+                  "they all have ovr, atk, def tiers but dont have the
+                  actual number to rank is not consistent and doesnt
+                  make sense" — the operator, comparing this card with
+                  the field's own page, which has always drawn the value
+                  and its half-width for these same clubs off this same
+                  fit. Two surfaces, one measurement, and only one of
+                  them showing it.
+                  STACKED, NOT PAIRED ACROSS. The tier line pairs with
+                  `v` because "1v3" is four characters; "1964±34v1727±93"
+                  is fifteen, and three of those side by side do not fit
+                  a card six abreast. Read down instead — favourite over
+                  opponent, the same order the line above reads across.
+                  THE HALF-WIDTH IS NOT OPTIONAL AND IT IS NOT A SECOND
+                  ELEMENT. `writeMeasurement` returns the pair as ONE
+                  string so no layout can wrap a value away from its
+                  band and leave a bare number on a line: that number
+                  would assert exactly the precision `tier_set` and the
+                  dagger above exist to refuse. On the two goals axes
+                  almost every interval crosses a cut, so the width IS
+                  the reading.
+                  ABSENT, NOT ZERO. A board from a backend that predates
+                  the change carries no measurement, `measurementOf`
+                  returns null for both sides, and these lines are
+                  simply not drawn — the card is the one it was before.
+                  Never a 0, never a dash where a rating goes; the
+                  absence is NAMED in the `#` panel, which is where
+                  there is room for a sentence. */}
+              {m && (
+                <span data-measure={lbl} data-unit={side?.unit ?? ""}
+                  title={measureTitle(lbl, side, m)}
+                  className="mt-[1px] flex flex-col items-center gap-[1px] text-[8.5px] leading-[1.25] text-ink-faint">
+                  <span data-measure-side="fav" className="whitespace-nowrap">
+                    {writeMeasurement(m.fav, side?.unit)}
+                  </span>
+                  <span data-measure-side="opp" className="whitespace-nowrap">
+                    {writeMeasurement(m.opp, side?.unit)}
+                  </span>
+                </span>
+              )}
             </span>
             );
           })}

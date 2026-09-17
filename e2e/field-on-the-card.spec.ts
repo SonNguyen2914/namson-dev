@@ -540,7 +540,13 @@ test("the trio draws ONE number per side — the point tier, with the set "
       axis: e.getAttribute("data-tier"),
       fav: e.getAttribute("data-fav-set"),
       opp: e.getAttribute("data-opp-set"),
-      text: (e.textContent || "").replace(/†/g, "").trim(),
+      /* THE PAIR, NOT THE WHOLE CELL (2026-09-16). The cell also
+         holds the figures the tier was read off now, so a whole-cell
+         read would return "ovr1v32080±401900±45" and this assertion
+         would be about the card's layout rather than about the trio
+         drawing one number per side. */
+      text: (e.querySelector("[data-tier-pair]")?.textContent || "")
+        .replace(/†/g, "").trim(),
     })));
     /* ONE NUMBER, AND IT IS THE POINT TIER — not the set joined, and
        not the set's first member either. The operator rejected the
@@ -554,7 +560,7 @@ test("the trio draws ONE number per side — the point tier, with the set "
        when that matters. */
     for (const t of drawn) {
       const row = FIELD_ROW(t.axis!);
-      expect(t.text).toBe(`${t.axis}${row.fav.tier}v${row.opp.tier}`);
+      expect(t.text).toBe(`${row.fav.tier}v${row.opp.tier}`);
       // the set survives as an attribute, whole
       expect((t.fav || "").split(",")).toEqual(row.fav.tier_set.map(String));
       expect((t.opp || "").split(",")).toEqual(row.opp.tier_set.map(String));
