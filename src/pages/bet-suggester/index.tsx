@@ -93,7 +93,7 @@ import { LeagueColumn, NotesPanel } from "../../components/PickerColumn";
 import {
   LeagueRibbon, VIEW, VIEW_NARROW, useBoardLoop,
 } from "../../components/LeagueRibbon";
-import { LeagueTabs } from "../../components/LeagueTabs";
+import { LeagueTabs, useLeagueSwipe } from "../../components/LeagueTabs";
 import { useBoardShape } from "../../lib/viewport";
 import {
   WatchDeclarationProvider, WatchPanel,
@@ -745,6 +745,24 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
    *  different problems. See components/LeagueTabs.tsx. */
   const showTabs = phone && boardReady && columnSlugs.length > 1;
   const showRibbon = !phone && windowed && boardReady;
+  /* AND THE BOARD BODY ANSWERS A SWIPE (operator, 2026-09-16, with the
+     loop: "add it"). The same step function the strip's arrow keys use,
+     so the two cannot come to disagree about which league is next, and
+     the same threshold `/bet-suggester/leagues` has read since it
+     shipped.
+     GATED ON `showTabs`, WHICH IS THE PHONE. The tablet and the desktop
+     steer with the ribbon over a track that reads horizontal drags
+     itself; a board-level swipe there would be a second switcher
+     competing with the scroll the reader actually started.
+     WHAT IT IS SPREAD ONTO is the track — the board's own body — and
+     not `<main>`: the sticky bar holding the strip is above `<main>`
+     and outside this subtree, so a tab press cannot reach here at all.
+     The hook refuses gestures that begin in the strip regardless (see
+     `carriesTheGesture`), because "the strip is somewhere else on the
+     page" is a layout fact and not a decision. */
+  const boardSwipe = useLeagueSwipe({
+    enabled: showTabs, slugs: columnSlugs, picked, onPick: setPicked,
+  });
   /** The declared set as one comparable string — the same key the loop
    *  itself is rebuilt on, so the rail's slots and the rotation can never
    *  be looking at two different boards. */
@@ -1607,6 +1625,8 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   which is also why the headers go back to sticking
                   inside their own column there. */}
               <div ref={trackRef} data-testid="board-track"
+                {...boardSwipe}
+                data-swipe={showTabs ? "league" : undefined}
                 style={{ ["--cols" as string]: String(drawnSlugs.length) }}
                 className={`grid grid-cols-1 gap-6 ${
                   windowed
