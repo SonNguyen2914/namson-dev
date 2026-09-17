@@ -319,6 +319,82 @@ test("the rank slot's hover says why there is no position, and says it "
     expect(title).toContain("rated");
   });
 
+test("EVERY SENTENCE IN THE PANEL IS THE PAYLOAD'S — the card authors no "
+  + "general rule of its own", async ({ page }) => {
+    /* THE DRIFT THIS PINS (2026-09-16). `REFUSAL_GENERAL` — a paragraph
+       written in PickerColumn.tsx — hung unconditionally as the FIRST
+       section of every refused card's panel, saying that a club with no
+       row in the table in use cannot be ranked against one that has a
+       row. On THIS card both clubs have rows: the refusal is that their
+       two orderings have never met. So a reader opening the i met a
+       false general sentence sitting directly above the true specific
+       one, which is worse than either alone.
+
+       The backend had already hit this and rewritten its own general
+       sentence on 2026-09-14 — `stages.REFUSAL_WITHHELD` now names BOTH
+       shapes and points at `case` — and that rewrite was on the payload,
+       in this same panel, the whole time. The second copy was the one
+       that rotted, so it was deleted rather than synced.
+
+       WHY THIS IS NOT A LIST OF BANNED PHRASES. A guard that named the
+       four words of the deleted paragraph would pass the day somebody
+       writes a fifth. This asserts the PROPERTY instead: every body in
+       the panel must be traceable to a string the backend sent. A
+       section the frontend composes fails here whatever it says. */
+    await open(page);
+    const card = cardIn(page, COLS[0]);
+    await card.getByTestId("refusal-why-open").click();
+    await expect(card.getByTestId("refusal-notes")).toBeVisible();
+
+    /* THE EMITTER'S SENTENCES, DERIVED FROM THE PAYLOAD — never typed
+       here, so a key the backend adds is inside this check on the day it
+       is written. */
+    const flat = (s: string) => s.replace(/\s+/g, " ").trim();
+    /* `flatMap` RATHER THAN A FILTERING TYPE PREDICATE: the fixture is
+       `as const`, so every one of these is its own string LITERAL type
+       and `s is string` widens the parameter, which tsc rejects
+       (TS2677). Widening to `unknown[]` first would work too and would
+       throw away the very thing the `as const` is for. */
+    const fromTheWire: string[] = ([
+      ROW.refusal.withheld,
+      ROW.refusal.why,
+      ...Object.values(ROW.refusal.absent ?? {}),
+      ...Object.values(ROW.refusal.detail ?? {}),
+      ...(ROW.reg_time_note ? [ROW.reg_time_note] : []),
+    ] as unknown[]).flatMap((s) =>
+      typeof s === "string" && s.length > 0 ? [flat(s)] : []);
+    expect(fromTheWire.length,
+      "the payload carries no prose — this check would pass over nothing")
+      .toBeGreaterThan(2);
+
+    /* ANCHORED ON A VISIBLE FIRST MATCH BEFORE `evaluateAll`, which does
+       NOT auto-wait. */
+    const bodies = card.locator(
+      '[data-testid="refusal-notes"] p[data-testid]');
+    await expect(bodies.first()).toBeVisible();
+    const drawn = (await bodies.evaluateAll(
+      (els) => els.map((e) => ({
+        id: e.getAttribute("data-testid") ?? "?",
+        text: e.textContent ?? "",
+      })))).map((b) => ({ id: b.id, text: flat(b.text) }));
+    expect(drawn.length, "the panel drew no sections at all")
+      .toBeGreaterThan(2);
+
+    for (const { id, text } of drawn) {
+      const traced = fromTheWire.some((w) => text.includes(w));
+      expect(traced,
+        `the "${id}" section is prose this frontend wrote, not the `
+        + `backend's: ${JSON.stringify(text.slice(0, 160))}. A second `
+        + "author for one fact is the author that rots — this card said "
+        + "one club had no row, over a refusal where both clubs have one.")
+        .toBe(true);
+    }
+
+    /* AND THE DELETED SECTION IS GONE BY NAME, so a reader of this file
+       can see WHICH copy went. `refusal-rule-general` was its id. */
+    await expect(card.getByTestId("refusal-rule-general")).toHaveCount(0);
+  });
+
 // ───────────── 4. the favourite is refused BY NAME, the rest is drawn ─
 
 test("no club is named favourite — the card says so in the backend's "

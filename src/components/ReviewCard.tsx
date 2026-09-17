@@ -42,7 +42,7 @@
 // how many of the finished fixtures had a frozen read, how many had to be
 // rebuilt, how many have none — and they are printed against their own n.
 import Link from "next/link";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { fmtDate } from "../lib/matchday";
 import { leagueLabel } from "../lib/pickerApi";
 import {
@@ -54,7 +54,9 @@ import {
   loadReviewOpen, loadReviewSort, reviewModeById, saveReviewOpen,
   saveReviewSort, sortReviewRows,
 } from "../lib/pickerReviewSort";
-import { failureSentence, readFailure } from "../lib/providerFailure";
+import {
+  announceFailure, failureSentence, readFailure,
+} from "../lib/providerFailure";
 import {
   KalshiCell, SeasonWeight, TierGaps, dec, sign,
 } from "./PickerRead";
@@ -350,8 +352,86 @@ function ReconBanner({ pre }: { pre: PreKickoff }) {
  *  so are the archive files that were looked at, because
  *  "fixture_not_in_archive" nearly always means "the archive stops before
  *  this match", which is fixable and invisible otherwise. */
+/** WHAT A REASON HAS TO LOOK LIKE TO BE PRINTED AS ONE.
+ *
+ *  `picker/replay.py` refuses a rebuild with a token out of its own
+ *  closed vocabulary — `fixture_not_in_archive`, `no_season_file`,
+ *  `archive_fixture_unsettled`, `no_prior_file`, `unknown_league`,
+ *  `unparseable_kickoff` — and `review.py` adds `cup_has_no_season_
+ *  archive`. Every one of those is lower-case, underscore-joined and
+ *  says something a reader can act on, and they are what this slot was
+ *  built to print.
+ *
+ *  A SHAPE, NOT A LIST, and deliberately. An enumeration here would be a
+ *  second copy of that module's vocabulary — the copy that rots — and it
+ *  would go stale the first time a reason is added, printing "unknown"
+ *  over a code the backend considers perfectly ordinary. A code added
+ *  upstream tomorrow is inside this test on the day it is written. */
+const LOOKS_LIKE_A_CODE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;
+
+/** THE ONE REASON THAT IS NOT A CODE, AND THE DEFECT IT CAUSED.
+ *
+ *  `replay.py:301` returns `f"table_error: {exc}"`. So when the archive's
+ *  own table cannot be built, a PYTHON EXCEPTION REPR arrives on this key
+ *  — and until 2026-09-16 this card drew it raw, in a mono span, on a
+ *  public page. That is the exact defect `picker/provider_failure.py`
+ *  exists to prevent, on the one surface it does not cover: the reader is
+ *  handed machine text they cannot act on, and whatever the exception's
+ *  message happens to carry — a path, a club name, a parser's internals —
+ *  is published with it.
+ *
+ *  THE BACKEND IS CLOSING IT AT SOURCE. This is the other half, and it is
+ *  needed either way: a fix that lives only in the emitter is undone by
+ *  the next emitter, and this card is deployed in front of backends older
+ *  than that fix.
+ *
+ *  THIS IS NOT "HIDE THE REASON", which would be the worse bug and the
+ *  one this repo keeps catching itself at. All three shapes are NAMED:
+ *
+ *    a code            printed, as it always was
+ *    not a code        replaced by a sentence written here, with the raw
+ *                      text sent to the console for the operator — the
+ *                      same division `announceFailure` already draws
+ *    nothing at all    said in words, never left as a sentence that
+ *                      simply stops
+ */
+function readUnavailable(raw: string | null | undefined): {
+  kind: "code" | "unnamed" | "absent"; said: string; raw: string | null;
+} {
+  const text = (raw ?? "").trim();
+  if (!text) {
+    return {
+      kind: "absent", raw: null,
+      said: "and no reason came back with it",
+    };
+  }
+  if (LOOKS_LIKE_A_CODE.test(text)) {
+    return { kind: "code", said: text, raw: text };
+  }
+  /* NOT THE PROVIDER VOCABULARY. `readFailure` would answer "no answer
+     we could read" here, which asserts a PROVIDER answered — and nothing
+     was asked of a provider: the archive is on disk and the failure is
+     ours. Naming the wrong actor is the same class of mistake as
+     printing the repr, so this sentence names what actually happened. */
+  return {
+    kind: "unnamed", raw: text,
+    said: "and the reason it came back with is not one this page can "
+      + "put into words — the backend's own text is in the browser "
+      + "console, where an operator reads it and a reader does not",
+  };
+}
+
 function NoReadBanner({ pre }: { pre: PreKickoff }) {
   const considered = pre.reconstructed_from?.considered ?? [];
+  const why = readUnavailable(pre.unavailable_reason);
+  /* THE RAW TEXT IS NOT THROWN AWAY — it is exactly what is needed when
+     a rebuild starts failing, and the answer to that is not to print it
+     on the page. Same treatment every other provider failure on this
+     surface gets. */
+  useEffect(() => {
+    if (why.kind !== "unnamed" || !why.raw) return;
+    announceFailure("a pre-kickoff rebuild refused", readFailure(why.raw));
+  }, [why.kind, why.raw]);
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
@@ -362,9 +442,15 @@ function NoReadBanner({ pre }: { pre: PreKickoff }) {
       </div>
       <p className="mt-2 text-[11px] leading-relaxed text-ink-low">
         Nothing was frozen for this fixture and the archive cannot rebuild
-        one{pre.unavailable_reason
-          ? <> — <span className="font-mono text-warn">{pre.unavailable_reason}</span></>
-          : ""}. The match is still here with its result and its tape; the
+        one{" "}
+        {/* THREE SHAPES, THREE READINGS, AND NONE OF THEM IS SILENCE.
+            `data-reason` says which one a guard is looking at, so the
+            set can be asserted rather than the words counted. */}
+        <span data-testid="unavailable-reason" data-reason={why.kind}
+          className={why.kind === "code"
+            ? "font-mono text-warn" : "text-ink-low"}>
+          {why.kind === "code" ? <>— {why.said}</> : why.said}
+        </span>. The match is still here with its result and its tape; the
         missing half is named rather than guessed at.
       </p>
       {considered.length > 0 && (

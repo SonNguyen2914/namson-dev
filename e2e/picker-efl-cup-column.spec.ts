@@ -19,18 +19,32 @@ import { RECORDED, rebased } from "./efl-cup-recorded";
 //     the brand gold is indistinguishable from the brand — which is
 //     exactly what shipped once already, as a colourless pill built by
 //     concatenating `var(--lg-<slug>)`.
-//  2. MOST OF ITS ROWS REFUSE, AND THE REFUSAL IS THE PRODUCT. Four
-//     English tiers with no measured scale between them means a
-//     cross-tier tie cannot name a favourite. That is the honest
-//     outcome and it must reach the reader as a REASON, never as an
-//     empty card and never as a zero.
+//  2. ITS CROSS-TIER TIES ARE RATED OFF A FIELD, AND UNTIL 2026-09-15
+//     THEY WERE NOT. RESTATED 2026-09-16 — this read "MOST OF ITS ROWS
+//     REFUSE, AND THE REFUSAL IS THE PRODUCT", because four English
+//     tiers had no measured scale between them and a cross-tier tie
+//     could name no favourite. Backend #151 (302a557) harvested the
+//     cup's own cross-tier ties as the bridges the Championship lacked,
+//     all four tiers cleared the placeability floor at two passes, and
+//     `cross_league_axes.NO_FIELD` is now `{}`. The fixture the first
+//     recording drew as a `no_shared_scale` refusal — Manchester City v
+//     Norwich City — now names a favourite with `fav_source: "field"`.
+//
+//     WHAT DID NOT CHANGE, and it is half of what this file guards: the
+//     COMPARISON GAPS ARE STILL WITHHELD. A field puts 94 clubs on one
+//     scale; it does not make two divisions' tables subtractable, and
+//     2.0 ppg in League Two is not 2.0 ppg in the Premier League. So
+//     `ppg_gap`, `gdg_gap` and `rank_gap` are null on a rated cross-tier
+//     row, and "missing is never zero, never a bare dash" now has to
+//     hold on a RATED card. That is where it is asserted below.
 //  3. THREE OF ITS FOUR TIERS HAVE NO PAGE AND MUST STILL BE NAMED.
 //     `rated_on` prints them, and without a `LEAGUE_LABEL` entry the
 //     chip reads "championship + leagueone + leaguetwo" — the raw-slug
 //     defect this repo has shipped twice.
 //
 // EVERY PAYLOAD HERE IS RECORDED, NEVER TYPED — see efl-cup-recorded.ts
-// for what that means and why this repo insists on it.
+// for what that means, why this repo insists on it, and why the
+// recording was RE-TAKEN rather than edited when the field landed.
 
 const json = (body: unknown, status = 200) => ({
   status, contentType: "application/json", body: JSON.stringify(body),
@@ -80,7 +94,7 @@ test("the page draws the EFL Cup column and nothing else", async ({ page }) => {
   await expect(page.locator('[data-testid="league-col"]')).toHaveCount(1);
 });
 
-test("the rated tie is drawn as a row and the unscaled ones as refusals",
+test("every fixture on the wire is drawn, and nothing is dropped",
   async ({ page }) => {
     await open(page);
     const c = col(page);
@@ -90,13 +104,82 @@ test("the rated tie is drawn as a row and the unscaled ones as refusals",
       .toHaveCount(RECORDED.rows.length);
     await expect(c.getByTestId("picker-refusal"))
       .toHaveCount(RECORDED.refusals.length);
-    /* AND THE PAIRING IS THE POINT. A column of nothing but refusals
-       would satisfy every "the refusal says why" assertion below while
-       proving the column cannot rate anything at all; a column of
-       nothing but rows would prove the refusals never render. This
-       payload carries both, and this asserts both are non-zero. */
-    expect(RECORDED.rows.length).toBeGreaterThan(0);
-    expect(RECORDED.refusals.length).toBeGreaterThan(0);
+    /* NON-VACUOUS: the column has to have drawn SOMETHING, or every
+       assertion below passes over an empty board. */
+    expect(RECORDED.rows.length + RECORDED.refusals.length)
+      .toBeGreaterThan(0);
+  });
+
+test("a CROSS-TIER tie names a favourite, and says the field is where it "
+  + "came from", async ({ page }) => {
+    /* THE CHANGE, ASSERTED AS A CHANGE (2026-09-16). This test replaces
+       "the rated tie is drawn as a row and the unscaled ones as
+       refusals", whose second half stopped being true the morning the
+       cross-tier Elo field landed (302a557): all four English tiers
+       cleared the placeability floor at two passes, `NO_FIELD` emptied,
+       and the fixture the old recording drew as a `no_shared_scale`
+       refusal is the same fixture that now names Manchester City.
+
+       THE PAIR IS DERIVED FROM THE PAYLOAD, never named here — a test
+       that typed two club names would keep passing against a recording
+       that stopped carrying them. */
+    const rows = RECORDED.rows as readonly Record<string, unknown>[];
+    const crossTier = rows.filter((r) => {
+      const rated = r.rated_in as { home?: string; away?: string } | undefined;
+      return Boolean(rated?.home && rated.away && rated.home !== rated.away);
+    });
+    expect(crossTier.length,
+      "the recording carries no cross-tier tie — this whole test would "
+      + "pass over nothing, and a cross-tier tie is the only fixture the "
+      + "field decides").toBeGreaterThan(0);
+    for (const r of crossTier) {
+      expect(r.favourite, "a cross-tier tie with no favourite is the "
+        + "refusal this competition stopped making").toBeTruthy();
+      expect(r.fav_source, "the favourite must be read off the MEASURED "
+        + "field, not off a tier triple with an alphabetical tail")
+        .toBe("field");
+    }
+    await open(page);
+    const c = col(page);
+    await expect(c.getByTestId("picker-row"))
+      .toHaveCount(RECORDED.rows.length);
+    /* AND IT REACHES THE READER. The name is on the card, not only on
+       the wire. */
+    await expect(c).toContainText(crossTier[0].favourite as string);
+  });
+
+test("NO fixture in this column refuses for want of a shared scale",
+  async ({ page }) => {
+    /* THE ASSERTION THE OLD RECORDING COULD NEVER HAVE PASSED, and the
+       reason this file was re-recorded instead of reworded. Its meta
+       carried `no_field` and two of its three refusals were
+       `no_shared_scale`; the suite would have gone on asserting "no
+       shared scale exists for this competition" for as long as nobody
+       looked, while the live board named favourites.
+
+       DERIVED FROM THE WHOLE PAYLOAD, not from a key this file picked:
+       every string anywhere in the recording is walked, so the claim
+       cannot come back on a key that did not exist today. */
+    const walk = (node: unknown): string[] =>
+      typeof node === "string" ? [node]
+        : Array.isArray(node) ? node.flatMap(walk)
+        : node && typeof node === "object"
+          ? Object.entries(node).flatMap(([k, v]) => [k, ...walk(v)])
+          : [];
+    const strings = walk(RECORDED);
+    expect(strings.length, "nothing was walked").toBeGreaterThan(50);
+    for (const s of strings) {
+      expect(s, "the recording still claims this competition has no "
+        + "shared scale — it was measured on 2026-09-15 and it has one")
+        .not.toBe("no_shared_scale");
+      expect(s, "the recording still carries a NO_FIELD entry for a "
+        + "competition whose field is measured").not.toBe("no_field");
+    }
+    /* AND ON THE PAGE. `col-empty` would be the other way this reads
+       wrong: a column that drew nothing at all. */
+    await open(page);
+    await expect(col(page)).toBeVisible();
+    await expect(col(page)).not.toContainText("no shared scale");
   });
 
 // ══ 2. THE THEME COLOUR — THE ONE INTENDED DIFFERENCE ════════════════
@@ -197,56 +280,114 @@ test("the four tiers it is rated on are NAMED, never printed as slugs",
     expect(ratedOn).toContain("championship");
   });
 
-// ══ 4. A REFUSAL IS A REASON, NEVER A ZERO AND NEVER A BLANK ═════════
+// ══ 4. A WITHHELD FIGURE IS NAMED, NEVER A ZERO AND NEVER A BLANK ════
 
-test("every refused tie names a reason, and none of them renders as zero",
-  async ({ page }) => {
+test("the gaps a field does not make subtractable are NAMED, never zero "
+  + "and never a bare dash", async ({ page }) => {
+    /* RESTATED 2026-09-16, AND THE RULE IS UNCHANGED. This ran over the
+       column's REFUSED cards, asserting `refused-cell` prints the word
+       and nothing renders as a dash. The EFL Cup serves no refusal today
+       — the field landed and its cross-tier ties rate — so the same rule
+       is asserted where it is now live: on a RATED cross-tier card,
+       whose comparison gaps are still withheld because a shared scale
+       for a FAVOURITE is not a shared scale for a SUBTRACTION. 2.0 ppg
+       in League Two is not 2.0 ppg in the Premier League, `gap_note`
+       says so on the wire, and `ppg_gap`/`gdg_gap`/`rank_gap` are null.
+
+       The refused CARD itself is proven against its own recorded
+       payloads in refused-card.spec.ts and one-fixture-two-columns
+       .spec.ts, which is where that component's guard belongs — a second
+       copy of it here was a second copy of a guard.
+
+       AND NEVER A ZERO-SHAPED TEST EITHER. An earlier version of this
+       banned "0.00" anywhere on the card and failed against the real
+       payload, because Coventry City genuinely have 0.00 ppg: four
+       games, no points. A measured zero and a withheld figure are
+       exactly the two things this rule exists to keep apart, so a guard
+       that cannot tell them apart is the rule's own mistake. */
+    const rows = RECORDED.rows as readonly Record<string, unknown>[];
+    const withheld = rows.filter((r) =>
+      r.ppg_gap === null && r.gdg_gap === null && r.rank_gap === null);
+    expect(withheld.length, "no row on this payload withholds a gap — "
+      + "this test would pass over a board of ordinary same-tier ties")
+      .toBeGreaterThan(0);
+
     await open(page);
     const c = col(page);
-    const refusals = c.getByTestId("picker-refusal");
-    await expect(refusals).toHaveCount(RECORDED.refusals.length);
-
-    /* MISSING IS NEVER ZERO — AND NEVER A ZERO-SHAPED TEST EITHER.
-       This first banned "0.00" anywhere on a refusal card and failed
-       against the real payload, because Coventry City genuinely have
-       0.00 ppg: four games, no points. A measured zero and a withheld
-       figure are exactly the two things this rule exists to keep apart,
-       so a guard that cannot tell them apart is the rule's own mistake.
-       What the component actually promises is narrower and checkable:
-       `refused-cell` prints the WORD, and `figure()` prints "not
-       stated" rather than "—" or 0.00 for a null. */
-    for (let i = 0; i < RECORDED.refusals.length; i += 1) {
-      const card = refusals.nth(i);
-      const cells = card.getByTestId("refused-cell");
-      await expect(cells.first()).toBeVisible();
-      for (const t of await cells.allInnerTexts()) {
-        expect(t.trim()).toBe("refused");
-      }
-      const text = await card.innerText();
-      /* THE EM DASH IS THE OTHER WAY AN ABSENCE HIDES — it occupies the
-         slot a number would and claims nothing, which is how a reader
-         comes to think something was measured. */
+    const cards = c.getByTestId("picker-row");
+    await expect(cards.first()).toBeVisible();
+    for (let i = 0; i < await cards.count(); i += 1) {
+      const text = await cards.nth(i).innerText();
+      /* THE EM DASH IS HOW AN ABSENCE HIDES — it occupies the slot a
+         number would and claims nothing, which is how a reader comes to
+         think something was measured. */
       expect(text, "an absence rendered as a bare dash").not.toContain("—");
     }
-
     /* NON-VACUOUS: the named-absence path has to be LIVE on this
-       payload, or every assertion above is satisfied by a card that
-       simply has every figure. */
+       payload, or the assertion above is satisfied by a card that simply
+       has every figure. `n/a` is the card's own word for a gap that was
+       REFUSED rather than missed — it is the vocabulary a cross-league
+       UCL row already uses, it sits beside each club's OWN figure
+       ("ppg n/a · 2.32 v 1.36"), and `gap_note` in the i says why. Read
+       off the rendering rather than guessed at: three gaps, three
+       named absences. */
     const colText = await c.innerText();
-    expect(colText).toMatch(/not stated|no rank/);
+    expect(colText).toMatch(/n\/a|withheld|not stated|no rank/i);
+    for (const axis of ["ppg", "GD/g", "rank"]) {
+      expect(colText, `the withheld ${axis} gap is not NAMED`)
+        .toContain(`${axis} n/a`);
+    }
+    /* AND NOT AS A ZERO. A withheld gap rendered 0.00 reads as two
+       clubs that measured level, which is a claim nobody made. */
+    for (const axis of ["ppg", "GD/g", "rank"]) {
+      expect(colText).not.toContain(`${axis} 0.00`);
+      expect(colText).not.toContain(`${axis} +0.00`);
+    }
   });
 
-test("the column carries the corpus reason it can name no favourite",
+test("the column carries the FIELD its favourites are read off",
   async ({ page }) => {
-    /* THE `no_field` BLOCK IS THE WHOLE POINT OF THIS COMPETITION'S
-       REFUSALS. The backend measured WHY — two of four tiers absent from
-       the Elo corpus, and the Championship in it with zero bridges — and
-       a refusal that cannot show that reads as an oversight rather than
-       as a finding. This asserts the sentence reaches the wire; the
-       backend's own guard asserts it is true. */
-    const noField = RECORDED.leagues.eflcup.no_field as string;
-    expect(noField.length).toBeGreaterThan(200);
-    expect(noField).toMatch(/bridge/i);
+    /* RESTATED 2026-09-16. This was "the column carries the corpus
+       reason it can name no favourite", and it asserted
+       `leagues.eflcup.no_field` — the account of why two of four tiers
+       were absent from the Elo corpus and the Championship sat in it
+       with zero bridges. That account was true when it was written and
+       was measured false the next morning: the cup's own cross-tier ties
+       ARE those bridges, `research_archive/efl_bridges_2026-09-15/`
+       harvested them, and all four tiers clear the floor at two passes.
+
+       THE CLAIM IS THE SAME CLAIM ONE STEP ALONG. An ordering a reader
+       is shown has to travel with the measurement behind it, or it reads
+       as an assertion somebody made up. What travels now is the field
+       rather than its absence, so that is what is asserted — including
+       the part the field does NOT claim, which is the half a column
+       naming favourites is most likely to lose. */
+    const meta = RECORDED.leagues.eflcup as Record<string, unknown>;
+    expect(meta.no_field, "a measured field and a recorded reason for "
+      + "having none cannot both be true").toBeUndefined();
+    const field = meta.field as Record<string, unknown>;
+    expect(field, "the column names favourites off nothing it publishes")
+      .toBeTruthy();
+    expect(field.competition).toBe("eflcup");
+    expect(field.axes_measured).toEqual(["ovr"]);
+    expect(field.size as number).toBeGreaterThan(90);
+    expect(String(field.corpus_sha256)).toMatch(/^[0-9a-f]{64}$/);
+
+    /* AND THE BASIS, WITH WHAT IT REFUSES TO SEPARATE. The field's own
+       text says the Championship and League One do not separate — 36
+       meetings, 0.486 to the higher tier — and a reader who takes "the
+       higher division" as evidence is not reading this field. A basis
+       that only advertised what it CAN do would be the ordering with
+       its caveat filed off. */
+    const rowField = (RECORDED.rows[0] as Record<string, unknown>)
+      .field_partial as Record<string, unknown>;
+    expect(rowField, "the row names a favourite with no field beside it")
+      .toBeTruthy();
+    const basis = String(rowField.field_basis);
+    expect(basis.length).toBeGreaterThan(200);
+    expect(basis).toMatch(/bridge/i);
+    expect(basis).toMatch(/do not separate/i);
+
     await open(page);
     await expect(col(page)).toBeVisible();
   });

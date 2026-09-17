@@ -123,14 +123,28 @@ const RANKED = {
  *  in this slot until 2026-09-11 — six cells' worth of hover text and
  *  one more copy underneath — while this sentence, written by the
  *  module that made the decision and naming the seven figures rather
- *  than gesturing at them, sat on the same payload. */
+ *  than gesturing at them, sat on the same payload.
+ *
+ *  RE-COPIED 2026-09-16, AND THAT IS THE POINT OF THE DATE. The emitter
+ *  rewrote this sentence on 2026-09-14: the old one ended "this club has
+ *  no row in the ordering the other club's rank and tier are positions
+ *  in", which was true of every refusal there was and is FALSE of the
+ *  `no_shared_scale` refusal added that day, where both clubs are rated
+ *  and it is the two orderings that have never met. The new one names
+ *  BOTH shapes and points at `case` for which applies. This constant
+ *  went on carrying the old wording for two days, under a comment
+ *  claiming it was verbatim — which is what a hand-typed copy of another
+ *  repository's string does, and why `campeones-board.ts` and
+ *  `efl-cup-recorded.ts` are RECORDED rather than typed. Both of those
+ *  already carried the rewrite. */
 const WITHHELD =
   "every figure that compares the two clubs — the ppg, GD/g and rank "
   + "gaps, the favourite, the tiers, the shape and the venue-aware "
-  + "annotation. The comparison is what was refused: this club has no "
-  + "row in the ordering the other club's rank and tier are positions "
-  + "in, so a gap would be measured against a club that is not in the "
-  + "table.";
+  + "annotation. The comparison is what was refused, and `case` beside "
+  + "this says which rule refused it: either this club has no row in "
+  + "the ordering the other club's rank and tier are positions in, or "
+  + "each club has a row in an ordering the other is not in and the two "
+  + "orderings have never been measured against one another.";
 
 /** THE WHOLE CONTRACT, as the backend serves it for a `no_prior_row`
  *  refusal. Sunderland resolved; Promoted Rovers FC did not. */
@@ -1035,18 +1049,43 @@ test("it still sits in its own matchday band, beside that day's ranked "
        four lines of prose at a distance from the card it explained, on a
        board that scrolls sideways. It is the FIRST section of every
        refused card's own panel now, which is nearer the card and costs
-       nothing until asked for. */
+       nothing until asked for.
+
+       RESTATED 2026-09-16 — WHAT MOVED IS WHOSE SENTENCE IT IS. This
+       pinned `refusal-rule-general` first, and its two phrases: "cannot
+       be ranked against one that has a row" and "refuses it by name
+       instead of imputing a number". That section was a paragraph
+       PickerColumn.tsx wrote, hung unconditionally over EVERY refusal,
+       and its claim — one club has no row — is false of the
+       `no_shared_scale` refusal added on 2026-09-14, where both clubs
+       are rated. So it is deleted rather than reworded: the payload has
+       carried a general sentence that is true under every reason since
+       2026-09-11, and `refused-rule` quotes it.
+
+       THE CLAIM THIS TEST MAKES IS UNCHANGED. A reader who opens the i
+       still meets a general account of the refusal FIRST, before the
+       case, the absent blocks and the detail. Only the author changed,
+       and the text is now read off the fixture — so it cannot drift into
+       a false paraphrase again, which is the failure being fixed. */
     await expect(epl(page).getByTestId("refusal-why")).toHaveCount(0);
     const panel = refused(page).getByTestId("refusal-notes");
     const first = await panel.evaluate((el) =>
       el.querySelector("[data-testid]")!.getAttribute("data-testid"));
     expect(first, "the general rule is the panel's FIRST section — a "
       + "reader meeting a refused card for the first time reads it first")
-      .toBe("refusal-rule-general");
+      .toBe("refused-rule");
+    await expect(refused(page).getByTestId("refused-rule"))
+      .toContainText("Withheld —");
+    await expect(refused(page).getByTestId("refused-rule"))
+      .toContainText(WITHHELD);
+    /* AND NO SECOND GENERAL SENTENCE STANDS ANYWHERE ON THE CARD. The
+       deleted one is named so a reader of this file can see which copy
+       went, and the phrase is banned outright so re-adding it under a
+       different id fails here too. */
     await expect(refused(page).getByTestId("refusal-rule-general"))
-      .toContainText("cannot be ranked against one that has a row");
-    await expect(refused(page).getByTestId("refusal-rule-general"))
-      .toContainText("refuses it by name instead of imputing a number");
+      .toHaveCount(0);
+    await expect(refused(page))
+      .not.toContainText("cannot be ranked against one that has a row");
     // the backend's own reason string survives on the card itself
     await expect(refused(page).getByTestId("refusal-reason"))
       .toContainText("no row in the prior-season top-flight table");

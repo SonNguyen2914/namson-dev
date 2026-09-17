@@ -26,7 +26,7 @@
 // count over a handful of matches reads as evidence it is not.
 
 import {
-  BlendWeights, KalshiQuote, Shape, Src, TierPair,
+  BlendWeights, DEFAULT_DAYS, KalshiQuote, Shape, Src, TierPair,
 } from "./pickerApi";
 
 /** The two ways a pre-kickoff read can exist. A third state — neither —
@@ -330,13 +330,43 @@ export function reviewAskHonoured(
   return Array.isArray(got) && asked.every((s) => got.includes(s));
 }
 
-/** The back-window choices. The endpoint accepts 1..30 and 422s outside
- *  it rather than clamping, so this list may never grow past 30. 7 is the
- *  default because it MATCHES THE BOARD'S FORWARD WINDOW: a league column
- *  should tell one continuous story, and two different windows above and
- *  below the divider would make the tail read as a separate page. */
-export const REVIEW_WINDOWS = [1, 3, 8, 14, 30];
-export const DEFAULT_BACK = 8;
+/** THE TAIL'S BACK WINDOW IS THE BOARD'S FORWARD WINDOW, DERIVED.
+ *
+ *  A league column should tell one continuous story, so the finished
+ *  tail below the divider opens at the same length as the fixtures
+ *  above it; two different windows would make the tail read as a
+ *  separate page. That has been the rule since the tail was built and it
+ *  is unchanged. What changed on 2026-09-16 is that it is now ENFORCED
+ *  BY THE CODE instead of asserted by a comment.
+ *
+ *  WHAT THE COMMENT SAID, AND WHAT THE CODE HELD. Three lines above the
+ *  number 8, this said "7 is the default because it MATCHES THE BOARD'S
+ *  FORWARD WINDOW". Both halves were wrong at once: the value was not 7,
+ *  and the forward window was not 7 either — the operator moved both to
+ *  8 on 2026-09-15 and only one of the two copies knew. A comment that
+ *  documents a value the code does not hold is worse than no comment,
+ *  because it is read as a check that somebody performed.
+ *
+ *  AND THE BACKEND'S 7 IS NOT THIS NUMBER. `picker/review.DEFAULT_BACK_
+ *  DAYS = 7` is what GET /api/picker/review answers a caller that names
+ *  no window. This frontend always names one — `fetchReview(back)` puts
+ *  it in the query string on every request — so that default is never
+ *  the tail's length and the two are not required to agree. They are
+ *  different answers to different questions, and this is the one the
+ *  board is read with. */
+export const DEFAULT_BACK = DEFAULT_DAYS;
+/** The back-window choices, with the default always among them. The
+ *  endpoint accepts 1..30 and 422s outside that rather than clamping, so
+ *  this list may never grow past 30.
+ *
+ *  BUILT RATHER THAN TYPED, for the same reason as the line above: as a
+ *  literal it read [1, 3, 8, 14, 30] beside a comment about 7, and it
+ *  did not contain 7 at all. The chips that offered these came off on
+ *  2026-09-15 and the list is kept as what the endpoint accepts — a spec
+ *  outliving its control — so nothing on screen would show it drifting
+ *  out of step with the default again. */
+export const REVIEW_WINDOWS: readonly number[] =
+  [...new Set([1, 3, DEFAULT_BACK, 14, 30])].sort((a, b) => a - b);
 export const MAX_BACK = 30;
 
 /** True when this pre-kickoff state is a full read rather than a refusal
