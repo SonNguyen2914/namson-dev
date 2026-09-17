@@ -1678,6 +1678,15 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                       storeNote,
                     }}
                     field={fields[slug]}
+                    /* WHAT A BELOW-FLOOR DAGGER SAYS, off the board and
+                       said once. It is a property of the RESPONSE, not
+                       of a column — one constant covers every column,
+                       every axis and both sides — so it is read here
+                       and handed down rather than copied onto each
+                       side, where `capture_rows` would freeze a copy of
+                       it per cup row per capture (see
+                       pickerApi.FieldSide). */
+                    boardFloorNote={board?.field_floor_note}
                     /* WHERE THIS COLUMN'S HEADER IS DRAWN — its slot in
                        the rail above, or nothing, in which case the
                        header stays at the top of the column and sticks
