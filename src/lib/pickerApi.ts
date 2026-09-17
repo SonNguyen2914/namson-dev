@@ -106,10 +106,26 @@ export interface FieldSide {
   tier_set: number[];
   straddles: boolean;
   below_floor: boolean;
-  /** the backend's own reason the placeability floor refused this club
-   *  on the first reading — carried so the dagger that marks it can say
-   *  why, in those words */
-  floor_note?: string | null;
+
+  /* THE NOTE IS NOT HERE, AND `below_floor` IS THE INDEX TO IT.
+     The sentence the dagger says on hover is `Board.field_floor_note`,
+     once per response. It used to be asked for on this object — the
+     card read `side.fav.floor_note` — and the board has never sent it,
+     so from the day the board began feeding these cards every
+     below-floor dagger rendered `title=""`: a mark that says nothing,
+     beside the one number on the card it is there to qualify.
+
+     THE FIX WAS NOT TO ADD THE KEY HERE. `BELOW_FLOOR_NOTE` is a
+     500-byte constant, and a Champions League card whose two clubs are
+     both refused on all three axes would carry SIX copies of it inside
+     one block. `snapshots.capture_rows` freezes whole rows onto the
+     backend's volume on every production GET, so that is ~3KB per cup
+     row per capture, forever — the growth pattern that filled the
+     volume on 2026-07-25. It rides the envelope instead, exactly as
+     `field_unit_notes` does and for the same reason.
+
+     See fieldApi.floorNoteFor, which is the one place the note is
+     resolved for a card, from whichever producer fed it. */
 
   /* THE MEASUREMENT THE RANK AND THE TIER WERE READ OFF (backend
      2026-09-16). The operator: "they all have ovr, atk, def tiers but
@@ -771,6 +787,23 @@ export interface Board {
    *
    *  Optional: a board served before 2026-09-16 carries none. */
   field_unit_notes?: Record<string, string>;
+  /** WHAT THE DAGGER ON A CARD MEANS — the backend's own sentence for a
+   *  club the placeability floor refused, to be printed rather than
+   *  restated here.
+   *
+   *  ONE STRING, NOT A MAP, because there is one such sentence; the
+   *  unit notes are keyed by unit because there are three scales. The
+   *  key that indexes THIS one is `FieldSide.below_floor`, which every
+   *  side already carries.
+   *
+   *  ON THE BOARD AND NOT ON THE ROW, for the reason spelled out on
+   *  `field_unit_notes` above and on FieldSide: a paragraph on the row
+   *  is frozen by `capture_rows` once per cup fixture per capture.
+   *
+   *  Optional: a board served before 2026-09-17 carries none, and a
+   *  card must then draw the dagger it drew before rather than invent a
+   *  sentence for it. Absent is not empty. */
+  field_floor_note?: string;
   /** THE FIXTURES THAT LEFT THE BOARD, AND WHY EACH ONE LEFT.
    *
    *  The picker is a PRE-KICKOFF board by design: every number on it is
