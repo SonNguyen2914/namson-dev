@@ -169,6 +169,104 @@ export function tierSet(row: Pick<AxisRow, "tier" | "tier_set">): string | null 
   return row.tier_set.length > 0 ? String(row.tier) : null;
 }
 
+/* =====================================================================
+   THE NUMBER THE RANK WAS READ OFF, AND THE ONE PLACE IT IS WRITTEN
+   ---------------------------------------------------------------------
+   The operator, 2026-09-16: "they all have ovr, atk, def tiers but dont
+   have the actual number to rank is not consistent and doesnt make
+   sense". The inconsistency was between two surfaces of ONE fit — the
+   field's own page has always drawn `value ± half_width_95`, and the
+   board card drew the rank and the band that were computed from them
+   and not the numbers themselves.
+
+   SO THE WRITING RULE LIVES HERE, not in either surface. A card that
+   rounds elo to two places while the page rounds it to none is the same
+   defect in a new costume: "a read below the divider is THE SAME READ
+   as one above it". Both call these.
+   ===================================================================== */
+
+/** HOW MANY DECIMALS A FIGURE ON THIS SCALE IS WRITTEN TO.
+ *
+ *  Elo is whole points — a rating is not measured to a tenth and the
+ *  narrowest half-width in the field is over 20 — so a decimal there is
+ *  precision nothing supports. Log-goals runs from about -0.45 to 1.15
+ *  across the whole field, so two places is what separates one club
+ *  from the next at all.
+ *
+ *  UNKNOWN UNITS GET THE FINER RULE. A unit this frontend has not been
+ *  taught is a backend that moved; rounding its numbers to whole
+ *  integers could silently flatten a scale where everything sits
+ *  between 0 and 1, and showing too many places only looks odd. */
+export function axisDecimals(unit: string | null | undefined): number {
+  return unit === "elo" ? 0 : 2;
+}
+
+/** WHAT THE SCALE IS CALLED WHERE A READER SEES IT, or null for a unit
+ *  this frontend does not know.
+ *
+ *  NULL RATHER THAN THE RAW SLUG, and rather than a guess. The raw
+ *  token is a backend identifier; printing `log_goals` at a reader is
+ *  not naming the scale, and printing nothing at all is honest about a
+ *  vocabulary that has moved on. The backend's own sentences ride
+ *  `Board.field_unit_notes`, keyed by the same token. */
+export function unitLabel(unit: string | null | undefined): string | null {
+  if (unit === "elo") return "elo";
+  if (unit === "log_goals") return "log-goals";
+  return null;
+}
+
+/** ONE CLUB'S MEASUREMENT ON ONE AXIS, or null when this payload does
+ *  not carry it.
+ *
+ *  THE ONE PLACE THE TOGETHER-CHECK IS MADE. A value and its half-width
+ *  travel together — the backend refuses to emit one without the other
+ *  in those words — and this is the frontend half of that rule: a
+ *  surface asks for the pair and gets both or neither, so there is no
+ *  call site that can draw the number having checked only that a
+ *  number is there. A bare value asserts a precision the measurement
+ *  refuses, which is exactly what `tier_set` exists to stop `tier`
+ *  doing.
+ *
+ *  NULL IS ONE OF THREE STATES AND IT IS NOT A ZERO. A board from a
+ *  backend that predates 2026-09-16 carries no measurement at all, and
+ *  a card must then draw what it drew before — not an elo of 0, not a
+ *  dash where a rating goes. The caller NAMES the absence or omits the
+ *  line; it never fills it in. */
+export function measurementOf(
+  side: Pick<FieldSide, "value" | "half_width_95" | "interval">,
+): { value: number; half_width_95: number; interval: [number, number] } | null {
+  const { value, half_width_95: hw, interval } = side;
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  if (typeof hw !== "number" || !Number.isFinite(hw)) return null;
+  /* THE INTERVAL IS THE BACKEND'S, AND IT IS NOT RECONSTRUCTED HERE
+     WHEN IT IS MISSING. `value ± hw` computed on this side of the wire
+     would be a second copy of a fact the backend already publishes, and
+     the copy that rots is always the second one. A payload carrying the
+     pair and no interval is a payload this frontend does not
+     understand, so it reads as no measurement rather than as one this
+     file finished off. */
+  if (!Array.isArray(interval) || interval.length !== 2) return null;
+  if (!interval.every((n) => typeof n === "number" && Number.isFinite(n))) {
+    return null;
+  }
+  return { value, half_width_95: hw, interval: interval as [number, number] };
+}
+
+/** THE FIGURE AND ITS BAND, WRITTEN — "1964±34", "1.14±0.24".
+ *
+ *  ONE STRING, SO THE TWO CANNOT BE SEPARATED BY A LAYOUT. The pair is
+ *  the unit of meaning; a template that puts the value in one element
+ *  and the half-width in another invites a narrow track to wrap one
+ *  away from the other, and a value alone on a line is the bare number
+ *  this whole change exists to avoid. */
+export function writeMeasurement(
+  m: { value: number; half_width_95: number },
+  unit: string | null | undefined,
+): string {
+  const d = axisDecimals(unit);
+  return `${m.value.toFixed(d)}±${m.half_width_95.toFixed(d)}`;
+}
+
 /** Every club on one axis, by name. Built per call rather than cached:
  *  the payload is small and a stale index of a refetched field is a
  *  worse bug than a re-walk of 36 rows. */
@@ -218,6 +316,16 @@ export function fieldFor(
       rank: r.rank, tier: r.tier, tier_set: r.tier_set,
       straddles: r.straddles, below_floor: r.below_floor,
       floor_note: r.floor_note,
+      /* THE MEASUREMENT IS FORWARDED, NOT DROPPED (2026-09-16). This
+         adapter was the OTHER half of the operator's complaint: the
+         ratings payload it reads has always carried `value`,
+         `half_width_95` and `interval` on every row — they are drawn a
+         few hundred pixels away on this very page — and this function
+         copied the rank and the band across and left the three numbers
+         behind, so a card fed from here could not print them either.
+         Forwarded, never recomputed: `interval` is the payload's own. */
+      value: r.value, half_width_95: r.half_width_95,
+      interval: r.interval,
     };
   };
 
@@ -225,7 +333,14 @@ export function fieldFor(
   for (const k of AXIS_ORDER) {
     const fav = side(k, row.favourite), opp = side(k, row.opponent);
     if (!fav || !opp) return null;
-    axes[k] = { fav, opp, tier_gap: null };
+    /* `tier_gap` STAYS NULL — the ratings payload carries no gap and a
+       difference computed here would be this file deciding something.
+       `unit` does NOT stay null: it is a fact the payload states about
+       the axis, so it is carried for the same reason the values are. */
+    axes[k] = {
+      fav, opp, tier_gap: null,
+      unit: ratings.axes[k]?.unit, label: ratings.axes[k]?.label,
+    };
   }
   /* THE N OF THE 1..N AXIS IS THE PAYLOAD'S OWN COUNT, never 36 typed
      here: the field is refitted whenever a league is admitted or drops

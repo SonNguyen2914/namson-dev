@@ -110,6 +110,37 @@ export interface FieldSide {
    *  on the first reading — carried so the dagger that marks it can say
    *  why, in those words */
   floor_note?: string | null;
+
+  /* THE MEASUREMENT THE RANK AND THE TIER WERE READ OFF (backend
+     2026-09-16). The operator: "they all have ovr, atk, def tiers but
+     dont have the actual number to rank is not consistent and doesnt
+     make sense". He is comparing two surfaces — this card printed the
+     rank and the band and could not print 1964, while
+     /bet-suggester/ratings printed the value and its half-width for
+     the same clubs off the same fit.
+
+     ALL THREE OPTIONAL, AND ABSENT IS NOT ZERO. A board served by a
+     backend that predates the change carries none of them, and a card
+     must then draw what it drew before rather than a club whose elo is
+     0. That is the ordering constraint between the two repositories:
+     this type ships first and tolerates the old payload.
+
+     THEY ARE OPTIONAL TOGETHER AND THEY ARE READ TOGETHER. A value
+     without its half-width asserts a precision the measurement
+     refuses — it is `tier` without `tier_set` in a second currency —
+     and the backend has no path that emits one alone (`_field_side`
+     raises "a value and its half-width travel together"). Nothing here
+     may print the first having only checked for it; see
+     fieldApi.measurementOf, which is the one place that check is
+     made. */
+  /** where this club sits on the axis, IN THE AXIS'S OWN UNIT — see
+   *  FieldAxis.unit, because elo and log-goals are not one scale */
+  value?: number;
+  /** the 95% half-width, in the same unit as `value` */
+  half_width_95?: number;
+  /** `[value - half_width_95, value + half_width_95]`, THE BACKEND'S
+   *  OWN, so this number is never a subtraction done here */
+  interval?: [number, number];
 }
 
 export interface FieldAxis {
@@ -120,6 +151,25 @@ export interface FieldAxis {
    *  see fieldApi.fieldFor — and a null is never differenced into a gap
    *  here. The frontend shows; it does not decide. */
   tier_gap: number | null;
+  /** WHICH SCALE THE TWO SIDES' `value`s ARE ON — "elo" on the overall
+   *  axis, "log_goals" on attack and defence.
+   *
+   *  ON THE AXIS, NOT ON THE SIDE, because both sides of one axis are
+   *  by construction in one unit and a second copy of that fact inside
+   *  the same object is the copy that rots.
+   *
+   *  IT IS WHY THE THREE NUMBERS ON A CARD ARE NOT COMPARABLE. `1964`
+   *  and `1.14` sit in one 10px row and nothing about either says they
+   *  are different kinds of quantity. It also decides how the figure is
+   *  written — see fieldApi.axisDecimals, which is where that is
+   *  decided once for this card and for the field's own page.
+   *
+   *  Optional for the same reason the measurement is: a board from a
+   *  backend that predates it carries neither. */
+  unit?: string;
+  /** the backend's own word for this axis — "overall" / "attack" /
+   *  "defence" — carried rather than restated here */
+  label?: string;
 }
 
 /** THE FIELD BLOCK ON A CROSS-LEAGUE RATED ROW (backend, 2026-09-09).
@@ -709,6 +759,18 @@ export interface Board {
    *  — see `declarationOf`, which is the one place that decision is
    *  made. */
   narrowed_to?: string[] | null;
+  /** WHAT A FIELD BLOCK'S NUMBERS MEAN, keyed by the `unit` each axis
+   *  declares (FieldAxis.unit) — the backend's own sentences, to be
+   *  printed rather than restated.
+   *
+   *  ON THE BOARD AND NOT ON THE ROW, and the backend's reason is
+   *  storage: `snapshots.capture_rows` freezes the whole row on every
+   *  production assembly, so a constant paragraph per row would be
+   *  written to the volume once per fixture per capture. Said once per
+   *  response instead.
+   *
+   *  Optional: a board served before 2026-09-16 carries none. */
+  field_unit_notes?: Record<string, string>;
   /** THE FIXTURES THAT LEFT THE BOARD, AND WHY EACH ONE LEFT.
    *
    *  The picker is a PRE-KICKOFF board by design: every number on it is
