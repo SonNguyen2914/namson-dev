@@ -1,4 +1,7 @@
 import { expect, test } from "@playwright/test";
+import {
+  CAMPEONES_FIELD_BOARD, CAMPEONES_FIELD_ROW, WIDE_PARTIAL,
+} from "./campeones-field";
 
 // THE FIELD, ON THE MATCH CARD — and on a page of its own.
 //
@@ -336,10 +339,13 @@ const BOARD = {
 const review = { finished: [], refusals: [], leagues: {}, store: null };
 
 /** `ratings` is what the field endpoint answers with; pass a status to
- *  make the read FAIL instead. */
+ *  make the read FAIL instead, and `rows` to serve a board with
+ *  something other than the three fixtures above on it. */
 async function openBoard(page: import("@playwright/test").Page,
-                         ratings: unknown = RATINGS, status = 200) {
-  await page.route("**/api/picker/board**", (r) => r.fulfill(json(BOARD)));
+                         ratings: unknown = RATINGS, status = 200,
+                         rows: unknown[] = BOARD.rows) {
+  await page.route("**/api/picker/board**", (r) =>
+    r.fulfill(json({ ...BOARD, rows })));
   await page.route("**/api/picker/review**", (r) => r.fulfill(json(review)));
   await page.route("**/api/comp/*/ratings", (r) =>
     r.fulfill(json(status === 200 ? ratings : { detail: "field unavailable" },
@@ -1229,4 +1235,446 @@ test("it names a page and nothing else — no count, no glow, no state",
     await expect(link).toHaveAttribute("aria-current", "page");
     await expect(link).not.toHaveAttribute("data-soon", /.*/);
     await expect(link).not.toHaveText(/\d/);
+  });
+
+// ═══════════════════════════════════════════════════════════════════════
+// 11. A FIELD MEASURED ON FEWER AXES THAN `shape` IS DEFINED ON
+// ═══════════════════════════════════════════════════════════════════════
+//
+// Backend #141, 2026-09-15. A SECOND cross-league field — MLS + Liga MX,
+// which is the Campeones Cup and the Leagues Cup — measured on the
+// OVERALL axis ALONE. Attack and defence exist for neither league
+// anywhere in the backend: the goals artifact holds the 36 Champions
+// League entrants and no club of either. So the block carries `ovr`,
+// carries no `atk` and no `def`, and carries no `shape` — which is
+// CLEAN/CUT/HOLLOW read off all three gaps together.
+//
+// IT RIDES UNDER ITS OWN KEY BECAUSE OF THIS FILE'S OWN SUBJECT. The
+// card built above walked `field.axes.ovr`, `.atk` and `.def` with no
+// guard, so a one-axis block under `field` did not degrade the card, it
+// threw inside it — and `tierSet` would have read `.length` off nothing.
+// The backend therefore publishes `field_partial`, leaves `field` a
+// three-axis contract, and carries its reasoning on the block itself as
+// `why_not_field`.
+//
+// ─── WHAT IS AT STAKE HERE, beyond the five properties above ─────────
+//
+//  6. AN AXIS NOBODY MEASURED IS NOT A CLUB THE FIELD FAILED TO PLACE.
+//     Property 4 said missing is never zero; this is its sharper form —
+//     TWO KINDS OF MISSING, and on screen they are one band apart. "no
+//     band" is a club whose interval touched none of a MEASURED axis's
+//     bands, a fact about that club. An absent axis is a fact about the
+//     EVIDENCE, true of all 48 clubs at once, and there is nothing for a
+//     cell to be empty of. So the axes the block has are drawn exactly
+//     as a whole field's are, and the axes it has not are drawn NOWHERE
+//     — no cell, no label, no band, and above all no fallback to the
+//     row's own within-league quintiles, which would put one field band
+//     beside two league quintiles in one trio and call it one reading.
+//
+//  7. AN ABSENCE DRAWN NOWHERE IS AN ABSENCE NOBODY CAN ASK ABOUT. So it
+//     is named where the field's own detail already lives — behind the
+//     `#` — in `shape_absent.why`, the backend's words, verbatim.
+//
+//  8. NOBODY INVENTS A SHAPE. The block has no `shape` key at all. The
+//     card keeps the ROW's own backend shape, which is the fallback the
+//     component was already built on, rather than composing a label out
+//     of one measured gap and two absences.
+
+const REVIEW_EMPTY = { back: 7, leagues: {}, finished: [], refusals: [],
+                       store: null };
+const STRIP_EMPTY = {
+  version: "watched-strip-v1", generated_at: "2026-12-10T12:00:00Z",
+  matches: [], monitored_by_source: { manual: [], open_position: [] },
+  open_positions_not_monitored: [], refusal_codes: {}, policy_codes: {},
+};
+
+/** THE ROW UNDER TEST, READ OFF THE PAYLOAD rather than named beside it
+ *  — the discipline `one-fixture-two-columns.spec.ts` keeps over the
+ *  same fixture one backend PR earlier. */
+const P_ROW = CAMPEONES_FIELD_ROW;
+const P_BLOCK = P_ROW.field_partial;
+/** The axes the block CARRIES and the ones it names as missing, both
+ *  DERIVED: a block that gains an axis tomorrow moves every expectation
+ *  below with it rather than leaving a stale list here asserting the
+ *  measurement it used to have. */
+const P_HAS: string[] = Object.keys(P_BLOCK.axes);
+const P_ABSENT: string[] = P_BLOCK.shape_absent.axes_absent;
+
+/** THE WORD EACH AXIS WEARS ON `data-dim`. This is the COMPONENT's
+ *  vocabulary and not the payload's, so it cannot be read off a
+ *  fixture — it is checked against a WHOLE field's own three cells in
+ *  the control below, which is what stops it going stale. */
+const DIM_WORD: Record<string, string> = {
+  ovr: "overall", atk: "attack", def: "defence",
+};
+
+/** The landing board, with whatever row list a test needs. Every route
+ *  is served; an unmatched `/api/` answers 599 rather than reaching a
+ *  live backend. */
+async function openFolded(page: import("@playwright/test").Page,
+                          rows: unknown[] = CAMPEONES_FIELD_BOARD.rows) {
+  await page.route("**/api/**", (r) =>
+    r.fulfill(json({ detail: "unmocked route" }, 599)));
+  await page.route("**/api/picker/board**", (r) =>
+    r.fulfill(json({ ...CAMPEONES_FIELD_BOARD, rows })));
+  await page.route("**/api/picker/review**", (r) =>
+    r.fulfill(json(REVIEW_EMPTY)));
+  await page.route("**/api/comp/**", (r) => r.fulfill(json({ fixtures: [] })));
+  await page.route("**/api/bet-suggester/watched-strip**", (r) =>
+    r.fulfill(json(STRIP_EMPTY)));
+  await page.goto("/bet-suggester");
+  await expect(page.getByTestId("picker-row").first()).toBeVisible();
+}
+
+/** The fixture's card AS DRAWN IN one column. It rides in two —
+ *  `FOLDED_INTO_COLUMNS` — and both must draw the same reading. */
+const foldedCard = (page: import("@playwright/test").Page, slug: string) =>
+  page.locator(`[data-testid="league-col"][data-league="${slug}"]`)
+    .locator(`[data-testid="picker-row"][data-event="${P_ROW.event_id}"]`);
+
+/** The span the trio's three cells hang off — the one that carries the
+ *  hover sentence about what a tier is here. Located by its own direct
+ *  children so nothing depends on how deep it sits. */
+const trioBox = (c: ReturnType<typeof foldedCard>) =>
+  c.locator(':has(> [data-tier])');
+
+// ──────────────────── 0. the partial block speaks the wire's language ─
+
+test("the partial block is a payload the backend could actually emit",
+  async () => {
+    /* THE FIXTURE'S OWN GUARD, for the reason section 0 gives at
+       length: every expectation below reads its numbers off this block,
+       which makes the block being wrong the one failure none of them
+       can see. These are `stages.field_block`'s rules, not this file's
+       opinion. */
+    expect(P_HAS.length).toBeGreaterThan(0);
+    for (const k of P_HAS) {
+      const ax = (P_BLOCK.axes as Record<string, typeof P_BLOCK.axes.ovr>)[k];
+      expect(AXIS_KEYS as readonly string[]).toContain(k);
+      expect(typeof ax.tier_gap).toBe("number");
+      for (const side of [ax.fav, ax.opp]) {
+        expect(side.tier_set.length).toBeGreaterThan(0);
+        expect(side.tier_set).toContain(side.tier);
+        expect(side.straddles).toBe(side.tier_set.length > 1);
+        expect(side.rank).toBeGreaterThanOrEqual(1);
+        expect(side.rank).toBeLessThanOrEqual(P_BLOCK.size);
+      }
+      // TIER 1 IS BEST, so a favourite-signed gap is opponent − favourite
+      expect(ax.tier_gap).toBe(ax.opp.tier - ax.fav.tier);
+    }
+    // it is PARTIAL: fewer axes than a shape is defined on, and it says
+    // which rather than padding the rest out with nulls
+    expect(P_HAS.length).toBeLessThan(AXIS_KEYS.length);
+    expect(P_BLOCK.axes_measured).toEqual(P_HAS);
+    expect("shape" in P_BLOCK).toBe(false);
+    expect(P_ABSENT).toEqual(
+      (AXIS_KEYS as readonly string[]).filter((k) => !P_HAS.includes(k)));
+    // and both of its sentences are PROSE a card can print
+    for (const said of [P_BLOCK.why_not_field, P_BLOCK.shape_absent.why]) {
+      expect(said.length).toBeGreaterThan(80);
+      expect(said).toMatch(/[a-z]{3,} [a-z]{3,}/);
+    }
+    // the row carries no `field`: one key or the other, never both
+    expect("field" in P_ROW).toBe(false);
+    // and the favourite came from the field, which is the whole point —
+    // this fixture was a `no_shared_scale` refusal one backend PR ago
+    expect(P_ROW.refused).toBe(false);
+    expect(P_ROW.fav_source).toBe("field");
+    expect(P_ROW.favourite).toBe(P_BLOCK.clubs.fav);
+  });
+
+// ───────────────── 1. the axes it HAS are drawn as a field's are ──────
+
+test("the axes the block carries are drawn exactly as a three-axis "
+   + "field's are — the field's bands, its ranks, its ladder",
+  async ({ page }) => {
+    /* NOT A SECOND DESIGN. The Champions League card is the board's own
+       card with the data behind it substituted; this is that same card
+       with a shorter list of axes behind it, and nothing else. */
+    await openFolded(page);
+    const c = foldedCard(page, "mls");
+    await expect(c).toBeVisible();
+
+    // it says which ladder it is reading, and which axes of it
+    await expect(c).toHaveAttribute("data-field", P_BLOCK.competition);
+    await expect(c).toHaveAttribute("data-field-size", String(P_BLOCK.size));
+    await expect(c).toHaveAttribute("data-field-axes", P_HAS.join(","));
+
+    // the ranks pair and the dumbbell are on the FIELD's 1..N, not on
+    // two domestic tables that have never been measured against one another
+    const rp = c.getByTestId("rank-pair");
+    await expect(rp).toHaveAttribute("data-basis", "field");
+    await expect(rp).toHaveAttribute("data-of", String(P_BLOCK.size));
+    await expect(rp).toHaveText(
+      `#${P_BLOCK.axes.ovr.fav.rank} v #${P_BLOCK.axes.ovr.opp.rank}`);
+    await expect(c.getByTestId("rank-dumbbell"))
+      .toHaveAttribute("data-basis", "field");
+
+    // the trio prints the FIELD's point band with the payload's own set
+    // behind it — the same marks, read the same way, as section 3
+    const ovr = c.locator('[data-tier="ovr"]');
+    await expect(ovr).toHaveAttribute(
+      "data-fav-set", P_BLOCK.axes.ovr.fav.tier_set.join(","));
+    await expect(ovr).toHaveAttribute(
+      "data-opp-set", P_BLOCK.axes.ovr.opp.tier_set.join(","));
+    expect((await ovr.textContent())!.replace(/\s+/g, "")).toBe(
+      `ovr${P_BLOCK.axes.ovr.fav.tier}v${P_BLOCK.axes.ovr.opp.tier}`);
+
+    // and its cell is coloured by the FIELD's gap, not by the row's
+    await expect(c.locator('[data-testid="tier-cell"][data-dim="overall"]'))
+      .toHaveAttribute("data-gap", String(P_BLOCK.axes.ovr.tier_gap));
+
+    // both columns it rides in draw the same reading — it is one fixture
+    const other = foldedCard(page, "ligamx");
+    await expect(other).toHaveAttribute("data-field-axes", P_HAS.join(","));
+    await expect(other.getByTestId("rank-pair")).toHaveText(
+      `#${P_BLOCK.axes.ovr.fav.rank} v #${P_BLOCK.axes.ovr.opp.rank}`);
+  });
+
+test("the straddle dagger still fires on a partial block — the mark says "
+   + "THE BAND IS NOT SETTLED wherever the band is drawn",
+  async ({ page }) => {
+    /* NEITHER CLUB OF THE REAL FIXTURE STRADDLES A CUT, so that card
+       draws no dagger and cannot prove the mark survived. `WIDE_PARTIAL`
+       is the same emitter asked for Cruz Azul against Austin, whose 95%
+       interval touches two bands; only the BLOCK changes — the row it
+       hangs on is the fixture's own. */
+    const opp = WIDE_PARTIAL.axes.ovr.opp;
+    expect(opp.straddles).toBe(true);
+    expect(WIDE_PARTIAL.axes.ovr.fav.straddles).toBe(false);
+    await openFolded(page, [{ ...P_ROW, field_partial: WIDE_PARTIAL }]);
+    const ovr = foldedCard(page, "mls").locator('[data-tier="ovr"]');
+    // the POINT tier is printed, and the dagger beside it says that
+    // point is not a placement the evidence will narrow to
+    expect((await ovr.textContent())!.replace(/\s+/g, "")).toBe(
+      `ovr${WIDE_PARTIAL.axes.ovr.fav.tier}v${opp.tier}†`);
+    const mark = ovr.getByTestId("field-floor-mark");
+    await expect(mark).toHaveCount(1);
+    await expect(mark).toHaveAttribute(
+      "title", new RegExp(`bands ${opp.tier_set.join("·")}\\b`));
+  });
+
+// ──────────── 2. an axis nobody measured is drawn NOWHERE at all ──────
+
+test("an axis the block does not carry is drawn nowhere — not as an "
+   + "empty band, and never as the row's own league quintile",
+  async ({ page }) => {
+    /* THE DISTINCTION THE WHOLE KEY IS BUILT AROUND, and the second
+       half is the one that could have shipped quietly: the row still
+       carries its within-league `tiers`, and falling back to them would
+       draw one FIELD band beside two LEAGUE quintiles in a trio of
+       three — the two-ladders defect this field exists to end,
+       reassembled inside the mark that replaced it. */
+    expect(P_ABSENT.length).toBeGreaterThan(0);
+    await openFolded(page);
+    const c = foldedCard(page, "mls");
+
+    for (const k of P_ABSENT) {
+      await expect(c.locator(`[data-tier="${k}"]`)).toHaveCount(0);
+      await expect(c.locator(
+        `[data-testid="tier-cell"][data-dim="${DIM_WORD[k]}"]`))
+        .toHaveCount(0);
+    }
+    // exactly as many cells as there are axes …
+    await expect(c.getByTestId("tier-cell")).toHaveCount(P_HAS.length);
+    /* … and the trio is the axes the block HAS, each reading the
+       FIELD's own bands. This is what rules the fallback out: had the
+       missing axes kept the row's quintiles, there would be three
+       groups here carrying two ladders between them. */
+    const shown = await c.locator("[data-tier]").evaluateAll((els) =>
+      els.map((e) => ({
+        axis: e.getAttribute("data-tier"),
+        text: (e.textContent || "").replace(/\s+/g, ""),
+      })));
+    expect(shown.map((x) => x.axis)).toEqual(P_HAS);
+    for (const x of shown) {
+      const ax = (P_BLOCK.axes as Record<string, typeof P_BLOCK.axes.ovr>)
+        [x.axis!];
+      expect(x.text).toBe(`${x.axis}${ax.fav.tier}v${ax.opp.tier}`);
+    }
+
+    /* AND NOWHERE ELSE ON THE CARD EITHER — the popover, a hover, a
+       stray copy. Checked only for a pair the card does not
+       legitimately draw: the field's own `ovr` reads 1v1 here and so
+       does the row's within-league `atk`, and a substring search cannot
+       tell a collision from a fallback. The trio above is what covers
+       the colliding ones. */
+    const drawnPairs = new Set(P_HAS.map((k) => {
+      const ax = (P_BLOCK.axes as Record<string, typeof P_BLOCK.axes.ovr>)[k];
+      return `${ax.fav.tier}v${ax.opp.tier}`;
+    }));
+    const text = (await c.textContent())!.replace(/\s+/g, "");
+    for (const k of P_ABSENT) {
+      const q = (P_ROW.tiers as Record<string, number[]>)[k];
+      const said = `${q[0]}v${q[1]}`;
+      if (drawnPairs.has(said)) continue;
+      expect(text, `${k} fell back to the row's league quintiles`)
+        .not.toContain(said);
+    }
+  });
+
+test("the axes nobody measured are NAMED, in the backend's own words, "
+   + "behind the field's own affordance", async ({ page }) => {
+    /* AN ABSENCE DRAWN NOWHERE IS AN ABSENCE NOBODY CAN ASK ABOUT. The
+       account rides the `#` — the field's own detail on this card — and
+       it is `shape_absent.why` VERBATIM: which axes are missing, why no
+       shape can be read off what is left, and the registry's own
+       account of what this field IS. The backend composes it off the
+       reading, so a field that gains an axis moves the sentence with
+       it; restated here it would be this surface asserting a
+       measurement it never made. */
+    await openFolded(page);
+    const c = foldedCard(page, "mls");
+    const trigger = c.getByTestId("field-ranks-open");
+
+    // the affordance says there is something missing before it is opened
+    await expect(trigger).toHaveAttribute("data-axes", P_HAS.join(","));
+    await expect(trigger)
+      .toHaveAttribute("data-axes-absent", P_ABSENT.join(","));
+    await expect(trigger).toHaveAccessibleName(
+      new RegExp(`no ${P_ABSENT.join(" or ")} axis`));
+
+    await trigger.click();
+    const panel = c.getByTestId("field-ranks");
+    // it holds the ranks of the axes that EXIST — one row, not three
+    const rows = await panel.locator("[data-rank-axis]")
+      .evaluateAll((els) => els.map((e) => e.getAttribute("data-rank-axis")));
+    expect(rows).toEqual(P_HAS);
+    // and the reason there are no others, word for word
+    await expect(panel.getByTestId("field-axes-absent"))
+      .toHaveText(P_BLOCK.shape_absent.why);
+
+    // the hover on the numbers says there is one, and points at it
+    await expect(trioBox(c)).toHaveAttribute(
+      "title", new RegExp(`no ${P_ABSENT.join(" or ")} axis`));
+  });
+
+test("a whole field says none of that — the control", async ({ page }) => {
+    /* THE THREE-AXIS PANEL IS BYTE FOR BYTE WHAT IT WAS. A field that is
+       missing nothing must not grow a sentence about absence, and its
+       trigger must not grow an attribute naming one. This is also where
+       DIM_WORD above is held to the component: three cells, in the
+       reading order, wearing the three words the trio uses. */
+    await openBoard(page);
+    const c = card(page, "ucl-1");
+    const dims = await c.getByTestId("tier-cell")
+      .evaluateAll((els) => els.map((e) => e.getAttribute("data-dim")));
+    expect(dims).toEqual(AXIS_KEYS.map((k) => DIM_WORD[k]));
+
+    const trigger = c.getByTestId("field-ranks-open");
+    await expect(trigger).toHaveAttribute("data-axes", AXIS_KEYS.join(","));
+    await expect(trigger).not.toHaveAttribute("data-axes-absent", /.*/);
+    await trigger.click();
+    await expect(c.getByTestId("field-axes-absent")).toHaveCount(0);
+    await expect(trioBox(c)).not.toHaveAttribute("title", /axis/);
+  });
+
+// ─────────────────────── 3. nobody invents a shape ───────────────────
+
+test("the shape chip is the ROW's own backend shape — the block carries "
+   + "none, and none is composed here", async ({ page }) => {
+    /* `shape` IS CLEAN/CUT/HOLLOW READ OFF THREE GAPS TOGETHER and this
+       field has one, so the block has no `shape` key at all. The
+       fallback the component was already built on — the block's shape
+       where it carries one, the row's where it does not — is the answer,
+       and the row's is still the backend's own word. A label composed
+       from one measured gap and two absences would be a sentence about
+       the fixture that no measurement stands behind. */
+    await openFolded(page);
+    const c = foldedCard(page, "mls");
+    /* THE CARD IS READING THE FIELD, asserted first and not assumed. A
+       card that ignored `field_partial` altogether would also print the
+       row's shape — that is the no-field path — so without this line
+       the test passes before the fix as well as after it, and proves
+       nothing. */
+    await expect(c).toHaveAttribute("data-field-axes", P_HAS.join(","));
+    await expect(c).toHaveAttribute("data-shape", P_ROW.shape);
+    await expect(c.getByTestId("shape-chip")).toHaveText(P_ROW.shape);
+    /* AND THE SHAPE IS THE ROW'S THREE GAPS, not a label read off the
+       one gap the field measured. The field's `ovr` is level here; a
+       word composed from that alone could not be the row's. */
+    expect(P_BLOCK.axes.ovr.tier_gap).toBe(0);
+    expect(P_ROW.shape).toBe(
+      (P_ROW.tier_gaps.ovr > 0 && P_ROW.tier_gaps.atk > 0
+        && P_ROW.tier_gaps.def > 0) ? "CLEAN"
+        : (P_ROW.tier_gaps.atk <= 0 && P_ROW.tier_gaps.def <= 0) ? "HOLLOW"
+          : "SPLIT");
+  });
+
+test("the `i` that explains a shape is not drawn on a partial card "
+   + "either — its sentence reads three gaps together", async ({ page }) => {
+    /* THE CONDITION IS THE FIELD, NOT THE PAGE (2026-09-10), and a
+       partial field is a field here. Both halves of the operator's
+       reason hold on one: the `#` is drawn six pixels away, so the `i`
+       would be the second identical circle; and this panel's prose
+       names attack and defence outright, which on a card whose field
+       measures neither would put two within-league quintiles into a
+       sentence about a cross-league fixture. */
+    await openFolded(page);
+    const c = foldedCard(page, "mls");
+    await expect(c.getByTestId("field-ranks-open")).toHaveCount(1);
+    await expect(c.getByTestId("tier-read")).toHaveCount(0);
+    // and an ordinary league card on the same board keeps it — the
+    // control that stops this becoming "no `i` anywhere"
+    const league = page
+      .locator('[data-testid="league-col"][data-league="mls"]')
+      .locator('[data-testid="picker-row"]:not([data-field])');
+    await expect(league.first().getByTestId("tier-read")).toHaveCount(1);
+    await expect(league.first().getByTestId("field-ranks-open"))
+      .toHaveCount(0);
+  });
+
+// ───────── 4. the guard is a guard, not a special case for one field ──
+
+test("a block with no OVERALL axis keeps the card's league ranks rather "
+   + "than throwing inside it", async ({ page }) => {
+    /* THE PROPERTY IS "ASK THE BLOCK", NOT "HANDLE THE ONE-AXIS CASE".
+       Every field measured today carries `ovr`, and a guard tested only
+       against the shape that exists is not tested at all — which is
+       exactly how `field.axes.atk` came to be walked unguarded. So the
+       block under test is the real one with its single axis MOVED to
+       `atk`: no emitter produces this today, and the card must degrade
+       to the two league positions rather than throw. */
+    const moved = {
+      ...P_BLOCK,
+      axes: { atk: P_BLOCK.axes.ovr },
+      axes_measured: ["atk"],
+      shape_absent: { ...P_BLOCK.shape_absent, axes_absent: ["ovr", "def"] },
+    };
+    await openFolded(page, [{ ...P_ROW, field_partial: moved }]);
+    const c = foldedCard(page, "mls");
+    await expect(c).toBeVisible();
+    await expect(c).toHaveAttribute("data-field-axes", "atk");
+    // the ranks fall back to the row's own two league positions, and the
+    // dumbbell keeps refusing a ladder these two clubs do not share
+    const rp = c.getByTestId("rank-pair");
+    await expect(rp).toHaveAttribute("data-basis", "league");
+    await expect(rp).toHaveText(`#${P_ROW.ranks.fav} v #${P_ROW.ranks.opp}`);
+    await expect(c.getByTestId("rank-dumbbell")).toHaveCount(0);
+    // and the attack axis the block DOES carry is still drawn off it
+    await expect(c.locator('[data-tier="atk"]')).toHaveAttribute(
+      "data-fav-set", P_BLOCK.axes.ovr.fav.tier_set.join(","));
+    await expect(c.locator("[data-tier]")).toHaveCount(1);
+  });
+
+test("a row carrying BOTH keys draws the three-axis block — they are "
+   + "never read together", async ({ page }) => {
+    /* THE EMITTER CANNOT PRODUCE THIS: it picks the key off the block's
+       own axis set. The ordering is asserted anyway, because what is
+       being guarded is that the client never MERGES the two — a card
+       that combined them would draw a trio with a field band and two
+       league quintiles in it, or one axis where a whole field was
+       served. It draws the whole field, which is the object every other
+       mark on the card was written for. */
+    const both = [{ ...BOARD.rows[0], field_partial: P_BLOCK },
+                  ...BOARD.rows.slice(1)];
+    await openBoard(page, RATINGS, 200, both);
+    const c = card(page, "ucl-1");
+    await expect(c).toHaveAttribute("data-field-axes", AXIS_KEYS.join(","));
+    await expect(c.locator("[data-tier]")).toHaveCount(AXIS_KEYS.length);
+    await expect(c.getByTestId("tier-cell")).toHaveCount(AXIS_KEYS.length);
+    await expect(c.getByTestId("field-ranks-open"))
+      .not.toHaveAttribute("data-axes-absent", /.*/);
+    await c.getByTestId("field-ranks-open").click();
+    await expect(c.getByTestId("field-axes-absent")).toHaveCount(0);
   });

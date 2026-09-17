@@ -20,10 +20,11 @@
 //    one blank.
 import { useEffect, useId, useRef, useState } from "react";
 import {
-  BlendWeights, BoardRowLive, KalshiQuote, RowField, Shape, THIN_ASK_SIZE,
-  WIDE_SPREAD_C, pctThisSeason, weightIsCurrent,
+  BlendWeights, BoardRowLive, FieldAxisKey, FieldBlockLike, KalshiQuote,
+  RowField, RowFieldPartial, Shape, THIN_ASK_SIZE, WIDE_SPREAD_C,
+  pctThisSeason, weightIsCurrent,
 } from "../lib/pickerApi";
-import { AXIS_ORDER, tierSet } from "../lib/fieldApi";
+import { AXIS_ORDER, axesPresent, tierSet } from "../lib/fieldApi";
 import { fmtDate } from "../lib/matchday";
 import { readMatchClock } from "../lib/suggesterApi";
 
@@ -397,23 +398,46 @@ export function ShapeChip({ read }: { read: ReadLike }) {
  *  fifth, so ten of twelve cards said the two clubs were level.
  *
  *  WHAT DOES NOT. The GAP and the SHAPE are the backend's, always:
- *  `field.tier_gap` and `field.shape` when the block carries them, and
- *  the row's own backend values when it does not. Differencing two band
- *  sets here to colour a cell would be this surface deciding a verdict,
- *  and the whole board is built the other way round — it shows. */
-function effectiveRead(read: ReadLike, field?: RowField | null): ReadLike {
-  if (!field) return read;
-  const text = (side: "fav" | "opp", k: typeof AXIS_ORDER[number]) => {
+ *  `field.tier_gap` and the block's own `shape` when they are carried,
+ *  and the row's own backend values when they are not. Differencing two
+ *  band sets here to colour a cell would be this surface deciding a
+ *  verdict, and the whole board is built the other way round — it shows.
+ *
+ *  AND THE BLOCK MAY NOT CARRY ALL THREE AXES (backend #141,
+ *  2026-09-15). `field.axes[k][side]` was indexed three times with no
+ *  guard, which is precisely why the MLS + Liga MX reading — measured
+ *  on Elo alone — rides under `field_partial` and not under `field`: a
+ *  one-axis block here did not degrade the card, it threw inside it. So
+ *  this walks `FieldBlockLike`, whose `axes` is PARTIAL, and an axis
+ *  the block does not carry keeps the ROW's own text and gap.
+ *
+ *  KEEPING IT IS NOT DRAWING IT. What the card renders for a missing
+ *  axis is NOTHING — see `drawn` in TierGaps — and the value kept here
+ *  is what the marks that read three gaps together need: the shape
+ *  chip's word is the row's, computed by the backend from the row's own
+ *  three gaps, and the chip's plate and cut must be able to read those
+ *  same three rather than two of three and a hole. */
+function effectiveRead(read: ReadLike, block?: FieldBlockLike | null,
+                       shape?: Shape | null): ReadLike {
+  if (!block) return read;
+  const text = (side: "fav" | "opp", k: FieldAxisKey) => {
+    const axis = block.axes[k];
+    /* AN AXIS NOBODY MEASURED IS NOT A CLUB WITH NO BAND. The first is
+       a fact about the evidence and the second about this club in it;
+       a field that carries no attack axis cannot say "no band" on
+       attack, because there is no axis for the club to be missing
+       from. So the row's own reading is kept, and the trio draws the
+       axis nowhere. */
+    if (!axis) return read.tiers[k][side === "fav" ? 0 : 1];
     /* NO FALLBACK NUMBER. An empty set is a club the payload placed in
        no band at all; printing its `tier` would invent exactly the
        placement the set exists to refuse. */
-    const t = tierSet(field.axes[k][side]);
-    return t ?? "no band";
+    return tierSet(axis[side]) ?? "no band";
   };
-  const gap = (k: typeof AXIS_ORDER[number]) =>
-    field.axes[k].tier_gap ?? read.tier_gaps[k];
+  const gap = (k: FieldAxisKey) =>
+    block.axes[k]?.tier_gap ?? read.tier_gaps[k];
   return {
-    shape: field.shape ?? read.shape,
+    shape: shape ?? read.shape,
     tiers: {
       ovr: [text("fav", "ovr"), text("opp", "ovr")],
       atk: [text("fav", "atk"), text("opp", "atk")],
@@ -422,6 +446,15 @@ function effectiveRead(read: ReadLike, field?: RowField | null): ReadLike {
     tier_gaps: { ovr: gap("ovr"), atk: gap("atk"), def: gap("def") },
   };
 }
+
+/** THE THREE AXES' READING NAMES, keyed by the axis rather than listed
+ *  beside it. The trio and the popover both spell the dimensions out in
+ *  words, and a trio that draws FEWER than three now walks the axes the
+ *  block carries — so a parallel list would go out of step with it the
+ *  first time an axis was missing from the middle. */
+const DIM_LABEL: Record<FieldAxisKey, string> = {
+  ovr: "overall", atk: "attack", def: "defence",
+};
 
 /** THE DAGGER ON A CLUB THE PLACEABILITY FLOOR REFUSED, carrying the
  *  backend's own reason on hover.
@@ -473,7 +506,16 @@ function FloorMark({ note }: { note?: string | null }) {
  *  Neutral line and ink at rest, accent only when it is open: it is an
  *  affordance, not an alert, and the traffic light stays on the
  *  numbers. */
-function FieldRanks({ field }: { field: RowField }) {
+function FieldRanks({ block, drawn, absent }: {
+  block: FieldBlockLike;
+  /** the axes this block CARRIES, in reading order — never AXIS_ORDER,
+   *  which is the set a three-axis field happens to fill */
+  drawn: readonly FieldAxisKey[];
+  /** WHICH AXES THE FIELD DOES NOT HOLD AND WHY, in the backend's own
+   *  words (`field_partial.shape_absent`). Null on a whole field, which
+   *  has none — and the panel is then byte for byte what it was. */
+  absent: { axes_absent: string[]; why: string } | null;
+}) {
   const panelId = useId();
   const [pinned, setPinned] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -496,10 +538,25 @@ function FieldRanks({ field }: { field: RowField }) {
     return () => document.removeEventListener("pointerdown", away, true);
   }, [pinned]);
 
-  const axes = AXIS_ORDER.map((k) => ({ k, a: field.axes[k] }));
+  /* THE AXES THE BLOCK HAS, NOT THE THREE A FIELD MAY HAVE. A panel
+     that walked AXIS_ORDER would print `ovr #1v#2` beside two labels
+     with nothing under them, which is the empty band this whole key
+     exists to avoid — one cell wide instead of one card wide. */
+  const axes = drawn.flatMap((k) => {
+    const a = block.axes[k];
+    return a ? [{ k, a }] : [];
+  });
   const label = "the field's ranks on each axis — "
     + axes.map(({ k, a }) => `${k} #${a.fav.rank} v #${a.opp.rank}`).join(", ")
-    + `, of ${field.size}`;
+    + `, of ${block.size}`
+    /* AND THE AXES IT HAS NONE FOR, NAMED IN THE NAME. A reader who
+       cannot see that the trio is one cell short is exactly the reader
+       this affordance is for. The account is inside; the name says
+       there is one. */
+    + (absent && absent.axes_absent.length > 0
+        ? `, and no ${absent.axes_absent.join(" or ")} axis — nobody has`
+          + " measured one for these leagues, and the panel says why"
+        : "");
 
   return (
     /* STILL NOT `relative`, and that is the property being preserved
@@ -517,7 +574,10 @@ function FieldRanks({ field }: { field: RowField }) {
       <button type="button" data-testid="field-ranks-open"
         aria-expanded={open} aria-label={label}
         aria-describedby={open ? panelId : undefined}
-        data-size={field.size}
+        data-size={block.size}
+        data-axes={axes.map(({ k }) => k).join(",")}
+        data-axes-absent={absent && absent.axes_absent.length > 0
+          ? absent.axes_absent.join(",") : undefined}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         onClick={(e) => {
@@ -589,7 +649,15 @@ function FieldRanks({ field }: { field: RowField }) {
              the club names on 2026-09-11; this placement did not move
              with it — the operator asked for it and has not disputed
              it.) */
-          className="absolute right-0 top-[calc(100%+7px)] z-20 w-max max-w-full rounded-lg border border-line-strong bg-elev2 p-3 shadow-xl">
+          /* `w-max` FITS THE RANK PAIRS; PROSE NEEDS A COLUMN TO WRAP
+             IN. A sentence under `w-max` asks for one enormous line and
+             is then capped by `max-w-full` at whatever the card happens
+             to be, which at the board's widest track is a paragraph
+             three words deep. `w-64` when there is prose, still capped
+             by the card, so the panel is a readable column at every
+             width and unchanged where there is none. */
+          className={`absolute right-0 top-[calc(100%+7px)] z-20 max-w-full rounded-lg border border-line-strong bg-elev2 p-3 shadow-xl ${
+            absent ? "w-64" : "w-max"}`}>
           {/* `flex`, NOT `inline-flex`. An inline-flex is an atomic
               inline and sits on its parent's baseline, so the strut's
               descender pushed this row 12px below the trio's — the
@@ -616,6 +684,33 @@ function FieldRanks({ field }: { field: RowField }) {
               </span>
             ))}
           </span>
+          {/* AND WHAT THIS FIELD DOES NOT MEASURE, IN THE BACKEND'S OWN
+              WORDS (backend #141, 2026-09-15).
+              THE TRIO CANNOT SAY IT, WHICH IS WHY IT IS HERE. An axis
+              nobody measured is drawn NOWHERE on this card — no cell,
+              no label, no band — because a cell for it would be a
+              claim about evidence that does not exist, and a blank one
+              would read as a club the field failed to place. But an
+              absence drawn nowhere is also an absence a reader cannot
+              ask about, so the account rides the one affordance that is
+              already the field's own detail on this card: the `#` the
+              trio it belongs to opens.
+              `shape_absent.why` VERBATIM, never summarised. It names
+              which axes are missing, says why no `shape` can be read
+              off what is left, and carries the registry's own account
+              of what this field IS — composed by the backend off the
+              reading, so a field that gains an axis tomorrow moves the
+              sentence with it. A sentence restated here would be this
+              surface asserting a measurement it did not make.
+              A WHOLE FIELD DRAWS NONE OF THIS: `absent` is null, and
+              the panel above is byte for byte what it was. */}
+          {absent && (
+            <span data-testid="field-axes-absent"
+              data-axes-absent={absent.axes_absent.join(",")}
+              className="mt-2.5 block border-t border-line pt-2 text-[10px] leading-relaxed text-ink-low">
+              {absent.why}
+            </span>
+          )}
         </span>
       )}
     </span>
@@ -629,7 +724,7 @@ function FieldRanks({ field }: { field: RowField }) {
  *  popover is the same shapeRead(), word for word — it just stops
  *  costing 70px on every card. Shared by the board card and the
  *  finished tail, so both surfaces converge together. */
-export function TierGaps({ read, dense = false, field }: {
+export function TierGaps({ read, dense = false, field, partial }: {
   read: ReadLike;
   /** WHERE THESE TWO CLUBS STAND IN THE COMPETITION'S OWN FIELD, when
    *  somebody has measured one (pickerApi.RowField). It substitutes the
@@ -640,6 +735,13 @@ export function TierGaps({ read, dense = false, field }: {
    *  Absent — every league column, and the finished tail — and this
    *  component draws precisely what it drew before. */
   field?: RowField | null;
+  /** THE SAME STANDING WHERE THE FIELD IS MEASURED ON FEWER AXES —
+   *  `row.field_partial` (pickerApi.RowFieldPartial), which is a
+   *  SEPARATE KEY and stays one: the axes it carries are drawn exactly
+   *  as `field`'s are, the axes it does not carry are drawn nowhere at
+   *  all, and its `shape_absent` sentence says which and why. Never
+   *  passed beside `field` — the backend emits one or the other. */
+  partial?: RowFieldPartial | null;
   /** the card sits in a narrow dense-grid track (PickerColumn.DENSE_GRID)
    *  — the shape popover anchors to the tier block there rather than to
    *  its trigger, so it spans the card's content width and cannot reach
@@ -647,17 +749,42 @@ export function TierGaps({ read, dense = false, field }: {
    *  field; a field-rated card draws no popover at all. */
   dense?: boolean;
 }) {
-  /* ONE READ, DERIVED ONCE, AND EVERY MARK BELOW ASKS IT. Without a
-     field this IS `read`, by identity — see effectiveRead — so the four
-     league columns and the finished tail render byte for byte what they
-     rendered before. */
   const [open, setOpen] = useState(false);
-  const r = effectiveRead(read, field);
-  const dims = [
-    ["overall", r.tier_gaps.ovr, r.tiers.ovr],
-    ["attack", r.tier_gaps.atk, r.tiers.atk],
-    ["defence", r.tier_gaps.def, r.tiers.def],
-  ] as const;
+  /* THE BLOCK THIS CARD IS READING — ONE OF THE TWO KEYS, CHOSEN, NEVER
+     THE TWO COMBINED. `field` is the three-axis contract and `partial`
+     is the reading that carries fewer; a row has one or the other, and
+     what is drawn below comes from whichever it was given. Nothing is
+     padded to the other's shape and nothing is read off both.
+     THE TYPE IS THE WEAKER ONE ON PURPOSE. `FieldBlockLike.axes` is
+     PARTIAL, so every mark below has to ask whether an axis is there —
+     which is the ask whose absence made `field_partial` a separate key
+     in the first place (backend #141). */
+  const block: FieldBlockLike | null = field ?? partial ?? null;
+  /* WHICH AXES ARE DRAWN AT ALL. A whole field answers all three and
+     every mark renders exactly what it rendered before; a partial one
+     answers fewer, and the axes it does not carry get no cell, no
+     label and no band — an axis nobody measured is not a club the
+     field failed to place, and a blank cell is how those two become
+     one thing on a screen. With no block the trio keeps its three
+     league quintiles, unchanged. */
+  const drawn: readonly FieldAxisKey[] =
+    block ? axesPresent(block) : AXIS_ORDER;
+  /* ONE READ, DERIVED ONCE, AND EVERY MARK BELOW ASKS IT. Without a
+     block this IS `read`, by identity — see effectiveRead — so the four
+     league columns and the finished tail render byte for byte what they
+     rendered before.
+     THE SHAPE COMES OFF THE BLOCK THAT HAS ONE. `field.shape` is the
+     backend's reading on the field's own tiers; a PARTIAL block carries
+     no `shape` key at all, because CLEAN/CUT/HOLLOW is read off three
+     gaps together and this field has one — so the row's own backend
+     shape stands, which is still the backend's word and not a label
+     composed here out of one gap and two absences. */
+  const r = effectiveRead(read, block, field?.shape ?? null);
+  /* WHY AN AXIS IS NOT DRAWN, in the backend's own words. Only a
+     partial block has any: a whole field is missing nothing. */
+  const absent = partial?.shape_absent ?? null;
+  const dims = drawn.map((k) =>
+    [DIM_LABEL[k], r.tier_gaps[k], r.tiers[k]] as const);
   return (
     <div className="relative">
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
@@ -687,12 +814,23 @@ export function TierGaps({ read, dense = false, field }: {
         <span className="inline-flex items-end gap-2">
         <span
           className="inline-flex items-end gap-2.5 font-mono text-[10px] tabular-nums text-ink-low"
-          title={field
+          title={block
             ? "tier bands in this competition's own field, favourite v"
               + " opponent — every band the club's 95% interval touches,"
               + " so a set of two is a placement the evidence refuses to"
               + " narrow. A name in its own colour is a unit that does"
               + " not back the pick."
+              /* AND WHY THERE ARE FEWER THAN THREE OF THEM. The hover
+                 on the numbers is where a reader asks what the numbers
+                 are; an axis missing from the row they are hovering is
+                 part of that answer. The account itself is the `#`'s,
+                 in the backend's own words — this says there is one. */
+              + (absent && absent.axes_absent.length > 0
+                  ? ` This field has no ${absent.axes_absent.join(" or ")}`
+                    + " axis: nobody has measured one for these leagues,"
+                    + " so neither is drawn. The # beside these numbers"
+                    + " says why, in the backend's own words."
+                  : "")
             : "tier pairs, favourite v opponent — a name in its own colour is a unit that does not back the pick"}>
           {/* A dissenting dimension's NAME lights in its own verdict tone.
               Same dissents() predicate the chip's cut uses, so the lit
@@ -703,9 +841,13 @@ export function TierGaps({ read, dense = false, field }: {
               '[data-dim="overall"]' UNQUALIFIED by tier-cell, so a second
               data-dim on a wrapper would resolve to two elements and fail
               Playwright's strict mode. */}
-          {AXIS_ORDER.map((lbl) => {
+          {/* `drawn`, NOT AXIS_ORDER (backend #141, 2026-09-15). The
+              order is the three axes a field MAY have; this is the
+              axes this block HAS. On a whole field they are the same
+              list and this trio is unchanged. */}
+          {drawn.map((lbl) => {
             const gap = r.tier_gaps[lbl], pr = r.tiers[lbl];
-            const side = field?.axes[lbl];
+            const side = block?.axes[lbl];
             return (
             <span key={lbl} data-tier={lbl} data-dissent={dissents(gap)}
               data-fav-set={side ? side.fav.tier_set.join(",") : undefined}
@@ -763,7 +905,7 @@ export function TierGaps({ read, dense = false, field }: {
             after the trio it belongs to, inside its group, and only
             when there is a field to open: an `i` over a competition
             nobody has measured would be an empty promise. */}
-        {field && <FieldRanks field={field} />}
+        {block && <FieldRanks block={block} drawn={drawn} absent={absent} />}
         </span>
         {/* THE SHAPE POPOVER — ON A LEAGUE COLUMN ONLY (2026-09-10).
             The operator: "keep the #, remove the i since it is
@@ -779,8 +921,16 @@ export function TierGaps({ read, dense = false, field }: {
             the shape explainer off the landing board, which is the one
             surface he protected outright: "only with new 'i' added.
             Consistency is key."
-            So the condition is the field, not the page. */}
-        {!field && (<>
+            So the condition is the field, not the page.
+            AND A PARTIAL FIELD IS A FIELD HERE (backend #141). Both
+            halves hold on one: the `#` is drawn, so the `i` would be
+            the second identical circle; and this panel's sentence
+            reads THREE gaps together — `shapeRead` names attack and
+            defence outright — which on a card whose field measures one
+            axis would put two within-league quintiles into a sentence
+            about a cross-league fixture. That is the two-ladders defect
+            the field exists to end, in prose. */}
+        {!block && (<>
         {/* THE POPOVER HANGS OFF THE BUTTON, NOT OFF THE ROW (2026-09-07).
             It was `absolute top-6` on the whole TierGaps block, which is
             24px below the block's top — fine while the row above it fits
@@ -836,7 +986,7 @@ export function TierGaps({ read, dense = false, field }: {
               quintiles" over the field's bands would be this line
               describing the read it replaced. Annotation either way. */}
           <p className="mt-2 border-t border-line pt-2 text-[10px] text-ink-low">
-            {field
+            {block
               ? "Tiers are bands of this competition's own field, and a"
                 + " club's read is every band its 95% interval touches;"
                 + " annotation, never a veto."
