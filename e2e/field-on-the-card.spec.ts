@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { routeEight } from "./eight-columns";
 
 // THE FIELD, ON THE MATCH CARD — and on a page of its own.
 //
@@ -1184,6 +1185,11 @@ test("the link to it sits in the TOP-LEFT of every page that carries the "
     /* "put in on the left upper side of the web ... anytime i need."
        The set of pages is not typed here as three or four favourites: it
        is every route in the app that renders the top bar, walked. */
+    // The landing board is the one route here that would otherwise be a
+    // live board assembly — which WRITES a pre-kickoff snapshot upstream
+    // (e2e/board-holdout.mjs). This test is about the nav bar, so the
+    // board under it is served from the recording.
+    await routeEight(page);
     const routes = [
       "/bet-suggester",
       "/bet-suggester/ucl",

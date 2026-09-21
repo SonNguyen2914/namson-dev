@@ -3688,11 +3688,32 @@ const json = (body: unknown) => ({
   status: 200, contentType: "application/json", body: JSON.stringify(body),
 });
 
+/** THE BOARD ROUTES ON THEIR OWN, WITHOUT GOING THERE.
+ *
+ *  Split out of `serveEight` for the specs that reach the board while
+ *  they are on their way somewhere else — a `?league=` deep link, a
+ *  layout sweep over every route, a back-link click — and so want the
+ *  read answered without a navigation of their own being dictated to
+ *  them.
+ *
+ *  WHY THEY WANT IT ANSWERED RATHER THAN LEFT ALONE: an unmocked board
+ *  read is a board ASSEMBLY on the backend, and an assembly calls
+ *  `snapshots.capture_rows`, which freezes a permanent first-write-wins
+ *  pre-kickoff row for every fixture on it. There is no delete path on
+ *  that table. See e2e/board-holdout.mjs.
+ *
+ *  Registered in a `beforeEach` this is a FLOOR, not a ceiling: a test
+ *  that wants its own board registers it later and Playwright prefers
+ *  the later handler, so nothing here overrides a spec's own fixture. */
+export async function routeEight(page: Page, board: unknown = BOARD_EIGHT) {
+  await page.route("**/api/picker/board**", (r) => r.fulfill(json(board)));
+  await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW_EIGHT)));
+}
+
 /** Serve the eight-column board, and a review so the finished tail is a
  *  read that HAPPENED rather than one the page is still waiting on. */
 export async function serveEight(page: Page, board: unknown = BOARD_EIGHT) {
-  await page.route("**/api/picker/board**", (r) => r.fulfill(json(board)));
-  await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW_EIGHT)));
+  await routeEight(page, board);
   await page.goto("/bet-suggester");
   await page.waitForSelector('[data-testid="league-col"]');
 }
