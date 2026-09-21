@@ -93,6 +93,13 @@ export const SHAPE_ORDER: Record<Shape, number> = {
   CLEAN: 2, SPLIT: 1, HOLLOW: 0,
 };
 
+/** THE AXES A FIELD IS DEFINED ON. Named here, beside the blocks that
+ *  are keyed by it, so `RowField`'s three-of-three and
+ *  `RowFieldPartial`'s some-of-three are the SAME three — and so
+ *  fieldApi.AXIS_ORDER, which is the reading order, cannot drift from
+ *  the set. */
+export type FieldAxisKey = "ovr" | "atk" | "def";
+
 /** ONE CLUB ON ONE AXIS OF THE FIELD — its place among the competition's
  *  own entrants rather than among its league's.
  *
@@ -202,6 +209,73 @@ export interface RowField {
    *  it, and the card then keeps the row's own backend shape — which is
    *  still the backend's word. It is never recomputed here. */
   shape?: Shape | null;
+}
+
+/** THE SAME READING, ON FEWER AXES THAN `field` IS DEFINED ON — and
+ *  UNDER ITS OWN KEY (backend PR #141, 2026-09-15).
+ *
+ *  WHAT IT IS. A field measured on the OVERALL axis alone. MLS + Liga
+ *  MX — the Campeones Cup and the Leagues Cup — have an Elo reading and
+ *  no goals reading at all: the goals artifact holds the 36 Champions
+ *  League entrants and no club of either league. So the block carries
+ *  `ovr`, carries no `atk` and no `def`, and carries NO `shape`, which
+ *  is CLEAN/SPLIT/HOLLOW read off all three gaps together.
+ *
+ *  WHY IT IS NOT `field`. Because `field` is a THREE-AXIS CONTRACT and
+ *  its readers walked it unguarded: `PickerRead.effectiveRead` indexed
+ *  `field.axes[k][side]` for each of ovr/atk/def, so a one-axis block
+ *  under that key did not degrade the card, it threw inside it. The
+ *  backend therefore publishes the partial reading under a key no
+ *  existing reader knows, and every consumer of `field` goes on seeing
+ *  the object it was written for or no key at all — the state it
+ *  already handles. `why_not_field` is that reasoning in the backend's
+ *  own words; it is carried so the frontend prints it rather than
+ *  restating it.
+ *
+ *  THE TWO KEYS ARE NEVER MERGED HERE. Not into one type, not into one
+ *  variable that has forgotten which it was. `axes` is PARTIAL and that
+ *  is the type's whole job: a reader that wants an axis has to ask
+ *  whether it is there, which is the check whose absence caused this
+ *  key to exist. Nothing is padded to the other key's shape — an `atk`
+ *  of nulls would say "this club has no row on an attack axis we
+ *  measured", and the truth is that no attack axis exists for these
+ *  leagues at all. */
+export interface RowFieldPartial {
+  competition?: string;
+  /** see RowField.size — the N of the 1..N axis, the field's own count */
+  size: number;
+  /** ONLY THE AXES SOMEBODY MEASURED. Absent is not null and not empty:
+   *  a key that is not here was never measured for these leagues. */
+  axes: Partial<Record<FieldAxisKey, FieldAxis>>;
+  /** the backend's own list of the keys above, in its order */
+  axes_measured?: string[];
+  /** WHICH AXES ARE MISSING AND WHY `shape` IS ABSENT, in the backend's
+   *  own words — composed off the reading and the registry entry that
+   *  decides it, so a field that gains an axis tomorrow cannot leave a
+   *  stale sentence here. There is no `shape` key on this block at all
+   *  (absent, never null), and the card keeps the ROW's own backend
+   *  shape instead of composing one from one gap and two absences. */
+  shape_absent?: { axes_absent: string[]; why: string } | null;
+  /** WHY THIS READING RIDES UNDER ITS OWN KEY — the backend's sentence,
+   *  printed rather than restated. */
+  why_not_field: string;
+  /** the field's own spelling of each club, beside the row's — what
+   *  makes a mis-resolve visible instead of silently printing some
+   *  other club's bands */
+  clubs?: { fav: string; opp: string };
+}
+
+/** WHAT A SURFACE NEEDS TO DRAW EITHER BLOCK, and it is deliberately
+ *  the WEAKER of the two shapes. Both `RowField` and `RowFieldPartial`
+ *  satisfy it; a renderer typed against it cannot assume an axis is
+ *  there, which is the one assumption that made `field_partial` a
+ *  separate key. It is a view FOR DRAWING, never a merge of the row's
+ *  two keys — which one a card is reading stays a fact about the card,
+ *  and `RowFieldPartial.why_not_field` is why. */
+export interface FieldBlockLike {
+  competition?: string;
+  size: number;
+  axes: Partial<Record<FieldAxisKey, FieldAxis>>;
 }
 
 export interface KalshiQuote {
@@ -408,6 +482,11 @@ export interface BoardRow {
    *  somebody has measured a field for; the card reads it in place of
    *  the three keys above and degrades to them when it is absent. */
   field?: RowField | null;
+  /** THE SAME STANDING, WHERE THE FIELD IS MEASURED ON FEWER AXES — see
+   *  RowFieldPartial. NEVER on the same row as `field`: the backend
+   *  picks the key off the block's own axis set, so a reading is one or
+   *  the other and a card reads whichever it was given. */
+  field_partial?: RowFieldPartial | null;
   league_gap?: LeagueGap | null;
   event_id: string;
   competition_id: string;
