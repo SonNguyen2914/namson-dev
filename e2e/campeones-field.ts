@@ -333,3 +333,49 @@ export const WIDE_PARTIAL = {
   "basis": "rated on the competition's own FIELD — its whole entrant set on one cross-league scale — and not on either club's domestic league. `field_basis` beside this says which field and how deeply it was measured, because two competitions' fields are not measured to the same depth. The `tiers` pair beside this block answers a different question and keeps answering it: a within-league quintile says 'best fifth of its own league', which is the same sentence in two leagues but not the same club. `straddles` and `below_floor` travel with each side because a band published without them reads as a measurement of the club rather than of the evidence.",
   "why_not_field": "THE FIELD PLACED BOTH CLUBS, ON FEWER AXES THAN `field` IS DEFINED ON. This key is not `field` because `field` is a three-axis contract its readers walk unguarded, and this field carries only the axes somebody has measured for these leagues. `axes_measured` says which; `shape_absent` says which are missing and why. Nothing here is padded to the shape of the other key: an axis nobody measured is absent, not a pair of nulls, because those two are different facts about different evidence."
 };
+
+/** THE SAME ONE-AXIS READING, FROM A BACKEND THAT ALSO CARRIES THE
+ *  MEASUREMENT (frontend #81, backend 2026-09-16).
+ *
+ *  WHY IT IS A SECOND FIXTURE AND NOT A FIELD ADDED ABOVE. The blocks
+ *  above were captured on 2026-09-15, the day `field_partial` was
+ *  emitted, and the value/half-width pair landed the day AFTER — so
+ *  they are a faithful record of a payload with no measurement in it,
+ *  which is the state this card must still draw (`measurementOf`
+ *  returns null for both sides and no figure is drawn). Adding the
+ *  numbers to them would delete that case and silently retarget every
+ *  assertion that reads a trio's text content.
+ *
+ *  WHAT IT IS FOR. `FieldSide` is the type BOTH keys' axes are built
+ *  from, so an axis arriving under `field_partial` carries the pair
+ *  exactly as an axis under `field` does. This is the fixture that
+ *  makes that inheritance a measured fact rather than a reading of the
+ *  type — the two keys stay separate, and the one axis this one has is
+ *  drawn with its number like any other.
+ *
+ *  THE NUMBERS ARE THE ELO SCALE THE `ovr` AXIS IS ON, and each
+ *  `interval` is the backend's own — never `value ± half_width`
+ *  computed here, which is the reconstruction `measurementOf` refuses
+ *  a payload for. */
+export const WIDE_PARTIAL_MEASURED = {
+  ...WIDE_PARTIAL,
+  "axes": {
+    "ovr": {
+      ...WIDE_PARTIAL.axes.ovr,
+      "fav": {
+        ...WIDE_PARTIAL.axes.ovr.fav,
+        "value": 1811,
+        "half_width_95": 27,
+        "interval": [1784, 1838],
+      },
+      "opp": {
+        ...WIDE_PARTIAL.axes.ovr.opp,
+        "value": 1523,
+        "half_width_95": 41,
+        "interval": [1482, 1564],
+      },
+      "unit": "elo",
+      "label": "overall",
+    },
+  },
+};

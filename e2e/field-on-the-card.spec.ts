@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { routeEight } from "./eight-columns";
 import {
   CAMPEONES_FIELD_BOARD, CAMPEONES_FIELD_ROW, WIDE_PARTIAL,
+  WIDE_PARTIAL_MEASURED,
 } from "./campeones-field";
 
 // THE FIELD, ON THE MATCH CARD — and on a page of its own.
@@ -1464,6 +1465,66 @@ test("the straddle dagger still fires on a partial block — the mark says "
     await expect(mark).toHaveCount(1);
     await expect(mark).toHaveAttribute(
       "title", new RegExp(`bands ${opp.tier_set.join("·")}\\b`));
+  });
+
+test("the one axis a partial block HAS is drawn with its number, "
+   + "because both keys' axes are the same FieldSide", async ({ page }) => {
+    /* THE SEAM BETWEEN THIS KEY AND #81, MEASURED.
+       `field_partial` was written on 2026-09-15 and the value/half-width
+       pair landed on `FieldSide` the day after — on `FieldSide`
+       deliberately, rather than on `RowField`, so that an axis arriving
+       under EITHER key carries the measurement. That inheritance is a
+       property of the types, and a property nothing exercised: every
+       partial fixture in this file predates the pair, so a card that
+       read the figure off `field` alone would draw this block's tier
+       with no number beside it and no test would have said so — for
+       exactly the leagues (MLS + Liga MX) this key exists to serve.
+       So: the same block, from a backend that carries the pair. */
+    const ax = WIDE_PARTIAL_MEASURED.axes.ovr;
+    await openFolded(page, [{ ...P_ROW, field_partial: WIDE_PARTIAL_MEASURED }]);
+    const ovr = foldedCard(page, "mls").locator('[data-tier="ovr"]');
+
+    // the figure is drawn, on the scale the AXIS declares it is on
+    const m = ovr.locator('[data-measure="ovr"]');
+    await expect(m).toHaveCount(1);
+    await expect(m).toHaveAttribute("data-unit", "elo");
+    // elo is a whole number — `axisDecimals`, not a rounding typed here
+    await expect(m.locator('[data-measure-side="fav"]'))
+      .toHaveText(`${ax.fav.value}±${ax.fav.half_width_95}`);
+    await expect(m.locator('[data-measure-side="opp"]'))
+      .toHaveText(`${ax.opp.value}±${ax.opp.half_width_95}`);
+
+    /* AND IT IS BESIDE ITS TIER, not instead of it. The band, the
+       dagger that says the band is not settled, and the figure the band
+       was read off are three marks about one axis and the card carries
+       all three. */
+    const text = (await ovr.textContent())!.replace(/\s+/g, "");
+    expect(text).toContain(`ovr${ax.fav.tier}v${ax.opp.tier}†`);
+
+    /* THE ABSENT AXES GAIN NOTHING FROM THE MEASUREMENT EITHER. An axis
+       nobody measured has no figure for the same reason it has no band:
+       there is no row for it. */
+    for (const k of P_ABSENT) {
+      await expect(ovr.page().locator(`[data-measure="${k}"]`)).toHaveCount(0);
+    }
+  });
+
+test("a partial block from a backend that predates the measurement draws "
+   + "no figure — and never a zero", async ({ page }) => {
+    /* THE OTHER HALF OF THE SAME RULE, and the one that decides whether
+       the pair may be read unguarded. The block above and this one are
+       the SAME reading from two backends; this is the one that carries
+       no measurement, and the card must be the card it was before
+       rather than a club whose elo is 0.00. */
+    expect("value" in WIDE_PARTIAL.axes.ovr.fav).toBe(false);
+    await openFolded(page, [{ ...P_ROW, field_partial: WIDE_PARTIAL }]);
+    const c = foldedCard(page, "mls");
+    await expect(c.locator("[data-measure]")).toHaveCount(0);
+    // the band is still drawn — an absent figure removes a line, not the axis
+    await expect(c.locator('[data-tier="ovr"]')).toHaveCount(1);
+    // and no zero stands in for it anywhere on the card
+    const text = (await c.textContent())!.replace(/\s+/g, "");
+    expect(text).not.toContain("0±0");
   });
 
 // ──────────── 2. an axis nobody measured is drawn NOWHERE at all ──────
