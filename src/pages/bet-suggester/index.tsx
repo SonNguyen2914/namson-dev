@@ -89,7 +89,7 @@ import { Eyebrow } from "../../components/ui";
 import { ArchiveMenu } from "../../components/ArchiveMenu";
 import { CompRail } from "../../components/CompRail";
 import LiveSection from "../../components/LiveCard";
-import { LeagueColumn, NotesPanel } from "../../components/PickerColumn";
+import { LeagueColumn, NotesPanel, hueOf } from "../../components/PickerColumn";
 import {
   LeagueRibbon, VIEW, VIEW_NARROW, useBoardLoop,
 } from "../../components/LeagueRibbon";
@@ -986,10 +986,26 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
               ragged edges instead of one shape. */}
           <div className="flex flex-wrap items-baseline justify-center gap-x-4 gap-y-1">
             <Eyebrow tone="accent">picker · stage 1 + stage 2</Eyebrow>
+            {/* ONE HUE LOOKUP, HERE TOO (2026-09-22). These four lights
+                used to build `var(--lg-${slug})` by concatenation, which
+                is the construction LeagueTabs.tsx names as a defect in
+                its own header and which shipped a colourless pill on
+                2026-09-15: it is right for every slug the stylesheet
+                happens to declare and silently EMPTY for the first one
+                it does not — `background: var(--lg-nope)` is not an
+                error, it is nothing at all, and a 1.5px dot that failed
+                to paint looks exactly like a 1.5px dot that painted.
+                `hueOf` is the single door a slug goes through to become
+                a colour, and an unmapped slug leaves it wearing the cup
+                fallback — visibly wrong rather than invisibly absent.
+                The four inks are unchanged: all four are mapped, and
+                `hueOf` answers each of them the same token this wrote.
+                Pinned by e2e/one-hue-lookup.spec.ts. */}
             <span aria-hidden className="flex items-center gap-1.5">
               {(["mls", "epl", "laliga", "ligamx"] as const).map((s2) => (
-                <i key={s2} className="h-1.5 w-1.5 rounded-full"
-                  style={{ background: `var(--lg-${s2})` }} />
+                <i key={s2} data-testid="hero-light" data-slug={s2}
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ background: hueOf(s2) }} />
               ))}
             </span>
           </div>
