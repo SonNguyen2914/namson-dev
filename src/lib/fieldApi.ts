@@ -425,23 +425,32 @@ export function partialFieldFor(
  *  volume on 2026-07-25. So both producers say it ONCE, on the
  *  envelope, and this is the one place a card joins the two back up.
  *
- *  THE PRECEDENCE IS `fieldFor`'S OWN, DELIBERATELY. That function
- *  reads `row.field` first and falls back to the ratings join, so a
- *  card fed by the board must get the BOARD's note even when a ratings
- *  read happens to have succeeded beside it — otherwise the sentence on
- *  the card would come from a payload the numbers on it did not. Read
- *  the two in the same order or they can disagree.
+ *  THE PRECEDENCE IS `fieldFor`'S AND `partialFieldFor`'S OWN,
+ *  DELIBERATELY. Those read the row's own block first — `field`, then
+ *  `field_partial` — and only `fieldFor` falls back to the ratings
+ *  join, so a card fed by the BOARD must get the board's note even
+ *  when a ratings read happens to have succeeded beside it; otherwise
+ *  the sentence on the card would come from a payload the numbers on
+ *  it did not. Read them in the same order or they can disagree.
+ *
+ *  BOTH ROW KEYS ARE BOARD-FED, AND `field_partial` IS ONE OF THEM
+ *  (backend #141). Its axes are built from the same `FieldSide`, so a
+ *  club the floor refused carries the same dagger on a one-axis block
+ *  as on a three-axis one; asking only about `field` here would have
+ *  left the MLS and Liga MX cup cards with the empty hover this change
+ *  exists to close. The two keys are still never merged — this asks
+ *  which PRODUCER fed the card, not which shape it sent.
  *
  *  NULL IS NOT AN EMPTY STRING. A board served before 2026-09-17 and a
  *  ratings payload that carries no note are both "nobody said", and a
  *  caller must draw the mark it drew before rather than a tooltip with
  *  nothing in it. */
 export function floorNoteFor(
-  row: Pick<BoardRow, "field">,
+  row: Pick<BoardRow, "field" | "field_partial">,
   boardNote: string | null | undefined,
   ratings: Ratings | null | undefined,
 ): string | null {
-  if (row.field) return boardNote || null;
+  if (row.field || row.field_partial) return boardNote || null;
   return ratings?.below_floor_note || null;
 }
 

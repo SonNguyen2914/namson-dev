@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { CAMPEONES_FIELD_ROW } from "./campeones-field";
 
 // THE DAGGER SAYS WHY — on the BOARD-FED CARD, which is the one it
 // never did.
@@ -48,7 +49,14 @@ import { expect, test } from "@playwright/test";
 //     dagger exactly as it was — the mark is still drawn, because the
 //     club really was refused, and nothing is invented for it.
 //
-//  6. THE STRADDLE DAGGER IS UNTOUCHED. That sentence is about THIS
+//  6. THE ONE-AXIS BLOCK IS BOARD-FED TOO. `field_partial` is a
+//     SEPARATE ROW KEY — and it comes off the same board, built from
+//     the same `FieldSide` (backend `stages._field_side`), so the same
+//     dagger fires on it and must say the same sentence. A reader that
+//     asked only about `field` would have left the MLS and Liga MX cup
+//     cards with exactly the empty hover this file is about.
+//
+//  7. THE STRADDLE DAGGER IS UNTOUCHED. That sentence is about THIS
 //     club's own bands, so it differs per side and is still composed on
 //     the card; a fix that hoisted it too would print one club's bands
 //     against another's.
@@ -139,11 +147,33 @@ const FIELD = (axes: unknown = AXES) => ({
     + "the goals measurement.",
 });
 
+/* THE ONE-AXIS BLOCK, OFF THE EMITTER'S OWN RECORDING (backend #141).
+   The MLS + Liga MX field is measured on Elo alone, so its cup rows
+   ride under `field_partial` — a DIFFERENT key from `field`, never
+   merged with it, and fed by the SAME board. Its sides are built by the
+   same `stages._field_side`, so a club the floor refused carries the
+   same dagger here as on a three-axis block.
+
+   DERIVED, NOT TYPED. `campeones-field.ts` is a verbatim recording of
+   that emitter; only the `ovr` pair is replaced, with the refused
+   favourite this file's other fixtures already use — so the envelope
+   (`why_not_field`, `shape_absent`, `axes_measured`, the two bases)
+   stays the wire's, key for key. */
+const PARTIAL = () => ({
+  ...CAMPEONES_FIELD_ROW.field_partial,
+  axes: {
+    ovr: {
+      ...CAMPEONES_FIELD_ROW.field_partial.axes.ovr,
+      fav: AXES.ovr.fav, opp: AXES.ovr.opp,
+    },
+  },
+});
+
 const meta = { src: "current", min_current_gp: 4, clubs: 36, kind: "cup",
                rated_on: ["epl", "laliga"], reg_time_note: null,
                blend_k: 10, blend_constant_w: null };
 
-const row = (field: unknown) => ({
+const row = (field: unknown, partial?: unknown) => ({
   refused: false, league: "ucl", column: "ucl",
   home: "Feyenoord", away: "Barcelona",
   favourite: "Feyenoord", opponent: "Barcelona",
@@ -166,12 +196,15 @@ const row = (field: unknown) => ({
   venue: null, venue_class: null, kalshi: null, current_only: null,
   form: { fav: "WWDLW", opp: "LDWLL", scope: "ucl", scope_is_cup: true },
   ...(field === undefined ? {} : { field }),
+  ...(partial === undefined ? {} : { field_partial: partial }),
 });
 
-const BOARD = (opts: { field?: unknown; note?: string | null } = {}) => ({
+const BOARD = (opts: {
+  field?: unknown; partial?: unknown; note?: string | null;
+} = {}) => ({
   generated_at: "2026-12-15T08:00:00Z", date: "20261215", days: 7,
   leagues: { ucl: meta },
-  rows: [row(opts.field)],
+  rows: [row(opts.field, opts.partial)],
   refusals: [], off_board: [], off_board_counts: {}, folded: {},
   narrowed_to: ["ucl"],
   field_unit_notes: {
@@ -372,7 +405,30 @@ test("a board that predates the key draws the mark and promises nothing",
     }
   });
 
-// ─────────────────────────── 6. the straddle sentence is untouched ──
+// ─────────────────── 6. the OTHER board key is board-fed as well ────
+
+test("a card drawn from the board's ONE-AXIS block says why as well",
+  async ({ page }) => {
+    // THE SAME DEFECT ON THE OTHER ROW KEY. `field_partial` arrived
+    // after this branch was written (backend #141, frontend #84) and it
+    // is board-fed exactly as `field` is, so a reader that asked only
+    // about `field` would send this card to the ratings fallback — and
+    // on a board-only page there is nothing there, which is `title=""`
+    // again. The ratings read FAILS here, as it does in property 1.
+    await openBoard(page, BOARD({ partial: PARTIAL(), note: FLOOR_NOTE }),
+                    null);
+
+    // ONE AXIS MEASURED, ONE SIDE REFUSED, SO ONE DAGGER — derived from
+    // the fixture, so a block that grew an axis moves the count.
+    const axes = Object.values(PARTIAL().axes);
+    const expected = axes
+      .filter((a) => a.fav.below_floor || a.opp.below_floor).length;
+    expect(expected).toBeGreaterThan(0);
+    await expect(marks(page)).toHaveCount(expected);
+    await expect(marks(page).first()).toHaveAttribute("title", FLOOR_NOTE);
+  });
+
+// ─────────────────────────── 7. the straddle sentence is untouched ──
 
 test("a straddling club still composes its own sentence, per side",
   async ({ page }) => {
