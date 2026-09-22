@@ -87,6 +87,7 @@ import {
 import { failureSentence, readFailure } from "../../lib/providerFailure";
 import { Eyebrow } from "../../components/ui";
 import { ArchiveMenu } from "../../components/ArchiveMenu";
+import { ColumnChooser } from "../../components/ColumnChooser";
 import { CompRail } from "../../components/CompRail";
 import LiveSection from "../../components/LiveCard";
 import { LeagueColumn, NotesPanel, hueOf } from "../../components/PickerColumn";
@@ -467,6 +468,41 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      live set on every render rather than corrected in an effect, which
      would render one frame of a column that is not there. */
   const [pickedRaw, setPicked] = useState<string | null>(null);
+  /* ── WHICH DECLARED COLUMNS THE BOARD DRAWS (operator, 2026-09-22) ──
+
+     The ribbon made every league REACHABLE and no four of them
+     CHOOSABLE: the four in front of you are whichever four the declared
+     order parks in the window, so "show me the EPL, La Liga, MLS and
+     Liga MX together" had no answer. `ColumnChooser` is that answer.
+
+     THE SAME SHAPE AS THE PHONE'S `picked`, ONE LINE BELOW IT, AND FOR
+     THE SAME REASON. This is a SELECTION, not a declaration:
+     `columnSlugs` is untouched, it is still what the chooser offers,
+     what the fields are fetched for and what the narrowed-board copy
+     names. Nothing here can add a competition and nothing here can take
+     one off the board's own account of itself.
+
+     null IS THE WHOLE DECLARATION, and it is the initial state — so a
+     reader who never touches the control, and every server render, sees
+     exactly the board that shipped.
+
+     HELD LOOSELY, resolved on every render against the live set rather
+     than corrected in an effect: a competition can leave the
+     declaration between two payloads, and an effect would render one
+     frame of a column that is not there. Resolved by FILTERING
+     `columnSlugs`, which is why a stale selection can only ever shrink
+     — it cannot reorder the board and cannot smuggle a slug back on. */
+  const [shownRaw, setShown] = useState<readonly string[] | null>(null);
+  const shownSlugs = (() => {
+    if (!shownRaw) return columnSlugs;
+    const want = new Set(shownRaw);
+    const kept = columnSlugs.filter((s) => want.has(s));
+    /* A SELECTION THAT NO LONGER NAMES A LIVE COLUMN IS NOT AN EMPTY
+       BOARD. Every league it held could have left the declaration since
+       it was made, and a board drawing nothing looks exactly like a
+       broken one — so the declaration is what is left. */
+    return kept.length ? kept : columnSlugs;
+  })();
   /** Has the reader opened the framing disclosure? Phone-only in effect
    *  — at every other width the paragraph is open regardless. */
   const [introOpen, setIntroOpen] = useState(false);
@@ -648,28 +684,6 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      `columnSort` is THE authority on what a column runs, and it is the
      same call the columns themselves make, so this cannot drift from
      them: a column whose key changes changes this sentence with it. */
-  /* THE LOOP IS A NO-OP AT FOUR COLUMNS OR FEWER, which is what keeps
-     every narrowed page (`/bet-suggester/ucl`) exactly as it is: nothing
-     is built to page through and no ribbon draws. */
-  const windowed = columnSlugs.length > VIEW;
-  /** HOW MANY COLUMNS THE SCROLLPORT HOLDS AT THIS WIDTH.
-   *
-   *  Four is the desktop's measured number and has not moved (see
-   *  components/LeagueRibbon.tsx). Two is the tablet's, and it is the
-   *  SAME ARITHMETIC run at a narrower viewport: `md:grid-cols-2` already
-   *  put two columns side by side from 768 up, so two is the count that
-   *  keeps a column exactly the width it is today — 352px at 768, 480 at
-   *  1024 — while the board becomes a scroller instead of a four-deep
-   *  stack. One is the phone, where a column is wider than the viewport.
-   *
-   *  `windowed` deliberately does NOT follow it. It asks whether the
-   *  board declares more columns than the WIDEST scrollport can draw,
-   *  which is a fact about the declaration rather than about the window
-   *  you are holding — so a four-column board and every narrowed page
-   *  build no loop, no ribbon and no rail at any width, exactly as
-   *  before. Only the eight-column board changes, and only in how many
-   *  of the eight are in front of you. */
-  const view = phone ? 1 : shape === "tablet" ? VIEW_NARROW : VIEW;
   /* EVERY DECLARED COLUMN IS ON THE TRACK (2026-09-15). It used to draw
      four and mount no others, which is precisely why the board could not
      move: there was nothing beside the four to scroll TO. The track now
@@ -686,7 +700,54 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      is where the page height went. THE DECLARATION IS UNCHANGED:
      `columnSlugs` still names every column, the strip still offers every
      one of them, and the fields are still fetched for all of them. */
-  const drawnSlugs = phone && picked ? [picked] : columnSlugs;
+  /* …AND SINCE 2026-09-22 THE OPERATOR CAN NARROW IT AT EVERY OTHER
+     WIDTH TOO, for a reason that is preference rather than arithmetic:
+     which four of the eight he wants side by side. `shownSlugs` is
+     `columnSlugs` until he says otherwise, so this line is the board
+     that shipped until something is pressed. THE ORDER IS STILL THE
+     DECLARATION'S — `shownSlugs` is a FILTER of `columnSlugs` and
+     nothing here sorts. */
+  const drawnSlugs = phone && picked ? [picked] : shownSlugs;
+  /** IS THERE A CHOICE TO OFFER AT ALL? A fact about the DECLARATION:
+   *  the board carries more columns than the widest scrollport can draw,
+   *  so which of them are in front of you is a question with more than
+   *  one answer. Four columns and every narrowed page (`/bet-suggester/
+   *  ucl`) build no chooser, exactly as they build no ribbon. */
+  const chooseable = columnSlugs.length > VIEW;
+  /* THE LOOP IS A NO-OP AT FOUR COLUMNS OR FEWER, which is what keeps
+     every narrowed page (`/bet-suggester/ucl`) exactly as it is: nothing
+     is built to page through and no ribbon draws.
+     …AND IS THE TRACK A SCROLLER? A fact about what is DRAWN, which
+     until 2026-09-22 was the same question — the board always drew its
+     whole declaration. Now the chooser can narrow it, and a board
+     drawing four of eight has nothing to scroll to: it lays them out
+     side by side and builds no loop, no ribbon and no rail, which is
+     the four-column board this page has always known how to draw. */
+  const windowed = drawnSlugs.length > VIEW;
+  /** HOW MANY COLUMNS THE SCROLLPORT HOLDS AT THIS WIDTH.
+   *
+   *  Four is the desktop's measured number and has not moved (see
+   *  components/LeagueRibbon.tsx). Two is the tablet's, and it is the
+   *  SAME ARITHMETIC run at a narrower viewport: `md:grid-cols-2` already
+   *  put two columns side by side from 768 up, so two is the count that
+   *  keeps a column exactly the width it is today — 352px at 768, 480 at
+   *  1024 — while the board becomes a scroller instead of a four-deep
+   *  stack. One is the phone, where a column is wider than the viewport.
+   *
+   *  NEITHER `chooseable` NOR `windowed` FOLLOWS IT, and they are two
+   *  different questions asked against the same `VIEW`. `chooseable`
+   *  asks whether the board DECLARES more columns than the widest
+   *  scrollport can draw — a fact about the declaration rather than
+   *  about the window you are holding, so a four-column board and every
+   *  narrowed page offer no choice and build no ribbon at any width,
+   *  exactly as before. `windowed` asks whether what is DRAWN overflows
+   *  that same widest scrollport, which is the question the track's own
+   *  template and the loop are built from.
+   *
+   *  They were ONE expression until the chooser existed, because the
+   *  board always drew its whole declaration. Only the eight-column
+   *  board can tell them apart, and only once something is pressed. */
+  const view = phone ? 1 : shape === "tablet" ? VIEW_NARROW : VIEW;
 
   /* ── MATCHDAY BANDS COVER THE WHOLE TRACK ─────────────────────────
      RESTATED 2026-09-15, when the board became a scroller. The union was
@@ -717,7 +778,13 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
     const k = localDay(r.kickoff);
     if (k && !dayLabelFor[k]) dayLabelFor[k] = dayLabel(r.kickoff);
   }
-  const runningSorts = columnSlugs.map((sl) => columnSort(sl, boardSort));
+  /* ASKED OF THE COLUMNS THE READER IS LOOKING AT. This feeds the one
+     sentence that says what the board is ordered by, and since the
+     chooser can narrow the board that is a question about `drawnSlugs`:
+     describing the sort of a column nobody is drawing would be the
+     heading naming a board other than the one on screen. Identical on
+     the default board, where the two lists are the same. */
+  const runningSorts = drawnSlugs.map((sl) => columnSort(sl, boardSort));
   /** How many fixtures each declared column holds — the tab strip's
    *  accessible names, off the same `columnsOf` reader the columns
    *  themselves claim a row with, so a folded fixture counts for every
@@ -745,6 +812,19 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
    *  different problems. See components/LeagueTabs.tsx. */
   const showTabs = phone && boardReady && columnSlugs.length > 1;
   const showRibbon = !phone && windowed && boardReady;
+  /** AND THE CHOOSER, WHICH OUTLIVES THE RIBBON (2026-09-22).
+   *
+   *  Gated on `chooseable` — the DECLARATION — and not on `windowed`,
+   *  which is the trapdoor this avoids: narrowing the board to four
+   *  columns makes the track stop scrolling, which takes the ribbon
+   *  away, which would take the bar away, which would take away the one
+   *  control that could put the other four back. The reader would be
+   *  locked into the selection they just made.
+   *
+   *  NOT ON A PHONE. One league is drawn there at any width and the tab
+   *  strip already chooses which — "which four side by side" is not a
+   *  question a 393px viewport can be asked. */
+  const showChooser = !phone && chooseable && boardReady;
   /* AND THE BOARD BODY ANSWERS A SWIPE (operator, 2026-09-16, with the
      loop: "add it"). The same step function the strip's arrow keys use,
      so the two cannot come to disagree about which league is next, and
@@ -763,12 +843,36 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   const boardSwipe = useLeagueSwipe({
     enabled: showTabs, slugs: columnSlugs, picked, onPick: setPicked,
   });
-  /** The declared set as one comparable string — the same key the loop
+  /** The DRAWN set as one comparable string — the same key the loop
    *  itself is rebuilt on, so the rail's slots and the rotation can never
-   *  be looking at two different boards. */
-  const declaredKey = columnSlugs.join(",");
+   *  be looking at two different boards. It was the DECLARED set until
+   *  2026-09-22, when those stopped being the same list: the rail holds
+   *  one slot per column on the track, so a chooser press that changes
+   *  the track must hand the slots out again. */
+  const drawnKey = drawnSlugs.join(",");
   useBoardLoop({
-    trackRef, stripRef, railRef, slugs: columnSlugs, view,
+    /* THE LOOP IS HANDED THE COLUMNS THAT ARE ON THE TRACK, WHICH IS
+       NOT ALWAYS THE DECLARATION (2026-09-22).
+
+       IT BAILS IF IT IS NOT. `useBoardLoop` looks every slug it is given
+       up in the track's own DOM and returns without binding anything the
+       moment one is missing — which is right, because a rotation
+       addressing a column that is not there would place headers on empty
+       grid tracks. Handed `columnSlugs` over a track the chooser has
+       narrowed, that guard fires on every press: no loop, no ribbon
+       motion, no header rail, and NO ERROR — the board just quietly
+       stops working. An earlier attempt at this feature narrowed the
+       track and left this line reading the declaration, and that is
+       exactly how it died.
+
+       So there is ONE list and four readers of it: the track mounts
+       `drawnSlugs`, the rail slots `drawnSlugs`, the ribbon draws
+       `drawnSlugs` and the loop rotates `drawnSlugs`. They cannot
+       disagree because they are the same expression.
+
+       THIS CHANGES NOTHING ON ITS OWN. `drawnSlugs` was `columnSlugs`
+       at every width but the phone, and the phone never ran the loop. */
+    trackRef, stripRef, railRef, slugs: drawnSlugs, view,
     /* NOT ON A PHONE. The loop addresses every declared column on the
        track and a phone mounts one, so it would refuse to run in any
        case — said here rather than left to that, because "the phone has
@@ -809,7 +913,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
         && ks.every((k) => prev[k] === next[k]);
       return same ? prev : next;
     });
-  }, [railOn, declaredKey]);
+  }, [railOn, drawnKey]);
 
   /* THE PILLS BAR IS THE STICKY STACK'S SECOND STOREY (2026-09-15).
      `--topbar-h` is what every column header sticks to, and it counted
@@ -938,15 +1042,37 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
           the two cases cannot drift apart. What changes is the control:
           a fixed-slot ribbon that divides its width by eight, or a strip
           of tabs each sized by its own name. */}
-      {(showTabs || showRibbon) && (
+      {(showTabs || showRibbon || showChooser) && (
         <div ref={barRef} data-testid="board-pillbar"
           className="sticky top-[var(--bar-top,calc(3rem+1px))] z-40 w-full border-b border-line bg-bs/95 backdrop-blur">
           <div className="mx-auto max-w-[96rem] px-5 py-2 max-md:px-3 max-md:py-1.5">
             {showTabs && picked
               ? <LeagueTabs slugs={columnSlugs} picked={picked}
                   onPick={setPicked} counts={fixtureCounts} />
-              : <LeagueRibbon slugs={columnSlugs} view={view}
-                  stripRef={stripRef} />}
+              : <>
+                  {/* THE RIBBON ONLY WHERE THERE IS A LOOP TO DRIVE IT.
+                      Its pills are filled IMPERATIVELY by `useBoardLoop`
+                      — React renders empty slots on purpose — so a
+                      ribbon drawn while the loop is off is a row of
+                      blank boxes. `showRibbon` is the loop's own gate,
+                      which is why it is the ribbon's too. */}
+                  {showRibbon && (
+                    <LeagueRibbon slugs={drawnSlugs} view={view}
+                      stripRef={stripRef} />
+                  )}
+                  {/* …AND THE CHOOSER UNDER IT, OR ALONE. The rule is
+                      separated from the ribbon rather than boxed with
+                      it, so a board that draws four columns and has no
+                      ribbon does not carry a divider above nothing. */}
+                  {showChooser && (
+                    <div className={showRibbon
+                      ? "mt-1.5 border-t border-line pt-1.5" : ""}>
+                      <ColumnChooser slugs={columnSlugs} drawn={drawnSlugs}
+                        counts={fixtureCounts} view={view}
+                        onChange={setShown} />
+                    </div>
+                  )}
+                </>}
           </div>
         </div>
       )}

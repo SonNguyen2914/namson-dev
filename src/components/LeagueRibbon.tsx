@@ -101,8 +101,14 @@ const restFor = (n: number, view: number) =>
 /** A LOOP NEEDS SLACK ON BOTH SIDES. Five columns give one column of
  *  scroll room in total: whichever end it is put at, the other has none,
  *  and a rotation there would be a jump rather than a seam. Such a board
- *  is a plainly bounded scroller and the rail is its position. */
-const loops = (n: number, view: number) => n - view >= 2;
+ *  is a plainly bounded scroller and the rail is its position.
+ *
+ *  EXPORTED because the column chooser asks the same question of the
+ *  set it is about to hand over — "can this board's first and last
+ *  columns end up neighbours?" is what decides whether two of them are
+ *  co-visible — and a second copy of this test would be free to answer
+ *  differently from the loop that actually runs. */
+export const boardLoops = (n: number, view: number) => n - view >= 2;
 /** The gap between two pills, px. */
 const RGAP = 6;
 /** The gap between two COLUMNS, px — Tailwind `gap-6` on the track. A
@@ -304,7 +310,7 @@ export function useBoardLoop({ trackRef, stripRef, railRef, slugs, view,
        ribbon is built and there is nothing here to drive. */
     if (N <= view) return;
     const SLACK = N - view;
-    const LOOPS = loops(N, view);
+    const LOOPS = boardLoops(N, view);
     const REST = restFor(N, view);
     /** The first LIT slot. Derived, never typed: slot k carries
      *  `ORDER[i - REST - 1 + k]`, so the slot holding the leftmost column
