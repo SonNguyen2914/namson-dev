@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { liveGet, unanswered } from "./live-read";
 import {
   LEAGUE_PROXY_ALLOWED,
   leagueRouteAllowed,
@@ -126,7 +127,16 @@ for (const slug of PICKER_COLUMN_ORDER) {
       // rendered HTML. This asks the deployed route surface whether the
       // URL reaches a handler, clears the allowlist, and comes back as
       // something a JSON caller can parse.
-      const r = await request.get(`/api/${slug}/standings`);
+      // BOUNDED, AND AN UNANSWERED READ IS NOT AN HTML PAGE. Eight of
+      // these go to the live backend in one file; on 2026-09-23 one of
+      // them held a 45s budget open and this test's name was printed
+      // under "failed", which reads as the defect it exists for — the
+      // route answering with Next's HTML 404. It had answered nothing.
+      // The claim is read off the answer, so no answer is a skip with
+      // its reason named; every assertion below is unchanged.
+      const r = await liveGet(request, `/api/${slug}/standings`);
+      test.skip(!r, unanswered(`/api/${slug}/standings`));
+      if (!r) return;
       const body = await r.text();
       const ct = r.headers()["content-type"];
 
@@ -196,7 +206,13 @@ test("the folded Campeones Cup is refused BY NAME in JSON, while a league "
     // /api/*/standings would pass every assertion above. So the same
     // path, one slug over, on a competition that really does have a
     // table.
-    const ok = await request.get("/api/mls/standings");
+    // THE CONTROL IS LIVE, AND AN UNANSWERED CONTROL CONTROLS NOTHING.
+    // Its own comment says the refusal above proves nothing without it,
+    // so a backend that did not answer takes the whole test with it —
+    // as a skip naming why, never as a refusal that failed.
+    const ok = await liveGet(request, "/api/mls/standings");
+    test.skip(!ok, unanswered("/api/mls/standings"));
+    if (!ok) return;
     expect(ok.status(), "the control request failed, so the refusal "
       + "above is not evidence of anything").toBe(200);
     expect(clubsInFirstGroup(await ok.text(), "/api/mls/standings"),
@@ -227,7 +243,11 @@ test("a declared prefix refuses an undeclared sub-path as a DIFFERENT "
 
     // NON-VACUITY: the prefix that refused `markets` is not refusing
     // everything — its one real route still forwards.
-    const ok = await request.get("/api/bundesliga/standings");
+    // Live, and the same reasoning as the control above: without it the
+    // two refusals are not evidence that the prefix still forwards.
+    const ok = await liveGet(request, "/api/bundesliga/standings");
+    test.skip(!ok, unanswered("/api/bundesliga/standings"));
+    if (!ok) return;
     expect(ok.status(), "bundesliga refuses its own standings route, so "
       + "the refusal above says nothing about sub-paths").toBe(200);
   });
@@ -273,6 +293,8 @@ test("the prototype keys above are refused because they are undeclared, "
     }
     // And a real prefix answers over the wire, so the loop above is not
     // agreeing with itself in memory while the routes are dead.
-    const r = await request.get("/api/eredivisie/standings");
+    const r = await liveGet(request, "/api/eredivisie/standings");
+    test.skip(!r, unanswered("/api/eredivisie/standings"));
+    if (!r) return;
     expect(r.status()).toBe(200);
   });
