@@ -215,7 +215,44 @@ test("?league=WC26 in the wrong case still means the archive page, never MLS",
       }),
     }));
     await page.goto("/bet-suggester?league=WC26");
-    await page.waitForURL(/\/bet-suggester\/wc26/);
+    /* AND THE WAIT IS FOR THE HOP, BECAUSE THE HOP IS THE CLAIM
+       (2026-09-23). `waitForURL` defaults to `waitUntil: "load"`, so
+       this line did not finish when the URL became /bet-suggester/wc26.
+       It finished when the DOCUMENT the hop landed in had fetched its
+       last subresource — a condition this test names nowhere and reads
+       nothing off. On run 35793175865 it spent the whole 45s having
+       ALREADY taken the first hop to /bet-suggester/leagues?league=WC26,
+       and the budget was printed against a test whose sentence is "the
+       wrong case still means the archive page": a page that had not
+       finished loading, reported as a deep link resolving to the wrong
+       competition.
+
+       The mocks above stop the reads that STARVED the hop; this stops
+       the wait from outliving it. They are different faults — one is
+       the hop not happening, the other is the wait not ending when it
+       does — and fixing only the first leaves a green test whose pass
+       still depends on subresources nobody is asserting.
+
+       "commit" is the honest state: it is reached exactly when the
+       navigation this test is about has happened. Nothing is relaxed by
+       declining to also wait on the leagues page's subresources, and
+       the redirect is not being taken on trust either — the heading
+       assertion below auto-waits and is untouched, so the archive page
+       must still actually render, and a hop to the wrong competition
+       still fails here as loudly as before.
+
+       AND IT BUYS NO TIME TODAY, which is worth writing down so nobody
+       re-measures it hoping otherwise. With the reads above mocked, the
+       leagues document reaches "load" almost as soon as it commits:
+       three isolated runs each, 550/445/445ms on "load" against
+       442/460ms on "commit" — the same number. (An early 125ms reading
+       was a warm full-file run compared against a cold single-test one,
+       and is an artifact of that, not a speed-up.) The point is not
+       that the wait is faster. It is that the wait no longer DEPENDS on
+       a condition this test does not assert, so it cannot be held
+       hostage by subresources again if these mocks are ever narrowed or
+       the page gains a slow one. */
+    await page.waitForURL(/\/bet-suggester\/wc26/, { waitUntil: "commit" });
     await expect(page.getByRole("heading", { name: /World Cup 26/ }).first())
       .toBeVisible();
   });
