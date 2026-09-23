@@ -26,9 +26,9 @@
 //
 // NOTHING HERE IS A RECOMMENDATION. The ordering says where to look.
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
-  AXIS_ORDER, Axis, axisDecimals, Ratings, unitLabel,
+  AXIS_ORDER, Axis, AxisRow, axisDecimals, Ratings, unitLabel,
 } from "../lib/fieldApi";
 import { failureSentence, readFailure } from "../lib/providerFailure";
 
@@ -52,11 +52,28 @@ const LEAGUE_LABEL: Record<string, string> = {
 };
 const lg = (s: string | null) => (s ? LEAGUE_LABEL[s] || s : "no league");
 
-/** The rate column's heading — a per-game figure on the goal axes and
- *  nothing on Elo, which has no per-game reading. Saying "—" there is
- *  the point: an Elo is not a rate and must not be printed as one. */
-const RATE_LABEL: Record<string, string> = {
-  atk: "scores/g", def: "concedes/g", ovr: "",
+/** The rate column's heading — a per-game figure on the goal axes, and
+ *  on Elo NO COLUMN AT ALL.
+ *
+ *  WHAT THIS USED TO BE AND WHY IT HAD TO GO. `ovr: ""` — an
+ *  empty-string header over 36 rows of "—". The intent was right and is
+ *  kept: an Elo is not a rate and must never be printed as one. But an
+ *  UNLABELLED column of dashes does not say that. It is indistinguishable
+ *  from a column whose data failed to arrive, which is the reading a
+ *  reader actually reaches for, and it breaks this tree's own rule twice
+ *  over — a bare dash standing in for a number, under a heading that
+ *  names nothing.
+ *
+ *  SO THE ELO AXIS SIMPLY HAS ONE FEWER COLUMN. Not a renamed header
+ *  over the same dashes: "not a rate on this axis" written 36 times is
+ *  still 36 cells asserting that a rate-shaped quantity belongs here and
+ *  is merely absent. It does not belong here. The axis that has no
+ *  per-game reading is drawn without the place a per-game reading would
+ *  go, which is the same move `axesPresent` makes for an axis nobody
+ *  measured: absent, not empty. The sentence itself moves to the column
+ *  heading's title on the axes that DO have one, where it is said once. */
+const RATE_LABEL: Record<string, string | null> = {
+  atk: "scores/g", def: "concedes/g", ovr: null,
 };
 
 /** THE DECLARATION AND THE LICENCE, DRAWN AS THE TWO DIFFERENT THINGS
@@ -185,6 +202,51 @@ function BandCount({ a }: { a: Axis }) {
   );
 }
 
+/** WHY A BAR IS REFUSED, or null when it is drawn.
+ *
+ *  THE INVERSION THIS DECIDES. `half_width_95` is a delete-d jackknife
+ *  over BRIDGE FIXTURES. A club that played none barely moves when
+ *  bridges are deleted, so it comes back NARROW — and the thinnest mark
+ *  on the page is the visual vocabulary for maximum certainty. The
+ *  measurement's own archive says so in as many words: "A club with zero
+ *  played no bridges, so deleting bridges barely moves it and it draws a
+ *  NARROW bar for the reason that makes it LEAST evidenced." At the
+ *  bottom of the range the width and the evidence run in OPPOSITE
+ *  directions, and a renderer holding only the width draws its most
+ *  confident mark on its least evidenced club.
+ *
+ *  SO THE BAR IS NOT DRAWN AT ALL, AND THE TRACK SAYS WHY. Not hatched,
+ *  not hollow, not tinted: a hatched bar is still a bar. It still has a
+ *  left edge, a right edge and a WIDTH, and the width is the thing that
+ *  is lying — at ±0.00 a hatched bar is the same 0.6% sliver with
+ *  decoration on it, and a reader who reads the mark before the legend
+ *  reads it the same way. The only treatment a narrow interval cannot be
+ *  mistaken for is the ABSENCE of an interval with words in its place,
+ *  which is the move this tree already makes everywhere else: a field
+ *  nobody measured renders `field-axes-absent` rather than an empty
+ *  table, and `fieldFor` returns no block rather than half a block.
+ *
+ *  THE RATING ITSELF STILL STANDS AND IS STILL DRAWN. Only the interval
+ *  is refused — the value tick stays exactly where it is, for the same
+ *  reason `BELOW_FLOOR_NOTE` gives for a below-floor club ("The rating
+ *  itself stands and is shown"). This refuses a claim about PRECISION,
+ *  not a claim about the club.
+ *
+ *  TWO REASONS, KEPT APART. Zero bridges is a fact about the corpus and
+ *  only a payload carrying `bridge_fixtures` can state it. A zero-WIDTH
+ *  interval is a fact about the arithmetic, visible on any payload, and
+ *  it is caught here too — a 95% interval of zero width is not a
+ *  precise measurement, it is an interval that measured nothing, and it
+ *  must not be drawn as the former on a payload that cannot say which. */
+function barRefusal(r: AxisRow): string | null {
+  /* `=== 0`, NEVER `!r.bridge_fixtures`. Zero is the value that matters
+     and it is the one truthiness would throw away — and `undefined`
+     here means "this payload does not say", which is not a finding. */
+  if (r.bridge_fixtures === 0) return "no bridge evidence";
+  if (r.interval[1] - r.interval[0] === 0) return "zero-width interval";
+  return null;
+}
+
 function AxisTable({ a }: { a: Axis }) {
   // pad the track so an interval reaching the extreme still draws inside
   const [lo0, hi0] = a.span;
@@ -197,6 +259,23 @@ function AxisTable({ a }: { a: Axis }) {
      same figure and the two must not round it differently. This page is
      where the rule came from; it is no longer where it lives. */
   const dec = axisDecimals(a.unit);
+  /* THE BRIDGE COUNT GETS A COLUMN ONLY WHERE THE PAYLOAD CARRIES ONE.
+     An always-on column would be 36 rows of nothing on every payload
+     served today, and a column of nothing is indistinguishable from a
+     column that broke — which is the very defect the rate column on the
+     Elo axis already has. Derived from the rows rather than from the
+     axis key, so a payload that gains the field is drawn the day it
+     arrives with no edit here. */
+  const hasBridges = a.rows.some((r) => typeof r.bridge_fixtures === "number");
+  /* WHETHER THIS AXIS HAS A PER-GAME READING AT ALL. Elo does not, and
+     an axis with none is drawn without the column rather than with an
+     empty one — see RATE_LABEL. */
+  const rateLabel = RATE_LABEL[a.axis] ?? null;
+  /* THE COLUMN COUNT, WRITTEN ONCE. The evidence warning below spans the
+     table, and a colSpan typed as a literal is a number that goes stale
+     the next time a column is added or dropped — which is twice in this
+     function already. */
+  const COLS = 5 + (hasBridges ? 1 : 0) + (rateLabel ? 1 : 0);
 
   return (
     <div data-testid="axis-table" data-axis={a.axis}>
@@ -208,8 +287,9 @@ function AxisTable({ a }: { a: Axis }) {
         <table className="w-full min-w-[620px] border-collapse text-[13px]">
           <thead>
             <tr className="bg-elev2">
-              {["#", "club", "", unitLabel(a.unit) ?? a.unit,
-                RATE_LABEL[a.axis], "tier"].map((h, i) => (
+              {[...(hasBridges ? ["bridges"] : []),
+                "#", "club", "", unitLabel(a.unit) ?? a.unit,
+                ...(rateLabel ? [rateLabel] : []), "tier"].map((h, i) => (
                 <th key={i}
                   className="border-b border-line px-3 py-2 text-left font-mono text-[9px] uppercase tracking-[0.12em] font-medium text-ink-faint">
                   {h}
@@ -218,11 +298,54 @@ function AxisTable({ a }: { a: Axis }) {
             </tr>
           </thead>
           <tbody>
-            {a.rows.map((r) => (
-              <tr key={r.club} data-testid="axis-row" data-club={r.club}
+            {a.rows.map((r) => {
+            const refused = barRefusal(r);
+            /* SENT-AND-SET, SENT-AND-NULL, NEVER-SENT are three facts and
+               only the first has anything to print. `!= null` catches the
+               first alone; truthiness would also swallow the empty string
+               the backend promises never to send, and `!== undefined`
+               would print a null. */
+            const warning = r.evidence_warning != null
+              ? r.evidence_warning : null;
+            return (
+              <Fragment key={r.club}>
+              <tr data-testid="axis-row" data-club={r.club}
                 data-below-floor={r.below_floor ? "true" : "false"}
                 data-straddles={r.straddles ? "true" : "false"}
-                className="border-b border-line last:border-b-0">
+                /* THE COUNT REACHES THE DOM ONLY IF THE PAYLOAD CARRIED
+                   IT. `undefined` renders no attribute at all, so a guard
+                   reading this can never be handed "0" by a payload that
+                   never said so — absent stays absent, and absent is not
+                   zero. Same discipline as `data-declared-above-licence`. */
+                data-bridge-fixtures={
+                  typeof r.bridge_fixtures === "number"
+                    ? String(r.bridge_fixtures) : undefined}
+                data-bar-refused={refused ?? undefined}
+                className={warning
+                  ? "border-b border-line/40 last:border-b-0"
+                  : "border-b border-line last:border-b-0"}>
+                {hasBridges && (
+                  <td data-testid="bridge-count"
+                    className={`px-3 py-1.5 font-mono text-[12px] tabular-nums ${
+                      r.bridge_fixtures === 0 ? "text-warn" : "text-ink-mid"}`}>
+                    {/* A COUNT, NEVER A BAR. The archive's instruction is
+                        "READ THIS BEFORE half_width_95", so it sits to the
+                        LEFT of the interval and is drawn as the integer it
+                        is. Drawing it as a second bar would put two
+                        lengths on one row and invite the reader to compare
+                        them, and they are not on one scale.
+                        A ROW THE PAYLOAD DID NOT COUNT IS NAMED. In a
+                        field where other rows carry the key, a missing one
+                        is a real gap — and a bare dash there is exactly
+                        the "missing rendered as a dash" this file is not
+                        allowed to do. */}
+                    {typeof r.bridge_fixtures === "number"
+                      ? r.bridge_fixtures
+                      : <span className="text-[9.5px] uppercase tracking-[0.1em] text-ink-faint">
+                          not counted
+                        </span>}
+                  </td>
+                )}
                 <td className="px-3 py-1.5 font-mono text-[11px] tabular-nums text-ink-faint">
                   {r.rank}
                 </td>
@@ -243,19 +366,41 @@ function AxisTable({ a }: { a: Axis }) {
                 <td className="w-[40%] min-w-[200px] py-1.5 pr-4">
                   {/* the track: cuts behind, the interval over them */}
                   <div className="relative h-[15px]"
-                    aria-label={`${r.club}: ${r.value.toFixed(dec)}, 95% interval ${r.interval[0].toFixed(dec)} to ${r.interval[1].toFixed(dec)}`}>
+                    /* THE REFUSAL IS SAID TO A SCREEN READER TOO. A
+                       label that went on reciting "95% interval 1467 to
+                       1467" would hand the assistive reading the exact
+                       claim the visual one refuses. */
+                    aria-label={refused
+                      ? `${r.club}: ${r.value.toFixed(dec)}, interval not drawn — ${refused}`
+                      : `${r.club}: ${r.value.toFixed(dec)}, 95% interval ${r.interval[0].toFixed(dec)} to ${r.interval[1].toFixed(dec)}`}>
                     <span className="absolute inset-x-0 top-[7px] h-px bg-line" />
                     {a.cuts.map((c) => (
                       <span key={c} aria-hidden
                         className="absolute inset-y-0 w-px bg-line-strong opacity-60"
                         style={{ left: `${pc(c)}%` }} />
                     ))}
-                    <span aria-hidden
-                      className={`absolute top-[5px] h-[5px] rounded-full ${r.straddles ? "bg-warn/45" : "bg-accent/50"}`}
-                      style={{
-                        left: `${pc(r.interval[0])}%`,
-                        width: `${Math.max(pc(r.interval[1]) - pc(r.interval[0]), 0.6)}%`,
-                      }} />
+                    {/* THE INTERVAL, OR THE NAMED REFUSAL OF ONE. See
+                        `barRefusal`: where the width would be read as
+                        confidence it has not earned, no bar is drawn and
+                        the track carries the reason in words instead. The
+                        floor on the width stays for every row that IS
+                        drawn — a real 3-elo interval on a 700-elo track
+                        is sub-pixel and has to round up to be seen at
+                        all — but it can no longer put a mark of maximum
+                        certainty where there is no measurement. */}
+                    {refused ? (
+                      <span data-testid="bar-refused"
+                        className="absolute inset-y-0 left-0 flex items-center font-mono text-[9px] uppercase tracking-[0.1em] text-warn">
+                        {refused}
+                      </span>
+                    ) : (
+                      <span aria-hidden
+                        className={`absolute top-[5px] h-[5px] rounded-full ${r.straddles ? "bg-warn/45" : "bg-accent/50"}`}
+                        style={{
+                          left: `${pc(r.interval[0])}%`,
+                          width: `${Math.max(pc(r.interval[1]) - pc(r.interval[0]), 0.6)}%`,
+                        }} />
+                    )}
                     <span aria-hidden
                       className="absolute top-[2px] h-[11px] w-[2px] rounded-sm bg-ink-hi"
                       style={{ left: `${pc(r.value)}%` }} />
@@ -267,9 +412,20 @@ function AxisTable({ a }: { a: Axis }) {
                     ±{r.half_width_95.toFixed(dec)}
                   </em>
                 </td>
-                <td className="px-3 py-1.5 font-mono text-[12px] tabular-nums text-accent">
-                  {r.rate === null ? "—" : r.rate.toFixed(2)}
-                </td>
+                {/* ONLY WHERE THE AXIS HAS A RATE. And where it does,
+                    a row that lacks one is NAMED rather than dashed:
+                    "no per-game reading for this club" is a different
+                    fact from "this axis has no per-game reading", and a
+                    bare "—" was the one mark that said neither. */}
+                {rateLabel && (
+                  <td className="px-3 py-1.5 font-mono text-[12px] tabular-nums text-accent">
+                    {r.rate === null
+                      ? <span className="text-[9.5px] uppercase tracking-[0.1em] text-ink-faint">
+                          not read
+                        </span>
+                      : r.rate.toFixed(2)}
+                  </td>
+                )}
                 <td className="px-3 py-1.5">
                   {r.tier_set.map((t) => (
                     <i key={t}
@@ -282,7 +438,29 @@ function AxisTable({ a }: { a: Axis }) {
                   ))}
                 </td>
               </tr>
-            ))}
+              {/* THE BACKEND'S WORDS, WHOLE, AND UNDER THE ROW THEY ARE
+                  ABOUT. A sentence does not fit a 40%-wide cell, and
+                  truncating it into a `title=` would hide the one thing
+                  on this row a reader has to see — so it gets a band of
+                  its own spanning the table, printed rather than
+                  paraphrased, the same treatment `band_count_note`
+                  gets. It is INLINE with the row and not a footnote:
+                  the whole defect being fixed is a reader taking the
+                  mark at face value before reaching the legend. */}
+              {warning && (
+                <tr data-testid="evidence-warning-row" data-club={r.club}
+                  className="border-b border-line last:border-b-0">
+                  <td colSpan={COLS} className="px-3 pb-2 pt-0">
+                    <p data-testid="evidence-warning"
+                      className="max-w-3xl border-l-2 border-warn/50 bg-warn/5 py-1.5 pl-3 pr-3 text-[11.5px] leading-relaxed text-ink-mid">
+                      {warning}
+                    </p>
+                  </td>
+                </tr>
+              )}
+              </Fragment>
+            );
+            })}
           </tbody>
         </table>
       </div>
@@ -358,6 +536,24 @@ export default function FieldAxes(
         <h2 className="text-lg font-medium text-ink-hi">The field, ranked</h2>
         <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
           {active.rows.length} clubs · 95% intervals · tier is a set
+          {/* WHICH FIT THIS IS. `passes` has been on the payload and on
+              the type since this page existed, and was read by NOTHING
+              — so two pages could draw two different fits of the same
+              club and neither said which. The live field is a 10-pass
+              chain and the archived league bundles are 1-pass; Arsenal
+              is ~199 elo apart between them, which is more than five
+              times the widest interval on this axis. A number that
+              large moving silently between surfaces is the whole reason
+              this key is published.
+              NAMED ONLY WHERE IT IS SENT. A payload without it says
+              nothing rather than claiming a pass count of one. */}
+          {data.passes != null && (
+            <> · <span data-testid="field-passes"
+              data-passes={String(data.passes)}
+              title="how many chaining passes the fit that produced these numbers was run for. Two readings of the same club at different pass counts are two different fits, not one fit read twice.">
+              {data.passes}-pass fit
+            </span></>
+          )}
         </p>
       </div>
       <p className="mb-4 max-w-3xl text-[13px] leading-relaxed text-ink-low">
