@@ -468,7 +468,26 @@ const DIM_LABEL: Record<FieldAxisKey, string> = {
  *  convention covers both surfaces. It rides the tier trio because that
  *  is where the band it qualifies is printed; the ranks panel therefore
  *  carries none, which is not an omission — a second copy of a mark
- *  eight pixels away says nothing the first did not. */
+ *  eight pixels away says nothing the first did not.
+ *
+ *  A MARK THAT CANNOT SPEAK IS WORSE THAN NO MARK (fixed 2026-09-17).
+ *  The below-floor branch used to read `side.fav.floor_note`, a key the
+ *  BOARD has never sent — only the ratings payload did — so every
+ *  dagger on a board-fed card rendered `title=""`. It said "something
+ *  is off about this number" and then refused to say what, directly
+ *  beside the rating the card had just started showing, which is the
+ *  one number on the card the dagger exists to qualify.
+ *
+ *  THE SENTENCE IS THE RESPONSE'S, SAID ONCE. It rides the envelope
+ *  (`Board.field_floor_note`, `Ratings.below_floor_note`) rather than
+ *  each side, because it is a 500-byte constant and the backend freezes
+ *  whole rows onto its volume on every production GET. See
+ *  fieldApi.floorNoteFor, which is where the two producers are joined,
+ *  and pickerApi.FieldSide, which says why the key is not there.
+ *
+ *  THE STRADDLE BRANCH IS UNCHANGED and still composes its sentence
+ *  here: that one is ABOUT this club's own bands, so it is a different
+ *  sentence per side and there is nothing to hoist. */
 function FloorMark({ note }: { note?: string | null }) {
   return (
     <sup data-testid="field-floor-mark" title={note || ""}
@@ -784,7 +803,8 @@ function measureTitle(
   ].filter(Boolean).join(" · ");
 }
 
-export function TierGaps({ read, dense = false, field, partial }: {
+export function TierGaps({ read, dense = false, field, partial,
+                          floorNote }: {
   read: ReadLike;
   /** WHERE THESE TWO CLUBS STAND IN THE COMPETITION'S OWN FIELD, when
    *  somebody has measured one (pickerApi.RowField). It substitutes the
@@ -802,6 +822,20 @@ export function TierGaps({ read, dense = false, field, partial }: {
    *  all, and its `shape_absent` sentence says which and why. Never
    *  passed beside `field` — the backend emits one or the other. */
   partial?: RowFieldPartial | null;
+  /** WHAT A BELOW-FLOOR DAGGER IN THIS BLOCK SAYS ON HOVER — the
+   *  response's own sentence, resolved once per card by
+   *  fieldApi.floorNoteFor and passed down rather than looked up here.
+   *
+   *  ON THE CARD AND NOT ON THE SIDE. It is one constant for every
+   *  refused club on every axis, so the payload says it once per
+   *  response; a copy per side would be six inside one Champions League
+   *  block and the backend freezes rows onto a volume. See
+   *  pickerApi.FieldSide.
+   *
+   *  Absent is not empty: a board that predates the key leaves the
+   *  dagger exactly as it was rather than promising a tooltip that has
+   *  nothing in it. */
+  floorNote?: string | null;
   /** the card sits in a narrow dense-grid track (PickerColumn.DENSE_GRID)
    *  — the shape popover anchors to the tier block there rather than to
    *  its trigger, so it spans the card's content width and cannot reach
@@ -967,11 +1001,11 @@ export function TierGaps({ read, dense = false, field, partial }: {
               <span data-tier-pair={lbl} className="whitespace-nowrap">
                 {pr[0]}{side && (side.fav.below_floor || side.fav.straddles)
                   && <FloorMark note={side.fav.below_floor
-                    ? side.fav.floor_note
+                    ? floorNote
                     : `the 95% interval touches bands ${side.fav.tier_set.join("·")} — ${side.fav.tier} is where the estimate falls, not a band the evidence will narrow to`} />}v{pr[1]}
                 {side && (side.opp.below_floor || side.opp.straddles)
                   && <FloorMark note={side.opp.below_floor
-                    ? side.opp.floor_note
+                    ? floorNote
                     : `the 95% interval touches bands ${side.opp.tier_set.join("·")} — ${side.opp.tier} is where the estimate falls, not a band the evidence will narrow to`} />}
               </span>
               {/* THE NUMBER THE TIER ABOVE WAS READ OFF (2026-09-16).
