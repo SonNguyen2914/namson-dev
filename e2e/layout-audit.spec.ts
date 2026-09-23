@@ -122,6 +122,47 @@ test("no route scrolls sideways, hides a sticky header, or cuts text",
   for (const route of ROUTES) {
     for (const w of WIDTHS) {
       if (Date.now() > DEADLINE) { unvisited.push(`${route} @${w}`); continue; }
+      /* THE WHOLE CELL IS BOUNDED, NOT JUST THE NAVIGATION — and the
+         difference is what killed this sweep on 2026-09-23. The deadline
+         above is only consulted BETWEEN cells, so one call that hangs
+         inside a cell never gives the loop back and the test dies with
+         nothing reported: measured, it was `page.setViewportSize`
+         stalling for the remaining five minutes against a backend that
+         had stopped answering, because a wedged renderer answers no
+         protocol call, not only the ones with a `timeout` option. So
+         every cell races its own clock, and a cell that does not finish
+         is recorded by name and the sweep moves on. */
+      const spent = await cell(page, route, w);
+      if (spent === null) { unreachable.push(`${route} @${w}`); continue; }
+      collect(route, w, spent);
+    }
+  }
+  /* The per-cell work, verbatim as it was written inline, so the race
+     above wraps it rather than reinterpreting it. */
+  async function cell(p: typeof page, route: string, w: number) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const bell = new Promise<null>((res) => {
+      timer = setTimeout(() => res(null), NAV_MS + SETTLE_MS + MEASURE_MS);
+    });
+    try {
+      return await Promise.race([measure(p, route, w), bell]);
+    } catch {
+      return null;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+  function collect(route: string, w: number, r: string[]) {
+      const uniq = [...new Set(r)];
+      const rank = (f: string) => f.startsWith("H-OVERFLOW") ? 0
+        : f.startsWith("STICKY-UNDER-BAR") ? 1
+        : f.startsWith("CLIPPED") ? 2 : 3;
+      uniq.sort((a, b) => rank(a) - rank(b));
+      uniq.slice(0, 8).forEach((f) => findings.push(`${route} @${w}: ${f}`));
+      if (uniq.length > 8) findings.push(`${route} @${w}: (+${uniq.length - 8} more)`);
+  }
+  async function measure(page: Parameters<typeof cell>[0], route: string,
+                         w: number): Promise<string[] | null> {
       await page.setViewportSize({ width: w, height: 900 });
       /* A ROUTE THAT WILL NOT LOAD IS NOT A LAYOUT DEFECT, and this
          sweep must not go red for one. Every route here is walked
@@ -137,8 +178,7 @@ test("no route scrolls sideways, hides a sticky header, or cuts text",
         await page.goto(route, { waitUntil: "domcontentloaded",
                                  timeout: NAV_MS });
       } catch {
-        unreachable.push(`${route} @${w}`);
-        continue;
+        return null;
       }
       await page.waitForTimeout(SETTLE_MS);
       const r = await page.evaluate((vw) => {
@@ -234,17 +274,11 @@ test("no route scrolls sideways, hides a sticky header, or cuts text",
         }
         return out;
       }, w);
-      const uniq = [...new Set(r)];
-      const rank = (f: string) => f.startsWith("H-OVERFLOW") ? 0
-        : f.startsWith("STICKY-UNDER-BAR") ? 1
-        : f.startsWith("CLIPPED") ? 2 : 3;
-      uniq.sort((a, b) => rank(a) - rank(b));
-      uniq.slice(0, 8).forEach((f) => findings.push(`${route} @${w}: ${f}`));
-      if (uniq.length > 8) findings.push(`${route} @${w}: (+${uniq.length - 8} more)`);
-    }
+      return r;
   }
   if (unreachable.length) {
-    console.log(`routes that did not load in ${NAV_MS / 1000}s (NOT layout `
+    console.log("cells that did not load or did not finish inside their "
+      + `own ${(NAV_MS + SETTLE_MS + MEASURE_MS) / 1000}s (NOT layout `
       + "findings, and not asserted here):\n" + unreachable.join("\n"));
   }
   if (unvisited.length) {
