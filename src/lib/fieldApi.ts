@@ -338,7 +338,13 @@ export function fieldFor(
     return {
       rank: r.rank, tier: r.tier, tier_set: r.tier_set,
       straddles: r.straddles, below_floor: r.below_floor,
-      floor_note: r.floor_note,
+      /* `floor_note` IS NOT COPIED ACROSS ANY MORE. The ratings
+         payload carries one per row AND one on its envelope
+         (`below_floor_note`), and the board carries only the envelope
+         copy — so a card reading the side would have a sentence on one
+         path and an empty string on the other, which is exactly the
+         defect this change closes. `below_floor` above is the index;
+         `floorNoteFor` below is the reader. */
       /* THE MEASUREMENT IS FORWARDED, NOT DROPPED (2026-09-16). This
          adapter was the OTHER half of the operator's complaint: the
          ratings payload it reads has always carried `value`,
@@ -405,6 +411,47 @@ export function partialFieldFor(
 ): RowFieldPartial | null {
   if (whole) return null;
   return row.field_partial ?? null;
+}
+
+/** THE SENTENCE A BELOW-FLOOR DAGGER SAYS, from whichever producer fed
+ *  this card — or null when neither has one.
+ *
+ *  WHY IT IS A FUNCTION AND NOT A FIELD. `FieldSide.below_floor` is a
+ *  flag and the note is a 500-byte constant; carrying the constant per
+ *  side would put six copies of it inside one Champions League block,
+ *  and the backend freezes whole rows onto its volume on every
+ *  production GET (`snapshots.capture_rows`) — ~3KB per cup row per
+ *  capture, forever, which is the growth pattern that filled that
+ *  volume on 2026-07-25. So both producers say it ONCE, on the
+ *  envelope, and this is the one place a card joins the two back up.
+ *
+ *  THE PRECEDENCE IS `fieldFor`'S AND `partialFieldFor`'S OWN,
+ *  DELIBERATELY. Those read the row's own block first — `field`, then
+ *  `field_partial` — and only `fieldFor` falls back to the ratings
+ *  join, so a card fed by the BOARD must get the board's note even
+ *  when a ratings read happens to have succeeded beside it; otherwise
+ *  the sentence on the card would come from a payload the numbers on
+ *  it did not. Read them in the same order or they can disagree.
+ *
+ *  BOTH ROW KEYS ARE BOARD-FED, AND `field_partial` IS ONE OF THEM
+ *  (backend #141). Its axes are built from the same `FieldSide`, so a
+ *  club the floor refused carries the same dagger on a one-axis block
+ *  as on a three-axis one; asking only about `field` here would have
+ *  left the MLS and Liga MX cup cards with the empty hover this change
+ *  exists to close. The two keys are still never merged — this asks
+ *  which PRODUCER fed the card, not which shape it sent.
+ *
+ *  NULL IS NOT AN EMPTY STRING. A board served before 2026-09-17 and a
+ *  ratings payload that carries no note are both "nobody said", and a
+ *  caller must draw the mark it drew before rather than a tooltip with
+ *  nothing in it. */
+export function floorNoteFor(
+  row: Pick<BoardRow, "field" | "field_partial">,
+  boardNote: string | null | undefined,
+  ratings: Ratings | null | undefined,
+): string | null {
+  if (row.field || row.field_partial) return boardNote || null;
+  return ratings?.below_floor_note || null;
 }
 
 /** THE COMPETITION'S FIELD, FETCHED — with every failure NAMED.
