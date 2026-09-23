@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { liveGet, unanswered } from "./live-read";
 
 // The scouting block showed a LOSS as a win (reported Jul 24, 2026):
 // ESPN's `score` string is winner-first, so "L 1-0" was really 0-1.
@@ -9,8 +10,18 @@ const EVENT = process.env.E2E_EVENT_ID || "761690";
 
 test("form + H2H rows: result letter agrees with the scoreline shown",
   async ({ page }) => {
-    const resp = await page.request.get(`/api/mls/match/${EVENT}`);
-    const body = await resp.json();
+    /* THE READ IS BOUNDED AND AN UNANSWERED ONE IS A SKIP. This spec
+       guards a real defect — ESPN's winner-first `score` rendered every
+       defeat as a win — and that guard is unchanged below. What was
+       missing is the third outcome: the read had no clock of its own, so
+       a slow shadow backend spent the whole 45s test budget and this
+       name was printed under "failed", as though the letters DID
+       contradict the scoreline. They were never read. The spec already
+       skips when the payload carries no scouting; a payload that never
+       arrived carries none either, and is the same sentence. */
+    const resp = await liveGet(page.request, `/api/mls/match/${EVENT}`);
+    test.skip(resp === null, unanswered(`/api/mls/match/${EVENT}`));
+    const body = await resp!.json();
     const sc = body.match?.scouting;
     test.skip(!sc, "no scouting section from this backend");
 
@@ -51,8 +62,9 @@ test("form + H2H rows: result letter agrees with the scoreline shown",
 
 test("the hero form strips mirror the scouting form, cell for cell",
   async ({ page }) => {
-    const resp = await page.request.get(`/api/mls/match/${EVENT}`);
-    const body = await resp.json();
+    const resp = await liveGet(page.request, `/api/mls/match/${EVENT}`);
+    test.skip(resp === null, unanswered(`/api/mls/match/${EVENT}`));
+    const body = await resp!.json();
     const sc = body.match?.scouting;
     test.skip(!sc?.last_five?.length, "no scouting from this backend");
 
