@@ -87,15 +87,18 @@ test("no route scrolls sideways, hides a sticky header, or cuts text",
      A budget that runs out is not a layout finding, so it is now
      derived from the same three numbers the loop is written with, and
      the sweep stops itself before it can be killed (see DEADLINE
-     below). The ceiling is capped: the job's own limit is 30 minutes,
-     this suite's slowest legitimate run is ~20, and CI retries a failed
-     test once — one sweep may not be able to spend a third of that. The
-     cap is a disaster ceiling and not a cost: warm, the whole sweep
-     takes about a minute. */
+     below). The ceiling is capped at five minutes, which is barely
+     above the four the old number already allowed and well under the
+     job's own thirty: the point of the change is not more time, it is
+     time apportioned per cell instead of per route, and a sweep that
+     runs out saying what it missed instead of dying saying nothing.
+     Measured against an UNREACHABLE backend the cap is what binds;
+     warm, the whole sweep takes about fifty seconds and never
+     approaches it. */
   const NAV_MS = 12_000, SETTLE_MS = 700, MEASURE_MS = 1_500;
   const CELLS = ROUTES.length * WIDTHS.length;
   const BUDGET_MS = Math.min((NAV_MS + SETTLE_MS + MEASURE_MS) * CELLS,
-                             8 * 60_000);
+                             5 * 60_000);
   test.setTimeout(BUDGET_MS);
   /* AND THE SWEEP STOPS ITSELF RATHER THAN BEING KILLED. A test that
      dies inside the loop reports NEITHER its findings nor what it did

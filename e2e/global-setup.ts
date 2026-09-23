@@ -59,10 +59,20 @@ function warmPaths(): string[] {
     // and it asserts a 200 with real clubs in it, so a cold table is a
     // red spec rather than a slow one
     ...PICKER_COLUMN_ORDER.map((slug) => `/api/${slug}/standings`),
-    // decision-safety.spec.ts
+    // (an-absent-route's OTHER reads — campeones/standings,
+    // campeones/markets, bundesliga/markets — are refused by the proxy
+    // before any socket opens, so there is nothing upstream to warm and
+    // they are deliberately not listed: a warm-up that walks locally
+    // authored refusals is a list nobody can read the cost off.)
+    // decision-safety.spec.ts — the schedule its fixture scan starts at
     "/api/mls/schedule?days=7",
-    // lineups.spec.ts, both tests, same fixture
+    // lineups.spec.ts (both tests) and scouting-consistency.spec.ts,
+    // same fixture
     `/api/mls/match/${process.env.E2E_EVENT_ID || "761439"}`,
+    // watched-strip.spec.ts — THE SLOW ONE, measured at 32s before its
+    // four indexes landed and 1.6-3.3s after, so it is the read most
+    // likely to be mid-recovery when a worker asks for it
+    "/api/bet-suggester/watched-strip",
   ];
 }
 

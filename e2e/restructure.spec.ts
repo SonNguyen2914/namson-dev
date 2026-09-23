@@ -181,6 +181,39 @@ test("a client-side ?league= transition in any CASE is caught by the board's gua
 
 test("?league=WC26 in the wrong case still means the archive page, never MLS",
   async ({ page }) => {
+    /* THE HOP THIS ASSERTS IS A CLIENT-SIDE ONE, AND IT WAITS FOR
+       HYDRATION (2026-09-22/23). `/bet-suggester?league=WC26` redirects
+       to `/bet-suggester/leagues?league=WC26`, and the second hop —
+       the one under test — is `router.replace("/bet-suggester/wc26")`
+       inside an effect gated on `router.isReady`. Nothing about it
+       touches data; it cannot run before the page's JS has loaded and
+       hydrated.
+
+       And that is what went wrong in CI, twice: the run's log shows the
+       first hop taken and the second never arriving inside 45s. The
+       leagues page fetches its own live data from the SAME origin that
+       serves its chunks, and a browser opens a fixed, small number of
+       connections per origin — so when the shadow backend is slow,
+       those pending proxy reads are in front of the script the redirect
+       is waiting on. A hop that never happened was reported as a
+       wrong-case deep link resolving to the wrong competition.
+
+       So the reads this test does not use are answered here. The claim
+       is untouched and is still the whole of it: the URL must end at
+       /bet-suggester/wc26 and the archive page's own heading must be on
+       it, both of which are true or false regardless of what any feed
+       says — and a page that could only redirect once its data arrived
+       would still fail this, as it should. */
+    await page.route("**/api/**", (r) => r.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({
+        detail: "the wrong-case deep-link guard is a client-side redirect "
+          + "and reads no feed; its reads are answered here so hydration "
+          + "is not queued behind them.",
+        reason: "e2e_deep_link_no_live_reads",
+      }),
+    }));
     await page.goto("/bet-suggester?league=WC26");
     await page.waitForURL(/\/bet-suggester\/wc26/);
     await expect(page.getByRole("heading", { name: /World Cup 26/ }).first())
