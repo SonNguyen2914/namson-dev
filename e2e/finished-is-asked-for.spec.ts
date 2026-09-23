@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { expectForwarded } from "./proxy-forwarding";
 
 /* THE WINDOW THE PAGE ASKS FOR, off the page's own constant. Both
    windows opened at 8 days on 2026-09-15 and the chips that used to set
@@ -504,13 +505,24 @@ test("the picker proxy forwards the review's query parameters — unmocked on pu
     // which is exactly how the comp proxy's allowlist 404'd a real
     // backend route on prod behind nine green specs.
     //
-    // THE DEADLINE IS A BUDGET. /api/picker/review is the most expensive
-    // route on the surface (measured 9.1s cold); `test.slow()` triples
-    // it for this test alone. The assertion is untouched, and a proxy
-    // that refuses the route still fails instantly because the refusal
-    // is authored here, not upstream.
-    test.slow();
-    const r = await request.get("/api/picker/review?back=1&leagues=ucl&shots=false");
-    expect(await r.text(), "review with a query parameter rejected by the allowlist")
-      .not.toContain("unknown picker route");
+    // THE DEADLINE WAS A BUDGET, AND THE BUDGET WAS THE WRONG FIX
+    // (2026-09-22). /api/picker/review is the most expensive route on
+    // the surface — 9.1s cold — so this test carried `test.slow()` to
+    // triple its deadline. It still lost: on run 35793175865 it spent
+    // the whole tripled 135s waiting for that backend and reported the
+    // PICKER PROXY as broken, on a PR that touches neither.
+    //
+    // The round trip was never the claim. `expectForwarded` reads the
+    // rewritten URL off the hold-out's socket — the same unmocked
+    // request through the same real handler, with the allowlist refusal
+    // still checked first and locally — so the deadline is a deadline
+    // again and no backend is in the way of it.
+    //
+    // AND THE CLAIM IS FINALLY THE ONE IN THE TITLE. "Forwards the
+    // review's QUERY PARAMETERS" was previously argued from the absence
+    // of a refusal, which is true of a proxy that drops every parameter
+    // it is given. The three below are now asserted to have arrived on
+    // the backend socket in order, verbatim.
+    await expectForwarded(request, "picker",
+                          "review?back=1&leagues=ucl&shots=false");
   });

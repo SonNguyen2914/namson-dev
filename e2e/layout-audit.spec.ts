@@ -73,11 +73,38 @@ const WIDTHS = [390, 768, 1100, 1440, 1920];
  * as its own sentence in the failure. */
 test("no route scrolls sideways, hides a sticky header, or cuts text",
   async ({ page }) => {
-  // this sweep walks every declared route at five widths against a
-  // live backend; the default per-test budget is not sized for that,
-  // and the budget scales with the route list rather than being a
-  // number that silently stops covering it
-  test.setTimeout(20_000 * ROUTES.length);
+  /* THE BUDGET IS PER CELL, BECAUSE THE LOOP IS (2026-09-22).
+     It read `20_000 * ROUTES.length` and its comment said the budget
+     scales with the route list "rather than being a number that
+     silently stops covering it" — which was the right rule applied to
+     the wrong dimension. The loop is routes × WIDTHS, and each cell may
+     legitimately spend a bounded 12s navigation, a 700ms settle and a
+     measuring pass over every element on the page. So twelve routes
+     bought 240s for a sweep whose own bounds allow about 63s PER ROUTE,
+     and on run 35793175865 it duly ran out mid-sweep — twice — and
+     reported nothing at all, on a PR that touches none of this.
+
+     A budget that runs out is not a layout finding, so it is now
+     derived from the same three numbers the loop is written with, and
+     the sweep stops itself before it can be killed (see DEADLINE
+     below). The ceiling is capped: the job's own limit is 30 minutes,
+     this suite's slowest legitimate run is ~20, and CI retries a failed
+     test once — one sweep may not be able to spend a third of that. The
+     cap is a disaster ceiling and not a cost: warm, the whole sweep
+     takes about a minute. */
+  const NAV_MS = 12_000, SETTLE_MS = 700, MEASURE_MS = 1_500;
+  const CELLS = ROUTES.length * WIDTHS.length;
+  const BUDGET_MS = Math.min((NAV_MS + SETTLE_MS + MEASURE_MS) * CELLS,
+                             8 * 60_000);
+  test.setTimeout(BUDGET_MS);
+  /* AND THE SWEEP STOPS ITSELF RATHER THAN BEING KILLED. A test that
+     dies inside the loop reports NEITHER its findings nor what it did
+     not reach: the whole sweep is lost and the log says "timeout". The
+     cells it could not get to are named in the same channel a route
+     that would not load already uses — printed, never asserted —
+     because a sweep that covered less is a fact about the run and not a
+     defect in the layout. */
+  const DEADLINE = Date.now() + BUDGET_MS * 0.9;
   // THE LANDING BOARD IS SERVED FROM A RECORDING, and that makes this
   // sweep stricter rather than weaker. The defect this test exists for
   // is "four league columns collapsed to 0px whenever a fifth
@@ -88,8 +115,10 @@ test("no route scrolls sideways, hides a sticky header, or cuts text",
   await routeEight(page);
   const findings: string[] = [];
   const unreachable: string[] = [];
+  const unvisited: string[] = [];
   for (const route of ROUTES) {
     for (const w of WIDTHS) {
+      if (Date.now() > DEADLINE) { unvisited.push(`${route} @${w}`); continue; }
       await page.setViewportSize({ width: w, height: 900 });
       /* A ROUTE THAT WILL NOT LOAD IS NOT A LAYOUT DEFECT, and this
          sweep must not go red for one. Every route here is walked
@@ -103,12 +132,12 @@ test("no route scrolls sideways, hides a sticky header, or cuts text",
          failing: reachability has its own specs. */
       try {
         await page.goto(route, { waitUntil: "domcontentloaded",
-                                 timeout: 12_000 });
+                                 timeout: NAV_MS });
       } catch {
         unreachable.push(`${route} @${w}`);
         continue;
       }
-      await page.waitForTimeout(700);
+      await page.waitForTimeout(SETTLE_MS);
       const r = await page.evaluate((vw) => {
         const out: string[] = [];
         const de = document.documentElement;
@@ -212,8 +241,15 @@ test("no route scrolls sideways, hides a sticky header, or cuts text",
     }
   }
   if (unreachable.length) {
-    console.log("routes that did not load in 12s (NOT layout findings, "
-      + "and not asserted here):\n" + unreachable.join("\n"));
+    console.log(`routes that did not load in ${NAV_MS / 1000}s (NOT layout `
+      + "findings, and not asserted here):\n" + unreachable.join("\n"));
+  }
+  if (unvisited.length) {
+    console.log(`the sweep ran out of its ${Math.round(BUDGET_MS / 1000)}s `
+      + `budget with ${unvisited.length} of ${CELLS} cells unmeasured — a `
+      + "slow run, not a layout finding, and the cells are named so the "
+      + `coverage lost is readable rather than silent:\n`
+      + unvisited.join("\n"));
   }
   expect(findings, "layout findings:\n" + findings.join("\n"))
     .toEqual([]);

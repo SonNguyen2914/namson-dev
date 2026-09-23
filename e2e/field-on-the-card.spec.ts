@@ -1196,6 +1196,40 @@ test("the link to it sits in the TOP-LEFT of every page that carries the "
     // live board assembly — which WRITES a pre-kickoff snapshot upstream
     // (e2e/board-holdout.mjs). This test is about the nav bar, so the
     // board under it is served from the recording.
+    //
+    // AND SO IS EVERY OTHER READ ON THESE TEN ROUTES (2026-09-22). The
+    // sentence above was right and stopped one route short of its own
+    // reasoning. The other nine each fetch their own live data through
+    // the proxy, none of which this test reads: on run 35793175865 the
+    // walk reached `/bet-suggester/bots` with its 90s budget already
+    // spent on the routes before it, died inside `page.goto`, and
+    // reported THE NAV LINK as missing from a page it never rendered.
+    //
+    // THE CLAIM IS NOT WEAKENED BY THIS, because the claim was never
+    // about data. `FieldLink` sits in `TopBar` (src/components/chrome),
+    // it is server-rendered chrome, and it takes no props from any
+    // payload — so a page that renders its header only when a read
+    // succeeds is still caught here, by the same `toHaveCount(1)` that
+    // has always been the assertion. What is removed is ten routes'
+    // worth of unmocked backend work that this test performs and does
+    // not measure, on the single Railway instance the whole suite
+    // shares.
+    //
+    // REGISTERED BEFORE `routeEight`, because Playwright prefers the
+    // handler registered LATER: the board and the review keep their
+    // recordings, and everything else is answered here.
+    await page.route("**/api/**", (r) => r.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({
+        detail: "field-on-the-card's nav walk answers every read itself: "
+          + "the top bar is server-rendered chrome and carries no data, "
+          + "so ten routes' worth of live fetches are cost without "
+          + "coverage. A failed read is the honest stand-in — this "
+          + "surface must name it, and must still draw its header.",
+        reason: "e2e_nav_walk_no_live_reads",
+      }),
+    }));
     await routeEight(page);
     const routes = [
       "/bet-suggester",
@@ -1220,9 +1254,17 @@ test("the link to it sits in the TOP-LEFT of every page that carries the "
        The link is in the server-rendered header, so it is present at
        DOM-ready; `toHaveCount` auto-waits from there if hydration is
        still in flight. */
-    test.setTimeout(90_000);
+    /* THE BUDGET IS DERIVED FROM THE WALK, not typed as a round number
+       that stops covering it when a route is added. With every read
+       answered in-process a navigation is a static document and a
+       bundle; 6s apiece is generous and the whole walk normally spends
+       a fraction of it. Per-navigation too, so a route that hangs is
+       named at once instead of eating the routes behind it. */
+    const NAV_MS = 6_000;
+    test.setTimeout(NAV_MS * routes.length * 1.5);
     for (const r of routes) {
-      await page.goto(r, { waitUntil: "domcontentloaded" });
+      await page.goto(r, { waitUntil: "domcontentloaded",
+                           timeout: NAV_MS });
       const link = page.getByTestId("field-link");
       await expect(link, `no field link on ${r}`).toHaveCount(1);
       await expect(link).toHaveAttribute("href", "/bet-suggester/ratings");
