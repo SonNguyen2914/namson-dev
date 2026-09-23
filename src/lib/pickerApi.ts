@@ -148,6 +148,33 @@ export interface FieldSide {
   /** `[value - half_width_95, value + half_width_95]`, THE BACKEND'S
    *  OWN, so this number is never a subtraction done here */
   interval?: [number, number];
+
+  /* WHAT THE INTERVAL ABOVE IS MADE OF. `half_width_95` is a delete-d
+     jackknife over BRIDGE FIXTURES, so a club that played none barely
+     moves when bridges are deleted and comes back NARROW — narrowest
+     exactly where it is least evidenced. The card draws that width;
+     without these keys it cannot tell the two reasons for a narrow bar
+     apart. Same contract, same three states and the same discipline as
+     fieldApi.AxisRow, where the full reasoning lives: optional, absent
+     is not zero, and a `bridge_fixtures` of 0 is the value that matters
+     most and the one truthiness would discard.
+
+     NOT SERVED TODAY. `stages._field_side` emits rank/tier/tier_set/
+     straddles/below_floor/value/half_width_95/interval and no more.
+     They are declared here so that the boundary KEEPS them when it
+     does — a field absent from an interface is dropped with no compile
+     error and no test, which is how this one went missing already. */
+
+  /** cross-league fixtures this club actually played; 0 is meaningful */
+  bridge_fixtures?: number;
+  /** the backend's sentence for a bar whose narrowness means the
+   *  opposite of confidence — printed whole, never paraphrased */
+  evidence_warning?: string | null;
+  /** the ladder this side was measured on, where the payload names one */
+  ladder?: string | null;
+  /** the bridge graph component this club sits in — two clubs in
+   *  different components are not on one scale at all */
+  component?: string | number | null;
 }
 
 export interface FieldAxis {

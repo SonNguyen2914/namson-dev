@@ -46,6 +46,61 @@ export interface AxisRow {
    *  reading and must never be printed as one */
   rate: number | null;
   floor_note: string | null;
+
+  /* WHAT THE BAND IS MADE OF, AND WHY IT IS READ BEFORE THE BAND.
+     ------------------------------------------------------------------
+     `half_width_95` is a delete-d jackknife over BRIDGE FIXTURES, and
+     the measurement's own archive states the consequence in a sentence
+     this interface exists to carry:
+
+       "How many cross-league fixtures this club actually played. READ
+        THIS BEFORE half_width_95. A club with zero played no bridges,
+        so deleting bridges barely moves it and it draws a NARROW bar
+        for the reason that makes it LEAST evidenced."
+                  (research_archive league_field slices.json,
+                   `row_field_meanings.bridge_fixtures`)
+
+     So the width and the evidence run in OPPOSITE directions at the
+     bottom of the range, and a renderer holding only the width draws
+     its most confident mark on its least evidenced club. That is not a
+     styling problem to be solved inside a component: it is a fact that
+     has to reach the component at all, and these keys are it.
+
+     ALL FOUR ARE OPTIONAL, AND MISSING IS NEVER ZERO. `GET
+     /api/comp/{key}/ratings` does not carry them today — verified
+     against the live UCL payload on 2026-09-22, whose row keys are
+     rank/club/league/value/half_width_95/interval/tier/tier_set/
+     straddles/below_floor/rate/floor_note and nothing else. They are
+     declared here so that the day the backend emits them they are not
+     dropped at this boundary with no compile error and no test, which
+     is exactly how a field goes missing in this repository. A renderer
+     must branch on `=== 0` / `!= null`, never on truthiness: a
+     `bridge_fixtures` of 0 is the MOST important value this key takes
+     and it is the one falsiness would throw away. */
+
+  /** HOW MANY CROSS-LEAGUE FIXTURES THIS CLUB ACTUALLY PLAYED. Zero is
+   *  a real and meaningful value — it is the state in which the bar
+   *  beside it means the opposite of what its width says — so it is
+   *  `number | undefined` and never coerced. Absent is "this payload
+   *  does not say", which is not the same fact as zero. */
+  bridge_fixtures?: number;
+  /** THE MEASUREMENT'S OWN SENTENCE FOR A BAR THAT MEANS THE OPPOSITE
+   *  OF CONFIDENCE. The archive: "Present and non-null on exactly the
+   *  rows whose narrow bar means the opposite of confidence. Null
+   *  otherwise — never an empty string." It rides `bridge_fixtures ===
+   *  0` the way `floor_note` rides `below_floor`, hence `string | null`
+   *  AND optional: sent-and-set, sent-and-null, and never-sent are
+   *  three different facts and only the first has anything to draw.
+   *  PRINTED WHOLE where it is there, never paraphrased — the same
+   *  discipline `band_count_note` keeps. */
+  evidence_warning?: string | null;
+  /** which ladder this row was measured on, where the payload names one
+   *  — carried rather than inferred from `league` */
+  ladder?: string | null;
+  /** the connected component of the bridge graph this club sits in. Two
+   *  clubs in different components are not on one scale at all, which
+   *  is a stronger statement than a wide interval. */
+  component?: string | number | null;
 }
 
 export interface Axis {
@@ -349,6 +404,18 @@ export function fieldFor(
          Forwarded, never recomputed: `interval` is the payload's own. */
       value: r.value, half_width_95: r.half_width_95,
       interval: r.interval,
+      /* AND SO IS WHAT THE INTERVAL IS MADE OF. Same reason, one key
+         later: this adapter's whole failure mode is copying a number
+         across and leaving behind the fact that says how to read it.
+         A plain copy rather than a `?? 0` so the three states survive
+         the hop — a row that never carried `bridge_fixtures` hands the
+         side `undefined` ("this payload does not say"), never 0 ("this
+         club played no bridges"), which is a claim about the corpus
+         this file has no business making. */
+      bridge_fixtures: r.bridge_fixtures,
+      evidence_warning: r.evidence_warning,
+      ladder: r.ladder,
+      component: r.component,
     };
   };
 
