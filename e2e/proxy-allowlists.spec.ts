@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { BACKEND_URL } from "./backend";
+import { expectForwarded } from "./proxy-forwarding";
 import {
   COMP_RESOURCES,
   LEAGUE_PROXY_ALLOWED,
@@ -204,12 +205,19 @@ for (const [prefix, resource] of PROBE) {
     async ({ request }) => {
       // What a real request adds that the route table cannot: that this
       // URL reaches this handler, gets past the allowlist, and is
-      // rewritten into a backend path. Whatever the backend answers,
-      // the one response that would prove the allowlist rejected the
-      // route is the proxy's own 404 body.
-      const r = await request.get(`/api/${prefix}/${resource}`);
-      expect(await r.text(), `${resource} rejected by the proxy allowlist`)
-        .not.toContain(`unknown ${prefix} route`);
+      // rewritten into a backend path.
+      //
+      // STILL UNMOCKED, AND NO LONGER WAITING ON A BACKEND (2026-09-22).
+      // These eleven probes are the +43s of backend work this file's
+      // header measured and then failed to stop charging: they round-
+      // tripped the live shadow backend for a claim about the app, and
+      // when that backend was slow they timed out and reported the
+      // PROXY as broken. `expectForwarded` reads the rewritten URL off
+      // the hold-out's socket instead — same real request, same real
+      // handler, same locally-authored refusal checked first, and the
+      // rewrite now asserted verbatim rather than inferred. See
+      // e2e/proxy-forwarding.ts.
+      await expectForwarded(request, prefix, resource);
     });
 }
 

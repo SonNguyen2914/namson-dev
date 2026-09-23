@@ -46,6 +46,16 @@ const WORKERS = Number(process.env.SUGGESTER_E2E_WORKERS || 2);
 
 export default defineConfig({
   testDir: "./e2e",
+  // THE BACKEND IS WARMED, AND SAID TO BE WARMED, BEFORE ANY WORKER
+  // STARTS. The cap above is the cure for this suite racing itself; it
+  // does nothing about the FIRST reader of a cold route paying for the
+  // cache every other reader then enjoys. Run 35793175865 lost three
+  // attempts to that on a PR touching none of the failing specs. The
+  // setup never fails the run — a backend that is down is not this
+  // branch being broken — it walks the live reads once, in sequence,
+  // and prints what they cost, so a red log says which of the two it
+  // was. See e2e/global-setup.ts.
+  globalSetup: "./e2e/global-setup.ts",
   timeout: 45_000,
   expect: { timeout: 15_000 },
   retries: process.env.CI ? 1 : 0,

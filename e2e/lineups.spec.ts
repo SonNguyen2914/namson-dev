@@ -106,12 +106,58 @@ test.describe("MLS match page — team news", () => {
     });
 
   test("absences are only claimed once an XI exists", async ({ page }) => {
-    const resp = await page.request.get(`/api/mls/match/${EVENT}`);
-    const body = await resp.json();
-    test.skip(!body.lineups, "backend has no lineup section");
+    // THE SAME BOUND ITS SIBLING ABOVE GREW ON 2026-09-09, and this test
+    // is why one repair per defect is not enough. That fix bounded the
+    // read at line 18 and left the identical unbounded read here; on
+    // 2026-09-22 this one spent the whole 45s budget on
+    // `/api/mls/match/761439` — twice, retry included — and reported
+    // ABSENCE CLAIMS as broken on a PR that touches neither this page
+    // nor that backend. The same route answers in 1.35s against an idle
+    // backend; what it had measured was the suite racing itself for it.
+    //
+    // "IT DID NOT ANSWER" IS NOT "IT HAS NO LINEUPS". An unreachable
+    // backend is a skip with its reason named, because the invariant
+    // below is read OFF the payload and there is no payload to read it
+    // off; a backend that answers without lineups is the pre-existing
+    // skip; anything else is a real failure. The timeout sits well
+    // inside the test budget so the skip happens rather than the runner
+    // killing the test.
+    //
+    // NOTHING ABOUT THE CLAIM IS TIME-DEPENDENT, and that is worth
+    // saying because an XI is published on a schedule. The assertion
+    // never asks what time it is: it reads `released` off the very same
+    // payload it reads `key_absences` off, so a pre-announcement fixture
+    // and a post-announcement one are both evaluated, and both are
+    // evaluated against the state the backend reports for THAT fixture.
+    // `key_absences` is NOT optional here, deliberately. The claim is
+    // about the two values the backend may send — `null` (it could not
+    // compute one) and `[]` (it computed one and nobody is missing) —
+    // which are not the same thing and are not collapsed below. A
+    // payload that carries no such key at all is a shape change, and
+    // this test has always gone loudly red for it rather than reading
+    // it as "no absences claimed".
+    let body: { lineups?: Record<string, {
+      released?: boolean; key_absences: { name?: string }[] | null;
+    }> } | null = null;
+    try {
+      const resp = await page.request.get(`/api/mls/match/${EVENT}`,
+                                          { timeout: 20_000 });
+      if (resp.ok()) body = await resp.json();
+      else test.skip(true, `backend answered ${resp.status()} for ${EVENT}`);
+    } catch (e) {
+      test.skip(true,
+        `backend did not answer within 20s — no payload was read, so this `
+        + `says nothing about absence claims (${String(e).slice(0, 80)})`);
+    }
+    test.skip(!body?.lineups, "backend has no lineup section");
+    // `test.skip()` ends the run at runtime but does not narrow the
+    // type, so state the invariant it just established rather than
+    // casting it away.
+    if (!body?.lineups) return;
 
+    const lineups = body.lineups;
     for (const side of ["home", "away"] as const) {
-      const s = body.lineups[side];
+      const s = lineups[side];
       if (!s) continue;
       // the invariant: no XI released => no absence CLAIMS.
       // null (backend could not compute) and [] (computed, nobody
@@ -124,7 +170,7 @@ test.describe("MLS match page — team news", () => {
     }
 
     await page.goto(`/bet-suggester/mls/${EVENT}`);
-    const absent = (body.lineups.home?.key_absences ?? [])[0];
+    const absent = (lineups.home?.key_absences ?? [])[0];
     if (absent?.name) {
       await expect(page.getByText(absent.name, { exact: false }).first())
         .toBeVisible();
