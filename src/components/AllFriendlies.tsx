@@ -84,7 +84,21 @@ function when(r: Row) {
 function StrengthCell({ s, home, away }: {
   s?: Strength; home?: string; away?: string;
 }) {
-  if (!s) return <span className="text-ink-faint">—</span>;
+  /* NO `strength` KEY AT ALL — a different fact from the three named
+     below, and the one case this function used to answer with a bare
+     dash, six lines under a comment reading "never a dash standing in
+     for a number". The three branches below name a read that HAPPENED
+     and came back unusable; this is a fixture the board never attached
+     a read to, so it is named as that and not as a failure. */
+  if (!s) {
+    return (
+      <span data-testid="strength-unattached"
+        className="font-mono text-[10px] text-ink-faint"
+        title="this fixture carries no strength block at all — no rating read was attached to it, which is not the same as a read that failed">
+        no read attached
+      </span>
+    );
+  }
   if (!s.available || !s.expected_points_share) {
     const why = s.home?.rated === false ? s.home?.reason : s.away?.reason;
     return (

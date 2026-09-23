@@ -90,6 +90,25 @@ export const SORT_MODES: SortMode[] = [
     value: (r) => magnitude(r.rank_gap), nullNote: GAP_NULL_NOTE,
     nullNoteOnlyWhenPresent: true,
     orderNote: (d) => `|rank gap| ${d === "desc" ? "descending" : "ascending"}` },
+  /* THESE FOUR READ THE ROW'S OWN WITHIN-LEAGUE GAPS, AND THE CARD MAY
+     BE DRAWING DIFFERENT NUMBERS.
+     `r.tier_gaps` and `r.shape` are the league quintiles the board has
+     always carried. A card draws `PickerRead.effectiveRead`, which
+     prefers `block.axes[k].tier_gap` and the block's own `shape`
+     wherever the row carries a FIELD block — the competition's own
+     N-club ladder, which is a different measurement on a different
+     population, not a refinement of this one. On a field-rated row the
+     two disagree, and `COLUMN_DEFAULT_SORT.ucl` is `shape`, so the UCL
+     column's default order is read off numbers that appear on no card
+     in it.
+     LEFT AS IT IS, DELIBERATELY (2026-09-22). Re-pointing these at the
+     field gaps would silently change what the operator sees first on a
+     live column — a bigger and much quieter change than the one being
+     fixed. The `col-own-sort` chip now NAMES which gaps it ordered on
+     and says the field-rated cards show another set, so the
+     disagreement is visible rather than implied. Whether the ordering
+     should move is the operator's call, and it can now be made with
+     the discrepancy on screen. */
   { id: "tier_ovr", label: "overall tier gap", defaultDir: "desc",
     value: (r) => r.tier_gaps.ovr },
   { id: "tier_atk", label: "attack tier gap", defaultDir: "desc",

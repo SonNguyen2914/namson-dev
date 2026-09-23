@@ -260,16 +260,77 @@ export default function MarketVsRead({ d, s }: {
         );
       })()}
 
-      {/* the raw ratings behind our number, with their source named */}
-      {(s?.home?.rating != null || s?.away?.rating != null) && (
-        <p className="mt-3 font-mono text-[10px] uppercase tracking-wide text-ink-faint">
-          elo · {s?.home?.club || "home"}{" "}
-          <span className="text-ink-low">{s?.home?.rating?.toFixed(0) ?? "—"}</span>
-          {" · "}{s?.away?.club || "away"}{" "}
-          <span className="text-ink-low">{s?.away?.rating?.toFixed(0) ?? "—"}</span>
-          {" "}({(s?.home as EloSide & {source?: string})?.source || s?.source || "ratings"})
-        </p>
-      )}
+      {/* THE RAW RATINGS BEHIND OUR NUMBER — AND A PAIR OR NOTHING.
+          ----------------------------------------------------------------
+          THIS GATE WAS AN `||`, and what it published was half a
+          comparison under one source label:
+
+            elo · Chelsea 1834 · Kawasaki — (clubelo)
+
+          Three claims in one line and two of them false. The dash is a
+          bare mark standing in for a number, which this tree does not
+          do — an absent figure is NAMED. The parenthesis attributes BOTH
+          sides to ClubElo when ClubElo is precisely what does not hold
+          the second club. And the line's whole job is a COMPARISON, so
+          one rating printed in a comparison's shape invites the reader
+          to supply the half that is missing: the number they imagine is
+          the number they act on.
+
+          THE BACKEND ALREADY REFUSES THIS OUTRIGHT. `club_strength_
+          estimate.SCALE_MISMATCH` will not combine a divisor-600 rating
+          with a divisor-400 one because that "would produce a number
+          with no referent" — and one side with no rating at all is the
+          same refusal a step earlier. `fieldApi` states the frontend
+          half in capitals, HALF A PAIR IS NOT A PAIR, and it did not
+          reach this component.
+
+          SO IT IS AN `&&` — AND THE OTHER BRANCH IS NAMED, NOT BLANK.
+          Dropping the line when one side is missing would trade a
+          misleading sentence for a silent one, and "this club has no
+          rating" is a fact worth as much page as the ratings are. Which
+          side is missing is SAID, because that is the whole content of
+          the absence. */}
+      {(() => {
+        const h = s?.home?.rating, a = s?.away?.rating;
+        /* `!= null` on each side, never truthiness: a legitimate rating
+           of 0 is not an absent one. */
+        const hasH = h != null, hasA = a != null;
+        if (!hasH && !hasA) return null;
+        const home = s?.home?.club || "home", away = s?.away?.club || "away";
+        /* THE SOURCE OF THE SIDE THAT ACTUALLY RESOLVED. Reading
+           `s.home.source` unconditionally names the provider of the
+           side that may be the missing one — so a refusal about a club
+           ClubElo does not hold could be signed "clubelo" off a home
+           side nobody read. On the pair branch the two sides are one
+           provider by construction (the backend refuses to mix scales
+           at all), so home-first is the same answer there. */
+        const srcOf = (side?: EloSide & { source?: string }) => side?.source;
+        const src = (hasH ? srcOf(s?.home) : srcOf(s?.away))
+          || srcOf(s?.home) || srcOf(s?.away) || s?.source || "ratings";
+
+        if (hasH && hasA) {
+          return (
+            <p data-testid="raw-elo-pair"
+              className="mt-3 font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+              elo · {home}{" "}
+              <span className="text-ink-low">{h.toFixed(0)}</span>
+              {" · "}{away}{" "}
+              <span className="text-ink-low">{a.toFixed(0)}</span>
+              {" "}({src})
+            </p>
+          );
+        }
+        const rated = hasH ? home : away;
+        const missing = hasH ? away : home;
+        return (
+          <p data-testid="raw-elo-refused" data-missing-side={hasH ? "away" : "home"}
+            className="mt-3 font-mono text-[10px] leading-relaxed text-ink-faint">
+            no elo pair — {src} rates {rated} and carries no rating for{" "}
+            {missing}. One side&rsquo;s number is not a comparison, so
+            neither is printed here.
+          </p>
+        );
+      })()}
 
       {/* The caveat sits WITH the number, not in a collapsed panel. A
           coloured gap with the explanation hidden reads as a tip. */}
