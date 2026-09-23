@@ -107,7 +107,30 @@ export async function expectForwarded(
     return;
   }
 
-  const r = await request.get(url);
+  /* AND THE HOLD-OUT BRANCH IS BOUNDED TOO. Its sibling above already
+     was, at 20s; this one carried no timeout of its own, so the only
+     clock on it was the TEST's — and a read that hung here spent the
+     whole 45s and died as `apiRequestContext.get: Test timeout`, which
+     names the request and says nothing about the forwarding this test
+     is actually about. Measured 2026-09-23: two specs failed that way
+     in three consecutive runs, in runs whose own setup had already
+     printed `/api/ready no answer in 60003ms`. The hold-out needs no
+     backend, so a stall here is a fact about the run — but it must be
+     SAID, not inferred from a timeout on a line that mentions neither
+     the hold-out nor the proxy. */
+  let r: Awaited<ReturnType<typeof request.get>>;
+  try {
+    r = await request.get(url, { timeout: 20_000 });
+  } catch (e) {
+    throw new Error(
+      `${url} did not answer within 20s, with the hold-out IN the path — `
+      + `so this is not a finding about what the proxy forwards. The `
+      + `hold-out authors its own sentinel and needs no backend, so a `
+      + `stall here is the app under test failing to answer at all, not `
+      + `a route being dropped by the allowlist. Read the run's `
+      + `[e2e] /api/ready line before reading this as a proxy defect `
+      + `(${String(e).slice(0, 120)})`);
+  }
   const text = await r.text();
 
   // THE CLAIM THAT WAS ALWAYS HERE, unchanged and asked first: a route
