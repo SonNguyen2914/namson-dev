@@ -31,7 +31,7 @@ import { ReactNode, useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   AXIS_ORDER, Axis, FieldRead, Ratings, axesPresent, fieldFor,
-  partialFieldFor,
+  floorNoteFor, partialFieldFor,
 } from "../lib/fieldApi";
 import { dayLabel, fmtDate, localDay } from "../lib/matchday";
 import {
@@ -501,7 +501,7 @@ export function seasonDeparture(
  *  RowCard's output is unchanged — which e2e/picker.spec.ts and
  *  e2e/picker-blend-cup.spec.ts prove, unedited, on every run. */
 export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
-                         field, partial }: {
+                         field, partial, floorNote }: {
   row: BoardRow; modeId: SortModeId; clubCount: number;
   /** WHERE THESE TWO CLUBS STAND IN THE COMPETITION'S OWN FIELD, when
    *  one has been measured — see pickerApi.RowField and fieldApi.fieldFor.
@@ -517,6 +517,17 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
    *  exactly as `field`'s are and the axes it does not carry are drawn
    *  nowhere, which is a distinction one merged value could not keep. */
   partial?: RowFieldPartial | null;
+  /** WHAT A BELOW-FLOOR DAGGER IN THIS READ SAYS — the response's own
+   *  sentence, resolved once per card beside `field` above and by the
+   *  SAME precedence (fieldApi.floorNoteFor), so the note and the
+   *  numbers it qualifies always come from one producer.
+   *
+   *  It travels beside the block rather than inside it because it is
+   *  one constant for every refused club on every axis: the payload
+   *  says it once per response, and a copy per side would be six inside
+   *  one Champions League block — frozen onto the backend's volume by
+   *  `capture_rows` on every production GET. See pickerApi.FieldSide. */
+  floorNote?: string | null;
   /** what this row's COLUMN header already states — see columnNotes. A
    *  note whose text the header carries is not drawn again down here.
    *  Absent off the board (LiveCard), where there is no header. */
@@ -788,7 +799,8 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
           with the finished tail (components/PickerRead.tsx), so a read
           below the divider is THE SAME READ as one above it. */}
       <div className="mt-3">
-        <TierGaps read={row} dense={dense} field={field} partial={partial} />
+        <TierGaps read={row} dense={dense} field={field} partial={partial}
+          floorNote={floorNote} />
       </div>
 
       {/* A WITHHELD GAP SAYS WHY, in the backend's own words — HERE only
@@ -808,7 +820,7 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
 }
 
 function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
-                  hoisted, field }: {
+                  hoisted, field, boardFloorNote }: {
   row: BoardRow; rank: number; modeId: SortModeId; clubCount: number;
   colSrc?: string | null;
   /** in a narrow dense-grid track — see RowRead's own `dense` note */
@@ -820,6 +832,11 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
    *  the DATA behind marks the card already has (see fieldFor and
    *  PickerRead.TierGaps). */
   field?: FieldRead;
+  /** THE BOARD'S OWN SENTENCE for a club the placeability floor
+   *  refused — `Board.field_floor_note`, said once per response and
+   *  handed down rather than copied onto every side (see
+   *  fieldApi.floorNoteFor and pickerApi.FieldSide). */
+  boardFloorNote?: string | null;
 }) {
   const cross = row.cross_league === true;
   /* THIS FIXTURE'S PLACE IN THAT FIELD, DERIVED ONCE PER CARD. Null for
@@ -842,6 +859,14 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
      is a whole field, fewer is a partial one — so the guard reads the
      axis list rather than inferring it from a competition name. */
   const blk: FieldBlockLike | null = fld ?? partial;
+  /* WHAT THIS CARD'S DAGGER SAYS, FROM THE SAME PRODUCER ITS NUMBERS
+     CAME FROM. Resolved beside `fld` and in the same precedence, which
+     is the point: a card reading the board's block must not take its
+     sentence from a ratings payload that happens to have loaded next to
+     it. Null when neither producer sent one, and the mark then renders
+     exactly as it did before the key existed. */
+  const floorNote = floorNoteFor(
+    row, boardFloorNote, field?.error ? null : field?.data);
   const alt = seasonDisagreement(row);
   const departure = seasonDeparture(row, colSrc, alt);
   /* WHICH RULE NAMED THE FAVOURITE THIS CARD IS SIGNED FROM. "rank" on
@@ -964,7 +989,8 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
       </div>
 
       <RowRead row={row} modeId={modeId} clubCount={clubCount}
-        dense={dense} hoisted={hoisted} field={fld} partial={partial} />
+        dense={dense} hoisted={hoisted} field={fld} partial={partial}
+        floorNote={floorNote} />
 
       <div className="mt-3 border-t border-line pt-3">
         <KalshiCell quote={row.kalshi} />
@@ -2293,8 +2319,8 @@ function Slotted({ to, children }: {
 
 export function LeagueColumn({
   slug, meta, rows, refusals, days, dayKeys, sortFor, dayLabels, colIndex,
-  review, dense = false, field, headSlot = null, sideways = false,
-  tabPanel = false,
+  review, dense = false, field, boardFloorNote, headSlot = null,
+  sideways = false, tabPanel = false,
 }: {
   slug: string;
   /** absent when the payload never mentioned this league at all */
@@ -2379,6 +2405,19 @@ export function LeagueColumn({
    *  a cup whose clubs come from tables that cannot be compared, and a
    *  league column's own table already does that job. */
   field?: FieldRead;
+  /** THE BOARD'S OWN SENTENCE for a club the placeability floor
+   *  refused (`Board.field_floor_note`). It belongs to the RESPONSE and
+   *  not to this column — one constant covers every column and every
+   *  axis — so the page reads it off the board once and hands it down.
+   *
+   *  It is threaded rather than fetched here because the alternative is
+   *  a per-side copy, and a paragraph on a row is frozen onto the
+   *  backend's volume by `capture_rows` on every production GET. See
+   *  pickerApi.FieldSide, which says why the key is not on the side.
+   *
+   *  Absent for a board that predates it, and the dagger is then drawn
+   *  exactly as it was. */
+  boardFloorNote?: string | null;
   /** WHERE THIS COLUMN'S HEADER IS DRAWN — its slot in the board's
    *  sticky header rail, or null to draw it at the top of the column as
    *  it always was.
@@ -2938,7 +2977,7 @@ export function LeagueColumn({
               <RowCard key={`${r.league}-${r.event_id}`} row={r} rank={i + 1}
                 modeId={modeId} clubCount={meta?.clubs ?? 0}
                 colSrc={meta?.src} dense={dense} hoisted={notes}
-                field={field} />
+                field={field} boardFloorNote={boardFloorNote} />
             ))}
             {refused.map((r, i) => (
               <RefusalCard key={`ref-${r.event_id ?? r.club}-${i}`} r={r}
