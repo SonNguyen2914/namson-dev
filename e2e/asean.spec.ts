@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { expectForwarded } from "./proxy-forwarding";
 
 // ASEAN Championship viewer — the first NATIONAL-TEAM competition on the
 // shared /comp/[key] page. Hermetic: recorded backend shapes only.
@@ -310,11 +311,15 @@ test("the comp proxy forwards tournament — unmocked on purpose", async ({
   // behind nine green specs. This hits the real dev server. Whatever the
   // backend answers (payload, error, unreachable), the one response that
   // proves the ALLOWLIST rejected it is the proxy's own 404 body.
+  //
+  // STILL UNMOCKED, AND NO LONGER FOUR LIVE ROUND TRIPS (2026-09-22).
+  // The backend's answer was never part of the claim — the assertion
+  // accepts a payload, a 500 and a 502 alike — so these four read the
+  // rewritten URL off the hold-out's socket instead, which also makes
+  // the `asean/<resource>` rewrite itself an assertion rather than an
+  // inference. See e2e/proxy-forwarding.ts.
   for (const resource of ["fixtures", "markets", "tournament", "status"]) {
-    const r = await request.get(`/api/comp/asean/${resource}`);
-    const body = await r.text();
-    expect(body, `${resource} rejected by the proxy allowlist`)
-      .not.toContain("unknown comp route");
+    await expectForwarded(request, "comp", `asean/${resource}`);
   }
 });
 

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { expectForwarded } from "./proxy-forwarding";
 // the SAME day-key function the board groups by, so a test can never
 // disagree with the page about which band a kickoff belongs to
 import { localDay as localDayOf } from "../src/lib/matchday";
@@ -2419,20 +2420,21 @@ test("the picker proxy forwards review too — unmocked on purpose",
     // never exercised by them, and a route missing from the allowlist
     // would 404 on prod behind a green suite.
     //
-    // THE DEADLINE IS A BUDGET, NOT AN ASSERTION (2026-09-07). This is
-    // one request, but it is the most expensive route on the surface:
-    // /api/picker/review rebuilds a pre-kickoff read per finished
-    // fixture across the window, measured at 9.1s COLD against an idle
-    // backend (0.19s once its cache is warm, which in this suite it
-    // usually is not — every other picker test answers `review` in the
-    // browser, so nothing here warms it). A 45s default sized for the
-    // hermetic majority left that one read four cold attempts of
-    // headroom, and it lost. `test.slow()` triples the budget for THIS
-    // test alone; the assertion is untouched and a proxy that refuses
-    // the route still fails instantly, because a refusal is authored
-    // before any backend is contacted.
-    test.slow();
-    const r = await request.get("/api/picker/review?back=7");
-    expect(await r.text(), "review rejected by the proxy allowlist")
-      .not.toContain("unknown picker route");
+    // THE DEADLINE WAS A BUDGET, NOT AN ASSERTION (2026-09-07) — and
+    // the budget lost anyway (2026-09-22). /api/picker/review rebuilds a
+    // pre-kickoff read per finished fixture across the window, measured
+    // at 9.1s COLD against an idle backend (0.19s once its cache is
+    // warm, which in this suite it usually is not — every other picker
+    // test answers `review` in the browser, so nothing here warms it).
+    // `test.slow()` tripled the budget for this test alone, and on run
+    // 35793175865 it spent all 135s of it, twice, and reported the
+    // picker proxy as broken on a PR that does not touch it.
+    //
+    // The backend was never the claim. `expectForwarded` asks the
+    // hold-out's socket what URL the handler put on it: the same
+    // unmocked request through the same real file, the locally-authored
+    // refusal still checked first and still failing instantly, and the
+    // rewrite asserted verbatim instead of inferred from whatever the
+    // backend happened to say. See e2e/proxy-forwarding.ts.
+    await expectForwarded(request, "picker", "review?back=7");
   });

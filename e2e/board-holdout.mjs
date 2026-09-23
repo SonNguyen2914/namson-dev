@@ -104,7 +104,22 @@ const server = http.createServer(async (req, res) => {
   // route, so the failure mode if it DOES reach a backend is an ignored
   // query parameter and nothing else.
   if (url.searchParams.has("__holdout_probe")) {
-    return sendJson(res, 200, { __board_holdout: true, upstream: UPSTREAM });
+    // `path` IS THE POINT FOR THE FORWARDING SPECS, not decoration on
+    // the sentinel. `req.url` here is what the app's proxy handler
+    // REWROTE the browser's URL into and put on this socket, so a spec
+    // can assert the rewrite — prefix, sub-path and query string,
+    // verbatim — instead of inferring it from the fact that a live
+    // backend answered something. Added 2026-09-22 with the forwarding
+    // probes in e2e/proxy-allowlists.spec.ts, e2e/picker.spec.ts and
+    // e2e/finished-is-asked-for.spec.ts, which used to prove forwarding
+    // by round-tripping the real backend and went red whenever that
+    // backend was slow — a failed read rendered as a finding, which is
+    // the shape this tree refuses. The probe is answered HERE and never
+    // forwarded, so those specs no longer depend on the backend's
+    // health for a claim that was never about the backend.
+    return sendJson(res, 200, {
+      __board_holdout: true, upstream: UPSTREAM, path: req.url,
+    });
   }
 
   if (isBoard(url.pathname)) {

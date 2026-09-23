@@ -73,11 +73,41 @@ const WIDTHS = [390, 768, 1100, 1440, 1920];
  * as its own sentence in the failure. */
 test("no route scrolls sideways, hides a sticky header, or cuts text",
   async ({ page }) => {
-  // this sweep walks every declared route at five widths against a
-  // live backend; the default per-test budget is not sized for that,
-  // and the budget scales with the route list rather than being a
-  // number that silently stops covering it
-  test.setTimeout(20_000 * ROUTES.length);
+  /* THE BUDGET IS PER CELL, BECAUSE THE LOOP IS (2026-09-22).
+     It read `20_000 * ROUTES.length` and its comment said the budget
+     scales with the route list "rather than being a number that
+     silently stops covering it" — which was the right rule applied to
+     the wrong dimension. The loop is routes × WIDTHS, and each cell may
+     legitimately spend a bounded 12s navigation, a 700ms settle and a
+     measuring pass over every element on the page. So twelve routes
+     bought 240s for a sweep whose own bounds allow about 63s PER ROUTE,
+     and on run 35793175865 it duly ran out mid-sweep — twice — and
+     reported nothing at all, on a PR that touches none of this.
+
+     A budget that runs out is not a layout finding, so it is now
+     derived from the same three numbers the loop is written with, and
+     the sweep stops itself before it can be killed (see DEADLINE
+     below). The ceiling is capped at five minutes, which is barely
+     above the four the old number already allowed and well under the
+     job's own thirty: the point of the change is not more time, it is
+     time apportioned per cell instead of per route, and a sweep that
+     runs out saying what it missed instead of dying saying nothing.
+     Measured against an UNREACHABLE backend the cap is what binds;
+     warm, the whole sweep takes about fifty seconds and never
+     approaches it. */
+  const NAV_MS = 12_000, SETTLE_MS = 700, MEASURE_MS = 1_500;
+  const CELLS = ROUTES.length * WIDTHS.length;
+  const BUDGET_MS = Math.min((NAV_MS + SETTLE_MS + MEASURE_MS) * CELLS,
+                             5 * 60_000);
+  test.setTimeout(BUDGET_MS);
+  /* AND THE SWEEP STOPS ITSELF RATHER THAN BEING KILLED. A test that
+     dies inside the loop reports NEITHER its findings nor what it did
+     not reach: the whole sweep is lost and the log says "timeout". The
+     cells it could not get to are named in the same channel a route
+     that would not load already uses — printed, never asserted —
+     because a sweep that covered less is a fact about the run and not a
+     defect in the layout. */
+  const DEADLINE = Date.now() + BUDGET_MS * 0.9;
   // THE LANDING BOARD IS SERVED FROM A RECORDING, and that makes this
   // sweep stricter rather than weaker. The defect this test exists for
   // is "four league columns collapsed to 0px whenever a fifth
@@ -88,8 +118,51 @@ test("no route scrolls sideways, hides a sticky header, or cuts text",
   await routeEight(page);
   const findings: string[] = [];
   const unreachable: string[] = [];
+  const unvisited: string[] = [];
   for (const route of ROUTES) {
     for (const w of WIDTHS) {
+      if (Date.now() > DEADLINE) { unvisited.push(`${route} @${w}`); continue; }
+      /* THE WHOLE CELL IS BOUNDED, NOT JUST THE NAVIGATION — and the
+         difference is what killed this sweep on 2026-09-23. The deadline
+         above is only consulted BETWEEN cells, so one call that hangs
+         inside a cell never gives the loop back and the test dies with
+         nothing reported: measured, it was `page.setViewportSize`
+         stalling for the remaining five minutes against a backend that
+         had stopped answering, because a wedged renderer answers no
+         protocol call, not only the ones with a `timeout` option. So
+         every cell races its own clock, and a cell that does not finish
+         is recorded by name and the sweep moves on. */
+      const spent = await cell(page, route, w);
+      if (spent === null) { unreachable.push(`${route} @${w}`); continue; }
+      collect(route, w, spent);
+    }
+  }
+  /* The per-cell work, verbatim as it was written inline, so the race
+     above wraps it rather than reinterpreting it. */
+  async function cell(p: typeof page, route: string, w: number) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const bell = new Promise<null>((res) => {
+      timer = setTimeout(() => res(null), NAV_MS + SETTLE_MS + MEASURE_MS);
+    });
+    try {
+      return await Promise.race([measure(p, route, w), bell]);
+    } catch {
+      return null;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+  function collect(route: string, w: number, r: string[]) {
+      const uniq = [...new Set(r)];
+      const rank = (f: string) => f.startsWith("H-OVERFLOW") ? 0
+        : f.startsWith("STICKY-UNDER-BAR") ? 1
+        : f.startsWith("CLIPPED") ? 2 : 3;
+      uniq.sort((a, b) => rank(a) - rank(b));
+      uniq.slice(0, 8).forEach((f) => findings.push(`${route} @${w}: ${f}`));
+      if (uniq.length > 8) findings.push(`${route} @${w}: (+${uniq.length - 8} more)`);
+  }
+  async function measure(page: Parameters<typeof cell>[0], route: string,
+                         w: number): Promise<string[] | null> {
       await page.setViewportSize({ width: w, height: 900 });
       /* A ROUTE THAT WILL NOT LOAD IS NOT A LAYOUT DEFECT, and this
          sweep must not go red for one. Every route here is walked
@@ -103,12 +176,11 @@ test("no route scrolls sideways, hides a sticky header, or cuts text",
          failing: reachability has its own specs. */
       try {
         await page.goto(route, { waitUntil: "domcontentloaded",
-                                 timeout: 12_000 });
+                                 timeout: NAV_MS });
       } catch {
-        unreachable.push(`${route} @${w}`);
-        continue;
+        return null;
       }
-      await page.waitForTimeout(700);
+      await page.waitForTimeout(SETTLE_MS);
       const r = await page.evaluate((vw) => {
         const out: string[] = [];
         const de = document.documentElement;
@@ -202,18 +274,19 @@ test("no route scrolls sideways, hides a sticky header, or cuts text",
         }
         return out;
       }, w);
-      const uniq = [...new Set(r)];
-      const rank = (f: string) => f.startsWith("H-OVERFLOW") ? 0
-        : f.startsWith("STICKY-UNDER-BAR") ? 1
-        : f.startsWith("CLIPPED") ? 2 : 3;
-      uniq.sort((a, b) => rank(a) - rank(b));
-      uniq.slice(0, 8).forEach((f) => findings.push(`${route} @${w}: ${f}`));
-      if (uniq.length > 8) findings.push(`${route} @${w}: (+${uniq.length - 8} more)`);
-    }
+      return r;
   }
   if (unreachable.length) {
-    console.log("routes that did not load in 12s (NOT layout findings, "
-      + "and not asserted here):\n" + unreachable.join("\n"));
+    console.log("cells that did not load or did not finish inside their "
+      + `own ${(NAV_MS + SETTLE_MS + MEASURE_MS) / 1000}s (NOT layout `
+      + "findings, and not asserted here):\n" + unreachable.join("\n"));
+  }
+  if (unvisited.length) {
+    console.log(`the sweep ran out of its ${Math.round(BUDGET_MS / 1000)}s `
+      + `budget with ${unvisited.length} of ${CELLS} cells unmeasured — a `
+      + "slow run, not a layout finding, and the cells are named so the "
+      + `coverage lost is readable rather than silent:\n`
+      + unvisited.join("\n"));
   }
   expect(findings, "layout findings:\n" + findings.join("\n"))
     .toEqual([]);
