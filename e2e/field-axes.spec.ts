@@ -448,8 +448,22 @@ test("a failed ratings read is NAMED, never drawn as an absent field",
     await page.goto("/bet-suggester/comp/ucl");
     // the failure is drawn, in its own words
     await expect(page.getByTestId("field-axes-error")).toBeVisible();
+    /* THE VOCABULARY IS `fetchRatings`'S, NOT THIS PAGE'S (2026-09-22).
+       The viewer used to read the field with its own
+       `fetch(...).then(r => r.ok ? r.json() : reject)`, which could say
+       only "did not answer" or "answered <status>" — and which also
+       skipped the A-200-IS-NOT-A-PAYLOAD guard, so a `200 null` made
+       this panel vanish with no message at all. It now goes through
+       `fetchRatings` like the field page next door, and the sentences
+       come with it: an aborted request is named as one that NEVER
+       REACHED THE SERVER, which is both more specific and more
+       actionable than "did not answer".
+       SO THE PATTERN NAMES THE CLAIM RATHER THAN ONE WORDING. What is
+       under guard is that a failed READ is named as a failed read;
+       pinning the exact old sentence made this test a guard on which
+       function did the fetching. */
     await expect(page.getByTestId("field-axes-error"))
-      .toContainText(/did not answer|answered \d+/);
+      .toContainText(/did not answer|answered \d+|never reached the server|not JSON|no payload/i);
     // and it does NOT claim the competition has no rating — that is the
     // other surface's sentence and they are different facts
     await expect(page.getByTestId("field-axes-absent")).toHaveCount(0);

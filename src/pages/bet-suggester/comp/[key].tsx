@@ -22,6 +22,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import FieldAxes, { Ratings } from "../../../components/FieldAxes";
+import { fetchRatings } from "../../../lib/fieldApi";
 
 import { ARCHIVE, ArchiveMenu } from "../../../components/ArchiveMenu";
 import { RouteProgress, TopBar } from "../../../components/chrome";
@@ -207,14 +208,49 @@ export default function CompViewer() {
         });
     };
     load();
-    fetch(`/api/comp/${key}/ratings`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then((j) => alive && setRat(j))
-      .catch((e) => alive && setRatErr(
-        typeof e === "number" ? `the field read answered ${e}`
-                              : "the field read did not answer"));
+    /* THE FIELD READ GETS AN ABORT OF ITS OWN. `alive` already stops a
+       late answer reaching setState, but it cannot stop the request, and
+       `fetchRatings` takes the signal the way the field page's own load
+       passes it. Scoped to this one read: the fixture poll below is a
+       different lifetime and keeps the flag it already has. */
+    const ac = new AbortController();
+    /* THE FIELD IS READ THROUGH `fetchRatings`, NOT BY HAND.
+       ------------------------------------------------------------------
+       This was its own `fetch(...).then(r => r.ok ? r.json() : reject)`,
+       and what that skipped is the guard `fieldApi` writes out in
+       capitals: A 200 IS NOT A PAYLOAD. `r.json()` alone hands a literal
+       `null` back TYPED as `Ratings`, so a backend answering `200 null`
+       set `rat = null` with `ratErr = null` — and the two states this
+       page is careful to keep apart everywhere else collapse into one.
+       `FieldAxes` then hits `if (!data) return null` and THE WHOLE PANEL
+       DISAPPEARS with no message: not "the field could not be read", not
+       "nobody has measured this competition", just an absence where a
+       table was, which is indistinguishable from a page that never had
+       one.
+       IT IS THE SAME PANEL AS THE PAGE NEXT DOOR. `/bet-suggester/ratings`
+       draws this component off this endpoint through this function; a
+       viewer that reached it by a weaker route was one surface of one
+       read holding itself to a lower standard than the other.
+       AND THE SENTENCES COME WITH IT. `fetchRatings` names each failure
+       in words the reader can act on — a dead connection, a non-JSON
+       body, the backend's own `detail` — where this branch could only
+       ever say "answered 503". `readFailure` in the component is written
+       against those sentences. */
+    void fetchRatings(key, ac.signal)
+      .then((j) => { if (alive) setRat(j); })
+      .catch((e) => {
+        if (!alive || (e instanceof DOMException && e.name === "AbortError")) {
+          return;
+        }
+        setRatErr(e instanceof Error ? e.message
+                                     : "the field read did not answer");
+      });
     poll.id = setInterval(load, 60000);
-    return () => { alive = false; if (poll.id) clearInterval(poll.id); };
+    return () => {
+      alive = false;
+      ac.abort();
+      if (poll.id) clearInterval(poll.id);
+    };
   }, [key, days]);
 
   const all = d?.fixtures || [];

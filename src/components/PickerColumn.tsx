@@ -764,8 +764,23 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
             rank <span className="text-ink-mid">{sign(row.rank_gap)}</span>
           </span>
         )}
+        {/* GAMES PLAYED, AND A SIDE NOBODY COUNTED IS NAMED.
+            `gp 12/—` put a bare dash where a count goes, and the slash
+            around it went on asserting a pair. Unlike the elo pair this
+            is two independent facts rather than a comparison, so one
+            side alone is still worth printing — what is not allowed is
+            printing the ABSENCE as a mark that looks like a figure.
+            `!= null` on each side: a genuine 0 games played is a count,
+            not a gap, and truthiness would have erased exactly the
+            clubs this chip is most about. */}
         <span className="text-ink-faint">
-          gp {row.gp_current.home ?? "—"}/{row.gp_current.away ?? "—"}
+          {row.gp_current.home != null && row.gp_current.away != null
+            ? <>gp {row.gp_current.home}/{row.gp_current.away}</>
+            : row.gp_current.home != null
+              ? <>gp {row.gp_current.home} home · away not counted</>
+              : row.gp_current.away != null
+                ? <>gp {row.gp_current.away} away · home not counted</>
+                : <>gp not counted</>}
         </span>
       </div>
 
@@ -2717,6 +2732,13 @@ export function LeagueColumn({
               no board entry
             </span>
           )}
+          {/* THE FLOOR AS A SENTENCE, OR NO SENTENCE ABOUT A FLOOR.
+              These titles read "The floor is ? GP." where the column's
+              meta carried no floor — a question mark standing in for a
+              number, with the words around it still asserting that a
+              floor exists and merely went missing. The clause is
+              dropped instead, which is the only version that is true
+              when there is nothing to say. */}
           {meta?.src === "prior" && (
             <span data-testid="col-season"
               {...(span ? {
@@ -2725,8 +2747,8 @@ export function LeagueColumn({
                 "data-season-clubs": String(span.clubs),
               } : {})}
               title={span
-                ? `only ${seasonSpanLabel(span)} of this table is THIS season, across ${span.clubs} club ratings in this column — which is WHY it is rated on last season's final table. The floor is ${meta.min_current_gp ?? "?"} GP.`
-                : `rated on last season's final table — min ${meta.min_current_gp ?? "?"} GP this season`}
+                ? `only ${seasonSpanLabel(span)} of this table is THIS season, across ${span.clubs} club ratings in this column — which is WHY it is rated on last season's final table.${meta.min_current_gp != null ? ` The floor is ${meta.min_current_gp} GP.` : " This column states no games-played floor."}`
+                : `rated on last season's final table${meta.min_current_gp != null ? ` — min ${meta.min_current_gp} GP this season` : ", with no games-played floor stated"}`}
               className="rounded border border-warn/40 bg-warn/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-warn">
               prior szn{span ? ` · ${seasonSpanLabel(span)} this szn` : ""}
             </span>
@@ -2739,11 +2761,21 @@ export function LeagueColumn({
                 "data-season-clubs": String(span.clubs),
               } : {})}
               title={span
-                ? `${seasonSpanLabel(span)} of this table is THIS season, across ${span.clubs} club ratings in this column — the rest is last season's final table, blended on k=${meta.blend_k ?? SEASON_BLEND_K}. Every club here has at least ${meta.min_current_gp ?? "?"} games played.`
+                ? `${seasonSpanLabel(span)} of this table is THIS season, across ${span.clubs} club ratings in this column — the rest is last season's final table, blended on k=${meta.blend_k ?? SEASON_BLEND_K}.${meta.min_current_gp != null ? ` Every club here has at least ${meta.min_current_gp} games played.` : " This column states no games-played floor."}`
                 : "rated on this season's table — every club has enough games played"}
               className="rounded border border-accent/40 bg-accent/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-accent">
-              {span ? `${seasonSpanLabel(span)} ` : ""}this szn · min{" "}
-              {meta.min_current_gp ?? "—"} GP
+              {span ? `${seasonSpanLabel(span)} ` : ""}this szn
+              {/* THE FLOOR, OR THE FACT THAT THE COLUMN DID NOT STATE
+                  ONE. `min — GP` read as a games-played floor whose
+                  number was missing; what it actually meant is that
+                  this column's meta carried no floor at all. A dash in
+                  the middle of a phrase is the worst form of the
+                  absence: the surrounding words go on asserting there
+                  is a minimum. So the phrase itself changes rather than
+                  one token inside it. */}
+              {meta.min_current_gp != null
+                ? <> · min {meta.min_current_gp} GP</>
+                : <> · no gp floor stated</>}
             </span>
           )}
           {meta?.kind === "cup" && (
@@ -2756,7 +2788,29 @@ export function LeagueColumn({
           )}
           {runsOwnSort && ownSort && (
             <span data-testid="col-own-sort" data-mode={ownSort.mode}
-              title={`Nearly every fixture in this column pairs two different domestic leagues, and the board refuses to subtract one league's table from another's — 2.0 ppg in one league is not 2.0 ppg in another. What survives a change of scale is the tier, and ${ownSort.mode} is derived from the tier gaps. Choose any sort above and this column follows the board like the others.`}
+              /* WHICH GAPS, SAID PLAINLY — because there are TWO SETS
+                 AND THEY ARE NOT THE SAME NUMBERS.
+                 This read "`${mode}` is derived from the tier gaps", as
+                 though there were one such thing. The ordering reads
+                 `row.tier_gaps` / `row.shape`: the WITHIN-LEAGUE
+                 quintiles the board has always carried. The cards below
+                 draw `PickerRead.effectiveRead`, which prefers
+                 `block.axes[k].tier_gap` and the block's own `shape`
+                 wherever the row carries a FIELD block — the
+                 competition's own N-club ladder, a different
+                 measurement on a different population. On a
+                 field-rated row those two disagree, so this column's
+                 default ordering came from numbers that appear on no
+                 card in it, under a sentence telling the reader the
+                 order was derived from the gaps they could see.
+                 THE ORDER IS LEFT EXACTLY AS IT WAS and the SENTENCE is
+                 corrected. Re-pointing the sort at the field gaps would
+                 silently change what the operator sees first on a live
+                 column — a bigger, quieter change than the one being
+                 fixed, and not one a renderer gets to make on its own.
+                 The mismatch is now visible, which is what makes it
+                 possible to decide. */
+              title={`Nearly every fixture in this column pairs two different domestic leagues, and the board refuses to subtract one league's table from another's — 2.0 ppg in one league is not 2.0 ppg in another. What survives a change of scale is the tier, and ${ownSort.mode} is derived from each row's WITHIN-LEAGUE tier gaps. Note that a card showing the competition's own field ranks draws its trio from the FIELD's gaps instead, which are a different measurement on a different population — so on those rows the number you see is not the number this column ordered on. Choose any sort above and this column follows the board like the others.`}
               className="rounded border border-line-strong px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-low">
               sorted on {ownSort.mode} · this column
             </span>
