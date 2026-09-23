@@ -1641,7 +1641,14 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
             +{cols.length - 1}
           </span>
         )}
-        <span className="ml-auto">
+        {/* `tap-floor-room` for the same reason the league ribbon has it:
+            the "i" is 16px of ink in a row that is barely taller, so its
+            44px `::after` was drawn and then clipped back to the row —
+            the audit read 44 off computed style while a press 18px off
+            centre answered the SECTION behind it. The room grows, the ink
+            does not, which is the whole principle of the floor. Coarse
+            pointers only; the desktop card is unchanged. */}
+        <span className="ml-auto tap-floor-room">
           <NotesPanel
             idPrefix={`refusal-${r.event_id ?? `${r.home}-${r.away}`}`}
             testidOpen="refusal-why-open" testidPanel="refusal-notes"
