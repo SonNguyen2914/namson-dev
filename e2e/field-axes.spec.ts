@@ -196,7 +196,8 @@ const RATINGS = {
 };
 
 const FIXTURES = {
-  competition: "ucl", display: "UEFA Champions League", accent: "#f174cc",
+  competition: "ucl", display: "UEFA Champions League",
+  accent: "var(--lg-ucl, var(--lg-cup))",
   model: { why: "a cup with qualifying rounds", note: null,
            instead: "the cross-league strength read is used meanwhile" },
   fixtures: [], counts: { upcoming: 0 },
