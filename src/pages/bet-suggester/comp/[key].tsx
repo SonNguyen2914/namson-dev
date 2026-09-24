@@ -30,6 +30,7 @@ import { Eyebrow, Reveal } from "../../../components/ui";
 import MarketVsRead, { MarketVsReadInline, type MarketVsReadData }
   from "../../../components/MarketVsRead";
 import TournamentView from "../../../components/TournamentView";
+import { hueOf } from "../../../components/PickerColumn";
 import { shortClub } from "../../../lib/clubName";
 import { TZ, dayLabel, groupByDay } from "../../../lib/matchday";
 
@@ -260,7 +261,17 @@ export default function CompViewer() {
     .map((f) => ({ id: String(f.fixture_id), date: f.kickoff_utc || "", f }))
     .filter((x) => x.date));
   const byDesign = d?.model?.state === "no_model_by_design";
-  const vars = { "--accent": d?.accent || "#7dd3fc" } as React.CSSProperties;
+  /* THE HUE IS A REFERENCE, NOT A COLOUR. `accent` arrives as
+     `var(--lg-{key}, var(--lg-cup))` — see Viewer.accent in the
+     backend's src/competitions.py — so the value resolves against the
+     one place the colour lives, the `--lg-*` tokens in globals.css.
+     Before the payload lands there is nothing to resolve, and `hueOf`
+     answers from those same tokens rather than from a fourth copy of a
+     hex: the page opens on the competition's own light instead of
+     flashing an unrelated blue and correcting itself. */
+  const vars = {
+    "--accent": d?.accent || hueOf(key ?? ""),
+  } as React.CSSProperties;
 
   // A key the backend does not serve gets its own page rather than the
   // board with every panel empty. The old behaviour rendered "Loading",

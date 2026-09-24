@@ -26,7 +26,7 @@ function inHours(h: number) {
 const PAYLOAD = {
   competition: "asean",
   display: "ASEAN Championship",
-  accent: "#fbbf24",
+  accent: "var(--lg-asean, var(--lg-cup))",
   season: 2025,
   count: 2,
   with_strength_read: 1,
