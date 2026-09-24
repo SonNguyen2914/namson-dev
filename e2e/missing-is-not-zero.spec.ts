@@ -420,6 +420,27 @@ export const REGISTERED_SWALLOWS: Record<string, Swallow> = {
       + "rather than as a form's remembered inputs — then a parse "
       + "failure must be named the way a fetch failure is.",
   },
+  "field:mode-read": {
+    finding:
+      "The field page reads which view (Leagues or Cups) the viewer last "
+      + "had open from localStorage, and swallows a storage that throws "
+      + "(private mode, blocked site data). Nothing is drawn from the "
+      + "read's failure: the page opens on Leagues, which is exactly what "
+      + "a first visit does, and no figure depends on it.",
+    closes_when:
+      "the remembered view carries anything a reader is told about — at "
+      + "which point a failed read must say so rather than fall back.",
+  },
+  "field:mode-write": {
+    finding:
+      "The field page remembers the view the viewer switched to, and "
+      + "swallows a storage write that throws. The switch itself has "
+      + "already happened in state; only the NEXT visit's default is lost, "
+      + "and the page promises nothing about it.",
+    closes_when:
+      "the page tells the reader their choice was remembered, which would "
+      + "then have to be derived from the write succeeding.",
+  },
   "livepanel:storage-write": {
     finding:
       "LivePanel's persist effect swallows a localStorage write failure "

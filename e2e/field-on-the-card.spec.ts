@@ -1108,82 +1108,30 @@ test("and a card with NO field keeps the `i` — the landing board is not "
 // ───────────────────────── 10. the field's own page ──────────────────
 
 
-test("the field has a page of its own, and it opens on the ranked field",
-  async ({ page }) => {
-    await page.route("**/api/comp/*/ratings", (r) => r.fulfill(json(RATINGS)));
-    await page.goto("/bet-suggester/ratings");
-    await expect(page.getByTestId("field-axes")).toBeVisible();
-    // the competition it is showing, by its DISPLAY name
-    await expect(page.getByTestId("field-comp")).toHaveText(RATINGS.display);
-    // all three axes offered, derived from the payload
-    await expect(page.getByTestId("axis-tab"))
-      .toHaveCount(Object.keys(AXES).length);
-    // and the whole field is already drawn — nothing to expand
-    await expect(page.getByTestId("axis-row"))
-      .toHaveCount(AXES.ovr.rows.length);
-  });
+/* RETIRED 2026-09-23, AND MOVED RATHER THAN DROPPED. Five tests stood
+   here for the field's own page when that page WAS `FieldAxes` over
+   `/api/comp/{key}/ratings`: it opened on the ranked field, it carried
+   the charter, a failed read was named, a wordless failure still said
+   its status, and an unmeasured competition said so in the backend's
+   words. The page was rebuilt to the operator's approved design and now
+   reads `/api/field/leagues` and `/api/field/cups`, so these five mocked
+   a route the page no longer asks for — they would have gone on
+   passing or failing about nothing.
 
-test("it carries the charter, because an ordering is the easiest thing on "
-   + "this site to mistake for advice", async ({ page }) => {
-    await page.route("**/api/comp/*/ratings", (r) => r.fulfill(json(RATINGS)));
-    await page.goto("/bet-suggester/ratings");
-    const charter = page.getByTestId("field-charter");
-    await expect(charter).toContainText(/no model runs on this page/i);
-    await expect(charter)
-      .toContainText(/no number below is a probability or an edge of ours/i);
-    await expect(charter).toContainText(/nothing here is a recommendation/i);
-    /* NO DIRECTIVE COPY ANYWHERE ON IT. The page is one long ranking, so
-       the vocabulary check is worth making over the whole document
-       rather than over one block. */
-    const body = (await page.locator("main").innerText()).toLowerCase();
-    for (const banned of ["you should", "bet on", "back the", "cash out",
-                          "sell now", "buy now", "best pick"]) {
-      expect(body).not.toContain(banned);
-    }
-  });
-
-test("a failed read on that page is NAMED, never drawn as an empty field",
-  async ({ page }) => {
-    await page.route("**/api/comp/*/ratings", (r) =>
-      r.fulfill(json({ detail: "field unavailable" }, 503)));
-    await page.goto("/bet-suggester/ratings");
-    await expect(page.getByTestId("field-axes-error")).toBeVisible();
-    // the backend's own sentence, carried rather than replaced
-    await expect(page.getByTestId("field-axes-error"))
-      .toContainText("field unavailable");
-    await expect(page.getByTestId("field-axes")).toHaveCount(0);
-    // and the empty-field block is NOT what a failure shows
-    await expect(page.getByTestId("field-axes-absent")).toHaveCount(0);
-  });
-
-test("a failure with NOTHING to say still says the status, rather than "
-   + "falling silent", async ({ page }) => {
-    /* The other half of the contract above. When the server sends no
-       words of its own there is still a fact to report, and the one
-       thing this must not do is degrade to a blank — a page that renders
-       nothing after a failed read is indistinguishable from one whose
-       field is genuinely empty. */
-    await page.route("**/api/comp/*/ratings", (r) =>
-      r.fulfill({ status: 502, contentType: "text/html", body: "<h1>bad</h1>" }));
-    await page.goto("/bet-suggester/ratings");
-    await expect(page.getByTestId("field-axes-error")).toBeVisible();
-    await expect(page.getByTestId("field-axes-error")).toContainText("502");
-    await expect(page.getByTestId("field-axes-absent")).toHaveCount(0);
-  });
-
-test("an unmeasured competition says so in the backend's own words",
-  async ({ page }) => {
-    await page.route("**/api/comp/*/ratings", (r) =>
-      r.fulfill(json({ competition: "epl", display: "Premier League",
-                       axes: null,
-                       why_not: "no cross-league field has been measured "
-                                + "for this competition." })));
-    await page.goto("/bet-suggester/ratings?comp=epl");
-    await expect(page.getByTestId("field-axes-absent")).toBeVisible();
-    await expect(page.getByTestId("field-axes-absent"))
-      .toContainText("no cross-league field has been measured");
-    await expect(page.getByTestId("field-axes-error")).toHaveCount(0);
-  });
+   Where each claim lives now:
+     opens on the ranked field     e2e/the-field-page.spec.ts ("the page
+                                   opens on the league field …")
+     the charter + no directive    e2e/the-field-page.spec.ts ("no decide
+       vocabulary                  vocabulary on either view …")
+     a failed read is named        e2e/the-field-page.spec.ts ("a failed
+     a wordless failure's status   read is NAMED …" and "…and a failure
+                                   with nothing to say …")
+     an unmeasured competition     e2e/field-axes.spec.ts ("a competition
+                                   with no measured field says so …") —
+                                   `FieldAxes` still draws that state, on
+                                   the competition viewer, and the new
+                                   page has no per-competition query that
+                                   could reach it. */
 
 // ───────────────────────────── 7. reachable from the upper left ──────
 

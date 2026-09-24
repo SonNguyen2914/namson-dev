@@ -246,15 +246,30 @@ async function everyRowOnEveryAxis(page: Page) {
   }
 }
 
+/** The competition viewer, serving `ratings` — the surface `FieldAxes`
+ *  is drawn on since the field page stopped using it (2026-09-23). */
+async function viewer(page: Page, ratings: unknown) {
+  await page.route("**/api/comp/ucl/ratings**", (r) =>
+    r.fulfill(json(ratings)));
+  await page.route("**/api/comp/ucl/fixtures**", (r) =>
+    r.fulfill(json({ competition: "ucl", display: "UEFA Champions League",
+      fixtures: [], model: { state: "no_model_by_design",
+        why: "a cup with qualifying rounds", note: null } })));
+  await page.route("**/api/comp/ucl/markets**", (r) =>
+    r.fulfill(json({ markets: [] })));
+  await page.goto("/bet-suggester/comp/ucl");
+}
+
 test.describe("a narrow bar is not confidence", () => {
-  test("the field page: every zero-bridge row names its absence",
-    async ({ page }) => {
-      await page.route("**/api/comp/ucl/ratings**", (r) =>
-        r.fulfill(json(RATINGS)));
-      await page.goto("/bet-suggester/ratings?comp=ucl");
-      await expect(page.getByTestId("field-axes")).toBeVisible();
-      await everyRowOnEveryAxis(page);
-    });
+  /* RETIRED 2026-09-23: "the field page: every zero-bridge row names its
+     absence". `/bet-suggester/ratings` no longer renders `FieldAxes` —
+     it was rebuilt to the operator's approved design over
+     `/api/field/leagues` — so this was the test below run a second time
+     against a component the page no longer holds. The rule it guarded
+     is kept TWICE: on `FieldAxes`, by the competition-viewer test that
+     follows (same component, same biconditional, same count), and on the
+     new page by e2e/the-field-page.spec.ts ("zero bridges ⟺ hollow ring
+     ⟺ no bar, on every row of every axis"). */
 
   test("the competition viewer: the same rule on the same component",
     async ({ page }) => {
@@ -278,9 +293,10 @@ test.describe("a narrow bar is not confidence", () => {
      league bundles, which is more than five times the widest interval on
      that axis. */
   test("the field says which fit it is", async ({ page }) => {
-    await page.route("**/api/comp/ucl/ratings**", (r) =>
-      r.fulfill(json(RATINGS)));
-    await page.goto("/bet-suggester/ratings?comp=ucl");
+    // ON THE COMPETITION VIEWER since 2026-09-23 — the one surface that
+    // still draws `FieldAxes`; the field page names its fit in its own
+    // words (e2e/the-field-page.spec.ts, "the page states its fit").
+    await viewer(page, RATINGS);
     await expect(page.getByTestId("field-passes")).toHaveAttribute(
       "data-passes", "10");
     await expect(page.getByTestId("field-passes")).toContainText("10-pass");
@@ -302,9 +318,8 @@ test.describe("a narrow bar is not confidence", () => {
           delete r.evidence_warning;
         }
       }
-      await page.route("**/api/comp/ucl/ratings**", (r) =>
-        r.fulfill(json(stripped)));
-      await page.goto("/bet-suggester/ratings?comp=ucl");
+      // on the competition viewer, which still draws `FieldAxes`
+      await viewer(page, stripped);
       await expect(page.getByTestId("field-axes")).toBeVisible();
 
       // No warning anywhere, and no attribute claiming a count of zero.

@@ -1174,3 +1174,17 @@ img.glyph-soft   { opacity: 0.11; filter: grayscale(1) brightness(1.1); }
              --sc-plate-tint: rgba(52,211,153,.10); }
 .sc-hollow { --sc-plate-edge: rgba(248,113,113,.50);
              --sc-plate-tint: rgba(248,113,113,.10); }
+
+/* THE FIELD PAGE'S FLIP (2026-09-23) — Leagues out, Cups in, or back. A
+   short fade that reads as a turned page rather than a reload, and none
+   at all under reduced motion. Only the lede and the view below the
+   controls take it: an animated transform on an ancestor would give the
+   sticky control zone a new containing block for a quarter second. */
+@keyframes field-flip {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.field-flip { animation: field-flip 0.26s cubic-bezier(0.22, 1, 0.36, 1); }
+@media (prefers-reduced-motion: reduce) {
+  .field-flip { animation: none; }
+}
