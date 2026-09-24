@@ -25,7 +25,9 @@
 //     bridge cannot move a club relative to its league-mates.
 //   A STRADDLING TIER SHOWS ITS SET's RANGE, min–max.
 //   A FACT TRUE OF A WHOLE SECTION IS SAID ONCE, in its header.
-//   CUPS ARE ONE AT A TIME — different corpora, different pass counts.
+//   CUPS ARE NEVER MERGED. Any number may be selected, and each is drawn
+//     as its OWN table — own heading, own axis, own rank — because no two
+//     share both a corpus and a pass count.
 //   MISSING IS NEVER ZERO. An absent figure is named, never 0, 0.00, 0%
 //     or a bare dash.
 //   IT SHOWS; IT DOES NOT DECIDE.
@@ -46,6 +48,25 @@ import { hueOf } from "./PickerColumn";
 const BTN = "flex items-center justify-center rounded-lg border bg-bs-elev2 px-2.5 py-2 font-mono text-[10px] uppercase leading-tight tracking-[0.08em] transition-colors hover:border-ink-faint disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-line";
 const btn = (on: boolean) =>
   `${BTN} ${on ? "border-accent text-ink-hi" : "border-line text-ink-faint"}`;
+/* SELECT ALL / DESELECT ALL is an ACTION, not a state, so it never takes
+   aria-pressed or the lit gold border; a dashed hairline in the muted ink
+   marks it as the odd one out in a row of toggles. */
+const ALL = `${BTN} border-dashed border-line text-ink-low hover:text-ink-hi`;
+
+/** ONE BUTTON, TWO WORDS. It says what a press will do: "deselect all"
+ *  while every pill is lit, "select all" otherwise — so a half-lit strip
+ *  fills in on the first press rather than emptying. */
+function SelectAll({ full, noun, onPress, testId }: {
+  full: boolean; noun: string; onPress: () => void; testId: string;
+}) {
+  return (
+    <button type="button" data-testid={testId} onClick={onPress}
+      aria-label={full ? `deselect every ${noun}` : `select every ${noun}`}
+      className={ALL}>
+      {full ? "deselect all" : "select all"}
+    </button>
+  );
+}
 const META = "font-mono text-[9.5px] uppercase tracking-[0.14em] text-ink-faint";
 const TH = "whitespace-nowrap border-b border-line px-3 py-2 text-left font-mono text-[9px] font-medium uppercase tracking-[0.12em] text-ink-faint";
 /* NO COLOUR IN THE BASE, on purpose: a cell that adds `text-accent` to
@@ -333,6 +354,16 @@ export function LeaguesView({ data, modeSwitch }: {
             onClick={() => setEvid((e) => !e)} className={btn(evid)}>
             with evidence only
           </button>
+          <SelectAll testId="league-select-all" noun="league"
+            full={selected.length === cols.length} onPress={() => {
+              const to = selected.length !== cols.length;
+              /* only the pills that CHANGE replay the reveal */
+              const moved = cols.filter((k) => (sel[k] === true) !== to);
+              setSel(Object.fromEntries(cols.map((k) => [k, to])));
+              const els = moved.map((k) => stripRef.current?.querySelector<HTMLElement>(
+                `[data-pill][data-key="${k}"]`)).filter((e): e is HTMLElement => !!e);
+              if (els.length) reveal(els);
+            }} />
           <SearchBox value={q} onChange={setQ} label="find a club" />
           <span data-testid="field-count" className={`${META} ml-auto`}>
             {shown.length} of {allRows.length} clubs
@@ -424,7 +455,8 @@ export function LeaguesView({ data, modeSwitch }: {
       {!sections.length && (
         <p data-testid="field-empty"
           className="py-10 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
-          No league is selected.</p>
+          {selected.length ? "No club matches this filter."
+            : "No league selected — pick one above, or select all."}</p>
       )}
 
       {absent.length > 0 && (
@@ -597,14 +629,28 @@ export function sameClubTwoFields(cups: CupField[]) {
   return null;
 }
 
+/** THE UNIT a cup axis is read in. */
+const cupUnit = (ax: FieldAxisName) => ax === "overall" ? "elo"
+  : `goals ${ax === "attack" ? "scored" : "conceded"} / match`;
+
+/** "A", "A or B", "A or B or C" — the cups a sentence is about. */
+const either = (cs: CupField[]) => cs.map((c) => c.display).join(" or ");
+
+/* MULTI-SELECT, NEVER MERGED. Each selected cup is drawn as its own table
+   with its own axis, heading and rank — no two cups share both a corpus
+   and a pass count, so nothing is ranked or scaled across them. */
 export function CupsView({ data, initial, modeSwitch, active }: {
   data: CupFields; initial?: string | null; modeSwitch: ReactNode;
   active: boolean;
 }) {
   const cups = data.cups;
-  const pick = (k?: string | null) =>
-    cups.find((c) => c.key === k || c.aliases.includes(k ?? "")) ?? cups[0];
-  const [key, setKey] = useState(() => pick(initial)?.key);
+  const find = (k?: string | null) =>
+    cups.find((c) => c.key === k || c.aliases.includes(k ?? ""));
+  /* The first cup alone is lit, or exactly the one `?comp=` asked for. */
+  const [sel, setSel] = useState<Record<string, boolean>>(() => {
+    const c = find(initial) ?? cups[0];
+    return c ? { [c.key]: true } : {};
+  });
   const [axis, setAxis] = useState<FieldAxisName>("overall");
   const [q, setQ] = useState("");
   const stripRef = useRef<HTMLDivElement | null>(null);
@@ -615,27 +661,45 @@ export function CupsView({ data, initial, modeSwitch, active }: {
     reveal(Array.from(stripRef.current.querySelectorAll<HTMLElement>("[data-pill]")));
   }, [active, reveal]);
 
-  const cup = pick(key);
-  if (!cup) return null;
-  const ax: FieldAxisName = cup.axes[axis] ? axis : "overall";
-  const a = cup.axes[ax];
-  const all = byValue(a?.rows ?? []);
-  const rank = new Map(all.filter((r) => r.value != null).map((r, i) => [r, i + 1]));
-  const needle = q.trim().toLowerCase();
-  const rows = needle ? all.filter((r) => r.club.toLowerCase().includes(needle)) : all;
-  const sc = tableScale(all);
+  const picked = cups.filter((c) => sel[c.key]);
+  const full = picked.length === cups.length;
+  /* A new selection in which NO cup carries the axis drops it for good,
+     back to the one every field has — it does not come back on its own
+     when a cup that carries it is lit again. */
+  const choose = (next: Record<string, boolean>) => {
+    setSel(next);
+    if (!cups.some((c) => next[c.key] && c.axes[axis])) setAxis("overall");
+  };
+  const pillEl = (k: string) => stripRef.current?.querySelector<HTMLElement>(
+    `[data-pill][data-key="${k}"]`) ?? null;
+
+  /* AN AXIS STAYS PRESSABLE WHILE ANY SELECTED CUP CARRIES IT. */
+  const ax: FieldAxisName = picked.some((c) => c.axes[axis]) ? axis : "overall";
   const goal = ax !== "overall";
-  const nbf = all.filter((r) => r.below_floor === true).length;
-  const hoisted = nbf > 0 && nbf === all.length;
-  const unit = goal
-    ? `goals ${ax === "attack" ? "scored" : "conceded"} / match` : "elo";
-  const note = [
-    `${all.length} clubs`,
-    goal ? "goals measurement · no pass count" : `${cup.passes} passes`,
-    `corpus ${shortSha(cup.corpus_sha256) ?? "not stated"}`,
-    `${cup.admitted_leagues?.length ?? 0} leagues admitted`,
-    ...(hoisted ? ["every club below the floor"] : nbf ? [`${nbf} below the floor`] : []),
-  ].join(" · ");
+  const unit = cupUnit(ax);
+  const needle = q.trim().toLowerCase();
+  const drawn = picked.filter((c) => c.axes[ax]);
+  const missing = picked.filter((c) => !c.axes[ax]);
+  const tables = drawn.map((cup) => {
+    const all = byValue(cup.axes[ax]?.rows ?? []);
+    const rank = new Map(all.filter((r) => r.value != null).map((r, i) => [r, i + 1]));
+    const rows = needle ? all.filter((r) => r.club.toLowerCase().includes(needle)) : all;
+    /* ONE TABLE, ONE AXIS — this cup's own rows, never the span of every
+       cup on screen. */
+    const sc = tableScale(all);
+    const nbf = all.filter((r) => r.below_floor === true).length;
+    const hoisted = nbf > 0 && nbf === all.length;
+    const note = [
+      `${all.length} clubs`,
+      goal ? "goals measurement · no pass count" : `${cup.passes} passes`,
+      `corpus ${shortSha(cup.corpus_sha256) ?? "not stated"}`,
+      `${cup.admitted_leagues?.length ?? 0} leagues admitted`,
+      ...(hoisted ? ["every club below the floor"] : nbf ? [`${nbf} below the floor`] : []),
+    ].join(" · ");
+    return { cup, all, rank, rows, sc, hoisted, note };
+  });
+  const shown = tables.reduce((n, t) => n + t.rows.length, 0);
+  const of = tables.reduce((n, t) => n + t.all.length, 0);
 
   return (
     <>
@@ -644,66 +708,101 @@ export function CupsView({ data, initial, modeSwitch, active }: {
         {modeSwitch}
         <div className="mb-2 flex flex-wrap items-center gap-[7px]">
           {FIELD_AXES.map((x) => {
-            const has = !!cup.axes[x];
+            const has = x === "overall" || picked.some((c) => !!c.axes[x]);
             return (
               <button key={x} type="button" data-testid="cup-axis-button"
                 data-axis={x} aria-pressed={ax === x} disabled={!has}
-                title={has ? undefined : `${x} is not measured for ${cup.display} `
-                  + "— this field carries the overall axis only"}
+                title={has ? undefined : `${x} is not measured for ${
+                  picked.length ? either(picked) : "the selected cups"} — ${
+                  picked.length > 1 ? "these fields carry" : "this field carries"
+                } the overall axis only`}
                 onClick={() => setAxis(x)} className={btn(ax === x)}>{x}</button>
             );
           })}
-          <SearchBox value={q} onChange={setQ} label="find a club in this cup" />
+          <SelectAll testId="cup-select-all" noun="cup" full={full}
+            onPress={() => {
+              const to = !full;
+              const moved = cups.filter((c) => (sel[c.key] === true) !== to);
+              choose(Object.fromEntries(cups.map((c) => [c.key, to])));
+              const els = moved.map((c) => pillEl(c.key))
+                .filter((e): e is HTMLElement => !!e);
+              if (els.length) reveal(els);
+            }} />
+          <SearchBox value={q} onChange={setQ} label="find a club in the selected cups" />
           <span data-testid="cup-count" className={`${META} ml-auto`}>
-            {rows.length} of {all.length} clubs
+            {shown} of {of} clubs
           </span>
         </div>
-        <RibbonStrip stripRef={stripRef} label="cup field shown — one at a time"
+        <RibbonStrip stripRef={stripRef} label="cup fields shown — one table each"
           testId="cup-strip">
           {cups.map((c) => (
             <RibbonPill key={c.key} hueKey={c.key} dataKey={c.key}
-              testId="cup-pill" label={c.display} on={c.key === cup.key}
+              testId="cup-pill" label={c.display} on={sel[c.key] === true}
               title={`${c.display} — ${c.passes} passes, corpus ${shortSha(c.corpus_sha256)}`}
               onClick={() => {
-                setKey(c.key); setQ("");
-                const el = stripRef.current?.querySelector<HTMLElement>(
-                  `[data-pill][data-key="${c.key}"]`);
+                choose({ ...sel, [c.key]: !sel[c.key] });
+                const el = pillEl(c.key);
                 if (el) reveal([el]);
               }} />
           ))}
         </RibbonStrip>
-        {cups.some((c) => !c.axes[axis]) && axis !== "overall" && !cup.axes[axis] && (
-          <p className={`${META} mt-2`}>{axis} is not measured for {cup.display}</p>
-        )}
       </div>
 
-      <section data-testid="cup-section" data-cup={cup.key}>
-        <SectionHead title={cup.display} note={note} testId="cup-note" />
-        <Table testId="cup-table" section={cup.key} head={<>
-          <th className={TH} />
-          <th className={TH}>club</th>
-          <th className={TH}>league</th>
-          <th className={`${TH} text-right text-accent`}>{unit} ↓</th>
-          <th className={`${TH} text-right`}>{goal ? "95% band (log)" : "95% band"}</th>
-          <th className={`${TH} hidden md:table-cell`}>interval</th>
-          <th className={TH}>tier</th>
-        </>}>
-          {rows.map((r) => (
-            <CupRowView key={r.club} r={r} rank={rank.get(r) ?? null}
-              goal={goal} sc={sc} hoisted={hoisted} />
-          ))}
-          {!rows.length && (
-            <tr><td colSpan={7}
-              className="py-10 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
-              No club matches this filter.</td></tr>
+      {picked.length > 1 && (
+        <p data-testid="cups-split-note"
+          className="mt-5 border-l-2 border-line-strong py-2 pl-3.5 pr-3 text-[12px] leading-relaxed text-ink-low">
+          <b className="font-semibold text-ink-hi">{picked.length} cups,{" "}
+            {picked.length} separate measurements.</b>{" "}
+          Each table has its own corpus, pass count, axis and rank. A
+          club&rsquo;s figure in one says nothing about its figure in another,
+          so the tables are never merged or sorted against each other.
+        </p>
+      )}
+
+      {tables.map(({ cup, rank, rows, sc, hoisted, note }) => (
+        <section key={cup.key} data-testid="cup-section" data-cup={cup.key}>
+          <SectionHead title={cup.display} note={note} testId="cup-note" />
+          <Table testId="cup-table" section={cup.key} head={<>
+            <th className={TH} />
+            <th className={TH}>club</th>
+            <th className={TH}>league</th>
+            <th className={`${TH} text-right text-accent`}>{unit} ↓</th>
+            <th className={`${TH} text-right`}>{goal ? "95% band (log)" : "95% band"}</th>
+            <th className={`${TH} hidden md:table-cell`}>interval</th>
+            <th className={TH}>tier</th>
+          </>}>
+            {rows.map((r) => (
+              <CupRowView key={r.club} r={r} rank={rank.get(r) ?? null}
+                goal={goal} sc={sc} hoisted={hoisted} />
+            ))}
+            {!rows.length && (
+              <tr><td colSpan={7}
+                className="py-10 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
+                No club matches this filter.</td></tr>
+            )}
+          </Table>
+          {cup.basis && (
+            <p className="mt-3 max-w-3xl text-[12px] leading-relaxed text-ink-faint">
+              <span className="text-ink-low">What this field is:</span> {cup.basis}
+            </p>
           )}
-        </Table>
-        {cup.basis && (
-          <p className="mt-3 max-w-3xl text-[12px] leading-relaxed text-ink-faint">
-            <span className="text-ink-low">What this field is:</span> {cup.basis}
-          </p>
-        )}
-      </section>
+        </section>
+      ))}
+
+      {missing.length > 0 && (
+        <p data-testid="cup-axis-absent"
+          className="mt-4 border-l-2 border-line-strong pl-3.5 text-[12.5px] leading-relaxed text-ink-low">
+          <b className="text-ink-mid">{unit} is not measured for {either(missing)}.</b>{" "}
+          {missing.length > 1 ? "These fields carry" : "This field carries"} the
+          overall axis only — named, not filled from another fit.
+        </p>
+      )}
+
+      {!picked.length && (
+        <p data-testid="cup-empty"
+          className="py-10 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
+          No cup selected — pick one above, or select all.</p>
+      )}
     </>
   );
 }

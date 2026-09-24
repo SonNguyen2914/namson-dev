@@ -19,8 +19,11 @@
 //   7  one league = a within-league read
 //   8  a straddling tier shows its set's range, min–max
 //   9  a fact true of a whole section is said once, in its header
-//   10 cups one at a time, the incomparability stated with a worked
-//      example, attack/defence disabled with a reason, no bridges column
+//   10 cups multi-select and NEVER merged: one table per cup, each with
+//      its own heading, axis and rank; the incomparability stated with a
+//      worked example (and a note at two or more); an axis live while any
+//      selected cup carries it, the others named; no bridges column
+//   12 select all / deselect all: an action, not a toggle
 //   11 missing is never zero; no decide vocabulary
 //
 // Variants the recording does not contain (two ladders, a section wholly
@@ -371,31 +374,114 @@ async function toCups(page: Page) {
   await expect(page.getByTestId("cup-table")).toBeVisible();
 }
 
-test("CUPS ARE ONE AT A TIME: single-select, each on its own fit",
-  async ({ page }) => {
+test("CUPS ARE MULTI-SELECT, NEVER MERGED: the Champions League alone is "
+   + "lit at first, and a pill toggles its own table", async ({ page }) => {
     await open(page);
     await toCups(page);
     const pills = page.getByTestId("cup-pill");
     await expect(pills).toHaveCount(CUPS.cups.length);
     await expect(page.locator('[data-testid="cup-pill"][aria-pressed="true"]'))
       .toHaveCount(1);
-    for (const c of CUPS.cups) {
-      await page.locator(`[data-testid="cup-pill"][data-key="${c.key}"]`).click();
+    await expect(page.locator(`[data-testid="cup-pill"][data-key="${CUPS.cups[0].key}"]`))
+      .toHaveAttribute("aria-pressed", "true");
+    // lighting the others ADDS a table each — nothing is replaced
+    for (const [i, c] of CUPS.cups.entries()) {
+      if (i > 0) await page.locator(`[data-testid="cup-pill"][data-key="${c.key}"]`).click();
       await expect(page.locator('[data-testid="cup-pill"][aria-pressed="true"]'))
-        .toHaveCount(1);
-      await expect(page.locator(`[data-testid="cup-pill"][data-key="${c.key}"]`))
-        .toHaveAttribute("aria-pressed", "true");
-      await expect(page.getByTestId("cup-section")).toHaveAttribute("data-cup", c.key);
-      await expect(page.getByTestId("cup-note"))
-        .toContainText(`${c.passes} passes`);
-      await expect(page.getByTestId("cup-note"))
-        .toContainText(`corpus ${c.corpus_sha256.slice(0, 8)}`);
-      // ranked by value
-      const got = await page.getByTestId("cup-row")
-        .evaluateAll((els) => els.map((e) => e.getAttribute("data-club")));
-      expect(got).toEqual(valueOrder(c.axes.overall.rows as unknown as Row[])
-        .map((r) => r.club));
+        .toHaveCount(i + 1);
+      await expect(page.getByTestId("cup-section")).toHaveCount(i + 1);
     }
+    // one table per cup, in the payload's cup order, each its OWN fit
+    expect(await page.getByTestId("cup-section").evaluateAll(
+      (els) => els.map((e) => e.getAttribute("data-cup"))))
+      .toEqual(CUPS.cups.map((c) => c.key));
+    await expect(page.getByTestId("cup-table")).toHaveCount(CUPS.cups.length);
+    for (const c of CUPS.cups) {
+      const s = page.locator(`[data-testid="cup-section"][data-cup="${c.key}"]`);
+      await expect(s.getByTestId("cup-note")).toContainText(`${c.passes} passes`);
+      await expect(s.getByTestId("cup-note"))
+        .toContainText(`corpus ${c.corpus_sha256.slice(0, 8)}`);
+      // ranked by value, WITHIN the cup, from 1
+      const want = valueOrder(c.axes.overall.rows as unknown as Row[]).map((r) => r.club);
+      expect(await s.getByTestId("cup-row").evaluateAll(
+        (els) => els.map((e) => e.getAttribute("data-club")))).toEqual(want);
+      expect(await s.getByTestId("cup-row").evaluateAll(
+        (els) => els.map((e) => Number(e.getAttribute("data-rank")))))
+        .toEqual(want.map((_, i) => i + 1));
+    }
+    // the count is the sum across the tables shown
+    const total = CUPS.cups.reduce((n, c) => n + c.axes.overall.rows.length, 0);
+    await expect(page.getByTestId("cup-count")).toHaveText(`${total} of ${total} clubs`);
+    // and un-lighting one takes only its own table away
+    await page.locator(`[data-testid="cup-pill"][data-key="${CUPS.cups[0].key}"]`).click();
+    expect(await page.getByTestId("cup-section").evaluateAll(
+      (els) => els.map((e) => e.getAttribute("data-cup"))))
+      .toEqual(CUPS.cups.slice(1).map((c) => c.key));
+  });
+
+test("the incomparability note is there only at TWO OR MORE cups",
+  async ({ page }) => {
+    await open(page);
+    await toCups(page);
+    const note = page.getByTestId("cups-split-note");
+    await expect(note).toHaveCount(0);
+    const [, second, third] = CUPS.cups;
+    await page.locator(`[data-testid="cup-pill"][data-key="${second.key}"]`).click();
+    await expect(note).toContainText("2 cups, 2 separate measurements.");
+    await expect(note).toContainText("Each table has its own corpus, pass count, "
+      + "axis and rank. A club’s figure in one says nothing about its figure in "
+      + "another, so the tables are never merged or sorted against each other.");
+    await page.locator(`[data-testid="cup-pill"][data-key="${third.key}"]`).click();
+    await expect(note).toContainText("3 cups, 3 separate measurements.");
+    await page.locator(`[data-testid="cup-pill"][data-key="${second.key}"]`).click();
+    await page.locator(`[data-testid="cup-pill"][data-key="${third.key}"]`).click();
+    await expect(note).toHaveCount(0);
+  });
+
+test("EACH CUP ITS OWN AXIS: every bar in a cup's table is drawn on that "
+   + "cup's rows, never on the span of all the cups shown", async ({ page }) => {
+    await open(page);
+    await toCups(page);
+    await page.getByTestId("cup-select-all").click();
+    const spans = CUPS.cups.map((c) => {
+      const rs = c.axes.overall.rows as unknown as Row[];
+      return { lo: Math.min(...rs.map((r) => r.lo as number)),
+               hi: Math.max(...rs.map((r) => r.hi as number)) };
+    });
+    // NON-VACUITY: the cups' own spans differ, so one shared axis would
+    // draw at least one point somewhere else
+    expect(new Set(spans.map((x) => `${x.lo}:${x.hi}`)).size).toBeGreaterThan(1);
+    for (const [i, c] of CUPS.cups.entries()) {
+      const { lo, hi } = spans[i];
+      const s = page.locator(`[data-testid="cup-section"][data-cup="${c.key}"]`);
+      for (const r of c.axes.overall.rows as unknown as Row[]) {
+        if (r.lo == null || r.hi == null || r.value == null) continue;
+        const left = await s.locator(`[data-testid="cup-row"][data-club="${r.club}"]`)
+          .getByTestId("bar").locator("i").nth(1)
+          .evaluate((e) => parseFloat((e as HTMLElement).style.left));
+        expect(left, `${c.key}/${r.club}`)
+          .toBeCloseTo(((r.value as number) - lo) / (hi - lo) * 100, 1);
+      }
+    }
+  });
+
+test("a search across the selected cups FINDS a club in each without "
+   + "renumbering it", async ({ page }) => {
+    await open(page);
+    await toCups(page);
+    await page.getByTestId("cup-select-all").click();
+    await page.getByLabel("find a club in the selected cups").fill("Arsenal");
+    const has = CUPS.cups.filter((c) => c.axes.overall.rows.some((r) => r.club === "Arsenal"));
+    expect(has.length, "the recording has Arsenal in two fields").toBe(2);
+    for (const c of has) {
+      const rank = valueOrder(c.axes.overall.rows as unknown as Row[])
+        .findIndex((r) => r.club === "Arsenal") + 1;
+      await expect(page.locator(`[data-testid="cup-section"][data-cup="${c.key}"] `
+        + '[data-testid="cup-row"][data-club="Arsenal"]'))
+        .toHaveAttribute("data-rank", String(rank));
+    }
+    await expect(page.getByTestId("cup-count")).toHaveText(
+      `2 of ${CUPS.cups.reduce((n, c) => n + c.axes.overall.rows.length, 0)} clubs`);
   });
 
 test("the incomparability is STATED, with a worked example read off the "
@@ -403,7 +489,13 @@ test("the incomparability is STATED, with a worked example read off the "
   await open(page);
   await toCups(page);
   const note = page.getByTestId("cups-incomparable");
-  await expect(note).toContainText("one at a time");
+  await expect(note).toContainText("So every cup gets its own table. Select one "
+    + "or all of them, but no two share both a corpus and a pass count, and a "
+    + "number is only comparable to another on the same one — so the tables are "
+    + "never merged, ranked or scaled against each other: ");
+  await expect(note).not.toContainText("one at a time");
+  await expect(page.getByTestId("field-tag"))
+    .toHaveText("one table per cup · each on its own corpus");
   const [ucl, , efl] = CUPS.cups;
   const a = ucl.axes.overall.rows.find((r) => r.club === "Arsenal")!;
   const b = efl.axes.overall.rows.find((r) => r.club === "Arsenal")!;
@@ -418,26 +510,51 @@ test("the incomparability is STATED, with a worked example read off the "
   await expect(page.getByTestId("bridge-count")).toHaveCount(0);
 });
 
-test("attack and defence are DISABLED, with the reason, where a cup has "
-   + "only overall", async ({ page }) => {
+test("an axis stays live while ANY selected cup carries it; a cup without "
+   + "it is NAMED, never drawn from another fit", async ({ page }) => {
   await open(page);
   await toCups(page);
   const one = CUPS.cups.find((c) => !("attack" in c.axes))!;
   const three = CUPS.cups.find((c) => "attack" in c.axes)!;
-  await page.locator(`[data-testid="cup-pill"][data-key="${three.key}"]`).click();
-  await page.locator('[data-testid="cup-axis-button"][data-axis="attack"]').click();
-  await expect(page.locator('[data-testid="cup-axis-button"][data-axis="attack"]'))
-    .toHaveAttribute("aria-pressed", "true");
-  await page.locator(`[data-testid="cup-pill"][data-key="${one.key}"]`).click();
-  for (const ax of ["attack", "defence"]) {
-    const b = page.locator(`[data-testid="cup-axis-button"][data-axis="${ax}"]`);
-    await expect(b).toBeDisabled();
-    await expect(b).toHaveAttribute("title",
-      new RegExp(`${ax} is not measured for ${one.display.replace(/[·]/g, ".")}`));
+  const bare = CUPS.cups.filter((c) => !("attack" in c.axes));
+  expect(bare.length, "the recording has two overall-only fields").toBe(2);
+  const axisBtn = (ax: string) =>
+    page.locator(`[data-testid="cup-axis-button"][data-axis="${ax}"]`);
+  await page.getByTestId("cup-select-all").click();
+  // every cup lit: attack is live, because one of them carries it
+  for (const ax of ["overall", "attack", "defence"]) await expect(axisBtn(ax)).toBeEnabled();
+  for (const [ax, unit] of [["attack", "goals scored / match"],
+                            ["defence", "goals conceded / match"]] as const) {
+    await axisBtn(ax).click();
+    await expect(axisBtn(ax)).toHaveAttribute("aria-pressed", "true");
+    // only the cup that carries it gets a table, ranked from 1 on its own
+    await expect(page.getByTestId("cup-section")).toHaveCount(1);
+    await expect(page.getByTestId("cup-section")).toHaveAttribute("data-cup", three.key);
+    await expect(page.getByTestId("cup-row").first()).toHaveAttribute("data-rank", "1");
+    const n = (three.axes as Record<string, { rows: unknown[] }>)[ax].rows.length;
+    await expect(page.getByTestId("cup-count")).toHaveText(`${n} of ${n} clubs`);
+    // and the others are named in ONE line
+    const absent = page.getByTestId("cup-axis-absent");
+    await expect(absent).toHaveCount(1);
+    await expect(absent).toHaveText(`${unit} is not measured for `
+      + `${bare.map((c) => c.display).join(" or ")}. These fields carry the overall `
+      + "axis only — named, not filled from another fit.");
   }
-  // the view fell back to the axis the field HAS
-  await expect(page.locator('[data-testid="cup-axis-button"][data-axis="overall"]'))
-    .toHaveAttribute("aria-pressed", "true");
+  // un-light the cup that carries it: attack and defence go dead, with the
+  // reason, and the view falls back to the axis the fields HAVE
+  await page.locator(`[data-testid="cup-pill"][data-key="${three.key}"]`).click();
+  for (const ax of ["attack", "defence"]) {
+    await expect(axisBtn(ax)).toBeDisabled();
+    await expect(axisBtn(ax)).toHaveAttribute("title", `${ax} is not measured for `
+      + `${bare.map((c) => c.display).join(" or ")} — these fields carry the overall axis only`);
+  }
+  await expect(axisBtn("overall")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("cup-axis-absent")).toHaveCount(0);
+  // one field alone says it in the singular
+  await page.locator(`[data-testid="cup-pill"][data-key="${bare[1].key}"]`).click();
+  await expect(axisBtn("attack")).toHaveAttribute("title",
+    new RegExp(`attack is not measured for ${one.display.replace(/[·]/g, ".")} `
+      + "— this field carries the overall axis only"));
 });
 
 test("the Leagues/Cups choice is remembered, and ?comp= opens a cup",
@@ -452,7 +569,13 @@ test("the Leagues/Cups choice is remembered, and ?comp= opens a cup",
     await expect(page.getByTestId("field-table")).toBeVisible();
     // an alias opens the field it shares
     await page.goto("/bet-suggester/ratings?comp=leaguescup");
+    await expect(page.getByTestId("cup-section")).toHaveCount(1);
     await expect(page.getByTestId("cup-section")).toHaveAttribute("data-cup", "campeones");
+    // EXACTLY that cup is lit — not it and the default
+    await expect(page.locator('[data-testid="cup-pill"][aria-pressed="true"]'))
+      .toHaveCount(1);
+    await expect(page.locator('[data-testid="cup-pill"][data-key="campeones"]'))
+      .toHaveAttribute("aria-pressed", "true");
   });
 
 // ═════════════════════════ 11 · it shows, it does not decide ═══════════
@@ -621,4 +744,140 @@ test("the coarse-pointer 44px floor holds on this page", async ({ browser }) => 
   expect(a.pressFail).toBe(0);
   expect(a.theft).toBe(0);
   await ctx.close();
+});
+
+// ═════════════════════════ 12 · select all / deselect all ═══════════════
+
+/* WHICH PILLS CHURNED. A MutationObserver on the strip records every pill
+   a reveal touched, so "only the pills that changed" is read off the DOM
+   rather than timed against a frame. */
+async function watchChurn(page: Page, strip: string) {
+  // any reveal already running (the strip's arrival) settles first
+  await page.waitForTimeout(1500);
+  await expect(page.locator('[data-churn="1"]')).toHaveCount(0);
+  await page.evaluate((id) => {
+    const w = window as unknown as { __churned: Set<string> };
+    w.__churned = new Set();
+    const el = document.querySelector(`[data-testid="${id}"]`)!;
+    new MutationObserver((ms) => {
+      for (const m of ms) {
+        const t = m.target as HTMLElement;
+        if (t.getAttribute("data-churn") !== "1") continue;
+        const k = t.closest("[data-pill]")?.getAttribute("data-key");
+        if (k) w.__churned.add(k);
+      }
+    }).observe(el, { subtree: true, attributes: true, attributeFilter: ["data-churn"] });
+  }, strip);
+}
+const churned = (page: Page) => page.evaluate(() =>
+  [...(window as unknown as { __churned: Set<string> }).__churned].sort());
+
+test("LEAGUES: select all / deselect all is an ACTION — it says what a press "
+   + "will do, and empties or fills the strip", async ({ page }) => {
+  await open(page);
+  const all = page.getByTestId("league-select-all");
+  const pills = page.getByTestId("league-pill");
+  const n = LEAGUES.columns.length;
+  const total = rowsOf(LEAGUES).length;
+  // it sits in the first control row, right after "with evidence only"
+  expect(await page.getByTestId("evidence-only").evaluate(
+    (e) => e.nextElementSibling?.getAttribute("data-testid"))).toBe("league-select-all");
+  // an action, not a state: never pressed, never the lit gold border
+  await expect(all).not.toHaveAttribute("aria-pressed", /.*/);
+  const cls = (await all.getAttribute("class")) ?? "";
+  for (const c of ["border-dashed", "text-ink-low", "hover:text-ink-hi"]) {
+    expect(cls).toContain(c);
+  }
+  expect(cls).not.toContain("border-accent");
+  // every league lit, so a press would empty the strip
+  await expect(page.locator('[data-testid="league-pill"][aria-pressed="true"]')).toHaveCount(n);
+  await expect(all).toHaveText("deselect all");
+  await expect(all).toHaveAttribute("aria-label", "deselect every league");
+  await all.click();
+  await expect(page.locator('[data-testid="league-pill"][aria-pressed="false"]')).toHaveCount(n);
+  await expect(all).toHaveText("select all");
+  await expect(all).toHaveAttribute("aria-label", "select every league");
+  await expect(page.getByTestId("field-row")).toHaveCount(0);
+  await expect(page.getByTestId("field-empty"))
+    .toHaveText("No league selected — pick one above, or select all.");
+  await expect(page.getByTestId("field-count")).toHaveText(`0 of ${total} clubs`);
+  await expect(all).not.toHaveClass(/border-accent/);
+  // …and fills it again
+  await all.click();
+  await expect(page.locator('[data-testid="league-pill"][aria-pressed="true"]')).toHaveCount(n);
+  await expect(page.getByTestId("field-row")).toHaveCount(total);
+  await expect(page.getByTestId("field-empty")).toHaveCount(0);
+  // a HALF-lit strip fills in on the first press rather than emptying
+  await pills.nth(2).click();
+  await expect(all).toHaveText("select all");
+  await all.click();
+  await expect(page.locator('[data-testid="league-pill"][aria-pressed="true"]')).toHaveCount(n);
+  await expect(all).toHaveText("deselect all");
+});
+
+test("LEAGUES: a filter miss still says so — 'no league selected' is only "
+   + "for an empty strip", async ({ page }) => {
+  await open(page);
+  await page.getByLabel("find a club", { exact: true }).fill("zzzz no such club");
+  await expect(page.getByTestId("field-table")).toContainText("No club matches this filter.");
+  await expect(page.locator("main")).not.toContainText("No league selected");
+});
+
+test("LEAGUES: select all replays the reveal on the pills it CHANGED, and "
+   + "on no other", async ({ page }) => {
+  await open(page);
+  const moved = [LEAGUES.columns[0].key, LEAGUES.columns[5].key];
+  for (const k of moved) {
+    await page.locator(`[data-testid="league-pill"][data-key="${k}"]`).click();
+  }
+  await watchChurn(page, "league-strip");
+  await page.getByTestId("league-select-all").click();
+  await page.waitForTimeout(1200);
+  expect(await churned(page)).toEqual([...moved].sort());
+  await expect(page.locator('[data-churn="1"]')).toHaveCount(0);
+});
+
+test("CUPS: select all draws three tables, each ranked from 1; deselect all "
+   + "empties the view and says how to fill it", async ({ page }) => {
+  await open(page);
+  await toCups(page);
+  const all = page.getByTestId("cup-select-all");
+  await expect(page.getByLabel("find a club in the selected cups")).toBeVisible();
+  await expect(all).not.toHaveAttribute("aria-pressed", /.*/);
+  expect((await all.getAttribute("class")) ?? "").toContain("border-dashed");
+  // only the Champions League is lit, so a press would fill the strip
+  await expect(all).toHaveText("select all");
+  await expect(all).toHaveAttribute("aria-label", "select every cup");
+  await all.click();
+  await expect(page.locator('[data-testid="cup-pill"][aria-pressed="true"]'))
+    .toHaveCount(CUPS.cups.length);
+  await expect(page.getByTestId("cup-table")).toHaveCount(CUPS.cups.length);
+  for (const c of CUPS.cups) {
+    const s = page.locator(`[data-testid="cup-section"][data-cup="${c.key}"]`);
+    await expect(s.locator("h2")).toHaveText(c.display);
+    await expect(s.getByTestId("cup-row").first()).toHaveAttribute("data-rank", "1");
+    await expect(s.getByTestId("cup-row")).toHaveCount(c.axes.overall.rows.length);
+  }
+  await expect(page.getByTestId("cups-split-note"))
+    .toContainText(`${CUPS.cups.length} cups, ${CUPS.cups.length} separate measurements.`);
+  await expect(all).toHaveText("deselect all");
+  await expect(all).toHaveAttribute("aria-label", "deselect every cup");
+  await all.click();
+  await expect(page.locator('[data-testid="cup-pill"][aria-pressed="true"]')).toHaveCount(0);
+  await expect(page.getByTestId("cup-section")).toHaveCount(0);
+  await expect(page.getByTestId("cups-split-note")).toHaveCount(0);
+  await expect(page.getByTestId("cup-empty"))
+    .toHaveText("No cup selected — pick one above, or select all.");
+  await expect(page.getByTestId("cup-count")).toHaveText("0 of 0 clubs");
+  await expect(all).toHaveText("select all");
+});
+
+test("CUPS: select all replays the reveal on the pills it CHANGED, and on "
+   + "no other", async ({ page }) => {
+  await open(page);
+  await toCups(page);
+  await watchChurn(page, "cup-strip");
+  await page.getByTestId("cup-select-all").click();
+  await page.waitForTimeout(1200);
+  expect(await churned(page)).toEqual(CUPS.cups.slice(1).map((c) => c.key).sort());
 });

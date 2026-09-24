@@ -12,9 +12,10 @@
 //   LEAGUES  every current-season club of the eight declared board
 //            columns, on the union corpus at the pinned pass count —
 //            GET /api/field/leagues
-//   CUPS     the measured cup fields, ONE AT A TIME, because no two of
-//            them share both a corpus and a pass count —
-//            GET /api/field/cups
+//   CUPS     the measured cup fields, ONE TABLE PER CUP — any number
+//            selected, never merged, ranked or scaled against each
+//            other, because no two share both a corpus and a pass
+//            count — GET /api/field/cups
 //
 // `FieldAxes` and `fieldApi` are untouched and still serve the
 // competition viewer and the board card; only this page's content moved.
@@ -25,7 +26,7 @@
 //
 // `?comp=` STILL WORKS, for any link made to the old page: a cup key (or
 // an alias — `leaguescup` opens the field it shares with `campeones`)
-// opens the Cups view on that field.
+// opens the Cups view with exactly that field selected.
 //
 // NOTHING HERE IS A RECOMMENDATION, and the page adds no verb the reader
 // could act on. It shows; it does not decide.
@@ -180,7 +181,7 @@ export default function FieldPage() {
       && String(c.passes) === String(L.passes);
 
   const tag = mode === "cups"
-    ? "one cup at a time · each on its own corpus"
+    ? "one table per cup · each on its own corpus"
     : L ? `${L.passes} passes · union corpus · ${countWord(nCols)} columns`
       : "union corpus";
   const modeSwitch = <ModeSwitch mode={mode} onChange={choose} />;
@@ -191,7 +192,7 @@ export default function FieldPage() {
       <Head>
         <title>The field, at the pinned pass · namson.dev</title>
         <meta name="description"
-          content="Every current-season club of the eight board leagues on one cross-league scale, and the three cup fields one at a time — with bridges, 95% intervals and tier sets." />
+          content="Every current-season club of the eight board leagues on one cross-league scale, and the three cup fields one table each — with bridges, 95% intervals and tier sets." />
       </Head>
       <RouteProgress />
       <TopBar left={<ArchiveMenu />} title="the field">
@@ -269,9 +270,11 @@ export default function FieldPage() {
               </p>
               <p data-testid="cups-incomparable"
                 className="mt-3 max-w-3xl border-l-2 border-line-strong pl-3.5 text-[12.5px] leading-relaxed text-ink-low">
-                <b className="font-semibold text-ink-mid">So cups are shown one at a
-                time.</b> No two share both a corpus and a pass count, and a number
-                is only comparable to another on the same one
+                <b className="font-semibold text-ink-mid">So every cup gets its own
+                table.</b> Select one or all of them, but no two share both a
+                corpus and a pass count, and a number is only comparable to
+                another on the same one — so the tables are never merged, ranked
+                or scaled against each other
                 {example ? (
                   <>: <span data-testid="cups-example">{example.club} is{" "}
                     <b className="font-semibold text-ink-mid">{example.va.toFixed(1)}</b>{" "}
