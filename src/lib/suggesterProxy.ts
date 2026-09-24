@@ -228,6 +228,14 @@ export const LEAGUE_PROXY_ALLOWED: Record<string, readonly string[]> = {
   hunter: ["findings", "live-coverage"],
   xg: ["summary", "friendlies"],
   picker: ["board", "review"],
+  // THE FIELD PAGE'S TWO READS (2026-09-23), both committed measurements
+  // re-served by the backend: the league field off the union-corpus
+  // bundle and the three cup fields off `read_axes`. GET-only on the
+  // backend, no board assembly behind either, so nothing here can reach
+  // the capture that `picker/board` does. Reached through the dynamic
+  // `[league]/[...path].ts` proxy — no directory of its own, which is
+  // the point of that file.
+  field: ["leagues", "cups"],
   // COMP HAS NO LITERAL ROUTES — every one of its paths begins with a
   // competition KEY, so its whole surface lives in the id-route table
   // below. It is listed here anyway, with an empty list, because THIS
@@ -290,6 +298,7 @@ export const LEAGUE_PROXY_ID_ROUTES: Record<string, readonly RegExp[]> = {
   hunter: [],
   xg: [/^league\/\d{1,8}$/],
   picker: [],
+  field: [],
   comp: [
     new RegExp(`^${COMP_KEY}/(${COMP_RESOURCES.join("|")})$`),
     // the per-match live read — see COMP_RESOURCES for why this was the
