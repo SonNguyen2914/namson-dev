@@ -249,7 +249,7 @@ export const LEAGUE_PROXY_ALLOWED: Record<string, readonly string[]> = {
   // backend holds this one read-only by construction (its
   // tests/test_championships_route.py makes the club assembly and its
   // capture raise and the route still answers). Forwarded AHEAD of the
-  // backend's deploy: see LEAGUE_PROXY_AHEAD.
+  // backend's deploy (retired from LEAGUE_PROXY_AHEAD once 0b94886 deployed).
   championships: ["board"],
   // COMP HAS NO LITERAL ROUTES — every one of its paths begins with a
   // competition KEY, so its whole surface lives in the id-route table
@@ -341,20 +341,8 @@ export const LEAGUE_PROXY_ID_ROUTES: Record<string, readonly RegExp[]> = {
  *  In the gap a forwarded request reaches the backend's own 404, which
  *  the page names like any other failed read — never an empty board. */
 export const LEAGUE_PROXY_AHEAD: Record<string, Record<string, string>> = {
-  championships: {
-    board: "GET /api/championships/board ships on the backend branch "
-      + "`championships-integrated` (a994f9e) and is not on the deployed "
-      + "backend yet. Retire this record when the deployed /openapi.json "
-      + "lists /api/championships/board — the drift guard fails on it "
-      + "from that moment.",
-  },
-  field: {
-    nations: "GET /api/field/nations ships on the backend branch "
-      + "`field-nations-route` and is not on the deployed backend yet. "
-      + "Retire this record when the deployed /openapi.json lists "
-      + "/api/field/nations — the drift guard fails on it from that "
-      + "moment.",
-  },
+  // Empty since backend 0b94886 (2026-09-25) deployed both
+  // /api/championships/board and /api/field/nations.
 };
 
 /** ROUTES THE BACKEND SERVES THAT THIS PROXY DELIBERATELY DOES NOT
