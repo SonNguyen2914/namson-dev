@@ -1500,7 +1500,30 @@ test("the league header follows the column when the rows scroll under it",
     const mlsCol = col(page, "mls");
     await expect(head).toBeVisible();
     await page.waitForTimeout(1200);            // let the live section settle
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    /* SCROLLED BY THE COLUMN, NOT TO THE FOOT OF THE PAGE (2026-09-24).
+       This scrolled to `document.body.scrollHeight`, which puts the
+       column wherever the page's height happens to leave it — and that
+       height moves with the live sections above the board, which read a
+       real backend and answer differently run to run. Once a four-column
+       board carried its pill strip the header parks 72px lower, and at
+       the page's foot the column's own bottom edge was sometimes close
+       enough to PUSH the sticky header up (sticky cannot leave its
+       container): measured 119 against a 121 bar, one run in three.
+       So the scroll is derived from the column itself: its top well out
+       of the viewport, its bottom still below the parked header — the
+       exact situation the claim is about, at every page height. */
+    await page.evaluate(() => {
+      const c = document.querySelector<HTMLElement>(
+        '[data-testid="league-col"][data-league="mls"]')!;
+      const h = document.querySelector<HTMLElement>(
+        '[data-testid="col-head"][data-league="mls"]')!;
+      const root = document.querySelector<HTMLElement>("[data-tap-floor]")!;
+      const parked = parseFloat(getComputedStyle(root)
+        .getPropertyValue("--topbar-h")) || 0;
+      const top = c.getBoundingClientRect().top + window.scrollY;
+      const room = c.offsetHeight - parked - h.offsetHeight - 20;
+      window.scrollTo({ top: top + room, behavior: "instant" as ScrollBehavior });
+    });
     await page.waitForTimeout(400);
     const after = await head.boundingBox();
     const colBox = await mlsCol.boundingBox();

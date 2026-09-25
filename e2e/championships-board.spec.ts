@@ -18,6 +18,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { BOARD_EIGHT, routeEight } from "./eight-columns";
 import { CHAMP_BOARD, CHAMP_CLOCK, SAMPLE_REFUSAL } from "./championships-recorded";
+import { SORT_MODES } from "../src/lib/pickerSort";
 
 const json = (body: unknown) => ({
   status: 200, contentType: "application/json", body: JSON.stringify(body),
@@ -350,6 +351,54 @@ test.describe("the national favourite is venue-adjusted", () => {
       // the backend named the favourite by its own headline: not re-read here
       await expect(c.locator('a[aria-label^="open "]')).toHaveAttribute(
         "aria-label", "open Nicaragua versus Dominican Republic");
+    });
+});
+
+/* ══ THE SORT MENU OFFERS WHAT THE ROWS CARRY (2026-09-24) ════════════
+ *  A national row has no league table, so GD/g, ppg and rank gap are null
+ *  on every card; a menu offering them offers orderings that order
+ *  nothing. The national menu is kickoff, the headline and the field rank
+ *  gap; the club menu is untouched. */
+const bandOptions = (page: Page) => page.locator('[data-testid="band-sort"]').first()
+  .evaluate((sel) => [...(sel as HTMLSelectElement).options]
+    .map((o) => ({ value: o.value, label: o.textContent?.trim() })));
+
+test.describe("the sort menu offers only keys the rows carry", () => {
+  test("a national band: kickoff, the headline, the field rank gap — nothing else",
+    async ({ page }) => {
+      await openChampionships(page);
+      expect(await bandOptions(page)).toEqual([
+        { value: "kickoff", label: "kickoff" },
+        // named by the headline the cards print (interim: the Elo gap)
+        { value: "headline", label: "elo gap" },
+        { value: "field_rank", label: "field rank gap" },
+      ]);
+    });
+
+  test("the Leagues menu is the club menu, verbatim", async ({ page }) => {
+    await routeBoth(page);
+    await page.goto("/bet-suggester");
+    await page.waitForSelector('[data-testid="league-col"]');
+    expect(await bandOptions(page)).toEqual(
+      SORT_MODES.map((m) => ({ value: m.id, label: m.label })));
+  });
+
+  test("sorting a band by the headline orders every column's cards by it",
+    async ({ page }) => {
+      await openChampionships(page);
+      const sel = page.locator('[data-testid="band-sort"]').first();
+      const day = await sel.getAttribute("data-day");
+      await sel.selectOption("headline");
+      await page.waitForTimeout(200);
+      const perCol = await page.locator(`[data-testid="day-track"][data-day="${day}"]`)
+        .evaluateAll((tracks) => tracks.map((t) =>
+          [...t.querySelectorAll('[data-testid="row-anchor"]')].map((a) =>
+            Number((a.textContent ?? "").replace("−", "-").replace("+", "")))));
+      expect(perCol.flat().length).toBeGreaterThan(1);
+      for (const v of perCol) {
+        expect(v, "descending |headline gap|")
+          .toEqual([...v].sort((a, b) => Math.abs(b) - Math.abs(a)));
+      }
     });
 });
 

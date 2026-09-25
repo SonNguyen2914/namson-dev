@@ -82,7 +82,8 @@ import {
   DEFAULT_BACK, Review, fetchReview, readHere, reviewAskHonoured,
 } from "../../lib/pickerReview";
 import {
-  COLUMN_DEFAULT_SORT, ColumnSort, DEFAULT_SORT, SORT_MODES, columnSort,
+  COLUMN_DEFAULT_SORT, ColumnSort, DEFAULT_SORT, NATIONAL_SORT_MODES,
+  SORT_MODES, columnSort,
   loadBoardSort, modeById, nullNoteFor, orderPhrase,
 } from "../../lib/pickerSort";
 import { failureSentence, readFailure } from "../../lib/providerFailure";
@@ -392,6 +393,8 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      the whole row is read from that side. The club board is untouched. */
   const rows = champ ? (board?.rows ?? []).map(venueAdjusted)
     : board?.rows ?? [];
+  const headlineLabel = rows.find((r) => r.headline)?.headline?.label
+    ?? "headline gap";
   const refusals = board?.refusals ?? [];
   const leaguesMap = board?.leagues ?? {};
 
@@ -2015,8 +2018,13 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                           applyDaySort(k, { mode: m.id, dir: m.defaultDir });
                         }}
                         className="rounded-md border border-line bg-bs px-1.5 py-0.5 font-mono text-[9.5px] uppercase text-ink-mid outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-accent">
-                        {SORT_MODES.map((m) => (
-                          <option key={m.id} value={m.id}>{m.label}</option>
+                        {(champ ? NATIONAL_SORT_MODES : SORT_MODES).map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {/* the headline key is named by the headline
+                                the cards print — the payload's own label
+                                when it sends one */}
+                            {m.id === "headline" ? headlineLabel : m.label}
+                          </option>
                         ))}
                       </select>
                       <button data-testid="band-dir" data-day={k}

@@ -245,6 +245,10 @@ function anchorValue(row: BoardRow, id: AnchorId):
     case "ppg": return { v: dec(row.ppg_gap), k: "ppg gap" };
     case "rank": return { v: sign(row.rank_gap), k: "rank gap" };
     case "tier_ovr": return { v: sign(row.tier_gaps.ovr), k: "tier · ovr" };
+    case "field_rank": {
+      const o = (row.field ?? row.field_partial)?.axes?.ovr;
+      return { v: sign(o ? o.opp.rank - o.fav.rank : null), k: "field rank gap" };
+    }
     case "headline": {
       const h = row.headline;
       if (!h) return { v: WITHHELD, k: "no headline" };
