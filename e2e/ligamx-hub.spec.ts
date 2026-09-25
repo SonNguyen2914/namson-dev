@@ -288,8 +288,11 @@ test.describe("Liga MX match hub (model dark)", () => {
       r.fulfill({ status: 404, contentType: "application/json",
                   body: JSON.stringify({ detail: "unknown event" }) }));
     await page.goto("/bet-suggester/ligamx/999999");
-    await expect(
-      page.getByText(/match feed unavailable — retrying every 30s/)
-    ).toBeVisible();
+    // THE FAILURE IS NAMED (2026-09-25): the status and the backend's own
+    // sentence, not a bare "unavailable" — the hub used to throw both away
+    const failed = page.getByTestId("feed-failed");
+    await expect(failed).toContainText("the match feed read failed");
+    await expect(failed).toContainText("HTTP 404");
+    await expect(failed).toContainText("unknown event");
   });
 });

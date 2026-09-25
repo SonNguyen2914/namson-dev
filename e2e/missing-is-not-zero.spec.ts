@@ -99,6 +99,34 @@ test("a bracket that ANSWERED with no quarter-finals renders nothing — the "
       .not.toContain("could not ask");
   });
 
+test("a decided tournament is read once: the archive stops polling when the "
+   + "bracket names a champion", async ({ page }) => {
+    // AUDIT F6 (2026-09-25): the WC26 archive polled ~9 reads a minute
+    // per tab — live scores every 15s, the bracket, suggestions, upcoming,
+    // watchlist and alerts every 60s — for a final Spain had already won.
+    let reads = 0;
+    await page.route("**/api/**", (r) => {
+      reads += 1;
+      return r.fulfill(json({}, 503));
+    });
+    await page.route("**/api/bet-suggester/live-scores", (r) => {
+      reads += 1;
+      return r.fulfill(json({ live: [] }));
+    });
+    await page.route(BRACKET_URL, (r) => {
+      reads += 1;
+      return r.fulfill(json({ ...A_DRAWN_BRACKET, champion: "Spain" }));
+    });
+    await page.clock.install();
+    await page.goto("/bet-suggester/wc26");
+    await expect(page.locator("body")).toContainText("Road to the final");
+    await expect(page.locator("body")).toContainText(/Archived — Spain won/);
+    await page.clock.runFor(5_000);
+    const settled = reads;
+    await page.clock.runFor(300_000);
+    expect(reads, "a finished tournament kept being polled").toBe(settled);
+  });
+
 test("a bracket that answered and then stopped answering keeps the road and "
    + "says the read behind it is the earlier one", async ({ page }) => {
     // THE POLL IS SIXTY SECONDS AND THIS TEST HAS TO SEE THE SECOND ONE.

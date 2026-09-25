@@ -10,6 +10,7 @@
 //   finished                        -> final score, winner white / loser grey
 //   placeholder (feeders unknown)   -> "TBD"
 import { useEffect, useState } from "react";
+import { usePoll } from "../lib/usePoll";
 import Link from "next/link";
 import {
   api, flag, pct, signedPct, countdown, kickoffLocal,
@@ -39,7 +40,11 @@ type Read<T> =
 const why = (e: unknown): string =>
   e instanceof Error ? e.message : String(e);
 
-export default function BracketView() {
+export default function BracketView({ onChampion }: {
+  /** Told once the bracket names a champion — the tournament is over, so
+   *  the page around it can stop refreshing too (audit F6). */
+  onChampion?: (champion: string) => void;
+} = {}) {
   const [read, setRead] = useState<Read<BracketResponse>>({ s: "asking" });
   // A bracket that arrived once is KEPT when a later poll fails, and is
   // drawn beside a line saying the read behind it is the earlier one. A
@@ -48,27 +53,38 @@ export default function BracketView() {
   // ref read during render is an error under this repo's lint.
   const [lastOk, setLastOk] = useState<BracketResponse | null>(null);
   const [, setTick] = useState(0); // ticking clock for per-card countdowns
+  const decided = Boolean((read.s === "ok" ? read.d : lastOk)?.champion);
 
-  useEffect(() => {
-    let alive = true;
-    // ONE bracket call carries probs + edges — no per-match prediction
-    // fetches (those triggered fresh backend sims every cache expiry,
-    // multiplied per viewer).
-    const load = async () => {
-      try {
-        const r = await api.bracket();
-        if (!alive) return;
-        setLastOk(r);
-        setRead({ s: "ok", d: r });
-      } catch (e) {
-        if (alive) setRead({ s: "failed", why: why(e) });
+  // ONE bracket call carries probs + edges — no per-match prediction
+  // fetches (those triggered fresh backend sims every cache expiry,
+  // multiplied per viewer). Every 60s through lib/usePoll (audit F5) —
+  // and NOT AT ALL once a champion is named: a decided bracket cannot
+  // change, and the WC26 archive asked it every minute from every tab
+  // for a tournament Spain had already won (audit F6).
+  usePoll(async (signal) => {
+    try {
+      const r = await api.bracket();
+      if (signal.aborted) return "stop";
+      setLastOk(r);
+      setRead({ s: "ok", d: r });
+      if (r.champion) {
+        onChampion?.(r.champion);
+        return "stop";
       }
-    };
-    load();
-    const poll = setInterval(load, 60000);
+      return "ok";
+    } catch (e) {
+      if (signal.aborted) return "stop";
+      setRead({ s: "failed", why: why(e) });
+      return "failed";
+    }
+  }, 60000, []);
+
+  // the per-card countdowns tick only while a match can still be ahead
+  useEffect(() => {
+    if (decided) return;
     const tick = setInterval(() => setTick((t) => t + 1), 1000);
-    return () => { alive = false; clearInterval(poll); clearInterval(tick); };
-  }, []);
+    return () => clearInterval(tick);
+  }, [decided]);
 
   // NOTHING HAS BEEN ASKED YET. Absence with a reason, not a claim about
   // whether a knockout draw exists.

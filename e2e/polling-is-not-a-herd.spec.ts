@@ -169,3 +169,20 @@ test("a backend that hangs is a named 504 in JSON after 15s, never an HTML "
     expect(took).toBeGreaterThanOrEqual(14_000);
     expect(took).toBeLessThan(25_000);
   });
+
+// -------------------------------------- F14: a definitive 404 is final
+
+test("the tournament read stops for the session after the backend says "
+  + "404 — it used to ask again every five minutes", async ({ page }) => {
+    let asked = 0;
+    await page.route("**/api/**", (r) => r.fulfill(json({}, 503)));
+    await page.route("**/api/comp/ucl/tournament", (r) => {
+      asked += 1;
+      return r.fulfill(json({ detail: "no tournament for ucl" }, 404));
+    });
+    await page.clock.install();
+    await page.goto("/bet-suggester/comp/ucl");
+    await expect.poll(() => asked).toBe(1);
+    for (let i = 0; i < 4; i += 1) await page.clock.runFor(300_000);
+    expect(asked, "a 404 that means 'absent' was asked again").toBe(1);
+  });

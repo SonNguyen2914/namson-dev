@@ -365,6 +365,54 @@ test.describe("a failed refresh is not an up-to-date page", () => {
     });
 });
 
+test.describe("a finished match is read, not watched", () => {
+  test("after full time the hub stops polling the match feed", async ({ page }) => {
+    // AUDIT F6 (2026-09-25): the hub kept asking every 30s after
+    // `state === "post"`, from every open tab, for a feed that cannot
+    // change. Counted with the clock driven.
+    let calls = 0;
+    const body = JSON.parse(JSON.stringify(MATCH_PAYLOAD));
+    body.match.state = "post";
+    body.match.detail = "FT";
+    body.match.date = new Date(Date.now() - 3 * 3_600_000).toISOString();
+    body.match.home.score = "2";
+    body.match.away.score = "1";
+    await page.route("**/api/card/**", (r) =>
+      r.fulfill({ status: 200, contentType: "application/json",
+                  body: JSON.stringify({ card: null }) }));
+    await page.route(`**/api/epl/match/${EVENT}`, (r) => {
+      calls += 1;
+      return r.fulfill({ status: 200, contentType: "application/json",
+                         body: JSON.stringify(body) });
+    });
+    await page.clock.install();
+    await page.goto(`/bet-suggester/epl/${EVENT}`);
+    await expect(page.getByText("Arsenal").first()).toBeVisible();
+    expect(calls).toBe(1);
+    await page.clock.runFor(180_000);   // six 30s cadences
+    expect(calls, "a finished match's feed was polled again").toBe(1);
+  });
+
+  test("before full time it still polls — the stop is about the state",
+    async ({ page }) => {
+      // non-vacuity: the same page, a match not yet played, does re-read
+      let calls = 0;
+      await page.route("**/api/card/**", (r) =>
+        r.fulfill({ status: 200, contentType: "application/json",
+                    body: JSON.stringify({ card: null }) }));
+      await page.route(`**/api/epl/match/${EVENT}`, (r) => {
+        calls += 1;
+        return r.fulfill({ status: 200, contentType: "application/json",
+                           body: JSON.stringify(MATCH_PAYLOAD) });
+      });
+      await page.clock.install();
+      await page.goto(`/bet-suggester/epl/${EVENT}`);
+      await expect(page.getByText("Arsenal").first()).toBeVisible();
+      await page.clock.runFor(95_000);
+      await expect.poll(() => calls).toBeGreaterThan(1);
+    });
+});
+
 test.describe("a column's caveat is on the page, not on a title", () => {
   test("the net-edge column states that its two halves come from "
     + "different moments", async ({ page }) => {
