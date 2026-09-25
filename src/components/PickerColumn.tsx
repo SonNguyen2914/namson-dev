@@ -38,7 +38,8 @@ import {
   ProviderFailure, announceFailure, failureSentence, readFailure,
 } from "../lib/providerFailure";
 import {
-  BoardRefusal, BoardRow, FieldBlockLike, LeagueMeta, RatePair, RowField,
+  BoardRefusal, BoardRow, FieldBlockLike, KalshiQuote, LeagueMeta,
+  NationalBlock, NationalTeam, RatePair, RowField,
   RowFieldPartial, SEASON_BLEND_K,
   columnsOf, homeBadge, leagueLabel, rowHref, rowIsInPlay,
   seasonDisagreement,
@@ -115,6 +116,9 @@ const LEAGUE_HUE: Record<string, string> = {
   bundesliga: "var(--lg-bundesliga)", seriea: "var(--lg-seriea)",
   ligue1: "var(--lg-ligue1)", eredivisie: "var(--lg-eredivisie)",
   eflcup: "var(--lg-eflcup)",
+  // the Championships board (globals.css, beside the tokens)
+  unl: "var(--lg-unl)", cnl: "var(--lg-cnl)",
+  asiancup: "var(--lg-asiancup)", afcon: "var(--lg-afcon)",
 };
 export const hueOf = (slug: string) => LEAGUE_HUE[slug] ?? "var(--lg-cup)";
 
@@ -180,7 +184,22 @@ function anchorFor(row: BoardRow, modeId: SortModeId):
      keeps `own_gdg` behind it for rows the level table does not cover. */
   const own = row.own_gdg?.diff;
   const lg = row.league_gap?.gd;
-  const fallback: AnchorId = !row.cross_league ? "gdg"
+  /* A FIELD-RATED NATIONAL ROW HAS NO GD/g GAP TO ANCHOR ON (2026-09-24).
+     A national team has no league table, so `gdg_gap` is null on every
+     Championships card and "GD/g gap n/a" would be the anchor on all of
+     them — the surface-where-every-anchor-is-withheld this function's
+     own header refuses. The comparison the national field supports is
+     its own tier gap, which the backend computed on that field
+     (`tier_gaps.ovr` = `field.axes.ovr.tier_gap`), exactly the anchor a
+     cross-league cup row falls back to. KEYED ON THE ROW'S `national`
+     BLOCK, which only the Championships board sends — not on
+     `fav_source: "field"`, which a Champions League or Campeones row
+     carries too and whose own anchors (league gap, own-league GD/g) this
+     branch must never pre-empt; e2e/the-anchor-compares-leagues.spec.ts
+     caught exactly that. */
+  const fieldRated = row.national != null && row.gdg_gap == null;
+  const fallback: AnchorId = fieldRated ? "tier_ovr"
+    : !row.cross_league ? "gdg"
     : lg != null ? "league_gap"
       : own != null ? "own_gdg" : "tier_ovr";
   const id = modeId === "kickoff" || modeId === "shape" ? fallback : modeId;
@@ -433,6 +452,141 @@ function FormStrip({ form, name, scope, cupScope, className = "" }: {
         </span>
       )}
     </span>
+  );
+}
+
+/* ── THE NATIONAL READER (2026-09-24) ─────────────────────────────────
+   What a national-team card has that a club card does not, read off the
+   row's one extra key, `national` (backend src/championships/payload
+   ._card). Drawn only when that key is present, so no club card changes
+   by a byte.
+
+   FOUR FACTS, EACH ABLE TO BE ABSENT BY NAME:
+     form     the last games ESPN lists — EVERY senior international,
+              so a friendly sits beside a qualifier. A friendly is drawn
+              HOLLOW (dashed, unfilled) and says so on hover: a win in a
+              friendly is not the same evidence as a win that counted,
+              and a strip that did not say which is which would be
+              asking the reader to trust it.
+     h2h      the tally of previous meetings, from ESPN's own series
+              block, in THIS fixture's home/away terms. No block is "no
+              meeting on ESPN's record" — the provider's record, not a
+              claim the two never met.
+     XI       whether both starting elevens are published.
+     price    whose price the market line above it is: the book quotes
+              one team's yes, and a price with no side named is a wrong
+              annotation rather than a smaller one. */
+const NAT_LABEL = "w-[3.4rem] flex-none text-[7.5px] uppercase tracking-[0.12em] text-ink-faint";
+
+function NationalFormLine({ side, team }: {
+  side: string; team?: NationalTeam;
+}) {
+  const f = team?.form;
+  const games = (f?.games ?? []).filter((g) => g.letter);
+  return (
+    <span data-testid="national-form-side" className="flex min-w-0 items-center gap-2">
+      <span className="min-w-0 max-w-[7.5rem] truncate text-ink-low">{side}</span>
+      {games.length === 0 ? (
+        <span data-testid="national-form-absent" className="text-ink-faint"
+          title={f?.reason ?? "no form block on this card"}>
+          not stated
+        </span>
+      ) : (
+        <span className="ml-auto inline-flex flex-none items-center gap-[3px]">
+          {games.map((g) => {
+            const friendly = g.kind === "friendly";
+            const ink = g.letter === "W" ? "text-up" : g.letter === "L"
+              ? "text-neg" : "text-ink-mid";
+            return (
+              <i key={g.event_id} data-testid="national-form-game"
+                data-letter={g.letter ?? ""} data-friendly={friendly ? "1" : "0"}
+                title={`${friendly ? "friendly" : g.competition ?? "competitive"}`
+                  + `${g.opponent ? ` v ${g.opponent}` : ""}`
+                  + `${g.gf != null && g.ga != null ? `, ${g.gf}–${g.ga}` : ""}`
+                  + `${g.date ? ` (${g.date.slice(0, 10)})` : ""}`}
+                className={`inline-flex h-[14px] w-[14px] items-center justify-center rounded-[3px] text-[9px] font-semibold not-italic leading-none ${ink} ${
+                  friendly ? "border border-dashed border-ink-low/70"
+                    : "border border-transparent bg-ink-hi/[0.07]"}`}>
+                {g.letter}
+              </i>
+            );
+          })}
+        </span>
+      )}
+    </span>
+  );
+}
+
+export function NationalRead({ national, home, away, kalshi }: {
+  national: NationalBlock; home: string; away: string;
+  kalshi?: (KalshiQuote & { side?: string | null }) | null;
+}) {
+  const t = national.teams ?? {};
+  const h2h = national.head_to_head;
+  const tally = h2h?.tally ?? null;
+  const met = tally ? tally.home + tally.draw + tally.away : 0;
+  const xi = national.lineups;
+  /* WHOSE PRICE. A refused card's quote names its side (`side`); a
+     ranked card's is the favourite's by the board's contract, and the
+     national block's own book says so outright — the leg whose ticker is
+     the quote's ticker. Read off the book, not assumed. */
+  const legs = (national.market as { legs?: Record<string,
+    { ticker?: string | null; name?: string } | null> } | null)?.legs ?? {};
+  const priceSide = kalshi?.side
+    ?? Object.values(legs).find((l) => l?.ticker && l.ticker === kalshi?.ticker)?.name
+    ?? null;
+  const anyFriendly = [t.home, t.away].some((x) =>
+    (x?.form?.games ?? []).some((g) => g.letter && g.kind === "friendly"));
+  return (
+    <div data-testid="national-read"
+      className="mt-3 flex flex-col gap-1.5 font-mono text-[10.5px] tabular-nums">
+      <div className="flex items-start gap-2">
+        <span className={`${NAT_LABEL} pt-[3px]`}>form</span>
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <NationalFormLine side={home} team={t.home} />
+          <NationalFormLine side={away} team={t.away} />
+        </span>
+      </div>
+      {anyFriendly && (
+        <div data-testid="national-form-key" className="flex items-center gap-2 pl-[3.9rem] text-[9px] text-ink-faint">
+          <i className="inline-block h-[9px] w-[9px] rounded-[2px] border border-dashed border-ink-low/70" />
+          friendly · oldest → newest
+        </div>
+      )}
+      <div data-testid="national-h2h" className="flex items-baseline gap-2">
+        <span className={NAT_LABEL}>h2h</span>
+        {tally && met > 0 ? (
+          <span className="min-w-0 truncate text-ink-mid"
+            title={`previous meetings on ESPN's ${h2h?.source ?? "record"}, in this fixture's home/away terms`}>
+            <span className="text-ink-low">{home}</span> {tally.home}
+            <span className="text-ink-faint"> · draw </span>{tally.draw}
+            <span className="text-ink-faint"> · </span>
+            <span className="text-ink-low">{away}</span> {tally.away}
+          </span>
+        ) : (
+          <span className="text-ink-faint"
+            title={h2h?.reason ?? "no head-to-head block on this card"}>
+            no meeting on ESPN&apos;s record
+          </span>
+        )}
+      </div>
+      <div data-testid="national-lineups" className="flex items-baseline gap-2">
+        <span className={NAT_LABEL}>xi</span>
+        <span data-announced={xi?.announced ? "1" : "0"}
+          className={xi?.announced ? "text-ink-mid" : "text-ink-faint"}
+          title={xi?.reason ?? undefined}>
+          {xi?.announced ? "both starting XIs announced" : "not announced yet"}
+        </span>
+      </div>
+      {kalshi && priceSide && (
+        <div data-testid="national-price-side" className="flex items-baseline gap-2">
+          <span className={NAT_LABEL}>price</span>
+          <span className="min-w-0 truncate text-ink-faint">
+            the quote below is <span className="text-ink-low">{priceSide}</span> to win
+          </span>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -991,6 +1145,11 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
       <RowRead row={row} modeId={modeId} clubCount={clubCount}
         dense={dense} hoisted={hoisted} field={fld} partial={partial}
         floorNote={floorNote} />
+
+      {row.national && (
+        <NationalRead national={row.national} home={row.home}
+          away={row.away} kalshi={row.kalshi} />
+      )}
 
       <div className="mt-3 border-t border-line pt-3">
         <KalshiCell quote={row.kalshi} />
@@ -1749,6 +1908,10 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
           ranked card draws them under. A refusal to RANK is not a refusal
           to QUOTE: Kalshi prices this match either way, and a reader who
           wants to watch it should not have to leave the card to say so. */}
+      {r.national && (
+        <NationalRead national={r.national} home={r.home} away={r.away}
+          kalshi={r.kalshi} />
+      )}
       <div className="mt-3 border-t border-line pt-3">
         {/* TWO DIFFERENT SILENCES ABOUT THE BOOK, KEPT APART. `kalshi:
             null` is the board saying it looked and matched no event —

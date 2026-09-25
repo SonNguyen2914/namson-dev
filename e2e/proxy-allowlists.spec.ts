@@ -6,6 +6,7 @@ import {
   LEAGUE_PROXY_ALLOWED,
   OPENAPI_PROBE_VALUES,
   PROXY_GUARDS_OPEN,
+  LEAGUE_PROXY_AHEAD,
   leagueRouteAllowed,
   proxyAllowlistDrift,
 } from "../src/lib/suggesterProxy";
@@ -117,7 +118,11 @@ test("every allowlist agrees with the backend's own route table, both ways",
     // round trips, and named one by one so a failure says which pair.
     const served = new Set(apiPaths);
     const unserved = FORWARDED.filter(
-      ([p, res]) => !served.has(`/api/${p}/${res}`));
+      ([p, res]) => !served.has(`/api/${p}/${res}`)
+        // a route REGISTERED as ahead of the deploy is excused here and
+        // held to its record below (`staleAhead`), never silently
+        && !Object.prototype.hasOwnProperty.call(
+          LEAGUE_PROXY_AHEAD[p] ?? {}, res));
     expect(unserved, "forwarded by the proxy and served by nothing — "
       + "each of these travels to a guaranteed backend 404 with this "
       + "layer's blessing (the La Liga `approval` shape)").toEqual([]);
@@ -136,6 +141,11 @@ test("every allowlist agrees with the backend's own route table, both ways",
       if (d.unserved.length) {
         findings.push(`${prefix}: forwarded to a backend that serves no `
           + `such route: ${d.unserved.join(", ")}`);
+      }
+      if (d.staleAhead.length) {
+        findings.push(`${prefix}: LEAGUE_PROXY_AHEAD still records `
+          + `${d.staleAhead.join(", ")}, which the backend now serves (or `
+          + "this proxy does not forward) — retire the record");
       }
       if (d.staleWithheld.length) {
         findings.push(`${prefix}: LEAGUE_PROXY_WITHHELD still records `

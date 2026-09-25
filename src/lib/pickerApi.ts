@@ -468,7 +468,9 @@ export interface BoardRow {
    *  cosmetic: under "venue" every signed field on this row is oriented
    *  to a side the table rates LOWER, so a negative rank_gap is the row
    *  saying exactly that rather than a sign bug. */
-  fav_source?: "rank" | "venue";
+  /** `field` on a national-team row: the favourite is the side ahead
+   *  on the competition's own field (the Championships board). */
+  fav_source?: "rank" | "venue" | "field";
   resolution: Record<string, string>;
   /** NULL on a cross-league cup fixture: the two clubs were rated in
    *  different competitions and their rates were never on one scale, so
@@ -561,6 +563,9 @@ export interface BoardRow {
    *  in-play row — a pre-kickoff card has no clock to be missing, so a
    *  block of nulls there would be a claim rather than an absence. */
   live?: BoardRowLive | null;
+  /** A national-team fixture's own facts (Championships board only) —
+   *  see NationalBlock. Absent on every club row. */
+  national?: NationalBlock | null;
 }
 
 /** One tape row's reading of a live match, as the board serves it.
@@ -664,6 +669,9 @@ export interface BoardRefusal {
   state?: string | null;
   in_play?: boolean;
   live?: BoardRowLive | null;
+  /** A national-team fixture's own facts (Championships board only) —
+   *  see NationalBlock. Absent on every club row. */
+  national?: NationalBlock | null;
   /** the competition's settlement rule, as on a rated row — a refusal
    *  to RANK is not a refusal to say what a leg settles under, and
    *  `annotate_row` attaches it to refusals for that reason. */
@@ -828,7 +836,11 @@ export interface LeagueMeta {
   clubs: number;
   /** "league" — has a table of its own; "cup" — a tournament that has
    *  none, whose clubs are rated on their domestic leagues' tables */
-  kind?: "league" | "cup";
+  /** `championship` — a national-team competition on the Championships
+   *  board (GET /api/championships/board). Neither a league with a table
+   *  nor a club cup rated on member tables: its sides are rated, when
+   *  they are, on the competition's own national-team field. */
+  kind?: "league" | "cup" | "championship";
   /** for a cup: the league slugs its clubs were rated on */
   rated_on?: string[];
   /** for a cup where a member league DID NOT BUILD: the members that
@@ -927,6 +939,13 @@ export interface Board {
    *  was already carrying the answer. */
   off_board?: OffBoard[] | null;
   off_board_counts?: Record<string, number> | null;
+  /** THE CHAMPIONSHIPS BOARD'S DECLARATION, IN ITS ORDER. Only
+   *  GET /api/championships/board sends it; the club board never has, and
+   *  `declarationOf` reads it only when it is here, so the Leagues board
+   *  declares exactly what it always declared. */
+  columns?: string[] | null;
+  /** "championships" on that payload; absent on the club board. */
+  mode?: string | null;
 }
 
 /** One fixture the board removed, in the backend's own words. */
@@ -961,7 +980,12 @@ export interface OffBoard {
  *  ONE DOOR, and it is this function: `boardColumns` is fed from here,
  *  and a narrowed payload can therefore never reach it. */
 export function declarationOf(board: Board): string[] | null {
-  return board.narrowed_to == null ? Object.keys(board.leagues) : null;
+  if (board.narrowed_to != null) return null;
+  /* THE CHAMPIONSHIPS BOARD NAMES ITS COLUMNS OUTRIGHT, in order, and
+     that list is the declaration — `leagues` is keyed by the same slugs
+     but a JSON object's key order is not a promise anybody made. */
+  if (Array.isArray(board.columns)) return [...board.columns];
+  return Object.keys(board.leagues);
 }
 
 /** DID THE BOARD ANSWER THE QUESTION WE ASKED IT?
@@ -1036,6 +1060,15 @@ export const LEAGUE_LABEL: Record<string, string> = {
   championship: "Championship",
   leagueone: "League One",
   leaguetwo: "League Two",
+  // THE CHAMPIONSHIPS BOARD'S FOUR COLUMNS (2026-09-24), keyed as the
+  // backend's `src/championships/registry.CHAMPIONSHIP_COLUMNS` keys them
+  // and named as it names them — Concacaf is the confederation's own
+  // spelling and ESPN's. They are never on the Leagues board: that board's
+  // columns are `tables.BOARD_COLUMNS` and these are not in it.
+  unl: "UEFA Nations League",
+  cnl: "Concacaf Nations League",
+  asiancup: "AFC Asian Cup",
+  afcon: "Africa Cup of Nations",
 };
 
 /** THE BADGE BESIDE THE FAVOURITE, and what it is allowed to claim.
@@ -1254,7 +1287,7 @@ export const pctThisSeason = (w: number | null | undefined) =>
  *  header stays silent rather than printing "0% this szn". */
 export function seasonSpan(
   rows: readonly { weights?: BlendWeights | null }[],
-  kind?: "league" | "cup" | null,
+  kind?: "league" | "cup" | "championship" | null,
 ): { lo: number; hi: number; clubs: number } | null {
   if (kind === "cup") return null;
   const ws: number[] = [];
@@ -1325,9 +1358,18 @@ export async function fetchBoard(
 ): Promise<Board> {
   const ask = leagues && leagues.length > 0
     ? `&leagues=${encodeURIComponent(leagues.join(","))}` : "";
+  return readBoard(`/api/picker/board?days=${days}${ask}`, signal);
+}
+
+/** ONE READER FOR BOTH BOARDS. Moved out of `fetchBoard` unchanged
+ *  (2026-09-24) so the Championships board is read by the same code —
+ *  the same abort screening, the same named failures, the same refusal
+ *  to read a `null` or a non-JSON 200 as an empty slate — rather than by
+ *  a copy of it that could learn a different lesson. */
+async function readBoard(path: string, signal?: AbortSignal): Promise<Board> {
   let r: Response;
   try {
-    r = await fetch(`/api/picker/board?days=${days}${ask}`, { signal });
+    r = await fetch(path, { signal });
   } catch (e) {
     // An abort is the caller's own cancellation — rethrow it untouched so
     // the caller's signal guard can screen it. Anything else is the
@@ -1373,4 +1415,95 @@ export async function fetchBoard(
       + "must not be read as an empty one");
   }
   return body as Board;
+}
+
+/** THE CHAMPIONSHIPS BOARD — GET /api/championships/board, the four
+ *  national-team columns in the club board's own payload shape
+ *  (`leagues`, `rows`, `refusals`, `off_board`, `off_board_counts`) plus
+ *  `columns`, their declared order.
+ *
+ *  A DIFFERENT ROUTE FROM THE CLUB BOARD, AND THAT IS LOAD-BEARING. The
+ *  club board's GET freezes a pre-kickoff snapshot per fixture; this one
+ *  writes nothing (backend tests/test_championships_route.py makes the
+ *  club assembly and its capture raise and the route still answers). So
+ *  the Leagues mode never asks this route and this mode never asks that
+ *  one — e2e/championships-board.spec.ts counts both. */
+export async function fetchChampionships(
+  days: number, signal?: AbortSignal,
+): Promise<Board> {
+  return readBoard(`/api/championships/board?days=${days}`, signal);
+}
+
+/** The backend's declared order, restated for the one reader that needs
+ *  it before a payload lands (the hero's four lights). The payload's own
+ *  `columns` stays the authority for what the board draws. */
+export const CHAMPIONSHIP_COLUMNS = ["unl", "cnl", "asiancup", "afcon"] as const;
+
+/* ── WHAT A NATIONAL CARD CARRIES BESIDES THE CLUB CARD'S KEYS ─────────
+   Backend `src/championships/payload._card`, field for field. Every
+   block can be ABSENT BY NAME — `available: false` with a `reason` —
+   and a reader must say so rather than draw a zero. */
+
+/** One game in a team's last-five, as ESPN's `lastFiveGames` lists it:
+ *  EVERY senior international, so a friendly sits beside a competitive
+ *  match and `kind` is what tells them apart. */
+export interface NationalFormGame {
+  event_id: string;
+  date?: string | null;
+  competition?: string | null;
+  kind?: string | null;
+  opponent?: string | null;
+  venue?: "home" | "away";
+  gf?: number;
+  ga?: number;
+  letter: "W" | "D" | "L" | null;
+  why_no_letter?: string;
+}
+
+export interface NationalForm {
+  available: boolean;
+  letters?: string | null;
+  games?: NationalFormGame[];
+  friendlies?: number;
+  reason?: string;
+}
+
+export interface NationalRating {
+  available: boolean;
+  source?: string | null;
+  competition?: string;
+  axes?: Record<string, unknown>;
+  axes_absent?: string[];
+  reason?: string;
+}
+
+export interface NationalTeam {
+  key?: string | null;
+  espn_id?: string | null;
+  name?: string | null;
+  rating?: NationalRating | null;
+  form?: NationalForm | null;
+}
+
+export interface NationalHeadToHead {
+  available?: boolean;
+  source: string | null;
+  tally?: { home: number; draw: number; away: number } | null;
+  meetings?: unknown[];
+  reason?: string;
+}
+
+export interface NationalBlock {
+  competition?: string;
+  stage?: string | null;
+  stage_kind?: string | null;
+  group?: string | null;
+  leg?: string | number | null;
+  status_detail?: string | null;
+  neutral?: boolean;
+  teams?: { home?: NationalTeam; away?: NationalTeam };
+  head_to_head?: NationalHeadToHead | null;
+  lineups?: { announced: boolean; reason?: string | null } | null;
+  market?: { status: string; status_words?: string;
+             event_ticker?: string } | null;
 }

@@ -75,7 +75,7 @@ import { TZ, dayLabel, localDay } from "../../lib/matchday";
 import {
   Board, CUP_COMP_KEY, DEFAULT_DAYS, SEASON_BLEND_K, THIN_ASK_SIZE,
   WIDE_SPREAD_C, askHonoured, boardColumns, columnsOf, declarationOf,
-  fetchBoard, leagueLabel,
+  CHAMPIONSHIP_COLUMNS, fetchBoard, fetchChampionships, leagueLabel,
 } from "../../lib/pickerApi";
 import {
   DEFAULT_BACK, Review, fetchReview, readHere, reviewAskHonoured,
@@ -87,6 +87,9 @@ import {
 import { failureSentence, readFailure } from "../../lib/providerFailure";
 import { Eyebrow } from "../../components/ui";
 import { ArchiveMenu } from "../../components/ArchiveMenu";
+import {
+  BoardMode, BoardModeSwitch,
+} from "../../components/BoardModeSwitch";
 import { ColumnChooser } from "../../components/ColumnChooser";
 import { CompRail } from "../../components/CompRail";
 import LiveSection from "../../components/LiveCard";
@@ -116,6 +119,11 @@ import {
 /** The board's own ET date key, YYYYMMDD, made readable. Left as the raw
  *  key if it is ever any other shape — inventing a date from a string we
  *  do not recognise is worse than showing the string. */
+/** Where the landing page remembers which board it was on. A per-viewer
+ *  convenience: every read and write is guarded, and the page renders
+ *  the Leagues board without it. */
+const BOARD_MODE_KEY = "board-mode";
+
 const etDate = (d: string) =>
   /^\d{8}$/.test(d) ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}` : d;
 
@@ -161,6 +169,38 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   const shape = useBoardShape();
   const phone = shape === "phone";
   const days = DEFAULT_DAYS;
+  /* ── WHICH BOARD THIS IS: LEAGUES OR CHAMPIONSHIPS (2026-09-24) ──────
+
+     The landing page carries two boards behind one switch — the club
+     board it has always been, and the four national-team competitions
+     (GET /api/championships/board). Same columns, same cards, same
+     ribbon; a different read.
+
+     NULL UNTIL THE REMEMBERED CHOICE IS READ, AND NOTHING IS FETCHED
+     WHILE IT IS NULL. That is the point of the null, not a nicety: a
+     viewer who left the page on Championships must not cost the club
+     board a GET on the way back, because every club-board GET freezes a
+     pre-kickoff snapshot row per fixture on the backend (see
+     e2e/board-holdout.mjs). The read is in an effect — the server has no
+     storage, and the first client render must match it.
+
+     A NARROWED ROUTE HAS NO SWITCH. `/bet-suggester/ucl` is the club
+     board narrowed to one column; it is Leagues by construction and
+     starts there without waiting on storage. */
+  const [mode, setMode] = useState<BoardMode | null>(only ? "leagues" : null);
+  const champ = mode === "championships";
+  useEffect(() => {
+    if (only) return;
+    let remembered: string | null = null;
+    try { remembered = window.localStorage.getItem(BOARD_MODE_KEY); } catch {
+      /* SWALLOWED(board:mode-read) — registered in
+         e2e/missing-is-not-zero.spec.ts with its closes_when. */
+    }
+    const t = setTimeout(() => {
+      setMode(remembered === "championships" ? "championships" : "leagues");
+    }, 0);
+    return () => clearTimeout(t);
+  }, [only]);
   /* HOW MANY COLUMNS ARE ON SCREEN AT ONCE — `VIEW`, in
      components/LeagueRibbon.tsx beside the loop that is built on it.
      Four is measured, not chosen: the board's track is `max-w-[96rem]`,
@@ -265,10 +305,16 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      the fetch — does not change on every render. */
   const ask = only ? [...only].join(",") : "";
   const load = useCallback(async (signal: AbortSignal) => {
+    if (mode === null) return;
     setLoading(true);
     try {
-      const b = await fetchBoard(days, signal,
-                                 ask === "" ? undefined : ask.split(","));
+      /* ONE ROUTE PER MODE, NEVER BOTH. The Leagues read is the string it
+         has always been; the Championships read is its own route, which
+         writes nothing. e2e/championships-board.spec.ts counts both. */
+      const b = mode === "championships"
+        ? await fetchChampionships(days, signal)
+        : await fetchBoard(days, signal,
+                           ask === "" ? undefined : ask.split(","));
       if (signal.aborted) return;
       setBoard(b);
       setError("");
@@ -279,16 +325,17 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
     } finally {
       if (!signal.aborted) setLoading(false);
     }
-  }, [days, ask]);
+  }, [days, ask, mode]);
 
   useEffect(() => {
     if (deepLink !== null) return;        // redirecting; do not fetch
+    if (mode === null) return;            // the remembered board is not read yet
     const ac = new AbortController();
     // async, not called sync in the effect body, so every setState inside
     // load() lands in a callback rather than cascading a render
     const t = setTimeout(() => { void load(ac.signal); }, 0);
     return () => { clearTimeout(t); ac.abort(); };
-  }, [load, nonce, deepLink]);
+  }, [load, nonce, deepLink, mode]);
 
   /* THE FINISHED TAIL ASKS THE SAME QUESTION THE BOARD ABOVE IT DOES
      (2026-09-10). It used to ask none: `fetchReview(back)` fetched the
@@ -325,10 +372,17 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
 
   useEffect(() => {
     if (deepLink !== null) return;
+    /* THE FINISHED TAIL IS A CLUB-BOARD READ. There is no national-team
+       review route, so the Championships board asks for none — its
+       tails say they were never asked (see `champTail` below), and a
+       national match that finished leaves the board BY NAME in the
+       off-board strip. */
+    if (mode !== "leagues") return;
     const ac = new AbortController();
     const t = setTimeout(() => { void loadReview(ac.signal); }, 0);
     return () => { clearTimeout(t); ac.abort(); };
-  }, [loadReview, nonce, deepLink]);
+  }, [loadReview, nonce, deepLink, mode]);
+
 
 
   const rows = board?.rows ?? [];
@@ -348,6 +402,20 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   // store reports it cannot write, EVERY read in every tail below is a
   // reconstruction by construction — say it once, at the top, rather than
   // leaving the reader to notice the pattern.
+  /* THE CHAMPIONSHIPS BOARD'S TAIL: NEVER ASKED, AND SAID SO. There is
+     no national-team review route, so the tail is state (2) of the three
+     `readHere` exists to keep apart — not a week in which nothing
+     finished. The finished matches themselves left the board by name in
+     the off-board strip above the columns. */
+  const champTail = {
+    rows: [], refusals: [], meta: undefined, back, loading: false, error: "",
+    read: false,
+    unreadWhy: "No finished-match read is served for the national-team "
+      + "competitions yet, so this tail was never asked. A match that "
+      + "finished in the window left the board by name, in the strip "
+      + "above the columns.",
+    storeNote: null,
+  };
   const storeNote = review && review.store && review.store.writable === false
     ? `No pre-kickoff read is being frozen on this deployment (snapshot `
       + `store: ${review.store.backend}), so every read below is a `
@@ -503,6 +571,21 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
        broken one — so the declaration is what is left. */
     return kept.length ? kept : columnSlugs;
   })();
+  /** The switch. The previous board is DROPPED before the next is asked
+   *  for: a Leagues column standing under a Championships header for the
+   *  length of a request is stale dressed as current. */
+  const chooseMode = useCallback((m: BoardMode) => {
+    if (m === mode) return;
+    setBoard(null);
+    setLoading(true);
+    setShown(null);
+    setPicked(null);
+    setMode(m);
+    try { window.localStorage.setItem(BOARD_MODE_KEY, m); } catch {
+      /* SWALLOWED(board:mode-write) — registered in
+         e2e/missing-is-not-zero.spec.ts with its closes_when. */
+    }
+  }, [mode]);
   /** Has the reader opened the framing disclosure? Phone-only in effect
    *  — at every other width the paragraph is open regardless. */
   const [introOpen, setIntroOpen] = useState(false);
@@ -1111,7 +1194,9 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
               its lines centred individually, which would give three
               ragged edges instead of one shape. */}
           <div className="flex flex-wrap items-baseline justify-center gap-x-4 gap-y-1">
-            <Eyebrow tone="accent">picker · stage 1 + stage 2</Eyebrow>
+            <Eyebrow tone="accent">
+              {champ ? "championships · national teams" : "picker · stage 1 + stage 2"}
+            </Eyebrow>
             {/* ONE HUE LOOKUP, HERE TOO (2026-09-22). These four lights
                 used to build `var(--lg-${slug})` by concatenation, which
                 is the construction LeagueTabs.tsx names as a defect in
@@ -1128,7 +1213,8 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                 `hueOf` answers each of them the same token this wrote.
                 Pinned by e2e/one-hue-lookup.spec.ts. */}
             <span aria-hidden className="flex items-center gap-1.5">
-              {(["mls", "epl", "laliga", "ligamx"] as const).map((s2) => (
+              {(champ ? CHAMPIONSHIP_COLUMNS
+                : ["mls", "epl", "laliga", "ligamx"] as const).map((s2) => (
                 <i key={s2} data-testid="hero-light" data-slug={s2}
                   className="h-1.5 w-1.5 rounded-full"
                   style={{ background: hueOf(s2) }} />
@@ -1183,7 +1269,9 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             </summary>
           <p data-testid="board-framing"
             className="text-center text-[13px] leading-relaxed text-ink-low max-md:pt-2">
-            {soleOwnSort
+            {champ
+              ? "Ranked by how far apart the two national teams sit on their competition's own field — overall, attack and defence, each measured on one scale; a side the field could not rate is listed with the reason, not ranked."
+              : soleOwnSort
               ? `Ranked by ${soleOwnSort.mode} — nearly every tie here pairs two different domestic tables, and the gap between them is withheld.`
               : "Ranked by how far apart the two clubs sit in their own league's table."}
             {" "}No model runs on this page, no number below
@@ -1192,6 +1280,14 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             one who picks.
           </p>
           </details>
+          {/* THE SWITCH, where the field page puts its own: under the
+              framing, at the head of the page it changes. Only on the
+              landing page, and only once the remembered board is read —
+              a switch drawn before that would show a choice the page has
+              not made yet. */}
+          {!only && mode !== null && (
+            <BoardModeSwitch mode={mode} onChange={chooseMode} />
+          )}
         </div>
 
         {/* ------------------------- controls ------------------------- */}
@@ -1264,8 +1360,17 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             open them. No assertion pinned either sentence. */}
         <p data-testid="board-times"
           className="mt-2 font-mono text-[10px] tracking-wide text-ink-faint max-md:mt-0 max-md:inline">
-          kickoffs in {TZ} · cached 90s · “built” is when the board was
-          assembled, not when you asked for it
+          {champ ? (
+            /* NO CACHE CLAIM ON THIS BOARD. "cached 90s" is the club
+               board's own TTL; the championships route states none, and
+               a sentence about a cache nobody measured is not one this
+               line may carry. */
+            <>kickoffs in {TZ} · “built” is when the board was assembled,
+            not when you asked for it</>
+          ) : (
+            <>kickoffs in {TZ} · cached 90s · “built” is when the board was
+          assembled, not when you asked for it</>
+          )}
         </p>
         </div>
 
@@ -1796,7 +1901,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                     meta={leaguesMap[slug]}
                     rows={rows.filter((r) => columnsOf(r).includes(slug))}
                     refusals={refusals.filter((r) => columnsOf(r).includes(slug))}
-                    review={{
+                    review={champ ? champTail : {
                       rows: finished.filter((r) => columnsOf(r).includes(slug)),
                       refusals: finishedRefusals.filter((r) => columnsOf(r).includes(slug)),
                       meta: reviewLeagues[slug],
