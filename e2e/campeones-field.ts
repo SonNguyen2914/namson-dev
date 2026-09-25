@@ -66,7 +66,8 @@ import { CAMPEONES_BOARD } from "./campeones-board";
 /** THE RATED ROW, RE-RECORDED 2026-09-25 — three axes, `field` and a
  *  `shape`. `board.assemble_board(date="20260916", days=1,
  *  leagues=["campeones"])` on the backend ship branch
- *  `be-ship-2026-09-25` @ 7eee6d17, through the SAME `wired` fixture of that
+ *  `be-ship-2026-09-25` @ 7eee6d17 (regenerated at the final tip ef4b16c0,
+ *  identical but for `generated_at`), through the SAME `wired` fixture of that
  *  branch's tests/test_picker_no_shared_scale.py the Sep-15 row came
  *  through, network blocked for the run. The result verbatim but for the
  *  one edit this file has always named: the kickoff, 2026-09-17T00:00Z

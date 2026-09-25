@@ -234,6 +234,23 @@ export interface NationRow {
   friendly_bridges?: number | null;
   matches?: number | null;
   caveats?: string[];
+  /** WHICH RESPONSE CARRIES THIS ROW (backend 6bf7e06b, attack/defence
+   *  only): "shots" or "goals" — whether xG or shots on target is the
+   *  response for most of the team's own appearances in `signal_block`.
+   *  Declared so the recording type-checks; the page does not draw it. */
+  signal?: "shots" | "goals" | null;
+  signal_mix?: Record<string, number> | null;
+  signal_block?: string | null;
+}
+
+/** Where a field's attack and defence were read from, said once for the
+ *  page and once per competition (backend 6bf7e06b). Not drawn yet. */
+export interface NationAttackDefence {
+  signal_source?: string | null;
+  signal_source_why?: string | null;
+  bundle?: string | null;
+  signal_note?: string | null;
+  sources?: Record<string, NationAttackDefence>;
 }
 
 export interface NationAxis {
@@ -251,6 +268,8 @@ export interface NationAxis {
   band?: string | null;
   /** on overall only: a goals axis has no pass count */
   passes?: number | string;
+  /** "elo" on overall; "shots" or "goals" on attack/defence */
+  signal_source?: string | null;
   rows: NationRow[];
 }
 
@@ -275,6 +294,7 @@ export interface NationCompetition {
   passes?: number | string | null;
   corpus_sha256?: string | null;
   band?: string | null;
+  attack_defence?: NationAttackDefence | null;
   axes: Record<string, NationAxis>;
   not_measured: NationNotMeasured[];
 }
@@ -302,6 +322,7 @@ export interface NationFields {
    *  one axis across tables only while `one_measurement` is true. */
   shared_axis?: { same_corpus?: boolean; same_passes?: boolean;
     one_measurement?: boolean };
+  attack_defence?: NationAttackDefence | null;
   band?: string | null;
   band_note?: string | null;
   no_bridge_caveat_scope?: string | null;

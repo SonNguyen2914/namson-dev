@@ -67,7 +67,8 @@
 // field gained its attack and defence axes (backend #183 measured them
 // for every club on the union corpus, League One and League Two
 // included) and BELOW_FLOOR_NOTE was corrected (backend ceb7cc30, on the
-// ship branch `be-ship-2026-09-25` @ 7eee6d17). The board route cannot be
+// ship branch `be-ship-2026-09-25` @ 7eee6d17; regenerated at the final
+// tip ef4b16c0, byte-identical). The board route cannot be
 // re-read for this fixture — the tie was played on 2026-09-17, and the
 // e2e hold-out refuses `GET /api/picker/board` against production by
 // design — so the parts those two changes reach were regenerated

@@ -1,6 +1,7 @@
 // RECORDED, NOT WRITTEN: the two field-page payloads as the backend
 // emits them. RE-RECORDED 2026-09-25 from the backend ship branch
-// `be-ship-2026-09-25` @ 7eee6d17, generated IN-PROCESS
+// `be-ship-2026-09-25` @ 7eee6d17 (regenerated at the final tip ef4b16c0
+// and byte-identical), generated IN-PROCESS
 // (`src.picker.field_page.leagues_payload()` and `cups_payload()`, the
 // functions behind GET /api/field/leagues and /api/field/cups, with the
 // network blocked for the run). The first recording (branch

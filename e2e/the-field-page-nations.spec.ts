@@ -27,10 +27,10 @@
 //      with the payload's own sentence on hover
 //   g  the ≥2 note, the empty states, a failed read named
 //
-// Regenerating the recording: in the backend worktree on branch
-// `field-nations-route`, write GET /api/field/nations through FastAPI's
-// TestClient to a file and trim it with the snippet in this branch's
-// commit message (drop rows only).
+// Regenerating the recording: in the backend worktree (last taken on
+// `be-ship-2026-09-25` @ ef4b16c0), write GET /api/field/nations through
+// FastAPI's TestClient to a file and trim it by the rule in
+// nations-recorded.ts's header (drop rows only).
 import { expect, test, type Page, type Request } from "@playwright/test";
 
 import { CUPS, LEAGUES } from "./field-page-recorded";
@@ -378,8 +378,20 @@ test("the floor chip is on every below-floor row, and the goal axes say so "
   await expect(section(page, "unl").getByTestId("floor-chip")).toHaveCount(bf);
   await expect(section(page, "unl").getByTestId("nation-note"))
     .toContainText("every team below the floor");
+  /* RESTATED 2026-09-25, on the re-recording (backend 6bf7e06b reads
+     attack and defence from shots). This asserted the licensed-cut line
+     on UNL ATTACK, which was declared above its licence (4 of 5 bands).
+     Read from shots it resolves 5.0 levels and is no longer above it, so
+     the line must be ABSENT there — asserted — and PRESENT on UNL
+     defence, which still is (3 of 5). Both conditions read off the
+     payload, so neither is a typed band count. */
+  expect(unl.axes.attack.declared_above_licence).toBe(false);
   await expect(section(page, "unl").getByTestId("nation-note"))
-    .toContainText(`tiered at the ${unl.axes.attack.bands_licensed} bands its resolution licenses`);
+    .not.toContainText("bands its resolution licenses");
+  expect(unl.axes.defence.declared_above_licence).toBe(true);
+  await page.locator('[data-testid="nation-axis-button"][data-axis="defence"]').click();
+  await expect(section(page, "unl").getByTestId("nation-note"))
+    .toContainText(`tiered at the ${unl.axes.defence.bands_licensed} bands its resolution licenses`);
 });
 
 // ═════════════════════════ g · rows, search, failure ══════════════════════
