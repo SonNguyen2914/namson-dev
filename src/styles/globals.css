@@ -168,6 +168,45 @@
   --lg-asiancup: #95d147;   /* lime       — AFC Asian Cup          */
   --lg-afcon:    #e699cc;   /* rose       — Africa Cup of Nations  */
 
+  /* ── THE EUROPA LEAGUE'S OWN LIGHT (2026-09-25) ─────────────────────
+     The backend now serves the Europa League as a FOURTH cup field
+     (GET /api/field/cups, key `uel`), and a `uel` pill on the field
+     page's Cups view had no light of its own: `hueOf` answered
+     --lg-cup, so it wore the brand gold — the same gold the Leagues Cup
+     · Campeones Cup pill already wears for the same reason, two pills in
+     one ink on one strip.
+
+     WHAT IT HAS TO CLEAR IS THE STRIP IT SITS ON. The Cups view's pills
+     are the only place this hue is drawn, and every one of them can be
+     lit beside it: --lg-ucl, --lg-eflcup, and the Campeones pill, whose
+     ink IS the brand gold. So the bar is those three and gold itself —
+     not the eight league columns, which live in the Leagues view, and
+     not the four national lights, which live in the National teams view.
+
+     Placed by a maximin search in CIELAB (dE*ab, the metric the blocks
+     above use — their published figures reproduce exactly from these
+     hex values) over the set's band — L* 61.7-81.7, C* 36-82 — with the
+     two floors the national block kept: a 12 dE floor from every league
+     and national light, so the pill never reads as some column's, and a
+     traffic-light floor of 42.3 (the clearance the national lights
+     reached), so a wayfinding light never reads as a verdict:
+       vs brand gold / the Campeones pill   67.1  (the binding one)
+       vs --lg-eflcup, a pill beside it    128.2
+       vs --lg-ucl, a pill beside it       142.2
+       vs the traffic light                 42.5  (nearest: --up)
+       vs a league or national light        18.5  (seriea — never on the
+                                                   Cups strip), then 24.3
+                                                   (asiancup), 41.9 (ligamx)
+     WHAT THE FLOOR COST, said rather than hidden. Unconstrained, the
+     same search reaches 85.8 with a teal (#00e4bd) that sits 12.6 from
+     --up: a cup pill in the colour of "ahead". The floor is worth the
+     18.7 it costs. The Europa League's own brand is orange, and orange
+     is the arc gold holds — the same collision the EFL block names for
+     the peach it turned down. hsl(113 70% 40%), L* 61.8, C* 81.9: the
+     search lands on the band's own edge, darkest and most saturated, as
+     far from gold as the band allows. */
+  --lg-uel:      #2eac1e;   /* green      — UEFA Europa League      */
+
   /* the board's display voice (bundled via @fontsource-variable) */
   --font-archivo: "Archivo Variable", var(--font-geist-sans), ui-sans-serif,
     system-ui, sans-serif;
@@ -368,6 +407,7 @@
   --color-lg-cnl: var(--lg-cnl);
   --color-lg-asiancup: var(--lg-asiancup);
   --color-lg-afcon: var(--lg-afcon);
+  --color-lg-uel: var(--lg-uel);
   --color-warn: var(--warn);
   --color-skylive: var(--skylive);
   --color-neg: var(--neg);

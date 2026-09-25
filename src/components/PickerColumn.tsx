@@ -122,6 +122,12 @@ const LEAGUE_HUE: Record<string, string> = {
   // the Championships board (globals.css, beside the tokens)
   unl: "var(--lg-unl)", cnl: "var(--lg-cnl)",
   asiancup: "var(--lg-asiancup)", afcon: "var(--lg-afcon)",
+  // THE EUROPA LEAGUE (2026-09-25), the field page's fourth cup pill.
+  // Not a board column: it is measured against the pills it can sit
+  // beside on the Cups strip — ucl, eflcup and the Campeones pill, whose
+  // ink is the brand gold — and clears gold by 67.1 dE. Derivation in
+  // globals.css beside the token.
+  uel: "var(--lg-uel)",
 };
 export const hueOf = (slug: string) => LEAGUE_HUE[slug] ?? "var(--lg-cup)";
 
