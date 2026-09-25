@@ -96,7 +96,15 @@ const RATINGS = {
   display: "UEFA Champions League",
   passes: "10",
   below_floor_clubs: [],
-  below_floor_note: "REFUSED BY THE PLACEABILITY FLOOR ON THE FIRST READING.",
+  // THE CLUB NOTE, re-recorded 2026-09-25 from the backend's current
+  // BELOW_FLOOR_NOTE (src/picker/cross_league_axes.py), abridged. It used
+  // to carry the NATIONAL wording, which a club field never serves.
+  below_floor_note: "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's LEAGUE, "
+    + "taken on the Elo measurement at this field's pinned pass count, and the "
+    + "league did not pass it. The value and the 95% interval beside it are this "
+    + "club's own measurement on this axis and are shown as measured; the mark is "
+    + "its league's verdict carried onto every axis, and it does not say that "
+    + "this club's interval is wider than a placed club's.",
   axes_disagree_note:
     "The three axes are read from two different measurements and do not agree.",
   not_a_trading_signal: true,

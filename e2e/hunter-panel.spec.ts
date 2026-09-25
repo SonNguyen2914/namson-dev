@@ -271,6 +271,30 @@ test.describe("hunter panel (hermetic recorded payloads)", () => {
       await expect(page.locator("#findings")).toHaveCount(0);
     });
 
+  test("a backend that ANSWERED 503 is a failed read, named — never "
+    + "'backend unreachable'", async ({ page }) => {
+      // AUDIT F10 (2026-09-25): every non-404 status was drawn as
+      // "backend unreachable", a 503 from a backend that plainly answered
+      // included. The status and the backend's own sentence are the
+      // evidence, and they are drawn.
+      await serve(page, { detail: "the scanner is restarting after a deploy" }, 503);
+      await page.goto(PAGE);
+      await expect(page.getByText(/the hunter read failed/i)).toBeVisible();
+      const said = page.getByTestId("hunter-failure");
+      await expect(said).toContainText("HTTP 503");
+      await expect(said).toContainText("the scanner is restarting after a deploy");
+      await expect(page.getByText(/backend unreachable/i)).toHaveCount(0);
+    });
+
+  test("…and a request that got no answer at all IS unreachable",
+    async ({ page }) => {
+      // the non-vacuity half: the word is kept for the case it names
+      await page.route("**/api/hunter/findings*", (r) => r.abort());
+      await page.goto(PAGE);
+      await expect(page.getByText(/backend unreachable/i).first()).toBeVisible();
+      await expect(page.getByText(/the hunter read failed/i)).toHaveCount(0);
+    });
+
   test("dormant live plane is its own explicit state", async ({ page }) => {
     await serve(page, { ready: false, reason: "live plane dormant" });
     await page.goto(PAGE);

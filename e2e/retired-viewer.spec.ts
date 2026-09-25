@@ -138,6 +138,29 @@ test("the board offers none of the five, and still offers the three",
     }
   });
 
+test("a competition read that FAILED names the failure — not 'Loading' for "
+  + "ever, and not 'no model · not built yet'", async ({ page }) => {
+    // AUDIT F10 (2026-09-25): on a failed fixtures read the H1 stayed
+    // "Loading" permanently and the model card asserted "no model · not
+    // built yet" off a read that never landed.
+    await page.route("**/api/**", (r) => r.fulfill({ status: 503,
+      contentType: "application/json", body: "{}" }));
+    await page.route("**/api/comp/ucl/fixtures**", (r) => r.fulfill({
+      status: 503, contentType: "application/json",
+      body: JSON.stringify({ detail: "the fixtures provider is rate-limited" }),
+    }));
+    await page.goto("/bet-suggester/comp/ucl");
+    const failed = page.getByTestId("comp-read-failed");
+    await expect(failed).toContainText("The competition read failed");
+    await expect(failed).toContainText("HTTP 503");
+    await expect(failed).toContainText("the fixtures provider is rate-limited");
+    await expect(page.locator("h1")).toHaveText("ucl");
+    const body = (await page.textContent("body")) || "";
+    expect(body).not.toContain("Loading");
+    expect(body).not.toContain("no model · not built yet");
+    expect(body).not.toContain("no model · by design");
+  });
+
 test("a bookmarked retired competition says it was retired, and stops asking",
   async ({ page }) => {
     let asked = 0;

@@ -183,6 +183,36 @@ test("rows are ranked by VALUE, never in the bundle's name order",
     expect(ranks).toEqual(want.map((_, i) => i + 1));
   });
 
+test("the sort headers are buttons a keyboard reaches, and aria-sort says "
+  + "which column sorts and which way", async ({ page }) => {
+    // AUDIT F13 (2026-09-25): they were `<th onClick>`, which Tab never
+    // reaches and a screen reader never announces as a control.
+    await open(page);
+    const table = page.getByTestId("field-table").first();
+    const clubTh = table.locator('th[data-sort="club"]');
+    const clubBtn = clubTh.getByRole("button", { name: /club/i });
+    await expect(clubBtn).toHaveCount(1);
+    // every sortable header has exactly one button; the others have none
+    const sortable = await table.locator("th[data-sort]").count();
+    expect(sortable).toBeGreaterThan(2);
+    await expect(table.locator("th[data-sort] button")).toHaveCount(sortable);
+    await expect(table.locator("th:not([data-sort]) button")).toHaveCount(0);
+    await expect(clubTh).toHaveAttribute("aria-sort", "none");
+
+    // THE KEYBOARD, not a click: focus it and press Enter, then Space
+    await clubBtn.focus();
+    await expect(clubBtn).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(clubTh).toHaveAttribute("aria-sort", "ascending");
+    const first = await page.getByTestId("field-row").first()
+      .getAttribute("data-club");
+    const names = await page.getByTestId("field-row")
+      .evaluateAll((els) => els.map((e) => e.getAttribute("data-club") ?? ""));
+    expect(first).toBe([...names].sort((a, b) => a.localeCompare(b))[0]);
+    await page.keyboard.press("Space");
+    await expect(clubTh).toHaveAttribute("aria-sort", "descending");
+  });
+
 test("a search FINDS a club without renumbering it", async ({ page }) => {
   const want = valueOrder(rowsOf(LEAGUES));
   const pick = want[Math.floor(want.length / 2)];

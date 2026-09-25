@@ -11,7 +11,9 @@
 // stable across ALL friendlies rather than the ESPN-visible subset, and
 // that id is what the per-match route below takes.
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { usePoll } from "../lib/usePoll";
+import { failureOf, NEVER_ANSWERED } from "../lib/httpFailure";
 
 import MarketVsRead, { MarketVsReadInline, type MarketVsReadData }
   from "./MarketVsRead";
@@ -140,27 +142,34 @@ export default function AllFriendlies() {
   const [onlyRated, setOnlyRated] = useState(true);
   const [days, setDays] = useState(2);
 
-  useEffect(() => {
-    let alive = true;
-    const load = () => {
-      fetch(`/api/friendlies/fixtures?days=${days}`)
-        .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-        .then((d) => {
-          if (!alive) return;
-          setRows(d.fixtures || []);
-          setKalshiOnly(d.kalshi_only || []);
-          setMeta({ count: d.count, registry: d.kalshi_registry_read,
-            finishedHidden: d.finished_hidden,
-            kalshiTradeable: d.kalshi_tradeable_total,
-            kalshiListed: d.kalshi_listed_total });
-          setErr(null);
-        })
-        .catch(() => alive && setErr("fixtures unavailable"));
-    };
-    load();
-    const t = setInterval(load, 60000);
-    return () => { alive = false; clearInterval(t); };
-  }, [days]);
+  // Every 60s through lib/usePoll (audit F5): never overlapping, paused
+  // in a hidden tab, backing off while the read keeps failing. The
+  // failure is NAMED — its status and the backend's sentence — rather
+  // than "fixtures unavailable" (audit F10).
+  usePoll(async (signal) => {
+    let r: Response;
+    try {
+      r = await fetch(`/api/friendlies/fixtures?days=${days}`, { signal });
+    } catch {
+      if (!signal.aborted) setErr(NEVER_ANSWERED);
+      return "failed";
+    }
+    if (!r.ok) {
+      const why = await failureOf(r);
+      if (!signal.aborted) setErr(why);
+      return "failed";
+    }
+    const d = await r.json();
+    if (signal.aborted) return "stop";
+    setRows(d.fixtures || []);
+    setKalshiOnly(d.kalshi_only || []);
+    setMeta({ count: d.count, registry: d.kalshi_registry_read,
+      finishedHidden: d.finished_hidden,
+      kalshiTradeable: d.kalshi_tradeable_total,
+      kalshiListed: d.kalshi_listed_total });
+    setErr(null);
+    return "ok";
+  }, 60000, [days]);
 
   // "rated only" used to drop fixtures that HAVE a tradeable Kalshi book
   // but no strength read — Sporting CP v Nottingham Forest vanished from
@@ -225,7 +234,7 @@ export default function AllFriendlies() {
 
       {err && (
         <p className="mt-4 font-mono text-[11px] text-ink-faint">
-          {err} — retrying every 60s
+          the fixtures read failed: {err} — retrying, less often while it keeps failing
         </p>
       )}
 
