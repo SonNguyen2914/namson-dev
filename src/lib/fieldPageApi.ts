@@ -283,7 +283,7 @@ export interface NationNotMeasured {
 }
 
 export interface NationCompetition {
-  /** the Championships column key (unl, cnl, gulfcup, afcon) */
+  /** the Championships column key (the payload's own `columns`) */
   key: string;
   field_key?: string;
   display: string;
@@ -297,11 +297,6 @@ export interface NationCompetition {
   attack_defence?: NationAttackDefence | null;
   axes: Record<string, NationAxis>;
   not_measured: NationNotMeasured[];
-  /** ONLY ON A FIELD DERIVED FROM ANOTHER (the Arabian Gulf Cup,
-   *  2026-09-25): where its entrants and rows came from and how its floors
-   *  were re-derived, in the backend's own words. Absent on a field
-   *  measured for itself. */
-  derived?: { entrants_from?: string; rows_from?: string; floor_rule?: string } | null;
 }
 
 export interface NationFields {

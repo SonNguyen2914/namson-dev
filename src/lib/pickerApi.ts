@@ -224,7 +224,7 @@ export interface FieldAxis {
    *  attack and defence only (backend `payload._band_extras`). The five
    *  declared bands stay in `fav` / `opp`; this is the same two teams on
    *  the coarser cut the measurement supports (UNL atk 5 / def 3, CNL 3/3,
-   *  AFCON 2/3, Gulf Cup 2/2 on 2026-09-25). See `licensedRead`. */
+   *  AFCON 2/3 on 2026-09-25). See `licensedRead`. */
   licensed?: LicensedAxis | null;
 }
 
@@ -1203,7 +1203,7 @@ export function nationalColumn(
     if (nextBeyond) {
       /* "STARTS" ONLY FOR A COMPETITION NOBODY HAS PLAYED IN. A column can
          also be empty between two stages of a tournament under way (the
-         Gulf Cup between its group stage and its semi-finals); there the
+         between its group stage and its knockout rounds); there the
          group tables hold results, and the chip says when it resumes. */
       const played = Object.values(standings).some((g) => g.some((r) => r.gp > 0));
       const first = stages[0];
@@ -1218,7 +1218,14 @@ export function nationalColumn(
     }
     const key = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
     const st = stages.find((x) => x.key === key);
-    const label = (st?.label ?? key ?? "").split(" (")[0].trim().toLowerCase();
+    /* A STAGE KEY THE STRUCTURE DOES NOT DECLARE IS NOT PRINTED AS A SLUG.
+       Recorded 2026-09-25 evening: ESPN began labelling the UEFA Nations
+       League rows `league-phase` while the backend's structure still
+       declares that stage as `group-stage`, and the chip read
+       "league-phase · md 1". With no declared stage to name, the chip says
+       the matchday alone and the hover names the key it could not match. */
+    const unmatched = !st && key ? key : null;
+    const label = (st?.label ?? "").split(" (")[0].trim().toLowerCase();
     let md: number | null = null;
     for (const r of rows) {
       const n = r.national;
@@ -1233,10 +1240,16 @@ export function nationalColumn(
     const totals = [...(st?.dates ?? "").matchAll(/MD\s?(\d+)(?:\s?-\s?(\d+))?/g)]
       .flatMap((m) => [Number(m[1]), ...(m[2] ? [Number(m[2])] : [])]);
     const total = totals.length ? Math.max(...totals) : null;
+    const mdText = md != null ? `md ${md}${total ? `/${total}` : ""}` : "";
     if (label) {
       stage = {
-        text: `${label}${md != null ? ` · md ${md}${total ? `/${total}` : ""}` : ""}`,
+        text: `${label}${mdText ? ` · ${mdText}` : ""}`,
         title: `${st?.label ?? label}${st?.dates ? ` — ${st.dates}` : ""}. The matchday is the earliest in this window, read off the group tables: one more than the games each side has played.`,
+      };
+    } else if (unmatched && mdText) {
+      stage = {
+        text: mdText,
+        title: `These fixtures carry the stage "${unmatched}", which this competition's structure does not declare, so no stage is named. The matchday is the earliest in this window, read off the group tables: one more than the games each side has played.`,
       };
     }
   }
@@ -1356,16 +1369,13 @@ export const LEAGUE_LABEL: Record<string, string> = {
   championship: "Championship",
   leagueone: "League One",
   leaguetwo: "League Two",
-  // THE CHAMPIONSHIPS BOARD'S FOUR COLUMNS (2026-09-24), keyed as the
+  // THE CHAMPIONSHIPS BOARD'S COLUMNS (2026-09-24), keyed as the
   // backend's `src/championships/registry.CHAMPIONSHIP_COLUMNS` keys them
   // and named as it names them — Concacaf is the confederation's own
   // spelling and ESPN's. They are never on the Leagues board: that board's
   // columns are `tables.BOARD_COLUMNS` and these are not in it.
   unl: "UEFA Nations League",
   cnl: "Concacaf Nations League",
-  // the 27th Arabian Gulf Cup took the Asian Cup's column on 2026-09-25
-  // (the Asian Cup starts in 2027 and left the board by decision)
-  gulfcup: "Arabian Gulf Cup",
   afcon: "Africa Cup of Nations",
 };
 
@@ -1755,10 +1765,6 @@ export async function fetchChampionships(
   return readBoard(`/api/championships/board?days=${days}`, signal);
 }
 
-/** The backend's declared order, restated for the one reader that needs
- *  it before a payload lands (the hero's four lights). The payload's own
- *  `columns` stays the authority for what the board draws. */
-export const CHAMPIONSHIP_COLUMNS = ["unl", "cnl", "gulfcup", "afcon"] as const;
 
 /* ── WHAT A NATIONAL CARD CARRIES BESIDES THE CLUB CARD'S KEYS ─────────
    Backend `src/championships/payload._card`, field for field. Every

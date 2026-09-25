@@ -155,25 +155,23 @@
                                              in column order; the three
                                              adjacent pairs are 50.4,
                                              149.1 and 106.8)
-       min dE vs brand gold           45.8  (gulfcup; the palette's own
+       min dE vs brand gold           45.8  (the third light; the palette's own
                                              bar is 45.3)
        min dE vs the traffic light    42.3  (unl vs skylive)
-       min dE vs a league light       12.8  (gulfcup vs seriea — never
+       min dE vs a league light       12.8  (the third light vs seriea — never
                                              co-visible)
      43.0 is short of the 57.0 the co-visible league set reaches; the
      space that set used is the space the status colours hold, and a
      national light that looked like a verdict would be the worse miss. */
   --lg-unl:      #8192fd;   /* periwinkle — UEFA Nations League   */
   --lg-cnl:      #ed5edf;   /* magenta    — Concacaf Nations League */
-  /* THE THIRD LIGHT CHANGED HANDS, NOT COLOUR (operator, 2026-09-25).
-     The AFC Asian Cup left the board (it starts in 2027) and the 27th
-     Arabian Gulf Cup took its column, third of four in the same order.
-     The search above placed a LIGHT for a SLOT, and the slot's
-     neighbours are unchanged, so the lime moves with it rather than
-     being searched again: every figure above reproduces from these hex
-     values with `gulfcup` in the place `asiancup` held — 45.8 from the
-     brand gold, 12.8 from seriea (never co-visible), 149.1 and 106.8 to
-     its two column neighbours cnl and afcon, 44.6 from --up. */
+  /* THE THIRD LIGHT IS UNUSED (2026-09-25). The AFC Asian Cup left the
+     board that day (it starts in 2027), the 27th Arabian Gulf Cup took its
+     column, and the Gulf Cup was dropped the same day — no Kalshi series
+     lists it. The board is three columns (unl, cnl, afcon), read off the
+     payload's `columns`. The lime the search placed in the third slot is
+     kept as a token for whichever competition is declared there next;
+     nothing maps a slug to it today (`hueOf` has no entry for it). */
   --lg-gulfcup:  #95d147;   /* lime       — Arabian Gulf Cup       */
   --lg-afcon:    #e699cc;   /* rose       — Africa Cup of Nations  */
 
@@ -205,7 +203,7 @@
        vs the traffic light                 42.5  (nearest: --up)
        vs a league or national light        18.5  (seriea — never on the
                                                    Cups strip), then 24.3
-                                                   (gulfcup), 41.9 (ligamx)
+                                                   (the lime), 41.9 (ligamx)
      WHAT THE FLOOR COST, said rather than hidden. Unconstrained, the
      same search reaches 85.8 with a teal (#00e4bd) that sits 12.6 from
      --up: a cup pill in the colour of "ahead". The floor is worth the

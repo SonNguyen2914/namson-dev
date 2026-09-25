@@ -7,7 +7,7 @@
  * club_board/http_20261010_3d.json.gz), with every assembly forced to
  * `capture=False` and the snapshot capture made to raise: nothing was
  * written anywhere and no request reached this project's API. Assembled
- * 2026-09-25T13:07:30.219374+00:00: 58 ranked rows, 17 refusals.
+ * 2026-09-25T23:48:06.497256+00:00: 58 ranked rows, 17 refusals.
  *
  * Every row and refusal carries `h2h` (backend 2026-09-25, the national
  * card's `head_to_head` shape): `source` "club_corpus+board_sweep" or
@@ -19,10 +19,10 @@
  * met, one a measured absence, and one whose club the corpus REFUSED
  * (ambiguous or unknown, `window: null`). Every kept key, value and absence
  * is the wire's. */
-export const CLUB_H2H_CLOCK = "2026-09-25T13:07:30.219374+00:00";
+export const CLUB_H2H_CLOCK = "2026-09-25T23:48:06.497256+00:00";
 
 export const CLUB_H2H_BOARD = {
- "generated_at": "2026-09-25T13:07:30.219374+00:00",
+ "generated_at": "2026-09-25T23:48:06.497256+00:00",
  "date": "20261010",
  "days": 3,
  "leagues": {

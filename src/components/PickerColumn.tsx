@@ -121,7 +121,7 @@ const LEAGUE_HUE: Record<string, string> = {
   eflcup: "var(--lg-eflcup)",
   // the Championships board (globals.css, beside the tokens)
   unl: "var(--lg-unl)", cnl: "var(--lg-cnl)",
-  gulfcup: "var(--lg-gulfcup)", afcon: "var(--lg-afcon)",
+  afcon: "var(--lg-afcon)",
   // THE EUROPA LEAGUE (2026-09-25), the field page's fourth cup pill.
   // Not a board column: it is measured against the pills it can sit
   // beside on the Cups strip — ucl, eflcup and the Campeones pill, whose

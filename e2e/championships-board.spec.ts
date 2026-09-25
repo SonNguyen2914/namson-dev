@@ -164,7 +164,7 @@ test.describe("the Championships board", () => {
       // own refused card for one of its fixtures stands in for that
       // fixture's ranked row (see championships-recorded.ts)
       await openChampionships(page, { ...CHAMP_BOARD,
-        rows: CHAMP_BOARD.rows.filter((r) => r.event_id !== SAMPLE_REFUSAL.event_id),
+        rows: CHAMP_BOARD.rows.filter((r) => (r.event_id as string) !== SAMPLE_REFUSAL.event_id),
         refusals: [...CHAMP_BOARD.refusals, SAMPLE_REFUSAL] });
       const refused = page.locator('[data-testid="picker-refusal"]');
       await expect(refused).toHaveCount(1);
@@ -401,8 +401,18 @@ test.describe("the national favourite is venue-adjusted", () => {
  *  drawn faint under 100 Elo, where the named favourite won 35–44% of
  *  held-out national matches. The backend serves "Elo points", which must
  *  print whole, not "+117.30". */
-const GEO_NIR = CHAMP_BOARD.rows.find((r) =>
-  r.home === "Georgia" && r.away === "Northern Ireland")!;
+/* A HOME FAVOURITE, AT HOME, CLEAR OF THE CLOSE-CALL LINE — read off the
+   recording rather than named: the first card whose served headline
+   favours the home side, whose venue is its own country, and whose gap is
+   at least 100 Elo. (Georgia v Northern Ireland was this card until it
+   kicked off before the 2026-09-25 re-recording.) */
+type HRow = { event_id: string; fav_side: string;
+  venue_class?: { class?: string; home_side?: string | null } | null;
+  national: { headline?: { value: number; favourite_side?: string } | null } };
+const GEO_NIR = (CHAMP_BOARD.rows as unknown as HRow[]).find((r) =>
+  r.fav_side === "home" && r.national.headline?.favourite_side === "home"
+  && r.venue_class?.class === "TRUE_HOME" && r.venue_class.home_side === "home"
+  && Math.abs(r.national.headline.value) >= 100)!;
 const geo = (page: Page) =>
   page.locator(`[data-testid="picker-row"][data-event="${GEO_NIR.event_id}"]`);
 
@@ -513,15 +523,15 @@ test.describe("the sort menu offers only keys the rows carry", () => {
 });
 
 test.describe("the Championships board wears the Leagues board's chrome", () => {
-  test("the pill strip and the chooser: four pills, all lit, 4 of 4 drawn",
+  test("the pill strip and the chooser: one pill per declared column, all lit, n of n drawn",
     async ({ page }) => {
       await openChampionships(page);
       const pills = page.locator('[data-testid="ribbon-pill"]');
-      await expect(pills).toHaveCount(4);
-      await expect(page.locator('[data-testid="ribbon-pill"][aria-selected="true"]')).toHaveCount(4);
+      await expect(pills).toHaveCount(COLUMNS.length);
+      await expect(page.locator('[data-testid="ribbon-pill"][aria-selected="true"]')).toHaveCount(COLUMNS.length);
       const slugs = await pills.evaluateAll((es) => es.map((e) => (e as HTMLElement).dataset.slug));
       expect(slugs).toEqual([...COLUMNS]);
-      await expect(page.locator('[data-testid="column-chooser-summary"]')).toContainText("4 of 4");
+      await expect(page.locator('[data-testid="column-chooser-summary"]')).toContainText(`${COLUMNS.length} of ${COLUMNS.length}`);
     });
 
   test("every column header carries its stage chip and its (i)", async ({ page }) => {
@@ -531,36 +541,52 @@ test.describe("the Championships board wears the Leagues board's chrome", () => 
       await expect(head.locator('[data-testid="col-stage"]')).not.toBeEmpty();
       await expect(head.locator('[data-testid="col-notes-open"]')).toBeAttached();
     }
-    await expect(page.locator('[data-testid="col-head"][data-league="unl"] [data-testid="col-stage"]'))
-      .toHaveText(/league phase · md 1\/6/i);
-    // the Gulf Cup is under way: its stage, and the matchday off its tables
-    await expect(page.locator('[data-testid="col-head"][data-league="gulfcup"] [data-testid="col-stage"]'))
-      .toHaveText(/group stage · md \d/i);
+    /* derived: a row stage the structure declares is named by its label;
+       one it does not (ESPN's `league-phase` on the 2026-09-25 evening
+       recording) is never printed as a slug, only the matchday */
+    for (const col of COLUMNS) {
+      const comp = (CHAMP_BOARD.competitions as unknown as Record<string,
+        { structure: { stages: Array<{ key: string; label: string }> } }>)[col];
+      const keys = new Set(CHAMP_BOARD.rows.filter((r) => r.column === col)
+        .map((r) => (r.national as { stage?: string }).stage));
+      const chip = page.locator(`[data-testid="col-head"][data-league="${col}"] [data-testid="col-stage"]`);
+      const declared = comp.structure.stages.find((x) => keys.has(x.key));
+      if (declared) {
+        await expect(chip).toHaveText(new RegExp(`^${declared.label.split(" (")[0]}`, "i"));
+      } else {
+        await expect(chip).toHaveText(/^md \d/);
+        for (const k of keys) await expect(chip).not.toContainText(k!);
+      }
+    }
+
   });
 
   test("a column with nothing in the window reads as rest days, with its next date",
     async ({ page }) => {
-      /* no column of the recorded window is empty (the Asian Cup's, which
-         was, left the board on 2026-09-25), so the Gulf Cup's rows are
-         taken out: between two stages of a tournament that is exactly
-         what it would look like. Its teams' next fixtures stay. */
-      const board = { ...CHAMP_BOARD,
-        rows: CHAMP_BOARD.rows.filter((r) => r.column !== "gulfcup") };
-      const teams = Object.values(CHAMP_BOARD.competitions.gulfcup.teams ?? {}) as
-        Array<{ next_fixture?: { kickoff?: string } | null }>;
-      const next = teams.map((t) => t.next_fixture?.kickoff).filter(Boolean).sort()[0]!;
+      /* no column of the recorded window is empty, so the LAST declared
+         column's rows are taken out; its teams' next fixtures stay, and
+         they are what the column must name */
+      const col0 = COLUMNS[COLUMNS.length - 1];
+      const comp = (CHAMP_BOARD.competitions as unknown as Record<string, {
+        teams?: Record<string, { next_fixture?: { kickoff?: string } | null }>;
+        standings?: { derived?: Record<string, Array<{ gp: number }>> } }>)[col0];
+      const board = { ...CHAMP_BOARD, rows: CHAMP_BOARD.rows.filter((r) => r.column !== col0) };
+      const next = Object.values(comp.teams ?? {}).map((t) => t.next_fixture?.kickoff)
+        .filter(Boolean).sort()[0]!;
+      expect(next, "the recording names the column's next fixture").toBeTruthy();
+      const played = Object.values(comp.standings?.derived ?? {}).some((g) => g.some((r) => r.gp > 0));
       await openChampionships(page, board);
-      const col = page.locator('[data-testid="league-col"][data-league="gulfcup"]');
+      const col = page.locator(`[data-testid="league-col"][data-league="${col0}"]`);
       await expect(col.locator('[data-testid="col-empty"]')).toHaveCount(0);
       const rest = col.locator('[data-testid="rest-day"]:visible');
       expect(await rest.count()).toBeGreaterThan(0);
-      await expect(rest.first()).toContainText(/Arabian Gulf Cup — rest day/i);
+      await expect(rest.first()).toContainText(/— rest day/i);
       const when = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles",
         weekday: "long", month: "short", day: "numeric" }).format(new Date(next)).toLowerCase();
       await expect(rest.first()).toContainText(`next · ${when}`, { ignoreCase: true });
-      // a tournament under way says when it resumes, not that it "starts"
-      await expect(page.locator('[data-testid="col-head"][data-league="gulfcup"] [data-testid="col-stage"]'))
-        .toHaveText(/^next /i);
+      // a competition under way says when it resumes; one not begun, when it starts
+      await expect(page.locator(`[data-testid="col-head"][data-league="${col0}"] [data-testid="col-stage"]`))
+        .toHaveText(played ? /^next /i : /^starts /i);
     });
 
   test("the Leagues board draws no national slot at all",

@@ -75,7 +75,7 @@ import { TZ, dayLabel, localDay } from "../../lib/matchday";
 import {
   Board, CUP_COMP_KEY, DEFAULT_DAYS, SEASON_BLEND_K, THIN_ASK_SIZE,
   WIDE_SPREAD_C, askHonoured, boardColumns, columnsOf, declarationOf,
-  CHAMPIONSHIP_COLUMNS, fetchBoard, fetchChampionships, leagueLabel,
+  fetchBoard, fetchChampionships, leagueLabel,
   nationalColumn, venueAdjusted,
 } from "../../lib/pickerApi";
 import {
@@ -1236,7 +1236,11 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                 `hueOf` answers each of them the same token this wrote.
                 Pinned by e2e/one-hue-lookup.spec.ts. */}
             <span aria-hidden className="flex items-center gap-1.5">
-              {(champ ? CHAMPIONSHIP_COLUMNS
+              {/* THE CHAMPIONSHIPS LIGHTS ARE THE PAYLOAD'S DECLARED COLUMNS
+                  (2026-09-25): a typed list here went stale twice in one
+                  day — the Asian Cup out, the Gulf Cup in, the Gulf Cup
+                  out. None before the payload lands. */}
+              {(champ ? columnSlugs
                 : ["mls", "epl", "laliga", "ligamx"] as const).map((s2) => (
                 <i key={s2} data-testid="hero-light" data-slug={s2}
                   className="h-1.5 w-1.5 rounded-full"
