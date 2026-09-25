@@ -354,6 +354,75 @@ test.describe("the national favourite is venue-adjusted", () => {
     });
 });
 
+/* ══ THE CORNER SAYS WHAT IT IS MADE OF, AND WHEN IT IS CLOSE (2026-09-25)
+ *  Operator's choice after the held-out hit-rate table: a venue line under
+ *  the Elo gap ("+52 rating · +65 home" / "· neutral"), and the number
+ *  drawn faint under 100 Elo, where the named favourite won 35–44% of
+ *  held-out national matches. The backend serves "Elo points", which must
+ *  print whole, not "+117.30". */
+const GEO_NIR = CHAMP_BOARD.rows.find((r) =>
+  r.home === "Georgia" && r.away === "Northern Ireland")!;
+const geo = (page: Page) =>
+  page.locator(`[data-testid="picker-row"][data-event="${GEO_NIR.event_id}"]`);
+
+test.describe("the corner: a venue line, and a close call drawn faint", () => {
+  test("a home call says so: rating and home term, signed to the favourite",
+    async ({ page }) => {
+      await openChampionships(page);
+      const k = card(page).locator('[data-testid="anchor-key"]');
+      await expect(k).toContainText(/\u221236 rating · \+65 home/i);
+      // derived from the recording, never typed: the favourite's rating
+      // minus the opponent's, on the row's own overall axis
+      const o = (GEO_NIR as unknown as { field: { axes: { ovr: {
+        fav: { value: number }; opp: { value: number } } } } }).field.axes.ovr;
+      const raw = Math.round(o.fav.value - o.opp.value);
+      const g = geo(page).locator('[data-testid="anchor-key"]');
+      await expect(g).toContainText(`+${raw} rating · +65 home`, { ignoreCase: true });
+    });
+
+  test("a neutral venue says neutral, and carries no home term", async ({ page }) => {
+    const board = JSON.parse(JSON.stringify(CHAMP_BOARD));
+    const r = board.rows.find((x: { event_id: string }) => x.event_id === DR_NIC.event_id);
+    r.venue_class = { class: "NEUTRAL", home_side: null };
+    await openChampionships(page, board);
+    await expect(card(page).locator('[data-testid="anchor-key"]'))
+      .toContainText(/\+36 rating · neutral/i);
+  });
+
+  test("under 100 Elo the number is drawn faint; from 100 it is not", async ({ page }) => {
+    await openChampionships(page);
+    const close = card(page).locator('[data-testid="row-anchor"]');
+    await expect(close).toHaveText("+29");
+    await expect(close).toHaveAttribute("data-close", "1");
+    await expect(close).toHaveClass(/text-ink-faint/);
+    const clear = geo(page).locator('[data-testid="row-anchor"]');
+    await expect(clear).not.toHaveAttribute("data-close", "1");
+    await expect(clear).toHaveClass(/text-ink-hi/);
+  });
+
+  test("the backend's headline in Elo points prints whole, with its own venue line",
+    async ({ page }) => {
+      const board = JSON.parse(JSON.stringify(CHAMP_BOARD));
+      const r = board.rows.find((x: { event_id: string }) => x.event_id === GEO_NIR.event_id);
+      r.national.headline = { value: 117.3, unit: "Elo points", label: "ELO GAP",
+        favourite_side: "home",
+        components: { raw_gap_home_minus_away: 52.3, venue_term_home_minus_away: 65.0,
+                      venue_class: "TRUE_HOME", host_side: "home" } };
+      const d = board.rows.find((x: { event_id: string }) => x.event_id === DR_NIC.event_id);
+      d.national.headline = { value: 44.2, unit: "Elo points", label: "ELO GAP",
+        favourite_side: "home",
+        components: { raw_gap_home_minus_away: -20.8, venue_term_home_minus_away: 65.0,
+                      venue_class: "TRUE_HOME", host_side: "home" } };
+      await openChampionships(page, board);
+      await expect(geo(page).locator('[data-testid="row-anchor"]')).toHaveText("+117");
+      await expect(geo(page).locator('[data-testid="anchor-key"]'))
+        .toContainText(/\+52 rating · \+65 home/i);
+      const dr = card(page).locator('[data-testid="row-anchor"]');
+      await expect(dr).toHaveText("+44");
+      await expect(dr).toHaveAttribute("data-close", "1");
+    });
+});
+
 /* ══ THE SORT MENU OFFERS WHAT THE ROWS CARRY (2026-09-24) ════════════
  *  A national row has no league table, so GD/g, ppg and rank gap are null
  *  on every card; a menu offering them offers orderings that order

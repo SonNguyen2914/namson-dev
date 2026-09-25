@@ -1033,9 +1033,12 @@ export function venueAdjusted(row: BoardRow): BoardRow {
           + "at home in its own country"
           : " — no home term (a neutral or unread venue)")
     + ". Interim: the headline signal is being chosen by measurement.";
+  const venueTerm = at === "home" ? HOME_ELO : at === "away" ? -HOME_ELO : 0;
   const headline: NationalHeadline = {
     value: Math.abs(adj), unit: "elo", label: "elo gap",
-    source: "venue_elo", basis };
+    source: "venue_elo", basis, favourite_side: newFav,
+    components: { raw_gap_home_minus_away: homeElo - awayElo,
+                  venue_term_home_minus_away: venueTerm, host_side: at } };
   if (newFav === row.fav_side) return { ...row, headline };
 
   const flipAxes = <B extends { axes: object; shape?: Shape | null }>(
@@ -1744,6 +1747,16 @@ export interface NationalHeadline {
   value: number;
   unit: string;
   label: string;
+  /** which side the value favours — the backend's, or the interim's */
+  favourite_side?: "home" | "away";
+  /** what the value is made of, home-minus-away: the two ratings'
+   *  difference and the venue term. The card's venue line reads these. */
+  components?: {
+    raw_gap_home_minus_away?: number | null;
+    venue_term_home_minus_away?: number | null;
+    venue_class?: string | null;
+    host_side?: string | null;
+  } | null;
   /** "payload" when the backend sent it; "venue_elo" while the card
    *  derives the interim one (see venueAdjusted) */
   source?: string;

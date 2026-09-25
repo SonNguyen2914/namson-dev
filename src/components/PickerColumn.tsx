@@ -140,7 +140,7 @@ type AnchorId = Exclude<SortModeId, "kickoff" | "shape">
   | "own_gdg" | "league_gap" | "headline";
 
 function anchorFor(row: BoardRow, modeId: SortModeId):
-  { v: string; k: string; k2?: string; basis?: string; id: AnchorId } {
+  { v: string; k: string; k2?: string; basis?: string; dim?: boolean; id: AnchorId } {
   // a time is not a magnitude, and neither is a shape — the shape is
   // already on the card as its coloured chip, so both keys fall back to
   // a measured gap for the anchor number.
@@ -226,8 +226,33 @@ function anchorFor(row: BoardRow, modeId: SortModeId):
   return { ...anchorValue(row, id), id };
 }
 
+/** A CLOSE CALL IS DRAWN AS ONE. Measured on 1,554 held-out national
+ *  matches (2025-01 to 2026-09, ratings from earlier matches only): under
+ *  a 50-Elo venue-adjusted gap the named favourite won 35% and lost 37%;
+ *  from 50 to 100 it won 44% and lost 28%; from 100 it wins more often
+ *  than not (59% at 100-150, 89% past 300). So under 100 the number stays
+ *  and its ink goes — the favourite is still named, the corner stops
+ *  implying it is a clear one. research_archive/
+ *  national_headline_bakeoff_2026-09-25 holds the ratings it was cut on. */
+const CLOSE_ELO = 100;
+
+/** THE VENUE LINE: what the headline is made of, signed to the favourite.
+ *  "+52 rating · +65 home" says a home call is a home call; "· neutral"
+ *  says there was no home term; "−65 away" says the favourite is the
+ *  visitor at a host. Read off the headline's own components — never
+ *  recomputed from the card — and absent when they are. */
+function venueLine(h: NonNullable<BoardRow["headline"]>, row: BoardRow): string | null {
+  const c = h.components;
+  const raw = c?.raw_gap_home_minus_away, ven = c?.venue_term_home_minus_away;
+  if (raw == null || ven == null) return null;
+  const s = (h.favourite_side ?? row.fav_side) === "away" ? -1 : 1;
+  const r = Math.round(s * raw), v = Math.round(s * ven);
+  const venue = v === 0 ? "neutral" : v > 0 ? `+${v} home` : `\u2212${-v} away`;
+  return `${r >= 0 ? "+" : "\u2212"}${Math.abs(r)} rating · ${venue}`;
+}
+
 function anchorValue(row: BoardRow, id: AnchorId):
-  { v: string; k: string; k2?: string; basis?: string } {
+  { v: string; k: string; k2?: string; basis?: string; dim?: boolean } {
   switch (id) {
     case "gdg": return { v: dec(row.gdg_gap), k: "GD/g gap" };
     // TWO LINES, BOTH LOAD-BEARING. "own-league GD/g" is what each of
@@ -259,9 +284,13 @@ function anchorValue(row: BoardRow, id: AnchorId):
       const h = row.headline;
       if (!h) return { v: WITHHELD, k: "no headline" };
       /* the unit decides the precision: points of a rating are whole
-         numbers, anything else is a rate and keeps two places */
-      return { v: h.unit === "elo" ? sign(Math.round(h.value)) : dec(h.value),
-               k: h.label, basis: h.basis };
+         numbers, anything else is a rate and keeps two places. The
+         backend says "Elo points", the interim says "elo" — both are a
+         rating, and "+117.30" is not a number anyone should read. */
+      const elo = /elo/i.test(h.unit);
+      return { v: elo ? sign(Math.round(h.value)) : dec(h.value),
+               k: h.label, k2: venueLine(h, row) ?? undefined, basis: h.basis,
+               dim: elo && Math.abs(h.value) < CLOSE_ELO };
     }
     case "tier_atk": return { v: sign(row.tier_gaps.atk), k: "tier · atk" };
     case "tier_def": return { v: sign(row.tier_gaps.def), k: "tier · def" };
@@ -923,7 +952,10 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
               title: `ON THIS SEASON ALONE the ${anchor.k} is ${dec(alt.current)}, not ${dec(alt.blended)} — the board ranks on the blend, and this says what the other cut would have concluded`,
             } : {})}
             className={`block font-mono text-[20px] font-semibold leading-none tabular-nums ${
-              anchor.v === WITHHELD ? "font-normal text-ink-faint" : "text-ink-hi"}`}>
+              anchor.v === WITHHELD ? "font-normal text-ink-faint"
+                : anchor.dim ? "text-ink-faint" : "text-ink-hi"}`}
+            {...(anchor.dim ? { "data-close": "1" } : {})}
+            {...(anchor.dim && !alt ? { title: `a close call: under ${CLOSE_ELO} Elo the named favourite won 35–44% of held-out national matches` } : {})}>
             {anchor.v}
           </span>
           {/* THE KEY, AND WHERE A SECOND LINE COMES FROM. Most anchors
