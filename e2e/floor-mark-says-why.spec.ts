@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { CAMPEONES_FIELD_ROW } from "./campeones-field";
+import { CAMPEONES_PARTIAL_ROW } from "./campeones-field";
 
 // THE DAGGER SAYS WHY — on the BOARD-FED CARD, which is the one it
 // never did.
@@ -73,14 +73,27 @@ const json = (body: unknown, status = 200) => ({
 /* THE BACKEND'S OWN SENTENCE, quoted whole. It is the fixture's, not
    the app's: nothing in the frontend composes this, and a test that
    retyped a paraphrase would go green against a card printing the
-   paraphrase. The em dash is the backend's. */
+   paraphrase. The em dash is the backend's. RE-QUOTED 2026-09-25 from
+   `cross_league_axes.BELOW_FLOOR_NOTE` on the backend ship branch: the
+   corrected note (backend ceb7cc30) names the floor's three conditions
+   and no longer claims the club's interval is wider than a placed
+   club's — the Europa League field measured that false on attack. */
 const FLOOR_NOTE =
-  "REFUSED BY THE PLACEABILITY FLOOR ON THE FIRST READING. This club's "
-  + "league did not clear the floor: its median club interval is wider "
-  + "than one band of the field, so the evidence does not place it in a "
-  + "tier. The rating itself stands and is shown — the wide interval "
-  + "beside it IS the refusal, and it is what stops the rank being read "
-  + "as precision.";
+  "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's "
+  + "LEAGUE, taken on the Elo measurement at this field's pinned pass "
+  + "count, and the league did not pass it: it is not connected to the "
+  + "reference leagues (C1), or more than half of its cross-league "
+  + "level is still the 1500 starting prior (C2), or its clubs' median "
+  + "95% interval does not fit inside one fifth of the field's spread "
+  + "(C3) — or the club has no league attribution at all (no league). "
+  + "So the evidence does not place this club in a tier. The value and "
+  + "the 95% interval beside it are this club's own measurement on "
+  + "this axis and are shown as measured; the mark is its league's "
+  + "verdict carried onto every axis, and it does not say that this "
+  + "club's interval is wider than a placed club's. It is ranked with "
+  + "everyone else because a club the evidence cannot place is not "
+  + "thereby a worse club; dropping it to the bottom would state "
+  + "exactly that.";
 
 /* A SECOND, DIFFERENT SENTENCE, so "the card took the board's note"
    and "the card took the ratings payload's note" are distinguishable
@@ -160,10 +173,10 @@ const FIELD = (axes: unknown = AXES) => ({
    (`why_not_field`, `shape_absent`, `axes_measured`, the two bases)
    stays the wire's, key for key. */
 const PARTIAL = () => ({
-  ...CAMPEONES_FIELD_ROW.field_partial,
+  ...CAMPEONES_PARTIAL_ROW.field_partial,
   axes: {
     ovr: {
-      ...CAMPEONES_FIELD_ROW.field_partial.axes.ovr,
+      ...CAMPEONES_PARTIAL_ROW.field_partial.axes.ovr,
       fav: AXES.ovr.fav, opp: AXES.ovr.opp,
     },
   },
@@ -270,12 +283,15 @@ test("the fixture speaks the wire's language, not the card's",
     for (const k of ["ovr", "atk", "def"] as const) {
       expect(AXES[k].fav.below_floor).toBe(true);
       expect(AXES[k].opp.below_floor).toBe(false);
-      // THE REFUSED SIDE CARRIES THE WIDER BAND, which is what the note
-      // claims — "the wide interval beside it IS the refusal". A
-      // fixture where the placed club is vaguer describes a field the
-      // floor could not have produced.
-      expect(AXES[k].fav.half_width_95)
-        .toBeGreaterThan(AXES[k].opp.half_width_95);
+      // NO WIDTH RULE (removed 2026-09-25). This asserted the refused
+      // side carries the wider band, because the old note claimed "the
+      // wide interval beside it IS the refusal". The corrected note
+      // withdraws that claim — the floor is its LEAGUE's verdict, and
+      // on the Europa League's attack axis the marked clubs' median
+      // half-width is 0.267 against 0.286 for the placed ones — so a
+      // fixture with a narrower refused side is a field the floor CAN
+      // produce, and this line would have rejected it. What the note
+      // does claim is asserted below, on the note itself.
       // REFUSED AND STRADDLING ARE DIFFERENT FACTS and this fixture
       // keeps them apart: every refused side here sits in ONE band, so
       // a note that reached the card could only have come through the
@@ -289,9 +305,13 @@ test("the fixture speaks the wire's language, not the card's",
     }
     // THE TWO NOTES DIFFER, so "which producer spoke" is answerable
     expect(RATINGS_NOTE).not.toEqual(FLOOR_NOTE);
+    // the quoted note is the CORRECTED one: it names the league's floor
+    // conditions and makes no claim about this club's width
+    for (const c of ["(C1)", "(C2)", "(C3)"]) expect(FLOOR_NOTE).toContain(c);
+    expect(FLOOR_NOTE).not.toMatch(/IS the refusal/);
     // and the block the board sends carries no prose of its own — the
     // storage rule, checked on the fixture that claims to be the wire
-    expect(JSON.stringify(FIELD())).not.toContain("REFUSED BY THE");
+    expect(JSON.stringify(FIELD())).not.toContain(FLOOR_NOTE.slice(0, 28));
     // THE SIDE IS THE WIRE'S SIDE, key for key. Read off a real `ucl`
     // block from `stages.field_block`, so a fixture that quietly grew
     // a key the backend does not send — `floor_note` above all — fails

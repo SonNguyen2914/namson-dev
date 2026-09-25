@@ -1,4 +1,4 @@
-// THE PINNED-PASS FIELD — the two views of /bet-suggester/ratings.
+// THE PINNED-PASS FIELD — the three views of /bet-suggester/ratings.
 //
 // Approved by the operator on 2026-09-23 as the artifact "The Pinned-Pass
 // Field", and ported here in the repo's own idiom. Every rule below was
@@ -28,6 +28,12 @@
 //   CUPS ARE NEVER MERGED. Any number may be selected, and each is drawn
 //     as its OWN table — own heading, own axis, own rank — because no two
 //     share both a corpus and a pass count.
+//   NATIONAL TEAMS ARE ONE MEASUREMENT (approved 2026-09-24). The four
+//     Championships competitions are cut from ONE national-team corpus at
+//     ONE pass count, so — unlike the cups — their tables share ONE axis,
+//     for as long as the backend's `shared_axis.one_measurement` says so.
+//     Each keeps its own rank; a team with no figure on an axis is named
+//     under its table, never filled.
 //   MISSING IS NEVER ZERO. An absent figure is named, never 0, 0.00, 0%
 //     or a bare dash.
 //   IT SHOWS; IT DOES NOT DECIDE.
@@ -35,8 +41,8 @@ import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   CupField, CupFields, CupRow, FIELD_AXES, FieldAxisName, LeagueField,
-  LeagueFieldRow, barRefusal, byValue, countWord, fmt, ladders, place,
-  shortSha, tableScale, tierText,
+  LeagueFieldRow, NationCompetition, NationFields, NationRow, barRefusal,
+  byValue, countWord, fmt, ladders, place, shortSha, tableScale, tierText,
 } from "../lib/fieldPageApi";
 import {
   RibbonPill, RibbonStrip, useLetterReveal, useRibbonSlot,
@@ -850,9 +856,333 @@ function CupRowView({ r, rank, goal, sc, hoisted }: {
   );
 }
 
+// ─────────────────────────── the national-teams view ───────────────────
+
+/** Per-row chips for the reader's caveat keys. The sentence on hover is
+ *  the payload's own (`caveat_notes`); only the two-word label is here. */
+const CAVEAT_LABEL: Record<string, string> = {
+  band_from_zero_bridges: "no bridge",
+  team_rating_mostly_prior: "mostly prior",
+  goal_axes_from_a_block_before_2022: "old block",
+};
+
+/** HIGHEST VALUE FIRST, the team's name breaking a tie; a missing value
+ *  last. The same order `byValue` gives a club. */
+const nationOrder = (rows: readonly NationRow[]) =>
+  byValue(rows.map((r) => ({ ...r, club: r.team }))) as Array<NationRow & { club: string }>;
+
+/** Where a row's bar sits: the band the field is read on, and the full
+ *  cross-confederation band around it (absent on a v1 payload, which is
+ *  then the same band twice). */
+function nationBands(r: NationRow) {
+  const within = r.lo != null && r.hi != null ? { lo: r.lo, hi: r.hi } : null;
+  const cross = r.lo_cross_confederation != null && r.hi_cross_confederation != null
+    ? { lo: r.lo_cross_confederation, hi: r.hi_cross_confederation } : within;
+  return { within, cross };
+}
+
+/** The tier as this view reads it: the LICENSED cut where the axis says
+ *  its declared five bands are more than the field's resolution licenses
+ *  (attack and defence, v2 section 4), the declared cut otherwise. */
+function nationTier(r: NationRow, licensed: boolean) {
+  return licensed && r.tier_set_licensed != null
+    ? { tier: r.tier_licensed, tier_set: r.tier_set_licensed,
+        straddles: r.straddles_licensed }
+    : { tier: r.tier, tier_set: r.tier_set, straddles: r.straddles };
+}
+
+/** THE INTERVAL ON THE SHARED AXIS. The full cross-confederation band as a
+ *  faint rule — the one to read against another table — and the band the
+ *  field is tiered on over it, with the point. */
+function NationBar({ r, sc }: { r: NationRow; sc: { lo: number; hi: number } }) {
+  const { within, cross } = nationBands(r);
+  if (!within || r.value == null) return <NoBar why="no interval measured" />;
+  const w = place(within.lo, within.hi, r.value, sc);
+  const c = cross ? place(cross.lo, cross.hi, r.value, sc) : null;
+  return (
+    <div data-testid="bar" data-lo={within.lo} data-hi={within.hi}
+      data-cross-lo={cross?.lo} data-cross-hi={cross?.hi}
+      className="relative h-[15px]"
+      title={`${within.lo.toFixed(1)} to ${within.hi.toFixed(1)}`
+        + (cross && (cross.lo !== within.lo || cross.hi !== within.hi)
+          ? `; across confederations ${cross.lo.toFixed(1)} to ${cross.hi.toFixed(1)}` : "")}>
+      <span className="absolute inset-x-0 top-[7px] h-px bg-line" />
+      {c && <i data-testid="bar-cross" className="absolute top-[7px] h-px bg-ink-faint"
+        style={{ left: `${c.left}%`, width: `${c.width}%` }} />}
+      <i data-testid="bar-within" className="absolute top-[6.5px] h-[2px] rounded-[1px] bg-ink-low"
+        style={{ left: `${w.left}%`, width: `${w.width}%` }} />
+      <i data-testid="bar-point" className="-ml-px absolute top-[2px] h-[11px] w-[2px] rounded-sm bg-ink-hi"
+        style={{ left: `${w.point}%` }} />
+    </div>
+  );
+}
+
+/* FOUR COMPETITIONS, ONE MEASUREMENT. Every table here is cut from the
+   same national-team corpus at the same pass count, so unlike the cups a
+   figure in one table IS comparable to a figure in another — which is why
+   the tables share ONE axis rather than each owning its own. Whether they
+   may is the backend's `shared_axis.one_measurement`, computed from the
+   four fields' own fits; the day it is false each table is drawn on its
+   own axis and the note says so. */
+export function NationsView({ data, modeSwitch, active }: {
+  data: NationFields; modeSwitch: ReactNode; active: boolean;
+}) {
+  const comps = data.competitions;
+  const shared = data.shared_axis?.one_measurement === true;
+  const notes = data.caveat_notes ?? {};
+  const [sel, setSel] = useState<Record<string, boolean>>(
+    () => (comps[0] ? { [comps[0].key]: true } : {}));
+  const [axis, setAxis] = useState<FieldAxisName>("overall");
+  const [q, setQ] = useState("");
+  const stripRef = useRef<HTMLDivElement | null>(null);
+  const reveal = useLetterReveal();
+  useRibbonSlot(stripRef, [comps.length]);
+  useEffect(() => {
+    if (!active || !stripRef.current) return;
+    reveal(Array.from(stripRef.current.querySelectorAll<HTMLElement>("[data-pill]")));
+  }, [active, reveal]);
+  const pillEl = (k: string) => stripRef.current?.querySelector<HTMLElement>(
+    `[data-pill][data-key="${k}"]`) ?? null;
+
+  const picked = comps.filter((c) => sel[c.key]);
+  const full = picked.length === comps.length;
+  const goal = axis !== "overall";
+  const unit = cupUnit(axis);
+  const needle = q.trim().toLowerCase();
+
+  /* ONE AXIS ACROSS EVERY TABLE SHOWN, on the span of the selected
+     competitions' full bands — the widest thing any bar draws. */
+  const scaleOf = (cs: NationCompetition[]) => tableScale(cs.flatMap((c) =>
+    (c.axes[axis]?.rows ?? []).map((r) => nationBands(r).cross ?? {})));
+  const common = shared ? scaleOf(picked) : null;
+
+  const tables = picked.map((c) => {
+    const A = c.axes[axis];
+    const all = nationOrder(A?.rows ?? []);
+    const rank = new Map(all.filter((r) => r.value != null)
+      .map((r, i) => [r.team_id, i + 1]));
+    const rows = needle ? all.filter((r) => r.team.toLowerCase().includes(needle)) : all;
+    const nbf = all.filter((r) => r.below_floor === true).length;
+    const licensed = goal && A?.declared_above_licence === true
+      && A.bands_licensed != null;
+    const note = [
+      `${all.length} of ${c.entrants} teams`,
+      c.confederation,
+      goal ? "goals measurement · no pass count" : `${A?.passes ?? c.passes} passes`,
+      `corpus ${shortSha(c.corpus_sha256) ?? "not stated"}`,
+      A?.levels != null ? `${A.levels.toFixed(1)} distinguishable levels` : "levels not stated",
+      ...(licensed ? [`tiered at the ${A!.bands_licensed} bands its resolution licenses`] : []),
+      ...(nbf ? [nbf === all.length ? "every team below the floor" : `${nbf} below the floor`] : []),
+    ].join(" · ");
+    const missing = c.not_measured.filter((m) => m.axes.includes(axis));
+    return { c, A, all, rank, rows, note, licensed,
+      sc: common ?? scaleOf([c]), missing };
+  });
+  const shown = tables.reduce((n, t) => n + t.rows.length, 0);
+  const of = tables.reduce((n, t) => n + t.all.length, 0);
+
+  return (
+    <>
+      <div data-testid="nation-controls"
+        className="z-20 mt-6 border-y border-line bg-bs pb-3 pt-4 md:sticky md:top-[var(--topbar-h)]">
+        {modeSwitch}
+        <div className="mb-2 flex flex-wrap items-center gap-[7px]">
+          {FIELD_AXES.map((x) => (
+            <button key={x} type="button" data-testid="nation-axis-button"
+              data-axis={x} aria-pressed={axis === x} onClick={() => setAxis(x)}
+              className={btn(axis === x)}>{x}</button>
+          ))}
+          <SelectAll testId="nation-select-all" noun="competition" full={full}
+            onPress={() => {
+              const to = !full;
+              const moved = comps.filter((c) => (sel[c.key] === true) !== to);
+              setSel(Object.fromEntries(comps.map((c) => [c.key, to])));
+              const els = moved.map((c) => pillEl(c.key))
+                .filter((e): e is HTMLElement => !!e);
+              if (els.length) reveal(els);
+            }} />
+          <input type="search" value={q} aria-label="find a team in the selected competitions"
+            placeholder="find a team" onChange={(e) => setQ(e.target.value)}
+            className="min-w-[140px] rounded-lg border border-line bg-bs-elev2 px-2.5 py-2 font-mono text-[10px] uppercase leading-tight tracking-[0.08em] text-ink-hi placeholder:uppercase placeholder:text-ink-faint" />
+          <span data-testid="nation-count" className={`${META} ml-auto`}>
+            {shown} of {of} teams
+          </span>
+        </div>
+        <RibbonStrip stripRef={stripRef} label="national-team competitions shown"
+          testId="nation-strip">
+          {comps.map((c) => (
+            <RibbonPill key={c.key} hueKey={c.key} dataKey={c.key}
+              testId="nation-pill" label={c.display} on={sel[c.key] === true}
+              title={`${c.display} — ${c.entrants} teams · ${c.confederation}`}
+              onClick={() => {
+                setSel({ ...sel, [c.key]: !sel[c.key] });
+                const el = pillEl(c.key);
+                if (el) reveal([el]);
+              }} />
+          ))}
+        </RibbonStrip>
+      </div>
+
+      {picked.length > 1 && (
+        <p data-testid="nations-split-note"
+          className="mt-5 border-l-2 border-line-strong py-2 pl-3.5 pr-3 text-[12px] leading-relaxed text-ink-low">
+          {shared ? (
+            <><b className="font-semibold text-ink-hi">{picked.length} competitions,
+              one measurement.</b>{" "}
+            Every table is cut from the same national-team corpus at the same
+            pass count and drawn on one shared axis, so a team in one table can
+            be read against a team in another. Each keeps its own rank.
+            {data.band === "within_confederation" && (
+              <>{" "}Across two tables read the faint rule under a bar — the full
+              cross-confederation band; the &plusmn; column and the tiers are
+              read within each confederation.</>
+            )}</>
+          ) : (
+            <><b className="font-semibold text-ink-hi">{picked.length} competitions,
+              not one measurement.</b>{" "}
+            These fields do not share both a corpus and a pass count, so each
+            table is drawn on its own axis and none is read against another.</>
+          )}
+        </p>
+      )}
+
+      {tables.map(({ c, rank, rows, note, licensed, sc, missing, all }) => (
+        <section key={c.key} data-testid="nation-section" data-nation={c.key}>
+          <div className="mb-3.5 mt-8 flex flex-wrap items-baseline justify-between gap-2 border-t border-line pt-5">
+            <h2 className="flex items-center text-lg font-medium text-ink-hi">
+              <span aria-hidden className="mr-2.5 inline-block h-2 w-2 flex-none rounded-full"
+                style={{ backgroundColor: hueOf(c.key) }} />
+              {c.display}
+            </h2>
+            <p data-testid="nation-note" className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
+              {note}
+            </p>
+          </div>
+          <Table testId="nation-table" section={c.key} head={<>
+            <th className={TH} />
+            <th className={TH}>team</th>
+            <th className={`${TH} hidden md:table-cell`}>group</th>
+            <th className={`${TH} text-right text-accent`}>{unit} ↓</th>
+            <th className={`${TH} text-right`}
+              title={data.band === "within_confederation"
+                ? "within the confederation — its own level taken out; hover a figure for the full cross-confederation band"
+                : undefined}>{goal ? "95% band (log)" : "95% band"}</th>
+            <th className={`${TH} hidden md:table-cell`}>interval</th>
+            <th className={TH}>tier</th>
+            <th className={`${TH} text-right`}
+              title="matches against another confederation: competitive + friendly">bridges</th>
+            <th className={`${TH} text-right`}>matches</th>
+          </>}>
+            {rows.map((r) => (
+              <NationRowView key={r.team_id} r={r} rank={rank.get(r.team_id) ?? null}
+                goal={goal} sc={sc} licensed={licensed} notes={notes}
+                scope={data.no_bridge_caveat_scope ?? null}
+                first={!needle && rank.get(r.team_id) === 1} />
+            ))}
+            {!rows.length && (
+              <tr><td colSpan={9}
+                className="py-10 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
+                {all.length ? "No team matches this filter." : `No team is measured on ${axis}.`}</td></tr>
+            )}
+          </Table>
+          {missing.length > 0 && (
+            <p data-testid="nation-absent"
+              className="mt-4 border-l-2 border-line-strong pl-3.5 text-[12.5px] leading-relaxed text-ink-low">
+              {missing.map((m) => (
+                <span key={m.team_id} data-team={m.team}>
+                  <b className="text-ink-mid">{m.team} has no {axis}.</b>{" "}
+                  {m.matches_in_window != null
+                    ? `${m.matches_in_window} matches in the window, and ` : ""}
+                  {m.why}. Named, not filled.{" "}
+                </span>
+              ))}
+            </p>
+          )}
+        </section>
+      ))}
+
+      {!picked.length && (
+        <p data-testid="nation-empty"
+          className="py-10 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
+          No competition selected — pick one above, or select all.</p>
+      )}
+    </>
+  );
+}
+
+function NationRowView({ r, rank, goal, sc, licensed, notes, scope, first }: {
+  r: NationRow; rank: number | null; goal: boolean;
+  sc: { lo: number; hi: number } | null; licensed: boolean;
+  notes: Record<string, string>; scope: string | null; first: boolean;
+}) {
+  const v = goal ? fmt(r.goals_per_match, 2) : fmt(r.value, 1);
+  const hw = fmt(r.half_width_95, goal ? 3 : 1);
+  const hwx = fmt(r.half_width_95_cross_confederation, goal ? 3 : 1);
+  const cb = r.competitive_bridges, fb = r.friendly_bridges;
+  const floorTitle = r.floor_failing_condition === "G3"
+    ? "G3: the median team’s 95% interval is wider than one band of the field. Measured and shown; not precise enough to tier."
+    : `below the floor${r.floor_failing_condition ? ` — failing condition ${r.floor_failing_condition}` : ""}`;
+  return (
+    <tr data-testid="nation-row" data-team={r.team} data-rank={rank ?? undefined}
+      {...(r.bridge_fixtures != null
+        ? { "data-bridge-fixtures": String(r.bridge_fixtures) } : {})}
+      className="border-b border-line last:border-b-0 hover:bg-white/[0.02]">
+      <td className={`${TD} w-10 text-right text-[11px] ${first ? "text-accent" : "text-ink-faint"}`}>
+        {rank ?? <Na>unranked</Na>}
+      </td>
+      <td className="min-w-[200px] py-1.5 pl-3 pr-4 md:w-[34%]">
+        <span className="flex items-center gap-2">
+          <span className={`min-w-0 truncate text-[13px] font-medium ${
+            r.below_floor === true && !goal ? "text-ink-mid" : "text-ink-hi"}`}>{r.team}</span>
+          {r.below_floor === true && (
+            <Chip warn testId="floor-chip" title={floorTitle}>floor</Chip>
+          )}
+          {(r.caveats ?? []).map((k) => (
+            <Chip key={k} testId="caveat-chip"
+              title={(notes[k] ?? k) + (k === "band_from_zero_bridges" && scope ? ` ${scope}` : "")}>
+              <span data-caveat={k}>{CAVEAT_LABEL[k] ?? k.replace(/_/g, " ")}</span>
+            </Chip>
+          ))}
+        </span>
+      </td>
+      <td className="hidden w-[118px] whitespace-nowrap px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-faint md:table-cell">
+        {r.group ? r.group.replace(/^Group /, "") : <Na>no group</Na>}
+      </td>
+      <td className={`${TD} w-[78px] text-right text-accent`}>
+        {v ?? <Na>not measured</Na>}
+      </td>
+      <td className={`${TD} w-[76px] text-right text-[11px] text-ink-faint`}
+        title={hwx != null && hwx !== hw ? `±${hwx} across confederations` : undefined}>
+        {hw != null ? `±${hw}` : <Na>not measured</Na>}
+      </td>
+      <td className="hidden min-w-[120px] px-3 py-1.5 md:table-cell md:w-[20%]">
+        {sc ? <NationBar r={r} sc={sc} /> : <NoBar why="no interval in this table to scale against" />}
+      </td>
+      <td className="w-[66px] whitespace-nowrap px-3 py-1.5"><Tier t={nationTier(r, licensed)} /></td>
+      <td data-testid="bridge-count" className={`${TD} w-[70px] whitespace-nowrap text-right text-ink-mid`}
+        title={cb != null || fb != null ? `${cb ?? "?"} competitive · ${fb ?? "?"} friendly` : undefined}>
+        {r.bridge_fixtures != null ? (
+          <>{r.bridge_fixtures}
+            {cb != null && fb != null && (
+              <em className="not-italic text-[0.85em] text-ink-faint"> {cb}+{fb}</em>
+            )}</>
+        ) : <Na>not reported</Na>}
+      </td>
+      <td className={`${TD} w-[58px] text-right text-ink-mid`}>
+        {r.matches ?? <Na>not reported</Na>}
+      </td>
+    </tr>
+  );
+}
+
 // ────────────────────────────── the page switch ────────────────────────
 
-export type FieldMode = "leagues" | "cups";
+export type FieldMode = "leagues" | "cups" | "nations";
+
+/** The switch's segments, in order, with the word each one shows. */
+export const FIELD_MODES: ReadonlyArray<readonly [FieldMode, string]> = [
+  ["leagues", "leagues"], ["cups", "cups"], ["nations", "national teams"],
+];
 
 /** THE PAGE SWITCH. Bigger than a pill because it changes what the whole
  *  page is about, built from the same parts: the board's filled ground,
@@ -863,13 +1193,13 @@ export function ModeSwitch({ mode, onChange }: {
   return (
     <div role="group" aria-label="what the page rates"
       className="mb-3 inline-flex gap-[3px] rounded-[10px] border border-line bg-bs-elev2 p-[3px]">
-      {(["leagues", "cups"] as const).map((m) => (
+      {FIELD_MODES.map(([m, word]) => (
         <button key={m} type="button" data-testid={`mode-${m}`}
           aria-pressed={mode === m} onClick={() => onChange(m)}
           className={`rounded-[7px] border px-[18px] py-[9px] font-mono text-[11px] uppercase tracking-[0.14em] transition-colors ${
             mode === m ? "border-accent bg-bs text-ink-hi"
               : "border-transparent text-ink-low hover:text-ink-hi"}`}>
-          {m}
+          {word}
         </button>
       ))}
     </div>

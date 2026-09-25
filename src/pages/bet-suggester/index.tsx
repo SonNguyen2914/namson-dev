@@ -75,18 +75,23 @@ import { TZ, dayLabel, localDay } from "../../lib/matchday";
 import {
   Board, CUP_COMP_KEY, DEFAULT_DAYS, SEASON_BLEND_K, THIN_ASK_SIZE,
   WIDE_SPREAD_C, askHonoured, boardColumns, columnsOf, declarationOf,
-  fetchBoard, leagueLabel,
+  CHAMPIONSHIP_COLUMNS, fetchBoard, fetchChampionships, leagueLabel,
+  nationalColumn, venueAdjusted,
 } from "../../lib/pickerApi";
 import {
   DEFAULT_BACK, Review, fetchReview, readHere, reviewAskHonoured,
 } from "../../lib/pickerReview";
 import {
-  COLUMN_DEFAULT_SORT, ColumnSort, DEFAULT_SORT, SORT_MODES, columnSort,
+  COLUMN_DEFAULT_SORT, ColumnSort, DEFAULT_SORT, NATIONAL_SORT_MODES,
+  SORT_MODES, columnSort,
   loadBoardSort, modeById, nullNoteFor, orderPhrase,
 } from "../../lib/pickerSort";
 import { failureSentence, readFailure } from "../../lib/providerFailure";
 import { Eyebrow } from "../../components/ui";
 import { ArchiveMenu } from "../../components/ArchiveMenu";
+import {
+  BoardMode, BoardModeSwitch,
+} from "../../components/BoardModeSwitch";
 import { ColumnChooser } from "../../components/ColumnChooser";
 import { CompRail } from "../../components/CompRail";
 import LiveSection from "../../components/LiveCard";
@@ -116,6 +121,11 @@ import {
 /** The board's own ET date key, YYYYMMDD, made readable. Left as the raw
  *  key if it is ever any other shape — inventing a date from a string we
  *  do not recognise is worse than showing the string. */
+/** Where the landing page remembers which board it was on. A per-viewer
+ *  convenience: every read and write is guarded, and the page renders
+ *  the Leagues board without it. */
+const BOARD_MODE_KEY = "board-mode";
+
 const etDate = (d: string) =>
   /^\d{8}$/.test(d) ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}` : d;
 
@@ -161,6 +171,38 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   const shape = useBoardShape();
   const phone = shape === "phone";
   const days = DEFAULT_DAYS;
+  /* ── WHICH BOARD THIS IS: LEAGUES OR CHAMPIONSHIPS (2026-09-24) ──────
+
+     The landing page carries two boards behind one switch — the club
+     board it has always been, and the four national-team competitions
+     (GET /api/championships/board). Same columns, same cards, same
+     ribbon; a different read.
+
+     NULL UNTIL THE REMEMBERED CHOICE IS READ, AND NOTHING IS FETCHED
+     WHILE IT IS NULL. That is the point of the null, not a nicety: a
+     viewer who left the page on Championships must not cost the club
+     board a GET on the way back, because every club-board GET freezes a
+     pre-kickoff snapshot row per fixture on the backend (see
+     e2e/board-holdout.mjs). The read is in an effect — the server has no
+     storage, and the first client render must match it.
+
+     A NARROWED ROUTE HAS NO SWITCH. `/bet-suggester/ucl` is the club
+     board narrowed to one column; it is Leagues by construction and
+     starts there without waiting on storage. */
+  const [mode, setMode] = useState<BoardMode | null>(only ? "leagues" : null);
+  const champ = mode === "championships";
+  useEffect(() => {
+    if (only) return;
+    let remembered: string | null = null;
+    try { remembered = window.localStorage.getItem(BOARD_MODE_KEY); } catch {
+      /* SWALLOWED(board:mode-read) — registered in
+         e2e/missing-is-not-zero.spec.ts with its closes_when. */
+    }
+    const t = setTimeout(() => {
+      setMode(remembered === "championships" ? "championships" : "leagues");
+    }, 0);
+    return () => clearTimeout(t);
+  }, [only]);
   /* HOW MANY COLUMNS ARE ON SCREEN AT ONCE — `VIEW`, in
      components/LeagueRibbon.tsx beside the loop that is built on it.
      Four is measured, not chosen: the board's track is `max-w-[96rem]`,
@@ -265,10 +307,16 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      the fetch — does not change on every render. */
   const ask = only ? [...only].join(",") : "";
   const load = useCallback(async (signal: AbortSignal) => {
+    if (mode === null) return;
     setLoading(true);
     try {
-      const b = await fetchBoard(days, signal,
-                                 ask === "" ? undefined : ask.split(","));
+      /* ONE ROUTE PER MODE, NEVER BOTH. The Leagues read is the string it
+         has always been; the Championships read is its own route, which
+         writes nothing. e2e/championships-board.spec.ts counts both. */
+      const b = mode === "championships"
+        ? await fetchChampionships(days, signal)
+        : await fetchBoard(days, signal,
+                           ask === "" ? undefined : ask.split(","));
       if (signal.aborted) return;
       setBoard(b);
       setError("");
@@ -279,16 +327,17 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
     } finally {
       if (!signal.aborted) setLoading(false);
     }
-  }, [days, ask]);
+  }, [days, ask, mode]);
 
   useEffect(() => {
     if (deepLink !== null) return;        // redirecting; do not fetch
+    if (mode === null) return;            // the remembered board is not read yet
     const ac = new AbortController();
     // async, not called sync in the effect body, so every setState inside
     // load() lands in a callback rather than cascading a render
     const t = setTimeout(() => { void load(ac.signal); }, 0);
     return () => { clearTimeout(t); ac.abort(); };
-  }, [load, nonce, deepLink]);
+  }, [load, nonce, deepLink, mode]);
 
   /* THE FINISHED TAIL ASKS THE SAME QUESTION THE BOARD ABOVE IT DOES
      (2026-09-10). It used to ask none: `fetchReview(back)` fetched the
@@ -325,13 +374,27 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
 
   useEffect(() => {
     if (deepLink !== null) return;
+    /* THE FINISHED TAIL IS A CLUB-BOARD READ. There is no national-team
+       review route, so the Championships board asks for none — its
+       tails say they were never asked (see `champTail` below), and a
+       national match that finished leaves the board BY NAME in the
+       off-board strip. */
+    if (mode !== "leagues") return;
     const ac = new AbortController();
     const t = setTimeout(() => { void loadReview(ac.signal); }, 0);
     return () => { clearTimeout(t); ac.abort(); };
-  }, [loadReview, nonce, deepLink]);
+  }, [loadReview, nonce, deepLink, mode]);
 
 
-  const rows = board?.rows ?? [];
+
+  /* A NATIONAL ROW IS READ FROM ITS HEADLINE (pickerApi.venueAdjusted):
+     the backend's when it serves one, the interim venue-adjusted Elo gap
+     otherwise — which can name the other side the favourite, and then
+     the whole row is read from that side. The club board is untouched. */
+  const rows = champ ? (board?.rows ?? []).map(venueAdjusted)
+    : board?.rows ?? [];
+  const headlineLabel = rows.find((r) => r.headline)?.headline?.label
+    ?? "headline gap";
   const refusals = board?.refusals ?? [];
   const leaguesMap = board?.leagues ?? {};
 
@@ -348,6 +411,20 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   // store reports it cannot write, EVERY read in every tail below is a
   // reconstruction by construction — say it once, at the top, rather than
   // leaving the reader to notice the pattern.
+  /* THE CHAMPIONSHIPS BOARD'S TAIL: NEVER ASKED, AND SAID SO. There is
+     no national-team review route, so the tail is state (2) of the three
+     `readHere` exists to keep apart — not a week in which nothing
+     finished. The finished matches themselves left the board by name in
+     the off-board strip above the columns. */
+  const champTail = {
+    rows: [], refusals: [], meta: undefined, back, loading: false, error: "",
+    read: false,
+    unreadWhy: "No finished-match read is served for the national-team "
+      + "competitions yet, so this tail was never asked. A match that "
+      + "finished in the window left the board by name, in the strip "
+      + "above the columns.",
+    storeNote: null,
+  };
   const storeNote = review && review.store && review.store.writable === false
     ? `No pre-kickoff read is being frozen on this deployment (snapshot `
       + `store: ${review.store.backend}), so every read below is a `
@@ -503,6 +580,21 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
        broken one — so the declaration is what is left. */
     return kept.length ? kept : columnSlugs;
   })();
+  /** The switch. The previous board is DROPPED before the next is asked
+   *  for: a Leagues column standing under a Championships header for the
+   *  length of a request is stale dressed as current. */
+  const chooseMode = useCallback((m: BoardMode) => {
+    if (m === mode) return;
+    setBoard(null);
+    setLoading(true);
+    setShown(null);
+    setPicked(null);
+    setMode(m);
+    try { window.localStorage.setItem(BOARD_MODE_KEY, m); } catch {
+      /* SWALLOWED(board:mode-write) — registered in
+         e2e/missing-is-not-zero.spec.ts with its closes_when. */
+    }
+  }, [mode]);
   /** Has the reader opened the framing disclosure? Phone-only in effect
    *  — at every other width the paragraph is open regardless. */
   const [introOpen, setIntroOpen] = useState(false);
@@ -713,7 +805,14 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
    *  so which of them are in front of you is a question with more than
    *  one answer. Four columns and every narrowed page (`/bet-suggester/
    *  ucl`) build no chooser, exactly as they build no ribbon. */
-  const chooseable = columnSlugs.length > VIEW;
+  /* …AND SINCE 2026-09-24 A DECLARED BOARD WHOSE COLUMNS ALL FIT OFFERS
+     THE CHOICE TOO ("4 of 4 drawn"). The operator read the Championships
+     board beside the Leagues one and asked for the same strip and the same
+     chooser on both; the rule is one rule for any declared board of two
+     or more columns, so it holds for both modes rather than for one of
+     them. A narrowed page (`only`) still offers none. */
+  const chooseable = columnSlugs.length > VIEW
+    || (!only && columnSlugs.length > 1);
   /* THE LOOP IS A NO-OP AT FOUR COLUMNS OR FEWER, which is what keeps
      every narrowed page (`/bet-suggester/ucl`) exactly as it is: nothing
      is built to page through and no ribbon draws.
@@ -811,7 +910,14 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
    *  control, and they are different controls because the widths are
    *  different problems. See components/LeagueTabs.tsx. */
   const showTabs = phone && boardReady && columnSlugs.length > 1;
-  const showRibbon = !phone && windowed && boardReady;
+  /* THE STATIC STRIP: a declared board whose drawn columns all fit keeps
+     its pills (all lit, nothing to step to), so both modes wear the same
+     storey under the nav. The loop is handed `view` = the drawn count for
+     it — see useBoardLoop. */
+  const staticStrip = !phone && !windowed && boardReady && !only
+    && drawnSlugs.length > 1;
+  const showRibbon = !phone && boardReady && (windowed || staticStrip);
+  const loopView = windowed ? view : drawnSlugs.length;
   /** AND THE CHOOSER, WHICH OUTLIVES THE RIBBON (2026-09-22).
    *
    *  Gated on `chooseable` — the DECLARATION — and not on `windowed`,
@@ -872,7 +978,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
 
        THIS CHANGES NOTHING ON ITS OWN. `drawnSlugs` was `columnSlugs`
        at every width but the phone, and the phone never ran the loop. */
-    trackRef, stripRef, railRef, slugs: drawnSlugs, view,
+    trackRef, stripRef, railRef, slugs: drawnSlugs, view: loopView,
     /* NOT ON A PHONE. The loop addresses every declared column on the
        track and a phone mounts one, so it would refuse to run in any
        case — said here rather than left to that, because "the phone has
@@ -1057,7 +1163,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                       blank boxes. `showRibbon` is the loop's own gate,
                       which is why it is the ribbon's too. */}
                   {showRibbon && (
-                    <LeagueRibbon slugs={drawnSlugs} view={view}
+                    <LeagueRibbon slugs={drawnSlugs} view={loopView}
                       stripRef={stripRef} />
                   )}
                   {/* …AND THE CHOOSER UNDER IT, OR ALONE. The rule is
@@ -1111,7 +1217,9 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
               its lines centred individually, which would give three
               ragged edges instead of one shape. */}
           <div className="flex flex-wrap items-baseline justify-center gap-x-4 gap-y-1">
-            <Eyebrow tone="accent">picker · stage 1 + stage 2</Eyebrow>
+            <Eyebrow tone="accent">
+              {champ ? "championships · national teams" : "picker · stage 1 + stage 2"}
+            </Eyebrow>
             {/* ONE HUE LOOKUP, HERE TOO (2026-09-22). These four lights
                 used to build `var(--lg-${slug})` by concatenation, which
                 is the construction LeagueTabs.tsx names as a defect in
@@ -1128,7 +1236,8 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                 `hueOf` answers each of them the same token this wrote.
                 Pinned by e2e/one-hue-lookup.spec.ts. */}
             <span aria-hidden className="flex items-center gap-1.5">
-              {(["mls", "epl", "laliga", "ligamx"] as const).map((s2) => (
+              {(champ ? CHAMPIONSHIP_COLUMNS
+                : ["mls", "epl", "laliga", "ligamx"] as const).map((s2) => (
                 <i key={s2} data-testid="hero-light" data-slug={s2}
                   className="h-1.5 w-1.5 rounded-full"
                   style={{ background: hueOf(s2) }} />
@@ -1183,7 +1292,9 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             </summary>
           <p data-testid="board-framing"
             className="text-center text-[13px] leading-relaxed text-ink-low max-md:pt-2">
-            {soleOwnSort
+            {champ
+              ? "Ranked by how far apart the two national teams sit on their competition's own field, home ground counted."
+              : soleOwnSort
               ? `Ranked by ${soleOwnSort.mode} — nearly every tie here pairs two different domestic tables, and the gap between them is withheld.`
               : "Ranked by how far apart the two clubs sit in their own league's table."}
             {" "}No model runs on this page, no number below
@@ -1192,6 +1303,14 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             one who picks.
           </p>
           </details>
+          {/* THE SWITCH, where the field page puts its own: under the
+              framing, at the head of the page it changes. Only on the
+              landing page, and only once the remembered board is read —
+              a switch drawn before that would show a choice the page has
+              not made yet. */}
+          {!only && mode !== null && (
+            <BoardModeSwitch mode={mode} onChange={chooseMode} />
+          )}
         </div>
 
         {/* ------------------------- controls ------------------------- */}
@@ -1264,8 +1383,17 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             open them. No assertion pinned either sentence. */}
         <p data-testid="board-times"
           className="mt-2 font-mono text-[10px] tracking-wide text-ink-faint max-md:mt-0 max-md:inline">
-          kickoffs in {TZ} · cached 90s · “built” is when the board was
-          assembled, not when you asked for it
+          {champ ? (
+            /* NO CACHE CLAIM ON THIS BOARD. "cached 90s" is the club
+               board's own TTL; the championships route states none, and
+               a sentence about a cache nobody measured is not one this
+               line may carry. */
+            <>kickoffs in {TZ} · “built” is when the board was assembled,
+            not when you asked for it</>
+          ) : (
+            <>kickoffs in {TZ} · cached 90s · “built” is when the board was
+          assembled, not when you asked for it</>
+          )}
         </p>
         </div>
 
@@ -1796,7 +1924,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                     meta={leaguesMap[slug]}
                     rows={rows.filter((r) => columnsOf(r).includes(slug))}
                     refusals={refusals.filter((r) => columnsOf(r).includes(slug))}
-                    review={{
+                    review={champ ? champTail : {
                       rows: finished.filter((r) => columnsOf(r).includes(slug)),
                       refusals: finishedRefusals.filter((r) => columnsOf(r).includes(slug)),
                       meta: reviewLeagues[slug],
@@ -1835,7 +1963,13 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                        there. Absent until the rail has mounted, so the
                        first paint (and the server's markup) is the
                        in-column header it has always been. */
-                    headSlot={headSlots[slug] ?? null} />
+                    headSlot={headSlots[slug] ?? null}
+                    /* THE NATIONAL COLUMN'S OWN FACTS — group tables,
+                       stage, next fixture — off the payload's
+                       `competitions` block. Null on the club board. */
+                    national={champ ? nationalColumn(
+                      board?.competitions?.[slug],
+                      rows.filter((r) => columnsOf(r).includes(slug))) : null} />
                 ))}
                 {dayKeys.map((k, i) => i % 2 === 0 ? null : (
                   <div key={`tint-${k}`} aria-hidden
@@ -1884,8 +2018,13 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                           applyDaySort(k, { mode: m.id, dir: m.defaultDir });
                         }}
                         className="rounded-md border border-line bg-bs px-1.5 py-0.5 font-mono text-[9.5px] uppercase text-ink-mid outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-accent">
-                        {SORT_MODES.map((m) => (
-                          <option key={m.id} value={m.id}>{m.label}</option>
+                        {(champ ? NATIONAL_SORT_MODES : SORT_MODES).map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {/* the headline key is named by the headline
+                                the cards print — the payload's own label
+                                when it sends one */}
+                            {m.id === "headline" ? headlineLabel : m.label}
+                          </option>
                         ))}
                       </select>
                       <button data-testid="band-dir" data-day={k}
@@ -1920,6 +2059,28 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
               is addressable now rather than found by document order. */}
           <dl data-testid="legend"
             className="space-y-4 text-sm leading-relaxed text-ink-low">
+            {champ && (
+              <div data-testid="legend-national">
+                <dt className="text-ink-hi">a national card</dt>
+                <dd className="mt-1">
+                  The same card as a club one, with national facts in its
+                  slots. The headline is the overall ELO gap on the
+                  competition&apos;s own field; the stats line is the field
+                  ranks, the group points gap and games played once the
+                  group has started, and the head-to-head (favourite
+                  won-drew-lost) when ESPN has a record. The group is the
+                  chip beside the rank. A hollow form square is
+                  a <span className="text-ink-mid">friendly</span> — a
+                  national team&apos;s last five are every senior
+                  international. An axis every team in a column sits below
+                  the placeability floor on carries its dagger once, in the
+                  column header (<span className="text-ink-mid">atk/def †</span>),
+                  rather than on every cell; the headline adds 65 Elo to
+                  the side at home in its own country, and none at a
+                  neutral ground.
+                </dd>
+              </div>
+            )}
             {/* Moved here 2026-09-06 from a two-line note above the
                 board. The FACTS it carried — the zone, and what "built"
                 means — stayed up there beside the numbers they qualify;

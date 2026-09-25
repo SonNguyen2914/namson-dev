@@ -369,7 +369,11 @@ test("the column carries the FIELD its favourites are read off",
     expect(field, "the column names favourites off nothing it publishes")
       .toBeTruthy();
     expect(field.competition).toBe("eflcup");
-    expect(field.axes_measured).toEqual(["ovr"]);
+    /* RESTATED 2026-09-25: ["ovr"] until the field gained its attack and
+       defence (backend #183, re-spliced into efl-cup-recorded.ts). THREE
+       AXES NOW, and the row carries `field` rather than `field_partial`
+       — the backend's own rule, all of SHAPE_AXES or the partial key. */
+    expect(field.axes_measured).toEqual(["ovr", "atk", "def"]);
     expect(field.size as number).toBeGreaterThan(90);
     expect(String(field.corpus_sha256)).toMatch(/^[0-9a-f]{64}$/);
 
@@ -379,10 +383,13 @@ test("the column carries the FIELD its favourites are read off",
        higher division" as evidence is not reading this field. A basis
        that only advertised what it CAN do would be the ordering with
        its caveat filed off. */
-    const rowField = (RECORDED.rows[0] as Record<string, unknown>)
-      .field_partial as Record<string, unknown>;
+    const row0 = RECORDED.rows[0] as Record<string, unknown>;
+    const rowField = row0.field as Record<string, unknown>;
     expect(rowField, "the row names a favourite with no field beside it")
       .toBeTruthy();
+    expect(row0.field_partial, "one key or the other, never both")
+      .toBeUndefined();
+    expect(rowField.axes_measured).toEqual(field.axes_measured);
     const basis = String(rowField.field_basis);
     expect(basis.length).toBeGreaterThan(200);
     expect(basis).toMatch(/bridge/i);

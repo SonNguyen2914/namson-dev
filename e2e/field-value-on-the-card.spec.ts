@@ -50,12 +50,24 @@ const json = (body: unknown, status = 200) => ({
   body: JSON.stringify(body),
 });
 
+/* `cross_league_axes.BELOW_FLOOR_NOTE`, the corrected wording (backend
+   ceb7cc30), re-quoted 2026-09-25 from the backend ship branch. */
 const FLOOR_NOTE =
-  "REFUSED BY THE PLACEABILITY FLOOR ON THE FIRST READING. This club's "
-  + "league did not clear the floor: its median club interval is wider "
-  + "than one band of the field, so the evidence does not place it in a "
-  + "tier. The rating itself stands and is shown — the wide interval "
-  + "beside it IS the refusal.";
+  "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's "
+  + "LEAGUE, taken on the Elo measurement at this field's pinned pass "
+  + "count, and the league did not pass it: it is not connected to the "
+  + "reference leagues (C1), or more than half of its cross-league "
+  + "level is still the 1500 starting prior (C2), or its clubs' median "
+  + "95% interval does not fit inside one fifth of the field's spread "
+  + "(C3) — or the club has no league attribution at all (no league). "
+  + "So the evidence does not place this club in a tier. The value and "
+  + "the 95% interval beside it are this club's own measurement on "
+  + "this axis and are shown as measured; the mark is its league's "
+  + "verdict carried onto every axis, and it does not say that this "
+  + "club's interval is wider than a placed club's. It is ranked with "
+  + "everyone else because a club the evidence cannot place is not "
+  + "thereby a worse club; dropping it to the bottom would state "
+  + "exactly that.";
 
 /** One club on one axis, shaped like the wire. `tier` is a parameter
  *  and not `set[0]`: on the live payload those differ on 31 of 36
@@ -213,17 +225,18 @@ test("the fixture speaks the wire's language, not the code's",
       for (let i = 0; i + 1 < a.rows.length; i++) {
         expect(a.rows[i].value).toBeGreaterThan(a.rows[i + 1].value);
       }
-      // THE REFUSED CLUB CARRIES THE WIDEST BAND, which is what
-      // BELOW_FLOOR_NOTE claims — "the wide interval beside it IS the
-      // refusal". A fixture where a placed club is vaguer than a
-      // refused one describes a field the floor could not have
-      // produced.
+      // BOTH STATES ARE ON EVERY AXIS, so the card below meets a refused
+      // club and a placed one. NO WIDTH RULE (removed 2026-09-25): this
+      // also asserted the refused club carries the widest band, because
+      // the old BELOW_FLOOR_NOTE claimed "the wide interval beside it IS
+      // the refusal". The corrected note withdraws that — the floor is
+      // the LEAGUE's verdict, and the Europa League field's marked clubs
+      // are NARROWER than its placed ones on attack (0.267 v 0.286) — so
+      // the rule would reject a field the floor can produce.
       const refused = a.rows.filter((r) => r.below_floor);
       const placed = a.rows.filter((r) => !r.below_floor);
       expect(refused.length).toBeGreaterThan(0);
       expect(placed.length).toBeGreaterThan(0);
-      expect(Math.min(...refused.map((r) => r.half_width_95)))
-        .toBeGreaterThan(Math.max(...placed.map((r) => r.half_width_95)));
       for (const r of a.rows) {
         // a value and its half-width travel together, and the interval
         // is theirs

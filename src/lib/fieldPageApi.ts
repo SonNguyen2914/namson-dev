@@ -1,4 +1,4 @@
-// THE FIELD PAGE'S TWO READS — types, fetchers, and the pure arithmetic
+// THE FIELD PAGE'S THREE READS — types, fetchers, and the pure arithmetic
 // the page does on them.
 //
 //   GET /api/field/leagues   every current-season club of the eight
@@ -6,6 +6,9 @@
 //                            at the pinned pass count, on three axes
 //   GET /api/field/cups      the measured cup fields, one block each,
 //                            each on its own corpus and pass count
+//   GET /api/field/nations   the four national-team competition fields
+//                            (the Championships columns), one block each,
+//                            all cut from ONE corpus at ONE pass count
 //
 // Served by backend src/picker/field_page.py from committed bytes: no
 // board, no capture, no write. The page at /bet-suggester/ratings reads
@@ -192,6 +195,144 @@ export interface CupFields {
   not_a_trading_signal?: boolean;
 }
 
+/** One national team on one axis of its competition's field — the
+ *  national reader's row (backend `national_team_axes._row`), copied by
+ *  name. Optional where the backend may not send it: the LICENSED tier is
+ *  absent on every overall row and wherever the licence could not cut. */
+export interface NationRow {
+  rank?: number;
+  team_id: string;
+  team: string;
+  group?: string | null;
+  confederation?: string | null;
+  value?: number | null;
+  /** the band the field is tiered and floor-checked on (`band`) */
+  lo?: number | null;
+  hi?: number | null;
+  half_width_95?: number | null;
+  band?: string | null;
+  /** THE FULL BAND — the one to read whenever teams of DIFFERENT
+   *  confederations are compared, i.e. across two tables. */
+  half_width_95_cross_confederation?: number | null;
+  lo_cross_confederation?: number | null;
+  hi_cross_confederation?: number | null;
+  tier?: number | null;
+  tier_set?: number[] | null;
+  straddles?: boolean | null;
+  tier_licensed?: number | null;
+  tier_set_licensed?: number[] | null;
+  straddles_licensed?: boolean | null;
+  below_floor?: boolean | null;
+  floor_refusal?: string | null;
+  floor_failing_condition?: string | null;
+  below_floor_licensed?: boolean | null;
+  floor_failing_condition_licensed?: string | null;
+  /** goals per match on a goal axis; null on overall */
+  goals_per_match?: number | null;
+  bridge_fixtures?: number | null;
+  competitive_bridges?: number | null;
+  friendly_bridges?: number | null;
+  matches?: number | null;
+  caveats?: string[];
+  /** WHICH RESPONSE CARRIES THIS ROW (backend 6bf7e06b, attack/defence
+   *  only): "shots" or "goals" — whether xG or shots on target is the
+   *  response for most of the team's own appearances in `signal_block`.
+   *  Declared so the recording type-checks; the page does not draw it. */
+  signal?: "shots" | "goals" | null;
+  signal_mix?: Record<string, number> | null;
+  signal_block?: string | null;
+}
+
+/** Where a field's attack and defence were read from, said once for the
+ *  page and once per competition (backend 6bf7e06b). Not drawn yet. */
+export interface NationAttackDefence {
+  signal_source?: string | null;
+  signal_source_why?: string | null;
+  bundle?: string | null;
+  signal_note?: string | null;
+  sources?: Record<string, NationAttackDefence>;
+}
+
+export interface NationAxis {
+  label: string;
+  unit?: string;
+  bands?: number;
+  levels?: number | null;
+  bands_licensed?: number | null;
+  /** true where the declared five bands are more than this field's
+   *  resolution licenses — the page then shows the LICENSED cut */
+  declared_above_licence?: boolean;
+  cuts?: number[];
+  cuts_licensed?: number[];
+  span?: number[];
+  band?: string | null;
+  /** on overall only: a goals axis has no pass count */
+  passes?: number | string;
+  /** "elo" on overall; "shots" or "goals" on attack/defence */
+  signal_source?: string | null;
+  rows: NationRow[];
+}
+
+export interface NationNotMeasured {
+  team_id: string;
+  team: string;
+  group?: string | null;
+  axes: string[];
+  why: string;
+  matches_in_window?: number | null;
+}
+
+export interface NationCompetition {
+  /** the Championships column key (unl, cnl, asiancup, afcon) */
+  key: string;
+  field_key?: string;
+  display: string;
+  competition_display?: string;
+  edition?: string;
+  confederation: string;
+  entrants: number;
+  passes?: number | string | null;
+  corpus_sha256?: string | null;
+  band?: string | null;
+  attack_defence?: NationAttackDefence | null;
+  axes: Record<string, NationAxis>;
+  not_measured: NationNotMeasured[];
+}
+
+export interface NationFields {
+  source?: string;
+  bundle?: string;
+  served_because?: string;
+  field_sha256?: string;
+  manifest_sha256?: string;
+  preregistration?: string | null;
+  corpus_sha256?: string | null;
+  passes?: number | string | null;
+  primary_variant?: string;
+  /** internationals in the corpus */
+  fixtures?: number | null;
+  window?: { start?: string | null; end?: string | null };
+  jackknife_replicates?: number | null;
+  teams_rated?: number | null;
+  confederations?: string[];
+  /** teams whose every match against another confederation is a friendly */
+  friendly_only_bridge_teams?: number | null;
+  /** WHETHER THE TABLES MAY SHARE ONE AXIS — computed by the backend from
+   *  the four fields' own corpus digests and pass counts. The page draws
+   *  one axis across tables only while `one_measurement` is true. */
+  shared_axis?: { same_corpus?: boolean; same_passes?: boolean;
+    one_measurement?: boolean };
+  attack_defence?: NationAttackDefence | null;
+  band?: string | null;
+  band_note?: string | null;
+  no_bridge_caveat_scope?: string | null;
+  below_floor_note?: string | null;
+  caveat_notes?: Record<string, string>;
+  unit_note?: Record<string, string> | null;
+  competitions: NationCompetition[];
+  not_a_trading_signal?: boolean;
+}
+
 /** THE AXES, in the order the page offers them. The backend spells them
  *  the same way on both routes (`cross_league_axes.AXES[*].label`). */
 export const FIELD_AXES = ["overall", "attack", "defence"] as const;
@@ -242,6 +383,11 @@ export function fetchLeagueField(signal?: AbortSignal): Promise<LeagueField> {
 
 export function fetchCupFields(signal?: AbortSignal): Promise<CupFields> {
   return readField<CupFields>("/api/field/cups", "cup field", signal);
+}
+
+export function fetchNationFields(signal?: AbortSignal): Promise<NationFields> {
+  return readField<NationFields>("/api/field/nations", "national-team field",
+    signal);
 }
 
 // ─────────────────────────── the page's arithmetic ─────────────────────

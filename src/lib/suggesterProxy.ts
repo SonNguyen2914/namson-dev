@@ -235,7 +235,22 @@ export const LEAGUE_PROXY_ALLOWED: Record<string, readonly string[]> = {
   // the capture that `picker/board` does. Reached through the dynamic
   // `[league]/[...path].ts` proxy — no directory of its own, which is
   // the point of that file.
-  field: ["leagues", "cups"],
+  //
+  // `nations` (2026-09-25): the third read, the four national-team
+  // competition fields off the national reader — GET-only, no board
+  // behind it either (backend tests/test_field_page_nations.py makes the
+  // club assembly, its capture and every file write raise and the route
+  // still answers). Forwarded AHEAD of the backend's deploy: see
+  // LEAGUE_PROXY_AHEAD.
+  field: ["leagues", "cups", "nations"],
+  // THE CHAMPIONSHIPS BOARD (2026-09-24): the four national-team columns
+  // in the club board's payload shape. ONE ROUTE, and it WRITES NOTHING —
+  // unlike `picker/board`, whose every GET freezes a snapshot row, the
+  // backend holds this one read-only by construction (its
+  // tests/test_championships_route.py makes the club assembly and its
+  // capture raise and the route still answers). Forwarded AHEAD of the
+  // backend's deploy (retired from LEAGUE_PROXY_AHEAD once 0b94886 deployed).
+  championships: ["board"],
   // COMP HAS NO LITERAL ROUTES — every one of its paths begins with a
   // competition KEY, so its whole surface lives in the id-route table
   // below. It is listed here anyway, with an empty list, because THIS
@@ -299,12 +314,35 @@ export const LEAGUE_PROXY_ID_ROUTES: Record<string, readonly RegExp[]> = {
   xg: [/^league\/\d{1,8}$/],
   picker: [],
   field: [],
+  championships: [],
   comp: [
     new RegExp(`^${COMP_KEY}/(${COMP_RESOURCES.join("|")})$`),
     // the per-match live read — see COMP_RESOURCES for why this was the
     // loudest of the three holes
     new RegExp(`^${COMP_KEY}/match/\\d{1,12}$`),
   ],
+};
+
+/** ROUTES THIS PROXY FORWARDS BEFORE THE BACKEND IT TALKS TO SERVES
+ *  THEM — registered, with the reason and the condition that retires the
+ *  record, exactly like LEAGUE_PROXY_WITHHELD below, pointing the other
+ *  way.
+ *
+ *  WHY THIS EXISTS AT ALL. The drift guard reads the DEPLOYED backend's
+ *  /openapi.json and fails on any forwarded route that table does not
+ *  list — the La Liga `approval` shape, a request travelling to a
+ *  guaranteed 404 with this layer's blessing. A frontend that ships a
+ *  route before its backend deploy is that shape for the length of the
+ *  gap, and the honest way through it is to SAY so rather than to wait
+ *  or to weaken the guard. A record here is excused from `unserved`; the
+ *  moment the backend lists the route the record goes STALE and fails
+ *  (`staleAhead`), so it cannot outlive the gap it describes.
+ *
+ *  In the gap a forwarded request reaches the backend's own 404, which
+ *  the page names like any other failed read — never an empty board. */
+export const LEAGUE_PROXY_AHEAD: Record<string, Record<string, string>> = {
+  // Empty since backend 0b94886 (2026-09-25) deployed both
+  // /api/championships/board and /api/field/nations.
 };
 
 /** ROUTES THE BACKEND SERVES THAT THIS PROXY DELIBERATELY DOES NOT
@@ -566,7 +604,8 @@ export function refuseLeagueRoute(
 export function proxyAllowlistDrift(
   prefix: string,
   paths: Record<string, unknown>
-): { unforwarded: string[]; unserved: string[]; staleWithheld: string[] } {
+): { unforwarded: string[]; unserved: string[]; staleWithheld: string[];
+     staleAhead: string[] } {
   const head = `/api/${prefix}/`;
   const served = Object.keys(paths)
     .filter((p) => p.startsWith(head))
@@ -595,8 +634,18 @@ export function proxyAllowlistDrift(
     && !idRe.some((re) => re.test(probe(s))));
   // FORWARDED TO A GUARANTEED 404 — the La Liga `approval` shape.
   const servedProbes = new Set(served.map(probe));
+  const ahead = LEAGUE_PROXY_AHEAD[prefix] || {};
+  const isAhead = (a: string) =>
+    Object.prototype.hasOwnProperty.call(ahead, a);
   const unserved = (LEAGUE_PROXY_ALLOWED[prefix] || [])
-    .filter((a) => !served.includes(a) && !servedProbes.has(a));
+    .filter((a) => !served.includes(a) && !servedProbes.has(a)
+      && !isAhead(a));
+  // …AND AN "AHEAD" RECORD THE BACKEND HAS CAUGHT UP WITH, or one naming
+  // a route this proxy does not even forward. Either way it is prose
+  // that outlived the gap it described.
+  const staleAhead = Object.keys(ahead).filter((a) =>
+    served.includes(a) || servedProbes.has(a)
+    || !(LEAGUE_PROXY_ALLOWED[prefix] || []).includes(a));
   // A RECORD LEFT STANDING AFTER ITS CONDITION CLOSED. The register
   // names a route the backend no longer serves, or one the allowlist
   // has since adopted — either way the prose has outlived the hole,
@@ -608,6 +657,7 @@ export function proxyAllowlistDrift(
     unforwarded: unforwarded.sort(),
     unserved: [...unserved].sort(),
     staleWithheld: staleWithheld.sort(),
+    staleAhead: staleAhead.sort(),
   };
 }
 

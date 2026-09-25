@@ -1,19 +1,39 @@
 // RECORDED, NOT WRITTEN: the two field-page payloads as the backend
-// emits them (branch field-page-api, served locally by uvicorn on
-// 2026-09-23 from research_archive/league_field_cups_union_2026-09-23 and
-// cross_league_axes.read_axes). TRIMMED ONLY BY DROPPING ROWS — three
-// clubs per column in the bundle's own (name) order, plus every
-// zero-bridge club and every club rated on another division; per cup and
-// axis the top six plus Arsenal, Club Brugge and two below-floor clubs.
-// No key, value or sentence was edited, so the fixture speaks the wire's
-// language. Variants the page must handle and this recording does not
-// contain (two ladders, a whole section below the floor, absent figures)
-// are DERIVED from these rows in e2e/the-field-page.spec.ts, each named.
+// emits them. RE-RECORDED 2026-09-25 from the backend ship branch
+// `be-ship-2026-09-25` @ 7eee6d17 (regenerated at the final tip ef4b16c0
+// and byte-identical), generated IN-PROCESS
+// (`src.picker.field_page.leagues_payload()` and `cups_payload()`, the
+// functions behind GET /api/field/leagues and /api/field/cups, with the
+// network blocked for the run). The first recording (branch
+// field-page-api, 2026-09-23) went stale on three facts, all of them the
+// backend's and none of them edited here:
+//   * every cup field now carries THREE axes — the Leagues Cup ·
+//     Campeones Cup and EFL Cup fields were overall-only (backend #183
+//     measured attack and defence for every club on the union corpus);
+//   * a FOURTH cup field, the Europa League (`uel`, backend uel-field);
+//   * `below_floor_note` is the corrected BELOW_FLOOR_NOTE (backend
+//     ceb7cc30): it names the three floor conditions and no longer
+//     claims the club's interval is wider than a placed club's.
+// The league field moved to research_archive/goal_axes_every_club_
+// 2026-09-24, so its attack and defence rows gained the clubs that were
+// unmeasured before.
+//
+// TRIMMED ONLY BY DROPPING ROWS, by the rule the first recording used —
+// three clubs per column in the bundle's own (name) order, plus every
+// zero-bridge club and every club rated on another division (read off
+// the overall axis); per cup and axis the top six plus Arsenal, Club
+// Brugge and the two best-ranked below-floor clubs, where the field
+// holds them. No key, value or sentence was edited, so the fixture
+// speaks the wire's language. Rows kept: leagues {"overall": 29, "attack": 30, "defence": 30}; cups
+// {"ucl": {"overall": 8, "attack": 9, "defence": 9}, "campeones": {"overall": 6, "attack": 6, "defence": 6}, "eflcup": {"overall": 6, "attack": 6, "defence": 6}, "uel": {"overall": 8, "attack": 7, "defence": 8}}. Variants the page must handle and this recording
+// does not contain (two ladders, a whole section below the floor,
+// absent figures, a cup short of an axis) are DERIVED from these rows in
+// e2e/the-field-page.spec.ts, each named.
 //
 // Regenerate: see the python snippet in that spec's header.
 export const LEAGUES = {
- "source": "research_archive/league_field_cups_union_2026-09-23/slices.json",
- "slices_sha256": "af4217aaf598655a59ffe085ae68c38fe09719c5d5d63437a84e0e8d7ac25f07",
+ "source": "research_archive/goal_axes_every_club_2026-09-24/league_field/slices.json",
+ "slices_sha256": "595010ab60f9409877a66b91c7784ea5ac6e19fbbc9d176495e38c2b1b3b866d",
  "corpus_sha256": "bf58f88facb0378a4e70fd294ba85c96b03521b81720f8b6cc93be349bac5695",
  "passes": 10,
  "jackknife_replicates": 200,
@@ -74,7 +94,7 @@ export const LEAGUES = {
     "epl": {
      "measured": true,
      "unit": "elo",
-     "n_rows": 6,
+     "n_rows": 20,
      "value_min": 1630.8177,
      "value_max": 2045.7031,
      "n_clubs": 20,
@@ -87,7 +107,7 @@ export const LEAGUES = {
     "laliga": {
      "measured": true,
      "unit": "elo",
-     "n_rows": 3,
+     "n_rows": 17,
      "value_min": 1656.7896,
      "value_max": 1998.3385,
      "n_clubs": 17,
@@ -100,7 +120,7 @@ export const LEAGUES = {
     "mls": {
      "measured": true,
      "unit": "elo",
-     "n_rows": 3,
+     "n_rows": 30,
      "value_min": 1460.0181,
      "value_max": 1763.3976,
      "n_clubs": 30,
@@ -113,7 +133,7 @@ export const LEAGUES = {
     "ligamx": {
      "measured": true,
      "unit": "elo",
-     "n_rows": 3,
+     "n_rows": 17,
      "value_min": 1383.2626,
      "value_max": 1754.8452,
      "n_clubs": 17,
@@ -126,7 +146,7 @@ export const LEAGUES = {
     "bundesliga": {
      "measured": true,
      "unit": "elo",
-     "n_rows": 3,
+     "n_rows": 17,
      "value_min": 1569.8457,
      "value_max": 2063.703,
      "n_clubs": 17,
@@ -139,7 +159,7 @@ export const LEAGUES = {
     "seriea": {
      "measured": true,
      "unit": "elo",
-     "n_rows": 3,
+     "n_rows": 19,
      "value_min": 1367.43,
      "value_max": 1888.5838,
      "n_clubs": 19,
@@ -152,7 +172,7 @@ export const LEAGUES = {
     "ligue1": {
      "measured": true,
      "unit": "elo",
-     "n_rows": 3,
+     "n_rows": 16,
      "value_min": 1622.3182,
      "value_max": 1986.6271,
      "n_clubs": 16,
@@ -165,7 +185,7 @@ export const LEAGUES = {
     "eredivisie": {
      "measured": true,
      "unit": "elo",
-     "n_rows": 5,
+     "n_rows": 18,
      "value_min": 1322.5101,
      "value_max": 1842.2054,
      "n_clubs": 18,
@@ -937,25 +957,25 @@ export const LEAGUES = {
     "epl": {
      "measured": true,
      "unit": "log-goals",
-     "n_rows": 4,
-     "value_min": 0.146699,
-     "value_max": 0.919545,
-     "n_clubs": 18,
-     "median_half_width_95": 0.273018,
-     "median_half_width_95_bridged_only": 0.273018,
-     "distinguishable_levels_all_clubs": 1.42,
-     "distinguishable_levels_bridged_only": 1.42,
-     "cut_against": "the 18 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on attack. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
+     "n_rows": 20,
+     "value_min": 0.184084,
+     "value_max": 0.956929,
+     "n_clubs": 20,
+     "median_half_width_95": 0.291233,
+     "median_half_width_95_bridged_only": 0.291233,
+     "distinguishable_levels_all_clubs": 1.33,
+     "distinguishable_levels_bridged_only": 1.33,
+     "cut_against": "the 20 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on attack. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
     },
     "laliga": {
      "measured": true,
      "unit": "log-goals",
-     "n_rows": 3,
-     "value_min": 0.045561,
-     "value_max": 1.1341,
+     "n_rows": 17,
+     "value_min": 0.057553,
+     "value_max": 1.146092,
      "n_clubs": 17,
-     "median_half_width_95": 0.255484,
-     "median_half_width_95_bridged_only": 0.255484,
+     "median_half_width_95": 0.255281,
+     "median_half_width_95_bridged_only": 0.255281,
      "distinguishable_levels_all_clubs": 2.13,
      "distinguishable_levels_bridged_only": 2.13,
      "cut_against": "the 17 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on attack. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
@@ -963,25 +983,25 @@ export const LEAGUES = {
     "mls": {
      "measured": true,
      "unit": "log-goals",
-     "n_rows": 3,
-     "value_min": -0.085749,
-     "value_max": 0.736011,
+     "n_rows": 30,
+     "value_min": -0.048042,
+     "value_max": 0.773717,
      "n_clubs": 30,
-     "median_half_width_95": 0.436465,
-     "median_half_width_95_bridged_only": 0.436465,
-     "distinguishable_levels_all_clubs": 0.94,
-     "distinguishable_levels_bridged_only": 0.94,
+     "median_half_width_95": 0.433527,
+     "median_half_width_95_bridged_only": 0.433527,
+     "distinguishable_levels_all_clubs": 0.95,
+     "distinguishable_levels_bridged_only": 0.95,
      "cut_against": "the 30 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on attack. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
     },
     "ligamx": {
      "measured": true,
      "unit": "log-goals",
-     "n_rows": 3,
-     "value_min": -0.185815,
-     "value_max": 0.414813,
+     "n_rows": 17,
+     "value_min": -0.148212,
+     "value_max": 0.452416,
      "n_clubs": 17,
-     "median_half_width_95": 0.303961,
-     "median_half_width_95_bridged_only": 0.303961,
+     "median_half_width_95": 0.30252,
+     "median_half_width_95_bridged_only": 0.30252,
      "distinguishable_levels_all_clubs": 0.99,
      "distinguishable_levels_bridged_only": 0.99,
      "cut_against": "the 17 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on attack. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
@@ -989,63 +1009,63 @@ export const LEAGUES = {
     "bundesliga": {
      "measured": true,
      "unit": "log-goals",
-     "n_rows": 3,
-     "value_min": 0.121418,
-     "value_max": 1.293022,
-     "n_clubs": 15,
-     "median_half_width_95": 0.279098,
-     "median_half_width_95_bridged_only": 0.279098,
-     "distinguishable_levels_all_clubs": 2.1,
-     "distinguishable_levels_bridged_only": 2.1,
-     "cut_against": "the 15 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on attack. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
+     "n_rows": 17,
+     "value_min": 0.116046,
+     "value_max": 1.287651,
+     "n_clubs": 17,
+     "median_half_width_95": 0.300276,
+     "median_half_width_95_bridged_only": 0.300276,
+     "distinguishable_levels_all_clubs": 1.95,
+     "distinguishable_levels_bridged_only": 1.95,
+     "cut_against": "the 17 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on attack. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
     },
     "seriea": {
      "measured": true,
      "unit": "log-goals",
-     "n_rows": 3,
-     "value_min": -0.339952,
-     "value_max": 0.842949,
+     "n_rows": 19,
+     "value_min": -0.321158,
+     "value_max": 0.861743,
      "n_clubs": 19,
-     "median_half_width_95": 0.301419,
-     "median_half_width_95_bridged_only": 0.301419,
-     "distinguishable_levels_all_clubs": 1.96,
-     "distinguishable_levels_bridged_only": 1.96,
+     "median_half_width_95": 0.291304,
+     "median_half_width_95_bridged_only": 0.291304,
+     "distinguishable_levels_all_clubs": 2.03,
+     "distinguishable_levels_bridged_only": 2.03,
      "cut_against": "the 19 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on attack. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
     },
     "ligue1": {
      "measured": true,
      "unit": "log-goals",
-     "n_rows": 3,
-     "value_min": -0.123688,
-     "value_max": 0.792466,
+     "n_rows": 16,
+     "value_min": -0.109617,
+     "value_max": 0.806537,
      "n_clubs": 16,
-     "median_half_width_95": 0.320534,
-     "median_half_width_95_bridged_only": 0.320534,
-     "distinguishable_levels_all_clubs": 1.43,
-     "distinguishable_levels_bridged_only": 1.43,
+     "median_half_width_95": 0.328535,
+     "median_half_width_95_bridged_only": 0.328535,
+     "distinguishable_levels_all_clubs": 1.39,
+     "distinguishable_levels_bridged_only": 1.39,
      "cut_against": "the 16 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on attack. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
     },
     "eredivisie": {
      "measured": true,
      "unit": "log-goals",
-     "n_rows": 4,
-     "value_min": -0.118396,
-     "value_max": 0.879939,
-     "n_clubs": 16,
-     "median_half_width_95": 0.279151,
-     "median_half_width_95_bridged_only": 0.27803,
-     "distinguishable_levels_all_clubs": 1.79,
-     "distinguishable_levels_bridged_only": 1.8,
-     "cut_against": "the 16 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on attack. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
+     "n_rows": 18,
+     "value_min": -0.463713,
+     "value_max": 0.830923,
+     "n_clubs": 18,
+     "median_half_width_95": 0.292067,
+     "median_half_width_95_bridged_only": 0.283256,
+     "distinguishable_levels_all_clubs": 2.22,
+     "distinguishable_levels_bridged_only": 1.76,
+     "cut_against": "the 18 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on attack. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
     }
    },
    "rows": [
     {
      "club": "Arsenal",
-     "value": 0.830139,
-     "lo": 0.613512,
-     "hi": 1.046766,
-     "half_width_95": 0.216627,
+     "value": 0.867523,
+     "lo": 0.631637,
+     "hi": 1.10341,
+     "half_width_95": 0.235886,
      "bridge_fixtures": 36,
      "bridged": true,
      "games_played": 5,
@@ -1053,10 +1073,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 3.315143,
-      "low": 2.149526,
+      "high": 3.572022,
+      "low": 2.228567,
       "means": "scored",
-      "point": 2.669454
+      "point": 2.821434
      },
      "column": "epl",
      "tier": 1,
@@ -1068,10 +1088,10 @@ export const LEAGUES = {
     },
     {
      "club": "Aston Villa",
-     "value": 0.614408,
-     "lo": 0.308929,
-     "hi": 0.919886,
-     "half_width_95": 0.305479,
+     "value": 0.651792,
+     "lo": 0.341745,
+     "hi": 0.961839,
+     "half_width_95": 0.310047,
      "bridge_fixtures": 28,
      "bridged": true,
      "games_played": 5,
@@ -1079,10 +1099,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 2.92011,
-      "low": 1.585126,
+      "high": 3.100492,
+      "low": 1.667736,
       "means": "scored",
-      "point": 2.151451
+      "point": 2.27394
      },
      "column": "epl",
      "tier": 2,
@@ -1095,10 +1115,10 @@ export const LEAGUES = {
     },
     {
      "club": "Bournemouth",
-     "value": 0.654686,
-     "lo": 0.383718,
-     "hi": 0.925654,
-     "half_width_95": 0.270968,
+     "value": 0.69207,
+     "lo": 0.431339,
+     "hi": 0.952802,
+     "half_width_95": 0.260732,
      "bridge_fixtures": 1,
      "bridged": true,
      "games_played": 5,
@@ -1106,26 +1126,25 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 2.937001,
-      "low": 1.708221,
+      "high": 3.072599,
+      "low": 1.824052,
       "means": "scored",
-      "point": 2.239877
+      "point": 2.3674
      },
      "column": "epl",
-     "tier": 2,
+     "tier": 1,
      "tier_set": [
       1,
-      2,
-      5
+      4
      ],
      "straddles": true
     },
     {
      "club": "Ipswich",
-     "value": 0.146699,
-     "lo": -0.185226,
-     "hi": 0.478625,
-     "half_width_95": 0.331925,
+     "value": 0.184084,
+     "lo": -0.147736,
+     "hi": 0.515904,
+     "half_width_95": 0.33182,
      "bridge_fixtures": 5,
      "bridged": true,
      "games_played": 5,
@@ -1133,11 +1152,66 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 1.878286,
-      "low": 0.967064,
+      "high": 1.985013,
+      "low": 1.02223,
       "means": "scored",
-      "point": 1.347747
+      "point": 1.424478
      },
+     "column": "epl",
+     "tier": 5,
+     "tier_set": [
+      3,
+      5
+     ],
+     "straddles": true
+    },
+    {
+     "club": "Coventry",
+     "value": 0.529208,
+     "lo": 0.225656,
+     "hi": 0.832759,
+     "half_width_95": 0.303551,
+     "bridge_fixtures": 3,
+     "bridged": true,
+     "games_played": 5,
+     "ladder": "A",
+     "component": 0,
+     "goals_per_match": {
+      "better": "higher",
+      "high": 2.725034,
+      "low": 1.484946,
+      "means": "scored",
+      "point": 2.011598
+     },
+     "rated_on_another_division": "The fit attributes 'Coventry' to 'championship', not 'epl': this club is in the current season of this column and its rating is of the division it came up from. Reached through a measured or reviewed join, never through bare exactness.",
+     "column": "epl",
+     "tier": 3,
+     "tier_set": [
+      1,
+      3,
+      5
+     ],
+     "straddles": true
+    },
+    {
+     "club": "Hull City",
+     "value": 0.204589,
+     "lo": -0.091686,
+     "hi": 0.500865,
+     "half_width_95": 0.296275,
+     "bridge_fixtures": 2,
+     "bridged": true,
+     "games_played": 5,
+     "ladder": "A",
+     "component": 0,
+     "goals_per_match": {
+      "better": "higher",
+      "high": 1.955384,
+      "low": 1.081161,
+      "means": "scored",
+      "point": 1.453989
+     },
+     "rated_on_another_division": "The fit attributes 'Hull City' to 'championship', not 'epl': this club is in the current season of this column and its rating is of the division it came up from. Reached through a measured or reviewed join, never through bare exactness.",
      "column": "epl",
      "tier": 5,
      "tier_set": [
@@ -1148,10 +1222,10 @@ export const LEAGUES = {
     },
     {
      "club": "Alaves",
-     "value": 0.382808,
-     "lo": 0.084668,
-     "hi": 0.680949,
-     "half_width_95": 0.298141,
+     "value": 0.3948,
+     "lo": 0.090448,
+     "hi": 0.699153,
+     "half_width_95": 0.304352,
      "bridge_fixtures": 4,
      "bridged": true,
      "games_played": 7,
@@ -1159,10 +1233,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 2.299482,
-      "low": 1.266684,
+      "high": 2.384226,
+      "low": 1.29715,
       "means": "scored",
-      "point": 1.706669
+      "point": 1.758607
      },
      "column": "laliga",
      "tier": 4,
@@ -1175,10 +1249,10 @@ export const LEAGUES = {
     },
     {
      "club": "Athletic Club",
-     "value": 0.361818,
-     "lo": 0.026675,
-     "hi": 0.696961,
-     "half_width_95": 0.335143,
+     "value": 0.37381,
+     "lo": 0.072677,
+     "hi": 0.674944,
+     "half_width_95": 0.301133,
      "bridge_fixtures": 23,
      "bridged": true,
      "games_played": 6,
@@ -1186,10 +1260,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 2.336599,
-      "low": 1.195315,
+      "high": 2.327199,
+      "low": 1.274303,
       "means": "scored",
-      "point": 1.671219
+      "point": 1.722079
      },
      "column": "laliga",
      "tier": 4,
@@ -1202,10 +1276,10 @@ export const LEAGUES = {
     },
     {
      "club": "Atletico Madrid",
-     "value": 0.714314,
-     "lo": 0.472877,
-     "hi": 0.955752,
-     "half_width_95": 0.241437,
+     "value": 0.726306,
+     "lo": 0.487138,
+     "hi": 0.965474,
+     "half_width_95": 0.239168,
      "bridge_fixtures": 30,
      "bridged": true,
      "games_played": 7,
@@ -1213,10 +1287,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 3.026741,
-      "low": 1.867521,
+      "high": 3.111784,
+      "low": 1.928727,
       "means": "scored",
-      "point": 2.377499
+      "point": 2.449853
      },
      "column": "laliga",
      "tier": 1,
@@ -1228,10 +1302,10 @@ export const LEAGUES = {
     },
     {
      "club": "Atlanta United FC",
-     "value": -0.085749,
-     "lo": -0.595804,
-     "hi": 0.424307,
-     "half_width_95": 0.510055,
+     "value": -0.048042,
+     "lo": -0.544709,
+     "hi": 0.448625,
+     "half_width_95": 0.496667,
      "bridge_fixtures": 8,
      "bridged": true,
      "games_played": 26,
@@ -1239,10 +1313,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 1.778982,
-      "low": 0.641421,
+      "high": 1.855857,
+      "low": 0.687298,
       "means": "scored",
-      "point": 1.068212
+      "point": 1.129392
      },
      "column": "mls",
      "tier": 5,
@@ -1254,10 +1328,10 @@ export const LEAGUES = {
     },
     {
      "club": "Austin",
-     "value": 0.148491,
-     "lo": -0.286342,
-     "hi": 0.583324,
-     "half_width_95": 0.434833,
+     "value": 0.186198,
+     "lo": -0.286016,
+     "hi": 0.658411,
+     "half_width_95": 0.472213,
      "bridge_fixtures": 6,
      "bridged": true,
      "games_played": 26,
@@ -1265,10 +1339,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 2.085605,
-      "low": 0.874059,
+      "high": 2.28904,
+      "low": 0.890214,
       "means": "scored",
-      "point": 1.350164
+      "point": 1.427492
      },
      "column": "mls",
      "tier": 4,
@@ -1281,10 +1355,10 @@ export const LEAGUES = {
     },
     {
      "club": "CF Montreal",
-     "value": 0.036896,
-     "lo": -0.487137,
-     "hi": 0.560929,
-     "half_width_95": 0.524033,
+     "value": 0.074603,
+     "lo": -0.486919,
+     "hi": 0.636125,
+     "half_width_95": 0.561522,
      "bridge_fixtures": 4,
      "bridged": true,
      "games_played": 26,
@@ -1292,10 +1366,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 2.039417,
-      "low": 0.71505,
+      "high": 2.23859,
+      "low": 0.728187,
       "means": "scored",
-      "point": 1.207595
+      "point": 1.276758
      },
      "column": "mls",
      "tier": 5,
@@ -1307,10 +1381,10 @@ export const LEAGUES = {
     },
     {
      "club": "Atlas",
-     "value": -0.033944,
-     "lo": -0.358444,
-     "hi": 0.290557,
-     "half_width_95": 0.324501,
+     "value": 0.003659,
+     "lo": -0.342159,
+     "hi": 0.349477,
+     "half_width_95": 0.345818,
      "bridge_fixtures": 8,
      "bridged": true,
      "games_played": 9,
@@ -1318,10 +1392,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 1.55627,
-      "low": 0.813256,
+      "high": 1.680681,
+      "low": 0.841611,
       "means": "scored",
-      "point": 1.125009
+      "point": 1.189319
      },
      "column": "ligamx",
      "tier": 4,
@@ -1334,10 +1408,10 @@ export const LEAGUES = {
     },
     {
      "club": "Atletico San Luis",
-     "value": 0.166593,
-     "lo": -0.142085,
-     "hi": 0.47527,
-     "half_width_95": 0.308677,
+     "value": 0.204196,
+     "lo": -0.098324,
+     "hi": 0.506716,
+     "half_width_95": 0.30252,
      "bridge_fixtures": 7,
      "bridged": true,
      "games_played": 9,
@@ -1345,10 +1419,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 1.871996,
-      "low": 1.009697,
+      "high": 1.966858,
+      "low": 1.074009,
       "means": "scored",
-      "point": 1.374827
+      "point": 1.453418
      },
      "column": "ligamx",
      "tier": 3,
@@ -1361,10 +1435,10 @@ export const LEAGUES = {
     },
     {
      "club": "CF Pachuca",
-     "value": 0.099567,
-     "lo": -0.209306,
-     "hi": 0.40844,
-     "half_width_95": 0.308873,
+     "value": 0.13717,
+     "lo": -0.163302,
+     "hi": 0.437642,
+     "half_width_95": 0.300472,
      "bridge_fixtures": 17,
      "bridged": true,
      "games_played": 9,
@@ -1372,10 +1446,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 1.750978,
-      "low": 0.944055,
+      "high": 1.835586,
+      "low": 1.00644,
       "means": "scored",
-      "point": 1.285698
+      "point": 1.359194
      },
      "column": "ligamx",
      "tier": 3,
@@ -1388,10 +1462,10 @@ export const LEAGUES = {
     },
     {
      "club": "1. FC Köln",
-     "value": 0.406367,
-     "lo": 0.127269,
-     "hi": 0.685465,
-     "half_width_95": 0.279098,
+     "value": 0.400996,
+     "lo": 0.133005,
+     "hi": 0.668986,
+     "half_width_95": 0.267991,
      "bridge_fixtures": 4,
      "bridged": true,
      "games_played": 4,
@@ -1399,10 +1473,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 2.309889,
-      "low": 1.321813,
+      "high": 2.313376,
+      "low": 1.353544,
       "means": "scored",
-      "point": 1.747353
+      "point": 1.769536
      },
      "column": "bundesliga",
      "tier": 3,
@@ -1415,10 +1489,10 @@ export const LEAGUES = {
     },
     {
      "club": "1899 Hoffenheim",
-     "value": 0.678104,
-     "lo": 0.40998,
-     "hi": 0.946228,
-     "half_width_95": 0.268124,
+     "value": 0.672733,
+     "lo": 0.413826,
+     "hi": 0.93164,
+     "half_width_95": 0.258907,
      "bridge_fixtures": 11,
      "bridged": true,
      "games_played": 4,
@@ -1426,10 +1500,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 2.998054,
-      "low": 1.753678,
+      "high": 3.008259,
+      "low": 1.792387,
       "means": "scored",
-      "point": 2.292951
+      "point": 2.32206
      },
      "column": "bundesliga",
      "tier": 2,
@@ -1442,10 +1516,10 @@ export const LEAGUES = {
     },
     {
      "club": "Bayer Leverkusen",
-     "value": 0.71798,
-     "lo": 0.47806,
-     "hi": 0.9579,
-     "half_width_95": 0.23992,
+     "value": 0.712609,
+     "lo": 0.443283,
+     "hi": 0.981934,
+     "half_width_95": 0.269325,
      "bridge_fixtures": 24,
      "bridged": true,
      "games_played": 4,
@@ -1453,10 +1527,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 3.033252,
-      "low": 1.877225,
+      "high": 3.163427,
+      "low": 1.84597,
       "means": "scored",
-      "point": 2.386231
+      "point": 2.416525
      },
      "column": "bundesliga",
      "tier": 1,
@@ -1468,10 +1542,10 @@ export const LEAGUES = {
     },
     {
      "club": "AC Milan",
-     "value": 0.322892,
-     "lo": 0.065942,
-     "hi": 0.579842,
-     "half_width_95": 0.25695,
+     "value": 0.341686,
+     "lo": 0.106368,
+     "hi": 0.577004,
+     "half_width_95": 0.235318,
      "bridge_fixtures": 11,
      "bridged": true,
      "games_played": 5,
@@ -1479,26 +1553,26 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 2.078356,
-      "low": 1.243185,
+      "high": 2.110081,
+      "low": 1.317966,
       "means": "scored",
-      "point": 1.607414
+      "point": 1.667638
      },
      "column": "seriea",
      "tier": 2,
      "tier_set": [
       1,
       2,
-      4
+      3
      ],
      "straddles": true
     },
     {
      "club": "AS Roma",
-     "value": 0.425822,
-     "lo": 0.176211,
-     "hi": 0.675433,
-     "half_width_95": 0.249611,
+     "value": 0.444616,
+     "lo": 0.20762,
+     "hi": 0.681612,
+     "half_width_95": 0.236996,
      "bridge_fixtures": 21,
      "bridged": true,
      "games_played": 5,
@@ -1506,10 +1580,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 2.286833,
-      "low": 1.388114,
+      "high": 2.342769,
+      "low": 1.458403,
       "means": "scored",
-      "point": 1.78168
+      "point": 1.848433
      },
      "column": "seriea",
      "tier": 1,
@@ -1521,10 +1595,10 @@ export const LEAGUES = {
     },
     {
      "club": "Atalanta",
-     "value": 0.285475,
-     "lo": 0.005851,
-     "hi": 0.565099,
-     "half_width_95": 0.279624,
+     "value": 0.304269,
+     "lo": 0.019449,
+     "hi": 0.589089,
+     "half_width_95": 0.28482,
      "bridge_fixtures": 23,
      "bridged": true,
      "games_played": 5,
@@ -1532,10 +1606,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 2.047938,
-      "low": 1.170682,
+      "high": 2.135735,
+      "low": 1.208248,
       "means": "scored",
-      "point": 1.548381
+      "point": 1.606393
      },
      "column": "seriea",
      "tier": 2,
@@ -1548,10 +1622,10 @@ export const LEAGUES = {
     },
     {
      "club": "Angers",
-     "value": -0.123688,
-     "lo": -0.503281,
-     "hi": 0.255906,
-     "half_width_95": 0.379594,
+     "value": -0.109617,
+     "lo": -0.494364,
+     "hi": 0.275131,
+     "half_width_95": 0.384747,
      "bridge_fixtures": 3,
      "bridged": true,
      "games_played": 5,
@@ -1559,10 +1633,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 1.503267,
-      "low": 0.703599,
+      "high": 1.56026,
+      "low": 0.722786,
       "means": "scored",
-      "point": 1.028444
+      "point": 1.061948
      },
      "column": "ligue1",
      "tier": 5,
@@ -1574,10 +1648,10 @@ export const LEAGUES = {
     },
     {
      "club": "Auxerre",
-     "value": 0.030907,
-     "lo": -0.36052,
-     "hi": 0.422335,
-     "half_width_95": 0.391427,
+     "value": 0.044978,
+     "lo": -0.337394,
+     "hi": 0.427351,
+     "half_width_95": 0.382373,
      "bridge_fixtures": 1,
      "bridged": true,
      "games_played": 5,
@@ -1585,10 +1659,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 1.775478,
-      "low": 0.811569,
+      "high": 1.816793,
+      "low": 0.845631,
       "means": "scored",
-      "point": 1.200385
+      "point": 1.23949
      },
      "column": "ligue1",
      "tier": 5,
@@ -1600,10 +1674,10 @@ export const LEAGUES = {
     },
     {
      "club": "Le Havre",
-     "value": -0.029843,
-     "lo": -0.404244,
-     "hi": 0.344558,
-     "half_width_95": 0.374401,
+     "value": -0.015771,
+     "lo": -0.380847,
+     "hi": 0.349304,
+     "half_width_95": 0.365076,
      "bridge_fixtures": 2,
      "bridged": true,
      "games_played": 5,
@@ -1611,10 +1685,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 1.642621,
-      "low": 0.77685,
+      "high": 1.68039,
+      "low": 0.809673,
       "means": "scored",
-      "point": 1.129633
+      "point": 1.166433
      },
      "column": "ligue1",
      "tier": 5,
@@ -1626,10 +1700,10 @@ export const LEAGUES = {
     },
     {
      "club": "AZ Alkmaar",
-     "value": 0.329408,
-     "lo": 0.093374,
-     "hi": 0.565442,
-     "half_width_95": 0.236034,
+     "value": 0.280393,
+     "lo": 0.023542,
+     "hi": 0.537244,
+     "half_width_95": 0.256851,
      "bridge_fixtures": 31,
      "bridged": true,
      "games_played": 7,
@@ -1637,10 +1711,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 2.048643,
-      "low": 1.27776,
+      "high": 2.027828,
+      "low": 1.213202,
       "means": "scored",
-      "point": 1.617923
+      "point": 1.568492
      },
      "column": "eredivisie",
      "tier": 2,
@@ -1653,10 +1727,10 @@ export const LEAGUES = {
     },
     {
      "club": "Ajax",
-     "value": 0.389148,
-     "lo": 0.148797,
-     "hi": 0.629499,
-     "half_width_95": 0.240351,
+     "value": 0.340132,
+     "lo": 0.105103,
+     "hi": 0.575161,
+     "half_width_95": 0.235029,
      "bridge_fixtures": 26,
      "bridged": true,
      "games_played": 7,
@@ -1664,10 +1738,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 2.184165,
-      "low": 1.350577,
+      "high": 2.106195,
+      "low": 1.3163,
       "means": "scored",
-      "point": 1.717522
+      "point": 1.665048
      },
      "column": "eredivisie",
      "tier": 1,
@@ -1679,10 +1753,10 @@ export const LEAGUES = {
     },
     {
      "club": "Excelsior",
-     "value": 0.034661,
-     "lo": -0.306987,
-     "hi": 0.376309,
-     "half_width_95": 0.341648,
+     "value": -0.014355,
+     "lo": -0.359556,
+     "hi": 0.330847,
+     "half_width_95": 0.345202,
      "bridge_fixtures": 3,
      "bridged": true,
      "games_played": 7,
@@ -1690,25 +1764,26 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 1.695612,
-      "low": 0.8562,
+      "high": 1.64966,
+      "low": 0.827096,
       "means": "scored",
-      "point": 1.204899
+      "point": 1.168087
      },
      "column": "eredivisie",
-     "tier": 5,
+     "tier": 4,
      "tier_set": [
       2,
+      4,
       5
      ],
      "straddles": true
     },
     {
      "club": "Sparta Rotterdam",
-     "value": -0.031367,
-     "lo": -0.366727,
-     "hi": 0.303994,
-     "half_width_95": 0.335361,
+     "value": -0.080382,
+     "lo": -0.439317,
+     "hi": 0.278552,
+     "half_width_95": 0.358935,
      "bridge_fixtures": 0,
      "bridged": false,
      "games_played": 7,
@@ -1716,15 +1791,70 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "higher",
-      "high": 1.577323,
-      "low": 0.806548,
+      "high": 1.565608,
+      "low": 0.763689,
       "means": "scored",
-      "point": 1.127912
+      "point": 1.093452
      },
+     "column": "eredivisie",
+     "tier": 4,
+     "tier_set": [
+      2,
+      4,
+      5
+     ],
+     "straddles": true
+    },
+    {
+     "club": "ADO Den Haag",
+     "value": -0.298241,
+     "lo": -1.546531,
+     "hi": 0.950049,
+     "half_width_95": 1.24829,
+     "bridge_fixtures": 0,
+     "bridged": false,
+     "games_played": 7,
+     "ladder": "A",
+     "component": 0,
+     "goals_per_match": {
+      "better": "higher",
+      "high": 3.064152,
+      "low": 0.252383,
+      "means": "scored",
+      "point": 0.879397
+     },
+     "rated_on_another_division": "The fit attributes 'ADO Den Haag' to 'eerste-divisie', not 'eredivisie': this club is in the current season of this column and its rating is of the division it came up from. Reached through a measured or reviewed join, never through bare exactness.",
      "column": "eredivisie",
      "tier": 5,
      "tier_set": [
-      3,
+      1,
+      5
+     ],
+     "straddles": true
+    },
+    {
+     "club": "Cambuur",
+     "value": -0.463713,
+     "lo": -1.720445,
+     "hi": 0.793019,
+     "half_width_95": 1.256732,
+     "bridge_fixtures": 0,
+     "bridged": false,
+     "games_played": 7,
+     "ladder": "A",
+     "component": 0,
+     "goals_per_match": {
+      "better": "higher",
+      "high": 2.618865,
+      "low": 0.212095,
+      "means": "scored",
+      "point": 0.745283
+     },
+     "rated_on_another_division": "The fit attributes 'Cambuur' to 'eerste-divisie', not 'eredivisie': this club is in the current season of this column and its rating is of the division it came up from. Reached through a measured or reviewed join, never through bare exactness.",
+     "column": "eredivisie",
+     "tier": 5,
+     "tier_set": [
+      1,
       5
      ],
      "straddles": true
@@ -1737,115 +1867,115 @@ export const LEAGUES = {
     "epl": {
      "measured": true,
      "unit": "log-goals",
-     "n_rows": 4,
-     "value_min": 0.166116,
-     "value_max": 1.186643,
-     "n_clubs": 18,
-     "median_half_width_95": 0.275651,
-     "median_half_width_95_bridged_only": 0.275651,
-     "distinguishable_levels_all_clubs": 1.85,
-     "distinguishable_levels_bridged_only": 1.85,
-     "cut_against": "the 18 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on defence. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
+     "n_rows": 20,
+     "value_min": -0.073222,
+     "value_max": 1.228426,
+     "n_clubs": 20,
+     "median_half_width_95": 0.291852,
+     "median_half_width_95_bridged_only": 0.291852,
+     "distinguishable_levels_all_clubs": 2.23,
+     "distinguishable_levels_bridged_only": 2.23,
+     "cut_against": "the 20 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on defence. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
     },
     "laliga": {
      "measured": true,
      "unit": "log-goals",
-     "n_rows": 3,
-     "value_min": 0.031026,
-     "value_max": 0.569613,
+     "n_rows": 17,
+     "value_min": 0.060262,
+     "value_max": 0.598849,
      "n_clubs": 17,
-     "median_half_width_95": 0.264305,
-     "median_half_width_95_bridged_only": 0.264305,
-     "distinguishable_levels_all_clubs": 1.02,
-     "distinguishable_levels_bridged_only": 1.02,
+     "median_half_width_95": 0.261818,
+     "median_half_width_95_bridged_only": 0.261818,
+     "distinguishable_levels_all_clubs": 1.03,
+     "distinguishable_levels_bridged_only": 1.03,
      "cut_against": "the 17 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on defence. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
     },
     "mls": {
      "measured": true,
      "unit": "log-goals",
-     "n_rows": 3,
-     "value_min": -0.294845,
-     "value_max": 0.811082,
+     "n_rows": 30,
+     "value_min": -0.245421,
+     "value_max": 0.860506,
      "n_clubs": 30,
-     "median_half_width_95": 0.429797,
-     "median_half_width_95_bridged_only": 0.429797,
-     "distinguishable_levels_all_clubs": 1.29,
-     "distinguishable_levels_bridged_only": 1.29,
+     "median_half_width_95": 0.430926,
+     "median_half_width_95_bridged_only": 0.430926,
+     "distinguishable_levels_all_clubs": 1.28,
+     "distinguishable_levels_bridged_only": 1.28,
      "cut_against": "the 30 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on defence. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
     },
     "ligamx": {
      "measured": true,
      "unit": "log-goals",
-     "n_rows": 3,
-     "value_min": -0.169844,
-     "value_max": 0.488019,
+     "n_rows": 17,
+     "value_min": -0.118085,
+     "value_max": 0.539778,
      "n_clubs": 17,
-     "median_half_width_95": 0.322882,
-     "median_half_width_95_bridged_only": 0.322882,
-     "distinguishable_levels_all_clubs": 1.02,
-     "distinguishable_levels_bridged_only": 1.02,
+     "median_half_width_95": 0.309007,
+     "median_half_width_95_bridged_only": 0.309007,
+     "distinguishable_levels_all_clubs": 1.06,
+     "distinguishable_levels_bridged_only": 1.06,
      "cut_against": "the 17 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on defence. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
     },
     "bundesliga": {
      "measured": true,
      "unit": "log-goals",
-     "n_rows": 3,
-     "value_min": 0.075018,
-     "value_max": 0.715665,
-     "n_clubs": 15,
-     "median_half_width_95": 0.286483,
-     "median_half_width_95_bridged_only": 0.286483,
-     "distinguishable_levels_all_clubs": 1.12,
-     "distinguishable_levels_bridged_only": 1.12,
-     "cut_against": "the 15 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on defence. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
+     "n_rows": 17,
+     "value_min": 0.015495,
+     "value_max": 0.762296,
+     "n_clubs": 17,
+     "median_half_width_95": 0.276781,
+     "median_half_width_95_bridged_only": 0.276781,
+     "distinguishable_levels_all_clubs": 1.35,
+     "distinguishable_levels_bridged_only": 1.35,
+     "cut_against": "the 17 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on defence. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
     },
     "seriea": {
      "measured": true,
      "unit": "log-goals",
-     "n_rows": 3,
-     "value_min": -0.041462,
-     "value_max": 0.727502,
+     "n_rows": 19,
+     "value_min": -0.009959,
+     "value_max": 0.759005,
      "n_clubs": 19,
-     "median_half_width_95": 0.312712,
-     "median_half_width_95_bridged_only": 0.312712,
-     "distinguishable_levels_all_clubs": 1.23,
-     "distinguishable_levels_bridged_only": 1.23,
+     "median_half_width_95": 0.329013,
+     "median_half_width_95_bridged_only": 0.329013,
+     "distinguishable_levels_all_clubs": 1.17,
+     "distinguishable_levels_bridged_only": 1.17,
      "cut_against": "the 19 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on defence. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
     },
     "ligue1": {
      "measured": true,
      "unit": "log-goals",
-     "n_rows": 3,
-     "value_min": 0.105269,
-     "value_max": 0.789194,
+     "n_rows": 16,
+     "value_min": 0.137133,
+     "value_max": 0.821058,
      "n_clubs": 16,
-     "median_half_width_95": 0.342458,
-     "median_half_width_95_bridged_only": 0.342458,
-     "distinguishable_levels_all_clubs": 1.0,
-     "distinguishable_levels_bridged_only": 1.0,
+     "median_half_width_95": 0.351961,
+     "median_half_width_95_bridged_only": 0.351961,
+     "distinguishable_levels_all_clubs": 0.97,
+     "distinguishable_levels_bridged_only": 0.97,
      "cut_against": "the 16 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on defence. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
     },
     "eredivisie": {
      "measured": true,
      "unit": "log-goals",
-     "n_rows": 4,
-     "value_min": -0.367007,
-     "value_max": 0.192305,
-     "n_clubs": 16,
-     "median_half_width_95": 0.297458,
-     "median_half_width_95_bridged_only": 0.297185,
-     "distinguishable_levels_all_clubs": 0.94,
-     "distinguishable_levels_bridged_only": 0.94,
-     "cut_against": "the 16 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on defence. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
+     "n_rows": 18,
+     "value_min": -0.572668,
+     "value_max": 0.193584,
+     "n_clubs": 18,
+     "median_half_width_95": 0.308081,
+     "median_half_width_95_bridged_only": 0.299703,
+     "distinguishable_levels_all_clubs": 1.24,
+     "distinguishable_levels_bridged_only": 0.93,
+     "cut_against": "the 18 CURRENT-SEASON clubs of this slice only — a WITHIN-LEAGUE quintile on defence. Inside one league the cross-league level is a CONSTANT shared by every row, so this cut is drawn entirely on the clubs' own domestic deviations"
     }
    },
    "rows": [
     {
      "club": "Arsenal",
-     "value": 1.186643,
-     "lo": 0.790309,
-     "hi": 1.582977,
-     "half_width_95": 0.396334,
+     "value": 1.228426,
+     "lo": 0.815245,
+     "hi": 1.641608,
+     "half_width_95": 0.413181,
      "bridge_fixtures": 36,
      "bridged": true,
      "games_played": 5,
@@ -1853,10 +1983,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 0.528045,
-      "low": 0.239012,
+      "high": 0.524388,
+      "low": 0.229492,
       "means": "conceded",
-      "point": 0.355259
+      "point": 0.346905
      },
      "column": "epl",
      "tier": 1,
@@ -1867,10 +1997,10 @@ export const LEAGUES = {
     },
     {
      "club": "Aston Villa",
-     "value": 0.604372,
-     "lo": 0.301874,
-     "hi": 0.906869,
-     "half_width_95": 0.302497,
+     "value": 0.646155,
+     "lo": 0.349737,
+     "hi": 0.942572,
+     "half_width_95": 0.296418,
      "bridge_fixtures": 28,
      "bridged": true,
      "games_played": 5,
@@ -1878,26 +2008,25 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 0.860588,
-      "low": 0.469947,
+      "high": 0.835257,
+      "low": 0.461695,
       "means": "conceded",
-      "point": 0.635949
+      "point": 0.620995
      },
      "column": "epl",
-     "tier": 2,
+     "tier": 1,
      "tier_set": [
       1,
-      2,
       5
      ],
      "straddles": true
     },
     {
      "club": "Bournemouth",
-     "value": 0.504883,
-     "lo": 0.214106,
-     "hi": 0.79566,
-     "half_width_95": 0.290777,
+     "value": 0.546666,
+     "lo": 0.245259,
+     "hi": 0.848073,
+     "half_width_95": 0.301407,
      "bridge_fixtures": 1,
      "bridged": true,
      "games_played": 5,
@@ -1905,10 +2034,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 0.939534,
-      "low": 0.525227,
+      "high": 0.927246,
+      "low": 0.507453,
       "means": "conceded",
-      "point": 0.702473
+      "point": 0.685954
      },
      "column": "epl",
      "tier": 4,
@@ -1921,10 +2050,10 @@ export const LEAGUES = {
     },
     {
      "club": "Ipswich",
-     "value": 0.166116,
-     "lo": -0.079012,
-     "hi": 0.411244,
-     "half_width_95": 0.245128,
+     "value": 0.207899,
+     "lo": -0.032708,
+     "hi": 0.448505,
+     "half_width_95": 0.240606,
      "bridge_fixtures": 5,
      "bridged": true,
      "games_played": 5,
@@ -1932,10 +2061,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 1.259541,
-      "low": 0.77143,
+      "high": 1.224374,
+      "low": 0.756704,
       "means": "conceded",
-      "point": 0.985722
+      "point": 0.962543
      },
      "column": "epl",
      "tier": 5,
@@ -1945,11 +2074,64 @@ export const LEAGUES = {
      "straddles": false
     },
     {
+     "club": "Coventry",
+     "value": 0.224292,
+     "lo": -0.100152,
+     "hi": 0.548736,
+     "half_width_95": 0.324444,
+     "bridge_fixtures": 3,
+     "bridged": true,
+     "games_played": 5,
+     "ladder": "A",
+     "component": 0,
+     "goals_per_match": {
+      "better": "lower",
+      "high": 1.309799,
+      "low": 0.684536,
+      "means": "conceded",
+      "point": 0.946892
+     },
+     "rated_on_another_division": "The fit attributes 'Coventry' to 'championship', not 'epl': this club is in the current season of this column and its rating is of the division it came up from. Reached through a measured or reviewed join, never through bare exactness.",
+     "column": "epl",
+     "tier": 5,
+     "tier_set": [
+      4,
+      5
+     ],
+     "straddles": true
+    },
+    {
+     "club": "Hull City",
+     "value": -0.073222,
+     "lo": -0.397997,
+     "hi": 0.251552,
+     "half_width_95": 0.324774,
+     "bridge_fixtures": 2,
+     "bridged": true,
+     "games_played": 5,
+     "ladder": "A",
+     "component": 0,
+     "goals_per_match": {
+      "better": "lower",
+      "high": 1.764237,
+      "low": 0.921429,
+      "means": "conceded",
+      "point": 1.274998
+     },
+     "rated_on_another_division": "The fit attributes 'Hull City' to 'championship', not 'epl': this club is in the current season of this column and its rating is of the division it came up from. Reached through a measured or reviewed join, never through bare exactness.",
+     "column": "epl",
+     "tier": 5,
+     "tier_set": [
+      5
+     ],
+     "straddles": false
+    },
+    {
      "club": "Alaves",
-     "value": 0.132446,
-     "lo": -0.13186,
-     "hi": 0.396751,
-     "half_width_95": 0.264305,
+     "value": 0.161682,
+     "lo": -0.100136,
+     "hi": 0.4235,
+     "half_width_95": 0.261818,
      "bridge_fixtures": 4,
      "bridged": true,
      "games_played": 7,
@@ -1957,10 +2139,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 1.327895,
-      "low": 0.782692,
+      "high": 1.309779,
+      "low": 0.775864,
       "means": "conceded",
-      "point": 1.019477
+      "point": 1.008073
      },
      "column": "laliga",
      "tier": 4,
@@ -1973,10 +2155,10 @@ export const LEAGUES = {
     },
     {
      "club": "Athletic Club",
-     "value": 0.098292,
-     "lo": -0.12409,
-     "hi": 0.320675,
-     "half_width_95": 0.222382,
+     "value": 0.127528,
+     "lo": -0.099774,
+     "hi": 0.354831,
+     "half_width_95": 0.227302,
      "bridge_fixtures": 23,
      "bridged": true,
      "games_played": 6,
@@ -1984,10 +2166,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 1.317618,
-      "low": 0.84456,
+      "high": 1.309304,
+      "low": 0.831014,
       "means": "conceded",
-      "point": 1.054897
+      "point": 1.043096
      },
      "column": "laliga",
      "tier": 4,
@@ -2000,10 +2182,10 @@ export const LEAGUES = {
     },
     {
      "club": "Atletico Madrid",
-     "value": 0.355692,
-     "lo": 0.064672,
-     "hi": 0.646712,
-     "half_width_95": 0.29102,
+     "value": 0.384928,
+     "lo": 0.095471,
+     "hi": 0.674386,
+     "half_width_95": 0.289457,
      "bridge_fixtures": 30,
      "bridged": true,
      "games_played": 7,
@@ -2011,10 +2193,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 1.090965,
-      "low": 0.609585,
+      "high": 1.077077,
+      "low": 0.603709,
       "means": "conceded",
-      "point": 0.815497
+      "point": 0.806375
      },
      "column": "laliga",
      "tier": 2,
@@ -2027,10 +2209,10 @@ export const LEAGUES = {
     },
     {
      "club": "Atlanta United FC",
-     "value": 0.040257,
-     "lo": -0.319654,
-     "hi": 0.400169,
-     "half_width_95": 0.359912,
+     "value": 0.089682,
+     "lo": -0.271501,
+     "hi": 0.450864,
+     "half_width_95": 0.361182,
      "bridge_fixtures": 8,
      "bridged": true,
      "games_played": 26,
@@ -2038,10 +2220,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 1.602218,
-      "low": 0.780021,
+      "high": 1.554607,
+      "low": 0.754921,
       "means": "conceded",
-      "point": 1.117929
+      "point": 1.083331
      },
      "column": "mls",
      "tier": 4,
@@ -2054,10 +2236,10 @@ export const LEAGUES = {
     },
     {
      "club": "Austin",
-     "value": -0.071775,
-     "lo": -0.468191,
-     "hi": 0.32464,
-     "half_width_95": 0.396416,
+     "value": -0.022351,
+     "lo": -0.387061,
+     "hi": 0.342359,
+     "half_width_95": 0.36471,
      "bridge_fixtures": 6,
      "bridged": true,
      "games_played": 26,
@@ -2065,25 +2247,25 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 1.85879,
-      "low": 0.841217,
+      "high": 1.74505,
+      "low": 0.841443,
       "means": "conceded",
-      "point": 1.250459
+      "point": 1.211759
      },
      "column": "mls",
      "tier": 5,
      "tier_set": [
-      2,
+      3,
       5
      ],
      "straddles": true
     },
     {
      "club": "CF Montreal",
-     "value": 0.001228,
-     "lo": -0.425529,
-     "hi": 0.427985,
-     "half_width_95": 0.426757,
+     "value": 0.050652,
+     "lo": -0.351163,
+     "hi": 0.452467,
+     "half_width_95": 0.401815,
      "bridge_fixtures": 4,
      "bridged": true,
      "games_played": 26,
@@ -2091,10 +2273,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 1.781159,
-      "low": 0.758624,
+      "high": 1.683517,
+      "low": 0.753712,
       "means": "conceded",
-      "point": 1.162424
+      "point": 1.126449
      },
      "column": "mls",
      "tier": 4,
@@ -2107,10 +2289,10 @@ export const LEAGUES = {
     },
     {
      "club": "Atlas",
-     "value": 0.069668,
-     "lo": -0.276555,
-     "hi": 0.415891,
-     "half_width_95": 0.346223,
+     "value": 0.121427,
+     "lo": -0.18758,
+     "hi": 0.430434,
+     "half_width_95": 0.309007,
      "bridge_fixtures": 8,
      "bridged": true,
      "games_played": 9,
@@ -2118,10 +2300,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 1.534632,
-      "low": 0.767853,
+      "high": 1.429468,
+      "low": 0.770502,
       "means": "conceded",
-      "point": 1.085529
+      "point": 1.04948
      },
      "column": "ligamx",
      "tier": 3,
@@ -2134,10 +2316,10 @@ export const LEAGUES = {
     },
     {
      "club": "Atletico San Luis",
-     "value": 0.007051,
-     "lo": -0.318295,
-     "hi": 0.332396,
-     "half_width_95": 0.325346,
+     "value": 0.05881,
+     "lo": -0.238642,
+     "hi": 0.356262,
+     "half_width_95": 0.297452,
      "bridge_fixtures": 7,
      "bridged": true,
      "games_played": 9,
@@ -2145,10 +2327,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 1.600042,
-      "low": 0.834718,
+      "high": 1.504355,
+      "low": 0.829826,
       "means": "conceded",
-      "point": 1.155675
+      "point": 1.117297
      },
      "column": "ligamx",
      "tier": 4,
@@ -2161,10 +2343,10 @@ export const LEAGUES = {
     },
     {
      "club": "CF Pachuca",
-     "value": 0.44135,
-     "lo": 0.146048,
-     "hi": 0.736652,
-     "half_width_95": 0.295302,
+     "value": 0.493109,
+     "lo": 0.208136,
+     "hi": 0.778082,
+     "half_width_95": 0.284973,
      "bridge_fixtures": 17,
      "bridged": true,
      "games_played": 9,
@@ -2172,10 +2354,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 1.005704,
-      "low": 0.557152,
+      "high": 0.962314,
+      "low": 0.544243,
       "means": "conceded",
-      "point": 0.748552
+      "point": 0.723694
      },
      "column": "ligamx",
      "tier": 1,
@@ -2187,10 +2369,10 @@ export const LEAGUES = {
     },
     {
      "club": "1. FC Köln",
-     "value": 0.119454,
-     "lo": -0.102585,
-     "hi": 0.341493,
-     "half_width_95": 0.222039,
+     "value": 0.166085,
+     "lo": -0.051845,
+     "hi": 0.384014,
+     "half_width_95": 0.21793,
      "bridge_fixtures": 4,
      "bridged": true,
      "games_played": 4,
@@ -2198,25 +2380,26 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 1.289585,
-      "low": 0.827159,
+      "high": 1.248031,
+      "low": 0.807112,
       "means": "conceded",
-      "point": 1.032808
+      "point": 1.003644
      },
      "column": "bundesliga",
-     "tier": 5,
+     "tier": 4,
      "tier_set": [
       2,
+      4,
       5
      ],
      "straddles": true
     },
     {
      "club": "1899 Hoffenheim",
-     "value": 0.294766,
-     "lo": 0.006367,
-     "hi": 0.583165,
-     "half_width_95": 0.288399,
+     "value": 0.341397,
+     "lo": 0.091485,
+     "hi": 0.591308,
+     "half_width_95": 0.249912,
      "bridge_fixtures": 11,
      "bridged": true,
      "games_played": 4,
@@ -2224,10 +2407,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 1.156465,
-      "low": 0.64958,
+      "high": 1.081379,
+      "low": 0.656005,
       "means": "conceded",
-      "point": 0.866727
+      "point": 0.842253
      },
      "column": "bundesliga",
      "tier": 3,
@@ -2240,10 +2423,10 @@ export const LEAGUES = {
     },
     {
      "club": "Bayer Leverkusen",
-     "value": 0.392999,
-     "lo": 0.099018,
-     "hi": 0.68698,
-     "half_width_95": 0.293981,
+     "value": 0.43963,
+     "lo": 0.135663,
+     "hi": 0.743596,
+     "half_width_95": 0.303967,
      "bridge_fixtures": 24,
      "bridged": true,
      "games_played": 4,
@@ -2251,10 +2434,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 1.054131,
-      "low": 0.585526,
+      "high": 1.034645,
+      "low": 0.563338,
       "means": "conceded",
-      "point": 0.785634
+      "point": 0.76345
      },
      "column": "bundesliga",
      "tier": 1,
@@ -2266,10 +2449,10 @@ export const LEAGUES = {
     },
     {
      "club": "AC Milan",
-     "value": 0.552741,
-     "lo": 0.15327,
-     "hi": 0.952212,
-     "half_width_95": 0.399471,
+     "value": 0.584244,
+     "lo": 0.186199,
+     "hi": 0.98229,
+     "half_width_95": 0.398046,
      "bridge_fixtures": 11,
      "bridged": true,
      "games_played": 5,
@@ -2277,10 +2460,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 0.998466,
-      "low": 0.449115,
+      "high": 0.983658,
+      "low": 0.443717,
       "means": "conceded",
-      "point": 0.669646
+      "point": 0.660656
      },
      "column": "seriea",
      "tier": 1,
@@ -2292,10 +2475,10 @@ export const LEAGUES = {
     },
     {
      "club": "AS Roma",
-     "value": 0.667532,
-     "lo": 0.278421,
-     "hi": 1.056644,
-     "half_width_95": 0.389111,
+     "value": 0.699036,
+     "lo": 0.313723,
+     "hi": 1.084348,
+     "half_width_95": 0.385313,
      "bridge_fixtures": 21,
      "bridged": true,
      "games_played": 5,
@@ -2303,10 +2486,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 0.88101,
-      "low": 0.404579,
+      "high": 0.865887,
+      "low": 0.400666,
       "means": "conceded",
-      "point": 0.597024
+      "point": 0.589009
      },
      "column": "seriea",
      "tier": 1,
@@ -2318,10 +2501,10 @@ export const LEAGUES = {
     },
     {
      "club": "Atalanta",
-     "value": 0.526786,
-     "lo": 0.169702,
-     "hi": 0.883869,
-     "half_width_95": 0.357083,
+     "value": 0.558289,
+     "lo": 0.222944,
+     "hi": 0.893634,
+     "half_width_95": 0.335345,
      "bridge_fixtures": 23,
      "bridged": true,
      "games_played": 5,
@@ -2329,10 +2512,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 0.982193,
-      "low": 0.480882,
+      "high": 0.948169,
+      "low": 0.484852,
       "means": "conceded",
-      "point": 0.687254
+      "point": 0.678028
      },
      "column": "seriea",
      "tier": 2,
@@ -2345,10 +2528,10 @@ export const LEAGUES = {
     },
     {
      "club": "Angers",
-     "value": 0.33871,
-     "lo": -0.004696,
-     "hi": 0.682115,
-     "half_width_95": 0.343405,
+     "value": 0.370573,
+     "lo": 0.021819,
+     "hi": 0.719328,
+     "half_width_95": 0.348754,
      "bridge_fixtures": 3,
      "bridged": true,
      "games_played": 5,
@@ -2356,10 +2539,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 1.16933,
-      "low": 0.588382,
+      "high": 1.1594,
+      "low": 0.577177,
       "means": "conceded",
-      "point": 0.829465
+      "point": 0.818034
      },
      "column": "ligue1",
      "tier": 3,
@@ -2372,10 +2555,10 @@ export const LEAGUES = {
     },
     {
      "club": "Auxerre",
-     "value": 0.419905,
-     "lo": 0.092235,
-     "hi": 0.747574,
-     "half_width_95": 0.327669,
+     "value": 0.451769,
+     "lo": 0.115813,
+     "hi": 0.787724,
+     "half_width_95": 0.335955,
      "bridge_fixtures": 1,
      "bridged": true,
      "games_played": 5,
@@ -2383,10 +2566,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 1.061305,
-      "low": 0.5511,
+      "high": 1.055388,
+      "low": 0.53902,
       "means": "conceded",
-      "point": 0.764778
+      "point": 0.754238
      },
      "column": "ligue1",
      "tier": 2,
@@ -2399,10 +2582,10 @@ export const LEAGUES = {
     },
     {
      "club": "Le Havre",
-     "value": 0.422302,
-     "lo": 0.056225,
-     "hi": 0.788379,
-     "half_width_95": 0.366077,
+     "value": 0.454166,
+     "lo": 0.061498,
+     "hi": 0.846833,
+     "half_width_95": 0.392667,
      "bridge_fixtures": 2,
      "bridged": true,
      "games_played": 5,
@@ -2410,10 +2593,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 1.10022,
-      "low": 0.529065,
+      "high": 1.114297,
+      "low": 0.508083,
       "means": "conceded",
-      "point": 0.762947
+      "point": 0.752433
      },
      "column": "ligue1",
      "tier": 2,
@@ -2426,10 +2609,10 @@ export const LEAGUES = {
     },
     {
      "club": "AZ Alkmaar",
-     "value": -0.05031,
-     "lo": -0.363299,
-     "hi": 0.262679,
-     "half_width_95": 0.312989,
+     "value": -0.049031,
+     "lo": -0.348734,
+     "hi": 0.250673,
+     "half_width_95": 0.299703,
      "bridge_fixtures": 31,
      "bridged": true,
      "games_played": 7,
@@ -2437,10 +2620,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 1.673696,
-      "low": 0.894989,
+      "high": 1.679432,
+      "low": 0.922239,
       "means": "conceded",
-      "point": 1.223903
+      "point": 1.244523
      },
      "column": "eredivisie",
      "tier": 2,
@@ -2453,10 +2636,10 @@ export const LEAGUES = {
     },
     {
      "club": "Ajax",
-     "value": 0.186409,
-     "lo": -0.105576,
-     "hi": 0.478395,
-     "half_width_95": 0.291986,
+     "value": 0.187689,
+     "lo": -0.102579,
+     "hi": 0.477956,
+     "half_width_95": 0.290267,
      "bridge_fixtures": 26,
      "bridged": true,
      "games_played": 7,
@@ -2464,10 +2647,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 1.293448,
-      "low": 0.721329,
+      "high": 1.312981,
+      "low": 0.734743,
       "means": "conceded",
-      "point": 0.96592
+      "point": 0.982194
      },
      "column": "eredivisie",
      "tier": 1,
@@ -2479,10 +2662,10 @@ export const LEAGUES = {
     },
     {
      "club": "Excelsior",
-     "value": -0.127813,
-     "lo": -0.387222,
-     "hi": 0.131595,
-     "half_width_95": 0.259408,
+     "value": -0.126534,
+     "lo": -0.38333,
+     "hi": 0.130262,
+     "half_width_95": 0.256796,
      "bridge_fixtures": 3,
      "bridged": true,
      "games_played": 7,
@@ -2490,10 +2673,10 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 1.714217,
-      "low": 1.020344,
+      "high": 1.73855,
+      "low": 1.040248,
       "means": "conceded",
-      "point": 1.322532
+      "point": 1.344814
      },
      "column": "eredivisie",
      "tier": 4,
@@ -2506,10 +2689,10 @@ export const LEAGUES = {
     },
     {
      "club": "Sparta Rotterdam",
-     "value": -0.226637,
-     "lo": -0.548457,
-     "hi": 0.095182,
-     "half_width_95": 0.321819,
+     "value": -0.225357,
+     "lo": -0.54056,
+     "hi": 0.089846,
+     "half_width_95": 0.315203,
      "bridge_fixtures": 0,
      "bridged": false,
      "games_played": 7,
@@ -2517,15 +2700,70 @@ export const LEAGUES = {
      "component": 0,
      "goals_per_match": {
       "better": "lower",
-      "high": 2.014139,
-      "low": 1.058182,
+      "high": 2.034566,
+      "low": 1.083153,
       "means": "conceded",
-      "point": 1.459906
+      "point": 1.484502
      },
+     "column": "eredivisie",
+     "tier": 4,
+     "tier_set": [
+      1,
+      4,
+      5
+     ],
+     "straddles": true
+    },
+    {
+     "club": "ADO Den Haag",
+     "value": -0.357153,
+     "lo": -0.799386,
+     "hi": 0.08508,
+     "half_width_95": 0.442233,
+     "bridge_fixtures": 0,
+     "bridged": false,
+     "games_played": 7,
+     "ladder": "A",
+     "component": 0,
+     "goals_per_match": {
+      "better": "lower",
+      "high": 2.635591,
+      "low": 1.088327,
+      "means": "conceded",
+      "point": 1.69363
+     },
+     "rated_on_another_division": "The fit attributes 'ADO Den Haag' to 'eerste-divisie', not 'eredivisie': this club is in the current season of this column and its rating is of the division it came up from. Reached through a measured or reviewed join, never through bare exactness.",
      "column": "eredivisie",
      "tier": 5,
      "tier_set": [
-      1,
+      2,
+      5
+     ],
+     "straddles": true
+    },
+    {
+     "club": "Cambuur",
+     "value": -0.572668,
+     "lo": -1.006131,
+     "hi": -0.139206,
+     "half_width_95": 0.433462,
+     "bridge_fixtures": 0,
+     "bridged": false,
+     "games_played": 7,
+     "ladder": "A",
+     "component": 0,
+     "goals_per_match": {
+      "better": "lower",
+      "high": 3.240905,
+      "low": 1.361964,
+      "means": "conceded",
+      "point": 2.100951
+     },
+     "rated_on_another_division": "The fit attributes 'Cambuur' to 'eerste-divisie', not 'eredivisie': this club is in the current season of this column and its rating is of the division it came up from. Reached through a measured or reviewed join, never through bare exactness.",
+     "column": "eredivisie",
+     "tier": 5,
+     "tier_set": [
+      4,
       5
      ],
      "straddles": true
@@ -2792,7 +3030,7 @@ export const CUPS = {
     "Slovan Bratislava",
     "Viking FK"
    ],
-   "below_floor_note": "REFUSED BY THE PLACEABILITY FLOOR ON THE FIRST READING. This club's league did not clear the floor: its median club interval is wider than one band of the field, so the evidence does not place it in a tier. The rating itself stands and is shown — the wide interval beside it IS the refusal, and it is what stops the rank being read as precision. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
+   "below_floor_note": "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's LEAGUE, taken on the Elo measurement at this field's pinned pass count, and the league did not pass it: it is not connected to the reference leagues (C1), or more than half of its cross-league level is still the 1500 starting prior (C2), or its clubs' median 95% interval does not fit inside one fifth of the field's spread (C3) — or the club has no league attribution at all (no league). So the evidence does not place this club in a tier. The value and the 95% interval beside it are this club's own measurement on this axis and are shown as measured; the mark is its league's verdict carried onto every axis, and it does not say that this club's interval is wider than a placed club's. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
    "basis": "the 36 entrants of the 2026-27 league phase, on three axes: overall from the Elo measurement, attack and defence from the goals measurement Elo cannot supply.",
    "axes_measured": [
     "overall",
@@ -2941,7 +3179,7 @@ export const CUPS = {
        ],
        "straddles": true,
        "below_floor": true,
-       "floor_note": "REFUSED BY THE PLACEABILITY FLOOR ON THE FIRST READING. This club's league did not clear the floor: its median club interval is wider than one band of the field, so the evidence does not place it in a tier. The rating itself stands and is shown — the wide interval beside it IS the refusal, and it is what stops the rank being read as precision. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
+       "floor_note": "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's LEAGUE, taken on the Elo measurement at this field's pinned pass count, and the league did not pass it: it is not connected to the reference leagues (C1), or more than half of its cross-league level is still the 1500 starting prior (C2), or its clubs' median 95% interval does not fit inside one fifth of the field's spread (C3) — or the club has no league attribution at all (no league). So the evidence does not place this club in a tier. The value and the 95% interval beside it are this club's own measurement on this axis and are shown as measured; the mark is its league's verdict carried onto every axis, and it does not say that this club's interval is wider than a placed club's. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
        "rate": null
       },
       {
@@ -2962,7 +3200,7 @@ export const CUPS = {
        ],
        "straddles": true,
        "below_floor": true,
-       "floor_note": "REFUSED BY THE PLACEABILITY FLOOR ON THE FIRST READING. This club's league did not clear the floor: its median club interval is wider than one band of the field, so the evidence does not place it in a tier. The rating itself stands and is shown — the wide interval beside it IS the refusal, and it is what stops the rank being read as precision. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
+       "floor_note": "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's LEAGUE, taken on the Elo measurement at this field's pinned pass count, and the league did not pass it: it is not connected to the reference leagues (C1), or more than half of its cross-league level is still the 1500 starting prior (C2), or its clubs' median 95% interval does not fit inside one fifth of the field's spread (C3) — or the club has no league attribution at all (no league). So the evidence does not place this club in a tier. The value and the 95% interval beside it are this club's own measurement on this axis and are shown as measured; the mark is its league's verdict carried onto every axis, and it does not say that this club's interval is wider than a placed club's. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
        "rate": null
       }
      ]
@@ -3115,7 +3353,7 @@ export const CUPS = {
        ],
        "straddles": true,
        "below_floor": true,
-       "floor_note": "REFUSED BY THE PLACEABILITY FLOOR ON THE FIRST READING. This club's league did not clear the floor: its median club interval is wider than one band of the field, so the evidence does not place it in a tier. The rating itself stands and is shown — the wide interval beside it IS the refusal, and it is what stops the rank being read as precision. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
+       "floor_note": "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's LEAGUE, taken on the Elo measurement at this field's pinned pass count, and the league did not pass it: it is not connected to the reference leagues (C1), or more than half of its cross-league level is still the 1500 starting prior (C2), or its clubs' median 95% interval does not fit inside one fifth of the field's spread (C3) — or the club has no league attribution at all (no league). So the evidence does not place this club in a tier. The value and the 95% interval beside it are this club's own measurement on this axis and are shown as measured; the mark is its league's verdict carried onto every axis, and it does not say that this club's interval is wider than a placed club's. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
        "rate": 1.5719044654241496
       },
       {
@@ -3136,7 +3374,7 @@ export const CUPS = {
        ],
        "straddles": true,
        "below_floor": true,
-       "floor_note": "REFUSED BY THE PLACEABILITY FLOOR ON THE FIRST READING. This club's league did not clear the floor: its median club interval is wider than one band of the field, so the evidence does not place it in a tier. The rating itself stands and is shown — the wide interval beside it IS the refusal, and it is what stops the rank being read as precision. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
+       "floor_note": "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's LEAGUE, taken on the Elo measurement at this field's pinned pass count, and the league did not pass it: it is not connected to the reference leagues (C1), or more than half of its cross-league level is still the 1500 starting prior (C2), or its clubs' median 95% interval does not fit inside one fifth of the field's spread (C3) — or the club has no league attribution at all (no league). So the evidence does not place this club in a tier. The value and the 95% interval beside it are this club's own measurement on this axis and are shown as measured; the mark is its league's verdict carried onto every axis, and it does not say that this club's interval is wider than a placed club's. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
        "rate": 1.9113974973567853
       },
       {
@@ -3157,7 +3395,7 @@ export const CUPS = {
        ],
        "straddles": true,
        "below_floor": true,
-       "floor_note": "REFUSED BY THE PLACEABILITY FLOOR ON THE FIRST READING. This club's league did not clear the floor: its median club interval is wider than one band of the field, so the evidence does not place it in a tier. The rating itself stands and is shown — the wide interval beside it IS the refusal, and it is what stops the rank being read as precision. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
+       "floor_note": "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's LEAGUE, taken on the Elo measurement at this field's pinned pass count, and the league did not pass it: it is not connected to the reference leagues (C1), or more than half of its cross-league level is still the 1500 starting prior (C2), or its clubs' median 95% interval does not fit inside one fifth of the field's spread (C3) — or the club has no league attribution at all (no league). So the evidence does not place this club in a tier. The value and the 95% interval beside it are this club's own measurement on this axis and are shown as measured; the mark is its league's verdict carried onto every axis, and it does not say that this club's interval is wider than a placed club's. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
        "rate": 1.7506106314157572
       }
      ]
@@ -3310,7 +3548,7 @@ export const CUPS = {
        ],
        "straddles": true,
        "below_floor": true,
-       "floor_note": "REFUSED BY THE PLACEABILITY FLOOR ON THE FIRST READING. This club's league did not clear the floor: its median club interval is wider than one band of the field, so the evidence does not place it in a tier. The rating itself stands and is shown — the wide interval beside it IS the refusal, and it is what stops the rank being read as precision. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
+       "floor_note": "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's LEAGUE, taken on the Elo measurement at this field's pinned pass count, and the league did not pass it: it is not connected to the reference leagues (C1), or more than half of its cross-league level is still the 1500 starting prior (C2), or its clubs' median 95% interval does not fit inside one fifth of the field's spread (C3) — or the club has no league attribution at all (no league). So the evidence does not place this club in a tier. The value and the 95% interval beside it are this club's own measurement on this axis and are shown as measured; the mark is its league's verdict carried onto every axis, and it does not say that this club's interval is wider than a placed club's. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
        "rate": 0.9755044031499056
       },
       {
@@ -3331,7 +3569,7 @@ export const CUPS = {
        ],
        "straddles": true,
        "below_floor": true,
-       "floor_note": "REFUSED BY THE PLACEABILITY FLOOR ON THE FIRST READING. This club's league did not clear the floor: its median club interval is wider than one band of the field, so the evidence does not place it in a tier. The rating itself stands and is shown — the wide interval beside it IS the refusal, and it is what stops the rank being read as precision. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
+       "floor_note": "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's LEAGUE, taken on the Elo measurement at this field's pinned pass count, and the league did not pass it: it is not connected to the reference leagues (C1), or more than half of its cross-league level is still the 1500 starting prior (C2), or its clubs' median 95% interval does not fit inside one fifth of the field's spread (C3) — or the club has no league attribution at all (no league). So the evidence does not place this club in a tier. The value and the 95% interval beside it are this club's own measurement on this axis and are shown as measured; the mark is its league's verdict carried onto every axis, and it does not say that this club's interval is wider than a placed club's. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
        "rate": 0.6799533902897686
       },
       {
@@ -3352,7 +3590,7 @@ export const CUPS = {
        ],
        "straddles": true,
        "below_floor": true,
-       "floor_note": "REFUSED BY THE PLACEABILITY FLOOR ON THE FIRST READING. This club's league did not clear the floor: its median club interval is wider than one band of the field, so the evidence does not place it in a tier. The rating itself stands and is shown — the wide interval beside it IS the refusal, and it is what stops the rank being read as precision. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
+       "floor_note": "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's LEAGUE, taken on the Elo measurement at this field's pinned pass count, and the league did not pass it: it is not connected to the reference leagues (C1), or more than half of its cross-league level is still the 1500 starting prior (C2), or its clubs' median 95% interval does not fit inside one fifth of the field's spread (C3) — or the club has no league attribution at all (no league). So the evidence does not place this club in a tier. The value and the 95% interval beside it are this club's own measurement on this axis and are shown as measured; the mark is its league's verdict carried onto every axis, and it does not say that this club's interval is wider than a placed club's. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
        "rate": 0.7944224945995271
       }
      ]
@@ -3374,10 +3612,12 @@ export const CUPS = {
     "mls"
    ],
    "below_floor_clubs": [],
-   "below_floor_note": "REFUSED BY THE PLACEABILITY FLOOR ON THE FIRST READING. This club's league did not clear the floor: its median club interval is wider than one band of the field, so the evidence does not place it in a tier. The rating itself stands and is shown — the wide interval beside it IS the refusal, and it is what stops the rank being read as precision. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
-   "basis": "every club of MLS and Liga MX on one cross-league scale, on the OVERALL axis alone. Attack and defence are not measured for these two leagues by anything in this repository — the goals artifact holds the 36 Champions League entrants and no club of either — so this field carries one axis and says so, rather than carrying three of which two would be somebody else's.",
+   "below_floor_note": "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's LEAGUE, taken on the Elo measurement at this field's pinned pass count, and the league did not pass it: it is not connected to the reference leagues (C1), or more than half of its cross-league level is still the 1500 starting prior (C2), or its clubs' median 95% interval does not fit inside one fifth of the field's spread (C3) — or the club has no league attribution at all (no league). So the evidence does not place this club in a tier. The value and the 95% interval beside it are this club's own measurement on this axis and are shown as measured; the mark is its league's verdict carried onto every axis, and it does not say that this club's interval is wider than a placed club's. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
+   "basis": "every club of MLS and Liga MX on one cross-league scale, on three axes: overall from the Elo measurement of the two leagues' own component at three passes, attack and defence from the goals measurement on the union corpus — each club's own MLS or Liga MX round-robin plus its league's level, placed by the bridges, with the club's own 95% interval. The two measurements are separate fits on separate corpora, so the overall axis and the goal axes carry no shared pass count and are not one scale.",
    "axes_measured": [
-    "overall"
+    "overall",
+    "attack",
+    "defence"
    ],
    "axes": {
     "overall": {
@@ -3506,6 +3746,281 @@ export const CUPS = {
        "rate": null
       }
      ]
+    },
+    "attack": {
+     "label": "attack",
+     "unit": "log_goals",
+     "bands": 5,
+     "source": "goals",
+     "artifact": "research_archive/goal_axes_every_club_2026-09-24/cup_fields",
+     "rows": [
+      {
+       "rank": 1,
+       "club": "FC Cincinnati",
+       "league": "mls",
+       "league_display": "MLS",
+       "board_column": "mls",
+       "value": 0.773717,
+       "half_width_95": 0.395326,
+       "lo": 0.378391,
+       "hi": 1.169043,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 2.5688
+      },
+      {
+       "rank": 2,
+       "club": "Inter Miami",
+       "league": "mls",
+       "league_display": "MLS",
+       "board_column": "mls",
+       "value": 0.717289,
+       "half_width_95": 0.382977,
+       "lo": 0.33431199999999994,
+       "hi": 1.100266,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 2.427862
+      },
+      {
+       "rank": 3,
+       "club": "Vancouver Whitecaps",
+       "league": "mls",
+       "league_display": "MLS",
+       "board_column": "mls",
+       "value": 0.714853,
+       "half_width_95": 0.432837,
+       "lo": 0.28201599999999993,
+       "hi": 1.1476899999999999,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 2.421954
+      },
+      {
+       "rank": 4,
+       "club": "Portland Timbers",
+       "league": "mls",
+       "league_display": "MLS",
+       "board_column": "mls",
+       "value": 0.604472,
+       "half_width_95": 0.434216,
+       "lo": 0.17025600000000002,
+       "hi": 1.038688,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2,
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 2.168842
+      },
+      {
+       "rank": 5,
+       "club": "FC Dallas",
+       "league": "mls",
+       "league_display": "MLS",
+       "board_column": "mls",
+       "value": 0.589161,
+       "half_width_95": 0.415709,
+       "lo": 0.17345200000000005,
+       "hi": 1.00487,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2,
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 2.135889
+      },
+      {
+       "rank": 6,
+       "club": "San Jose Earthquakes",
+       "league": "mls",
+       "league_display": "MLS",
+       "board_column": "mls",
+       "value": 0.546306,
+       "half_width_95": 0.408074,
+       "lo": 0.13823199999999997,
+       "hi": 0.95438,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2,
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 2.046289
+      }
+     ]
+    },
+    "defence": {
+     "label": "defence",
+     "unit": "log_goals",
+     "bands": 5,
+     "source": "goals",
+     "artifact": "research_archive/goal_axes_every_club_2026-09-24/cup_fields",
+     "rows": [
+      {
+       "rank": 1,
+       "club": "Nashville SC",
+       "league": "mls",
+       "league_display": "MLS",
+       "board_column": "mls",
+       "value": 0.860506,
+       "half_width_95": 0.588386,
+       "lo": 0.27212000000000003,
+       "hi": 1.4488919999999998,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 0.501183
+      },
+      {
+       "rank": 2,
+       "club": "Vancouver Whitecaps",
+       "league": "mls",
+       "league_display": "MLS",
+       "board_column": "mls",
+       "value": 0.74202,
+       "half_width_95": 0.487904,
+       "lo": 0.254116,
+       "hi": 1.229924,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 0.564228
+      },
+      {
+       "rank": 3,
+       "club": "Los Angeles FC",
+       "league": "mls",
+       "league_display": "MLS",
+       "board_column": "mls",
+       "value": 0.716142,
+       "half_width_95": 0.693416,
+       "lo": 0.022725999999999913,
+       "hi": 1.409558,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2,
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 0.579019
+      },
+      {
+       "rank": 4,
+       "club": "Toluca",
+       "league": "liga-mx",
+       "league_display": "Liga MX",
+       "board_column": "ligamx",
+       "value": 0.539778,
+       "half_width_95": 0.346823,
+       "lo": 0.192955,
+       "hi": 0.886601,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2,
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 0.690696
+      },
+      {
+       "rank": 5,
+       "club": "Tigres UANL",
+       "league": "liga-mx",
+       "league_display": "Liga MX",
+       "board_column": "ligamx",
+       "value": 0.534473,
+       "half_width_95": 0.312421,
+       "lo": 0.22205199999999997,
+       "hi": 0.846894,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 0.69437
+      },
+      {
+       "rank": 6,
+       "club": "CF Pachuca",
+       "league": "liga-mx",
+       "league_display": "Liga MX",
+       "board_column": "ligamx",
+       "value": 0.493109,
+       "half_width_95": 0.284973,
+       "lo": 0.20813600000000004,
+       "hi": 0.7780819999999999,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 0.723694
+      }
+     ]
     }
    },
    "carries_bridge_counts": false
@@ -3525,10 +4040,12 @@ export const CUPS = {
     "league-two"
    ],
    "below_floor_clubs": [],
-   "below_floor_note": "REFUSED BY THE PLACEABILITY FLOOR ON THE FIRST READING. This club's league did not clear the floor: its median club interval is wider than one band of the field, so the evidence does not place it in a tier. The rating itself stands and is shown — the wide interval beside it IS the refusal, and it is what stops the rank being read as precision. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
-   "basis": "the 94 clubs of the EFL Cup's four English tiers on one cross-tier scale, on the OVERALL axis alone. The corpus held the Championship at 1,114 domestic fixtures and ZERO bridges and held neither lower tier at all; research_archive/efl_bridges_2026-09-15/ adds two seasons of the EFL Cup, the FA Cup and the EFL Trophy and the two missing tiers' own seasons, and all four clear the floor at two passes. Attack and defence are not measured for any English club outside the Premier League by anything in this repository, so this field carries one axis and says so. WHAT THE BRIDGES DO NOT SEPARATE, measured and published rather than left for a reader to notice: the Championship and League One. Over the two seasons in the corpus those two tiers met 36 times and the higher one scored 0.486 — 15 wins, 5 draws, 16 defeats — so the chain puts League One's level at +22.9 Elo and the Championship's at -1.5 at the pinned two passes, and a reading that treats a club being in the higher division as evidence of anything is not reading this field. The other three tier pairs do separate, in the expected direction: 0.824 for the Premier League over the Championship, 0.859 and 0.917 over the two lower tiers, 0.760 for the Championship over League Two and 0.586 for League One over League Two.",
+   "below_floor_note": "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's LEAGUE, taken on the Elo measurement at this field's pinned pass count, and the league did not pass it: it is not connected to the reference leagues (C1), or more than half of its cross-league level is still the 1500 starting prior (C2), or its clubs' median 95% interval does not fit inside one fifth of the field's spread (C3) — or the club has no league attribution at all (no league). So the evidence does not place this club in a tier. The value and the 95% interval beside it are this club's own measurement on this axis and are shown as measured; the mark is its league's verdict carried onto every axis, and it does not say that this club's interval is wider than a placed club's. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
+   "basis": "the 94 clubs of the EFL Cup's four English tiers on one cross-tier scale, on three axes. Attack and defence come from the goals measurement on the union corpus, which fits a round-robin for every one of the four tiers — League One's and League Two's since 2026-09-24, when a definition the goals fit had bound at import stopped leaving both tiers attributed and unfitted — each club with its own 95% interval. The overall axis is the Elo measurement below, on its own corpus. The corpus held the Championship at 1,114 domestic fixtures and ZERO bridges and held neither lower tier at all; research_archive/efl_bridges_2026-09-15/ adds two seasons of the EFL Cup, the FA Cup and the EFL Trophy and the two missing tiers' own seasons, and all four clear the floor at two passes. WHAT THE BRIDGES DO NOT SEPARATE, measured and published rather than left for a reader to notice: the Championship and League One. Over the two seasons in the corpus those two tiers met 36 times and the higher one scored 0.486 — 15 wins, 5 draws, 16 defeats — so the chain puts League One's level at +22.9 Elo and the Championship's at -1.5 at the pinned two passes, and a reading that treats a club being in the higher division as evidence of anything is not reading this field. The other three tier pairs do separate, in the expected direction: 0.824 for the Premier League over the Championship, 0.859 and 0.917 over the two lower tiers, 0.760 for the Championship over League Two and 0.586 for League One over League Two.",
    "axes_measured": [
-    "overall"
+    "overall",
+    "attack",
+    "defence"
    ],
    "axes": {
     "overall": {
@@ -3654,6 +4171,815 @@ export const CUPS = {
        "below_floor": false,
        "floor_note": null,
        "rate": null
+      }
+     ]
+    },
+    "attack": {
+     "label": "attack",
+     "unit": "log_goals",
+     "bands": 5,
+     "source": "goals",
+     "artifact": "research_archive/goal_axes_every_club_2026-09-24/cup_fields",
+     "rows": [
+      {
+       "rank": 1,
+       "club": "Manchester City",
+       "league": "epl",
+       "league_display": "Premier League",
+       "board_column": "epl",
+       "value": 0.956929,
+       "half_width_95": 0.225783,
+       "lo": 0.7311460000000001,
+       "hi": 1.182712,
+       "tier": 1,
+       "tier_set": [
+        1
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 3.085306
+      },
+      {
+       "rank": 2,
+       "club": "Arsenal",
+       "league": "epl",
+       "league_display": "Premier League",
+       "board_column": "epl",
+       "value": 0.867523,
+       "half_width_95": 0.235886,
+       "lo": 0.631637,
+       "hi": 1.103409,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 2.821434
+      },
+      {
+       "rank": 3,
+       "club": "Manchester United",
+       "league": "epl",
+       "league_display": "Premier League",
+       "board_column": "epl",
+       "value": 0.862234,
+       "half_width_95": 0.228375,
+       "lo": 0.633859,
+       "hi": 1.090609,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 2.806549
+      },
+      {
+       "rank": 4,
+       "club": "Liverpool",
+       "league": "epl",
+       "league_display": "Premier League",
+       "board_column": "epl",
+       "value": 0.774018,
+       "half_width_95": 0.23145,
+       "lo": 0.5425679999999999,
+       "hi": 1.005468,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 2.569573
+      },
+      {
+       "rank": 5,
+       "club": "Bournemouth",
+       "league": "epl",
+       "league_display": "Premier League",
+       "board_column": "epl",
+       "value": 0.69207,
+       "half_width_95": 0.260732,
+       "lo": 0.43133799999999994,
+       "hi": 0.9528019999999999,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 2.3674
+      },
+      {
+       "rank": 6,
+       "club": "Chelsea",
+       "league": "epl",
+       "league_display": "Premier League",
+       "board_column": "epl",
+       "value": 0.690032,
+       "half_width_95": 0.288589,
+       "lo": 0.401443,
+       "hi": 0.978621,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 2.362579
+      }
+     ]
+    },
+    "defence": {
+     "label": "defence",
+     "unit": "log_goals",
+     "bands": 5,
+     "source": "goals",
+     "artifact": "research_archive/goal_axes_every_club_2026-09-24/cup_fields",
+     "rows": [
+      {
+       "rank": 1,
+       "club": "Arsenal",
+       "league": "epl",
+       "league_display": "Premier League",
+       "board_column": "epl",
+       "value": 1.228426,
+       "half_width_95": 0.413181,
+       "lo": 0.815245,
+       "hi": 1.641607,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 0.346905
+      },
+      {
+       "rank": 2,
+       "club": "Manchester City",
+       "league": "epl",
+       "league_display": "Premier League",
+       "board_column": "epl",
+       "value": 0.962248,
+       "half_width_95": 0.344377,
+       "lo": 0.6178710000000001,
+       "hi": 1.306625,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 0.4527
+      },
+      {
+       "rank": 3,
+       "club": "Brighton",
+       "league": "epl",
+       "league_display": "Premier League",
+       "board_column": "epl",
+       "value": 0.71353,
+       "half_width_95": 0.280608,
+       "lo": 0.432922,
+       "hi": 0.994138,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 0.580533
+      },
+      {
+       "rank": 4,
+       "club": "Sunderland",
+       "league": "epl",
+       "league_display": "Premier League",
+       "board_column": "epl",
+       "value": 0.680877,
+       "half_width_95": 0.359053,
+       "lo": 0.32182399999999994,
+       "hi": 1.03993,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 0.599802
+      },
+      {
+       "rank": 5,
+       "club": "Aston Villa",
+       "league": "epl",
+       "league_display": "Premier League",
+       "board_column": "epl",
+       "value": 0.646155,
+       "half_width_95": 0.296418,
+       "lo": 0.349737,
+       "hi": 0.9425730000000001,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 0.620995
+      },
+      {
+       "rank": 6,
+       "club": "Everton",
+       "league": "epl",
+       "league_display": "Premier League",
+       "board_column": "epl",
+       "value": 0.63497,
+       "half_width_95": 0.355835,
+       "lo": 0.279135,
+       "hi": 0.990805,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 0.62798
+      }
+     ]
+    }
+   },
+   "carries_bridge_counts": false
+  },
+  {
+   "key": "uel",
+   "aliases": [
+    "uel"
+   ],
+   "display": "Europa League",
+   "passes": "10",
+   "corpus_sha256": "0dbb69159e0bb0cf2d1fb9fe8b3f4947723f1997173ae07328361a4fcd7b914f",
+   "admitted_leagues": [
+    "arg-primera",
+    "belgian-pro-league",
+    "brasileirao",
+    "bulgarian-first-league",
+    "bundesliga",
+    "championship",
+    "cypriot-first-division",
+    "czech-liga",
+    "ekstraklasa",
+    "eliteserien",
+    "epl",
+    "greek-super-league",
+    "hungarian-nb-i",
+    "israeli-premier-league",
+    "la-liga",
+    "league-one",
+    "league-two",
+    "liga-mx",
+    "ligue-1",
+    "mls",
+    "primeira-liga",
+    "scottish-premiership",
+    "serie-a",
+    "super-lig",
+    "usl-championship"
+   ],
+   "below_floor_clubs": [
+    "AZ Alkmaar",
+    "Ararat-Armenia",
+    "Celje",
+    "Dinamo Zagreb",
+    "NEC Nijmegen",
+    "Red Bull Salzburg",
+    "Sturm Graz"
+   ],
+   "below_floor_note": "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's LEAGUE, taken on the Elo measurement at this field's pinned pass count, and the league did not pass it: it is not connected to the reference leagues (C1), or more than half of its cross-league level is still the 1500 starting prior (C2), or its clubs' median 95% interval does not fit inside one fifth of the field's spread (C3) — or the club has no league attribution at all (no league). So the evidence does not place this club in a tier. The value and the 95% interval beside it are this club's own measurement on this axis and are shown as measured; the mark is its league's verdict carried onto every axis, and it does not say that this club's interval is wider than a placed club's. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
+   "basis": "the 36 entrants of the 2026-27 Europa League league phase, on three axes, on a corpus of the field's own: the union corpus the other fields use plus the domestic seasons of the sixteen leagues its entrants play in that the union corpus lacks (ESPN where ESPN carries them, API-Football for Poland, Croatia, Hungary, Bulgaria, Slovenia, Armenia, Czechia, Israel, Cyprus and Liga Portugal 2) and the 2026 UEFA ties before the first league-phase kickoff. Overall is the Elo chain at ten passes; attack and defence are the goals measurement on the same corpus, each club with its own 95% interval. Seven clubs are below the floor: Armenia and Slovenia clear it at no pass count, and the Austrian Bundesliga, the HNL and the Eredivisie clear it at five and not at ten, the pin the preregistered rule picks. Torreense's Elo is filed under the Primeira Liga by its two promotion play-off fixtures, while its attack and defence are read on its own 2025-26 Liga Portugal 2 round-robin. Lillestrom played no UEFA tie in the window and is placed by Eliteserien 2026 alone. This field is its own measurement and is never merged with or ranked against another cup's.",
+   "axes_measured": [
+    "overall",
+    "attack",
+    "defence"
+   ],
+   "axes": {
+    "overall": {
+     "label": "overall",
+     "unit": "elo",
+     "bands": 5,
+     "source": "elo",
+     "artifact": "research_archive/uel_field_2026-09-24/elo",
+     "passes": "10",
+     "rows": [
+      {
+       "rank": 1,
+       "club": "Bournemouth",
+       "league": "epl",
+       "league_display": "Premier League",
+       "board_column": "epl",
+       "value": 1935.2092710057561,
+       "half_width_95": 24.87596605705554,
+       "lo": 1910.3333049487005,
+       "hi": 1960.0852370628118,
+       "tier": 1,
+       "tier_set": [
+        1
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": null
+      },
+      {
+       "rank": 2,
+       "club": "Bayer Leverkusen",
+       "league": "bundesliga",
+       "league_display": "Bundesliga",
+       "board_column": "bundesliga",
+       "value": 1867.5178116999539,
+       "half_width_95": 40.864686115599284,
+       "lo": 1826.6531255843547,
+       "hi": 1908.382497815553,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": null
+      },
+      {
+       "rank": 3,
+       "club": "Benfica",
+       "league": "primeira-liga",
+       "league_display": "Primeira Liga",
+       "board_column": null,
+       "value": 1864.0759456377305,
+       "half_width_95": 63.36089463646278,
+       "lo": 1800.7150510012677,
+       "hi": 1927.4368402741932,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": null
+      },
+      {
+       "rank": 4,
+       "club": "Crystal Palace",
+       "league": "epl",
+       "league_display": "Premier League",
+       "board_column": "epl",
+       "value": 1847.0046545860812,
+       "half_width_95": 44.97698872438745,
+       "lo": 1802.0276658616938,
+       "hi": 1891.9816433104686,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": null
+      },
+      {
+       "rank": 5,
+       "club": "Juventus",
+       "league": "serie-a",
+       "league_display": "Serie A",
+       "board_column": "seriea",
+       "value": 1816.8818685477722,
+       "half_width_95": 37.03471990418977,
+       "lo": 1779.8471486435824,
+       "hi": 1853.916588451962,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": null
+      },
+      {
+       "rank": 6,
+       "club": "Union St. Gilloise",
+       "league": "belgian-pro-league",
+       "league_display": "Belgian Pro League",
+       "board_column": null,
+       "value": 1816.7116636612448,
+       "half_width_95": 50.55972934446362,
+       "lo": 1766.151934316781,
+       "hi": 1867.2713930057084,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": null
+      },
+      {
+       "rank": 17,
+       "club": "Dinamo Zagreb",
+       "league": "croatian-hnl",
+       "league_display": "HNL",
+       "board_column": null,
+       "value": 1745.9949110985995,
+       "half_width_95": 57.400360683543894,
+       "lo": 1688.5945504150557,
+       "hi": 1803.3952717821433,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "floor_note": "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's LEAGUE, taken on the Elo measurement at this field's pinned pass count, and the league did not pass it: it is not connected to the reference leagues (C1), or more than half of its cross-league level is still the 1500 starting prior (C2), or its clubs' median 95% interval does not fit inside one fifth of the field's spread (C3) — or the club has no league attribution at all (no league). So the evidence does not place this club in a tier. The value and the 95% interval beside it are this club's own measurement on this axis and are shown as measured; the mark is its league's verdict carried onto every axis, and it does not say that this club's interval is wider than a placed club's. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
+       "rate": null
+      },
+      {
+       "rank": 19,
+       "club": "AZ Alkmaar",
+       "league": "eredivisie",
+       "league_display": "Eredivisie",
+       "board_column": "eredivisie",
+       "value": 1726.1255723339991,
+       "half_width_95": 51.195077454088754,
+       "lo": 1674.9304948799104,
+       "hi": 1777.3206497880878,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "floor_note": "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's LEAGUE, taken on the Elo measurement at this field's pinned pass count, and the league did not pass it: it is not connected to the reference leagues (C1), or more than half of its cross-league level is still the 1500 starting prior (C2), or its clubs' median 95% interval does not fit inside one fifth of the field's spread (C3) — or the club has no league attribution at all (no league). So the evidence does not place this club in a tier. The value and the 95% interval beside it are this club's own measurement on this axis and are shown as measured; the mark is its league's verdict carried onto every axis, and it does not say that this club's interval is wider than a placed club's. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
+       "rate": null
+      }
+     ]
+    },
+    "attack": {
+     "label": "attack",
+     "unit": "log_goals",
+     "bands": 5,
+     "source": "goals",
+     "artifact": "research_archive/uel_field_2026-09-24",
+     "rows": [
+      {
+       "rank": 1,
+       "club": "Bayer Leverkusen",
+       "league": "bundesliga",
+       "league_display": "Bundesliga",
+       "board_column": "bundesliga",
+       "value": 0.87020212140355,
+       "half_width_95": 0.2546758955808226,
+       "lo": 0.6155262258227274,
+       "hi": 1.1248780169843726,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 2.656459435608012
+      },
+      {
+       "rank": 2,
+       "club": "Bournemouth",
+       "league": "epl",
+       "league_display": "Premier League",
+       "board_column": "epl",
+       "value": 0.8520537034841369,
+       "half_width_95": 0.2742715304349052,
+       "lo": 0.5777821730492316,
+       "hi": 1.1263252339190422,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 2.6086837375486738
+      },
+      {
+       "rank": 3,
+       "club": "1899 Hoffenheim",
+       "league": "bundesliga",
+       "league_display": "Bundesliga",
+       "board_column": "bundesliga",
+       "value": 0.8303264845792255,
+       "half_width_95": 0.25137734805233597,
+       "lo": 0.5789491365268895,
+       "hi": 1.0817038326315616,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 2.5526156029125633
+      },
+      {
+       "rank": 4,
+       "club": "Real Sociedad",
+       "league": "la-liga",
+       "league_display": "La Liga",
+       "board_column": "laliga",
+       "value": 0.8266284561701811,
+       "half_width_95": 0.2182028506906532,
+       "lo": 0.6084256054795278,
+       "hi": 1.0448313068608344,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 2.5431933904380446
+      },
+      {
+       "rank": 5,
+       "club": "Marseille",
+       "league": "ligue-1",
+       "league_display": "Ligue 1",
+       "board_column": "ligue1",
+       "value": 0.8031555458179224,
+       "half_width_95": 0.3264704088508412,
+       "lo": 0.47668513696708115,
+       "hi": 1.1296259546687635,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 2.484192411315543
+      },
+      {
+       "rank": 6,
+       "club": "NEC Nijmegen",
+       "league": "eredivisie",
+       "league_display": "Eredivisie",
+       "board_column": "eredivisie",
+       "value": 0.7945754396676018,
+       "half_width_95": 0.22113376466150514,
+       "lo": 0.5734416750060967,
+       "hi": 1.015709204329107,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "floor_note": "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's LEAGUE, taken on the Elo measurement at this field's pinned pass count, and the league did not pass it: it is not connected to the reference leagues (C1), or more than half of its cross-league level is still the 1500 starting prior (C2), or its clubs' median 95% interval does not fit inside one fifth of the field's spread (C3) — or the club has no league attribution at all (no league). So the evidence does not place this club in a tier. The value and the 95% interval beside it are this club's own measurement on this axis and are shown as measured; the mark is its league's verdict carried onto every axis, and it does not say that this club's interval is wider than a placed club's. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
+       "rate": 2.462968956678057
+      },
+      {
+       "rank": 12,
+       "club": "AZ Alkmaar",
+       "league": "eredivisie",
+       "league_display": "Eredivisie",
+       "board_column": "eredivisie",
+       "value": 0.5077857406897034,
+       "half_width_95": 0.23749748317367136,
+       "lo": 0.270288257516032,
+       "hi": 0.7452832238633748,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "floor_note": "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's LEAGUE, taken on the Elo measurement at this field's pinned pass count, and the league did not pass it: it is not connected to the reference leagues (C1), or more than half of its cross-league level is still the 1500 starting prior (C2), or its clubs' median 95% interval does not fit inside one fifth of the field's spread (C3) — or the club has no league attribution at all (no league). So the evidence does not place this club in a tier. The value and the 95% interval beside it are this club's own measurement on this axis and are shown as measured; the mark is its league's verdict carried onto every axis, and it does not say that this club's interval is wider than a placed club's. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
+       "rate": 1.8488758693517349
+      }
+     ]
+    },
+    "defence": {
+     "label": "defence",
+     "unit": "log_goals",
+     "bands": 5,
+     "source": "goals",
+     "artifact": "research_archive/uel_field_2026-09-24",
+     "rows": [
+      {
+       "rank": 1,
+       "club": "Sunderland",
+       "league": "epl",
+       "league_display": "Premier League",
+       "board_column": "epl",
+       "value": 0.8344221157236874,
+       "half_width_95": 0.32336789133271066,
+       "lo": 0.5110542243909768,
+       "hi": 1.157790007056398,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 0.4830524494659596
+      },
+      {
+       "rank": 2,
+       "club": "Union St. Gilloise",
+       "league": "belgian-pro-league",
+       "league_display": "Belgian Pro League",
+       "board_column": null,
+       "value": 0.7839872273521401,
+       "half_width_95": 0.41907548506947,
+       "lo": 0.3649117422826701,
+       "hi": 1.2030627124216102,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 0.5080399707974826
+      },
+      {
+       "rank": 3,
+       "club": "Crystal Palace",
+       "league": "epl",
+       "league_display": "Premier League",
+       "board_column": "epl",
+       "value": 0.7746712118249217,
+       "half_width_95": 0.28503517425308994,
+       "lo": 0.4896360375718318,
+       "hi": 1.0597063860780116,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 0.5127949935970785
+      },
+      {
+       "rank": 4,
+       "club": "Olympiakos Piraeus",
+       "league": "greek-super-league",
+       "league_display": "Greek Super League",
+       "board_column": null,
+       "value": 0.7404616059796536,
+       "half_width_95": 0.537788773692366,
+       "lo": 0.2026728322872876,
+       "hi": 1.2782503796720195,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 0.5306410205864963
+      },
+      {
+       "rank": 5,
+       "club": "Juventus",
+       "league": "serie-a",
+       "league_display": "Serie A",
+       "board_column": "seriea",
+       "value": 0.7253486362658992,
+       "half_width_95": 0.3021425003851698,
+       "lo": 0.42320613588072936,
+       "hi": 1.027491136651069,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 0.5387214883932138
+      },
+      {
+       "rank": 6,
+       "club": "AC Milan",
+       "league": "serie-a",
+       "league_display": "Serie A",
+       "board_column": "seriea",
+       "value": 0.7054623392412784,
+       "half_width_95": 0.3860317353692564,
+       "lo": 0.31943060387202205,
+       "hi": 1.0914940746105348,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "floor_note": null,
+       "rate": 0.5495418962587907
+      },
+      {
+       "rank": 16,
+       "club": "Dinamo Zagreb",
+       "league": "croatian-hnl",
+       "league_display": "HNL",
+       "board_column": null,
+       "value": 0.21235392396670877,
+       "half_width_95": 0.38660200679473533,
+       "lo": -0.17424808282802656,
+       "hi": 0.598955930761444,
+       "tier": 3,
+       "tier_set": [
+        1,
+        2,
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "floor_note": "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's LEAGUE, taken on the Elo measurement at this field's pinned pass count, and the league did not pass it: it is not connected to the reference leagues (C1), or more than half of its cross-league level is still the 1500 starting prior (C2), or its clubs' median 95% interval does not fit inside one fifth of the field's spread (C3) — or the club has no league attribution at all (no league). So the evidence does not place this club in a tier. The value and the 95% interval beside it are this club's own measurement on this axis and are shown as measured; the mark is its league's verdict carried onto every axis, and it does not say that this club's interval is wider than a placed club's. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
+       "rate": 0.8998188187343202
+      },
+      {
+       "rank": 20,
+       "club": "Sturm Graz",
+       "league": "austrian-bundesliga",
+       "league_display": "Austrian Bundesliga",
+       "board_column": null,
+       "value": 0.14609296569323743,
+       "half_width_95": 0.391078896944653,
+       "lo": -0.24498593125141555,
+       "hi": 0.5371718626378904,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3,
+        4,
+        5
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "floor_note": "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's LEAGUE, taken on the Elo measurement at this field's pinned pass count, and the league did not pass it: it is not connected to the reference leagues (C1), or more than half of its cross-league level is still the 1500 starting prior (C2), or its clubs' median 95% interval does not fit inside one fifth of the field's spread (C3) — or the club has no league attribution at all (no league). So the evidence does not place this club in a tier. The value and the 95% interval beside it are this club's own measurement on this axis and are shown as measured; the mark is its league's verdict carried onto every axis, and it does not say that this club's interval is wider than a placed club's. It is ranked with everyone else because a club the evidence cannot place is not thereby a worse club; dropping it to the bottom would state exactly that.",
+       "rate": 0.9614613713456832
       }
      ]
     }

@@ -438,8 +438,13 @@ test("four league columns, fixed order, each header carrying its facts",
        them is drawn and no ribbon is built at all. Asserted here, on the
        test that already fixes the column set, because the two facts are
        one fact: four declared, four drawn, nothing to page through. */
-    await expect(page.getByTestId("league-ribbon")).toHaveCount(0);
-    await expect(page.getByTestId("ribbon-pill")).toHaveCount(0);
+    /* RESTATED 2026-09-24: a declared board whose columns all fit keeps
+       its strip, STATIC — every pill lit, because every column is on
+       screen, and nothing to page through. The Championships board has
+       four columns and the operator asked for the same strip on both. */
+    await expect(page.getByTestId("ribbon-pill")).toHaveCount(4);
+    await expect(page.locator('[data-testid="ribbon-pill"][aria-selected="true"]'))
+      .toHaveCount(4);
 
     /* AND THE ORDER IS THE OPERATOR'S, NOT THE PAYLOAD'S — which the
        assertion above cannot see on its own, because this fixture's
