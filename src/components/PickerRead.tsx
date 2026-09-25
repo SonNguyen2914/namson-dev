@@ -809,8 +809,18 @@ function measureTitle(
 }
 
 export function TierGaps({ read, dense = false, field, partial,
-                          floorNote }: {
+                          floorNote, values = true, quietFloor = [] }: {
   read: ReadLike;
+  /** DRAW THE VALUE ± HALF-WIDTH UNDER EACH TIER. True everywhere it has
+   *  been drawn; a national card passes false and keeps the values behind
+   *  the `#` panel, the way a league card keeps its tiers alone. */
+  values?: boolean;
+  /** AXES WHOSE BELOW-FLOOR VERDICT IS UNIVERSAL IN THIS COLUMN, and so
+   *  said ONCE in the column header rather than as a dagger on every
+   *  cell. Derived by the column from its own rows (see LeagueColumn),
+   *  never typed: an axis where even one side clears the floor is not
+   *  here, and its cells keep their per-cell marks. */
+  quietFloor?: readonly FieldAxisKey[];
   /** WHERE THESE TWO CLUBS STAND IN THE COMPETITION'S OWN FIELD, when
    *  somebody has measured one (pickerApi.RowField). It substitutes the
    *  DATA and adds exactly one mark: the tier trio prints the field's
@@ -966,7 +976,10 @@ export function TierGaps({ read, dense = false, field, partial,
                one-axis block's tier with no figure beside it for
                exactly the leagues this key exists to serve. */
             const side = block?.axes[lbl];
-            const m = bothMeasured(side);
+            const m = values ? bothMeasured(side) : null;
+            /* a universal verdict is in the header; a cell repeating it
+               carries no information */
+            const quiet = quietFloor.includes(lbl);
             return (
             <span key={lbl} data-tier={lbl} data-dissent={dissents(gap)}
               data-fav-set={side ? side.fav.tier_set.join(",") : undefined}
@@ -1015,11 +1028,11 @@ export function TierGaps({ read, dense = false, field, partial,
                   is a claim about, so it is addressable rather than
                   inferred from everything the cell happens to contain. */}
               <span data-tier-pair={lbl} className="whitespace-nowrap">
-                {pr[0]}{side && (side.fav.below_floor || side.fav.straddles)
+                {pr[0]}{side && !quiet && (side.fav.below_floor || side.fav.straddles)
                   && <FloorMark note={side.fav.below_floor
                     ? floorNote
                     : `the 95% interval touches bands ${side.fav.tier_set.join("·")} — ${side.fav.tier} is where the estimate falls, not a band the evidence will narrow to`} />}v{pr[1]}
-                {side && (side.opp.below_floor || side.opp.straddles)
+                {side && !quiet && (side.opp.below_floor || side.opp.straddles)
                   && <FloorMark note={side.opp.below_floor
                     ? floorNote
                     : `the 95% interval touches bands ${side.opp.tier_set.join("·")} — ${side.opp.tier} is where the estimate falls, not a band the evidence will narrow to`} />}
@@ -1172,7 +1185,13 @@ export function TierGaps({ read, dense = false, field, partial,
  *  or an event with no live quote, STAYS on the board and says which of
  *  the two it is: "no kalshi event" and "listed · no quote" are different
  *  facts, and collapsing them into one blank hides a mapping failure. */
-export function KalshiCell({ quote }: { quote: KalshiQuote | null | undefined }) {
+export function KalshiCell({ quote, side }: {
+  quote: KalshiQuote | null | undefined;
+  /** WHOSE yes this is, as a short prefix — drawn only where the caller
+   *  names it (a national card, whose book quotes one of two named
+   *  teams). A club card passes nothing and draws exactly what it drew. */
+  side?: { code: string; name: string } | null;
+}) {
   const k = quote;
   if (!k) {
     return (
@@ -1199,6 +1218,12 @@ export function KalshiCell({ quote }: { quote: KalshiQuote | null | undefined })
   }
   return (
     <span className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] tabular-nums text-ink-mid">
+      {side && (
+        <span data-testid="price-side" className="text-ink-low"
+          title={`the price is ${side.name}'s yes on Kalshi`}>
+          {side.code}
+        </span>
+      )}
       <span className="text-ink-hi">ask {k.ask_c}¢</span>
       <span>bid {k.bid_c == null ? "—" : `${k.bid_c}¢`}</span>
       <span>spread {k.spread_c == null ? "—" : `${k.spread_c}¢`}</span>

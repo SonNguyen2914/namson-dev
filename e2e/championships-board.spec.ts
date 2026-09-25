@@ -144,18 +144,14 @@ test.describe("the Championships board", () => {
       expect(new Set(got.out.map((c) => c.rail)).size).toBe(COLUMNS.length);
     });
 
-  test("a ranked national card reads the field: favourite, tiers, a below-floor mark",
+  test("a ranked national card reads the field: favourite, tiers, the # panel",
     async ({ page }) => {
       await openChampionships(page);
       const ranked = page.locator('[data-testid="picker-row"]');
       await expect(ranked).toHaveCount(CHAMP_BOARD.rows.length);
-      // attack and defence are below the floor for every team: marked,
-      // the way a below-floor club side is
-      expect(await page.locator('[data-testid="field-floor-mark"]').count())
-        .toBeGreaterThan(0);
-      // the field block is the one a club cup card draws
+      // the field block is the one a club cup card draws, values behind `#`
       expect(await page.locator('[data-testid="picker-row"] [data-testid="field-ranks-open"]').count())
-        .toBeGreaterThan(0);
+        .toBe(CHAMP_BOARD.rows.length);
     });
 
   test("a side without a rating is a refusal, listed with its reason",
@@ -170,37 +166,228 @@ test.describe("the Championships board", () => {
       await expect(refused).toHaveCount(1);
       await expect(refused.locator('[data-testid="refusal-reason"]'))
         .toHaveText("no_national_rating");
-      // a refusal to RANK is not a refusal to show the book or the facts
+      // a refused card's price has no favourite to belong to, so it is
+      // named — by the book's own code for the side
+      await expect(refused.locator('[data-testid="price-side"]')).toHaveText("GEO");
       await expect(refused).toContainText("ask 53¢");
-      await expect(refused.locator('[data-testid="national-read"]')).toBeAttached();
     });
+});
 
-  test("a Kalshi price is drawn the way the board draws one, with its side named",
+/* ══ THE SAME OBJECT AS A LEAGUES CARD (operator, 2026-09-24) ══════════
+ *
+ *  "A Championships card that reads as the SAME object as a Leagues card,
+ *  with national-team analogues in the same slots and nothing extra." Each
+ *  test below is one slot: what the club card draws there, and what the
+ *  national card draws instead — never beside it. */
+test.describe("a national card is a league card with national facts in its slots", () => {
+  test("no second form block: the form cells mark friendlies, hollow",
     async ({ page }) => {
       await openChampionships(page);
-      const priced = page.locator('[data-testid="national-price-side"]');
-      expect(await priced.count()).toBeGreaterThan(0);
-      const card = page.locator('article:has([data-testid="national-price-side"])').first();
-      await expect(card).toContainText(/ask \d+¢/);
-    });
-
-  test("the national reader: friendlies marked, head-to-head, lineups",
-    async ({ page }) => {
-      await openChampionships(page);
-      await expect(page.locator('[data-testid="national-read"]').first()).toBeAttached();
-      expect(await page.locator('[data-testid="national-form-game"][data-friendly="1"]').count())
+      await expect(page.locator('[data-testid="national-read"]')).toHaveCount(0);
+      expect(await page.locator('[data-testid="form-strip"] [data-friendly="1"]').count())
         .toBeGreaterThan(0);
-      await expect(page.locator('[data-testid="national-form-key"]').first()).toBeAttached();
-      await expect(page.locator('[data-testid="national-h2h"]').first()).toBeAttached();
-      await expect(page.locator('[data-testid="national-lineups"]').first()).toBeAttached();
+      // …and the key to the mark is in the legend, once, not on each card
+      await page.getByRole("button", { name: /how to read a row/i }).click();
+      await expect(page.locator('[data-testid="legend-national"]')).toContainText(/friendly/);
     });
 
-  test("the Leagues board draws no national reader and no switch-born change to its cards",
+  test("the stats line carries no club stat, and never an n/a", async ({ page }) => {
+    await openChampionships(page);
+    const cards = page.locator('[data-testid="picker-row"]');
+    for (const t of await cards.allInnerTexts()) {
+      expect(t, "no club stat on a national card").not.toMatch(/\bGD\/g\b|\bppg\b|\brank [+−-]/);
+      expect(t).not.toContain("n/a");
+    }
+    // the group-table slots, drawn once a group has started
+    expect(await page.locator('[data-testid="national-pts"]').count()).toBeGreaterThan(0);
+    expect(await page.locator('[data-testid="national-gp"]').count()).toBeGreaterThan(0);
+  });
+
+  test("the headline is the overall Elo gap, not the tier the OVR row already shows",
+    async ({ page }) => {
+      await openChampionships(page);
+      const anchors = page.locator('[data-testid="picker-row"] [data-testid="row-anchor"]');
+      const ids = await anchors.evaluateAll((es) => es.map((e) => (e as HTMLElement).dataset.anchor));
+      expect(new Set(ids)).toEqual(new Set(["headline"]));
+      await expect(page.locator('[data-testid="picker-row"] [data-testid="anchor-key"]').first())
+        .toHaveText(/elo gap/i);
+    });
+
+  test("tiers only on the card: the value ± half-width stays behind the #",
+    async ({ page }) => {
+      await openChampionships(page);
+      await expect(page.locator('[data-testid="picker-row"] [data-measure]')).toHaveCount(0);
+    });
+
+  test("a below-floor verdict every side shares is said ONCE, in the column header",
+    async ({ page }) => {
+      await openChampionships(page);
+      for (const col of ["unl", "cnl", "afcon"]) {
+        await expect(page.locator(`[data-testid="col-head"][data-league="${col}"] [data-testid="col-floor"]`))
+          .toHaveAttribute("data-axes", "atk,def");
+      }
+      await expect(page.locator('[data-testid="picker-row"] [data-tier="atk"] [data-testid="field-floor-mark"]'))
+        .toHaveCount(0);
+      await expect(page.locator('[data-testid="picker-row"] [data-tier="def"] [data-testid="field-floor-mark"]'))
+        .toHaveCount(0);
+    });
+
+  test("…and it is DERIVED: one side clearing the floor brings the per-cell marks back",
+    async ({ page }) => {
+      // the v2 ratings may clear the floor for some fields; this is that
+      // case, made by editing ONE side of ONE recorded row
+      const board = JSON.parse(JSON.stringify(CHAMP_BOARD));
+      const row = board.rows.find((r: { league: string; field?: unknown }) =>
+        r.league === "unl" && r.field);
+      row.field.axes.atk.fav.below_floor = false;
+      await openChampionships(page, board);
+      await expect(page.locator('[data-testid="col-head"][data-league="unl"] [data-testid="col-floor"]'))
+        .toHaveAttribute("data-axes", "def");
+      expect(await page.locator('[data-testid="league-col"][data-league="unl"] [data-tier="atk"] [data-testid="field-floor-mark"]').count())
+        .toBeGreaterThan(0);
+      // the other columns are untouched by one column's evidence
+      await expect(page.locator('[data-testid="col-head"][data-league="cnl"] [data-testid="col-floor"]'))
+        .toHaveAttribute("data-axes", "atk,def");
+    });
+
+  test("the price row is the club row: the favourite's quote is not relabelled",
+    async ({ page }) => {
+      await openChampionships(page);
+      await expect(page.locator('[data-testid="national-price-side"]')).toHaveCount(0);
+      await expect(page.locator('[data-testid="picker-row"] [data-testid="price-side"]')).toHaveCount(0);
+      expect(await page.locator('[data-testid="picker-row"]', { hasText: /ask \d+¢/ }).count())
+        .toBeGreaterThan(0);
+    });
+
+  test("XI: nothing until both are announced, then one chip", async ({ page }) => {
+    await openChampionships(page);
+    const announced = CHAMP_BOARD.rows.filter((r) => r.national?.lineups?.announced).length;
+    expect(announced).toBeGreaterThan(0);
+    await expect(page.locator('[data-testid="xi-chip"]')).toHaveCount(announced);
+    await expect(page.locator('[data-testid="national-lineups"]')).toHaveCount(0);
+    for (const t of await page.locator('[data-testid="picker-row"]').allInnerTexts()) {
+      expect(t).not.toMatch(/not announced/i);
+    }
+  });
+
+  test("head-to-head: one compact item, only where ESPN has a record", async ({ page }) => {
+    await openChampionships(page);
+    const met = CHAMP_BOARD.rows.filter((r) => {
+      const h = r.national?.head_to_head as { tally?: { home: number; draw: number; away: number } };
+      const t = h?.tally;
+      return t && t.home + t.draw + t.away > 0;
+    }).length;
+    expect(met).toBeLessThan(CHAMP_BOARD.rows.length);   // the fixture holds both kinds
+    await expect(page.locator('[data-testid="national-h2h"]')).toHaveCount(met);
+    for (const t of await page.locator('[data-testid="picker-row"]').allInnerTexts()) {
+      expect(t).not.toMatch(/no meeting/i);
+    }
+  });
+});
+
+/* ══ THE VENUE-ADJUSTED FAVOURITE (operator, 2026-09-24) ══════════════
+ *
+ *  Dominican Republic (home, Santiago) v Nicaragua, recorded at
+ *  2026-09-24T23:32Z: overall Elo DR 1439, Nicaragua 1474 — a raw gap that
+ *  named Nicaragua and quoted its 19¢ leg while the market had the DR at
+ *  62¢. The DR won 3–2. With the home term (+65 to the side at home in
+ *  its own country) the DR is the favourite by 29. */
+const DR_NIC = CHAMP_BOARD.rows.find((r) =>
+  r.home === "Dominican Republic" && r.away === "Nicaragua")!;
+const card = (page: Page) =>
+  page.locator(`[data-testid="picker-row"][data-event="${DR_NIC.event_id}"]`);
+
+test.describe("the national favourite is venue-adjusted", () => {
+  test("the home term names the Dominican Republic, and prices its leg",
+    async ({ page }) => {
+      expect(DR_NIC.favourite, "the recording named Nicaragua").toBe("Nicaragua");
+      await openChampionships(page);
+      const c = card(page);
+      await expect(c.locator('a[aria-label^="open "]')).toHaveAttribute(
+        "aria-label", "open Dominican Republic versus Nicaragua");
+      await expect(c.locator('[data-testid="row-anchor"]')).toHaveText("+29");
+      await expect(c.locator('[data-testid="anchor-key"]')).toHaveText(/elo gap/i);
+      // the venue chip stays: it is why the number moved
+      await expect(c.locator('[data-testid="home-badge"]')).toHaveText("H");
+      // and the price is the new favourite's leg — the DR's 62¢, not 19¢
+      await expect(c).toContainText("ask 62¢");
+      await expect(c).not.toContainText("ask 19¢");
+    });
+
+  test("no home term at a neutral venue: the raw gap stands", async ({ page }) => {
+    const board = JSON.parse(JSON.stringify(CHAMP_BOARD));
+    const r = board.rows.find((x: { event_id: string }) => x.event_id === DR_NIC.event_id);
+    r.venue_class = { class: "NEUTRAL", home_side: null };
+    await openChampionships(page, board);
+    const c = card(page);
+    await expect(c.locator('a[aria-label^="open "]')).toHaveAttribute(
+      "aria-label", "open Nicaragua versus Dominican Republic");
+    await expect(c.locator('[data-testid="row-anchor"]')).toHaveText("+36");
+    await expect(c.locator('[data-testid="home-badge"]')).toHaveText("N");
+    await expect(c).toContainText("ask 19¢");
+  });
+
+  test("a headline the backend serves is printed as served — value, unit, label",
+    async ({ page }) => {
+      const board = JSON.parse(JSON.stringify(CHAMP_BOARD));
+      const r = board.rows.find((x: { event_id: string }) => x.event_id === DR_NIC.event_id);
+      r.national.headline = { value: 0.42, unit: "goals", label: "xg gap" };
+      await openChampionships(page, board);
+      const c = card(page);
+      await expect(c.locator('[data-testid="row-anchor"]')).toHaveText("+0.42");
+      await expect(c.locator('[data-testid="anchor-key"]')).toHaveText(/xg gap/i);
+      // the backend named the favourite by its own headline: not re-read here
+      await expect(c.locator('a[aria-label^="open "]')).toHaveAttribute(
+        "aria-label", "open Nicaragua versus Dominican Republic");
+    });
+});
+
+test.describe("the Championships board wears the Leagues board's chrome", () => {
+  test("the pill strip and the chooser: four pills, all lit, 4 of 4 drawn",
+    async ({ page }) => {
+      await openChampionships(page);
+      const pills = page.locator('[data-testid="ribbon-pill"]');
+      await expect(pills).toHaveCount(4);
+      await expect(page.locator('[data-testid="ribbon-pill"][aria-selected="true"]')).toHaveCount(4);
+      const slugs = await pills.evaluateAll((es) => es.map((e) => (e as HTMLElement).dataset.slug));
+      expect(slugs).toEqual([...COLUMNS]);
+      await expect(page.locator('[data-testid="column-chooser-summary"]')).toContainText("4 of 4");
+    });
+
+  test("every column header carries its stage chip and its (i)", async ({ page }) => {
+    await openChampionships(page);
+    for (const col of COLUMNS) {
+      const head = page.locator(`[data-testid="col-head"][data-league="${col}"]`);
+      await expect(head.locator('[data-testid="col-stage"]')).not.toBeEmpty();
+      await expect(head.locator('[data-testid="col-notes-open"]')).toBeAttached();
+    }
+    await expect(page.locator('[data-testid="col-head"][data-league="unl"] [data-testid="col-stage"]'))
+      .toHaveText(/league phase · md 1\/6/i);
+    await expect(page.locator('[data-testid="col-head"][data-league="asiancup"] [data-testid="col-stage"]'))
+      .toHaveText(/starts 7 jan/i);
+  });
+
+  test("a column with nothing in the window reads as rest days, with its next date",
+    async ({ page }) => {
+      await openChampionships(page);
+      const col = page.locator('[data-testid="league-col"][data-league="asiancup"]');
+      await expect(col.locator('[data-testid="col-empty"]')).toHaveCount(0);
+      const rest = col.locator('[data-testid="rest-day"]:visible');
+      expect(await rest.count()).toBeGreaterThan(0);
+      await expect(rest.first()).toContainText(/AFC Asian Cup — rest day/i);
+      await expect(rest.first()).toContainText(/next · thursday, jan 7/i);
+    });
+
+  test("the Leagues board draws no national slot at all",
     async ({ page }) => {
       await routeBoth(page);
       await page.goto("/bet-suggester");
       await page.waitForSelector('[data-testid="league-col"]');
-      await expect(page.locator('[data-testid="national-read"]')).toHaveCount(0);
+      for (const id of ["national-pts", "national-gp", "national-h2h", "xi-chip",
+                        "group-chip", "price-side", "col-stage", "col-floor"]) {
+        await expect(page.locator(`[data-testid="${id}"]`)).toHaveCount(0);
+      }
+      await expect(page.locator('[data-testid="form-strip"] [data-friendly]')).toHaveCount(0);
       expect(await page.locator('[data-testid="league-col"]').count())
         .toBe(Object.keys(BOARD_EIGHT.leagues).length);
     });

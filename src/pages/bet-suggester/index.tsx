@@ -76,6 +76,7 @@ import {
   Board, CUP_COMP_KEY, DEFAULT_DAYS, SEASON_BLEND_K, THIN_ASK_SIZE,
   WIDE_SPREAD_C, askHonoured, boardColumns, columnsOf, declarationOf,
   CHAMPIONSHIP_COLUMNS, fetchBoard, fetchChampionships, leagueLabel,
+  nationalColumn, venueAdjusted,
 } from "../../lib/pickerApi";
 import {
   DEFAULT_BACK, Review, fetchReview, readHere, reviewAskHonoured,
@@ -385,7 +386,12 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
 
 
 
-  const rows = board?.rows ?? [];
+  /* A NATIONAL ROW IS READ FROM ITS HEADLINE (pickerApi.venueAdjusted):
+     the backend's when it serves one, the interim venue-adjusted Elo gap
+     otherwise — which can name the other side the favourite, and then
+     the whole row is read from that side. The club board is untouched. */
+  const rows = champ ? (board?.rows ?? []).map(venueAdjusted)
+    : board?.rows ?? [];
   const refusals = board?.refusals ?? [];
   const leaguesMap = board?.leagues ?? {};
 
@@ -796,7 +802,14 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
    *  so which of them are in front of you is a question with more than
    *  one answer. Four columns and every narrowed page (`/bet-suggester/
    *  ucl`) build no chooser, exactly as they build no ribbon. */
-  const chooseable = columnSlugs.length > VIEW;
+  /* …AND SINCE 2026-09-24 A DECLARED BOARD WHOSE COLUMNS ALL FIT OFFERS
+     THE CHOICE TOO ("4 of 4 drawn"). The operator read the Championships
+     board beside the Leagues one and asked for the same strip and the same
+     chooser on both; the rule is one rule for any declared board of two
+     or more columns, so it holds for both modes rather than for one of
+     them. A narrowed page (`only`) still offers none. */
+  const chooseable = columnSlugs.length > VIEW
+    || (!only && columnSlugs.length > 1);
   /* THE LOOP IS A NO-OP AT FOUR COLUMNS OR FEWER, which is what keeps
      every narrowed page (`/bet-suggester/ucl`) exactly as it is: nothing
      is built to page through and no ribbon draws.
@@ -894,7 +907,14 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
    *  control, and they are different controls because the widths are
    *  different problems. See components/LeagueTabs.tsx. */
   const showTabs = phone && boardReady && columnSlugs.length > 1;
-  const showRibbon = !phone && windowed && boardReady;
+  /* THE STATIC STRIP: a declared board whose drawn columns all fit keeps
+     its pills (all lit, nothing to step to), so both modes wear the same
+     storey under the nav. The loop is handed `view` = the drawn count for
+     it — see useBoardLoop. */
+  const staticStrip = !phone && !windowed && boardReady && !only
+    && drawnSlugs.length > 1;
+  const showRibbon = !phone && boardReady && (windowed || staticStrip);
+  const loopView = windowed ? view : drawnSlugs.length;
   /** AND THE CHOOSER, WHICH OUTLIVES THE RIBBON (2026-09-22).
    *
    *  Gated on `chooseable` — the DECLARATION — and not on `windowed`,
@@ -955,7 +975,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
 
        THIS CHANGES NOTHING ON ITS OWN. `drawnSlugs` was `columnSlugs`
        at every width but the phone, and the phone never ran the loop. */
-    trackRef, stripRef, railRef, slugs: drawnSlugs, view,
+    trackRef, stripRef, railRef, slugs: drawnSlugs, view: loopView,
     /* NOT ON A PHONE. The loop addresses every declared column on the
        track and a phone mounts one, so it would refuse to run in any
        case — said here rather than left to that, because "the phone has
@@ -1140,7 +1160,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                       blank boxes. `showRibbon` is the loop's own gate,
                       which is why it is the ribbon's too. */}
                   {showRibbon && (
-                    <LeagueRibbon slugs={drawnSlugs} view={view}
+                    <LeagueRibbon slugs={drawnSlugs} view={loopView}
                       stripRef={stripRef} />
                   )}
                   {/* …AND THE CHOOSER UNDER IT, OR ALONE. The rule is
@@ -1940,7 +1960,13 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                        there. Absent until the rail has mounted, so the
                        first paint (and the server's markup) is the
                        in-column header it has always been. */
-                    headSlot={headSlots[slug] ?? null} />
+                    headSlot={headSlots[slug] ?? null}
+                    /* THE NATIONAL COLUMN'S OWN FACTS — group tables,
+                       stage, next fixture — off the payload's
+                       `competitions` block. Null on the club board. */
+                    national={champ ? nationalColumn(
+                      board?.competitions?.[slug],
+                      rows.filter((r) => columnsOf(r).includes(slug))) : null} />
                 ))}
                 {dayKeys.map((k, i) => i % 2 === 0 ? null : (
                   <div key={`tint-${k}`} aria-hidden
@@ -2025,6 +2051,25 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
               is addressable now rather than found by document order. */}
           <dl data-testid="legend"
             className="space-y-4 text-sm leading-relaxed text-ink-low">
+            {champ && (
+              <div data-testid="legend-national">
+                <dt className="text-ink-hi">a national card</dt>
+                <dd className="mt-1">
+                  The same card as a club one, with national facts in its
+                  slots. The headline is the overall ELO gap on the
+                  competition&apos;s own field; the stats line is the field
+                  ranks, the group points gap and games played once the
+                  group has started, and the head-to-head (favourite
+                  won-drew-lost) when ESPN has a record. The group is the
+                  chip beside the rank. A hollow form square is
+                  a <span className="text-ink-mid">friendly</span> — a
+                  national team&apos;s last five are every senior
+                  international. An axis every team in a column sits below
+                  the placeability floor on is said once, in the column
+                  header, rather than as a dagger on every cell.
+                </dd>
+              </div>
+            )}
             {/* Moved here 2026-09-06 from a two-line note above the
                 board. The FACTS it carried — the zone, and what "built"
                 means — stayed up there beside the numbers they qualify;

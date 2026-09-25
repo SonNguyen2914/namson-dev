@@ -566,6 +566,9 @@ export interface BoardRow {
   /** A national-team fixture's own facts (Championships board only) —
    *  see NationalBlock. Absent on every club row. */
   national?: NationalBlock | null;
+  /** the national card's headline — the backend's when it sends one,
+   *  else the interim venue-adjusted Elo gap (see venueAdjusted) */
+  headline?: NationalHeadline | null;
 }
 
 /** One tape row's reading of a live match, as the board serves it.
@@ -946,6 +949,246 @@ export interface Board {
   columns?: string[] | null;
   /** "championships" on that payload; absent on the club board. */
   mode?: string | null;
+  /** Per column, the competition's structure, standings and teams (the
+   *  Championships board only). Null for a column whose season could not
+   *  be read — that column's `leagues` entry names the error. */
+  competitions?: Record<string, ChampionshipCompetition | null> | null;
+}
+
+/* ── THE VENUE-ADJUSTED NATIONAL FAVOURITE (operator, 2026-09-24) ──────
+   Measured that day: Dominican Republic (home, Santiago) v Nicaragua read
+   a raw Elo gap of −21 and named Nicaragua; the card quoted Nicaragua's
+   19¢ leg while the market had the DR at 62¢, and the DR won 3–2. With a
+   home term the DR is the favourite.
+
+   INTERIM, AND SAID TO BE. A bake-off is choosing the headline signal by
+   measurement and will serve it per card (`headline` or
+   `national.headline`); while that field is absent the card derives this
+   one: the Elo difference plus HOME_ELO to the side at home in its own
+   country. Venue in national football is irregular, so "at home" is the
+   payload's `venue_class`, never the listed home side: TRUE_HOME and
+   OPPONENT_COUNTRY both name the side at home (`home_side`), NEUTRAL gives
+   nobody the term, and UNKNOWN gives nobody the term either — an unread
+   venue is not a home ground.
+
+   The favourite, every favourite-signed figure on the card and the quoted
+   Kalshi leg all come from this ONE number, so a card cannot headline one
+   side while pricing the other. */
+export const HOME_ELO = 65;
+
+type Pairish = readonly [unknown, unknown] | null | undefined;
+const swapPair = <T extends Pairish>(p: T): T =>
+  (Array.isArray(p) ? [p[1], p[0]] as unknown as T : p);
+const neg = (n: number | null | undefined) => (n == null ? n : -n);
+/** backend stages.shape, restated: CLEAN = all three favourite-signed
+ *  tier gaps > 0; HOLLOW = attack and defence both <= 0; SPLIT otherwise.
+ *  Null when an axis is absent — a shape nobody can read off three gaps
+ *  is not composed from fewer. */
+const shapeOf = (g: Record<string, number | null | undefined>): Shape | null => {
+  const { ovr, atk, def } = g;
+  if (ovr == null || atk == null || def == null) return null;
+  if (ovr > 0 && atk > 0 && def > 0) return "CLEAN";
+  if (atk <= 0 && def <= 0) return "HOLLOW";
+  return "SPLIT";
+};
+
+/** The side at home in its own country, or null. */
+export function venueHomeSide(
+  vc: { class?: string | null; home_side?: string | null } | null | undefined,
+): "home" | "away" | null {
+  if (!vc) return null;
+  if ((vc.class === "TRUE_HOME" || vc.class === "OPPONENT_COUNTRY")
+      && (vc.home_side === "home" || vc.home_side === "away")) return vc.home_side;
+  return null;
+}
+
+/** A national row, re-read from its headline. Untouched when it is not a
+ *  national row or carries no Elo pair to adjust. When the backend sent a
+ *  headline the row keeps it verbatim — the backend named the favourite
+ *  by it. Otherwise the row gains the interim venue-adjusted `headline`,
+ *  and is FLIPPED when the home term names the other side: every
+ *  favourite-signed field mirrored, the shape re-read by the backend's own
+ *  rule and the Kalshi quote re-taken from the new favourite's leg. */
+export function venueAdjusted(row: BoardRow): BoardRow {
+  const n = row.national;
+  if (!n) return row;
+  const served = row.headline ?? n.headline ?? null;
+  if (served) {
+    return { ...row, headline: { ...served, source: served.source ?? "payload" } };
+  }
+  const block = row.field ?? row.field_partial ?? null;
+  const ovr = block?.axes?.ovr;
+  const fv = ovr?.fav?.value, ov = ovr?.opp?.value;
+  if (fv == null || ov == null) return row;
+  const favHome = row.fav_side === "home";
+  const homeElo = favHome ? fv : ov, awayElo = favHome ? ov : fv;
+  const at = venueHomeSide(row.venue_class as
+    { class?: string | null; home_side?: string | null } | null | undefined);
+  const adj = homeElo - awayElo
+    + (at === "home" ? HOME_ELO : at === "away" ? -HOME_ELO : 0);
+  const newFav: "home" | "away" = adj >= 0 ? "home" : "away";
+  const basis = `overall Elo on the competition's own field — ${row.home} `
+    + `${Math.round(homeElo)}, ${row.away} ${Math.round(awayElo)}`
+    + (at ? ` — plus ${HOME_ELO} to ${at === "home" ? row.home : row.away}, `
+          + "at home in its own country"
+          : " — no home term (a neutral or unread venue)")
+    + ". Interim: the headline signal is being chosen by measurement.";
+  const headline: NationalHeadline = {
+    value: Math.abs(adj), unit: "elo", label: "elo gap",
+    source: "venue_elo", basis };
+  if (newFav === row.fav_side) return { ...row, headline };
+
+  const flipAxes = <B extends { axes: object; shape?: Shape | null }>(
+    b: B | null | undefined,
+  ): B | null | undefined => {
+    if (!b) return b;
+    const axes: Record<string, unknown> = {};
+    const gaps: Record<string, number | null | undefined> = {};
+    for (const [k, a] of Object.entries(b.axes)) {
+      const x = a as { fav: unknown; opp: unknown; tier_gap?: number | null };
+      axes[k] = { ...x, fav: x.opp, opp: x.fav, tier_gap: neg(x.tier_gap) };
+      gaps[k] = neg(x.tier_gap);
+    }
+    return { ...b, axes, ...("shape" in b ? { shape: shapeOf(gaps) } : {}) };
+  };
+  const tierGaps = Object.fromEntries(
+    Object.entries(row.tier_gaps ?? {}).map(([k, v]) => [k, neg(v as number | null)]));
+  const tiers = Object.fromEntries(
+    Object.entries(row.tiers ?? {}).map(([k, p]) => [k, swapPair(p as Pairish)]));
+  const legs = (n.market as { legs?: Record<string,
+    (KalshiQuote & { name?: string }) | null> } | null)?.legs;
+  const leg = legs?.[newFav] ?? null;
+  let kalshi: KalshiQuote | null = null;
+  if (leg) {
+    const { name: _name, ...quote } = leg;
+    void _name;
+    kalshi = quote;
+  }
+  return {
+    ...row,
+    favourite: row.opponent, opponent: row.favourite, fav_side: newFav,
+    form: row.form ? { ...row.form, fav: row.form.opp, opp: row.form.fav } : row.form,
+    field: flipAxes(row.field) ?? row.field,
+    field_partial: flipAxes(row.field_partial) ?? row.field_partial,
+    tiers: tiers as unknown as BoardRow["tiers"],
+    tier_gaps: tierGaps as unknown as BoardRow["tier_gaps"],
+    shape: (shapeOf(tierGaps) ?? row.shape) as BoardRow["shape"],
+    rank_gap: neg(row.rank_gap) ?? null,
+    ranks: row.ranks ? { fav: row.ranks.opp, opp: row.ranks.fav } : row.ranks,
+    rates: row.rates ? Object.fromEntries(Object.entries(row.rates)
+      .map(([k, p]) => [k, swapPair(p as Pairish)])) as unknown as BoardRow["rates"]
+      : row.rates,
+    own_gdg: row.own_gdg ? { ...row.own_gdg, diff: neg(row.own_gdg.diff) ?? null }
+      : row.own_gdg,
+    kalshi,
+    headline,
+  };
+}
+
+/** One national-team competition's own account of itself — only the keys
+ *  a surface reads (backend src/championships/payload.competition_payload). */
+export interface ChampionshipCompetition {
+  structure?: {
+    stages?: { key: string; kind?: string; label?: string; dates?: string }[];
+  } | null;
+  standings?: {
+    /** the group tables DERIVED from played results, keyed by group */
+    derived?: Record<string, StandingRow[]> | null;
+    ordering_note?: string | null;
+  } | null;
+  teams?: Record<string, {
+    name?: string; espn_id?: string; group?: string | null;
+    next_fixture?: { event_id?: string; kickoff?: string; opponent?: string } | null;
+  }> | null;
+}
+
+export interface StandingRow {
+  espn_id: string;
+  name?: string;
+  position?: number | null;
+  gp: number; w?: number; d?: number; l?: number;
+  gf?: number; ga?: number; gd?: number; pts: number;
+}
+
+/** WHAT A NATIONAL COLUMN NEEDS BESIDE ITS ROWS, derived once per column
+ *  from the payload: its group tables (for the card's stats line), the
+ *  stage chip its header carries where a league header carries its season
+ *  chip, and — for a column with nothing in the window — when it next
+ *  plays, so its empty days read as rest days. */
+export interface NationalColumn {
+  standings: Record<string, StandingRow[]>;
+  stage: { text: string; title: string } | null;
+  /** the kickoff of this competition's next fixture OUTSIDE the window;
+   *  null when it has fixtures in the window, or none at all */
+  nextBeyond: string | null;
+  standingsNote: string | null;
+}
+
+const DM = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "America/Los_Angeles", day: "numeric", month: "short" });
+
+/** THE STAGE, AS A LEAGUE HEADER SAYS ITS SEASON. Derived, never typed:
+ *   - the stage is the one the column's rows are in (`national.stage`),
+ *     named by the backend's own stage label up to its parenthesis;
+ *   - the matchday is the EARLIEST one in the window — for each fixture,
+ *     one more than the games its two sides have already played in their
+ *     group table — so a window straddling two matchdays names the first;
+ *   - the total is the highest `MD<n>` the backend's own stage dates name,
+ *     and is simply left off where they name none (a total nobody stated
+ *     is not printed);
+ *   - a column with nothing in the window says when it starts. */
+export function nationalColumn(
+  comp: ChampionshipCompetition | null | undefined,
+  rows: readonly { national?: NationalBlock | null; fav_side?: string }[],
+): NationalColumn | null {
+  if (!comp) return null;
+  const standings = comp.standings?.derived ?? {};
+  const gpOf = (group: string | null | undefined, id: string | null | undefined) =>
+    (group && id ? standings[group]?.find((r) => r.espn_id === id)?.gp : undefined);
+  const stages = comp.structure?.stages ?? [];
+  let stage: NationalColumn["stage"] = null;
+  let nextBeyond: string | null = null;
+  if (rows.length === 0) {
+    const kicks = Object.values(comp.teams ?? {})
+      .map((t) => t.next_fixture?.kickoff).filter((k): k is string => !!k).sort();
+    nextBeyond = kicks[0] ?? null;
+    if (nextBeyond) {
+      const first = stages[0];
+      stage = { text: `starts ${DM.format(new Date(nextBeyond)).toLowerCase()}`,
+                title: `${first?.label ?? "the competition"} — ${first?.dates ?? ""}`.trim() };
+    }
+  } else {
+    const counts = new Map<string, number>();
+    for (const r of rows) {
+      const k = r.national?.stage;
+      if (k) counts.set(k, (counts.get(k) ?? 0) + 1);
+    }
+    const key = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+    const st = stages.find((x) => x.key === key);
+    const label = (st?.label ?? key ?? "").split(" (")[0].trim().toLowerCase();
+    let md: number | null = null;
+    for (const r of rows) {
+      const n = r.national;
+      const h = gpOf(n?.group, n?.teams?.home?.espn_id);
+      const a = gpOf(n?.group, n?.teams?.away?.espn_id);
+      if (h == null || a == null) continue;
+      const m = Math.max(h, a) + 1;
+      md = md == null ? m : Math.min(md, m);
+    }
+    /* "MD1 24-26 Sep, …, MD6 15-17 Nov" and "MD1-2 …, MD5-6 …" both
+       name their last matchday; a range's upper end counts */
+    const totals = [...(st?.dates ?? "").matchAll(/MD\s?(\d+)(?:\s?-\s?(\d+))?/g)]
+      .flatMap((m) => [Number(m[1]), ...(m[2] ? [Number(m[2])] : [])]);
+    const total = totals.length ? Math.max(...totals) : null;
+    if (label) {
+      stage = {
+        text: `${label}${md != null ? ` · md ${md}${total ? `/${total}` : ""}` : ""}`,
+        title: `${st?.label ?? label}${st?.dates ? ` — ${st.dates}` : ""}. The matchday is the earliest in this window, read off the group tables: one more than the games each side has played.`,
+      };
+    }
+  }
+  return { standings, stage, nextBeyond,
+           standingsNote: comp.standings?.ordering_note ?? null };
 }
 
 /** One fixture the board removed, in the backend's own words. */
@@ -1493,8 +1736,23 @@ export interface NationalHeadToHead {
   reason?: string;
 }
 
+/** THE NATIONAL CARD'S HEADLINE, AS DATA. A bake-off is choosing the
+ *  signal by measurement and will serve it per card as this field; the
+ *  label and the unit ride with the value so the card prints what it is
+ *  told rather than what it assumed. Signed from the row's favourite. */
+export interface NationalHeadline {
+  value: number;
+  unit: string;
+  label: string;
+  /** "payload" when the backend sent it; "venue_elo" while the card
+   *  derives the interim one (see venueAdjusted) */
+  source?: string;
+  basis?: string;
+}
+
 export interface NationalBlock {
   competition?: string;
+  headline?: NationalHeadline | null;
   stage?: string | null;
   stage_kind?: string | null;
   group?: string | null;

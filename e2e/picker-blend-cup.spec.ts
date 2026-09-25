@@ -1508,10 +1508,14 @@ test("the league header follows the column when the rows scroll under it",
     // the column really did travel out of the top of the viewport
     expect(colBox!.y).toBeLessThan(-100);
     // and its header did not go with it — it is pinned just under the
-    // top bar, whose height it reads rather than a number typed here
+    // top bar AND the pill bar under it (a four-column board carries the
+    // static strip since 2026-09-24), whose heights it reads rather than
+    // a number typed here
     const barH = await page.evaluate(() => {
       const b = document.querySelector(".topbar");
-      return b ? b.getBoundingClientRect().height : 0;
+      const p = document.querySelector('[data-testid="board-pillbar"]');
+      return (b ? b.getBoundingClientRect().height : 0)
+        + (p ? p.getBoundingClientRect().height : 0);
     });
     expect(barH).toBeGreaterThan(0);
     expect(after!.y).toBeGreaterThanOrEqual(barH - 1);

@@ -7,12 +7,13 @@
  *
  * HOW IT WAS TRIMMED, AND NOTHING ELSE WAS TOUCHED. The recording was cut
  * to the page's own ask (`days=8`) exactly as the backend's
- * `payload._in_window` cuts it, then to 18 rows — the first few of
+ * `payload._in_window` cuts it, then to 19 rows — the first few of
  * each column by kickoff, both `field_partial` rows, one with the starting
  * XIs announced, one with no Kalshi book and one with no head-to-head on
  * ESPN's record — and three of the off-board entries. The per-competition
- * `competitions` block (standings, season counts) is dropped: no surface
- * reads it yet. Every kept key, value and absence is the wire's.
+ * `competitions` block is cut to what a surface reads: each column's
+ * stages, its derived group tables and the Asian Cup's next fixtures.
+ * Every kept key, value and absence is the wire's.
  * `off_board_counts` is left as the backend counted it.
  *
  * The AFC Asian Cup has no fixture in this window (it starts 7 Jan 2027),
@@ -42,6 +43,2777 @@ export const CHAMP_BOARD = {
   "asiancup",
   "afcon"
  ],
+ "competitions": {
+  "afcon": {
+   "structure": {
+    "stages": [
+     {
+      "dates": "25-31 Mar 2026",
+      "key": "preliminary-round",
+      "kind": "knockout",
+      "label": "Qualifying preliminary round (two legs)",
+      "on_provider": true
+     },
+     {
+      "dates": "MD1-2 24 Sep-6 Oct 2026, MD3-4 9-17 Nov 2026, MD5-6 22-30 Mar 2027",
+      "key": "group-stage",
+      "kind": "group",
+      "label": "Qualifying groups (12 groups of 4, home and away)",
+      "on_provider": true
+     },
+     {
+      "dates": "19 Jun-17 Jul 2027",
+      "key": "finals",
+      "kind": "finals",
+      "label": "Finals, Kenya / Uganda / Tanzania",
+      "on_provider": false
+     }
+    ]
+   },
+   "standings": {
+    "derived": {
+     "Group A": [
+      {
+       "d": 0,
+       "espn_id": "4231",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "gabon",
+       "l": 0,
+       "name": "Gabon",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "6640",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "lesotho",
+       "l": 0,
+       "name": "Lesotho",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2869",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "morocco",
+       "l": 0,
+       "name": "Morocco",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "8937",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "niger",
+       "l": 0,
+       "name": "Niger",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group B": [
+      {
+       "d": 0,
+       "espn_id": "653",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "angola",
+       "l": 0,
+       "name": "Angola",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2620",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "egypt",
+       "l": 0,
+       "name": "Egypt",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "4325",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "malawi",
+       "l": 0,
+       "name": "Malawi",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "14075",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "south-sudan",
+       "l": 0,
+       "name": "South Sudan",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group C": [
+      {
+       "d": 0,
+       "espn_id": "4789",
+       "ga": 0,
+       "gd": 2,
+       "gf": 2,
+       "gp": 1,
+       "key": "ivory-coast",
+       "l": 0,
+       "name": "Ivory Coast",
+       "position": 1,
+       "pts": 3,
+       "w": 1
+      },
+      {
+       "d": 0,
+       "espn_id": "7368",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "gambia",
+       "l": 0,
+       "name": "Gambia",
+       "position": 2,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "5776",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "somalia",
+       "l": 0,
+       "name": "Somalia",
+       "position": 3,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "4469",
+       "ga": 2,
+       "gd": -2,
+       "gf": 0,
+       "gp": 1,
+       "key": "ghana",
+       "l": 1,
+       "name": "Ghana",
+       "position": 4,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group D": [
+      {
+       "d": 0,
+       "espn_id": "5774",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "eritrea",
+       "l": 0,
+       "name": "Eritrea",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2847",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "guinea",
+       "l": 0,
+       "name": "Guinea",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2848",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "kenya",
+       "l": 0,
+       "name": "Kenya",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "467",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "south-africa",
+       "l": 0,
+       "name": "South Africa",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group E": [
+      {
+       "d": 0,
+       "espn_id": "2850",
+       "ga": 0,
+       "gd": 2,
+       "gf": 2,
+       "gp": 1,
+       "key": "congo-dr",
+       "l": 0,
+       "name": "Congo DR",
+       "position": 1,
+       "pts": 3,
+       "w": 1
+      },
+      {
+       "d": 0,
+       "espn_id": "4214",
+       "ga": 2,
+       "gd": 1,
+       "gf": 3,
+       "gp": 1,
+       "key": "zimbabwe",
+       "l": 0,
+       "name": "Zimbabwe",
+       "position": 2,
+       "pts": 3,
+       "w": 1
+      },
+      {
+       "d": 0,
+       "espn_id": "8600",
+       "ga": 3,
+       "gd": -1,
+       "gf": 2,
+       "gp": 1,
+       "key": "sierra-leone",
+       "l": 1,
+       "name": "Sierra Leone",
+       "position": 3,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "8938",
+       "ga": 2,
+       "gd": -2,
+       "gf": 0,
+       "gp": 1,
+       "key": "equatorial-guinea",
+       "l": 1,
+       "name": "Equatorial Guinea",
+       "position": 4,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group F": [
+      {
+       "d": 0,
+       "espn_id": "8940",
+       "ga": 1,
+       "gd": 2,
+       "gf": 3,
+       "gp": 1,
+       "key": "mauritania",
+       "l": 0,
+       "name": "Mauritania",
+       "position": 1,
+       "pts": 3,
+       "w": 1
+      },
+      {
+       "d": 0,
+       "espn_id": "2844",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "benin",
+       "l": 0,
+       "name": "Benin",
+       "position": 2,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2845",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "burkina-faso",
+       "l": 0,
+       "name": "Burkina Faso",
+       "position": 3,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "10528",
+       "ga": 3,
+       "gd": -2,
+       "gf": 1,
+       "gp": 1,
+       "key": "central-african-republic",
+       "l": 1,
+       "name": "Central African Republic",
+       "position": 4,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group G": [
+      {
+       "d": 0,
+       "espn_id": "656",
+       "ga": 1,
+       "gd": 2,
+       "gf": 3,
+       "gp": 1,
+       "key": "cameroon",
+       "l": 0,
+       "name": "Cameroon",
+       "position": 1,
+       "pts": 3,
+       "w": 1
+      },
+      {
+       "d": 0,
+       "espn_id": "6725",
+       "ga": 0,
+       "gd": 1,
+       "gf": 1,
+       "gp": 1,
+       "key": "namibia",
+       "l": 0,
+       "name": "Namibia",
+       "position": 2,
+       "pts": 3,
+       "w": 1
+      },
+      {
+       "d": 0,
+       "espn_id": "4276",
+       "ga": 1,
+       "gd": -1,
+       "gf": 0,
+       "gp": 1,
+       "key": "congo",
+       "l": 1,
+       "name": "Congo",
+       "position": 3,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "8601",
+       "ga": 3,
+       "gd": -2,
+       "gf": 1,
+       "gp": 1,
+       "key": "comoros",
+       "l": 1,
+       "name": "Comoros",
+       "position": 4,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group H": [
+      {
+       "d": 1,
+       "espn_id": "4245",
+       "ga": 2,
+       "gd": 0,
+       "gf": 2,
+       "gp": 1,
+       "key": "botswana",
+       "l": 0,
+       "name": "Botswana",
+       "position": 1,
+       "pts": 1,
+       "w": 0
+      },
+      {
+       "d": 1,
+       "espn_id": "2621",
+       "ga": 2,
+       "gd": 0,
+       "gf": 2,
+       "gp": 1,
+       "key": "libya",
+       "l": 0,
+       "name": "Libya",
+       "position": 2,
+       "pts": 1,
+       "w": 0
+      },
+      {
+       "d": 1,
+       "espn_id": "659",
+       "ga": 1,
+       "gd": 0,
+       "gf": 1,
+       "gp": 1,
+       "key": "tunisia",
+       "l": 0,
+       "name": "Tunisia",
+       "position": 3,
+       "pts": 1,
+       "w": 0
+      },
+      {
+       "d": 1,
+       "espn_id": "4211",
+       "ga": 1,
+       "gd": 0,
+       "gf": 1,
+       "gp": 1,
+       "key": "uganda",
+       "l": 0,
+       "name": "Uganda",
+       "position": 4,
+       "pts": 1,
+       "w": 0
+      }
+     ],
+     "Group I": [
+      {
+       "d": 0,
+       "espn_id": "624",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "algeria",
+       "l": 0,
+       "name": "Algeria",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "5779",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "burundi",
+       "l": 0,
+       "name": "Burundi",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "4356",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "togo",
+       "l": 0,
+       "name": "Togo",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "4277",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "zambia",
+       "l": 0,
+       "name": "Zambia",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group J": [
+      {
+       "d": 0,
+       "espn_id": "5777",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "ethiopia",
+       "l": 0,
+       "name": "Ethiopia",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "8939",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "mozambique",
+       "l": 0,
+       "name": "Mozambique",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "654",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "senegal",
+       "l": 0,
+       "name": "Senegal",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "4319",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "sudan",
+       "l": 0,
+       "name": "Sudan",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group K": [
+      {
+       "d": 0,
+       "espn_id": "2597",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "cape-verde",
+       "l": 0,
+       "name": "Cape Verde",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "4205",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "liberia",
+       "l": 0,
+       "name": "Liberia",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2849",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "mali",
+       "l": 0,
+       "name": "Mali",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2851",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "rwanda",
+       "l": 0,
+       "name": "Rwanda",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group L": [
+      {
+       "d": 0,
+       "espn_id": "8602",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "guinea-bissau",
+       "l": 0,
+       "name": "Guinea-Bissau",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "5533",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "madagascar",
+       "l": 0,
+       "name": "Madagascar",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "657",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "nigeria",
+       "l": 0,
+       "name": "Nigeria",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "5778",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "tanzania",
+       "l": 0,
+       "name": "Tanzania",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ]
+    },
+    "ordering_note": "ordered by points, then goal difference, then goals scored, then name. THIS IS NOT THE GOVERNING BODY'S TIE-BREAK: UEFA, Concacaf, the AFC and CAF all break level points on head-to-head results first, so two teams level on points may legitimately sit in the other order on the official table. The NUMBERS are the claim here; the order on a points tie is not."
+   }
+  },
+  "asiancup": {
+   "structure": {
+    "stages": [
+     {
+      "dates": "7-20 Jan 2027",
+      "key": "group-stage",
+      "kind": "group",
+      "label": "Group stage (6 groups of 4)",
+      "on_provider": true
+     },
+     {
+      "dates": "22-25 Jan 2027",
+      "key": "round-of-16",
+      "kind": "knockout",
+      "label": "Round of 16",
+      "on_provider": true
+     },
+     {
+      "dates": "28-29 Jan 2027",
+      "key": "quarterfinals",
+      "kind": "knockout",
+      "label": "Quarter-finals",
+      "on_provider": true
+     },
+     {
+      "dates": "1-2 Feb 2027",
+      "key": "semifinals",
+      "kind": "knockout",
+      "label": "Semi-finals",
+      "on_provider": true
+     },
+     {
+      "dates": "5 Feb 2027",
+      "key": "final",
+      "kind": "knockout",
+      "label": "Final",
+      "on_provider": true
+     }
+    ]
+   },
+   "standings": {
+    "derived": {
+     "Group A": [
+      {
+       "d": 0,
+       "espn_id": "841",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "kuwait",
+       "l": 0,
+       "name": "Kuwait",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2841",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "oman",
+       "l": 0,
+       "name": "Oman",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "6167",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "palestine",
+       "l": 0,
+       "name": "Palestine",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "655",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "saudi-arabia",
+       "l": 0,
+       "name": "Saudi Arabia",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group B": [
+      {
+       "d": 0,
+       "espn_id": "4381",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "bahrain",
+       "l": 0,
+       "name": "Bahrain",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2917",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "jordan",
+       "l": 0,
+       "name": "Jordan",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "4860",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "north-korea",
+       "l": 0,
+       "name": "North Korea",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2570",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "uzbekistan",
+       "l": 0,
+       "name": "Uzbekistan",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group C": [
+      {
+       "d": 0,
+       "espn_id": "658",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "china",
+       "l": 0,
+       "name": "China",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "469",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "iran",
+       "l": 0,
+       "name": "Iran",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "6724",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "kyrgyz-republic",
+       "l": 0,
+       "name": "Kyrgyz Republic",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "4380",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "syria",
+       "l": 0,
+       "name": "Syria",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group D": [
+      {
+       "d": 0,
+       "espn_id": "628",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "australia",
+       "l": 0,
+       "name": "Australia",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "4375",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "iraq",
+       "l": 0,
+       "name": "Iraq",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "4384",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "singapore",
+       "l": 0,
+       "name": "Singapore",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "6723",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "tajikistan",
+       "l": 0,
+       "name": "Tajikistan",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group E": [
+      {
+       "d": 0,
+       "espn_id": "451",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "south-korea",
+       "l": 0,
+       "name": "South Korea",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "4397",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "united-arab-emirates",
+       "l": 0,
+       "name": "United Arab Emirates",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "7349",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "vietnam",
+       "l": 0,
+       "name": "Vietnam",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "6014",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "yemen",
+       "l": 0,
+       "name": "Yemen",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group F": [
+      {
+       "d": 0,
+       "espn_id": "4895",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "indonesia",
+       "l": 0,
+       "name": "Indonesia",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "627",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "japan",
+       "l": 0,
+       "name": "Japan",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "4398",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "qatar",
+       "l": 0,
+       "name": "Qatar",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "4396",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "thailand",
+       "l": 0,
+       "name": "Thailand",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ]
+    },
+    "ordering_note": "ordered by points, then goal difference, then goals scored, then name. THIS IS NOT THE GOVERNING BODY'S TIE-BREAK: UEFA, Concacaf, the AFC and CAF all break level points on head-to-head results first, so two teams level on points may legitimately sit in the other order on the official table. The NUMBERS are the claim here; the order on a points tie is not."
+   },
+   "teams": {
+    "australia": {
+     "name": "Australia",
+     "espn_id": "628",
+     "group": "Group D",
+     "next_fixture": {
+      "event_id": "401872242",
+      "kickoff": "2027-01-09T20:00Z",
+      "opponent": "Singapore"
+     }
+    },
+    "bahrain": {
+     "name": "Bahrain",
+     "espn_id": "4381",
+     "group": "Group B",
+     "next_fixture": {
+      "event_id": "401872239",
+      "kickoff": "2027-01-08T20:00Z",
+      "opponent": "North Korea"
+     }
+    },
+    "china": {
+     "name": "China",
+     "espn_id": "658",
+     "group": "Group C",
+     "next_fixture": {
+      "event_id": "401872244",
+      "kickoff": "2027-01-09T20:00Z",
+      "opponent": "Iran"
+     }
+    },
+    "indonesia": {
+     "name": "Indonesia",
+     "espn_id": "4895",
+     "group": "Group F",
+     "next_fixture": {
+      "event_id": "401872248",
+      "kickoff": "2027-01-11T20:00Z",
+      "opponent": "Japan"
+     }
+    },
+    "iran": {
+     "name": "Iran",
+     "espn_id": "469",
+     "group": "Group C",
+     "next_fixture": {
+      "event_id": "401872244",
+      "kickoff": "2027-01-09T20:00Z",
+      "opponent": "China"
+     }
+    },
+    "iraq": {
+     "name": "Iraq",
+     "espn_id": "4375",
+     "group": "Group D",
+     "next_fixture": {
+      "event_id": "401872246",
+      "kickoff": "2027-01-10T20:00Z",
+      "opponent": "Tajikistan"
+     }
+    },
+    "japan": {
+     "name": "Japan",
+     "espn_id": "627",
+     "group": "Group F",
+     "next_fixture": {
+      "event_id": "401872248",
+      "kickoff": "2027-01-11T20:00Z",
+      "opponent": "Indonesia"
+     }
+    },
+    "jordan": {
+     "name": "Jordan",
+     "espn_id": "2917",
+     "group": "Group B",
+     "next_fixture": {
+      "event_id": "401872241",
+      "kickoff": "2027-01-08T20:00Z",
+      "opponent": "Uzbekistan"
+     }
+    },
+    "kuwait": {
+     "name": "Kuwait",
+     "espn_id": "841",
+     "group": "Group A",
+     "next_fixture": {
+      "event_id": "401872240",
+      "kickoff": "2027-01-08T20:00Z",
+      "opponent": "Oman"
+     }
+    },
+    "kyrgyz-republic": {
+     "name": "Kyrgyz Republic",
+     "espn_id": "6724",
+     "group": "Group C",
+     "next_fixture": {
+      "event_id": "401872243",
+      "kickoff": "2027-01-09T20:00Z",
+      "opponent": "Syria"
+     }
+    },
+    "north-korea": {
+     "name": "North Korea",
+     "espn_id": "4860",
+     "group": "Group B",
+     "next_fixture": {
+      "event_id": "401872239",
+      "kickoff": "2027-01-08T20:00Z",
+      "opponent": "Bahrain"
+     }
+    },
+    "oman": {
+     "name": "Oman",
+     "espn_id": "2841",
+     "group": "Group A",
+     "next_fixture": {
+      "event_id": "401872240",
+      "kickoff": "2027-01-08T20:00Z",
+      "opponent": "Kuwait"
+     }
+    },
+    "palestine": {
+     "name": "Palestine",
+     "espn_id": "6167",
+     "group": "Group A",
+     "next_fixture": {
+      "event_id": "401872238",
+      "kickoff": "2027-01-07T20:00Z",
+      "opponent": "Saudi Arabia"
+     }
+    },
+    "qatar": {
+     "name": "Qatar",
+     "espn_id": "4398",
+     "group": "Group F",
+     "next_fixture": {
+      "event_id": "401872247",
+      "kickoff": "2027-01-11T20:00Z",
+      "opponent": "Thailand"
+     }
+    },
+    "saudi-arabia": {
+     "name": "Saudi Arabia",
+     "espn_id": "655",
+     "group": "Group A",
+     "next_fixture": {
+      "event_id": "401872238",
+      "kickoff": "2027-01-07T20:00Z",
+      "opponent": "Palestine"
+     }
+    },
+    "singapore": {
+     "name": "Singapore",
+     "espn_id": "4384",
+     "group": "Group D",
+     "next_fixture": {
+      "event_id": "401872242",
+      "kickoff": "2027-01-09T20:00Z",
+      "opponent": "Australia"
+     }
+    },
+    "south-korea": {
+     "name": "South Korea",
+     "espn_id": "451",
+     "group": "Group E",
+     "next_fixture": {
+      "event_id": "401872245",
+      "kickoff": "2027-01-10T20:00Z",
+      "opponent": "Yemen"
+     }
+    },
+    "syria": {
+     "name": "Syria",
+     "espn_id": "4380",
+     "group": "Group C",
+     "next_fixture": {
+      "event_id": "401872243",
+      "kickoff": "2027-01-09T20:00Z",
+      "opponent": "Kyrgyz Republic"
+     }
+    },
+    "tajikistan": {
+     "name": "Tajikistan",
+     "espn_id": "6723",
+     "group": "Group D",
+     "next_fixture": {
+      "event_id": "401872246",
+      "kickoff": "2027-01-10T20:00Z",
+      "opponent": "Iraq"
+     }
+    },
+    "thailand": {
+     "name": "Thailand",
+     "espn_id": "4396",
+     "group": "Group F",
+     "next_fixture": {
+      "event_id": "401872247",
+      "kickoff": "2027-01-11T20:00Z",
+      "opponent": "Qatar"
+     }
+    },
+    "united-arab-emirates": {
+     "name": "United Arab Emirates",
+     "espn_id": "4397",
+     "group": "Group E",
+     "next_fixture": {
+      "event_id": "401872249",
+      "kickoff": "2027-01-11T20:00Z",
+      "opponent": "Vietnam"
+     }
+    },
+    "uzbekistan": {
+     "name": "Uzbekistan",
+     "espn_id": "2570",
+     "group": "Group B",
+     "next_fixture": {
+      "event_id": "401872241",
+      "kickoff": "2027-01-08T20:00Z",
+      "opponent": "Jordan"
+     }
+    },
+    "vietnam": {
+     "name": "Vietnam",
+     "espn_id": "7349",
+     "group": "Group E",
+     "next_fixture": {
+      "event_id": "401872249",
+      "kickoff": "2027-01-11T20:00Z",
+      "opponent": "United Arab Emirates"
+     }
+    },
+    "yemen": {
+     "name": "Yemen",
+     "espn_id": "6014",
+     "group": "Group E",
+     "next_fixture": {
+      "event_id": "401872245",
+      "kickoff": "2027-01-10T20:00Z",
+      "opponent": "South Korea"
+     }
+    }
+   }
+  },
+  "cnl": {
+   "structure": {
+    "stages": [
+     {
+      "dates": "21 Sep-6 Oct 2026; League B also 9-17 Nov 2026",
+      "key": "group-stage",
+      "kind": "group",
+      "label": "Group stage (Leagues A, B, C)",
+      "on_provider": true
+     },
+     {
+      "dates": "9-17 Nov 2026",
+      "key": "quarterfinals",
+      "kind": "knockout",
+      "label": "League A quarter-finals (two legs)",
+      "on_provider": false
+     },
+     {
+      "dates": "25-28 Mar 2027",
+      "key": "finals",
+      "kind": "finals",
+      "label": "League A Finals, SoFi Stadium",
+      "on_provider": false
+     },
+     {
+      "dates": "22-30 Mar 2027",
+      "key": "league-bc-championships",
+      "kind": "finals",
+      "label": "League B and League C Championships",
+      "on_provider": false
+     }
+    ]
+   },
+   "standings": {
+    "derived": {
+     "League A - Group A": [
+      {
+       "d": 0,
+       "espn_id": "214",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "costa-rica",
+       "l": 0,
+       "name": "Costa Rica",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "11678",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "curacao",
+       "l": 0,
+       "name": "Curaçao",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2649",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "dominican-republic",
+       "l": 0,
+       "name": "Dominican Republic",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2654",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "haiti",
+       "l": 0,
+       "name": "Haiti",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2658",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "nicaragua",
+       "l": 0,
+       "name": "Nicaragua",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2627",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "trinidad-and-tobago",
+       "l": 0,
+       "name": "Trinidad and Tobago",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "League A - Group B": [
+      {
+       "d": 0,
+       "espn_id": "2650",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "el-salvador",
+       "l": 0,
+       "name": "El Salvador",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2652",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "guatemala",
+       "l": 0,
+       "name": "Guatemala",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "215",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "honduras",
+       "l": 0,
+       "name": "Honduras",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "1038",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "jamaica",
+       "l": 0,
+       "name": "Jamaica",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2728",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "martinique",
+       "l": 0,
+       "name": "Martinique",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2664",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "suriname",
+       "l": 0,
+       "name": "Suriname",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "League B - Group A": [
+      {
+       "d": 0,
+       "espn_id": "2653",
+       "ga": 0,
+       "gd": 1,
+       "gf": 1,
+       "gp": 1,
+       "key": "guyana",
+       "l": 0,
+       "name": "Guyana",
+       "position": 1,
+       "pts": 3,
+       "w": 1
+      },
+      {
+       "d": 0,
+       "espn_id": "2646",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "cayman-islands",
+       "l": 0,
+       "name": "Cayman Islands",
+       "position": 2,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "13582",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "dominica",
+       "l": 0,
+       "name": "Dominica",
+       "position": 3,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "11766",
+       "ga": 1,
+       "gd": -1,
+       "gf": 0,
+       "gp": 1,
+       "key": "puerto-rico",
+       "l": 1,
+       "name": "Puerto Rico",
+       "position": 4,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "League B - Group B": [
+      {
+       "d": 0,
+       "espn_id": "2637",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "barbados",
+       "l": 0,
+       "name": "Barbados",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2643",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "bermuda",
+       "l": 0,
+       "name": "Bermuda",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "7657",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "guadeloupe",
+       "l": 0,
+       "name": "Guadeloupe",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2661",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "st-lucia",
+       "l": 0,
+       "name": "St. Lucia",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "League B - Group C": [
+      {
+       "d": 0,
+       "espn_id": "19314",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "bonaire",
+       "l": 0,
+       "name": "Bonaire",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2647",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "cuba",
+       "l": 0,
+       "name": "Cuba",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2651",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "grenada",
+       "l": 0,
+       "name": "Grenada",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2662",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "st-kitts-and-nevis",
+       "l": 0,
+       "name": "St. Kitts and Nevis",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "League B - Group D": [
+      {
+       "d": 0,
+       "espn_id": "2641",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "belize",
+       "l": 0,
+       "name": "Belize",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "10532",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "french-guiana",
+       "l": 0,
+       "name": "French Guiana",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "18243",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "sint-maarten",
+       "l": 0,
+       "name": "Sint Maarten",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "13584",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "st-vincent-and-the-grenadines",
+       "l": 0,
+       "name": "St. Vincent and the Grenadines",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "League C - Group A": [
+      {
+       "d": 0,
+       "espn_id": "2655",
+       "ga": 0,
+       "gd": 2,
+       "gf": 2,
+       "gp": 1,
+       "key": "montserrat",
+       "l": 0,
+       "name": "Montserrat",
+       "position": 1,
+       "pts": 3,
+       "w": 1
+      },
+      {
+       "d": 0,
+       "espn_id": "2644",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "british-virgin-islands",
+       "l": 0,
+       "name": "British Virgin Islands",
+       "position": 2,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2665",
+       "ga": 2,
+       "gd": -2,
+       "gf": 0,
+       "gp": 1,
+       "key": "turks-and-caicos-islands",
+       "l": 1,
+       "name": "Turks and Caicos Islands",
+       "position": 3,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "League C - Group B": [
+      {
+       "d": 0,
+       "espn_id": "2642",
+       "ga": 0,
+       "gd": 1,
+       "gf": 1,
+       "gp": 1,
+       "key": "aruba",
+       "l": 0,
+       "name": "Aruba",
+       "position": 1,
+       "pts": 3,
+       "w": 1
+      },
+      {
+       "d": 0,
+       "espn_id": "8942",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "anguilla",
+       "l": 0,
+       "name": "Anguilla",
+       "position": 2,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2638",
+       "ga": 1,
+       "gd": -1,
+       "gf": 0,
+       "gp": 1,
+       "key": "antigua-and-barbuda",
+       "l": 1,
+       "name": "Antigua and Barbuda",
+       "position": 3,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "League C - Group C": [
+      {
+       "d": 0,
+       "espn_id": "10596",
+       "ga": 0,
+       "gd": 8,
+       "gf": 8,
+       "gp": 1,
+       "key": "st-martin",
+       "l": 0,
+       "name": "St. Martin",
+       "position": 1,
+       "pts": 3,
+       "w": 1
+      },
+      {
+       "d": 0,
+       "espn_id": "2645",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "us-virgin-islands",
+       "l": 0,
+       "name": "US Virgin Islands",
+       "position": 2,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2640",
+       "ga": 8,
+       "gd": -8,
+       "gf": 0,
+       "gp": 1,
+       "key": "bahamas",
+       "l": 1,
+       "name": "Bahamas",
+       "position": 3,
+       "pts": 0,
+       "w": 0
+      }
+     ]
+    },
+    "ordering_note": "ordered by points, then goal difference, then goals scored, then name. THIS IS NOT THE GOVERNING BODY'S TIE-BREAK: UEFA, Concacaf, the AFC and CAF all break level points on head-to-head results first, so two teams level on points may legitimately sit in the other order on the official table. The NUMBERS are the claim here; the order on a points tie is not."
+   }
+  },
+  "unl": {
+   "structure": {
+    "stages": [
+     {
+      "dates": "MD1 24-26 Sep, MD2 27-29 Sep, MD3 30 Sep-3 Oct, MD4 4-6 Oct, MD5 12-14 Nov, MD6 15-17 Nov 2026",
+      "key": "group-stage",
+      "kind": "group",
+      "label": "League phase (Leagues A-D)",
+      "on_provider": true
+     },
+     {
+      "dates": "25-30 Mar 2027",
+      "key": "quarterfinals",
+      "kind": "knockout",
+      "label": "League A quarter-finals (two legs)",
+      "on_provider": false
+     },
+     {
+      "dates": "25-30 Mar 2027",
+      "key": "promotion-relegation-playoffs",
+      "kind": "playoff",
+      "label": "League A/B and B/C promotion/relegation play-offs",
+      "on_provider": false
+     },
+     {
+      "dates": "9-13 Jun 2027",
+      "key": "finals",
+      "kind": "finals",
+      "label": "Final tournament (four teams)",
+      "on_provider": false
+     },
+     {
+      "dates": "23-28 Mar 2028",
+      "key": "league-cd-playoffs",
+      "kind": "playoff",
+      "label": "League C/D play-offs",
+      "on_provider": false
+     }
+    ]
+   },
+   "standings": {
+    "derived": {
+     "Group A1": [
+      {
+       "d": 0,
+       "espn_id": "459",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "belgium",
+       "l": 0,
+       "name": "Belgium",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "478",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "france",
+       "l": 0,
+       "name": "France",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "162",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "italy",
+       "l": 0,
+       "name": "Italy",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "465",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "turkiye",
+       "l": 0,
+       "name": "Türkiye",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group A2": [
+      {
+       "d": 0,
+       "espn_id": "455",
+       "ga": 1,
+       "gd": 1,
+       "gf": 2,
+       "gp": 1,
+       "key": "greece",
+       "l": 0,
+       "name": "Greece",
+       "position": 1,
+       "pts": 3,
+       "w": 1
+      },
+      {
+       "d": 1,
+       "espn_id": "481",
+       "ga": 1,
+       "gd": 0,
+       "gf": 1,
+       "gp": 1,
+       "key": "germany",
+       "l": 0,
+       "name": "Germany",
+       "position": 2,
+       "pts": 1,
+       "w": 0
+      },
+      {
+       "d": 1,
+       "espn_id": "449",
+       "ga": 1,
+       "gd": 0,
+       "gf": 1,
+       "gp": 1,
+       "key": "netherlands",
+       "l": 0,
+       "name": "Netherlands",
+       "position": 3,
+       "pts": 1,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "6757",
+       "ga": 2,
+       "gd": -1,
+       "gf": 1,
+       "gp": 1,
+       "key": "serbia",
+       "l": 1,
+       "name": "Serbia",
+       "position": 4,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group A3": [
+      {
+       "d": 0,
+       "espn_id": "477",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "croatia",
+       "l": 0,
+       "name": "Croatia",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "450",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "czechia",
+       "l": 0,
+       "name": "Czechia",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "448",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "england",
+       "l": 0,
+       "name": "England",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "164",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "spain",
+       "l": 0,
+       "name": "Spain",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group A4": [
+      {
+       "d": 0,
+       "espn_id": "464",
+       "ga": 2,
+       "gd": 1,
+       "gf": 3,
+       "gp": 1,
+       "key": "norway",
+       "l": 0,
+       "name": "Norway",
+       "position": 1,
+       "pts": 3,
+       "w": 1
+      },
+      {
+       "d": 0,
+       "espn_id": "482",
+       "ga": 0,
+       "gd": 1,
+       "gf": 1,
+       "gp": 1,
+       "key": "portugal",
+       "l": 0,
+       "name": "Portugal",
+       "position": 2,
+       "pts": 3,
+       "w": 1
+      },
+      {
+       "d": 0,
+       "espn_id": "479",
+       "ga": 3,
+       "gd": -1,
+       "gf": 2,
+       "gp": 1,
+       "key": "denmark",
+       "l": 1,
+       "name": "Denmark",
+       "position": 3,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "578",
+       "ga": 1,
+       "gd": -1,
+       "gf": 0,
+       "gp": 1,
+       "key": "wales",
+       "l": 1,
+       "name": "Wales",
+       "position": 4,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group B1": [
+      {
+       "d": 0,
+       "espn_id": "463",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "north-macedonia",
+       "l": 0,
+       "name": "North Macedonia",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "580",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "scotland",
+       "l": 0,
+       "name": "Scotland",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "472",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "slovenia",
+       "l": 0,
+       "name": "Slovenia",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "475",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "switzerland",
+       "l": 0,
+       "name": "Switzerland",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group B2": [
+      {
+       "d": 0,
+       "espn_id": "584",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "georgia",
+       "l": 0,
+       "name": "Georgia",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "480",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "hungary",
+       "l": 0,
+       "name": "Hungary",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "586",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "northern-ireland",
+       "l": 0,
+       "name": "Northern Ireland",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "457",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "ukraine",
+       "l": 0,
+       "name": "Ukraine",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group B3": [
+      {
+       "d": 0,
+       "espn_id": "474",
+       "ga": 1,
+       "gd": 2,
+       "gf": 3,
+       "gp": 1,
+       "key": "austria",
+       "l": 0,
+       "name": "Austria",
+       "position": 1,
+       "pts": 3,
+       "w": 1
+      },
+      {
+       "d": 0,
+       "espn_id": "18272",
+       "ga": 0,
+       "gd": 1,
+       "gf": 1,
+       "gp": 1,
+       "key": "kosovo",
+       "l": 0,
+       "name": "Kosovo",
+       "position": 2,
+       "pts": 3,
+       "w": 1
+      },
+      {
+       "d": 0,
+       "espn_id": "476",
+       "ga": 1,
+       "gd": -1,
+       "gf": 0,
+       "gp": 1,
+       "key": "republic-of-ireland",
+       "l": 1,
+       "name": "Republic of Ireland",
+       "position": 3,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "461",
+       "ga": 3,
+       "gd": -2,
+       "gf": 1,
+       "gp": 1,
+       "key": "israel",
+       "l": 1,
+       "name": "Israel",
+       "position": 4,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group B4": [
+      {
+       "d": 0,
+       "espn_id": "452",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "bosnia-herzegovina",
+       "l": 0,
+       "name": "Bosnia-Herzegovina",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "471",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "poland",
+       "l": 0,
+       "name": "Poland",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "473",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "romania",
+       "l": 0,
+       "name": "Romania",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "466",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "sweden",
+       "l": 0,
+       "name": "Sweden",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group C1": [
+      {
+       "d": 0,
+       "espn_id": "585",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "albania",
+       "l": 0,
+       "name": "Albania",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "583",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "belarus",
+       "l": 0,
+       "name": "Belarus",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "458",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "finland",
+       "l": 0,
+       "name": "Finland",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "588",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "san-marino",
+       "l": 0,
+       "name": "San Marino",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group C2": [
+      {
+       "d": 0,
+       "espn_id": "579",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "armenia",
+       "l": 0,
+       "name": "Armenia",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "445",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "cyprus",
+       "l": 0,
+       "name": "Cyprus",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "456",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "latvia",
+       "l": 0,
+       "name": "Latvia",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "6775",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "montenegro",
+       "l": 0,
+       "name": "Montenegro",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group C3": [
+      {
+       "d": 0,
+       "espn_id": "447",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "faroe-islands",
+       "l": 0,
+       "name": "Faroe Islands",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "2619",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "kazakhstan",
+       "l": 0,
+       "name": "Kazakhstan",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "483",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "moldova",
+       "l": 0,
+       "name": "Moldova",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "468",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "slovakia",
+       "l": 0,
+       "name": "Slovakia",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group C4": [
+      {
+       "d": 0,
+       "espn_id": "462",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "bulgaria",
+       "l": 0,
+       "name": "Bulgaria",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "444",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "estonia",
+       "l": 0,
+       "name": "Estonia",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "470",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "iceland",
+       "l": 0,
+       "name": "Iceland",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "582",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "luxembourg",
+       "l": 0,
+       "name": "Luxembourg",
+       "position": null,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group D1": [
+      {
+       "d": 0,
+       "espn_id": "453",
+       "ga": 1,
+       "gd": 1,
+       "gf": 2,
+       "gp": 1,
+       "key": "malta",
+       "l": 0,
+       "name": "Malta",
+       "position": 1,
+       "pts": 3,
+       "w": 1
+      },
+      {
+       "d": 0,
+       "espn_id": "16721",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "gibraltar",
+       "l": 0,
+       "name": "Gibraltar",
+       "position": 2,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "587",
+       "ga": 2,
+       "gd": -1,
+       "gf": 1,
+       "gp": 1,
+       "key": "andorra",
+       "l": 1,
+       "name": "Andorra",
+       "position": 3,
+       "pts": 0,
+       "w": 0
+      }
+     ],
+     "Group D2": [
+      {
+       "d": 0,
+       "espn_id": "460",
+       "ga": 0,
+       "gd": 2,
+       "gf": 2,
+       "gp": 1,
+       "key": "lithuania",
+       "l": 0,
+       "name": "Lithuania",
+       "position": 1,
+       "pts": 3,
+       "w": 1
+      },
+      {
+       "d": 0,
+       "espn_id": "581",
+       "ga": 0,
+       "gd": 0,
+       "gf": 0,
+       "gp": 0,
+       "key": "azerbaijan",
+       "l": 0,
+       "name": "Azerbaijan",
+       "position": 2,
+       "pts": 0,
+       "w": 0
+      },
+      {
+       "d": 0,
+       "espn_id": "589",
+       "ga": 2,
+       "gd": -2,
+       "gf": 0,
+       "gp": 1,
+       "key": "liechtenstein",
+       "l": 1,
+       "name": "Liechtenstein",
+       "position": 3,
+       "pts": 0,
+       "w": 0
+      }
+     ]
+    },
+    "ordering_note": "ordered by points, then goal difference, then goals scored, then name. THIS IS NOT THE GOVERNING BODY'S TIE-BREAK: UEFA, Concacaf, the AFC and CAF all break level points on head-to-head results first, so two teams level on points may legitimately sit in the other order on the official table. The NUMBERS are the claim here; the order on a points tie is not."
+   }
+  }
+ },
  "date": "2026-09-24",
  "days": 8,
  "field_floor_note": "REFUSED BY THE PLACEABILITY FLOOR ON THE FIRST READING. This team's confederation did not clear the floor on this axis for this competition's field — on the goal axes that is G3: the median entrant's 95% interval is wider than one equal-width band of the field. The value is measured and shown; the interval beside it IS the refusal, and it is what stops the rank being read as precision. It is ranked with everyone else, because a team the evidence cannot place is not thereby a worse team.",
@@ -4296,6 +7068,696 @@ export const CHAMP_BOARD = {
     "city": "Budapest",
     "country": "Hungary",
     "name": "Puskás Aréna"
+   },
+   "venue_class": {
+    "class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "venue_favourite": {
+    "flipped": false,
+    "home_side": "home",
+    "policy": "off",
+    "reason": "no_gdg_gap",
+    "refused": true,
+    "venue_class": "TRUE_HOME"
+   },
+   "weights": null
+  },
+  {
+   "away": "Azerbaijan",
+   "column": "unl",
+   "columns": [
+    "unl"
+   ],
+   "competition_id": "401861067",
+   "cross_league": false,
+   "current_only": null,
+   "espn": "uefa.nations",
+   "event_id": "401861067",
+   "fav_side": "away",
+   "fav_source": "field",
+   "favourite": "Azerbaijan",
+   "field": {
+    "axes": {
+     "atk": {
+      "fav": {
+       "below_floor": true,
+       "half_width_95": 0.6447324219351562,
+       "interval": [
+        -1.3143303488197162,
+        -0.02486550494940387
+       ],
+       "rank": 50,
+       "straddles": true,
+       "tier": 4,
+       "tier_set": [
+        3,
+        4,
+        5
+       ],
+       "value": -0.6695979268845601
+      },
+      "field_size": 54,
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "label": "attack",
+      "opp": {
+       "below_floor": true,
+       "half_width_95": 0.4905172225027586,
+       "interval": [
+        -0.8335100274868288,
+        0.14752441751868844
+       ],
+       "rank": 46,
+       "straddles": true,
+       "tier": 3,
+       "tier_set": [
+        3,
+        4
+       ],
+       "value": -0.34299280498407014
+      },
+      "tier_gap": -1,
+      "unit": "log_goals"
+     },
+     "def": {
+      "fav": {
+       "below_floor": true,
+       "half_width_95": 0.3391368406616741,
+       "interval": [
+        -0.5586560046774935,
+        0.11961767664585471
+       ],
+       "rank": 48,
+       "straddles": true,
+       "tier": 4,
+       "tier_set": [
+        3,
+        4,
+        5
+       ],
+       "value": -0.2195191640158194
+      },
+      "field_size": 54,
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "label": "defence",
+      "opp": {
+       "below_floor": true,
+       "half_width_95": 0.33449096479329327,
+       "interval": [
+        -0.21834621638359278,
+        0.4506357132029938
+       ],
+       "rank": 39,
+       "straddles": true,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3,
+        4
+       ],
+       "value": 0.11614474840970049
+      },
+      "tier_gap": -1,
+      "unit": "log_goals"
+     },
+     "ovr": {
+      "fav": {
+       "below_floor": false,
+       "half_width_95": 50.919205997213275,
+       "interval": [
+        1366.989223728553,
+        1468.8276357229797
+       ],
+       "rank": 43,
+       "straddles": true,
+       "tier": 3,
+       "tier_set": [
+        3,
+        4
+       ],
+       "value": 1417.9084297257664
+      },
+      "field_size": 54,
+      "floor": {
+       "below_floor": false,
+       "failing_condition": null
+      },
+      "label": "overall",
+      "opp": {
+       "below_floor": false,
+       "half_width_95": 18.904289528697067,
+       "interval": [
+        1304.4860013973528,
+        1342.294580454747
+       ],
+       "rank": 50,
+       "straddles": false,
+       "tier": 4,
+       "tier_set": [
+        4
+       ],
+       "value": 1323.3902909260498
+      },
+      "tier_gap": 1,
+      "unit": "elo"
+     }
+    },
+    "axes_measured": [
+     "ovr",
+     "atk",
+     "def"
+    ],
+    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
+    "clubs": {
+     "fav": "Azerbaijan",
+     "opp": "Lithuania"
+    },
+    "competition": "unl",
+    "field_basis": "the UEFA Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus b89af5d2210e, variant 'all', Elo pinned at 10 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals.",
+    "shape": "HOLLOW",
+    "size": 54
+   },
+   "form": {
+    "fav": "WDLWW",
+    "opp": "LDLWL",
+    "scope": "all senior internationals, friendlies marked",
+    "scope_is_cup": false
+   },
+   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
+   "gdg_gap": null,
+   "gp_current": {
+    "away": 0,
+    "home": 1,
+    "min": 0
+   },
+   "home": "Lithuania",
+   "in_play": false,
+   "kalshi": {
+    "ask_c": 31,
+    "ask_size": 956,
+    "bid_c": 29,
+    "bid_size": 63,
+    "event_ticker": "KXUEFANLGAME-26SEP27LTUAZE",
+    "flags": [],
+    "spread_c": 2,
+    "ticker": "KXUEFANLGAME-26SEP27LTUAZE-AZE"
+   },
+   "kickoff": "2026-09-27T13:00Z",
+   "league": "unl",
+   "national": {
+    "competition": "unl",
+    "group": "Group D2",
+    "head_to_head": {
+     "available": true,
+     "meetings": [
+      {
+       "away": "Azerbaijan",
+       "away_score": 0,
+       "completed": true,
+       "date": "2008-03-26T17:00:00Z",
+       "event_id": "237441",
+       "home": "Lithuania",
+       "home_score": 1,
+       "winner": "home",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "away": "Lithuania",
+       "away_score": 0,
+       "completed": true,
+       "date": "2019-03-25T14:00:00Z",
+       "event_id": "501645",
+       "home": "Azerbaijan",
+       "home_score": 0,
+       "winner": "draw",
+       "winner_means": "this fixture's home/away sides"
+      }
+     ],
+     "reason": null,
+     "source": "seasonseries",
+     "tally": {
+      "away": 0,
+      "draw": 1,
+      "home": 1
+     }
+    },
+    "leg": null,
+    "lineups": {
+     "announced": false,
+     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff",
+     "sides": {
+      "away": {
+       "announced": false,
+       "bench": 0,
+       "formation": null,
+       "starters": [],
+       "team": "Azerbaijan"
+      },
+      "home": {
+       "announced": false,
+       "bench": 0,
+       "formation": null,
+       "starters": [],
+       "team": "Lithuania"
+      }
+     }
+    },
+    "market": {
+     "event_ticker": "KXUEFANLGAME-26SEP27LTUAZE",
+     "legs": {
+      "away": {
+       "ask_c": 31,
+       "ask_size": 956,
+       "bid_c": 29,
+       "bid_size": 63,
+       "event_ticker": "KXUEFANLGAME-26SEP27LTUAZE",
+       "flags": [],
+       "name": "Azerbaijan",
+       "spread_c": 2,
+       "ticker": "KXUEFANLGAME-26SEP27LTUAZE-AZE"
+      },
+      "home": {
+       "ask_c": 39,
+       "ask_size": 61,
+       "bid_c": 36,
+       "bid_size": 48,
+       "event_ticker": "KXUEFANLGAME-26SEP27LTUAZE",
+       "flags": [
+        "THIN"
+       ],
+       "name": "Lithuania",
+       "spread_c": 3,
+       "ticker": "KXUEFANLGAME-26SEP27LTUAZE-LTU"
+      },
+      "tie": {
+       "ask_c": 33,
+       "ask_size": 1415,
+       "bid_c": 29,
+       "bid_size": 62,
+       "event_ticker": "KXUEFANLGAME-26SEP27LTUAZE",
+       "flags": [
+        "WIDE"
+       ],
+       "spread_c": 4,
+       "ticker": "KXUEFANLGAME-26SEP27LTUAZE-TIE"
+      }
+     },
+     "orientation": "same",
+     "status": "mapped",
+     "status_words": "one open Kalshi event names both teams on this date",
+     "title": "Lithuania vs Azerbaijan"
+    },
+    "neutral": false,
+    "neutral_provider_flag": false,
+    "stage": "group-stage",
+    "stage_kind": "group",
+    "status_detail": "Sun, September 27th at 9:00 AM EDT",
+    "teams": {
+     "away": {
+      "espn_id": "581",
+      "form": {
+       "available": true,
+       "friendlies": 5,
+       "games": [
+        {
+         "competition": "International Friendly",
+         "date": "2026-03-27T15:00Z",
+         "event_id": "401861921",
+         "ga": 1,
+         "gf": 6,
+         "kind": "friendly",
+         "letter": "W",
+         "opponent": "St. Lucia",
+         "provider_agrees": true,
+         "provider_letter": "W",
+         "venue": "home"
+        },
+        {
+         "competition": "International Friendly",
+         "date": "2026-03-30T15:00Z",
+         "event_id": "401866531",
+         "ga": 1,
+         "gf": 1,
+         "kind": "friendly",
+         "letter": "D",
+         "opponent": "Sierra Leone",
+         "provider_agrees": false,
+         "provider_letter": "W",
+         "shootout": {
+          "against": 1,
+          "for": 2,
+          "note": "level after play, decided on penalties; the letter is the scoreline's, D"
+         },
+         "venue": "home"
+        },
+        {
+         "competition": "International Friendly",
+         "date": "2026-06-05T18:00Z",
+         "event_id": "401871785",
+         "ga": 2,
+         "gf": 0,
+         "kind": "friendly",
+         "letter": "L",
+         "opponent": "Malta",
+         "provider_agrees": true,
+         "provider_letter": "L",
+         "venue": "home"
+        },
+        {
+         "competition": "International Friendly",
+         "date": "2026-06-09T18:00Z",
+         "event_id": "401871580",
+         "ga": 1,
+         "gf": 2,
+         "kind": "friendly",
+         "letter": "W",
+         "opponent": "San Marino",
+         "provider_agrees": true,
+         "provider_letter": "W",
+         "venue": "home"
+        },
+        {
+         "competition": "International Friendly",
+         "date": "2026-09-23T16:00Z",
+         "event_id": "401898013",
+         "ga": 0,
+         "gf": 1,
+         "kind": "friendly",
+         "letter": "W",
+         "opponent": "Tajikistan",
+         "provider_agrees": true,
+         "provider_letter": "W",
+         "venue": "home"
+        }
+       ],
+       "letters": "WDLWW",
+       "provider_disagreements": 1,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      },
+      "key": "azerbaijan",
+      "name": "Azerbaijan",
+      "rating": {
+       "available": true,
+       "axes": {
+        "atk": {
+         "below_floor": true,
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "half_width_95": 0.6447324219351562,
+         "interval": [
+          -1.3143303488197162,
+          -0.02486550494940387
+         ],
+         "rank": 50,
+         "straddles": true,
+         "tier": 4,
+         "tier_set": [
+          3,
+          4,
+          5
+         ],
+         "unit": "log_goals",
+         "value": -0.6695979268845601
+        },
+        "def": {
+         "below_floor": true,
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "half_width_95": 0.3391368406616741,
+         "interval": [
+          -0.5586560046774935,
+          0.11961767664585471
+         ],
+         "rank": 48,
+         "straddles": true,
+         "tier": 4,
+         "tier_set": [
+          3,
+          4,
+          5
+         ],
+         "unit": "log_goals",
+         "value": -0.2195191640158194
+        },
+        "ovr": {
+         "below_floor": false,
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "half_width_95": 50.919205997213275,
+         "interval": [
+          1366.989223728553,
+          1468.8276357229797
+         ],
+         "rank": 43,
+         "straddles": true,
+         "tier": 3,
+         "tier_set": [
+          3,
+          4
+         ],
+         "unit": "elo",
+         "value": 1417.9084297257664
+        }
+       },
+       "axes_absent": [],
+       "competition": "unl",
+       "source": "src.picker.national_team_axes"
+      }
+     },
+     "home": {
+      "espn_id": "460",
+      "form": {
+       "available": true,
+       "friendlies": 3,
+       "games": [
+        {
+         "competition": "FIFA World Cup Qualifying - UEFA",
+         "date": "2025-10-12T18:45Z",
+         "event_id": "724858",
+         "ga": 2,
+         "gf": 0,
+         "kind": "competitive",
+         "letter": "L",
+         "opponent": "Poland",
+         "provider_agrees": true,
+         "provider_letter": "L",
+         "venue": "home"
+        },
+        {
+         "competition": "International Friendly",
+         "date": "2025-11-13T17:00Z",
+         "event_id": "755121",
+         "ga": 0,
+         "gf": 0,
+         "kind": "friendly",
+         "letter": "D",
+         "opponent": "Israel",
+         "provider_agrees": true,
+         "provider_letter": "D",
+         "venue": "home"
+        },
+        {
+         "competition": "FIFA World Cup Qualifying - UEFA",
+         "date": "2025-11-17T19:45Z",
+         "event_id": "724912",
+         "ga": 4,
+         "gf": 0,
+         "kind": "competitive",
+         "letter": "L",
+         "opponent": "Netherlands",
+         "provider_agrees": true,
+         "provider_letter": "L",
+         "venue": "away"
+        },
+        {
+         "competition": "International Friendly",
+         "date": "2026-03-26T15:00Z",
+         "event_id": "401851163",
+         "ga": 0,
+         "gf": 2,
+         "kind": "friendly",
+         "letter": "W",
+         "opponent": "Moldova",
+         "provider_agrees": true,
+         "provider_letter": "W",
+         "venue": "away"
+        },
+        {
+         "competition": "International Friendly",
+         "date": "2026-03-29T13:00Z",
+         "event_id": "763033",
+         "ga": 2,
+         "gf": 0,
+         "kind": "friendly",
+         "letter": "L",
+         "opponent": "Georgia",
+         "provider_agrees": true,
+         "provider_letter": "L",
+         "venue": "home"
+        }
+       ],
+       "letters": "LDLWL",
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      },
+      "key": "lithuania",
+      "name": "Lithuania",
+      "rating": {
+       "available": true,
+       "axes": {
+        "atk": {
+         "below_floor": true,
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "half_width_95": 0.4905172225027586,
+         "interval": [
+          -0.8335100274868288,
+          0.14752441751868844
+         ],
+         "rank": 46,
+         "straddles": true,
+         "tier": 3,
+         "tier_set": [
+          3,
+          4
+         ],
+         "unit": "log_goals",
+         "value": -0.34299280498407014
+        },
+        "def": {
+         "below_floor": true,
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "half_width_95": 0.33449096479329327,
+         "interval": [
+          -0.21834621638359278,
+          0.4506357132029938
+         ],
+         "rank": 39,
+         "straddles": true,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3,
+          4
+         ],
+         "unit": "log_goals",
+         "value": 0.11614474840970049
+        },
+        "ovr": {
+         "below_floor": false,
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "half_width_95": 18.904289528697067,
+         "interval": [
+          1304.4860013973528,
+          1342.294580454747
+         ],
+         "rank": 50,
+         "straddles": false,
+         "tier": 4,
+         "tier_set": [
+          4
+         ],
+         "unit": "elo",
+         "value": 1323.3902909260498
+        }
+       },
+       "axes_absent": [],
+       "competition": "unl",
+       "source": "src.picker.national_team_axes"
+      }
+     }
+    },
+    "venue_country": "Lithuania"
+   },
+   "opponent": "Lithuania",
+   "own_gdg": {
+    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record.",
+    "diff": null
+   },
+   "ppg_gap": null,
+   "rank_gap": null,
+   "ranks": {
+    "fav": 43,
+    "opp": 50
+   },
+   "rated_in": {
+    "away": "unl",
+    "home": "unl"
+   },
+   "rates": {
+    "ga": [
+     null,
+     0
+    ],
+    "gdg": [
+     null,
+     2
+    ],
+    "gf": [
+     null,
+     2
+    ],
+    "ppg": [
+     null,
+     3
+    ]
+   },
+   "refused": false,
+   "reg_time_note": "KXUEFANLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
+   "resolution": {
+    "Azerbaijan": "espn_id",
+    "Lithuania": "espn_id"
+   },
+   "shape": "HOLLOW",
+   "src": "current",
+   "state": "pre",
+   "table_notes": {
+    "away": null,
+    "home": null
+   },
+   "tier_gaps": {
+    "atk": -1,
+    "def": -1,
+    "ovr": 1
+   },
+   "tiers": {
+    "atk": [
+     4,
+     3
+    ],
+    "def": [
+     4,
+     3
+    ],
+    "ovr": [
+     3,
+     4
+    ]
+   },
+   "venue": {
+    "city": "Kaunas",
+    "country": "Lithuania",
+    "name": "S. Darius and S. Gireno Stadium"
    },
    "venue_class": {
     "class": "TRUE_HOME",
