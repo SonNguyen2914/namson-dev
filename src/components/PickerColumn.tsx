@@ -3080,7 +3080,7 @@ export function LeagueColumn({
             <span data-testid="col-floor" data-axes={quietFloor.join(",")}
               title={boardFloorNote ?? "below the placeability floor on these axes for every team in this column"}
               className="rounded border border-line-strong px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-low">
-              {quietFloor.join("/")} indicative · below floor
+              {quietFloor.join("/")} †
             </span>
           )}
           {meta?.kind === "cup" && (

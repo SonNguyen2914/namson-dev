@@ -1290,7 +1290,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
           <p data-testid="board-framing"
             className="text-center text-[13px] leading-relaxed text-ink-low max-md:pt-2">
             {champ
-              ? "Ranked by how far apart the two national teams sit on their competition's own field — overall, attack and defence, each measured on one scale; a side the field could not rate is listed with the reason, not ranked."
+              ? "Ranked by how far apart the two national teams sit on their competition's own field, home ground counted."
               : soleOwnSort
               ? `Ranked by ${soleOwnSort.mode} — nearly every tie here pairs two different domestic tables, and the gap between them is withheld.`
               : "Ranked by how far apart the two clubs sit in their own league's table."}
@@ -2065,8 +2065,11 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   a <span className="text-ink-mid">friendly</span> — a
                   national team&apos;s last five are every senior
                   international. An axis every team in a column sits below
-                  the placeability floor on is said once, in the column
-                  header, rather than as a dagger on every cell.
+                  the placeability floor on carries its dagger once, in the
+                  column header (<span className="text-ink-mid">atk/def †</span>),
+                  rather than on every cell; the headline adds 65 Elo to
+                  the side at home in its own country, and none at a
+                  neutral ground.
                 </dd>
               </div>
             )}

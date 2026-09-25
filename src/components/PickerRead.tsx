@@ -354,9 +354,21 @@ function plateClass(read: ReadLike): string {
  *  — and once inside each piece through `data-w` + `::after`, which never
  *  enters textContent and so can never be matched a second time. The
  *  geometry lives in globals.css under THE SHAPE CHIP. */
-export function ShapeChip({ read }: { read: ReadLike }) {
+export function ShapeChip({ read, quiet = [] }: {
+  read: ReadLike;
+  /** axes whose below-floor verdict is universal in the column (see
+   *  TierGaps `quietFloor`). A CUT names the unit that gave way; on an
+   *  axis the column header already calls indicative for every team, a
+   *  red tear through the word asserts exactly the unit verdict that
+   *  evidence cannot carry — the "SP|LIT" the operator read as a bug on
+   *  the national board (2026-09-24). So the tear is withheld there and
+   *  the word keeps its plate; a club card passes nothing and is cut as
+   *  it always was. */
+  quiet?: readonly FieldAxisKey[];
+}) {
   const shape = read.shape;
-  const cut = cutOf(read);
+  const raw = cutOf(read);
+  const cut = raw && quiet.includes(raw.axis === "h" ? "atk" : "def") ? null : raw;
   const plate = plateClass(read);
   const ink =
     shape === "CLEAN" ? "text-up"
@@ -365,6 +377,7 @@ export function ShapeChip({ read }: { read: ReadLike }) {
   if (!cut) {
     return (
       <span data-testid="shape-chip" data-cut="none"
+        {...(raw && !cut ? { "data-cut-withheld": raw.axis } : {})}
         className={`sc sc-intact ${plate} ${ink} font-mono text-[10px] uppercase tracking-[0.16em]`}>
         <span className="sc-w">{shape}</span>
       </span>
@@ -908,7 +921,7 @@ export function TierGaps({ read, dense = false, field, partial,
             off three gaps and this fixture has one. The chip's plate
             with nothing in it would read as a shape that failed to
             load; the backend's own sentence says why there is none. */}
-        {r.shape ? <ShapeChip read={r} /> : (
+        {r.shape ? <ShapeChip read={r} quiet={quietFloor} /> : (
           <span data-testid="shape-absent" title={absent?.why ?? undefined}
             className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
             no shape

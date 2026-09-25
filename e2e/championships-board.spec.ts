@@ -250,6 +250,17 @@ test.describe("a national card is a league card with national facts in its slots
         .toHaveAttribute("data-axes", "atk,def");
     });
 
+  test("no tear through a shape word on an axis the header calls indicative",
+    async ({ page }) => {
+      // "SP|LIT": a SPLIT chip is CUT along the unit that gave way; where
+      // that unit is below the floor for every team, the cut is withheld
+      await openChampionships(page);
+      await expect(page.locator('[data-testid="picker-row"] [data-testid="shape-chip"]:not([data-cut="none"])'))
+        .toHaveCount(0);
+      expect(await page.locator('[data-testid="picker-row"] [data-cut-withheld]').count())
+        .toBeGreaterThan(0);
+    });
+
   test("the price row is the club row: the favourite's quote is not relabelled",
     async ({ page }) => {
       await openChampionships(page);
