@@ -21,6 +21,8 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
+import { usePoll } from "../../../lib/usePoll";
+import { failureOf, NEVER_ANSWERED } from "../../../lib/httpFailure";
 import FieldAxes, { Ratings } from "../../../components/FieldAxes";
 import { fetchRatings } from "../../../lib/fieldApi";
 
@@ -148,7 +150,9 @@ export default function CompViewer() {
   const [mk, setMk] = useState<Markets | null>(null);
   const [days, setDays] = useState(14);
   const [onlyRated, setOnlyRated] = useState(false);
-  const [err, setErr] = useState(false);
+  // NAMED, NOT A BOOLEAN (audit F10): the status and the backend's own
+  // sentence, so a failed read says what failed.
+  const [err, setErr] = useState<string | null>(null);
   // A key the backend does not serve is PERMANENT, not a blip. Kept
   // apart from `err` because the two need opposite behaviour: a
   // transient failure should keep retrying, and a retired competition
@@ -163,57 +167,56 @@ export default function CompViewer() {
      about the measurement rather than about the request. */
   const [ratErr, setRatErr] = useState<string | null>(null);
 
+  // THE FIXTURES AND THE BOOK, every 60s through lib/usePoll (audit F5):
+  // never overlapping, paused in a hidden tab, backing off while they
+  // fail. A 404 on the fixtures means this key is not served — a
+  // retirement or a typo, either way permanent — so the poll STOPS there;
+  // the backend sends the reason in `detail`. Anything else is a failure
+  // worth retrying, and it is named rather than folded into a boolean.
+  usePoll(async (signal) => {
+    if (!key) return "stop";
+    const markets = fetch(`/api/comp/${key}/markets`, { signal })
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((j) => { if (!signal.aborted) setMk(j); })
+      .catch(() => {
+        /* SWALLOWED(comp:kalshi-market-counts) — registered in
+           e2e/missing-is-not-zero.spec.ts with its closes_when. */
+      });
+    let r: Response;
+    try {
+      r = await fetch(`/api/comp/${key}/fixtures?days=${days}`, { signal });
+    } catch {
+      if (!signal.aborted) setErr(NEVER_ANSWERED);
+      await markets;
+      return "failed";
+    }
+    if (r.status === 404) {
+      const body = await r.json().catch(() => null);
+      const why = body && typeof body.detail === "string" ? body.detail : null;
+      if (!signal.aborted) setGone(why || "this competition is not served here");
+      return "stop";
+    }
+    if (!r.ok) {
+      const why = await failureOf(r);
+      if (!signal.aborted) setErr(why);
+      await markets;
+      return "failed";
+    }
+    const j = await r.json();
+    if (signal.aborted) return "stop";
+    setD(j); setErr(null);
+    await markets;
+    return "ok";
+  }, 60000, [key, days]);
+
   useEffect(() => {
     if (!key) return;
     let alive = true;
-    // Flips false on a 404 and never back: the backend does not serve
-    // this key, so every later poll would ask the same dead question.
-    // The handle lives in an object so the 404 branch can cancel the
-    // poll without depending on when the timer was assigned.
-    let served = true;
-    const poll: { id?: ReturnType<typeof setInterval> } = {};
-    const load = () => {
-      if (!served) return;
-      fetch(`/api/comp/${key}/fixtures?days=${days}`)
-        .then(async (r) => {
-          if (r.ok) return r.json();
-          // 404 means this key is not served — a retirement or a typo,
-          // either way permanent. The backend sends the reason in
-          // `detail`; show it and STOP polling. Anything else is a
-          // failure worth retrying.
-          if (r.status === 404) {
-            const body = await r.json().catch(() => null);
-            const why = body && typeof body.detail === "string"
-              ? body.detail : null;
-            throw { permanent: true as const, why };
-          }
-          throw { permanent: false as const, why: null };
-        })
-        .then((j) => { if (alive) { setD(j); setErr(false); } })
-        .catch((e) => {
-          if (!alive) return;
-          if (e && e.permanent) {
-            served = false;
-            setGone(e.why || "this competition is not served here");
-            if (poll.id) clearInterval(poll.id);
-          } else {
-            setErr(true);
-          }
-        });
-      fetch(`/api/comp/${key}/markets`)
-        .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-        .then((j) => alive && setMk(j))
-        .catch(() => {
-          /* SWALLOWED(comp:kalshi-market-counts) — registered in
-             e2e/missing-is-not-zero.spec.ts with its closes_when. */
-        });
-    };
-    load();
     /* THE FIELD READ GETS AN ABORT OF ITS OWN. `alive` already stops a
        late answer reaching setState, but it cannot stop the request, and
        `fetchRatings` takes the signal the way the field page's own load
-       passes it. Scoped to this one read: the fixture poll below is a
-       different lifetime and keeps the flag it already has. */
+       passes it. It is a frozen artifact read, so it is fetched once per
+       key and never on the fixtures poll. */
     const ac = new AbortController();
     /* THE FIELD IS READ THROUGH `fetchRatings`, NOT BY HAND.
        ------------------------------------------------------------------
@@ -246,13 +249,11 @@ export default function CompViewer() {
         setRatErr(e instanceof Error ? e.message
                                      : "the field read did not answer");
       });
-    poll.id = setInterval(load, 60000);
     return () => {
       alive = false;
       ac.abort();
-      if (poll.id) clearInterval(poll.id);
     };
-  }, [key, days]);
+  }, [key]);
 
   const all = d?.fixtures || [];
   const shown = onlyRated ? all.filter((f) => f.strength?.available) : all;
@@ -313,14 +314,29 @@ export default function CompViewer() {
         back={{ href: "/bet-suggester", label: "board" }}
         title={`${d?.display || "Competition"} · market viewer`} />
       <main className="mx-auto max-w-5xl px-5 pb-24 pt-10">
-        <Eyebrow>{(d?.display || "competition").toLowerCase()} · viewer</Eyebrow>
+        <Eyebrow>{(d?.display || String(key || "competition")).toLowerCase()} · viewer</Eyebrow>
+        {/* A FAILED READ IS NOT A LOADING ONE (audit F10). The H1 said
+            "Loading" for ever when the fixtures read failed; before a
+            payload the page names the key it was asked for, and says
+            that the read failed and how. */}
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-ink-hi">
-          {d?.display || "Loading"}
+          {d?.display || (err ? String(key || "Competition") : "Loading")}
         </h1>
+        {err && !d && (
+          <p data-testid="comp-read-failed" role="status"
+            className="mt-4 rounded-xl border border-warn/40 bg-warn/5 px-4 py-3 text-[12px] leading-relaxed text-warn">
+            The competition read failed: {err}. Nothing on this page is a
+            claim about this competition until it answers — retrying, less
+            often while it keeps failing.
+          </p>
+        )}
 
         {/* The missing model, with the reason — and the two reasons are
             NOT the same claim. A cup can never support one; a league
-            simply has not had one built. */}
+            simply has not had one built. DRAWN ONLY OFF A PAYLOAD
+            (audit F10): before one arrives, "no model · not built yet"
+            would be a claim this page never read. */}
+        {d && (
         <section className="mt-8 rounded-2xl border border-line bg-elev p-5">
           <Eyebrow tone="accent">
             {byDesign ? "no model · by design" : "no model · not built yet"}
@@ -337,6 +353,7 @@ export default function CompViewer() {
             {d?.model?.instead}
           </p>
         </section>
+        )}
 
         {/* THE CROSS-LEAGUE FIELD, directly under the "no model" block
             because it is what that block's `instead` sentence points at:
@@ -385,11 +402,6 @@ export default function CompViewer() {
           ))}
         </div>
 
-        {err && !d && (
-          <p className="mt-6 font-mono text-[11px] uppercase tracking-wide text-ink-faint">
-            fixtures unavailable — retrying every 60s
-          </p>
-        )}
 
         {groups.map(({ key: dk, list }) => (
           <Reveal key={dk}>

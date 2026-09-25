@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { BACKEND_URL } from "./backend";
+import { BACKEND_URL, LIVE_TAG } from "./backend";
 import { expectForwarded } from "./proxy-forwarding";
 import {
   COMP_RESOURCES,
@@ -93,8 +93,11 @@ test("the derived set is not vacuous and matches the allowlist exactly",
     expect(FORWARDED.length).toBe(total);
   });
 
+// @live (2026-09-25): this claim is about the DEPLOYED backend, so it runs
+// only in the rate-limited live set (SUGGESTER_E2E_MODE=live) and never
+// in the hermetic default run. See e2e/backend.ts.
 test("every allowlist agrees with the backend's own route table, both ways",
-  async ({ request }) => {
+  { tag: LIVE_TAG }, async ({ request }) => {
     // THE DOCUMENT IS THE POINT. Not a copy of the allowlist and not a
     // second hand-list: the path table the backend serves out of its
     // own router. Read from BACKEND_URL, which is the value the app

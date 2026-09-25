@@ -395,6 +395,22 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
     expect(body).not.toMatch(/loading fixtures/i);
   });
 
+  test("a friendly whose feed failed names the status and the backend's "
+    + "sentence", async ({ page }) => {
+      // AUDIT F10 (2026-09-25): the fixture page reduced every failure to
+      // "match feed unavailable" — 43 characters of text on the page.
+      await page.route("**/api/**", (r) => r.fulfill({ status: 503,
+        contentType: "application/json", body: "{}" }));
+      await page.route("**/api/friendlies/fixtures/1234567**", (r) =>
+        r.fulfill({ status: 404, contentType: "application/json",
+          body: JSON.stringify({ detail: "fixture 1234567 is not in the window" }) }));
+      await page.goto("/bet-suggester/friendlies/1234567");
+      const failed = page.getByTestId("feed-failed");
+      await expect(failed).toContainText("the match feed read failed");
+      await expect(failed).toContainText("HTTP 404");
+      await expect(failed).toContainText("fixture 1234567 is not in the window");
+    });
+
   test("unreachable backend states it in words", async ({ page }) => {
     await page.route("**/api/friendlies/**", (r) => r.abort());
     await page.goto("/bet-suggester/friendlies");

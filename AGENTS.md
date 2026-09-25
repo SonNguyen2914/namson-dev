@@ -97,6 +97,28 @@ probes on every run that the app is actually wired to the hold-out —
 a stale `npm start` adopted by `reuseExistingServer` keeps the backend
 it booted with, and that is the way this protection fails silently.
 
+**Superseded 2026-09-25: the default run is now hermetic.** The
+paragraph below was the reasoning until then. Measured that day against a
+counting stand-in, the "hermetic" suite still sent ~2,400 GETs per run
+upstream (578 + 578 CompRail cup-fixture reads alone), and the frontend
+suite hitting `/api/comp/ucl/fixtures` about twice a second was the herd
+that filled the production backend's worker pool when it hung. So:
+
+- `npx playwright test` / `npm run test:e2e` is **hermetic**. The app's
+  backend is `e2e/stand-in-backend.mjs` (a named 503 for everything,
+  logged at `/__standin/log`), behind the same board hold-out. Nothing
+  reaches a real backend, whatever `SUGGESTER_BACKEND_URL` says.
+  `global-setup.ts` refuses to start a hermetic run pointed anywhere else.
+- Tests whose claim is about the **deployed** backend carry
+  `{ tag: LIVE_TAG }` (`@live`) and are excluded from that run.
+  `npm run test:e2e:live` (`SUGGESTER_E2E_MODE=live`) runs **only** them,
+  on one worker, through a hold-out that spaces forwarded reads at least
+  250ms apart. Its upstream is `SUGGESTER_BACKEND_URL` or production.
+- A new spec that needs data serves it with `page.route`; if it only
+  passes because a backend answered, the hermetic run will say so.
+
+The earlier reasoning, kept for the record:
+
 **Pointing CI at a non-production backend instead was considered and
 is not the answer.** There is no staging Railway service, and the
 specs that earn their keep against a live backend — `proxy-allowlists`,
@@ -105,10 +127,10 @@ the *deployed* server, which is exactly what a local stand-in would
 stop testing. Holding out the single writing route keeps that value and
 removes the harm.
 
-Set it explicitly unless you mean to smoke-test live:
+To run the `@live` set against a backend you own:
 
 ```bash
-SUGGESTER_BACKEND_URL=http://localhost:8000 npx playwright test
+SUGGESTER_E2E_MODE=live SUGGESTER_BACKEND_URL=http://localhost:8000 npx playwright test
 ```
 
 Most specs are hermetic: they serve recorded payloads through

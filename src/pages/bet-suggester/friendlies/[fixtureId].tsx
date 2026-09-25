@@ -1,4 +1,3 @@
-import { TZ } from "../../../lib/matchday";
 // One club friendly's own page.
 //
 // Named [fixtureId], not [eventId], because the id space genuinely differs
@@ -13,7 +12,9 @@ import { TZ } from "../../../lib/matchday";
 // convenience.
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { usePoll } from "../../../lib/usePoll";
+import { failureOf, NEVER_ANSWERED } from "../../../lib/httpFailure";
 
 import { RouteProgress, TopBar } from "../../../components/chrome";
 import { Eyebrow, Reveal } from "../../../components/ui";
@@ -374,26 +375,41 @@ function ClubProfile({ r, label }: { r?: SideRating; label: string }) {
   );
 }
 
+/** API-Football's finished statuses: full time, after extra time, after
+ *  penalties. A fixture in one of them is not polled again. */
+const FINISHED = new Set(["FT", "AET", "PEN"]);
+
 export default function FriendlyMatchPage() {
   const router = useRouter();
   const fixtureId = typeof router.query.fixtureId === "string"
     ? router.query.fixtureId : null;
   const [d, setD] = useState<Detail | null>(null);
-  const [err, setErr] = useState(false);
+  // NAMED, NOT A BOOLEAN (audit F10): the status and the backend's own
+  // sentence travel to the page instead of "unavailable".
+  const [err, setErr] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!fixtureId) return;
-    let alive = true;
-    const load = () => {
-      fetch(`/api/friendlies/fixtures/${fixtureId}`)
-        .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-        .then((j) => { if (alive) { setD(j); setErr(false); } })
-        .catch(() => alive && setErr(true));
-    };
-    load();
-    const t = setInterval(load, 30000);
-    return () => { alive = false; clearInterval(t); };
-  }, [fixtureId]);
+  // Every 30s through lib/usePoll (audit F5): no overlap, paused in a
+  // hidden tab, backing off while it fails — and stopped once the
+  // fixture is finished, because a finished match's feed cannot change.
+  usePoll(async (signal) => {
+    if (!fixtureId) return "stop";
+    let r: Response;
+    try {
+      r = await fetch(`/api/friendlies/fixtures/${fixtureId}`, { signal });
+    } catch {
+      if (!signal.aborted) setErr(NEVER_ANSWERED);
+      return "failed";
+    }
+    if (!r.ok) {
+      const why = await failureOf(r);
+      if (!signal.aborted) setErr(why);
+      return "failed";
+    }
+    const j = await r.json();
+    if (signal.aborted) return "stop";
+    setD(j); setErr(null);
+    return FINISHED.has(j?.fixture?.status) ? "stop" : "ok";
+  }, 30000, [fixtureId]);
 
   const f = d?.fixture;
   const live = f?.status === "1H" || f?.status === "2H" || f?.status === "HT";
@@ -408,8 +424,10 @@ export default function FriendlyMatchPage() {
         title="Club friendly" />
       <main className="mx-auto max-w-2xl px-5 pb-24 pt-10">
         {err && !d && (
-          <p className="font-mono text-[11px] uppercase tracking-wide text-ink-faint">
-            match feed unavailable — retrying every 30s
+          <p data-testid="feed-failed" role="status"
+            className="font-mono text-[11px] leading-relaxed text-warn">
+            the match feed read failed: {err}. Nothing below is a claim about
+            this fixture. Retrying — less often while it keeps failing.
           </p>
         )}
         {f && (

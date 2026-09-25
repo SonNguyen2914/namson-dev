@@ -347,6 +347,16 @@
     display: flex;
     align-items: center;
   }
+
+  /* A SORT HEADER IS A BUTTON IN A <th> (2026-09-25, audit F13), and the
+     table's own scroller clips overflow the same way the ribbon window
+     does: a 14px button in a 30px header row drew its 44px `::after` and
+     had the top of it cut off by the scroller, so a press above the word
+     answered nothing. The ROW takes the floor, not the word — the same
+     move as `.tap-floor-room` above, for a table cell. */
+  [data-tap-floor] th:has(> button) {
+    height: var(--tap-floor);
+  }
 }
 
 /* ── THE TWO WIDTHS THE BOARD CHANGES SHAPE AT ─────────────────────────

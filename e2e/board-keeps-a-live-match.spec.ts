@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { armToken } from "./operator-token";
 import type { Page } from "@playwright/test";
 // THE ABSENT-CLOCK WORDS ARE THE READER'S, never typed here — the same
 // rule e2e/live-card.spec.ts follows, and for the same reason: a fixture
@@ -180,6 +181,8 @@ async function open(page: Page, board: unknown, strip: unknown = null) {
       : json(toV2(strip))));
   await page.goto("/bet-suggester");
   await page.getByTestId("picker-row").first().waitFor({ timeout: 15_000 });
+  // operator-only since audit F4: the strip is read only with a token
+  if (strip != null) await armToken(page);
 }
 
 const card = (page: Page, event: string) =>

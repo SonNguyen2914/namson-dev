@@ -227,10 +227,12 @@ function BandCount({ a }: { a: Axis }) {
  *  table, and `fieldFor` returns no block rather than half a block.
  *
  *  THE RATING ITSELF STILL STANDS AND IS STILL DRAWN. Only the interval
- *  is refused — the value tick stays exactly where it is, for the same
- *  reason `BELOW_FLOOR_NOTE` gives for a below-floor club ("The rating
- *  itself stands and is shown"). This refuses a claim about PRECISION,
- *  not a claim about the club.
+ *  is refused — the value tick stays exactly where it is, as it does for
+ *  a below-floor club, whose value and interval `BELOW_FLOOR_NOTE` says
+ *  "are shown as measured". This refuses a claim about PRECISION, not a
+ *  claim about the club. (Restated 2026-09-25: this used to quote "The
+ *  rating itself stands and is shown", a sentence the backend's note no
+ *  longer carries.)
  *
  *  TWO REASONS, KEPT APART. Zero bridges is a fact about the corpus and
  *  only a payload carrying `bridge_fixtures` can state it. A zero-WIDTH
@@ -247,7 +249,11 @@ function barRefusal(r: AxisRow): string | null {
   return null;
 }
 
-function AxisTable({ a }: { a: Axis }) {
+function AxisTable({ a, floorNote }: {
+  a: Axis;
+  /** The payload's own `below_floor_note`, quoted in the footnote. */
+  floorNote?: string | null;
+}) {
   // pad the track so an interval reaching the extreme still draws inside
   const [lo0, hi0] = a.span;
   const pad = (hi0 - lo0) * 0.08;
@@ -464,11 +470,20 @@ function AxisTable({ a }: { a: Axis }) {
           </tbody>
         </table>
       </div>
+      {/* THE BACKEND'S OWN NOTE, QUOTED (2026-09-25, audit F8). This was a
+          typed sentence — "the band was too wide to place" — and the
+          backend's corrected `below_floor_note` now says the opposite: the
+          floor is a verdict on the club's LEAGUE, and it does not say this
+          club's interval is wider than a placed club's. A footnote that
+          paraphrases the payload drifts from it; one that quotes it
+          cannot. With no note on the payload it says only that. */}
       <p data-testid="floor-footnote"
         className="mt-2.5 font-mono text-[10.5px] leading-relaxed text-ink-faint">
-        <span className="text-ink-low">†</span> refused by the placeability
-        floor on the first reading — the rating stands, the band was too wide
-        to place.
+        <span className="text-ink-low">†</span>{" "}
+        {floorNote
+          ? floorNote
+          : "below the placeability floor — this payload carried no note "
+            + "saying what the mark means."}
       </p>
     </div>
   );
@@ -576,7 +591,7 @@ export default function FieldAxes(
         ))}
       </div>
 
-      <AxisTable a={active} />
+      <AxisTable a={active} floorNote={data.below_floor_note} />
 
       <p className="mt-4 max-w-3xl border-l-2 border-line-strong pl-3.5 text-[12.5px] leading-relaxed text-ink-low">
         The ordering says where to look. A bar crossing a cut is a club the

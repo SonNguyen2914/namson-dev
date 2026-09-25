@@ -24,6 +24,8 @@ import { TZ } from "../../lib/matchday";
 //      says so. Completeness is never implied.
 import Head from "next/head";
 import { useEffect, useState } from "react";
+import { usePoll } from "../../lib/usePoll";
+import { failureOf, NEVER_ANSWERED } from "../../lib/httpFailure";
 import { Eyebrow } from "../../components/ui";
 import {
   NavChip, RouteProgress, SkeletonRows, TopBar, useScrollSpy,
@@ -246,7 +248,13 @@ function ageOf(iso: string | null | undefined, nowMs: number): string {
 
 /* ---------- page ---------- */
 
-type Phase = "loading" | "ok" | "not_deployed" | "unreachable" | "dormant";
+// "failed" is a backend that ANSWERED with an error status; "unreachable"
+// is kept for a request that got no answer at all, or a proxy that says it
+// could not reach the backend (reason `backend_unreachable`). Until
+// 2026-09-25 every non-404 status was "unreachable", so a 503 from a
+// backend that plainly answered was reported as one that never did.
+type Phase = "loading" | "ok" | "not_deployed" | "unreachable" | "failed"
+  | "dormant";
 
 export default function HunterPanel() {
   const [phase, setPhase] = useState<Phase>("loading");
@@ -255,28 +263,48 @@ export default function HunterPanel() {
   const [fetchedAt, setFetchedAt] = useState(0);
   const [nowMs, setNowMs] = useState(0);
 
+  const [failure, setFailure] = useState("");
+
+  // Every 60s through lib/usePoll (audit F5): no overlap, paused in a
+  // hidden tab, backing off while it fails.
+  usePoll(async (signal) => {
+    let r: Response;
+    try {
+      r = await fetch(`/api/hunter/findings?limit=${FINDINGS_LIMIT}`,
+                      { signal });
+    } catch {
+      if (signal.aborted) return "stop";
+      setFailure(NEVER_ANSWERED);
+      setPhase("unreachable");
+      return "failed";
+    }
+    if (signal.aborted) return "stop";
+    if (r.status === 404) { setPhase("not_deployed"); return "failed"; }
+    if (!r.ok) {
+      // the proxy's own "I could not reach it" is the one error status
+      // that IS an unreachable backend; every other status is an answer
+      const reason = await r.clone().json()
+        .then((b) => b?.reason, () => undefined);
+      const words = await failureOf(r);
+      if (signal.aborted) return "stop";
+      setFailure(words);
+      setPhase(reason === "backend_unreachable" ? "unreachable" : "failed");
+      return "failed";
+    }
+    const d: Report = await r.json();
+    if (signal.aborted) return "stop";
+    if (d.ready === false) {
+      setDormantReason(d.reason || "");
+      setPhase("dormant");
+      return "ok";
+    }
+    setReport(d);
+    setFetchedAt(Date.now());
+    setPhase("ok");
+    return "ok";
+  }, 60_000, []);
+
   useEffect(() => {
-    let alive = true;
-    const load = () =>
-      fetch(`/api/hunter/findings?limit=${FINDINGS_LIMIT}`)
-        .then(async (r) => {
-          if (!alive) return;
-          if (r.status === 404) { setPhase("not_deployed"); return; }
-          if (!r.ok) { setPhase("unreachable"); return; }
-          const d: Report = await r.json();
-          if (!alive) return;
-          if (d.ready === false) {
-            setDormantReason(d.reason || "");
-            setPhase("dormant");
-            return;
-          }
-          setReport(d);
-          setFetchedAt(Date.now());
-          setPhase("ok");
-        })
-        .catch(() => alive && setPhase("unreachable"));
-    load();
-    const poll = setInterval(load, 60_000);
     const tick = setInterval(() => setNowMs(Date.now()), 1000);
     // Seed the clock on the next frame rather than synchronously in the
     // effect body (react-hooks/set-state-in-effect) — the same idiom
@@ -285,9 +313,7 @@ export default function HunterPanel() {
     // the heartbeat falls back to the API's own age_seconds until then.
     const seed = requestAnimationFrame(() => setNowMs(Date.now()));
     return () => {
-      alive = false;
       cancelAnimationFrame(seed);
-      clearInterval(poll);
       clearInterval(tick);
     };
   }, []);
@@ -361,10 +387,24 @@ export default function HunterPanel() {
         {phase === "unreachable" && (
           <EmptyShell tone="live" eyebrow="backend · unreachable">
             <p className="text-lg text-live">backend unreachable</p>
-            <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-ink-low">
-              The hunter API could not be reached. Whether the scanner is
-              alive is UNKNOWN from here — this page re-checks every 60
-              seconds.
+            <p data-testid="hunter-failure"
+              className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-ink-low">
+              The hunter API could not be reached ({failure}). Whether the
+              scanner is alive is UNKNOWN from here — this page re-checks
+              every 60 seconds, less often while it keeps failing.
+            </p>
+          </EmptyShell>
+        )}
+
+        {phase === "failed" && (
+          <EmptyShell tone="warn" eyebrow="backend · answered with an error">
+            <p className="text-lg text-warn">the hunter read failed</p>
+            <p data-testid="hunter-failure"
+              className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-ink-low">
+              The backend answered, with an error: {failure}. That is not
+              an unreachable backend and not an empty scan — whether the
+              scanner is alive is UNKNOWN from here. This page re-checks
+              every 60 seconds, less often while it keeps failing.
             </p>
           </EmptyShell>
         )}

@@ -13,8 +13,7 @@
 // statuses (404 unknown fixture, 503 plane dormant) pass through
 // unchanged so the client can render the real status.
 import type { NextApiRequest, NextApiResponse } from "next";
-import { reach, readJson, statusForUnreadableAnswer }
-  from "../../../../lib/suggesterProxy";
+import { reach, readJson, statusForUnreadableAnswer, timeoutAnswer } from "../../../../lib/suggesterProxy";
 
 const BACKEND = process.env.SUGGESTER_BACKEND_URL || "http://localhost:8000";
 
@@ -72,6 +71,11 @@ export default async function handler(
   }
   try {
     const rg = await reach(`${BACKEND}/api/news/fixture/${eventId}`);
+    // a backend that did not answer in time is named as a timeout (504),
+    // never as an unreachable one
+    if (!rg.reached && rg.timedOut) {
+      return res.status(504).json(timeoutAnswer());
+    }
     if (!rg.reached) {
       return res.status(502).json({
         error: "Backend unreachable",
@@ -131,6 +135,11 @@ export default async function handler(
     }
     const cg = await reach(
       `${BACKEND}/api/${competition}/card/${resolved.fixture_id}`);
+    // a backend that did not answer in time is named as a timeout (504),
+    // never as an unreachable one
+    if (!cg.reached && cg.timedOut) {
+      return res.status(504).json(timeoutAnswer());
+    }
     if (!cg.reached) {
       return res.status(502).json({
         error: "Backend unreachable",

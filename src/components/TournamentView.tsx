@@ -10,7 +10,8 @@
 // Renders null for competitions whose backend serves no tournament —
 // the 404 is the feature switch, so this component mounts unconditionally
 // on the shared /comp/[key] page without per-competition frontend code.
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { usePoll } from "../lib/usePoll";
 
 import { flag } from "../lib/suggesterApi";
 import { Eyebrow, Reveal } from "./ui";
@@ -101,6 +102,11 @@ function StaleNotice({ reason }: { reason: string | null }) {
   );
 }
 
+/** Competition keys whose tournament read answered 404 in this page's
+ *  life. A 404 is the backend saying there is no tournament for the key,
+ *  and that does not change within a session. */
+const ABSENT_TOURNAMENTS = new Set<string>();
+
 export default function TournamentView({ compKey }: { compKey: string }) {
   const [read, setRead] = useState<Read<Tournament>>({ s: "asking" });
   // A forecast that arrived once is KEPT when a later poll fails; the
@@ -120,30 +126,44 @@ export default function TournamentView({ compKey }: { compKey: string }) {
     setLastOk(null);
   }
 
-  useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      try {
-        const r = await fetch(`/api/comp/${compKey}/tournament`);
-        if (!alive) return;
-        // THE SWITCH, AND NOTHING ELSE THROUGH IT.
-        if (r.status === 404) { setRead({ s: "absent" }); return; }
-        if (!r.ok) {
-          setRead({ s: "failed", why: `the tournament read answered ${r.status}` });
-          return;
-        }
-        const j = (await r.json()) as Tournament;
-        if (!alive) return;
-        setLastOk(j);
-        setRead({ s: "ok", d: j });
-      } catch (e) {
-        if (alive) setRead({ s: "failed", why: why(e) });
-      }
-    };
-    load();
-    const poll = setInterval(load, 300000);
-    return () => { alive = false; clearInterval(poll); };
-  }, [compKey]);
+  // Every five minutes through lib/usePoll (audit F5): never
+  // overlapping, paused in a hidden tab, backing off while it fails.
+  //
+  // A 404 IS FINAL FOR THE SESSION (audit F14, 2026-09-25). It is this
+  // component's "no tournament for this competition" switch, and the poll
+  // used to go on asking every five minutes after being told — and every
+  // viewer mount asked again. The key is remembered for the life of the
+  // page (ABSENT_TOURNAMENTS) and never asked about again.
+  usePoll(async (signal) => {
+    if (ABSENT_TOURNAMENTS.has(compKey)) {
+      setRead({ s: "absent" });
+      return "stop";
+    }
+    let r: Response;
+    try {
+      r = await fetch(`/api/comp/${compKey}/tournament`, { signal });
+    } catch (e) {
+      if (signal.aborted) return "stop";
+      setRead({ s: "failed", why: why(e) });
+      return "failed";
+    }
+    if (signal.aborted) return "stop";
+    // THE SWITCH, AND NOTHING ELSE THROUGH IT.
+    if (r.status === 404) {
+      ABSENT_TOURNAMENTS.add(compKey);
+      setRead({ s: "absent" });
+      return "stop";
+    }
+    if (!r.ok) {
+      setRead({ s: "failed", why: `the tournament read answered ${r.status}` });
+      return "failed";
+    }
+    const j = (await r.json()) as Tournament;
+    if (signal.aborted) return "stop";
+    setLastOk(j);
+    setRead({ s: "ok", d: j });
+    return "ok";
+  }, 300000, [compKey]);
 
   // NOTHING ASKED YET, and THE ANSWER WAS "no tournament for this
   // competition" — the only two states that may draw nothing at all.

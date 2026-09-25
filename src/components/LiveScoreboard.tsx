@@ -5,7 +5,8 @@
 // Polls the feed-backed /live-scores endpoint (one API-Football call covers
 // every live match at once, so this is budget-cheap). Renders nothing when
 // no match is live, so it never clutters the page pre-match.
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { usePoll } from "../lib/usePoll";
 import Link from "next/link";
 import { api, flag, pct, signedPct, LiveAutoResponse, LiveScoreEntry, LiveSignalRow, LiveStatsResponse, TeamNewsResponse } from "../lib/suggesterApi";
 import { groupMarkets } from "../lib/marketGroups";
@@ -130,7 +131,11 @@ function RedCards({ team, raw }: { team: string; raw: unknown }) {
   );
 }
 
-export default function LiveScoreboard() {
+export default function LiveScoreboard({ final = false }: {
+  /** The tournament is over (the bracket names a champion): read once and
+   *  stop, because nothing can go live again (audit F6). */
+  final?: boolean;
+} = {}) {
   const [read, setRead] = useState<Read<LiveScoreEntry[]>>({ s: "asking" });
   // A payload that arrived once is KEPT when a later poll fails, and it
   // is drawn beside a line saying the read behind it is the earlier
@@ -140,23 +145,23 @@ export default function LiveScoreboard() {
   // for (react-hooks/refs, which is an error in this repo's lint).
   const [lastOk, setLastOk] = useState<LiveScoreEntry[] | null>(null);
 
-  useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      try {
-        const r = await api.liveScores();
-        if (!alive) return;
-        setLastOk(r.live);
-        setRead({ s: "ok", d: r.live });
-      } catch (e) {
-        if (!alive) return;
-        setRead({ s: "failed", why: why(e) });
-      }
-    };
-    load();
-    const id = setInterval(load, POLL_MS);
-    return () => { alive = false; clearInterval(id); };
-  }, []);
+  // Every POLL_MS through lib/usePoll (audit F5): no overlap, paused in a
+  // hidden tab, backing off while it fails — and stopped once the
+  // tournament is final and one read has landed.
+  usePoll(async (signal) => {
+    if (final && lastOk !== null) return "stop";
+    try {
+      const r = await api.liveScores();
+      if (signal.aborted) return "stop";
+      setLastOk(r.live);
+      setRead({ s: "ok", d: r.live });
+      return final ? "stop" : "ok";
+    } catch (e) {
+      if (signal.aborted) return "stop";
+      setRead({ s: "failed", why: why(e) });
+      return final ? "stop" : "failed";
+    }
+  }, POLL_MS, [final]);
 
   // NOTHING HAS BEEN ASKED YET. Absence with a reason, not a claim
   // about what is being played.
@@ -414,70 +419,70 @@ function LiveExtras({ m }: { m: LiveScoreEntry }) {
     useState<Read<Map<string, LiveSignalRow>>>({ s: "asking" });
   const seenSignals = useRef<Set<number> | null>(null);
 
-  useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      try {
-        const tn = await api.teamNews(m.match_id);
-        if (alive) setNews({ s: "ok", d: tn });
-      } catch (e) { if (alive) setNews({ s: "failed", why: why(e) }); }
-    };
-    load();
-    const id = setInterval(load, 300000); // squads are settled; 5 min is plenty
-    // broadcast stat card — moves with the match, 30s cadence
-    const loadStats = async () => {
-      try {
-        const st = await api.liveStats(m.match_id);
-        if (alive) setStats({ s: "ok", d: st });
-      } catch (e) { if (alive) setStats({ s: "failed", why: why(e) }); }
-    };
-    loadStats();
-    const id2 = setInterval(loadStats, 30000);
-    // the self-running live read: same 30s cycle as the stats
-    const loadAuto = async () => {
-      try {
-        const la = await api.liveAuto(m.match_id);
-        if (alive) setAuto({ s: "ok", d: la });
-      } catch (e) { if (alive) setAuto({ s: "failed", why: why(e) }); }
-    };
-    loadAuto();
-    const id3 = setInterval(loadAuto, 30000);
-    // watched-market BUY/SELL signals — same 30s cadence as the read that
-    // produces them; the backend job also pushes to Discord, this poll is
-    // just the on-page mirror (toast fresh ones, badge the rows)
-    const loadSignals = async () => {
-      try {
-        const sr = await api.liveSignals(m.match_id);
-        if (!alive) return;
-        const priming = seenSignals.current === null;
-        if (priming) seenSignals.current = new Set();
-        const seen = seenSignals.current!;
-        const latest = new Map<string, LiveSignalRow>();
-        // newest first from the API — keep the first row seen per market
-        for (const s of sr.signals) {
-          if (!latest.has(s.market_id)) latest.set(s.market_id, s);
-          if (!seen.has(s.id)) {
-            seen.add(s.id);
-            if (!priming) {
-              toast(s.kind === "easy_win"
-                ? `💰 EASY WIN — ${s.market_title}: live ${pct(s.live_probability)} vs market ${pct(s.market_probability)}`
-                : `${s.side === "BUY" ? "🟢 BUY" : "🔴 SELL"} signal — ${s.market_title}: live ${pct(s.live_probability)} vs market ${pct(s.market_probability)}`);
-            }
+  // FOUR POLLS, each through lib/usePoll (audit F5): no overlap, paused
+  // in a hidden tab, backing off while it fails.
+  usePoll(async (signal) => {
+    try {
+      const tn = await api.teamNews(m.match_id);
+      if (!signal.aborted) setNews({ s: "ok", d: tn });
+    } catch (e) {
+      if (!signal.aborted) setNews({ s: "failed", why: why(e) });
+      return "failed";
+    }
+  }, 300000, [m.match_id]); // squads are settled; 5 min is plenty
+  // broadcast stat card — moves with the match, 30s cadence
+  usePoll(async (signal) => {
+    try {
+      const st = await api.liveStats(m.match_id);
+      if (!signal.aborted) setStats({ s: "ok", d: st });
+    } catch (e) {
+      if (!signal.aborted) setStats({ s: "failed", why: why(e) });
+      return "failed";
+    }
+  }, 30000, [m.match_id]);
+  // the self-running live read: same 30s cycle as the stats
+  usePoll(async (signal) => {
+    try {
+      const la = await api.liveAuto(m.match_id);
+      if (!signal.aborted) setAuto({ s: "ok", d: la });
+    } catch (e) {
+      if (!signal.aborted) setAuto({ s: "failed", why: why(e) });
+      return "failed";
+    }
+  }, 30000, [m.match_id]);
+  // watched-market BUY/SELL signals — same 30s cadence as the read that
+  // produces them; the backend job also pushes to Discord, this poll is
+  // just the on-page mirror (toast fresh ones, badge the rows)
+  usePoll(async (signal) => {
+    try {
+      const sr = await api.liveSignals(m.match_id);
+      if (signal.aborted) return "stop";
+      const priming = seenSignals.current === null;
+      if (priming) seenSignals.current = new Set();
+      const seen = seenSignals.current!;
+      const latest = new Map<string, LiveSignalRow>();
+      // newest first from the API — keep the first row seen per market
+      for (const s of sr.signals) {
+        if (!latest.has(s.market_id)) latest.set(s.market_id, s);
+        if (!seen.has(s.id)) {
+          seen.add(s.id);
+          if (!priming) {
+            toast(s.kind === "easy_win"
+              ? `💰 EASY WIN — ${s.market_title}: live ${pct(s.live_probability)} vs market ${pct(s.market_probability)}`
+              : `${s.side === "BUY" ? "🟢 BUY" : "🔴 SELL"} signal — ${s.market_title}: live ${pct(s.live_probability)} vs market ${pct(s.market_probability)}`);
           }
         }
-        setSignals({ s: "ok", d: latest });
-      } catch (e) {
-        // THE WORST OF THE FIVE. An operator reading a card with no
-        // signal badges concluded there were no signals; the truth was
-        // that the read never landed. Named now, at the place the
-        // absence is read.
-        if (alive) setSignals({ s: "failed", why: why(e) });
       }
-    };
-    loadSignals();
-    const id4 = setInterval(loadSignals, 30000);
-    return () => { alive = false; clearInterval(id); clearInterval(id2); clearInterval(id3); clearInterval(id4); };
-  }, [m.match_id]);
+      setSignals({ s: "ok", d: latest });
+    } catch (e) {
+      // THE WORST OF THE FIVE. An operator reading a card with no
+      // signal badges concluded there were no signals; the truth was
+      // that the read never landed. Named now, at the place the
+      // absence is read.
+      if (!signal.aborted) setSignals({ s: "failed", why: why(e) });
+      return "failed";
+    }
+  }, 30000, [m.match_id]);
 
   const autoOk = auto.s === "ok" ? auto.d : null;
   const statsOk = stats.s === "ok" ? stats.d : null;

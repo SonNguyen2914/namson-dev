@@ -288,20 +288,34 @@ export function LeaguesView({ data, modeSwitch }: {
        ["bridge_fixtures", "bridges", true], ["value", vlabel, true],
        ["half_width_95", goal ? "95% band (log)" : "95% band", true],
        [null, "interval", false], [null, "tier", false]];
-  const head = heads.map(([k, label, right]) => (
-    <th key={label || "rank"} data-sort={k ?? undefined}
-      aria-sort={k && sort.key === k ? (sort.dir < 0 ? "descending" : "ascending") : undefined}
-      onClick={k ? () => setSort((s) => s.key === k
-        ? { key: k, dir: (s.dir * -1) as 1 | -1 }
-        : { key: k, dir: k === "club" || k === "column" ? 1 : -1 }) : undefined}
-      title={k === "value" && axis === "defence"
-        ? "ranked on the signed value — higher is better on every axis, so "
-          + "the fewest goals conceded come first" : undefined}
-      className={`${TH} ${right ? "text-right" : ""} ${k ? "cursor-pointer select-none" : ""} ${
-        k && sort.key === k ? "text-accent" : ""}`}>
-      {label}{k && sort.key === k ? (sort.dir < 0 ? " ↓" : " ↑") : ""}
-    </th>
-  ));
+  /* A SORTABLE HEADER IS A BUTTON INSIDE THE <th> (2026-09-25, audit
+     F13). It was `<th onClick>`, which no keyboard can reach and no
+     screen reader announces as a control. `aria-sort` stays on the <th>,
+     where the table semantics put it; the button carries the name and
+     the press, so Tab reaches it and Enter or Space sorts. */
+  const head = heads.map(([k, label, right]) => {
+    const active = k !== null && sort.key === k;
+    const press = k ? () => setSort((s) => s.key === k
+      ? { key: k, dir: (s.dir * -1) as 1 | -1 }
+      : { key: k, dir: k === "club" || k === "column" ? 1 : -1 }) : undefined;
+    return (
+      <th key={label || "rank"} data-sort={k ?? undefined} scope="col"
+        aria-sort={k ? (active ? (sort.dir < 0 ? "descending" : "ascending")
+                               : "none") : undefined}
+        title={k === "value" && axis === "defence"
+          ? "ranked on the signed value — higher is better on every axis, so "
+            + "the fewest goals conceded come first" : undefined}
+        className={`${TH} ${right ? "text-right" : ""} ${active ? "text-accent" : ""}`}>
+        {k ? (
+          <button type="button" data-testid="sort-header" onClick={press}
+            className={`cursor-pointer select-none rounded-sm uppercase tracking-[inherit] ${
+              right ? "text-right" : "text-left"} focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent`}>
+            {label}{active ? (sort.dir < 0 ? " ↓" : " ↑") : ""}
+          </button>
+        ) : label}
+      </th>
+    );
+  });
 
   const sections: Array<{ title: string; note: string; rows: LeagueFieldRow[];
     ladder: string; all: LeagueFieldRow[] }> = [];

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { armToken } from "./operator-token";
 // THE ABSENT-CLOCK WORDS ARE THE READER'S. Typing the sentence into
 // this file would let the surface and the guard drift apart and still
 // agree — a fixture speaking the reader's vocabulary instead of the
@@ -484,6 +485,8 @@ async function openAsSent(page: Page, strip: unknown, board = BOARD) {
   await page.route("**/api/bet-suggester/watched-strip**",
     (r) => r.fulfill(json(strip)));
   await page.goto("/bet-suggester");
+  // operator-only since audit F4: no token, no strip read, no section
+  await armToken(page);
   await page.getByTestId("live-section").waitFor({ timeout: 15_000 });
 }
 
@@ -493,6 +496,8 @@ async function open(page: Page, strip: unknown, board = BOARD) {
   await page.route("**/api/bet-suggester/watched-strip**",
     (r) => r.fulfill(json(isObj(strip) ? toV2(strip) : strip)));
   await page.goto("/bet-suggester");
+  // operator-only since audit F4: no token, no strip read, no section
+  await armToken(page);
   await page.getByTestId("live-section").waitFor({ timeout: 15_000 });
 }
 
@@ -931,6 +936,7 @@ test("a draw wide enough for its own label keeps it INSIDE the segment; "
       ...ENVELOPE, matches: [withTriples([97, 1, 2], [96, 2, 2])],
     })));
   await page.reload();
+  await armToken(page);   // a reload drops the typed token with the tab state
   await page.getByTestId("live-section").waitFor();
   const narrow = liveCard(page, 101)
     .getByTestId("live-draw-label").first();
@@ -1438,6 +1444,8 @@ test("a ninth live match starts a second page, ordered by kickoff, and "
     (r) => r.fulfill(json({ ...BOARD, rows })));
   await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW)));
   await page.goto("/bet-suggester");
+  // operator-only since audit F4: no token, no strip read, no section
+  await armToken(page);
   await page.getByTestId("live-section").waitFor({ timeout: 15_000 });
 
   const section = page.getByTestId("live-section");
@@ -1496,6 +1504,9 @@ test("nothing is drawn at all when no declared match is under way",
       r.fulfill(json({ ...ENVELOPE, matches: [] })));
     await page.goto("/bet-suggester");
     await expect(page.getByTestId("picker-row").first()).toBeVisible();
+    // the token is held, so the read is made and it said: nothing
+    await armToken(page);
+    await page.waitForTimeout(1_000);
     // ABSENT, NOT EMPTY: an empty frame headed "Under way" reads as a
     // claim that nothing is, and this read did not say that.
     await expect(page.getByTestId("live-section")).toHaveCount(0);

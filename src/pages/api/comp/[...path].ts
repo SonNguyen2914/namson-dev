@@ -2,14 +2,9 @@
 // Deliberately no odds route: these competitions have no model, so there is
 // nothing for one to serve. See src/competitions.py.
 import type { NextApiRequest, NextApiResponse } from "next";
-import {
-  leagueRouteAllowed,
-  proxy,
-  refuseLeagueRoute,
-} from "../../../lib/suggesterProxy";
+import { proxyLeague } from "../../../lib/suggesterProxy";
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  const segs = ((req.query.path as string[]) || []).join("/");
   // THE PATTERN MOVED to lib/suggesterProxy.ts (COMP_RESOURCES and
   // LEAGUE_PROXY_ID_ROUTES.comp) on 2026-09-07, and the move IS the
   // fix. Living here as an inline literal is why comp was the one proxy
@@ -32,12 +27,5 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   // (their route mocks intercept in the browser, so no test exercised
   // this file). e2e/asean.spec.ts has an unmocked proxy test pinning
   // exactly this.
-  if (req.method !== "GET" || !leagueRouteAllowed("comp", segs)) {
-    // The refusal is authored in lib/suggesterProxy.ts so all ten
-    // proxies say it in one shape — JSON that names the competition
-    // and which finding this is, never Next's HTML 404 page.
-    return refuseLeagueRoute(res, "comp", segs);
-  }
-  const qs = req.url?.includes("?") ? "?" + req.url.split("?")[1] : "";
-  return proxy(req, res, `/api/comp/${segs}${qs}`);
+  return proxyLeague(req, res, "comp");
 }

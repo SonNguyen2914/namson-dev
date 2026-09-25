@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { armToken } from "./operator-token";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 // THE STRIP IS SERVED AS `watched-strip-v2` (backend #129). The
@@ -538,6 +539,8 @@ test("one read per cadence, however many surfaces draw it",
 
     const hits = await serve(page, () => ({ body: NEW }));
     await page.goto("/bet-suggester");
+    // operator-only since audit F4: no token, no strip read, no section
+    await armToken(page);
 
     // THE SURFACE IS GENUINELY ON SCREEN. Without this the count below
     // could pass because nothing ever mounted.

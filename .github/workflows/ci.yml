@@ -66,5 +66,21 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
-      - name: E2E — decision-safety (against the live shadow backend)
+      # HERMETIC SINCE 2026-09-25. This step used to run the whole suite
+      # against the production backend (through the board hold-out) and
+      # sent it ~2,400 GETs per run — measured against a counting stand-in
+      # that day: 578 + 578 CompRail cup-fixture reads, 418 watched-strip
+      # polls, 95 Leagues Cup field reads, and so on. The same day the
+      # backend's worker pool starved and it hung twice. The default run
+      # now talks to e2e/stand-in-backend.mjs only; see e2e/backend.ts.
+      - name: E2E — hermetic (local stand-in backend, no network)
         run: npm run test:e2e
+
+      # THE LIVE SET: only the tests tagged @live, whose claim is about the
+      # DEPLOYED backend (its route table, a real standings table, the
+      # shadow framing on a real match). One worker, and the hold-out
+      # spaces forwarded reads at least 250ms apart; the board is still
+      # never forwarded. Each test skips with its reason when the backend
+      # does not answer, so an outage there does not fail this branch.
+      - name: E2E — live set (@live, rate-limited, read-only)
+        run: npm run test:e2e:live

@@ -219,8 +219,24 @@ const EMPTY_REVIEW = {
   leagues: {}, finished: [], refusals: [],
 };
 
+/** HERMETIC FOR REAL (2026-09-25). This used to route the board and the
+ *  review and nothing else, so the Leagues Cup column's own field read —
+ *  `/api/comp/leagues-cup/ratings` — went wherever the environment
+ *  pointed it. In CI that was production, which answered, and two tests
+ *  here passed only because it did: against no backend the column gains
+ *  `field-error` and they fail (measured against the stand-in, 2 of 2).
+ *  So the catch-all 503 goes on FIRST (Playwright tries the most recently
+ *  registered handler first), the way picker-efl-cup-column.spec.ts does
+ *  it, and the field read is answered here. */
 async function open(page: import("@playwright/test").Page,
                     body: unknown = BOARD) {
+  await page.route("**/api/**", (r) => r.fulfill(json({}, 503)));
+  // A 200 SAYING UNMEASURED — "no field is fitted" is not "the read
+  // failed", and the column draws the two differently.
+  await page.route("**/api/comp/*/ratings", (r) => r.fulfill(json({
+    competition: "leagues-cup", axes: null,
+    why_not: "no field is fitted for this fixture's competition",
+  })));
   await page.route("**/api/picker/board**", (r) => r.fulfill(json(body)));
   await page.route("**/api/picker/review**", (r) =>
     r.fulfill(json(EMPTY_REVIEW)));

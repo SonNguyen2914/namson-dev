@@ -8,6 +8,7 @@ import { TZ } from "../lib/matchday";
 // forecast or a fabricated preseason table.
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { pollReads, usePoll } from "../lib/usePoll";
 import { Eyebrow, Reveal } from "./ui";
 
 type Side = { name?: string; short?: string; abbrev?: string; logo?: string;
@@ -67,34 +68,9 @@ export default function EplDashboard() {
   const [modelState, setModelState] = useState<ModelState>("loading");
   const [disco, setDisco] = useState<Load<Discovery>>({ s: "loading" });
 
+  // THE ONE-OFF READS: the week, the tables — fetched once per mount.
   useEffect(() => {
     let alive = true;
-    const load = () => {
-      fetch("/api/epl/scoreboard").then(j)
-        .then((d) => alive && setToday(settle<Fixture[]>(d?.fixtures ?? [])))
-        .catch(() => alive && setToday({ s: "error" }));
-      fetch("/api/epl/markets").then(j)
-        .then((d) => alive && setBooks(settle<GameBook[]>(d?.games ?? [])))
-        .catch(() => alive && setBooks({ s: "error" }));
-      fetch("/api/epl/odds").then(j)
-        .then((d) => {
-          if (!alive) return;
-          const map: Record<string, OddsRow> = {};
-          for (const o of d.odds ?? []) map[o.espn_event_id] = o;
-          setOdds({ s: "ok", d: map });
-          // trust the backend's explicit state; fall back to
-          // "unavailable" rather than inventing "dark" from an absence
-          const s = d.model_state as ModelState | undefined;
-          setModelState(s && s !== "loading" ? s : "unavailable");
-        })
-        // a REJECTED fetch is a failure, not a dark model
-        .catch(() => {
-          if (!alive) return;
-          setModelState("unavailable");
-          setOdds({ s: "error" });
-        });
-    };
-    load();
     fetch("/api/epl/schedule?days=7").then(j)
       .then((d) => alive && setWeek(settle<Fixture[]>(d?.fixtures ?? [])))
       .catch(() => alive && setWeek({ s: "error" }));
@@ -104,9 +80,41 @@ export default function EplDashboard() {
     fetch("/api/epl/markets/discovery").then(j)
       .then((d) => alive && setDisco(settle<Discovery>(d)))
       .catch(() => alive && setDisco({ s: "error" }));
-    const poll = setInterval(load, 60000);
-    return () => { alive = false; clearInterval(poll); };
+    return () => { alive = false; };
   }, []);
+
+  // THE LIVE READS, every 60s through lib/usePoll: never overlapping,
+  // paused in a hidden tab, backing off while they keep failing
+  // (audit F5 — this was a bare setInterval).
+  usePoll(async (signal) => {
+    let alive = true;
+    signal.addEventListener("abort", () => { alive = false; });
+    const { get, settled } = pollReads(signal);
+    get("/api/epl/scoreboard").then(j)
+      .then((d) => alive && setToday(settle<Fixture[]>(d?.fixtures ?? [])))
+      .catch(() => alive && setToday({ s: "error" }));
+    get("/api/epl/markets").then(j)
+      .then((d) => alive && setBooks(settle<GameBook[]>(d?.games ?? [])))
+      .catch(() => alive && setBooks({ s: "error" }));
+    get("/api/epl/odds").then(j)
+      .then((d) => {
+        if (!alive) return;
+        const map: Record<string, OddsRow> = {};
+        for (const o of d.odds ?? []) map[o.espn_event_id] = o;
+        setOdds({ s: "ok", d: map });
+        // trust the backend's explicit state; fall back to
+        // "unavailable" rather than inventing "dark" from an absence
+        const s = d.model_state as ModelState | undefined;
+        setModelState(s && s !== "loading" ? s : "unavailable");
+      })
+      // a REJECTED fetch is a failure, not a dark model
+      .catch(() => {
+        if (!alive) return;
+        setModelState("unavailable");
+        setOdds({ s: "error" });
+      });
+    return settled();
+  }, 60000, []);
 
   // ESPN's scoreboard bucket is a MATCHDAY, not a calendar day (same
   // rule as the MLS hub, and it matters MORE preseason: today's bucket

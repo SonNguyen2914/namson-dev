@@ -75,6 +75,22 @@ const persist = () => {
   catch { /* the ledger is evidence, never a reason to fail a run */ }
 };
 
+// THE LIVE SET IS RATE-LIMITED HERE (2026-09-25). In live mode
+// (SUGGESTER_E2E_MODE=live) the hold-out is the one socket between the
+// `@live` tests and a backend this suite does not own, so it is also the
+// one place a ceiling on their pace can be enforced for every path at
+// once: forwarded reads leave at least MIN_GAP_MS apart. 0 (hermetic
+// mode, where the upstream is the local stand-in) turns it off.
+const MIN_GAP_MS = Number(process.env.SUGGESTER_E2E_MIN_GAP_MS || 0);
+let nextSlot = 0;
+const awaitSlot = () => {
+  if (!MIN_GAP_MS) return Promise.resolve();
+  const now = Date.now();
+  const at = Math.max(now, nextSlot);
+  nextSlot = at + MIN_GAP_MS;
+  return new Promise((r) => setTimeout(r, at - now));
+};
+
 const sendJson = (res, status, body) => {
   const raw = JSON.stringify(body);
   res.writeHead(status, {
@@ -149,6 +165,7 @@ const server = http.createServer(async (req, res) => {
 
   // EVERYTHING ELSE IS FORWARDED UNTOUCHED.
   let upstream;
+  await awaitSlot();
   try {
     upstream = await fetch(`${UPSTREAM}${req.url}`, {
       method: req.method,
@@ -164,6 +181,9 @@ const server = http.createServer(async (req, res) => {
     });
   }
   ledger.forwarded += 1;
+  // persisted on every forward too, so the file's count is the run's
+  // count: "how many reads reached the upstream" is the live set's cost
+  persist();
   // A SECOND, DELIBERATELY CRUDER PREDICATE — and it is not redundant
   // with `isBoard`. Asking `isBoard` again here could never fail: a
   // request only reaches this line BECAUSE `isBoard` said no, so the

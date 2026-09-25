@@ -18,7 +18,7 @@
 // so "this event has no fixture row" and "we did not ask" cannot render
 // alike.
 import type { NextApiRequest, NextApiResponse } from "next";
-import { reach, readJson } from "../../../../lib/suggesterProxy";
+import { reach, readJson, timeoutAnswer } from "../../../../lib/suggesterProxy";
 
 const BACKEND = process.env.SUGGESTER_BACKEND_URL || "http://localhost:8000";
 
@@ -132,6 +132,11 @@ export default async function handler(
     // The gate. `log=0` asks for the smallest possible operator payload.
     const gated = await reach(`${BACKEND}/api/admin/live/watchlist?log=0`,
       { headers: token ? { "x-admin-token": token } : {} });
+    // a backend that did not answer in time is named as a timeout (504),
+    // never as an unreachable one
+    if (!gated.reached && gated.timedOut) {
+      return res.status(504).json(timeoutAnswer());
+    }
     if (!gated.reached) {
       return res.status(502).json({
         error: "Backend unreachable",

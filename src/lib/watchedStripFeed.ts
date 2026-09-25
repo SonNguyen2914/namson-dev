@@ -52,6 +52,7 @@ import { useCallback, useSyncExternalStore } from "react";
 import {
   WatchedStripRefusal, WatchedStripResponse, api,
 } from "./suggesterApi";
+import { nextDelay } from "./usePoll";
 
 /** THE CADENCE, AND IT IS NOW IN ONE PLACE.
  *
@@ -146,7 +147,12 @@ interface Feed {
   token: string;
   state: WatchedStripRead;
   listeners: Set<() => void>;
-  timer: ReturnType<typeof setInterval> | null;
+  timer: ReturnType<typeof setTimeout> | null;
+  /** consecutive failed reads — what the backoff is computed from */
+  failures: number;
+  /** a read fell due while the tab was hidden and was not made */
+  dueWhileHidden: boolean;
+  onVisibility: (() => void) | null;
   /** the number of the last read ISSUED */
   issued: number;
   /** the number of the newest read APPLIED — the ordering guard */
@@ -198,6 +204,7 @@ async function poll(feed: Feed, forced = false): Promise<void> {
   const sent = feed.token !== "";
   try {
     const r = await api.watchedStrip(feed.token, ctl.signal);
+    feed.failures = 0;
     // A STRAGGLER IS NOT NEWS. Dropped before it can touch anything —
     // the payload, the stale clock, or the refusal.
     if (!feed.live || seq <= feed.applied) return;
@@ -208,6 +215,7 @@ async function poll(feed: Feed, forced = false): Promise<void> {
     publish(feed, { data: r, refusal: null, asked: true,
                     stale: false, staleSince: null });
   } catch (err) {
+    feed.failures += 1;
     if (!feed.live || seq <= feed.applied) return;
     feed.applied = seq;
     const refusal = abandoned
@@ -228,17 +236,63 @@ async function poll(feed: Feed, forced = false): Promise<void> {
   }
 }
 
+// NO TOKEN, NO READ — AND A HIDDEN TAB DOES NOT READ EITHER (2026-09-25).
+//
+// The route is operator-only: the backend refuses it with a 403 unless
+// `x-admin-token` is right (api/main.py, `_admin_ok`). This feed used to
+// start on subscribe regardless, so every anonymous tab on the landing
+// page, /ucl and /efl-cup asked every 15s for a guaranteed 403 — four
+// requests a minute per tab, for ever, hidden tabs included. That was
+// the 403 noise in the backend's logs on the day it hung (audit F4). An
+// anonymous reader is now never asked about: the feed holds IDLE, which
+// LiveSection already renders exactly as it rendered the 403 — nothing.
+//
+// With a token the poll is a `setTimeout` chain rather than an interval
+// (audit F5): the next read is scheduled when the last one settles, a
+// read that falls due in a hidden tab is made when the tab is visible
+// again, and consecutive failures back off (lib/usePoll `nextDelay`:
+// the normal cadence after one failure, doubling with jitter after
+// that, capped at five minutes).
+const tabHidden = () =>
+  typeof document !== "undefined" && document.visibilityState === "hidden";
+
+function schedule(feed: Feed): void {
+  if (!feed.live || feed.token === "") return;
+  feed.timer = setTimeout(() => { void tick(feed); },
+    nextDelay(WATCHED_STRIP_POLL_MS, feed.failures));
+}
+
+async function tick(feed: Feed): Promise<void> {
+  feed.timer = null;
+  if (!feed.live) return;
+  if (tabHidden()) { feed.dueWhileHidden = true; return; }
+  await poll(feed);
+  schedule(feed);
+}
+
 function start(feed: Feed): void {
   feed.live = true;
-  void poll(feed);
-  feed.timer = setInterval(() => { void poll(feed); },
-                           WATCHED_STRIP_POLL_MS);
+  if (feed.token === "") return;
+  feed.onVisibility = () => {
+    if (!tabHidden() && feed.dueWhileHidden && feed.live) {
+      feed.dueWhileHidden = false;
+      void tick(feed);
+    }
+  };
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", feed.onVisibility);
+  }
+  void poll(feed).then(() => schedule(feed));
 }
 
 function stop(feed: Feed): void {
   feed.live = false;
-  if (feed.timer !== null) clearInterval(feed.timer);
+  if (feed.timer !== null) clearTimeout(feed.timer);
   feed.timer = null;
+  if (feed.onVisibility && typeof document !== "undefined") {
+    document.removeEventListener("visibilitychange", feed.onVisibility);
+  }
+  feed.onVisibility = null;
   for (const c of feed.flight) c.abort();
   feed.flight.clear();
 }
@@ -251,6 +305,7 @@ export function subscribeWatchedStrip(
   let feed = feeds.get(token);
   if (feed === undefined) {
     feed = { token, state: IDLE, listeners: new Set(), timer: null,
+             failures: 0, dueWhileHidden: false, onVisibility: null,
              issued: 0, applied: 0, everOk: false, stamp: null,
              live: false, flight: new Set() };
     feeds.set(token, feed);
@@ -280,7 +335,9 @@ export function watchedStripSnapshot(token: string): WatchedStripRead {
  *  flight cannot land on top of its answer. */
 export function refreshWatchedStrip(token: string): void {
   const feed = feeds.get(token);
-  if (feed !== undefined && feed.live) void poll(feed, true);
+  if (feed !== undefined && feed.live && feed.token !== "") {
+    void poll(feed, true);
+  }
 }
 
 /** THE READ, FOR A COMPONENT.

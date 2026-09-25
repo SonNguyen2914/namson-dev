@@ -40,7 +40,7 @@
 // board` is NOT here and must never be: a board GET is an assembly, and
 // an assembly freezes a permanent pre-kickoff snapshot. See
 // e2e/board-holdout.mjs. That is asserted rather than remembered.
-import { UPSTREAM_URL } from "./backend";
+import { LIVE, UPSTREAM_URL } from "./backend";
 import { PICKER_COLUMN_ORDER } from "../src/lib/pickerApi";
 
 /** How long to wait for the backend to say it is up at all. */
@@ -69,14 +69,33 @@ function warmPaths(): string[] {
     // lineups.spec.ts (both tests) and scouting-consistency.spec.ts,
     // same fixture
     `/api/mls/match/${process.env.E2E_EVENT_ID || "761439"}`,
-    // watched-strip.spec.ts — THE SLOW ONE, measured at 32s before its
-    // four indexes landed and 1.6-3.3s after, so it is the read most
-    // likely to be mid-recovery when a worker asks for it
-    "/api/bet-suggester/watched-strip",
+    // (watched-strip is NOT warmed any more, 2026-09-25: it is operator-
+    // only, so an unauthenticated warm-up is a guaranteed 403 that costs
+    // the backend an auth check and proves nothing, and no `@live` test
+    // reads it.)
   ];
 }
 
 export default async function globalSetup(): Promise<void> {
+  // THE HERMETIC RUN WARMS NOTHING AND REACHES NOTHING (2026-09-25). Its
+  // upstream is the local stand-in, so there is no cache to fill — and a
+  // default run that could be pointed at a real backend is the thing this
+  // mode exists to rule out, so that is asserted rather than trusted.
+  if (!LIVE) {
+    const host = new URL(UPSTREAM_URL).hostname;
+    if (host !== "127.0.0.1" && host !== "localhost") {
+      throw new Error(`the hermetic e2e run is pointed at ${UPSTREAM_URL}, `
+        + "which is not the local stand-in. The default suite never reads "
+        + "a real backend; set SUGGESTER_E2E_MODE=live for the @live set.");
+    }
+    if (process.env.SUGGESTER_BACKEND_URL) {
+      console.log("[e2e] hermetic run: SUGGESTER_BACKEND_URL is ignored "
+        + "here (it names the upstream of the @live set only)");
+    }
+    console.log(`[e2e] hermetic run: upstream is the stand-in at `
+      + `${UPSTREAM_URL}; @live tests are excluded`);
+    return;
+  }
   const paths = warmPaths();
 
   // THE ONE PATH THAT MUST NEVER BE HERE, asserted rather than trusted.

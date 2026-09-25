@@ -38,6 +38,7 @@ import Head from "next/head";
 import { Anton } from "next/font/google";
 import Link from "next/link";
 import { CSSProperties, useCallback, useEffect, useRef, useState } from "react";
+import { usePoll } from "../../lib/usePoll";
 import { TZ } from "../../lib/matchday";
 import {
   api, countdown, flag, pct, signedPct, kickoffLocal,
@@ -319,7 +320,15 @@ export default function WC26Archive() {
     return () => clearTimeout(t);
   }, []);
 
-  const load = useCallback(async () => {
+  // THE TOURNAMENT IS OVER ONCE THE BRACKET NAMES A CHAMPION, and a
+  // finished tournament cannot change: this archive used to poll about
+  // nine reads a minute per tab for a final Spain had already won (audit
+  // F6). Once BracketView reports a champion, every poll on this page
+  // stops after the read it has — the page is read once, not watched.
+  const [champion, setChampion] = useState<string | null>(null);
+  const final = champion !== null;
+
+  const load = useCallback(async (): Promise<boolean> => {
     try {
       const [s, m, wl, al] = await Promise.all([
         api.suggestions(), api.upcoming(72), api.watchlist(), api.alerts(),
@@ -335,31 +344,41 @@ export default function WC26Archive() {
       setUpdatedAt(new Date());
       setSecsToRefresh(POLL_MS / 1000);
       setError("");
+      return true;
     } catch {
       setError("Backend unreachable. Is the Python service running?");
+      return false;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    // Scheduled (not called sync in the effect body) so the setState calls
-    // inside load() happen in async callbacks — keeps react-hooks happy and
-    // avoids cascading sync renders.
-    const t = setTimeout(load, 0);
-    const id = setInterval(load, POLL_MS);
-    return () => { clearTimeout(t); clearInterval(id); };
-  }, [load]);
+  // Every POLL_MS through lib/usePoll (audit F5): no overlap, paused in a
+  // hidden tab, backing off while it fails — and stopped once the
+  // tournament is final and this page holds a read.
+  //
+  // `final` IS A DEPENDENCY on purpose: the moment the bracket names a
+  // champion the poll restarts, makes at most one last read (none if it
+  // already holds one) and stops — whether or not that read landed.
+  usePoll(async () => {
+    if (final && updatedAt) return "stop";
+    const ok = await load();
+    if (final) return "stop";
+    return ok ? "ok" : "failed";
+  }, POLL_MS, [final]);
 
   // 1s tick for the "next auto-refresh in Ns" countdown; also keeps the
   // "in play" kickoff comparison fresh without impure reads during render.
+  // Not needed once the tournament is final: nothing is refreshed and
+  // nothing kicks off.
   useEffect(() => {
+    if (final) return;
     const t = setInterval(() => {
       setSecsToRefresh((s) => Math.max(0, s - 1));
       setNowMs(Date.now());
     }, 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [final]);
 
   async function handleRefreshAll() {
     setRefreshingAll(true);
@@ -500,7 +519,7 @@ export default function WC26Archive() {
           )}
 
           {/* Live scoreboard — real feed-backed score cards, at the top */}
-          <LiveScoreboard />
+          <LiveScoreboard final={final} />
 
           {/* Next match hero — under the live board */}
           {next && (
@@ -539,7 +558,7 @@ export default function WC26Archive() {
 
         {/* Knockout bracket — reversed pyramid, model win probabilities */}
         <div id="bracket" className="mb-20 border-t border-line pt-10">
-          <BracketView />
+          <BracketView onChampion={setChampion} />
         </div>
 
         {/* Ranking board — likelihood-first, all matches pooled */}
@@ -568,9 +587,11 @@ export default function WC26Archive() {
             </button>
           </div>
           <p className="mb-4 font-mono text-[11px] tracking-wide text-ink-faint">
-            Auto-updates every 60s
+            {final
+              ? `Archived — ${champion} won the tournament, so this page reads once and does not refresh`
+              : "Auto-updates every 60s"}
             {updatedAt && ` · Last updated ${updatedAt.toLocaleTimeString("en-US", { timeZone: TZ })}`}
-            {` · next auto-refresh in ${secsToRefresh}s`}
+            {!final && ` · next auto-refresh in ${secsToRefresh}s`}
           </p>
           {refreshMsg && (
             <p className={`mb-4 text-xs ${

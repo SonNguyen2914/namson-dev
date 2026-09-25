@@ -3,7 +3,8 @@
 // money by design: this page is a strategy laboratory, not a broker.
 // Ledger polls every 60s (the backend bot tick's cadence).
 import Head from "next/head";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { usePoll } from "../../lib/usePoll";
 import { api, pct, BotLedger, BotPositionRow, BotsResponse } from "../../lib/suggesterApi";
 import { Eyebrow, Reveal } from "../../components/ui";
 import { RouteProgress, TopBar } from "../../components/chrome";
@@ -144,21 +145,18 @@ export default function BotArena() {
   const [data, setData] = useState<BotsResponse | null>(null);
   const [err, setErr] = useState("");
 
-  useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      try {
-        const d = await api.bots();
-        if (alive) { setData(d); setErr(""); }
-      } catch {
-        if (alive && !data) setErr("Couldn't reach the bot ledger.");
-      }
-    };
-    load();
-    const id = setInterval(load, POLL_MS);
-    return () => { alive = false; clearInterval(id); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Every POLL_MS through lib/usePoll (audit F5): no overlap, paused in a
+  // hidden tab, backing off while it fails.
+  usePoll(async (signal) => {
+    try {
+      const d = await api.bots();
+      if (!signal.aborted) { setData(d); setErr(""); }
+      return "ok";
+    } catch {
+      if (!signal.aborted && !data) setErr("Couldn't reach the bot ledger.");
+      return "failed";
+    }
+  }, POLL_MS, []);
 
   const bots = data?.bots ?? [];
   const ranked = [...bots].sort((a, b) => b.net_pnl - a.net_pnl);

@@ -20,6 +20,8 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { countdown, pct, signedPct } from "../lib/suggesterApi";
+import { failureOf, NEVER_ANSWERED } from "../lib/httpFailure";
+import { usePoll } from "../lib/usePoll";
 import { FEE_NOT_MODELED, maxContractsForStake, orderCostDollars,
   unitFeeDollars } from "../lib/fee";
 import { Eyebrow, Reveal } from "./ui";
@@ -154,6 +156,27 @@ function sideColor(s: Side, fallback: string): string {
   return fallback;
 }
 
+/** THE ONE THING ON THE HUB THAT TICKS, IN A LEAF OF ITS OWN (2026-09-25).
+ *  The 1s countdown clock used to be `now` state on the whole hub, so the
+ *  entire 1,500-line tree re-rendered every second to move four digits
+ *  (audit F6). It renders nothing once kick-off has passed. */
+function KickCountdown({ at }: { at: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  const kick = new Date(at).getTime();
+  useEffect(() => {
+    if (!(kick > Date.now())) return;
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(tick);
+  }, [kick]);
+  const secs = Math.floor((kick - now) / 1000);
+  if (!(secs > 0)) return null;
+  return (
+    <span className="font-mono text-[11px] tabular-nums text-ink-low">
+      in {countdown(secs)}
+    </span>
+  );
+}
+
 export default function MatchHub({ cfg }: { cfg: HubCfg }) {
   const router = useRouter();
   const eventId = typeof router.query.eventId === "string"
@@ -163,38 +186,46 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
   const [books, setBooks] = useState<Family[]>([]);
   const [model, setModel] = useState<ModelInfo | null>(null);
   const [lineups, setLineups] = useState<Lineups | null>(null);
-  const [err, setErr] = useState(false);
-  const [now, setNow] = useState(() => Date.now());   // 1s countdown tick
+  // THE FAILURE IS NAMED, NOT A BOOLEAN (2026-09-25). This was `err: true`
+  // off `Promise.reject(r.status)` then `.catch(() => setErr(true))`, so
+  // the status and the backend's own sentence were thrown away and the
+  // page could only say "unavailable".
+  const [err, setErr] = useState<string | null>(null);
   const [fetchedAt, setFetchedAt] = useState(0);      // when `book` was pulled
 
-  useEffect(() => {
-    if (!eventId) return;
-    let alive = true;
-    const load = () =>
-      fetch(`${cfg.api}/match/${eventId}`)
-        .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-        .then((d) => {
-          if (!alive) return;
-          setM(d.match); setBook(d.book ?? null);
-          setBooks(d.books ?? []);
-          setModel(d.model ?? null); setLineups(d.lineups ?? null);
-          setErr(false);
-          setFetchedAt(Date.now());
-        })
-        .catch(() => alive && setErr(true));
-    load();
-    const poll = setInterval(load, 30000);
-    const tick = setInterval(() => setNow(Date.now()), 1000);
-    return () => { alive = false; clearInterval(poll); clearInterval(tick); };
-  }, [eventId]);
+  // ONE POLLER (lib/usePoll): no overlap, paused in a hidden tab, backing
+  // off while the feed keeps failing — and STOPPED at full time, because a
+  // finished match's feed cannot change and every open tab of one used to
+  // ask it again every 30s for ever (audit F6).
+  usePoll(async (signal) => {
+    if (!eventId) return "stop";
+    let r: Response;
+    try {
+      r = await fetch(`${cfg.api}/match/${eventId}`, { signal });
+    } catch {
+      if (signal.aborted) return "stop";
+      setErr(NEVER_ANSWERED);
+      return "failed";
+    }
+    if (!r.ok) {
+      setErr(await failureOf(r));
+      return "failed";
+    }
+    const d = await r.json();
+    if (signal.aborted) return "stop";
+    setM(d.match); setBook(d.book ?? null);
+    setBooks(d.books ?? []);
+    setModel(d.model ?? null); setLineups(d.lineups ?? null);
+    setErr(null);
+    setFetchedAt(Date.now());
+    return d.match?.state === "post" ? "stop" : "ok";
+  }, 30000, [eventId, cfg.api]);
 
   const live = m?.state === "in";
   const post = m?.state === "post";
   // the canonical T-10 lock is the fixture's model once it exists —
   // a later scheduled run must never silently supersede it (V8 eval F9)
   const run = model?.primary ?? model?.latest;
-  const secsToKick = m?.date && now > 0
-    ? Math.floor((new Date(m.date).getTime() - now) / 1000) : null;
   const activeSection = useScrollSpy([
     ...(cfg.suggestion ? ["card"] : []),
     "prediction", "strategy", "markets", "stats"]);
@@ -229,8 +260,10 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
 
       <div className="mx-auto max-w-6xl px-4 py-8 lg:px-6">
         {err && !m && (
-          <p className="mt-10 rounded-2xl border border-dashed border-line px-4 py-8 text-center font-mono text-[11px] uppercase tracking-[0.15em] text-ink-faint">
-            match feed unavailable — retrying every 30s
+          <p data-testid="feed-failed" role="status"
+            className="mt-10 rounded-2xl border border-dashed border-warn/40 px-4 py-8 text-center font-mono text-[11px] leading-relaxed text-warn">
+            the match feed read failed: {err}. Nothing below is a claim about
+            this match. Retrying — less often while it keeps failing.
           </p>
         )}
         {/* A REFRESH THAT FAILED IS NOT A PAGE THAT IS UP TO DATE. The
@@ -245,9 +278,9 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
         {err && m && (
           <p data-testid="feed-stale"
             className="mt-4 rounded-xl border border-warn/40 px-4 py-2.5 font-mono text-[10px] leading-relaxed text-warn">
-            the last refresh FAILED — every number below is held from
-            the previous successful fetch, not current. Retrying every
-            30s.
+            the last refresh FAILED ({err}) — every number below is held
+            from the previous successful fetch, not current. Retrying —
+            less often while it keeps failing.
           </p>
         )}
 
@@ -261,11 +294,7 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                     <Eyebrow tone="accent">
                       {live ? `live · ${m.minute ?? ""}` : m.detail}
                     </Eyebrow>
-                    {secsToKick != null && secsToKick > 0 && (
-                      <span className="font-mono text-[11px] tabular-nums text-ink-low">
-                        in {countdown(secsToKick)}
-                      </span>
-                    )}
+                    {m.date && !live && !post && <KickCountdown at={m.date} />}
                   </span>
                   <span className="truncate font-mono text-[10px] uppercase tracking-wide text-ink-faint">
                     {m.venue}
