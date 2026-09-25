@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { armToken } from "./operator-token";
 // THE STRIP IS SERVED AS `watched-strip-v2` (backend #129). The
 // fixtures below stay the shape RECORDED off this route and `toV2`
 // applies the route's OWN hoist to them at the serve site, so the
@@ -144,6 +145,8 @@ async function open(page: Page, matches: unknown[]) {
   await page.route("**/api/bet-suggester/watched-strip**",
     (r) => r.fulfill(json(toV2({ ...ENVELOPE, matches }))));
   await page.goto("/bet-suggester");
+  // operator-only since audit F4: no token, no strip read, no section
+  await armToken(page);
   await page.getByTestId("live-section").waitFor({ timeout: 15_000 });
 }
 

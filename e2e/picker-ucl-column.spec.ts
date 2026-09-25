@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { armToken } from "./operator-token";
 /* THE ORDER THE BOARD DRAWS IN IS IMPORTED, NEVER RETYPED. `boardColumns`
    is the one door the page's column order comes through, and it is the
    same call the page makes — see src/lib/pickerApi. */
@@ -1846,6 +1847,8 @@ async function openBoard(page: import("@playwright/test").Page,
   await page.route("**/api/bet-suggester/watched-strip**", (r) =>
     r.fulfill(json(asV2(strip))));
   await page.goto(route);
+  // operator-only since audit F4: no token, no strip read, no section
+  await armToken(page);
   await page.getByTestId("live-section").waitFor({ timeout: 15_000 });
 }
 

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { armToken } from "./operator-token";
 import { liveGet, unanswered } from "./live-read";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
@@ -3308,6 +3309,15 @@ test("the landing page draws the DECLARATION panel and not the "
   await routes(page, STRIP);
   const settled = page.waitForResponse((r) => r.url().includes(STRIP_URL));
   await page.goto("/bet-suggester");
+  // THE TOKEN IS HELD (since audit F4, 2026-09-25): the read is
+  // operator-only and the page no longer makes it without one.
+  const panel = page.getByTestId("watch-panel");
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText("matches to watch");
+  await expect(page.getByTestId("watch-panel-chip"))
+    .toContainText("operator only");
+  await armToken(page);
+  await expect(page.locator("#watch-token")).toBeVisible();
   const resp = await settled;
 
   // NON-VACUITY, AND IT IS THE WHOLE DIFFICULTY HERE. `toHaveCount(0)`
@@ -3332,18 +3342,11 @@ test("the landing page draws the DECLARATION panel and not the "
   await expect(page.getByTestId("watched-strip-gate")).toHaveCount(0);
   await expect(page.getByTestId("watched-strip-boundary")).toHaveCount(0);
 
-  // AND THE DECLARATION PANEL STILL OPENS FOR WHOEVER HOLDS THE TOKEN.
-  // Only the read went; the operator's way in did not. It names itself
-  // as operator-only rather than hiding — absent-by-design must not
-  // read as vanished, and this page keeps saying what it can and
-  // cannot do instead of removing the control.
-  const panel = page.getByTestId("watch-panel");
-  await expect(panel).toBeVisible();
-  await expect(panel).toContainText("matches to watch");
-  await expect(page.getByTestId("watch-panel-chip"))
-    .toContainText("operator only");
-  await panel.locator("summary").click();
-  await expect(page.locator("#watch-token")).toBeVisible();
+  // AND THE DECLARATION PANEL STILL OPENS FOR WHOEVER HOLDS THE TOKEN —
+  // asserted above, before the token was typed into it. Only the read
+  // went; the operator's way in did not. It names itself as operator-
+  // only rather than hiding — absent-by-design must not read as
+  // vanished.
 });
 
 test("every declared match is drawn, and each block appears in the order "

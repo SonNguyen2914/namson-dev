@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { armToken, E2E_OPERATOR_TOKEN } from "./operator-token";
 // THE STRIP IS SERVED AS `watched-strip-v2` (backend #129). The
 // fixtures below stay the shape RECORDED off this route and `toV2`
 // applies the route's OWN hoist to them at the serve site, so the
@@ -272,37 +273,47 @@ async function settle(page: Page, hits: { strip: number }) {
 }
 
 /** Type the operator token into the watch panel — the SAME field the
- *  watch toggle uses, and the only place this secret is ever typed. */
-async function typeToken(page: Page, token = "operator-token-typed-by-a-person") {
-  await page.getByTestId("watch-panel").locator("summary").click();
-  await page.locator("#watch-token").fill(token);
-}
+ *  watch toggle uses, and the only place this secret is ever typed.
+ *  Shared since 2026-09-25 (e2e/operator-token.ts), and idempotent: the
+ *  panel is opened only if it is shut. */
+const typeToken = armToken;
 
-/** Load the board and wait for the live section to settle. */
-async function openBoard(page: Page) {
+/** Load the board, hold the token, and wait for the live section.
+ *
+ *  THE TOKEN COMES FIRST SINCE AUDIT F4 (2026-09-25). The strip is
+ *  operator-only and the frontend no longer asks for it without a token
+ *  — every anonymous tab used to poll it every 15s for a certain 403 —
+ *  so there is no live section to wait for until one is held. */
+async function openBoard(page: Page, token = E2E_OPERATOR_TOKEN) {
   await page.goto("/bet-suggester");
+  await typeToken(page, token);
   await page.getByTestId("live-section").waitFor({ timeout: 15_000 });
   await expect(readout(page)).toHaveText("tape 12s");
 }
 
 // ================================================ the readout is the press
 
-test("with no token held there is no button — and the age still reads as "
-  + "an age", async ({ page }) => {
-    await serve(page);
-    await openBoard(page);
-    // NOT PRESSABLE, AND NOT PRETENDING TO BE. A disabled control still
-    // reads as "this does something, later"; with no credential in the
-    // tab there is nothing that could work, so there is no control.
+test("with no token held there is no button — and no read to press on",
+  async ({ page }) => {
+    // RESTATED 2026-09-25 (audit F4). This used to assert that an
+    // anonymous tab drew the live card with its age and no button. That
+    // card was drawn off a read the backend always refuses without a
+    // token (a 403, every 15s, from every anonymous tab) — the page no
+    // longer makes it, so with no credential there is no card, no age
+    // and no control, and the strip is never asked.
+    const hits = await serve(page);
+    await page.goto("/bet-suggester");
+    await page.getByTestId("picker-row").first().waitFor({ timeout: 15_000 });
+    await page.waitForTimeout(1_000);
     await expect(button(page)).toHaveCount(0);
-    // THE READOUT IS UNTOUCHED BY THE BUTTON'S ABSENCE. The age is the
-    // information; the press was only ever the extra.
-    await expect(readout(page)).toHaveText("tape 12s");
+    await expect(page.getByTestId("live-section")).toHaveCount(0);
+    expect(hits.strip, "an anonymous tab asked for the operator-only strip")
+      .toBe(0);
 
-    // NON-VACUITY. This absence must be able to go red: typing the
-    // token is the one thing that makes the control exist, and the
-    // readout must survive that too.
+    // NON-VACUITY. Typing the token is the one thing that makes the
+    // read, the card, its age and the control exist.
     await typeToken(page);
+    await page.getByTestId("live-section").waitFor({ timeout: 15_000 });
     await expect(button(page)).toHaveCount(1);
     await expect(readout(page)).toHaveText("tape 12s");
   });
