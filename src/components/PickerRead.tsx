@@ -431,7 +431,12 @@ function effectiveRead(read: ReadLike, block?: FieldBlockLike | null,
        attack, because there is no axis for the club to be missing
        from. So the row's own reading is kept, and the trio draws the
        axis nowhere. */
-    if (!axis) return read.tiers[k][side === "fav" ? 0 : 1];
+    /* …AND A ROW MAY CARRY NO READING FOR THAT AXIS EITHER (2026-09-24,
+       the Championships board): a national team measured on Elo alone
+       rides under `field_partial` with `tiers.atk: null`, and indexing
+       that null threw inside the card. The axis is not drawn either
+       way; what is kept is the named absence, never a number. */
+    if (!axis) return read.tiers[k]?.[side === "fav" ? 0 : 1] ?? "no band";
     /* NO FALLBACK NUMBER. An empty set is a club the payload placed in
        no band at all; printing its `tier` would invent exactly the
        placement the set exists to refuse. */
@@ -887,7 +892,18 @@ export function TierGaps({ read, dense = false, field, partial,
             <TierCell key={label} label={label} gap={gap} />
           ))}
         </span>
-        <ShapeChip read={r} />
+        {/* A SHAPE THE BACKEND WITHHELD IS SAID, NOT DRAWN EMPTY. A partial
+            block carries no shape and — on a national row measured on
+            Elo alone — neither does the row: CLEAN/HOLLOW/SPLIT is read
+            off three gaps and this fixture has one. The chip's plate
+            with nothing in it would read as a shape that failed to
+            load; the backend's own sentence says why there is none. */}
+        {r.shape ? <ShapeChip read={r} /> : (
+          <span data-testid="shape-absent" title={absent?.why ?? undefined}
+            className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+            no shape
+          </span>
+        )}
         {/* THE TRIO AND ITS `#`, AS ONE FLEX ITEM (2026-09-09). This row
             is `flex-wrap`, so as separate items the circle wrapped onto
             the line BELOW the trio in a narrow track and sat adrift in
