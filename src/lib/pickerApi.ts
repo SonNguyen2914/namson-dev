@@ -1466,12 +1466,35 @@ export const CUP_COMP_KEY: Record<string, string> = {
   ucl: "ucl",
 };
 
-export const rowHref = (row: { league: string; event_id: string }) => {
+/** THE ROUTE TABLE, AS THE BUILD READ IT — see next.config.ts. Two
+ *  lists of page names that exist under /bet-suggester: the match hubs
+ *  (`<slug>/[eventId]`) and the static competition pages. */
+const listEnv = (v: string | undefined) => new Set((v ?? "").split(",").filter(Boolean));
+export const MATCH_HUBS = listEnv(process.env.TRIVELA_MATCH_HUBS);
+export const COMP_PAGES = listEnv(process.env.TRIVELA_COMP_PAGES);
+
+/** WHERE A CARD GOES WHEN OPENED — OR NOWHERE, SAID (audit F2, 2026-09-25).
+ *  In order: the league's match hub when one exists; the comp viewer for
+ *  a cup it serves (`CUP_COMP_KEY`, the dynamic `comp/[key]` page); the
+ *  competition's own static page when one exists under the league's name
+ *  ("eflcup" is `efl-cup`, compared without separators); otherwise NULL,
+ *  and the card is drawn unlinked with `rowNoHrefWhy` as its title. Every
+ *  target is a page the build found, never a pattern assumed to resolve —
+ *  the pattern sent Bundesliga, Serie A, Ligue 1, Eredivisie, the EFL Cup
+ *  and every national card to the 404. */
+export const rowHref = (row: { league: string; event_id: string }): string | null => {
+  if (MATCH_HUBS.has(row.league)) return `/bet-suggester/${row.league}/${row.event_id}`;
   const comp = CUP_COMP_KEY[row.league];
-  return comp
-    ? `/bet-suggester/comp/${comp}`
-    : `/bet-suggester/${row.league}/${row.event_id}`;
+  if (comp) return `/bet-suggester/comp/${comp}`;
+  const bare = (x: string) => x.replace(/[-_]/g, "");
+  const page = [...COMP_PAGES].find((p) => bare(p) === bare(row.league));
+  return page ? `/bet-suggester/${page}` : null;
 };
+
+/** The sentence an unlinked card carries: there is no page to open. */
+export const rowNoHrefWhy = (row: { league: string }) =>
+  `no match page exists for ${LEAGUE_LABEL[row.league] ?? row.league} fixtures yet, `
+  + "so this card does not link anywhere";
 
 /** THE READING ORDER OF THE COLUMNS THE BOARD DECLARES. It ORDERS; it
  *  never ADMITS.

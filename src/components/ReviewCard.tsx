@@ -44,7 +44,7 @@
 import Link from "next/link";
 import { useEffect, useId, useState } from "react";
 import { fmtDate } from "../lib/matchday";
-import { leagueLabel } from "../lib/pickerApi";
+import { leagueLabel, rowHref, rowNoHrefWhy } from "../lib/pickerApi";
 import {
   Checkpoint, PreKickoff, ReviewLeagueMeta, ReviewRefusal, ReviewRow,
   isRead, pct,
@@ -655,11 +655,13 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
 
       {/* The way IN — the same affordance the upcoming card has, into the
           same id space. A finished match you cannot open is a line of text. */}
-      <Link
-        href={`/bet-suggester/${row.league}/${row.event_id}`}
-        aria-label={`review ${row.home} versus ${row.away}`}
-        data-testid="review-link"
-        className="mt-2 block rounded-md outline-none transition-colors hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bs">
+      {/* THROUGH `rowHref`, THE BOARD CARD'S OWN ROUTE (audit F2, 2026-09-25).
+          This built `/bet-suggester/<league>/<event_id>` itself, so every
+          finished Champions League, Leagues Cup and hub-less league match
+          opened the 404. A match with no page to open is drawn unlinked,
+          with the reason on hover. */}
+      <ReviewWay href={rowHref(row)} why={rowNoHrefWhy(row)}
+        label={`review ${row.home} versus ${row.away}`}>
         <div data-testid="review-score"
           className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           {/* TWO FACTS, TWO CHANNELS, AND THEY USED TO FIGHT (2026-09-10).
@@ -692,7 +694,7 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
           <span className={`text-sm ${scoreTone("away")}`}>{row.away}</span>
           <span aria-hidden className="text-ink-faint">→</span>
         </div>
-      </Link>
+      </ReviewWay>
 
       {/* THE FAVOURITE ON THIS CARD WAS NAMED BY A RULE SINCE
           CORRECTED, SAID BEFORE ANYTHING SIGNED FROM IT.
@@ -1327,5 +1329,21 @@ export function ReviewTail({
       </div>
       )}
     </section>
+  );
+}
+
+/** The finished card's way in, or its statement that there is none. */
+function ReviewWay({ href, why, label, children }: {
+  href: string | null; why: string; label: string; children: React.ReactNode;
+}) {
+  const cls = "mt-2 block rounded-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bs";
+  if (!href) {
+    return <div data-testid="review-unlinked" title={why} className={cls}>{children}</div>;
+  }
+  return (
+    <Link href={href} aria-label={label} data-testid="review-link"
+      className={`${cls} hover:text-accent`}>
+      {children}
+    </Link>
   );
 }

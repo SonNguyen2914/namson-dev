@@ -44,7 +44,7 @@ import {
   LeagueMeta,
   HeadToHead, NationalBlock, NationalColumn, RatePair, RowField,
   RowFieldPartial, SEASON_BLEND_K,
-  columnsOf, homeBadge, leagueLabel, licensedRead, rowHref, rowIsInPlay,
+  columnsOf, homeBadge, leagueLabel, licensedRead, rowHref, rowIsInPlay, rowNoHrefWhy,
   seasonDisagreement,
   seasonSpan, seasonSpanLabel, venueDisagreement,
 } from "../lib/pickerApi";
@@ -794,6 +794,33 @@ export function seasonDeparture(
   return null;
 }
 
+/** THE WAY IN, OR A CARD THAT SAYS THERE IS NONE (audit F2, 2026-09-25).
+ *  `rowHref` answers only with a page the build found; where it finds
+ *  none — a league with no match hub, every national competition — the
+ *  same block is drawn as plain content with the reason on hover, rather
+ *  than as a link into the site's 404. Same classes either way, less the
+ *  hover ink a thing you cannot click must not wear. */
+export function CardLink({ row, className, children, label }: {
+  row: { league: string; event_id: string; favourite?: string; opponent?: string };
+  className: string; children: ReactNode; label?: string;
+}) {
+  const href = rowHref(row);
+  if (!href) {
+    return (
+      <div data-testid="card-unlinked" title={rowNoHrefWhy(row)} className={className}>
+        {children}
+      </div>
+    );
+  }
+  return (
+    <Link href={href}
+      aria-label={label ?? `open ${row.favourite} versus ${row.opponent}`}
+      className={`${className} hover:text-accent`}>
+      {children}
+    </Link>
+  );
+}
+
 /** THE BOARD'S READ OF ONE FIXTURE — the matchup line and its anchor,
  *  the rank dumbbell, Stage 1 and Stage 2 — LIFTED OUT OF RowCard
  *  VERBATIM so a second surface can render THE SAME READ rather than a
@@ -922,10 +949,8 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
           its key under it, sized at max-content by `flex-none` — the
           width this card was drawn against, and the width the dense
           branch below stacks away entirely. */}
-      <Link
-        href={rowHref(row)}
-        aria-label={`open ${row.favourite} versus ${row.opponent}`}
-        className={`mt-2.5 flex items-start gap-3 rounded-md outline-none transition-colors hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bs${
+      <CardLink row={row}
+        className={`mt-2.5 flex items-start gap-3 rounded-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bs${
           // THE ANCHOR STOPS COMPETING WITH THE NAMES FOR ONE LINE. Side
           // by side in a ~200px track the figure takes ~60px of it and
           // "Manchester City" is left with room for "Man…". Stacked, the
@@ -1029,7 +1054,11 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
               anchor.v === WITHHELD ? "font-normal text-ink-faint"
                 : anchor.dim ? "text-ink-faint" : "text-ink-hi"}`}
             {...(anchor.dim ? { "data-close": "1" } : {})}
-            {...(anchor.dim && !alt ? { title: `a close call: under ${CLOSE_ELO} Elo the named favourite won 35–44% of held-out national matches` } : {})}>
+            /* NO TYPED RATES (audit F9, 2026-09-25): the hit rates this
+               threshold was cut on are in the bake-off's archive, not in
+               the payload, so the hover says what the ink means and where
+               the measurement lives rather than restating its numbers */
+            {...(anchor.dim && !alt ? { title: `a close call: an Elo gap under ${CLOSE_ELO}, where the named favourite has not been a clear one in held-out national matches (research_archive/national_headline_bakeoff_2026-09-25)` } : {})}>
             {anchor.v}
           </span>
           {/* THE KEY, AND WHERE A SECOND LINE COMES FROM. Most anchors
@@ -1047,7 +1076,7 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
             {anchor.k2 && <span className="block">{anchor.k2}</span>}
           </span>
         </span>
-      </Link>
+      </CardLink>
 
       <RankDumbbell ranks={ranks} />
 

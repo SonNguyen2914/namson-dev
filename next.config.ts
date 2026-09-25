@@ -1,7 +1,34 @@
+import fs from "node:fs";
+import path from "node:path";
 import type { NextConfig } from "next";
+
+/* WHICH PAGES A BOARD CARD CAN OPEN, READ OFF THE PAGES THAT EXIST
+   (2026-09-25, frontend audit F2). A card's link used to be a typed
+   pattern — `/bet-suggester/<league>/<event_id>` — and 9 of 22 landing
+   links, every EFL Cup card and every national card went to the 404,
+   because only four leagues have a match hub. So the build reads the
+   route table itself and hands it to the client as two lists:
+     - MATCH HUBS: every `bet-suggester/<slug>/[eventId]` page;
+     - COMPETITION PAGES: every static `bet-suggester/<name>` page.
+   A hub added tomorrow is linked by its existence, and a card with
+   nowhere to go is drawn unlinked (lib/pickerApi.rowHref), never sent to
+   a page that is not there. */
+const PAGES = path.join(process.cwd(), "src/pages/bet-suggester");
+const entries = fs.readdirSync(PAGES, { withFileTypes: true });
+const MATCH_HUBS = entries
+  .filter((e) => e.isDirectory() && fs.existsSync(path.join(PAGES, e.name, "[eventId].tsx")))
+  .map((e) => e.name).sort();
+const COMP_PAGES = entries
+  .filter((e) => e.isFile() && /^[a-z0-9-]+\.tsx$/.test(e.name) && e.name !== "index.tsx")
+  .map((e) => e.name.replace(/\.tsx$/, "")).sort();
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+
+  env: {
+    TRIVELA_MATCH_HUBS: MATCH_HUBS.join(","),
+    TRIVELA_COMP_PAGES: COMP_PAGES.join(","),
+  },
 
   // /bet-suggester was the league carousel until 2026-08-30; it is the
   // picker board now, and the carousel moved to /bet-suggester/leagues.
