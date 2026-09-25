@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { LIVE_TAG } from "./backend";
 
 // Team-news section: the announced XI, each player's own xG/90 from the
 // official MLS feed, and the notable names not starting.
@@ -14,7 +15,10 @@ import { expect, test } from "@playwright/test";
 
 const EVENT = process.env.E2E_EVENT_ID || "761439";
 
-test.describe("MLS match page — team news", () => {
+// @live (2026-09-25): this claim is about the DEPLOYED backend, so it runs
+// only in the rate-limited live set (SUGGESTER_E2E_MODE=live) and never
+// in the hermetic default run. See e2e/backend.ts.
+test.describe("MLS match page — team news", { tag: LIVE_TAG }, () => {
   test("renders the announced XI with strength, or says it's pending",
     async ({ page }) => {
       // THE BACKEND IS LIVE, AND "IT DID NOT ANSWER" IS NOT "IT HAS NO

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { LIVE_TAG } from "./backend";
 import { liveGet, unanswered } from "./live-read";
 
 // The scouting block showed a LOSS as a win (reported Jul 24, 2026):
@@ -8,8 +9,11 @@ import { liveGet, unanswered } from "./live-read";
 
 const EVENT = process.env.E2E_EVENT_ID || "761690";
 
+// @live (2026-09-25): this claim is about the DEPLOYED backend, so it runs
+// only in the rate-limited live set (SUGGESTER_E2E_MODE=live) and never
+// in the hermetic default run. See e2e/backend.ts.
 test("form + H2H rows: result letter agrees with the scoreline shown",
-  async ({ page }) => {
+  { tag: LIVE_TAG }, async ({ page }) => {
     /* THE READ IS BOUNDED AND AN UNANSWERED ONE IS A SKIP. This spec
        guards a real defect — ESPN's winner-first `score` rendered every
        defeat as a win — and that guard is unchanged below. What was
@@ -61,7 +65,7 @@ test("form + H2H rows: result letter agrees with the scoreline shown",
   });
 
 test("the hero form strips mirror the scouting form, cell for cell",
-  async ({ page }) => {
+  { tag: LIVE_TAG }, async ({ page }) => {
     const resp = await liveGet(page.request, `/api/mls/match/${EVENT}`);
     test.skip(resp === null, unanswered(`/api/mls/match/${EVENT}`));
     const body = await resp!.json();

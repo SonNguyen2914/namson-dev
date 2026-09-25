@@ -77,6 +77,16 @@ test("a bracket that ANSWERED with no quarter-finals renders nothing — the "
   async ({ page }) => {
     // The non-vacuity half. If the failure notice fired here too it
     // would be the same collapse pointing the other way.
+    // HERMETIC (2026-09-25). This mocked the bracket and nothing else,
+    // then asserted the WHOLE PAGE never said "could not ask" — so the
+    // unmocked live-scores read decided the result: against a backend
+    // that answered it passed, against none it failed, and in CI that
+    // backend was production. The catch-all goes on first, the scoreboard
+    // answers "nothing live", and the claim is read off the bracket's own
+    // section, which is the only thing it is about.
+    await page.route("**/api/**", (r) => r.fulfill(json({}, 503)));
+    await page.route("**/api/bet-suggester/live-scores",
+      (r) => r.fulfill(json({ live: [] })));
     const answered = page.waitForResponse((r) => r.url().includes("/bracket"));
     await page.route(BRACKET_URL, (r) => r.fulfill(json({
       ...A_DRAWN_BRACKET, quarterfinals: [],
@@ -85,7 +95,8 @@ test("a bracket that ANSWERED with no quarter-finals renders nothing — the "
     await answered;
     await page.waitForTimeout(500);
     await expect(page.getByTestId("bracket-read-failed")).toHaveCount(0);
-    expect(await words(page)).not.toContain("could not ask");
+    expect(await page.locator("#bracket").innerText())
+      .not.toContain("could not ask");
   });
 
 test("a bracket that answered and then stopped answering keeps the road and "

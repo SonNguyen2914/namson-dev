@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { LIVE_TAG } from "./backend";
 import { liveGet, unanswered } from "./live-read";
 import {
   LEAGUE_PROXY_ALLOWED,
@@ -119,7 +120,7 @@ test("the operator's declared columns are a real set, and each one has a "
 
 for (const slug of PICKER_COLUMN_ORDER) {
   test(`the ${slug} column's standings proxy answers JSON, not a page — `
-    + "unmocked on purpose", async ({ request }) => {
+    + "unmocked on purpose", { tag: LIVE_TAG }, async ({ request }) => {
       // WHAT ONLY A REAL REQUEST CAN SAY. The allowlist test above is
       // hermetic and would stay green if no handler file existed at
       // all: four of these eight had an allowlist entry and no
@@ -157,7 +158,8 @@ for (const slug of PICKER_COLUMN_ORDER) {
 }
 
 test("the folded Campeones Cup is refused BY NAME in JSON, while a league "
-  + "that has a table still answers with one", async ({ request }) => {
+  + "that has a table still answers with one", { tag: LIVE_TAG },
+  async ({ request }) => {
     // THE NINTH SLUG, AND WHY IT GETS NO ROUTE. campeones is FOLDED:
     // its one fixture is drawn in the MLS and Liga MX columns rather
     // than in a column of its own, and the backend publishes no
@@ -221,7 +223,8 @@ test("the folded Campeones Cup is refused BY NAME in JSON, while a league "
   });
 
 test("a declared prefix refuses an undeclared sub-path as a DIFFERENT "
-  + "finding from a competition with no prefix", async ({ request }) => {
+  + "finding from a competition with no prefix", { tag: LIVE_TAG },
+  async ({ request }) => {
     // The two refusals are not the same fact and must not read as one.
     // bundesliga is a declared prefix that forwards exactly one route,
     // so `markets` is a sub-path refusal; campeones has no prefix at
@@ -280,7 +283,8 @@ for (const key of PROTOTYPE_KEYS) {
 }
 
 test("the prototype keys above are refused because they are undeclared, "
-  + "not because the check refuses everything", async ({ request }) => {
+  + "not because the check refuses everything", { tag: LIVE_TAG },
+  async ({ request }) => {
     // The non-vacuity half of the loop: the same lookup that rejects
     // `constructor` still admits every real prefix, so the hardening
     // narrowed nothing.

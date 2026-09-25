@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 import {
   BACKEND_URL as BACKEND, UPSTREAM_URL, HOLDOUT_PORT, HOLDOUT_URL,
-  BOARD_HOLDOUT,
+  BOARD_HOLDOUT, LIVE, LIVE_TAG, STANDIN_PORT, STANDIN_URL,
 } from "./e2e/backend";
 
 // V8.1 evaluation Phase 9/10 — decision-safety E2E. Builds and starts
@@ -44,6 +44,18 @@ const PORT = Number(process.env.SUGGESTER_E2E_PORT || 3123);
 // for this in wall-clock and nothing else.
 const WORKERS = Number(process.env.SUGGESTER_E2E_WORKERS || 2);
 
+// TWO MODES (2026-09-25) — see e2e/backend.ts. The default run is
+// HERMETIC: the app's backend is the local stand-in, and every test
+// tagged `@live` is left out. `SUGGESTER_E2E_MODE=live` runs ONLY the
+// `@live` tests, on ONE worker, through a hold-out that spaces its
+// forwarded reads (LIVE_MIN_GAP_MS) — a small, explicit, rate-limited
+// set, instead of ~2,400 incidental reads of production per run.
+const LIVE_TAG_RE = new RegExp(LIVE_TAG);
+
+/** The least time between two reads the hold-out forwards in live mode:
+ *  at most four a second against a backend that is not ours. */
+const LIVE_MIN_GAP_MS = Number(process.env.SUGGESTER_E2E_MIN_GAP_MS || 250);
+
 export default defineConfig({
   testDir: "./e2e",
   // THE BACKEND IS WARMED, AND SAID TO BE WARMED, BEFORE ANY WORKER
@@ -59,7 +71,8 @@ export default defineConfig({
   timeout: 45_000,
   expect: { timeout: 15_000 },
   retries: process.env.CI ? 1 : 0,
-  workers: WORKERS,
+  workers: LIVE ? 1 : WORKERS,
+  ...(LIVE ? { grep: LIVE_TAG_RE } : { grepInvert: LIVE_TAG_RE }),
   reporter: "line",
   use: {
     baseURL: `http://localhost:${PORT}`,
@@ -79,6 +92,16 @@ export default defineConfig({
   // against production, on every PR. e2e/board-holdout.mjs forwards
   // everything else untouched and refuses that one path. See its header.
   webServer: [
+    // THE STAND-IN, FIRST, in hermetic mode: the hold-out forwards to it,
+    // so it must be listening before the hold-out boots. Never reused —
+    // a stand-in already on the port holds some other run's log.
+    ...(!LIVE ? [{
+      command: "node e2e/stand-in-backend.mjs",
+      url: `${STANDIN_URL}/__standin/log`,
+      timeout: 30_000,
+      reuseExistingServer: false,
+      env: { SUGGESTER_E2E_STANDIN_PORT: String(STANDIN_PORT) },
+    }] : []),
     ...(BOARD_HOLDOUT ? [{
       command: "node e2e/board-holdout.mjs",
       url: `${HOLDOUT_URL}/__holdout/ledger`,
@@ -92,6 +115,7 @@ export default defineConfig({
       env: {
         SUGGESTER_E2E_UPSTREAM: UPSTREAM_URL,
         SUGGESTER_E2E_HOLDOUT_PORT: String(HOLDOUT_PORT),
+        SUGGESTER_E2E_MIN_GAP_MS: LIVE ? String(LIVE_MIN_GAP_MS) : "0",
       },
     }] : []),
     {

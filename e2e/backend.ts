@@ -24,8 +24,43 @@
 // (e2e/board-holdout.mjs), which forwards every path to UPSTREAM_URL
 // except `GET /api/picker/board` — the one route on the backend that
 // WRITES. See that file for why a board GET is not a read.
-export const UPSTREAM_URL = process.env.SUGGESTER_BACKEND_URL
-  || "https://wc26-bet-suggester-production.up.railway.app";
+//
+// THREE ADDRESSES SINCE 2026-09-25, AND THE DEFAULT IS NOT PRODUCTION.
+//
+// The default suite forwarded 1,786-2,072 GETs per run to the production
+// backend (measured that day against a counting stand-in), on the
+// morning that backend hung twice from worker-pool starvation. Almost
+// none of them were claims about the backend: they were CompRail's cup
+// fixtures on every landing-page test, the watched strip polled from
+// every anonymous tab, and three "mocked" tests that had never mocked
+// the Leagues Cup field. So the suite now has two MODES:
+//
+//   hermetic (default)  UPSTREAM_URL is the local stand-in
+//                       (e2e/stand-in-backend.mjs), which answers every
+//                       read with a named 503 and logs it. Tests tagged
+//                       `@live` are not run. Nothing reaches a real
+//                       backend, whatever SUGGESTER_BACKEND_URL says.
+//   live                SUGGESTER_E2E_MODE=live. Only the `@live` tests
+//                       run, on one worker, through a hold-out that spaces
+//                       its forwarded reads; UPSTREAM_URL is
+//                       SUGGESTER_BACKEND_URL or production.
+export const PRODUCTION_URL =
+  "https://wc26-bet-suggester-production.up.railway.app";
+
+/** Spelled as a word, like SUGGESTER_E2E_BOARD below, so a stray `1`
+ *  cannot turn it on. */
+export const LIVE = process.env.SUGGESTER_E2E_MODE === "live";
+
+export const STANDIN_PORT = Number(process.env.SUGGESTER_E2E_STANDIN_PORT || 3125);
+export const STANDIN_URL = `http://127.0.0.1:${STANDIN_PORT}`;
+
+export const UPSTREAM_URL = LIVE
+  ? (process.env.SUGGESTER_BACKEND_URL || PRODUCTION_URL)
+  : STANDIN_URL;
+
+/** The tag a test carries when its claim is about the DEPLOYED backend
+ *  and cannot be made against the stand-in. */
+export const LIVE_TAG = "@live";
 
 export const HOLDOUT_PORT = Number(process.env.SUGGESTER_E2E_HOLDOUT_PORT || 3124);
 

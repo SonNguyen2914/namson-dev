@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { LIVE_TAG } from "./backend";
 import { liveGet, unanswered } from "./live-read";
 
 // Decision-safety invariants (V8.1 evaluation). These must hold no
@@ -16,8 +17,11 @@ test("MLS board loads in league mode with the shadow framing", async ({ page }) 
     .toBeVisible();
 });
 
+// @live (2026-09-25): this claim is about the DEPLOYED backend, so it runs
+// only in the rate-limited live set (SUGGESTER_E2E_MODE=live) and never
+// in the hermetic default run. See e2e/backend.ts.
 test("match hub shows the model as shadow, never as advice",
-  async ({ page, request }) => {
+  { tag: LIVE_TAG }, async ({ page, request }) => {
     // This hard-coded fixture 761680 (Columbus vs Cincinnati). That
     // match kicked off, settled, and its Kalshi markets closed — so the
     // every-market table had nothing to render and the test went red
