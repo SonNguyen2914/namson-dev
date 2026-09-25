@@ -235,7 +235,14 @@ export const LEAGUE_PROXY_ALLOWED: Record<string, readonly string[]> = {
   // the capture that `picker/board` does. Reached through the dynamic
   // `[league]/[...path].ts` proxy — no directory of its own, which is
   // the point of that file.
-  field: ["leagues", "cups"],
+  //
+  // `nations` (2026-09-25): the third read, the four national-team
+  // competition fields off the national reader — GET-only, no board
+  // behind it either (backend tests/test_field_page_nations.py makes the
+  // club assembly, its capture and every file write raise and the route
+  // still answers). Forwarded AHEAD of the backend's deploy: see
+  // LEAGUE_PROXY_AHEAD.
+  field: ["leagues", "cups", "nations"],
   // THE CHAMPIONSHIPS BOARD (2026-09-24): the four national-team columns
   // in the club board's payload shape. ONE ROUTE, and it WRITES NOTHING —
   // unlike `picker/board`, whose every GET freezes a snapshot row, the
@@ -340,6 +347,13 @@ export const LEAGUE_PROXY_AHEAD: Record<string, Record<string, string>> = {
       + "backend yet. Retire this record when the deployed /openapi.json "
       + "lists /api/championships/board — the drift guard fails on it "
       + "from that moment.",
+  },
+  field: {
+    nations: "GET /api/field/nations ships on the backend branch "
+      + "`field-nations-route` and is not on the deployed backend yet. "
+      + "Retire this record when the deployed /openapi.json lists "
+      + "/api/field/nations — the drift guard fails on it from that "
+      + "moment.",
   },
 };
 
