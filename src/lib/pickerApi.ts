@@ -220,6 +220,43 @@ export interface FieldAxis {
   /** the backend's own word for this axis — "overall" / "attack" /
    *  "defence" — carried rather than restated here */
   label?: string;
+  /** THIS AXIS CUT AT THE BAND COUNT ITS RESOLUTION LICENSES — national
+   *  attack and defence only (backend `payload._band_extras`). The five
+   *  declared bands stay in `fav` / `opp`; this is the same two teams on
+   *  the coarser cut the measurement supports (UNL atk 5 / def 3, CNL 3/3,
+   *  AFCON 2/3, Gulf Cup 2/2 on 2026-09-25). See `licensedRead`. */
+  licensed?: LicensedAxis | null;
+}
+
+export interface LicensedSide { tier: number; tier_set: number[]; straddles: boolean }
+export interface LicensedAxis {
+  bands: number;
+  below_floor: boolean;
+  failing_condition?: string | null;
+  fav?: LicensedSide | null;
+  opp?: LicensedSide | null;
+}
+
+/** THE AXIS AS THE CARD DRAWS IT: at the licensed count where the backend
+ *  serves one for BOTH sides, the declared five bands otherwise.
+ *
+ *  THE GAP IS THE BACKEND'S OWN DEFINITION, APPLIED TO THE TIERS DRAWN.
+ *  `tier_gap` is `opp.tier − fav.tier` on the tiers the backend read
+ *  (`payload._field_block`); a card that printed the licensed pair "2v2"
+ *  beside the five-band gap's green "ahead" would contradict itself in one
+ *  row. So the licensed pair carries the licensed difference, and the
+ *  shape is re-read off the three gaps drawn by the backend's own rule
+ *  (`shapeFromGaps`) — the same restatement the venue flip already uses.
+ *  Null when the axis has no licensed cut, or one side is missing from it:
+ *  half a licensed pair is not drawn beside half a declared one. */
+export function licensedRead(axis: FieldAxis | undefined | null): {
+  bands: number; below_floor: boolean; fav: LicensedSide; opp: LicensedSide;
+  tier_gap: number;
+} | null {
+  const l = axis?.licensed;
+  if (!l || !l.fav || !l.opp) return null;
+  return { bands: l.bands, below_floor: l.below_floor, fav: l.fav, opp: l.opp,
+           tier_gap: l.opp.tier - l.fav.tier };
 }
 
 /** THE FIELD BLOCK ON A CROSS-LEAGUE RATED ROW (backend, 2026-09-09).
@@ -566,6 +603,9 @@ export interface BoardRow {
   /** A national-team fixture's own facts (Championships board only) —
    *  see NationalBlock. Absent on every club row. */
   national?: NationalBlock | null;
+  /** PREVIOUS MEETINGS on a club row, in the national block's own shape
+   *  (see HeadToHead). Absent on a board built before 2026-09-25. */
+  h2h?: HeadToHead | null;
   /** the national card's headline — the backend's when it sends one,
    *  else the interim venue-adjusted Elo gap (see venueAdjusted) */
   headline?: NationalHeadline | null;
@@ -984,7 +1024,7 @@ const neg = (n: number | null | undefined) => (n == null ? n : -n);
  *  tier gaps > 0; HOLLOW = attack and defence both <= 0; SPLIT otherwise.
  *  Null when an axis is absent — a shape nobody can read off three gaps
  *  is not composed from fewer. */
-const shapeOf = (g: Record<string, number | null | undefined>): Shape | null => {
+export const shapeFromGaps = (g: Record<string, number | null | undefined>): Shape | null => {
   const { ovr, atk, def } = g;
   if (ovr == null || atk == null || def == null) return null;
   if (ovr > 0 && atk > 0 && def > 0) return "CLEAN";
@@ -1048,11 +1088,16 @@ export function venueAdjusted(row: BoardRow): BoardRow {
     const axes: Record<string, unknown> = {};
     const gaps: Record<string, number | null | undefined> = {};
     for (const [k, a] of Object.entries(b.axes)) {
-      const x = a as { fav: unknown; opp: unknown; tier_gap?: number | null };
-      axes[k] = { ...x, fav: x.opp, opp: x.fav, tier_gap: neg(x.tier_gap) };
+      const x = a as { fav: unknown; opp: unknown; tier_gap?: number | null;
+                       licensed?: LicensedAxis | null };
+      /* the licensed cut names fav/opp too, and must turn with them */
+      const licensed = x.licensed
+        ? { ...x.licensed, fav: x.licensed.opp, opp: x.licensed.fav } : x.licensed;
+      axes[k] = { ...x, fav: x.opp, opp: x.fav, tier_gap: neg(x.tier_gap),
+                  ...(x.licensed !== undefined ? { licensed } : {}) };
       gaps[k] = neg(x.tier_gap);
     }
-    return { ...b, axes, ...("shape" in b ? { shape: shapeOf(gaps) } : {}) };
+    return { ...b, axes, ...("shape" in b ? { shape: shapeFromGaps(gaps) } : {}) };
   };
   const tierGaps = Object.fromEntries(
     Object.entries(row.tier_gaps ?? {}).map(([k, v]) => [k, neg(v as number | null)]));
@@ -1075,7 +1120,7 @@ export function venueAdjusted(row: BoardRow): BoardRow {
     field_partial: flipAxes(row.field_partial) ?? row.field_partial,
     tiers: tiers as unknown as BoardRow["tiers"],
     tier_gaps: tierGaps as unknown as BoardRow["tier_gaps"],
-    shape: (shapeOf(tierGaps) ?? row.shape) as BoardRow["shape"],
+    shape: (shapeFromGaps(tierGaps) ?? row.shape) as BoardRow["shape"],
     rank_gap: neg(row.rank_gap) ?? null,
     ranks: row.ranks ? { fav: row.ranks.opp, opp: row.ranks.fav } : row.ranks,
     rates: row.rates ? Object.fromEntries(Object.entries(row.rates)
@@ -1156,8 +1201,13 @@ export function nationalColumn(
       .map((t) => t.next_fixture?.kickoff).filter((k): k is string => !!k).sort();
     nextBeyond = kicks[0] ?? null;
     if (nextBeyond) {
+      /* "STARTS" ONLY FOR A COMPETITION NOBODY HAS PLAYED IN. A column can
+         also be empty between two stages of a tournament under way (the
+         Gulf Cup between its group stage and its semi-finals); there the
+         group tables hold results, and the chip says when it resumes. */
+      const played = Object.values(standings).some((g) => g.some((r) => r.gp > 0));
       const first = stages[0];
-      stage = { text: `starts ${DM.format(new Date(nextBeyond)).toLowerCase()}`,
+      stage = { text: `${played ? "next" : "starts"} ${DM.format(new Date(nextBeyond)).toLowerCase()}`,
                 title: `${first?.label ?? "the competition"} — ${first?.dates ?? ""}`.trim() };
     }
   } else {
@@ -1313,7 +1363,9 @@ export const LEAGUE_LABEL: Record<string, string> = {
   // columns are `tables.BOARD_COLUMNS` and these are not in it.
   unl: "UEFA Nations League",
   cnl: "Concacaf Nations League",
-  asiancup: "AFC Asian Cup",
+  // the 27th Arabian Gulf Cup took the Asian Cup's column on 2026-09-25
+  // (the Asian Cup starts in 2027 and left the board by decision)
+  gulfcup: "Arabian Gulf Cup",
   afcon: "Africa Cup of Nations",
 };
 
@@ -1683,7 +1735,7 @@ export async function fetchChampionships(
 /** The backend's declared order, restated for the one reader that needs
  *  it before a payload lands (the hero's four lights). The payload's own
  *  `columns` stays the authority for what the board draws. */
-export const CHAMPIONSHIP_COLUMNS = ["unl", "cnl", "asiancup", "afcon"] as const;
+export const CHAMPIONSHIP_COLUMNS = ["unl", "cnl", "gulfcup", "afcon"] as const;
 
 /* ── WHAT A NATIONAL CARD CARRIES BESIDES THE CLUB CARD'S KEYS ─────────
    Backend `src/championships/payload._card`, field for field. Every
@@ -1702,7 +1754,9 @@ export interface NationalFormGame {
   venue?: "home" | "away";
   gf?: number;
   ga?: number;
-  letter: "W" | "D" | "L" | null;
+  /** "?" when the providers disagree on the score (see `disputed`) */
+  letter: "W" | "D" | "L" | "?" | null;
+  disputed?: { letter?: string; why?: string } | null;
   why_no_letter?: string;
 }
 
@@ -1731,13 +1785,25 @@ export interface NationalTeam {
   form?: NationalForm | null;
 }
 
-export interface NationalHeadToHead {
+/** PREVIOUS MEETINGS, ONE SHAPE ON BOTH BOARDS: `national.head_to_head`
+ *  on a national card, `h2h` on a club row (backend board-data-gaps,
+ *  2026-09-25). `tally` is keyed by THIS fixture's home and away sides.
+ *  `source` names where the record was read — ESPN's `seasonseries` /
+ *  `headToHeadGames`, whose `window` is null, or one of our own corpora
+ *  (`corpus_since_2018` for national teams), whose `window` is the span
+ *  searched. A corpus that found nothing is `available: false` with a
+ *  tally of zeros and a `reason` the card quotes verbatim. */
+export interface HeadToHead {
   available?: boolean;
   source: string | null;
+  window?: { from?: string | null; to?: string | null; label?: string | null } | null;
   tally?: { home: number; draw: number; away: number } | null;
   meetings?: unknown[];
-  reason?: string;
+  last_meeting?: unknown;
+  reason?: string | null;
+  espn_reason?: string | null;
 }
+export type NationalHeadToHead = HeadToHead;
 
 /** THE NATIONAL CARD'S HEADLINE, AS DATA. A bake-off is choosing the
  *  signal by measurement and will serve it per card as this field; the

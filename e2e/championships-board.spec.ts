@@ -17,7 +17,9 @@
  *      way back. */
 import { test, expect, type Page } from "@playwright/test";
 import { BOARD_EIGHT, routeEight } from "./eight-columns";
-import { CHAMP_BOARD, CHAMP_CLOCK, SAMPLE_REFUSAL } from "./championships-recorded";
+import {
+  CHAMP_BOARD, CHAMP_CLOCK, INTERIM_CLOCK, INTERIM_DR_NIC, SAMPLE_REFUSAL, XI_LINEUPS,
+} from "./championships-recorded";
 import { SORT_MODES } from "../src/lib/pickerSort";
 
 const json = (body: unknown) => ({
@@ -43,8 +45,9 @@ async function routeBoth(page: Page, champ: unknown = CHAMP_BOARD): Promise<Call
 
 /** Open the landing page on the Championships board, the way a returning
  *  viewer arrives: the choice already remembered. */
-async function openChampionships(page: Page, champ: unknown = CHAMP_BOARD) {
-  await page.clock.install({ time: new Date(CHAMP_CLOCK) });
+async function openChampionships(page: Page, champ: unknown = CHAMP_BOARD,
+                                 clock: string = CHAMP_CLOCK) {
+  await page.clock.install({ time: new Date(clock) });
   await page.addInitScript(() => {
     try { window.localStorage.setItem("board-mode", "championships"); } catch { /* none */ }
   });
@@ -240,7 +243,11 @@ test.describe("a national card is a league card with national facts in its slots
       const board = JSON.parse(JSON.stringify(CHAMP_BOARD));
       const row = board.rows.find((r: { league: string; field?: unknown }) =>
         r.league === "unl" && r.field);
+      /* attack is DRAWN at its licensed count, so the verdict that counts
+         is that cut's own (pickerApi.licensedRead) — and the five-band
+         side's too, so the edit holds on either reading */
       row.field.axes.atk.fav.below_floor = false;
+      if (row.field.axes.atk.licensed) row.field.axes.atk.licensed.below_floor = false;
       await openChampionships(page, board);
       await expect(page.locator('[data-testid="col-head"][data-league="unl"] [data-testid="col-floor"]'))
         .toHaveAttribute("data-axes", "def");
@@ -251,15 +258,17 @@ test.describe("a national card is a league card with national facts in its slots
         .toHaveAttribute("data-axes", "atk,def");
     });
 
-  test("no tear through a shape word on an axis the header calls indicative",
+  test("the shape chip is the club card's: a SPLIT is torn, as on the Leagues board",
     async ({ page }) => {
-      // "SP|LIT": a SPLIT chip is CUT along the unit that gave way; where
-      // that unit is below the floor for every team, the cut is withheld
+      /* REVERSED 2026-09-25. From 2026-09-24 the tear was withheld on an
+         axis the column header calls indicative; the operator: "I told
+         you to copy everything and some of them are still behind like
+         the clean/split/hollow design". The header's "atk/def †" still
+         says it once. Per-row expectations: e2e/card-parity.spec.ts. */
       await openChampionships(page);
-      await expect(page.locator('[data-testid="picker-row"] [data-testid="shape-chip"]:not([data-cut="none"])'))
-        .toHaveCount(0);
-      expect(await page.locator('[data-testid="picker-row"] [data-cut-withheld]').count())
+      expect(await page.locator('[data-testid="picker-row"] [data-testid="shape-chip"]:not([data-cut="none"])').count())
         .toBeGreaterThan(0);
+      await expect(page.locator('[data-testid="picker-row"] [data-cut-withheld]')).toHaveCount(0);
     });
 
   test("the price row is the club row: the favourite's quote is not relabelled",
@@ -272,9 +281,14 @@ test.describe("a national card is a league card with national facts in its slots
     });
 
   test("XI: nothing until both are announced, then one chip", async ({ page }) => {
-    await openChampionships(page);
-    const announced = CHAMP_BOARD.rows.filter((r) => r.national?.lineups?.announced).length;
-    expect(announced).toBeGreaterThan(0);
+    /* the recording's own announced XIs; where it holds none, one row
+       carries the recorded 2026-09-24 block that had (XI_LINEUPS) */
+    const board = JSON.parse(JSON.stringify(CHAMP_BOARD));
+    const own = board.rows.filter((r: { national?: { lineups?: { announced?: boolean } } }) =>
+      r.national?.lineups?.announced).length;
+    if (own === 0) board.rows[0].national.lineups = XI_LINEUPS;
+    await openChampionships(page, board);
+    const announced = own || 1;
     await expect(page.locator('[data-testid="xi-chip"]')).toHaveCount(announced);
     await expect(page.locator('[data-testid="national-lineups"]')).toHaveCount(0);
     for (const t of await page.locator('[data-testid="picker-row"]').allInnerTexts()) {
@@ -282,19 +296,37 @@ test.describe("a national card is a league card with national facts in its slots
     }
   });
 
-  test("head-to-head: one compact item, only where ESPN has a record", async ({ page }) => {
-    await openChampionships(page);
-    const met = CHAMP_BOARD.rows.filter((r) => {
-      const h = r.national?.head_to_head as { tally?: { home: number; draw: number; away: number } };
-      const t = h?.tally;
-      return t && t.home + t.draw + t.away > 0;
-    }).length;
-    expect(met).toBeLessThan(CHAMP_BOARD.rows.length);   // the fixture holds both kinds
-    await expect(page.locator('[data-testid="national-h2h"]')).toHaveCount(met);
-    for (const t of await page.locator('[data-testid="picker-row"]').allInnerTexts()) {
-      expect(t).not.toMatch(/no meeting/i);
-    }
-  });
+  test("head-to-head: one compact item, ESPN's record or our corpus's, said as such",
+    async ({ page }) => {
+      await openChampionships(page);
+      type H = { source: string; available: boolean; reason?: string | null;
+                 window?: { label?: string } | null;
+                 tally: { home: number; draw: number; away: number } };
+      const rows = (CHAMP_BOARD.rows as unknown as Array<{ event_id: string;
+        favourite: string; fav_side: "home" | "away"; national: { head_to_head: H } }>);
+      const kinds = rows.map((r) => r.national.head_to_head);
+      // the recording holds all three: ESPN, a corpus meeting, a corpus absence
+      expect(kinds.some((h) => h.source === "seasonseries")).toBe(true);
+      expect(kinds.some((h) => h.source === "corpus_since_2018" && h.available)).toBe(true);
+      expect(kinds.some((h) => h.source === "corpus_since_2018" && !h.available)).toBe(true);
+      for (const r of rows) {
+        const h = r.national.head_to_head;
+        const item = page.locator(`[data-testid="picker-row"][data-event="${r.event_id}"] [data-testid="h2h"]`);
+        const met = h.tally.home + h.tally.draw + h.tally.away;
+        if (met > 0) {
+          const opp = r.fav_side === "home" ? "away" : "home";
+          await expect(item).toHaveText(`h2h ${h.tally[r.fav_side]}-${h.tally.draw}-${h.tally[opp]}`);
+          await expect(item).toHaveAttribute("title", h.source === "corpus_since_2018"
+            ? new RegExp(`our match corpus, ${h.window!.label}`) : /ESPN's seasonseries record/);
+        } else {
+          // a measured absence over a named window, and the backend's own
+          // sentence for it verbatim — which never says "never met"
+          await expect(item).toHaveText("h2h none since 2018");
+          await expect(item).toHaveAttribute("title", h.reason!);
+          expect(h.reason).toMatch(/a measured absence over that window, not a claim/i);
+        }
+      }
+    });
 });
 
 /* ══ THE VENUE-ADJUSTED FAVOURITE (operator, 2026-09-24) ══════════════
@@ -304,8 +336,14 @@ test.describe("a national card is a league card with national facts in its slots
  *  named Nicaragua and quoted its 19¢ leg while the market had the DR at
  *  62¢. The DR won 3–2. With the home term (+65 to the side at home in
  *  its own country) the DR is the favourite by 29. */
-const DR_NIC = CHAMP_BOARD.rows.find((r) =>
-  r.home === "Dominican Republic" && r.away === "Nicaragua")!;
+/* EVERY CARD IN THE CURRENT RECORDING CARRIES THE SERVED HEADLINE, so the
+   interim fallback is proved on the row it was built for: the 2026-09-24
+   recording's DR v Nicaragua, served before the backend sent a headline
+   (INTERIM_DR_NIC), dropped into this board at its own clock. */
+const DR_NIC = INTERIM_DR_NIC;
+const WITH_DR = { ...CHAMP_BOARD, rows: [...CHAMP_BOARD.rows, INTERIM_DR_NIC] };
+const openInterim = (page: Page, board: unknown = WITH_DR) =>
+  openChampionships(page, board, INTERIM_CLOCK);
 const card = (page: Page) =>
   page.locator(`[data-testid="picker-row"][data-event="${DR_NIC.event_id}"]`);
 
@@ -313,10 +351,11 @@ test.describe("the national favourite is venue-adjusted", () => {
   test("the home term names the Dominican Republic, and prices its leg",
     async ({ page }) => {
       expect(DR_NIC.favourite, "the recording named Nicaragua").toBe("Nicaragua");
-      await openChampionships(page);
+      await openInterim(page);
       const c = card(page);
-      await expect(c.locator('a[aria-label^="open "]')).toHaveAttribute(
-        "aria-label", "open Dominican Republic versus Nicaragua");
+      // a national card has no match page to open (rowHref), so the order is
+      // read off the favourite's own name line, whose title is "fav v opp"
+      await expect(c.locator('[title="Dominican Republic v Nicaragua"]')).toHaveCount(1);
       await expect(c.locator('[data-testid="row-anchor"]')).toHaveText("+29");
       await expect(c.locator('[data-testid="anchor-key"]')).toHaveText(/elo gap/i);
       // the venue chip stays: it is why the number moved
@@ -327,13 +366,14 @@ test.describe("the national favourite is venue-adjusted", () => {
     });
 
   test("no home term at a neutral venue: the raw gap stands", async ({ page }) => {
-    const board = JSON.parse(JSON.stringify(CHAMP_BOARD));
+    const board = JSON.parse(JSON.stringify(WITH_DR));
     const r = board.rows.find((x: { event_id: string }) => x.event_id === DR_NIC.event_id);
     r.venue_class = { class: "NEUTRAL", home_side: null };
-    await openChampionships(page, board);
+    await openInterim(page, board);
     const c = card(page);
-    await expect(c.locator('a[aria-label^="open "]')).toHaveAttribute(
-      "aria-label", "open Nicaragua versus Dominican Republic");
+    // a national card has no match page to open (rowHref), so the order is
+      // read off the favourite's own name line, whose title is "fav v opp"
+      await expect(c.locator('[title="Nicaragua v Dominican Republic"]')).toHaveCount(1);
     await expect(c.locator('[data-testid="row-anchor"]')).toHaveText("+36");
     await expect(c.locator('[data-testid="home-badge"]')).toHaveText("N");
     await expect(c).toContainText("ask 19¢");
@@ -341,16 +381,17 @@ test.describe("the national favourite is venue-adjusted", () => {
 
   test("a headline the backend serves is printed as served — value, unit, label",
     async ({ page }) => {
-      const board = JSON.parse(JSON.stringify(CHAMP_BOARD));
+      const board = JSON.parse(JSON.stringify(WITH_DR));
       const r = board.rows.find((x: { event_id: string }) => x.event_id === DR_NIC.event_id);
       r.national.headline = { value: 0.42, unit: "goals", label: "xg gap" };
-      await openChampionships(page, board);
+      await openInterim(page, board);
       const c = card(page);
       await expect(c.locator('[data-testid="row-anchor"]')).toHaveText("+0.42");
       await expect(c.locator('[data-testid="anchor-key"]')).toHaveText(/xg gap/i);
       // the backend named the favourite by its own headline: not re-read here
-      await expect(c.locator('a[aria-label^="open "]')).toHaveAttribute(
-        "aria-label", "open Nicaragua versus Dominican Republic");
+      // a national card has no match page to open (rowHref), so the order is
+      // read off the favourite's own name line, whose title is "fav v opp"
+      await expect(c.locator('[title="Nicaragua v Dominican Republic"]')).toHaveCount(1);
     });
 });
 
@@ -368,7 +409,7 @@ const geo = (page: Page) =>
 test.describe("the corner: a venue line, and a close call drawn faint", () => {
   test("a home call says so: rating and home term, signed to the favourite",
     async ({ page }) => {
-      await openChampionships(page);
+      await openInterim(page);
       const k = card(page).locator('[data-testid="anchor-key"]');
       await expect(k).toContainText(/\u221236 rating · \+65 home/i);
       // derived from the recording, never typed: the favourite's rating
@@ -381,16 +422,16 @@ test.describe("the corner: a venue line, and a close call drawn faint", () => {
     });
 
   test("a neutral venue says neutral, and carries no home term", async ({ page }) => {
-    const board = JSON.parse(JSON.stringify(CHAMP_BOARD));
+    const board = JSON.parse(JSON.stringify(WITH_DR));
     const r = board.rows.find((x: { event_id: string }) => x.event_id === DR_NIC.event_id);
     r.venue_class = { class: "NEUTRAL", home_side: null };
-    await openChampionships(page, board);
+    await openInterim(page, board);
     await expect(card(page).locator('[data-testid="anchor-key"]'))
       .toContainText(/\+36 rating · neutral/i);
   });
 
   test("under 100 Elo the number is drawn faint; from 100 it is not", async ({ page }) => {
-    await openChampionships(page);
+    await openInterim(page);
     const close = card(page).locator('[data-testid="row-anchor"]');
     await expect(close).toHaveText("+29");
     await expect(close).toHaveAttribute("data-close", "1");
@@ -402,7 +443,7 @@ test.describe("the corner: a venue line, and a close call drawn faint", () => {
 
   test("the backend's headline in Elo points prints whole, with its own venue line",
     async ({ page }) => {
-      const board = JSON.parse(JSON.stringify(CHAMP_BOARD));
+      const board = JSON.parse(JSON.stringify(WITH_DR));
       const r = board.rows.find((x: { event_id: string }) => x.event_id === GEO_NIR.event_id);
       r.national.headline = { value: 117.3, unit: "Elo points", label: "ELO GAP",
         favourite_side: "home",
@@ -413,7 +454,7 @@ test.describe("the corner: a venue line, and a close call drawn faint", () => {
         favourite_side: "home",
         components: { raw_gap_home_minus_away: -20.8, venue_term_home_minus_away: 65.0,
                       venue_class: "TRUE_HOME", host_side: "home" } };
-      await openChampionships(page, board);
+      await openInterim(page, board);
       await expect(geo(page).locator('[data-testid="row-anchor"]')).toHaveText("+117");
       await expect(geo(page).locator('[data-testid="anchor-key"]'))
         .toContainText(/\+52 rating · \+65 home/i);
@@ -492,19 +533,34 @@ test.describe("the Championships board wears the Leagues board's chrome", () => 
     }
     await expect(page.locator('[data-testid="col-head"][data-league="unl"] [data-testid="col-stage"]'))
       .toHaveText(/league phase · md 1\/6/i);
-    await expect(page.locator('[data-testid="col-head"][data-league="asiancup"] [data-testid="col-stage"]'))
-      .toHaveText(/starts 7 jan/i);
+    // the Gulf Cup is under way: its stage, and the matchday off its tables
+    await expect(page.locator('[data-testid="col-head"][data-league="gulfcup"] [data-testid="col-stage"]'))
+      .toHaveText(/group stage · md \d/i);
   });
 
   test("a column with nothing in the window reads as rest days, with its next date",
     async ({ page }) => {
-      await openChampionships(page);
-      const col = page.locator('[data-testid="league-col"][data-league="asiancup"]');
+      /* no column of the recorded window is empty (the Asian Cup's, which
+         was, left the board on 2026-09-25), so the Gulf Cup's rows are
+         taken out: between two stages of a tournament that is exactly
+         what it would look like. Its teams' next fixtures stay. */
+      const board = { ...CHAMP_BOARD,
+        rows: CHAMP_BOARD.rows.filter((r) => r.column !== "gulfcup") };
+      const teams = Object.values(CHAMP_BOARD.competitions.gulfcup.teams ?? {}) as
+        Array<{ next_fixture?: { kickoff?: string } | null }>;
+      const next = teams.map((t) => t.next_fixture?.kickoff).filter(Boolean).sort()[0]!;
+      await openChampionships(page, board);
+      const col = page.locator('[data-testid="league-col"][data-league="gulfcup"]');
       await expect(col.locator('[data-testid="col-empty"]')).toHaveCount(0);
       const rest = col.locator('[data-testid="rest-day"]:visible');
       expect(await rest.count()).toBeGreaterThan(0);
-      await expect(rest.first()).toContainText(/AFC Asian Cup — rest day/i);
-      await expect(rest.first()).toContainText(/next · thursday, jan 7/i);
+      await expect(rest.first()).toContainText(/Arabian Gulf Cup — rest day/i);
+      const when = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles",
+        weekday: "long", month: "short", day: "numeric" }).format(new Date(next)).toLowerCase();
+      await expect(rest.first()).toContainText(`next · ${when}`, { ignoreCase: true });
+      // a tournament under way says when it resumes, not that it "starts"
+      await expect(page.locator('[data-testid="col-head"][data-league="gulfcup"] [data-testid="col-stage"]'))
+        .toHaveText(/^next /i);
     });
 
   test("the Leagues board draws no national slot at all",
@@ -512,7 +568,7 @@ test.describe("the Championships board wears the Leagues board's chrome", () => 
       await routeBoth(page);
       await page.goto("/bet-suggester");
       await page.waitForSelector('[data-testid="league-col"]');
-      for (const id of ["national-pts", "national-gp", "national-h2h", "xi-chip",
+      for (const id of ["national-pts", "national-gp", "xi-chip",
                         "group-chip", "price-side", "col-stage", "col-floor"]) {
         await expect(page.locator(`[data-testid="${id}"]`)).toHaveCount(0);
       }

@@ -1,7 +1,8 @@
 // THE FIELD PAGE'S THIRD MODE — "National teams" (approved 2026-09-24).
 //
 // The four Championships competitions — UEFA and CONCACAF Nations
-// Leagues, the AFC Asian Cup, AFCON qualifying — one table each, drawn on
+// Leagues, the Arabian Gulf Cup (the AFC Asian Cup's place since
+// 2026-09-25), AFCON qualifying — one table each, drawn on
 // ONE SHARED AXIS because all four are cut from one national-team corpus
 // at one pass count. GET /api/field/nations.
 //
@@ -28,7 +29,7 @@
 //   g  the ≥2 note, the empty states, a failed read named
 //
 // Regenerating the recording: in the backend worktree (last taken on
-// `be-ship-2026-09-25` @ ef4b16c0), write GET /api/field/nations through
+// `board-data-gaps`, 2026-09-25), write GET /api/field/nations through
 // FastAPI's TestClient to a file and trim it by the rule in
 // nations-recorded.ts's header (drop rows only).
 import { expect, test, type Page, type Request } from "@playwright/test";
@@ -163,7 +164,7 @@ test("FOUR PILLS in the payload's order, the first alone lit, each on its "
   await expect(pills).toHaveCount(comps().length);
   expect(await pills.evaluateAll((els) => els.map((e) => e.getAttribute("data-key"))))
     .toEqual(comps().map((c) => c.key));
-  expect(comps().map((c) => c.key)).toEqual(["unl", "cnl", "asiancup", "afcon"]);
+  expect(comps().map((c) => c.key)).toEqual(["unl", "cnl", "gulfcup", "afcon"]);
   // the arrival reveal settles first, then every label reads whole
   await expect(page.locator('[data-churn="1"]')).toHaveCount(0, { timeout: 5000 });
   for (const [i, c] of comps().entries()) {
@@ -229,22 +230,22 @@ test("ONE SHARED AXIS: with all four selected every bar sits on the span of "
         .toBeCloseTo(want, 1);
     }
   }
-  // the Asian Cup's leader sits where the SHARED axis puts it — well away
-  // from where an axis of the Asian Cup's own would
-  const ac = byKey("asiancup");
+  // the Gulf Cup's leader sits where the SHARED axis puts it — well away
+  // from where an axis of the Gulf Cup's own would
+  const ac = byKey("gulfcup");
   const top = ac.axes.overall.rows[0];
   const alone = spanOf([ac]);
   const perTable = ((top.value as number) - alone.lo) / (alone.hi - alone.lo) * 100;
-  expect(Math.abs(await leftOf(page, "asiancup", top.team) - perTable))
+  expect(Math.abs(await leftOf(page, "gulfcup", top.team) - perTable))
     .toBeGreaterThan(5);
 });
 
 test("the axis follows the SELECTION: two competitions share the span of "
    + "those two, on attack as on overall", async ({ page }) => {
   await openNations(page);
-  await pill(page, "asiancup").click();
+  await pill(page, "gulfcup").click();
   await page.locator('[data-testid="nation-axis-button"][data-axis="attack"]').click();
-  const two = [byKey("unl"), byKey("asiancup")];
+  const two = [byKey("unl"), byKey("gulfcup")];
   const { lo, hi } = spanOf(two, "attack");
   for (const c of two) {
     for (const r of c.axes.attack.rows) {

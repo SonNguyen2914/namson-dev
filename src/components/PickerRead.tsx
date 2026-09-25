@@ -22,7 +22,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import {
   BlendWeights, BoardRowLive, FieldAxis, FieldAxisKey, FieldBlockLike,
   KalshiQuote, RowField, RowFieldPartial, Shape, THIN_ASK_SIZE,
-  WIDE_SPREAD_C, pctThisSeason, weightIsCurrent,
+  WIDE_SPREAD_C, licensedRead, pctThisSeason, shapeFromGaps, weightIsCurrent,
 } from "../lib/pickerApi";
 import {
   AXIS_ORDER, axesPresent, axisDecimals, measurementOf, tierSet,
@@ -354,21 +354,16 @@ function plateClass(read: ReadLike): string {
  *  — and once inside each piece through `data-w` + `::after`, which never
  *  enters textContent and so can never be matched a second time. The
  *  geometry lives in globals.css under THE SHAPE CHIP. */
-export function ShapeChip({ read, quiet = [] }: {
-  read: ReadLike;
-  /** axes whose below-floor verdict is universal in the column (see
-   *  TierGaps `quietFloor`). A CUT names the unit that gave way; on an
-   *  axis the column header already calls indicative for every team, a
-   *  red tear through the word asserts exactly the unit verdict that
-   *  evidence cannot carry — the "SP|LIT" the operator read as a bug on
-   *  the national board (2026-09-24). So the tear is withheld there and
-   *  the word keeps its plate; a club card passes nothing and is cut as
-   *  it always was. */
-  quiet?: readonly FieldAxisKey[];
-}) {
+export function ShapeChip({ read }: { read: ReadLike }) {
+  /* ONE CHIP FOR EVERY CARD (operator, 2026-09-25: "I told you to copy
+     everything and some of them are still behind like the
+     clean/split/hollow design"). From 2026-09-24 a national card withheld
+     the tear on an axis its column header calls indicative; the operator
+     has asked for the club card's chip exactly, so a SPLIT is cut along
+     the unit that gave way on every board. The header's "atk/def †" chip
+     still says, once, that those two axes sit below the floor. */
   const shape = read.shape;
-  const raw = cutOf(read);
-  const cut = raw && quiet.includes(raw.axis === "h" ? "atk" : "def") ? null : raw;
+  const cut = cutOf(read);
   const plate = plateClass(read);
   const ink =
     shape === "CLEAN" ? "text-up"
@@ -377,7 +372,6 @@ export function ShapeChip({ read, quiet = [] }: {
   if (!cut) {
     return (
       <span data-testid="shape-chip" data-cut="none"
-        {...(raw && !cut ? { "data-cut-withheld": raw.axis } : {})}
         className={`sc sc-intact ${plate} ${ink} font-mono text-[10px] uppercase tracking-[0.16em]`}>
         <span className="sc-w">{shape}</span>
       </span>
@@ -450,21 +444,32 @@ function effectiveRead(read: ReadLike, block?: FieldBlockLike | null,
        that null threw inside the card. The axis is not drawn either
        way; what is kept is the named absence, never a number. */
     if (!axis) return read.tiers[k]?.[side === "fav" ? 0 : 1] ?? "no band";
+    /* AT THE LICENSED COUNT WHERE THE BACKEND SERVES ONE (national attack
+       and defence, 2026-09-25) — see pickerApi.licensedRead. */
+    const lic = licensedRead(axis);
     /* NO FALLBACK NUMBER. An empty set is a club the payload placed in
        no band at all; printing its `tier` would invent exactly the
        placement the set exists to refuse. */
-    return tierSet(axis[side]) ?? "no band";
+    return tierSet(lic ? lic[side] : axis[side]) ?? "no band";
   };
   const gap = (k: FieldAxisKey) =>
-    block.axes[k]?.tier_gap ?? read.tier_gaps[k];
+    licensedRead(block.axes[k])?.tier_gap
+      ?? block.axes[k]?.tier_gap ?? read.tier_gaps[k];
+  /* A LICENSED AXIS MOVES THE SHAPE WITH IT. The chip, its cut, the lit
+     label and the popover's sentence all read these three gaps; with an
+     axis drawn at its licensed count the shape is re-read off the gaps
+     drawn, by the backend's own rule, rather than left describing the
+     five-band pair the card no longer prints. */
+  const licensedAny = AXIS_ORDER.some((k) => licensedRead(block.axes[k]) != null);
+  const gaps = { ovr: gap("ovr"), atk: gap("atk"), def: gap("def") };
   return {
-    shape: shape ?? read.shape,
+    shape: (licensedAny && shape ? shapeFromGaps(gaps) : null) ?? shape ?? read.shape,
     tiers: {
       ovr: [text("fav", "ovr"), text("opp", "ovr")],
       atk: [text("fav", "atk"), text("opp", "atk")],
       def: [text("fav", "def"), text("opp", "def")],
     },
-    tier_gaps: { ovr: gap("ovr"), atk: gap("atk"), def: gap("def") },
+    tier_gaps: gaps,
   };
 }
 
@@ -822,8 +827,19 @@ function measureTitle(
 }
 
 export function TierGaps({ read, dense = false, field, partial,
-                          floorNote, values = true, quietFloor = [] }: {
+                          floorNote, values = true, quietFloor = [],
+                          explain = false }: {
   read: ReadLike;
+  /** DRAW THE SHAPE EXPLAINER (the `i`) ON A FIELD-READ CARD TOO. A card
+   *  with no field always carries it. A national card passes true: the
+   *  Championships board copies the Leagues board's card (operator,
+   *  2026-09-25), and on a field-read card the panel prints the field's
+   *  own bands and gaps (`effectiveRead`) and says they are the field's,
+   *  so nothing in it is a within-league reading. A card whose field
+   *  carries no shape (a partial block) has nothing for it to explain
+   *  and draws none. Cup cards pass nothing: there the operator's
+   *  2026-09-10 rule ("keep the #, remove the i") stands. */
+  explain?: boolean;
   /** DRAW THE VALUE ± HALF-WIDTH UNDER EACH TIER. True everywhere it has
    *  been drawn; a national card passes false and keeps the values behind
    *  the `#` panel, the way a league card keeps its tiers alone. */
@@ -921,7 +937,7 @@ export function TierGaps({ read, dense = false, field, partial,
             off three gaps and this fixture has one. The chip's plate
             with nothing in it would read as a shape that failed to
             load; the backend's own sentence says why there is none. */}
-        {r.shape ? <ShapeChip read={r} quiet={quietFloor} /> : (
+        {r.shape ? <ShapeChip read={r} /> : (
           <span data-testid="shape-absent" title={absent?.why ?? undefined}
             className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
             no shape
@@ -990,13 +1006,22 @@ export function TierGaps({ read, dense = false, field, partial,
                exactly the leagues this key exists to serve. */
             const side = block?.axes[lbl];
             const m = values ? bothMeasured(side) : null;
+            /* THE SIDES AS DRAWN: at the licensed count, with that cut's
+               own sets, straddles and floor verdict, where there is one */
+            const lic = licensedRead(side);
+            const fs = lic ? { ...lic.fav, below_floor: lic.below_floor } : side?.fav;
+            const os = lic ? { ...lic.opp, below_floor: lic.below_floor } : side?.opp;
             /* a universal verdict is in the header; a cell repeating it
                carries no information */
             const quiet = quietFloor.includes(lbl);
             return (
             <span key={lbl} data-tier={lbl} data-dissent={dissents(gap)}
-              data-fav-set={side ? side.fav.tier_set.join(",") : undefined}
-              data-opp-set={side ? side.opp.tier_set.join(",") : undefined}
+              data-fav-set={fs ? fs.tier_set.join(",") : undefined}
+              data-opp-set={os ? os.tier_set.join(",") : undefined}
+              data-bands={lic ? lic.bands : undefined}
+              {...(lic ? { title: `${DIM_LABEL[lbl]} at the ${lic.bands} bands `
+                + "its resolution licenses, not the declared five: "
+                + `favourite ${lic.fav.tier}, opponent ${lic.opp.tier}` } : {})}
               className="inline-flex flex-col items-center gap-[2px] leading-none">
               <span className={`text-[7.5px] uppercase tracking-[0.12em] ${
                 gap > 0 ? "text-ink-faint"
@@ -1041,14 +1066,14 @@ export function TierGaps({ read, dense = false, field, partial,
                   is a claim about, so it is addressable rather than
                   inferred from everything the cell happens to contain. */}
               <span data-tier-pair={lbl} className="whitespace-nowrap">
-                {pr[0]}{side && !quiet && (side.fav.below_floor || side.fav.straddles)
-                  && <FloorMark note={side.fav.below_floor
+                {pr[0]}{fs && !quiet && (fs.below_floor || fs.straddles)
+                  && <FloorMark note={fs.below_floor
                     ? floorNote
-                    : `the 95% interval touches bands ${side.fav.tier_set.join("·")} — ${side.fav.tier} is where the estimate falls, not a band the evidence will narrow to`} />}v{pr[1]}
-                {side && !quiet && (side.opp.below_floor || side.opp.straddles)
-                  && <FloorMark note={side.opp.below_floor
+                    : `the 95% interval touches bands ${fs.tier_set.join("·")} — ${fs.tier} is where the estimate falls, not a band the evidence will narrow to`} />}v{pr[1]}
+                {os && !quiet && (os.below_floor || os.straddles)
+                  && <FloorMark note={os.below_floor
                     ? floorNote
-                    : `the 95% interval touches bands ${side.opp.tier_set.join("·")} — ${side.opp.tier} is where the estimate falls, not a band the evidence will narrow to`} />}
+                    : `the 95% interval touches bands ${os.tier_set.join("·")} — ${os.tier} is where the estimate falls, not a band the evidence will narrow to`} />}
               </span>
               {/* THE NUMBER THE TIER ABOVE WAS READ OFF (2026-09-16).
                   "they all have ovr, atk, def tiers but dont have the
@@ -1123,7 +1148,7 @@ export function TierGaps({ read, dense = false, field, partial,
             axis would put two within-league quintiles into a sentence
             about a cross-league fixture. That is the two-ladders defect
             the field exists to end, in prose. */}
-        {!block && (<>
+        {(!block || (explain && r.shape)) && (<>
         {/* THE POPOVER HANGS OFF THE BUTTON, NOT OFF THE ROW (2026-09-07).
             It was `absolute top-6` on the whole TierGaps block, which is
             24px below the block's top — fine while the row above it fits
@@ -1182,6 +1207,9 @@ export function TierGaps({ read, dense = false, field, partial,
             {block
               ? "Tiers are bands of this competition's own field, and a"
                 + " club's read is every band its 95% interval touches;"
+                + (drawn.some((k) => licensedRead(block.axes[k]))
+                  ? " attack and defence are cut at the band count their"
+                    + " resolution licenses;" : "")
                 + " annotation, never a veto."
               : "Tiers are within-league quintiles; annotation, never a veto."}
           </p>
