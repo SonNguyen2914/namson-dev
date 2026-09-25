@@ -24,7 +24,7 @@
 // to be written on, and `watchlist.declare` has no `source` parameter
 // left to write one with.
 import type { NextApiRequest, NextApiResponse } from "next";
-import { reach } from "../../../../lib/suggesterProxy";
+import { reach, timeoutAnswer } from "../../../../lib/suggesterProxy";
 
 const BACKEND = process.env.SUGGESTER_BACKEND_URL || "http://localhost:8000";
 
@@ -41,6 +41,11 @@ export default async function handler(
     `${BACKEND}/api/admin/live/watchlist/sync-positions`,
     { method: "POST",
       headers: token ? { "x-admin-token": token } : {} });
+  // a backend that did not answer in time is named as a timeout (504),
+  // never as an unreachable one
+  if (!got.reached && got.timedOut) {
+    return res.status(504).json(timeoutAnswer());
+  }
   if (!got.reached) {
     // THE ONLY 502 THIS ROUTE AUTHORS. The fetch threw, so nothing
     // upstream is known and NO ANSWER WAS READ — which is a different

@@ -33,6 +33,7 @@
 //     words with nothing normalized.
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { pollReads, usePoll } from "../lib/usePoll";
 import { TZ, dayKeyOf, dayLabel, fmtDate, groupByDay, localDay } from "../lib/matchday";
 import { Eyebrow, Reveal } from "./ui";
 
@@ -151,49 +152,55 @@ export default function FriendliesDashboard() {
     return () => { alive = false; };
   }, []);
 
+  // THE ONE-OFF READ: the week — fetched once per mount.
   useEffect(() => {
     let alive = true;
-    const load = () => {
-      fetch("/api/friendlies/scoreboard")
-        .then((r) => {
-          if (r.status === 404) { if (alive) setNotDeployed(true); return null; }
-          return j(r);
-        })
-        .then((d) => { if (alive && d) { setToday(d.fixtures); setUnreachable(false); } })
-        .catch(() => { if (alive && today === null) setUnreachable(true); });
-      fetch("/api/friendlies/markets").then(j)
-        .then((d) => {
-          if (!alive) return;
-          const m: Record<string, MappedRow> = {};
-          for (const row of d.fixtures ?? []) {
-            if (row.fixture_id) m[row.fixture_id] = row;
-          }
-          setMaps({ s: "ok", d: m });
-          setListed(d.listed ?? null);
-        }).catch(() => alive && setMaps({ s: "error" }));
-      // League-derived xG form. An absent entry renders nothing at all
-      // rather than an empty rating row — the card must never imply a
-      // measurement it does not have. A FAILED read used to leave the
-      // same empty map, so "we did not ask" rendered as "these clubs
-      // have no xG form"; it is named now instead.
-      fetch("/api/xg/friendlies?days=1").then(j)
-        .then((d) => {
-          if (!alive) return;
-          const x: Record<string, XgBlock> = {};
-          for (const row of (d.fixtures ?? []) as XgFixture[]) {
-            if (row.espn_event_id) x[row.espn_event_id] = row.xg ?? null;
-          }
-          setXg({ s: "ok", d: x });
-        }).catch(() => alive && setXg({ s: "error" }));
-    };
-    load();
     fetch("/api/friendlies/schedule?days=7").then(j)
       .then((d) => alive && setWeek(settle<Fixture[]>(d?.fixtures ?? [])))
       .catch(() => alive && setWeek({ s: "error" }));
-    const poll = setInterval(load, 60000);
-    return () => { alive = false; clearInterval(poll); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => { alive = false; };
   }, []);
+
+  // THE LIVE READS, every 60s through lib/usePoll: never overlapping,
+  // paused in a hidden tab, backing off while they keep failing
+  // (audit F5 — this was a bare setInterval).
+  usePoll(async (signal) => {
+    let alive = true;
+    signal.addEventListener("abort", () => { alive = false; });
+    const { get, settled } = pollReads(signal);
+    get("/api/friendlies/scoreboard")
+      .then((r) => {
+        if (r.status === 404) { if (alive) setNotDeployed(true); return null; }
+        return j(r);
+      })
+      .then((d) => { if (alive && d) { setToday(d.fixtures); setUnreachable(false); } })
+      .catch(() => { if (alive && today === null) setUnreachable(true); });
+    get("/api/friendlies/markets").then(j)
+      .then((d) => {
+        if (!alive) return;
+        const m: Record<string, MappedRow> = {};
+        for (const row of d.fixtures ?? []) {
+          if (row.fixture_id) m[row.fixture_id] = row;
+        }
+        setMaps({ s: "ok", d: m });
+        setListed(d.listed ?? null);
+      }).catch(() => alive && setMaps({ s: "error" }));
+    // League-derived xG form. An absent entry renders nothing at all
+    // rather than an empty rating row — the card must never imply a
+    // measurement it does not have. A FAILED read used to leave the
+    // same empty map, so "we did not ask" rendered as "these clubs
+    // have no xG form"; it is named now instead.
+    get("/api/xg/friendlies?days=1").then(j)
+      .then((d) => {
+        if (!alive) return;
+        const x: Record<string, XgBlock> = {};
+        for (const row of (d.fixtures ?? []) as XgFixture[]) {
+          if (row.espn_event_id) x[row.espn_event_id] = row.xg ?? null;
+        }
+        setXg({ s: "ok", d: x });
+      }).catch(() => alive && setXg({ s: "error" }));
+    return settled();
+  }, 60000, []);
 
   // The heading is DERIVED from the fixtures (ESPN's bucket is a
   // matchday, not a calendar day) and fixtures group by LOCAL day —

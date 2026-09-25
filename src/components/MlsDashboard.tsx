@@ -6,6 +6,7 @@
 // recommendation, and real-money signals stay disabled server-side.
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { pollReads, usePoll } from "../lib/usePoll";
 import { dayKeyOf, dayLabel, fmtDate, groupByDay, localDay } from "../lib/matchday";
 import { Eyebrow, Reveal } from "./ui";
 
@@ -50,33 +51,40 @@ export default function MlsDashboard() {
   // every fixture at once.
   const [odds, setOdds] = useState<Load<Record<string, OddsRow>>>({ s: "loading" });
 
+  // THE ONE-OFF READS: the week, the tables — fetched once per mount.
   useEffect(() => {
     let alive = true;
-    const load = () => {
-      fetch("/api/mls/scoreboard").then(j)
-        .then((d) => alive && setToday(settle<Fixture[]>(d?.fixtures ?? [])))
-        .catch(() => alive && setToday({ s: "error" }));
-      fetch("/api/mls/markets").then(j)
-        .then((d) => alive && setBooks(settle<GameBook[]>(d?.games ?? [])))
-        .catch(() => alive && setBooks({ s: "error" }));
-      fetch("/api/mls/odds").then(j)
-        .then((d) => {
-          if (!alive) return;
-          const map: Record<string, OddsRow> = {};
-          for (const o of d.odds ?? []) map[o.espn_event_id] = o;
-          setOdds({ s: "ok", d: map });
-        }).catch(() => alive && setOdds({ s: "error" }));
-    };
-    load();
     fetch("/api/mls/schedule?days=7").then(j)
       .then((d) => alive && setWeek(settle<Fixture[]>(d?.fixtures ?? [])))
       .catch(() => alive && setWeek({ s: "error" }));
     fetch("/api/mls/standings").then(j)
       .then((d) => alive && setTables(settle<Conference[]>(d?.conferences ?? [])))
       .catch(() => alive && setTables({ s: "error" }));
-    const poll = setInterval(load, 60000);
-    return () => { alive = false; clearInterval(poll); };
+    return () => { alive = false; };
   }, []);
+
+  // THE LIVE READS, every 60s through lib/usePoll: never overlapping,
+  // paused in a hidden tab, backing off while they keep failing
+  // (audit F5 — this was a bare setInterval).
+  usePoll(async (signal) => {
+    let alive = true;
+    signal.addEventListener("abort", () => { alive = false; });
+    const { get, settled } = pollReads(signal);
+    get("/api/mls/scoreboard").then(j)
+      .then((d) => alive && setToday(settle<Fixture[]>(d?.fixtures ?? [])))
+      .catch(() => alive && setToday({ s: "error" }));
+    get("/api/mls/markets").then(j)
+      .then((d) => alive && setBooks(settle<GameBook[]>(d?.games ?? [])))
+      .catch(() => alive && setBooks({ s: "error" }));
+    get("/api/mls/odds").then(j)
+      .then((d) => {
+        if (!alive) return;
+        const map: Record<string, OddsRow> = {};
+        for (const o of d.odds ?? []) map[o.espn_event_id] = o;
+        setOdds({ s: "ok", d: map });
+      }).catch(() => alive && setOdds({ s: "error" }));
+    return settled();
+  }, 60000, []);
 
   // ESPN's scoreboard bucket is a MATCHDAY, not a calendar day: when
   // nothing is on today it returns the next one instead. So the heading

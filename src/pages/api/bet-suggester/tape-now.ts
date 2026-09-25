@@ -35,7 +35,7 @@
 // can say which of them it is looking at, and so that neither is ever
 // read as "the sweep was refused".
 import type { NextApiRequest, NextApiResponse } from "next";
-import { reach } from "../../../lib/suggesterProxy";
+import { reach, timeoutAnswer } from "../../../lib/suggesterProxy";
 
 const BACKEND = process.env.SUGGESTER_BACKEND_URL || "http://localhost:8000";
 
@@ -88,6 +88,11 @@ export default async function handler(
   // fixtures the operator meant.
   const got = await reach(`${BACKEND}/api/admin/live/tape-now`,
     { method: "POST", headers: operatorHeaders(req) });
+  // a backend that did not answer in time is named as a timeout (504),
+  // never as an unreachable one
+  if (!got.reached && got.timedOut) {
+    return res.status(504).json(timeoutAnswer());
+  }
   if (!got.reached) {
     return res.status(502).json({
       error: "proxy_unreachable",

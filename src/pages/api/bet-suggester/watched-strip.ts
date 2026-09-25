@@ -33,7 +33,7 @@
 // a refusal. It is labelled `proxy_unreachable` so the surface can name
 // which of the two it is looking at.
 import type { NextApiRequest, NextApiResponse } from "next";
-import { reach } from "../../../lib/suggesterProxy";
+import { reach, timeoutAnswer } from "../../../lib/suggesterProxy";
 
 const BACKEND = process.env.SUGGESTER_BACKEND_URL || "http://localhost:8000";
 
@@ -56,6 +56,11 @@ export default async function handler(
   }
   const got = await reach(`${BACKEND}/api/bet-suggester/watched-strip`,
     { headers: operatorHeaders(req) });
+  // a backend that did not answer in time is named as a timeout (504),
+  // never as an unreachable one
+  if (!got.reached && got.timedOut) {
+    return res.status(504).json(timeoutAnswer());
+  }
   if (!got.reached) {
     return res.status(502).json({
       error: "proxy_unreachable",

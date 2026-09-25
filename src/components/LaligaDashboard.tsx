@@ -21,7 +21,8 @@
 // still in flight, and one that FAILED. A permanent "loading…" is a lie,
 // and a failure that renders as "no fixtures" is a worse one.
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { pollReads, usePoll } from "../lib/usePoll";
 
 import { dayKeyOf, dayLabel, fmtDate, groupByDay, localDay } from "../lib/matchday";
 import { Eyebrow, Reveal } from "./ui";
@@ -102,44 +103,45 @@ export default function LaligaDashboard() {
   const [stateReadFailed, setStateReadFailed] =
     useState<{ odds: boolean; status: boolean }>({ odds: false, status: false });
 
-  useEffect(() => {
+  // THE LIVE READS, every 60s through lib/usePoll: never overlapping,
+  // paused in a hidden tab, backing off while they keep failing
+  // (audit F5 — this was a bare setInterval).
+  usePoll(async (signal) => {
     let alive = true;
-    const load = () => {
-      Promise.all([
-        fetch("/api/laliga/scoreboard").then(j).catch(() => null),
-        fetch("/api/laliga/schedule?days=7").then(j).catch(() => null),
-        fetch("/api/laliga/standings").then(j).catch(() => null),
-        fetch("/api/laliga/markets").then(j).catch(() => null),
-        // The odds board is EMPTY while the model is dark; polled anyway
-        // so the surface lights up the day an approval ever lands,
-        // without a frontend deploy.
-        fetch("/api/laliga/odds").then(j).catch(() => null),
-        fetch("/api/laliga/status").then(j).catch(() => null),
-      ]).then(([sb, sc, stn, mkt, od, sts]) => {
-        if (!alive) return;
-        setToday(settle<Fixture[]>(sb ? sb.fixtures ?? [] : null));
-        setWeek(settle<Fixture[]>(sc ? sc.fixtures ?? [] : null));
-        setStandings(settle<StandingsPayload>(stn));
-        setBooks(settle<GameBook[]>(mkt ? mkt.games ?? [] : null));
-        setProbe(mkt?.kalshi ?? null);
-        setModel(od ?? null);
-        setStatus(sts ?? null);
-        // `null` here can only be the catch above: a 200 with an empty
-        // body still lands as an object.
-        setStateReadFailed({ odds: od == null, status: sts == null });
-        if (od == null) {
-          setOdds({ s: "error" });
-        } else {
-          const map: Record<string, OddsRow> = {};
-          for (const o of od.odds ?? []) map[o.espn_event_id] = o;
-          setOdds({ s: "ok", d: map });
-        }
-      });
-    };
-    load();
-    const poll = setInterval(load, 60000);
-    return () => { alive = false; clearInterval(poll); };
-  }, []);
+    signal.addEventListener("abort", () => { alive = false; });
+    const { get, settled } = pollReads(signal);
+    Promise.all([
+      get("/api/laliga/scoreboard").then(j).catch(() => null),
+      get("/api/laliga/schedule?days=7").then(j).catch(() => null),
+      get("/api/laliga/standings").then(j).catch(() => null),
+      get("/api/laliga/markets").then(j).catch(() => null),
+      // The odds board is EMPTY while the model is dark; polled anyway
+      // so the surface lights up the day an approval ever lands,
+      // without a frontend deploy.
+      get("/api/laliga/odds").then(j).catch(() => null),
+      get("/api/laliga/status").then(j).catch(() => null),
+    ]).then(([sb, sc, stn, mkt, od, sts]) => {
+      if (!alive) return;
+      setToday(settle<Fixture[]>(sb ? sb.fixtures ?? [] : null));
+      setWeek(settle<Fixture[]>(sc ? sc.fixtures ?? [] : null));
+      setStandings(settle<StandingsPayload>(stn));
+      setBooks(settle<GameBook[]>(mkt ? mkt.games ?? [] : null));
+      setProbe(mkt?.kalshi ?? null);
+      setModel(od ?? null);
+      setStatus(sts ?? null);
+      // `null` here can only be the catch above: a 200 with an empty
+      // body still lands as an object.
+      setStateReadFailed({ odds: od == null, status: sts == null });
+      if (od == null) {
+        setOdds({ s: "error" });
+      } else {
+        const map: Record<string, OddsRow> = {};
+        for (const o of od.odds ?? []) map[o.espn_event_id] = o;
+        setOdds({ s: "ok", d: map });
+      }
+    });
+    return settled();
+  }, 60000, []);
 
   // ESPN's scoreboard bucket is a MATCHDAY, not a calendar day — the
   // heading is DERIVED from the fixtures, never asserted. Shared rules

@@ -53,6 +53,13 @@ const server = http.createServer((req, res) => {
     try { fs.appendFileSync(LOG_PATH, `${entry.at} ${entry.method} ${url}\n`); }
     catch { /* the log is evidence, never a reason to fail a request */ }
   }
+  // A BACKEND THAT HANGS, on request: accept and never answer. This is
+  // how e2e/polling-is-not-a-herd.spec.ts proves the proxy's own clock
+  // (a named 504 after PROXY_TIMEOUT_MS) without waiting on a real stall.
+  if (/[?&]__standin_hang=1(&|$)/.test(url)) {
+    req.on("close", () => res.destroy());
+    return;
+  }
   // READY, so the hold-out and anything that asks "is there a backend"
   // get a real answer about the stand-in rather than a refusal.
   if (url === "/api/ready") {

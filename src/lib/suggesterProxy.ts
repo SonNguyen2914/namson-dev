@@ -90,6 +90,31 @@ export function statusForUnreadableAnswer(upstream: number): number {
   return upstream >= 200 && upstream < 300 ? 502 : upstream;
 }
 
+/** How long a proxy waits on the backend before it says so. The backend
+ *  hung twice on 2026-09-25 (worker-pool starvation during a provider
+ *  rate-limit storm); with no clock here every open tab held a
+ *  serverless invocation until the platform killed it, and the tab got
+ *  an HTML error page instead of a named JSON answer. */
+export const PROXY_TIMEOUT_MS = 15_000;
+
+const isTimeout = (err: unknown) =>
+  err instanceof Error
+  && (err.name === "TimeoutError" || err.name === "AbortError");
+
+/** The named 504 for a backend that did not answer in time. JSON, and
+ *  distinct from `backend_unreachable`: the request may well have been
+ *  delivered, and what is unknown is the answer. */
+export function timeoutAnswer(what = "the backend") {
+  return {
+    error: "backend_timeout",
+    reason: "backend_timeout",
+    detail: `${what} did not answer within ${PROXY_TIMEOUT_MS / 1000}s, so `
+      + "this proxy stopped waiting. The request may have been delivered; "
+      + "what is unknown is the answer. This is not an unreachable "
+      + "backend and not an empty payload.",
+  };
+}
+
 export async function proxy(
   req: NextApiRequest,
   res: NextApiResponse,
@@ -101,8 +126,10 @@ export async function proxy(
       method: req.method,
       headers: { "Content-Type": "application/json" },
       body: ["POST", "PUT"].includes(req.method || "") ? JSON.stringify(req.body) : undefined,
+      signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
     });
   } catch (err) {
+    if (isTimeout(err)) return res.status(504).json(timeoutAnswer());
     // NEVER REACHED. Nothing upstream is known, so there is no status
     // to relay and no body to quote. This is the only 502 below.
     return res.status(502).json({
@@ -116,6 +143,14 @@ export async function proxy(
   try {
     raw = await r.text();
   } catch (err) {
+    // the same clock covers the body: a backend that sends headers and
+    // then stalls is a timeout, named as one, with its status kept
+    if (isTimeout(err)) {
+      return res.status(504).json({
+        ...timeoutAnswer(`the backend answered ${r.status} and its body`),
+        upstream_status: r.status,
+      });
+    }
     return res.status(502).json({
       error: "Backend unreachable",
       reason: "backend_body_unreadable",
@@ -681,18 +716,25 @@ export function proxyAllowlistDrift(
 /** A backend read that keeps "never reached" apart from "answered". */
 export type Reached =
   | { reached: true; res: Response }
-  | { reached: false; detail: string };
+  | { reached: false; detail: string; timedOut: boolean };
 
 /** fetch(), with the throw turned into a value. NOTHING else is inside
  *  the try — the body is read by `readJson` below, so a body that
  *  cannot be parsed can never be reported as a backend that was never
- *  contacted. */
+ *  contacted.
+ *
+ *  BOUNDED (2026-09-25) by the same PROXY_TIMEOUT_MS as `proxy()`, unless
+ *  the caller brings its own signal. A timeout comes back as
+ *  `timedOut: true` so the route can answer the named 504
+ *  (`timeoutAnswer`) rather than calling a slow backend unreachable. */
 export async function reach(url: string, init?: RequestInit):
     Promise<Reached> {
   try {
-    return { reached: true, res: await fetch(url, init) };
+    return { reached: true, res: await fetch(url, {
+      ...init, signal: init?.signal ?? AbortSignal.timeout(PROXY_TIMEOUT_MS),
+    }) };
   } catch (err) {
-    return { reached: false, detail: String(err) };
+    return { reached: false, detail: String(err), timedOut: isTimeout(err) };
   }
 }
 

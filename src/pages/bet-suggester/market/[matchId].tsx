@@ -27,6 +27,7 @@ import { TZ } from "../../../lib/matchday";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
+import { usePoll } from "../../../lib/usePoll";
 import {
   api, flag, pct, signedPct, countdown, kickoffLocal,
   PredictionResponse, PredictionSummary, HalfDist, MarketPrediction,
@@ -172,30 +173,36 @@ export default function MatchDetail() {
         if (alive) setFailedReads((p) => ({ ...p, "settlement record": why(e) }));
       }
     })();
-    // Team news: kickoff/venue for the hero + official lineups once posted
-    // (~1h before kickoff). Polled so a viewer parked on the page catches the
-    // lineup drop; ESPN is keyless and the backend caches it for 60s.
-    const loadNews = async () => {
-      try {
-        const tn = await api.teamNews(matchId);
-        if (!alive) return;
-        setNews(tn);
-        setTeams((t) => t ?? { home: tn.home_team, away: tn.away_team });
-        // this read polls; an answer RETIRES the failure line rather
-        // than leaving a stale one over live content
-        setFailedReads((p) => {
-          if (!("team news" in p)) return p;
-          const n = { ...p }; delete n["team news"]; return n;
-        });
-      } catch (e) {
-        if (alive) setFailedReads((p) => ({ ...p, "team news": why(e) }));
-      }
-    };
-    loadNews();
-    const newsPoll = setInterval(loadNews, 120000);
     const tick = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => { alive = false; clearInterval(newsPoll); clearInterval(tick); };
+    return () => { alive = false; clearInterval(tick); };
   }, [matchId]);
+
+  // Team news: kickoff/venue for the hero + official lineups once posted
+  // (~1h before kickoff). Polled so a viewer parked on the page catches the
+  // lineup drop; ESPN is keyless and the backend caches it for 60s. Every
+  // 120s through lib/usePoll (audit F5): no overlap, paused in a hidden
+  // tab, backing off while it fails.
+  usePoll(async (signal) => {
+    if (!matchId) return "stop";
+    try {
+      const tn = await api.teamNews(matchId);
+      if (signal.aborted) return "stop";
+      setNews(tn);
+      setTeams((t) => t ?? { home: tn.home_team, away: tn.away_team });
+      // this read polls; an answer RETIRES the failure line rather
+      // than leaving a stale one over live content
+      setFailedReads((p) => {
+        if (!("team news" in p)) return p;
+        const n = { ...p }; delete n["team news"]; return n;
+      });
+      return "ok";
+    } catch (e) {
+      if (!signal.aborted) {
+        setFailedReads((p) => ({ ...p, "team news": why(e) }));
+      }
+      return "failed";
+    }
+  }, 120000, [matchId]);
 
   async function toggleWatch(marketId: string, marketTitle: string) {
     if (!matchId) return;
@@ -328,21 +335,22 @@ export default function MatchDetail() {
   // Site-wide live awareness: a small score chip in the top bar whenever
   // ANY match is in play (links home to the live box).
   const [liveNow, setLiveNow] = useState<LiveScoreEntry | null>(null);
-  useEffect(() => {
-    let alive = true;
-    const check = async () => {
-      try {
-        const r = await api.liveScores();
-        if (alive) setLiveNow(r.live.find((l) => !l.is_finished) ?? null);
-      } catch {
-        /* SWALLOWED(market:live-chip) — registered in
-           e2e/missing-is-not-zero.spec.ts with its closes_when. */
+  // Every 45s through lib/usePoll (audit F5): no overlap, paused in a
+  // hidden tab, backing off while it fails.
+  usePoll(async (signal) => {
+    let failed = false;
+    try {
+      const r = await api.liveScores();
+      if (!signal.aborted) {
+        setLiveNow(r.live.find((l) => !l.is_finished) ?? null);
       }
-    };
-    check();
-    const id = setInterval(check, 45000);
-    return () => { alive = false; clearInterval(id); };
-  }, []);
+    } catch {
+      /* SWALLOWED(market:live-chip) — registered in
+         e2e/missing-is-not-zero.spec.ts with its closes_when. */
+      failed = true;
+    }
+    return failed ? "failed" : "ok";
+  }, 45000, []);
 
   // the chip for the section you're reading lights up
   const activeSection = useScrollSpy(

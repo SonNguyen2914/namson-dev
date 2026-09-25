@@ -27,8 +27,7 @@
 // refusal is a 200 with `recorded: true`. This route never rewrites
 // that into an error.
 import type { NextApiRequest, NextApiResponse } from "next";
-import { reach, readJson, statusForUnreadableAnswer }
-  from "../../../../lib/suggesterProxy";
+import { reach, readJson, statusForUnreadableAnswer, timeoutAnswer } from "../../../../lib/suggesterProxy";
 
 const BACKEND = process.env.SUGGESTER_BACKEND_URL || "http://localhost:8000";
 
@@ -74,6 +73,11 @@ export default async function handler(
     const got = await reach(
       `${BACKEND}/api/admin/live/watchlist?log=${log}`,
       { headers: operatorHeaders(req) });
+    // a backend that did not answer in time is named as a timeout (504),
+    // never as an unreachable one
+    if (!got.reached && got.timedOut) {
+      return res.status(504).json(timeoutAnswer());
+    }
     if (!got.reached) {
       // THE ONLY 502 ON THIS BRANCH. The fetch threw, so there is no
       // status and no body: nothing upstream is known.
@@ -113,6 +117,11 @@ export default async function handler(
 
   try {
     const rg = await reach(`${BACKEND}/api/news/fixture/${eventId}`);
+    // a backend that did not answer in time is named as a timeout (504),
+    // never as an unreachable one
+    if (!rg.reached && rg.timedOut) {
+      return res.status(504).json(timeoutAnswer());
+    }
     if (!rg.reached) {
       return res.status(502).json({
         error: "Backend unreachable",
@@ -162,6 +171,11 @@ export default async function handler(
     const wg = await reach(
       `${BACKEND}/api/admin/live/watchlist?${qs.toString()}`,
       { method: "POST", headers: operatorHeaders(req) });
+    // a backend that did not answer in time is named as a timeout (504),
+    // never as an unreachable one
+    if (!wg.reached && wg.timedOut) {
+      return res.status(504).json(timeoutAnswer());
+    }
     if (!wg.reached) {
       return res.status(502).json({
         error: "Backend unreachable",
