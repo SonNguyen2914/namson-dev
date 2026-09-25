@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { routeEight } from "./eight-columns";
 import {
-  CAMPEONES_FIELD_BOARD, CAMPEONES_FIELD_ROW, WIDE_PARTIAL,
-  WIDE_PARTIAL_MEASURED,
+  CAMPEONES_FIELD_BOARD, CAMPEONES_FIELD_ROW, CAMPEONES_PARTIAL_BOARD,
+  CAMPEONES_PARTIAL_ROW, WIDE_PARTIAL, WIDE_PARTIAL_MEASURED,
 } from "./campeones-field";
 
 // THE FIELD, ON THE MATCH CARD — and on a page of its own.
@@ -64,11 +64,25 @@ const kickoff = (h: number) =>
 
 // ───────────────────────────────────────────── the field, as measured
 
+/* `cross_league_axes.BELOW_FLOOR_NOTE`, the corrected wording (backend
+   ceb7cc30), re-quoted whole 2026-09-25; this was the first four
+   sentences of the old one, whose width claim the backend withdrew. */
 const FLOOR_NOTE =
-  "REFUSED BY THE PLACEABILITY FLOOR ON THE FIRST READING. This club's "
-  + "league did not clear the floor: its median club interval is wider "
-  + "than one band of the field, so the evidence does not place it in a "
-  + "tier.";
+  "BELOW THE PLACEABILITY FLOOR. The floor is a test of this club's "
+  + "LEAGUE, taken on the Elo measurement at this field's pinned pass "
+  + "count, and the league did not pass it: it is not connected to the "
+  + "reference leagues (C1), or more than half of its cross-league "
+  + "level is still the 1500 starting prior (C2), or its clubs' median "
+  + "95% interval does not fit inside one fifth of the field's spread "
+  + "(C3) — or the club has no league attribution at all (no league). "
+  + "So the evidence does not place this club in a tier. The value and "
+  + "the 95% interval beside it are this club's own measurement on "
+  + "this axis and are shown as measured; the mark is its league's "
+  + "verdict carried onto every axis, and it does not say that this "
+  + "club's interval is wider than a placed club's. It is ranked with "
+  + "everyone else because a club the evidence cannot place is not "
+  + "thereby a worse club; dropping it to the bottom would state "
+  + "exactly that.";
 
 /** THE BACKEND'S OWN PARAGRAPH when an axis is cut finer than the
  *  measurement licenses. `FieldAxes` prints it verbatim beside the two
@@ -1294,7 +1308,13 @@ const STRIP_EMPTY = {
 /** THE ROW UNDER TEST, READ OFF THE PAYLOAD rather than named beside it
  *  — the discipline `one-fixture-two-columns.spec.ts` keeps over the
  *  same fixture one backend PR earlier. */
-const P_ROW = CAMPEONES_FIELD_ROW;
+/*  THE 2026-09-15 RECORDING (renamed CAMPEONES_PARTIAL_* on 2026-09-25):
+ *  the Campeones Cup field has since gained its attack and defence and
+ *  now arrives as a whole `field` — see the control at the end of this
+ *  section — so the partial branch is proven on the one real payload of
+ *  that shape this repository holds, which is still a payload the
+ *  backend's code emits for any field short of an axis. */
+const P_ROW = CAMPEONES_PARTIAL_ROW;
 const P_BLOCK = P_ROW.field_partial;
 /** The axes the block CARRIES and the ones it names as missing, both
  *  DERIVED: a block that gains an axis tomorrow moves every expectation
@@ -1315,11 +1335,12 @@ const DIM_WORD: Record<string, string> = {
  *  is served; an unmatched `/api/` answers 599 rather than reaching a
  *  live backend. */
 async function openFolded(page: import("@playwright/test").Page,
-                          rows: unknown[] = CAMPEONES_FIELD_BOARD.rows) {
+                          rows: unknown[] = CAMPEONES_PARTIAL_BOARD.rows,
+                          board: object = CAMPEONES_PARTIAL_BOARD) {
   await page.route("**/api/**", (r) =>
     r.fulfill(json({ detail: "unmocked route" }, 599)));
   await page.route("**/api/picker/board**", (r) =>
-    r.fulfill(json({ ...CAMPEONES_FIELD_BOARD, rows })));
+    r.fulfill(json({ ...board, rows })));
   await page.route("**/api/picker/review**", (r) =>
     r.fulfill(json(REVIEW_EMPTY)));
   await page.route("**/api/comp/**", (r) => r.fulfill(json({ fixtures: [] })));
@@ -1718,6 +1739,45 @@ test("a block with no OVERALL axis keeps the card's league ranks rather "
     await expect(c.locator('[data-tier="atk"]')).toHaveAttribute(
       "data-fav-set", P_BLOCK.axes.ovr.fav.tier_set.join(","));
     await expect(c.locator("[data-tier]")).toHaveCount(1);
+  });
+
+test("the Campeones Cup ARRIVES WHOLE now — re-recorded 2026-09-25, its "
+   + "row carries `field` on three axes and the card draws all three",
+  async ({ page }) => {
+    /* WHAT CHANGED ON THE WIRE, asserted off the re-recording rather
+       than typed: backend #183 measured attack and defence for MLS and
+       Liga MX, so the same fixture that was the partial block above is
+       now a whole field — `field`, never `field_partial`, with a
+       `shape`, because the backend picks the key off the block's own
+       axis set. The card must draw it exactly as it draws a Champions
+       League card: three cells, no absence named. */
+    const W = CAMPEONES_FIELD_ROW.field;
+    expect("field_partial" in CAMPEONES_FIELD_ROW).toBe(false);
+    expect(Object.keys(W.axes)).toEqual(AXIS_KEYS);
+    expect(W.axes_measured).toEqual(AXIS_KEYS);
+    expect(typeof W.shape).toBe("string");
+    expect(CAMPEONES_FIELD_BOARD.folded.campeones.field.axes_measured)
+      .toEqual(AXIS_KEYS);
+    expect(CAMPEONES_FIELD_ROW.favourite).toBe(W.clubs.fav);
+
+    await openFolded(page, CAMPEONES_FIELD_BOARD.rows, CAMPEONES_FIELD_BOARD);
+    for (const slug of ["mls", "ligamx"]) {
+      const c = page.locator(`[data-testid="league-col"][data-league="${slug}"]`)
+        .locator(`[data-testid="picker-row"][data-event="${CAMPEONES_FIELD_ROW.event_id}"]`);
+      await expect(c).toBeVisible();
+      await expect(c).toHaveAttribute("data-field", W.competition);
+      await expect(c).toHaveAttribute("data-field-axes", AXIS_KEYS.join(","));
+      await expect(c.locator("[data-tier]")).toHaveCount(AXIS_KEYS.length);
+      await expect(c).toHaveAttribute("data-shape", CAMPEONES_FIELD_ROW.shape);
+      const trigger = c.getByTestId("field-ranks-open");
+      await expect(trigger).toHaveAttribute("data-axes", AXIS_KEYS.join(","));
+      await expect(trigger).not.toHaveAttribute("data-axes-absent", /.*/);
+      for (const k of AXIS_KEYS) {
+        const ax = (W.axes as Record<string, typeof W.axes.ovr>)[k];
+        await expect(c.locator(`[data-tier="${k}"]`)).toHaveAttribute(
+          "data-fav-set", ax.fav.tier_set.join(","));
+      }
+    }
   });
 
 test("a row carrying BOTH keys draws the three-axis block — they are "
