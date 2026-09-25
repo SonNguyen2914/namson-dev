@@ -562,12 +562,16 @@ export function priceSide(row: {
 function GroupChip({ national }: { national?: NationalBlock | null }) {
   if (!national?.group) return null;
   return (
-    /* "League B - Group C" (Concacaf's two-level groups) is drawn
+    /* "League B - Group C" / "League B, Group C" (Concacaf's two-level
+       groups) is drawn
        "League B · Grp C" so the chip, the rank and the kickoff keep the
        club card's one chip line; the full name is on hover. */
     <span data-testid="group-chip" title={national.group}
       className="rounded border border-line-strong px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-low">
-      {national.group.replace(/ - Group /, " · Grp ").replace(/ - /g, " · ")}
+      {/* the provider spells the two levels "League A - Group A" and,
+          on a later read, "League A, Group A": both are one chip */}
+      {national.group.replace(/\s*[-,]\s*Group\s+/, " · Grp ")
+        .replace(/\s+-\s+/g, " · ")}
     </span>
   );
 }
