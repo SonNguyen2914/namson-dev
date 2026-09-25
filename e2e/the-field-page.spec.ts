@@ -126,6 +126,24 @@ function withAbsences() {
   return { p, clubs: hit.map((r) => r.club) };
 }
 
+/** Every cup but the FIRST with its attack and defence REMOVED — the
+ *  shape of the first recording (2026-09-23), when the Leagues Cup ·
+ *  Campeones Cup and EFL Cup fields were overall-only. Since backend
+ *  #183 every recorded cup carries all three axes, so the "a cup
+ *  without the axis is NAMED" rule has no real subject left on the wire
+ *  and is proven on this variant instead. Only whole axes are dropped;
+ *  no row, value or sentence is touched. */
+function goalAxesOnFirstCupOnly() {
+  const c = clone(CUPS);
+  for (const cup of c.cups.slice(1)) {
+    const axes = cup.axes as Record<string, unknown>;
+    delete axes.attack;
+    delete axes.defence;
+    cup.axes_measured = ["overall"];
+  }
+  return c;
+}
+
 // ═════════════════════════ 3 · 5 · the ranked table ═════════════════════
 
 test("the page opens on the league field: every recorded row, one ladder, "
@@ -512,12 +530,23 @@ test("the incomparability is STATED, with a worked example read off the "
 
 test("an axis stays live while ANY selected cup carries it; a cup without "
    + "it is NAMED, never drawn from another fit", async ({ page }) => {
-  await open(page);
+  /* RESTATED 2026-09-25. This read the RECORDING's two overall-only
+     fields; the re-recording has none (every cup carries three axes
+     since backend #183), so the rule is proven on a named derived
+     variant — every cup but the first stripped of its goal axes — and
+     the assertions are the same ones, over three bare cups, not two. */
+  const cups = goalAxesOnFirstCupOnly();
+  expect(CUPS.cups.every((c) => "attack" in c.axes),
+    "the recording has an overall-only cup again: read it, not the variant")
+    .toBe(true);
+  await open(page, LEAGUES, cups);
   await toCups(page);
-  const one = CUPS.cups.find((c) => !("attack" in c.axes))!;
-  const three = CUPS.cups.find((c) => "attack" in c.axes)!;
-  const bare = CUPS.cups.filter((c) => !("attack" in c.axes));
-  expect(bare.length, "the recording has two overall-only fields").toBe(2);
+  const one = cups.cups.find((c) => !("attack" in c.axes))!;
+  const three = cups.cups.find((c) => "attack" in c.axes)!;
+  const bare = cups.cups.filter((c) => !("attack" in c.axes));
+  expect(bare.length, "the variant has every cup but one overall-only")
+    .toBe(CUPS.cups.length - 1);
+  expect(bare.length).toBeGreaterThanOrEqual(2);
   const axisBtn = (ax: string) =>
     page.locator(`[data-testid="cup-axis-button"][data-axis="${ax}"]`);
   await page.getByTestId("cup-select-all").click();
@@ -551,7 +580,9 @@ test("an axis stays live while ANY selected cup carries it; a cup without "
   await expect(axisBtn("overall")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("cup-axis-absent")).toHaveCount(0);
   // one field alone says it in the singular
-  await page.locator(`[data-testid="cup-pill"][data-key="${bare[1].key}"]`).click();
+  for (const c of bare.slice(1)) {
+    await page.locator(`[data-testid="cup-pill"][data-key="${c.key}"]`).click();
+  }
   await expect(axisBtn("attack")).toHaveAttribute("title",
     new RegExp(`attack is not measured for ${one.display.replace(/[·]/g, ".")} `
       + "— this field carries the overall axis only"));
