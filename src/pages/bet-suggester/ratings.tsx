@@ -7,7 +7,7 @@
 // REBUILT 2026-09-23 TO THE DESIGN THE OPERATOR APPROVED — the artifact
 // "The Pinned-Pass Field". The page used to draw ONE competition's field
 // (`FieldAxes` over `/api/comp/{key}/ratings`, the Champions League by
-// default). It now draws two things, behind one switch:
+// default). It now draws three things, behind one switch:
 //
 //   LEAGUES  every current-season club of the eight declared board
 //            columns, on the union corpus at the pinned pass count —
@@ -16,6 +16,11 @@
 //            selected, never merged, ranked or scaled against each
 //            other, because no two share both a corpus and a pass
 //            count — GET /api/field/cups
+//   NATIONAL TEAMS (approved 2026-09-24) the four Championships
+//            competitions, one table each on ONE SHARED AXIS, because all
+//            four are cut from one national-team corpus at one pass
+//            count — GET /api/field/nations. Read the first time the view
+//            is shown, like the cups, so the other two never ask for it.
 //
 // `FieldAxes` and `fieldApi` are untouched and still serve the
 // competition viewer and the board card; only this page's content moved.
@@ -37,15 +42,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArchiveMenu } from "../../components/ArchiveMenu";
 import { CompRail } from "../../components/CompRail";
 import {
-  CupsView, FLIP, FieldMode, LeaguesView, ModeSwitch, sameClubTwoFields,
+  CupsView, FLIP, FieldMode, LeaguesView, ModeSwitch, NationsView,
+  sameClubTwoFields,
 } from "../../components/PinnedPassField";
 import { Eyebrow } from "../../components/ui";
 import {
   Collapse, NavChip, RouteProgress, SkeletonRows, TopBar,
 } from "../../components/chrome";
 import {
-  CupFields, LeagueField, countWord, fetchCupFields, fetchLeagueField,
-  shortSha,
+  CupFields, LeagueField, NationFields, countWord, fetchCupFields,
+  fetchLeagueField, fetchNationFields, shortSha,
 } from "../../lib/fieldPageApi";
 
 /** Where the last view is remembered. Browser storage is a per-viewer
@@ -81,6 +87,7 @@ export default function FieldPage() {
     { data: null, error: null, loading: true });
   const [cups, setCups] = useState<Read<CupFields>>(idle);
   const [cupAsked, setCupAsked] = useState<string | null>(null);
+  const [nations, setNations] = useState<Read<NationFields>>(idle);
 
   /* THE LAST VIEW, and `?comp=`, read once the router knows the query.
      In an effect, never in render: the server has no storage and no
@@ -96,7 +103,9 @@ export default function FieldPage() {
     }
     const t = setTimeout(() => {
       if (comp) { setCupAsked(comp); setMode("cups"); }
-      else if (remembered === "cups") setMode("cups");
+      else if (remembered === "cups" || remembered === "nations") {
+        setMode(remembered);
+      }
     }, 0);
     return () => clearTimeout(t);
   }, [router.isReady, router.query.comp]);
@@ -154,6 +163,33 @@ export default function FieldPage() {
     };
   }, [mode]);
 
+  /* THE NATIONAL READ, the same way and for the same reasons: asked for
+     the first time the view is shown and never before, so the Leagues and
+     Cups views never call /api/field/nations, and a national bundle that
+     fails cannot blank either of them. */
+  const nationsStarted = useRef(false);
+  useEffect(() => {
+    if (mode !== "nations" || nationsStarted.current) return;
+    nationsStarted.current = true;
+    let fired = false;
+    const t = setTimeout(() => {
+      fired = true;
+      setNations({ data: null, error: null, loading: true });
+      void fetchNationFields()
+        .then((d) => {
+          if (mounted.current) setNations({ data: d, error: null, loading: false });
+        })
+        .catch((e) => {
+          if (!mounted.current) return;
+          setNations({ data: null, loading: false,
+            error: e instanceof Error ? e.message : String(e) });
+        });
+    }, 0);
+    return () => {
+      if (!fired) { clearTimeout(t); nationsStarted.current = false; }
+    };
+  }, [mode]);
+
   const choose = useCallback((m: FieldMode) => {
     if (m === mode) return;
     setMode(m);
@@ -180,10 +216,34 @@ export default function FieldPage() {
     passes?: number | string | null }) => !!L && c.corpus_sha256 === L.corpus_sha256
       && String(c.passes) === String(L.passes);
 
+  const N = nations.data;
+  const nComps = N?.competitions ?? [];
+  const oneFit = N?.shared_axis?.one_measurement === true;
+  /* THE NATIONAL LEDE'S FACTS, every one read off the payload: how many
+     internationals, over what window, at what count, and what the floor
+     said on each axis across the four fields. */
+  const goalRows = nComps.flatMap((c) => ["attack", "defence"]
+    .flatMap((a) => c.axes[a]?.rows ?? []));
+  const goalBelow = goalRows.filter((r) => r.below_floor === true).length;
+  const ovrRows = nComps.flatMap((c) => c.axes.overall?.rows ?? []);
+  const ovrBelow = ovrRows.filter((r) => r.below_floor === true).length;
+  const yearOf = (d?: string | null) => d ? d.slice(0, 4) : null;
+  const dayOf = (d?: string | null) => {
+    if (!d) return null;
+    const t = new Date(d);
+    return Number.isNaN(t.getTime()) ? d : t.toLocaleDateString("en-GB",
+      { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  };
+
   const tag = mode === "cups"
     ? "one table per cup · each on its own corpus"
-    : L ? `${L.passes} passes · union corpus · ${countWord(nCols)} columns`
-      : "union corpus";
+    : mode === "nations"
+      ? N ? `${countWord(nComps.length)} competitions · ${
+          oneFit ? "one national-team measurement" : "separate measurements"
+        } · ${N.passes ?? "an unstated number of"} passes`
+        : "national-team field"
+      : L ? `${L.passes} passes · union corpus · ${countWord(nCols)} columns`
+        : "union corpus";
   const modeSwitch = <ModeSwitch mode={mode} onChange={choose} />;
   const flipClass = flip > 0 ? FLIP : "";
 
@@ -248,6 +308,73 @@ export default function FieldPage() {
                     : L.live_ucl_field
                       ? `The live Champions League field is on corpus ${shortSha(L.live_ucl_field.corpus_sha256) ?? "not stated"} at ${L.live_ucl_field.passes} passes, so a figure here and one on its panel are not the same measurement.`
                       : ""}
+                </p>
+              )}
+            </>
+          ) : mode === "nations" ? (
+            <>
+              <p data-testid="field-lede"
+                className="mt-3 max-w-3xl text-[13.5px] leading-relaxed text-ink-low">
+                Every senior men&rsquo;s national team in{" "}
+                {N ? countWord(nComps.length) : "the"} competitions
+                {N && nComps.length ? (
+                  <> &mdash; {nComps.map((c, i) => (
+                    <span key={c.key}>{i === 0 ? "" : i === nComps.length - 1 ? " and " : ", "}{c.display}</span>
+                  ))} &mdash;</>
+                ) : null}{" "}
+                rated on{" "}
+                <b className="font-semibold text-ink-mid">{oneFit || !N
+                  ? "one national-team measurement" : "the national-team field"}</b>
+                {N ? (
+                  <>: <span data-testid="nations-corpus">{N.fixtures != null
+                    ? `${N.fixtures.toLocaleString("en-US")} internationals` : "an unstated number of internationals"}
+                  {N.window?.start ? ` from ${yearOf(N.window.start)}` : ""}
+                  {N.window?.end ? ` to ${dayOf(N.window.end)}` : ""}
+                  {N.confederations?.length
+                    ? ` across ${countWord(N.confederations.length)} confederations` : ""}</span>,
+                  the same Elo chain, pass-count pin, jackknife band and
+                  placeability floor as the club field, at{" "}
+                  <b data-testid="nations-passes" className="font-semibold text-ink-mid">{N.passes ?? "an unstated number of"} passes</b>.</>
+                ) : "."}{" "}
+                Attack and defence come from the same goals model, fitted on
+                each confederation&rsquo;s matches.
+              </p>
+              {N && (
+                <p data-testid="nations-comparable"
+                  className="mt-3 max-w-3xl border-l-2 border-line-strong pl-3.5 text-[12.5px] leading-relaxed text-ink-low">
+                  {oneFit ? (
+                    <><b className="font-semibold text-ink-mid">So these tables can be
+                      read against each other.</b> Unlike the cups, all{" "}
+                      {countWord(nComps.length)} are cut from one corpus at one
+                      count, and they share one axis.</>
+                  ) : (
+                    <><b className="font-semibold text-ink-mid">These fields are not one
+                      measurement today</b> — they do not share both a corpus and a
+                      pass count — so each table is drawn on its own axis.</>
+                  )}{" "}
+                  Two things to read before a number: friendlies are in the fit
+                  {N.friendly_only_bridge_teams != null
+                    ? <>, because {N.friendly_only_bridge_teams} teams meet another
+                      confederation only in friendlies</> : ""}; and{" "}
+                  {goalRows.length && goalBelow === goalRows.length ? (
+                    <><b className="font-semibold text-ink-mid">attack and defence sit
+                      below the floor for every team</b>{" "}&mdash; a typical 95% band is
+                      wider than one band of the field, so those two are measured and
+                      shown but too wide to tier with confidence</>
+                  ) : (
+                    <>{goalBelow} of {goalRows.length} attack and defence rows sit
+                      below the floor</>
+                  )}.{" "}
+                  {ovrRows.length ? (ovrBelow === 0
+                    ? "Overall clears the floor in every confederation."
+                    : `${ovrBelow} of ${ovrRows.length} overall rows sit below the floor.`) : ""}
+                  {N.band === "within_confederation" && (
+                    <>{" "}Inside each table the &plusmn; band, the tiers and the floor
+                      are read within the confederation &mdash; its own level taken
+                      out, because every entrant shares it; the faint rule under a
+                      bar is the full cross-confederation band, the one to read
+                      across tables.</>
+                  )}
                 </p>
               )}
             </>
@@ -328,6 +455,31 @@ export default function FieldPage() {
           )
         )}
 
+        {mode === "nations" && (
+          nations.error ? (
+            <div className="mt-6">{modeSwitch}
+              <ReadFailed what="national-team field" error={nations.error}
+                testId="nations-read-error" /></div>
+          ) : N ? (
+            nComps.length ? (
+              <div key={`view-${flip}`} className={flipClass}>
+                <NationsView data={N} modeSwitch={modeSwitch}
+                  active={mode === "nations"} />
+              </div>
+            ) : (
+              <div className="mt-6">{modeSwitch}
+                <p data-testid="nations-none" className="mt-6 text-[13px] text-ink-low">
+                  The backend reports no national-team competition field. That
+                  is a statement that none is measured, not that a competition
+                  has no teams.
+                </p></div>
+            )
+          ) : (
+            <div className="mt-6">{modeSwitch}
+              <div data-testid="nations-loading" className="mt-4"><SkeletonRows rows={8} height="h-9" /></div></div>
+          )
+        )}
+
         <Collapse eyebrow="legend" title="How to read a row" defaultOpen={false}
           className="mt-12 border-t border-line pt-5">
           <dl data-testid="field-legend"
@@ -366,9 +518,10 @@ export default function FieldPage() {
                 below it, that is said once, in the section&rsquo;s header.</>],
               ["passes", <>The multipass fit returns a different value at every
                 pass count
-                {L?.published_sweep?.length ? ` in its published sweep (${L.published_sweep.join(", ")})` : ""},
-                and the band widens with it. This page reads{" "}
-                <b className="font-semibold text-ink-mid">{L?.passes ?? "the pinned count"}</b>.
+                {mode !== "nations" && L?.published_sweep?.length ? ` in its published sweep (${L.published_sweep.join(", ")})` : ""},
+                and the band widens with it. This {mode === "nations" ? "view" : "page"} reads{" "}
+                <b className="font-semibold text-ink-mid">{mode === "nations"
+                  ? N?.passes ?? "the pinned count" : L?.passes ?? "the pinned count"}</b>.
                 Attack and defence come from a goals model with no pass count at
                 all. A rating without its count is not a number.</>],
             ] as const).map(([k, v]) => (
@@ -394,6 +547,14 @@ export default function FieldPage() {
               = {L.passes}. A slice is a filter, not a refit. League hues are
               wayfinding and gold is the brand; neither is ever a verdict.
               Research surface: this page shows and does not decide.
+            </p>
+          )}
+          {mode === "nations" && N && (
+            <p data-testid="nations-source" className="mt-3">
+              National teams read from <code className="text-ink-low">{N.source}</code>
+              {N.field_sha256 ? <> (sha256 {shortSha(N.field_sha256)}, checked against the bundle&rsquo;s own SHA256SUMS)</> : null}
+              {N.served_because ? <> &mdash; {N.served_because}</> : null}.
+              Competition hues are wayfinding, never a verdict.
             </p>
           )}
         </div>

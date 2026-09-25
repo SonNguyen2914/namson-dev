@@ -138,6 +138,36 @@
      THE SAME CARD as this blue, not merely on the same screen. */
   --lg-eflcup: #0e9cfb;       /* azure — the last empty arc */
 
+  /* ── THE CHAMPIONSHIPS BOARD'S FOUR LIGHTS (2026-09-24) ─────────────
+     The national-team board is its OWN four-column board, reached by the
+     landing page's Leagues | Championships switch, so these four are
+     never on screen with a league column. The bar they must clear is
+     each other, the brand gold and the traffic light — not the ten
+     league lights above. With gold/warn (43-45°), live/neg (0-5°), up
+     (160°) and skylive (199°) taken, the free space in the set's band is
+     violet, magenta, pink and lime, and that is where they sit.
+
+     Placed by a maximin search in CIELAB (dE*ab, the metric the blocks
+     above use) over the set's own band — L* 61.7-81.7, C* 36-82 — with
+     a 12 dE floor from every league light, so no hue reads as a league's
+     across the flip:
+       min dE among the four          43.0  (afcon vs cnl — kept APART
+                                             in column order; the three
+                                             adjacent pairs are 50.4,
+                                             149.1 and 106.8)
+       min dE vs brand gold           45.8  (asiancup; the palette's own
+                                             bar is 45.3)
+       min dE vs the traffic light    42.3  (unl vs skylive)
+       min dE vs a league light       12.8  (asiancup vs seriea — never
+                                             co-visible)
+     43.0 is short of the 57.0 the co-visible league set reaches; the
+     space that set used is the space the status colours hold, and a
+     national light that looked like a verdict would be the worse miss. */
+  --lg-unl:      #8192fd;   /* periwinkle — UEFA Nations League   */
+  --lg-cnl:      #ed5edf;   /* magenta    — Concacaf Nations League */
+  --lg-asiancup: #95d147;   /* lime       — AFC Asian Cup          */
+  --lg-afcon:    #e699cc;   /* rose       — Africa Cup of Nations  */
+
   /* the board's display voice (bundled via @fontsource-variable) */
   --font-archivo: "Archivo Variable", var(--font-geist-sans), ui-sans-serif,
     system-ui, sans-serif;
@@ -334,6 +364,10 @@
   --color-lg-ligue1: var(--lg-ligue1);
   --color-lg-eredivisie: var(--lg-eredivisie);
   --color-lg-eflcup: var(--lg-eflcup);
+  --color-lg-unl: var(--lg-unl);
+  --color-lg-cnl: var(--lg-cnl);
+  --color-lg-asiancup: var(--lg-asiancup);
+  --color-lg-afcon: var(--lg-afcon);
   --color-warn: var(--warn);
   --color-skylive: var(--skylive);
   --color-neg: var(--neg);

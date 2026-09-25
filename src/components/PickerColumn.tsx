@@ -115,6 +115,9 @@ const LEAGUE_HUE: Record<string, string> = {
   bundesliga: "var(--lg-bundesliga)", seriea: "var(--lg-seriea)",
   ligue1: "var(--lg-ligue1)", eredivisie: "var(--lg-eredivisie)",
   eflcup: "var(--lg-eflcup)",
+  // the Championships board (globals.css, beside the tokens)
+  unl: "var(--lg-unl)", cnl: "var(--lg-cnl)",
+  asiancup: "var(--lg-asiancup)", afcon: "var(--lg-afcon)",
 };
 export const hueOf = (slug: string) => LEAGUE_HUE[slug] ?? "var(--lg-cup)";
 
