@@ -139,13 +139,23 @@ export async function auditFloor(page: Page): Promise<FloorAudit> {
 
       // ── and now the part a box cannot tell you ──
       if (b0.left < 2 || b0.right > innerWidth - 2) continue;
-      e.scrollIntoView({ block: "center", inline: "nearest" });
-      /* AND WAIT FOR IT TO ARRIVE. `html` sets `scroll-behavior: smooth`,
-         so this scroll travels; a rect read while it is still moving and
-         a hit test taken after it lands are two different pages, and that
-         disagreement reported a healthy control as unreachable. Under
-         `reducedMotion: "reduce"` the scroll is instant and this exits on
-         the second read. */
+      /* INSTANT, SAID ON THE CALL (2026-09-24). `html` sets
+         `scroll-behavior: smooth`, and a call that does not name its
+         behaviour inherits it — so this scroll TRAVELLED, and the settle
+         loop below had to guess when it had landed. It guessed wrong
+         under load: the loop exits the first time two reads 25ms apart
+         agree, and a smooth scroll that has not STARTED yet agrees with
+         itself perfectly. Measured at 6x CPU throttle on the phone board:
+         3 of 10 runs read the rect at scrollY 0 while the scroll began
+         after, and pressed a point the control had already left
+         ("refusal-why-open did not answer a press 18px off centre —
+         league-col did"), which is the failure the full suite showed in 2
+         of 4 runs and never alone. With `behavior: "instant"` the same
+         throttled probe fails 0 of 10: the scroll has landed before this
+         line returns, whatever the load. The loop stays as a floor for a
+         layout that is still moving for its own reasons. */
+      e.scrollIntoView({ block: "center", inline: "nearest",
+        behavior: "instant" as ScrollBehavior });
       for (let i = 0, last = -1; i < 40 && last !== window.scrollY; i++) {
         last = window.scrollY;
         await new Promise((done) => setTimeout(done, 25));

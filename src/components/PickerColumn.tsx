@@ -27,7 +27,9 @@
 // to components/PickerRead.tsx so the tail renders THE SAME READ this
 // column does, rather than a hand-copied one free to drift from it.
 import Link from "next/link";
-import { ReactNode, useEffect, useId, useState } from "react";
+import {
+  ReactNode, createContext, useContext, useEffect, useId, useState,
+} from "react";
 import { createPortal } from "react-dom";
 import {
   AXIS_ORDER, Axis, FieldRead, Ratings, axesPresent, fieldFor,
@@ -38,7 +40,9 @@ import {
   ProviderFailure, announceFailure, failureSentence, readFailure,
 } from "../lib/providerFailure";
 import {
-  BoardRefusal, BoardRow, FieldBlockLike, LeagueMeta, RatePair, RowField,
+  BoardRefusal, BoardRow, FieldAxisKey, FieldBlockLike, KalshiQuote,
+  LeagueMeta,
+  NationalBlock, NationalColumn, RatePair, RowField,
   RowFieldPartial, SEASON_BLEND_K,
   columnsOf, homeBadge, leagueLabel, rowHref, rowIsInPlay,
   seasonDisagreement,
@@ -115,6 +119,9 @@ const LEAGUE_HUE: Record<string, string> = {
   bundesliga: "var(--lg-bundesliga)", seriea: "var(--lg-seriea)",
   ligue1: "var(--lg-ligue1)", eredivisie: "var(--lg-eredivisie)",
   eflcup: "var(--lg-eflcup)",
+  // the Championships board (globals.css, beside the tokens)
+  unl: "var(--lg-unl)", cnl: "var(--lg-cnl)",
+  asiancup: "var(--lg-asiancup)", afcon: "var(--lg-afcon)",
 };
 export const hueOf = (slug: string) => LEAGUE_HUE[slug] ?? "var(--lg-cup)";
 
@@ -124,7 +131,7 @@ export const hueOf = (slug: string) => LEAGUE_HUE[slug] ?? "var(--lg-cup)";
  *  magnitude); a missing quote says "no quote", a withheld gap says the
  *  board's own word for it. */
 type AnchorId = Exclude<SortModeId, "kickoff" | "shape">
-  | "own_gdg" | "league_gap";
+  | "own_gdg" | "league_gap" | "headline";
 
 function anchorFor(row: BoardRow, modeId: SortModeId):
   { v: string; k: string; k2?: string; basis?: string; id: AnchorId } {
@@ -180,7 +187,33 @@ function anchorFor(row: BoardRow, modeId: SortModeId):
      keeps `own_gdg` behind it for rows the level table does not cover. */
   const own = row.own_gdg?.diff;
   const lg = row.league_gap?.gd;
-  const fallback: AnchorId = !row.cross_league ? "gdg"
+  /* A FIELD-RATED NATIONAL ROW HAS NO GD/g GAP TO ANCHOR ON (2026-09-24).
+     A national team has no league table, so `gdg_gap` is null on every
+     Championships card and "GD/g gap n/a" would be the anchor on all of
+     them — the surface-where-every-anchor-is-withheld this function's
+     own header refuses. The comparison the national field supports is
+     its own tier gap, which the backend computed on that field
+     (`tier_gaps.ovr` = `field.axes.ovr.tier_gap`), exactly the anchor a
+     cross-league cup row falls back to. KEYED ON THE ROW'S `national`
+     BLOCK, which only the Championships board sends — not on
+     `fav_source: "field"`, which a Champions League or Campeones row
+     carries too and whose own anchors (league gap, own-league GD/g) this
+     branch must never pre-empt; e2e/the-anchor-compares-leagues.spec.ts
+     caught exactly that. */
+  const fieldRated = row.national != null && row.gdg_gap == null;
+  /* …AND THE TIER GAP IS NOT THE HEADLINE EITHER (operator, 2026-09-24:
+     "+1 TIER · OVR duplicates the OVR tier row below it"). A league
+     card's headline is a continuous number, the GD/g gap; the national
+     analogue is the overall ELO gap on the competition's field — the
+     difference of the two values the OVR tier was read off. The tier
+     keeps its own row. Absent values fall back to the tier gap. */
+  /* THE HEADLINE IS A FIELD, NOT A FORMULA HERE. The backend's own when
+     it sends one; the interim venue-adjusted Elo gap otherwise — both
+     arrive on `row.headline` via pickerApi.venueAdjusted, which is also
+     where the favourite was named, so the number and the side it signs
+     from cannot come apart. */
+  const fallback: AnchorId = fieldRated ? (row.headline ? "headline" : "tier_ovr")
+    : !row.cross_league ? "gdg"
     : lg != null ? "league_gap"
       : own != null ? "own_gdg" : "tier_ovr";
   const id = modeId === "kickoff" || modeId === "shape" ? fallback : modeId;
@@ -212,6 +245,18 @@ function anchorValue(row: BoardRow, id: AnchorId):
     case "ppg": return { v: dec(row.ppg_gap), k: "ppg gap" };
     case "rank": return { v: sign(row.rank_gap), k: "rank gap" };
     case "tier_ovr": return { v: sign(row.tier_gaps.ovr), k: "tier · ovr" };
+    case "field_rank": {
+      const o = (row.field ?? row.field_partial)?.axes?.ovr;
+      return { v: sign(o ? o.opp.rank - o.fav.rank : null), k: "field rank gap" };
+    }
+    case "headline": {
+      const h = row.headline;
+      if (!h) return { v: WITHHELD, k: "no headline" };
+      /* the unit decides the precision: points of a rating are whole
+         numbers, anything else is a rate and keeps two places */
+      return { v: h.unit === "elo" ? sign(Math.round(h.value)) : dec(h.value),
+               k: h.label, basis: h.basis };
+    }
     case "tier_atk": return { v: sign(row.tier_gaps.atk), k: "tier · atk" };
     case "tier_def": return { v: sign(row.tier_gaps.def), k: "tier · def" };
     case "ask": return row.kalshi?.ask_c == null
@@ -361,9 +406,16 @@ function RankDumbbell({ ranks }: { ranks: ReturnType<typeof rankPair> }) {
  *  match hubs' form chips: a draw is not a warning. Oldest→newest, so
  *  the rightmost cell is the latest result; the title spells it out. */
 const FORM_SLOTS = 5;
-function FormStrip({ form, name, scope, cupScope, className = "" }: {
+function FormStrip({ form, name, scope, cupScope, className = "",
+                    friendly }: {
   form?: string | null; name: string; scope?: string;
   cupScope?: boolean; className?: string;
+  /** PER RESULT, WAS IT A FRIENDLY — aligned to `form`, oldest first.
+   *  Only a national card sends it: a national team's last five are every
+   *  senior international, and a friendly is drawn HOLLOW in its own
+   *  colour so it reads as the same result carrying less weight. The
+   *  legend says so once; the cell's title says it here. */
+  friendly?: readonly boolean[];
 }) {
   if (!form) return null;
   // FIXED WIDTH, right-aligned (2026-09-01): five slots always, empty
@@ -385,6 +437,8 @@ function FormStrip({ form, name, scope, cupScope, className = "" }: {
   const letters = form.slice(-FORM_SLOTS).split("");
   const pad = FORM_SLOTS - letters.length;
   const slots = [...Array(pad).fill(null), ...letters];
+  const fr = friendly && friendly.length === form.length
+    ? [...Array(pad).fill(false), ...friendly.slice(-FORM_SLOTS)] : null;
   return (
     // NOT aria-hidden. The strip was invisible to a screen reader
     // entirely, so its only description was a mouse-only tooltip. It has
@@ -400,6 +454,7 @@ function FormStrip({ form, name, scope, cupScope, className = "" }: {
       className={`inline-flex flex-none items-center gap-[2px] ${className}`}>
       {slots.map((c, i) => {
         const latest = i === FORM_SLOTS - 1 && c != null;
+        const hollow = fr?.[i] === true && c != null;
         return (
           /* FIVE CELLS OF ONE SHAPE (2026-09-10). Two things made this
              read as ragged rather than as a strip. An empty slot was
@@ -414,8 +469,13 @@ function FormStrip({ form, name, scope, cupScope, className = "" }: {
              the bump the operator saw. Inset, the mark stays inside its
              own footprint and every cell keeps its place in the row. */
           <i key={i} data-r={c ?? ""}
+            {...(fr ? { "data-friendly": hollow ? "1" : "0" } : {})}
+            {...(hollow ? { title: `${c} — a friendly` } : {})}
             className={`h-[7px] w-[7px] rounded-[1.5px] ${
-              c == null ? "bg-line"
+              hollow
+                ? `border ${c === "W" ? "border-up/85" : c === "L"
+                    ? "border-neg/75" : "border-ink-low"}`
+              : c == null ? "bg-line"
               : c === "W" ? "bg-up/85"
               : c === "L" ? "bg-neg/75"
               : "bg-line-strong"}${
@@ -433,6 +493,148 @@ function FormStrip({ form, name, scope, cupScope, className = "" }: {
         </span>
       )}
     </span>
+  );
+}
+
+/* ── A NATIONAL CARD IS A LEAGUE CARD, WITH NATIONAL FACTS IN ITS SLOTS
+   (operator, 2026-09-24: "the SAME object as a Leagues card, with
+   national-team analogues in the same slots and nothing extra") ──────
+   Every piece below replaces a club fact that cannot exist for a national
+   team, in the club fact's own slot and typography — never beside it:
+     GD/g · ppg · rank · gp   ->  elo v elo · group · pts (gp) · h2h
+     the GD/g gap headline    ->  the overall Elo gap
+     the form cells           ->  the same cells, a friendly drawn hollow
+     the price row            ->  the same row, prefixed by whose yes it is
+   and a chip in the chip row for the one event a club card has no slot
+   for: both starting XIs published. Anything the column says once (the
+   stage, a universal below-floor verdict) is in its header, not on each
+   card. */
+type NatSide = "home" | "away";
+
+export interface NationalCardCtx {
+  col: NationalColumn | null;
+  /** axes whose below-floor verdict holds for every side in the column */
+  quietFloor: FieldAxisKey[];
+}
+const NationalCtx = createContext<NationalCardCtx>({ col: null, quietFloor: [] });
+
+function friendlyMarks(n: NationalBlock | null | undefined,
+                       side: NatSide | undefined): boolean[] | undefined {
+  const games = side ? n?.teams?.[side]?.form?.games : undefined;
+  return games?.filter((g) => g.letter).map((g) => g.kind === "friendly");
+}
+
+function favSides(row: { fav_side?: string | null }):
+    { fav: NatSide; opp: NatSide } {
+  const fav: NatSide = row.fav_side === "away" ? "away" : "home";
+  return { fav, opp: fav === "home" ? "away" : "home" };
+}
+
+/** WHOSE YES THE PRICE IS. A refused card's quote names its side; a
+ *  ranked card's is the favourite's leg by the board's contract, and the
+ *  book on the card says which by ticker. Read off the book, not assumed. */
+export function priceSide(row: {
+  kalshi?: (KalshiQuote & { side?: string | null }) | null;
+  national?: NationalBlock | null;
+  favourite?: string;
+  refused?: boolean;
+}): { code: string; name: string } | null {
+  const k = row.kalshi;
+  if (!k || !row.national) return null;
+  const legs = (row.national.market as { legs?: Record<string,
+    { ticker?: string | null; name?: string } | null> } | null)?.legs ?? {};
+  const name = k.side ?? Object.values(legs)
+    .find((l) => l?.ticker && l.ticker === k.ticker)?.name ?? null;
+  if (!name) return null;
+  /* A RANKED CARD'S PRICE IS THE FAVOURITE'S, and a club card says so by
+     saying nothing — the price row under a favourite is that side's yes.
+     The national card keeps that convention and names the side only when
+     the quote is NOT the favourite's (a refused card has no favourite;
+     its quote is the home side's). */
+  if (!row.refused && row.favourite && name === row.favourite) return null;
+  /* THE BOOK'S OWN CODE FOR THE SIDE — the ticker's last segment
+     (…-GEONIR-GEO is Georgia's yes) — so the prefix costs three
+     characters and the price row keeps the club row's one line. The
+     full name rides on hover. */
+  const code = /-([A-Z]{2,4})$/.exec(k.ticker ?? "")?.[1] ?? name;
+  return { code, name };
+}
+
+/** THE GROUP, IN THE CHIP ROW — where a club card names a cup tie's
+ *  competition (`competition-badge`), in the neutral chip style: it says
+ *  which table this fixture belongs to, which is a label and not a stat. */
+function GroupChip({ national }: { national?: NationalBlock | null }) {
+  if (!national?.group) return null;
+  return (
+    /* "League B - Group C" / "League B, Group C" (Concacaf's two-level
+       groups) is drawn
+       "League B · Grp C" so the chip, the rank and the kickoff keep the
+       club card's one chip line; the full name is on hover. */
+    <span data-testid="group-chip" title={national.group}
+      className="rounded border border-line-strong px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-low">
+      {/* the provider spells the two levels "League A - Group A" and,
+          on a later read, "League A, Group A": both are one chip */}
+      {national.group.replace(/\s*[-,]\s*Group\s+/, " · Grp ")
+        .replace(/\s+-\s+/g, " · ")}
+    </span>
+  );
+}
+
+function XiChip({ national }: { national?: NationalBlock | null }) {
+  if (!national?.lineups?.announced) return null;
+  return (
+    <span data-testid="xi-chip"
+      title="both starting XIs are published on ESPN's match summary"
+      className="rounded border border-line-strong px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-low">
+      xi named
+    </span>
+  );
+}
+
+/** THE STATS LINE'S NATIONAL SLOTS — the points gap and games from the
+ *  derived group table, and the head-to-head when ESPN has a record. Each is drawn only when it exists; a stat that cannot exist for
+ *  a national team is never drawn as "n/a". */
+function NationalStats({ row, col }: {
+  row: BoardRow; col: NationalColumn | null;
+}) {
+  const n = row.national!;
+  const { fav, opp } = favSides(row);
+  const table = n.group ? col?.standings[n.group] : undefined;
+  const rec = (s: NatSide) =>
+    table?.find((r) => r.espn_id === n.teams?.[s]?.espn_id);
+  const fr = rec(fav), or = rec(opp);
+  const played = fr && or && fr.gp + or.gp > 0;
+  const t = n.head_to_head?.tally;
+  const met = t ? t.home + t.draw + t.away : 0;
+  const w = t ? t[fav] : 0, l = t ? t[opp] : 0;
+  return (
+    <>
+      {/* THE CLUB LINE'S SHAPE, PAIR FOR PAIR: a club card reads
+          "#2 v #17 · ppg +1.42 · rank +15 · gp 5/5" — the ranks, a signed
+          gap and the games behind it. The national line is the same
+          grammar on the group table: the points gap and the games it was
+          earned in, drawn only once somebody has played (at 0/0 both would
+          be a zero standing in for "not yet"). The two Elo values are the
+          headline's inputs and sit behind the `#` with the other axes, as
+          a club card keeps its values behind its tiers. */}
+      {played && (
+        <span data-testid="national-pts" className="text-ink-low"
+          title={`group points so far — ${row.favourite} ${fr!.pts}, ${row.opponent} ${or!.pts} — from the group table derived from played results${col?.standingsNote ? `. ${col.standingsNote}` : ""}`}>
+          pts <span className="text-ink-mid">{sign(fr!.pts - or!.pts)}</span>
+        </span>
+      )}
+      {played && (
+        <span data-testid="national-gp" className="text-ink-faint">
+          gp {fr!.gp}/{or!.gp}
+        </span>
+      )}
+      {met > 0 && (
+        <span data-testid="national-h2h" className="text-ink-low"
+          title={`previous meetings on ESPN's ${n.head_to_head?.source ?? "record"}: ${row.favourite} won ${w}, drew ${t!.draw}, lost ${l}`}>
+          h2h <span className="text-ink-mid">{w}-{t!.draw}-{l}</span>
+        </span>
+      )}
+    </>
   );
 }
 
@@ -558,6 +760,8 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
 }) {
   const badge = homeBadge(row);
   const anchor = anchorFor(row, modeId);
+  const nat = useContext(NationalCtx);
+  const natSides = row.national ? favSides(row) : null;
   const alt = seasonDisagreement(row);
   const ranks = rankPair(row, field ?? partial, clubCount);
   /* THE VENUE RULE'S DISAGREEMENT, ON THE BADGE THAT IS ABOUT THE VENUE
@@ -665,6 +869,7 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
             )}
             <FormStrip form={row.form?.fav} name={row.favourite}
               scope={row.form?.scope} cupScope={row.form?.scope_is_cup}
+              friendly={friendlyMarks(row.national, natSides?.fav)}
               className="ml-auto pl-2" />
           </span>
           <span className={`mt-0.5 flex min-w-0 items-center gap-2${
@@ -677,6 +882,7 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
             </span>
             <FormStrip form={row.form?.opp} name={row.opponent}
               scope={row.form?.scope} cupScope={row.form?.scope_is_cup}
+              friendly={friendlyMarks(row.national, natSides?.opp)}
               className="ml-auto pl-2" />
           </span>
         </span>
@@ -758,6 +964,9 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
           title={ranks.title} className="text-ink-faint">
           #{ranks.fav} v #{ranks.opp}
         </span>
+        {row.national
+          ? <NationalStats row={row} col={nat.col} />
+          : (<>
         {anchor.id !== "gdg" && (
           <span className="text-ink-low">
             GD/g <span className="text-ink-mid">{dec(row.gdg_gap)}</span>
@@ -793,6 +1002,7 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
                 ? <>gp {row.gp_current.away} away · home not counted</>
                 : <>gp not counted</>}
         </span>
+          </>)}
       </div>
 
       {/* Stage 2 — the three tier gaps, each drawn on its own. Shared
@@ -800,6 +1010,8 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
           below the divider is THE SAME READ as one above it. */}
       <div className="mt-3">
         <TierGaps read={row} dense={dense} field={field} partial={partial}
+          values={!row.national}
+          quietFloor={row.national ? nat.quietFloor : []}
           floorNote={floorNote} />
       </div>
 
@@ -970,6 +1182,8 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
             every signed number below is read from the side the venue
             named, so a rank_gap of −3 is the row stating that the
             favourite is three places WORSE, not a sign bug. */}
+        <GroupChip national={row.national} />
+        <XiChip national={row.national} />
         {flipped && (
           <span data-testid="fav-source-venue"
             title={`The venue-aware rule named the favourite on this card, not the league table — ${row.favourite} is at home and the table gap between these two is under that rule's bar. Every signed figure below is read from ${row.favourite}'s side, so a negative gap here means the favourite is the lower-rated club. The rule is annotation the board has been switched to act on; it is not a measured edge.`}
@@ -993,7 +1207,7 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
         floorNote={floorNote} />
 
       <div className="mt-3 border-t border-line pt-3">
-        <KalshiCell quote={row.kalshi} />
+        <KalshiCell quote={row.kalshi} side={priceSide(row)} />
         {/* WHAT THAT PRICE ACTUALLY SETTLES ON — the settlement rule of
             a whole competition, so on a cup column it is identical on
             every card and the header carries it instead (columnNotes).
@@ -1366,6 +1580,8 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
             className="rounded border border-line-strong bg-ink-hi/[0.06] px-1.5 py-0.5 font-mono text-[9.5px] tracking-[0.12em] text-ink-hi">
             #refused
           </span>
+          <GroupChip national={r.national} />
+          <XiChip national={r.national} />
           {/* THE COMPETITION, when it is not the column — the same badge,
               on the same condition, a ranked card carries. A cup tie
               folded into a league column is still a cup tie whether or
@@ -1469,6 +1685,7 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
             </span>
             <FormStrip form={homeForm} name={r.home}
               scope={r.form?.scope} cupScope={r.form?.scope_is_cup}
+              friendly={friendlyMarks(r.national, "home")}
               className="ml-auto pl-2" />
           </span>
           <span className={`mt-0.5 flex min-w-0 items-center gap-2${
@@ -1481,6 +1698,7 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
             </span>
             <FormStrip form={awayForm} name={r.away}
               scope={r.form?.scope} cupScope={r.form?.scope_is_cup}
+              friendly={friendlyMarks(r.national, "away")}
               className="ml-auto pl-2" />
           </span>
         </span>
@@ -1758,7 +1976,7 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
             that would be this card making a claim on the backend's
             behalf. */}
         {"kalshi" in r
-          ? <KalshiCell quote={r.kalshi} />
+          ? <KalshiCell quote={r.kalshi} side={priceSide(r)} />
           : (
             <span data-testid="refused-no-market"
               className="font-mono text-[11px] text-ink-faint">
@@ -1960,6 +2178,10 @@ function fieldNoteFor(data: Ratings | null | undefined): string | null {
 
 export function columnNotes(
   slug: string, rows: BoardRow[], field?: FieldRead,
+  /** the column's own settlement rule, when its META carries one — used
+   *  only where no row speaks for it (a column with nothing in the
+   *  window), so the header's note does not vanish with the fixtures */
+  metaRegTime?: string | null,
 ): ColumnNoteSet {
   const agreed = (pick: (r: BoardRow) => string | null | undefined) => {
     let only: string | null = null;
@@ -1975,7 +2197,8 @@ export function columnNotes(
   const fieldFailure = readFailure(field?.error);
   return {
     gap: agreed((r) => r.gap_note),
-    regTime: agreed((r) => r.reg_time_note),
+    regTime: agreed((r) => r.reg_time_note)
+      ?? (rows.length === 0 ? metaRegTime ?? null : null),
     field: fieldNoteFor(field?.data),
     /* THE FAILURE IS THE COLUMN'S, because the request is. One fetch
        serves every card here, so one failure is one sentence — and it
@@ -2320,9 +2543,13 @@ function Slotted({ to, children }: {
 export function LeagueColumn({
   slug, meta, rows, refusals, days, dayKeys, sortFor, dayLabels, colIndex,
   review, dense = false, field, boardFloorNote, headSlot = null,
-  sideways = false, tabPanel = false,
+  sideways = false, tabPanel = false, national = null,
 }: {
   slug: string;
+  /** A NATIONAL COLUMN'S OWN FACTS (the Championships board): its group
+   *  tables, its stage chip and when it next plays. Null on every club
+   *  column, which then renders exactly as it did. */
+  national?: NationalColumn | null;
   /** absent when the payload never mentioned this league at all */
   meta?: LeagueMeta;
   rows: BoardRow[];
@@ -2450,7 +2677,24 @@ export function LeagueColumn({
      how to read a tier set is true of every card in this column, and a
      field that failed to load is true of the column rather than of any
      fixture in it. */
-  const notes = columnNotes(slug, rows, field);
+  const notes = columnNotes(slug, rows, field, meta?.reg_time_note);
+  /* A BELOW-FLOOR VERDICT THAT HOLDS FOR EVERY SIDE IN THE COLUMN IS SAID
+     ONCE (operator, 2026-09-24). Per axis, over every field-read row in
+     this column: an axis where every side is below the floor carries no
+     information cell by cell, so its daggers go and the header chip says
+     it; an axis where even one side clears it keeps its per-cell marks,
+     because there they discriminate. Derived here, never typed — a
+     ratings build that clears the floor for some fields brings the
+     daggers back by itself. National columns only. */
+  const quietFloor: FieldAxisKey[] = !national ? [] : (["ovr", "atk", "def"] as const)
+    .filter((k) => {
+      const sides = rows.flatMap((r) => {
+        const ax = (r.field ?? r.field_partial)?.axes?.[k];
+        return ax ? [ax.fav, ax.opp] : [];
+      });
+      return sides.length > 0 && sides.every((x) => x.below_floor);
+    });
+  const natCtx: NationalCardCtx = { col: national, quietFloor };
 
   // DAY-MAJOR (operator, 2026-09-01): the matchday is the board's
   // primary structure and each band's sort — the board default or that
@@ -2505,6 +2749,11 @@ export function LeagueColumn({
      an unexplained gap where every neighbour has one is what made the
      column read as broken. It is NAMED in the header now. */
   const nothingAhead = rows.length === 0 && refusals.length === 0;
+  /* A NATIONAL COLUMN WITH NOTHING IN THE WINDOW BUT A KNOWN NEXT FIXTURE
+     (the Asian Cup, until January) reads as a league on a rest week: a
+     rest-day cell per band naming when it next plays, not one box
+     saying it has nothing. */
+  const restNext = nothingAhead ? national?.nextBeyond ?? null : null;
   /* `review.read` IS PART OF "KNOWN" (2026-09-10). Without it a
      competition the sweep never covered reported a KNOWN zero here —
      the header speaking, in the operator's own words, for a read that
@@ -2586,6 +2835,7 @@ export function LeagueColumn({
   const hue = hueOf(slug);
 
   return (
+    <NationalCtx.Provider value={natCtx}>
     <section data-testid="league-col" data-league={slug}
       id={`picker-col-${slug}`}
       /* ON A PHONE THIS IS THE TAB STRIP'S PANEL (2026-09-16). The board
@@ -2824,6 +3074,23 @@ export function LeagueColumn({
                 : <> · no gp floor stated</>}
             </span>
           )}
+          {/* THE NATIONAL COLUMN'S HEADER CHIPS, in the season chip's
+              place and style: the stage (derived — see
+              pickerApi.nationalColumn), and a universal below-floor
+              verdict said once for the column (see `quietFloor`). */}
+          {national?.stage && (
+            <span data-testid="col-stage" title={national.stage.title}
+              className="rounded border border-accent/40 bg-accent/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-accent">
+              {national.stage.text}
+            </span>
+          )}
+          {quietFloor.length > 0 && (
+            <span data-testid="col-floor" data-axes={quietFloor.join(",")}
+              title={boardFloorNote ?? "below the placeability floor on these axes for every team in this column"}
+              className="rounded border border-line-strong px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-low">
+              {quietFloor.join("/")} †
+            </span>
+          )}
           {meta?.kind === "cup" && (
             <span data-testid="col-cup"
               title="a knockout tournament with no table of its own — every club is rated on its domestic league's table instead"
@@ -2949,7 +3216,7 @@ export function LeagueColumn({
           // Only when the league plays elsewhere in the window — a fully
           // empty column keeps its own louder empty-state below — and
           // only at xl, where the aligned matrix exists.
-          if (rows.length === 0 && refusals.length === 0) return null;
+          if (rows.length === 0 && refusals.length === 0 && !restNext) return null;
           const next = byDay.slice(di + 1)
             .find((d) => d.rows.length > 0 || d.refused.length > 0);
           return (
@@ -2962,7 +3229,9 @@ export function LeagueColumn({
               <span className="font-mono text-[9.5px] text-ink-low">
                 {next
                   ? `next · ${(dayLabels[next.key] ?? next.key).toLowerCase()}`
-                  : "no more fixtures in window"}
+                  : restNext
+                    ? `next · ${dayLabel(restNext).toLowerCase()}`
+                    : "no more fixtures in window"}
               </span>
             </div>
           );
@@ -3024,7 +3293,21 @@ export function LeagueColumn({
           ONE grid item, not two at the same row: explicitly placed
           items may overlap, and `col-empty` and the tail would have
           been drawn on top of each other. */}
-      {nothingAhead && (
+      {/* …AND BELOW `xl`, where rest days are not drawn, the same cell
+          once, so a phone's column reads as a schedule rather than an
+          empty box. */}
+      {restNext && (
+        <div data-testid="rest-day" data-day="next"
+          className="mt-3 flex min-h-[52px] flex-col justify-center gap-0.5 rounded-[10px] border border-dashed border-line px-3 py-2.5 xl:hidden">
+          <span className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-ink-faint">
+            {leagueLabel(slug)} — rest day
+          </span>
+          <span className="font-mono text-[9.5px] text-ink-low">
+            next · {dayLabel(restNext).toLowerCase()}
+          </span>
+        </div>
+      )}
+      {nothingAhead && !restNext && (
         <div data-slot="tail-track" data-at="head"
           style={{ ["--r" as string]: "3" }}
           className="mt-3 xl:mt-0 xl:self-start xl:[grid-row:var(--r)]">
@@ -3120,7 +3403,7 @@ export function LeagueColumn({
           complete before the backward one starts. A column with nothing
           ahead of it has already drawn this, up in the first track — see
           above; it is ONE element either way, never two. */}
-      {!nothingAhead && (
+      {(!nothingAhead || restNext) && (
         <div className="xl:self-start xl:[grid-row:var(--r)]"
           style={{ ["--r" as string]: String(3 + 2 * dayKeys.length) }}
           data-slot="tail-track" data-at="foot">
@@ -3128,5 +3411,6 @@ export function LeagueColumn({
         </div>
       )}
     </section>
+    </NationalCtx.Provider>
   );
 }

@@ -306,9 +306,14 @@ export function useBoardLoop({ trackRef, stripRef, railRef, slugs, view,
 
     const ORDER = key.split(",");
     const N = ORDER.length;
-    /* At `view` columns or fewer the board shows everything it has: no
-       ribbon is built and there is nothing here to drive. */
-    if (N <= view) return;
+    /* FEWER COLUMNS THAN THE WINDOW: nothing to drive.
+       EXACTLY AS MANY (2026-09-24) IS THE STATIC STRIP: a declared board
+       whose columns all fit still carries its pills — the same slots, the
+       same ink, every one lit because every one is on screen — and there
+       is nothing to step to, so no key and no pill moves anything. The
+       page hands `view` = the drawn count for exactly this case. */
+    if (N < view) return;
+    const STATIC = N === view;
     const SLACK = N - view;
     const LOOPS = boardLoops(N, view);
     const REST = restFor(N, view);
@@ -908,12 +913,14 @@ export function useBoardLoop({ trackRef, stripRef, railRef, slugs, view,
       }
     };
     const onPill = (e: Event) => {
+      if (STATIC) return;
       const b = (e.currentTarget as HTMLElement);
       if (b.dataset.slug) goto(b.dataset.slug);
     };
     pills.forEach((b) => b.addEventListener("click", onPill));
 
     const onKey = (e: KeyboardEvent) => {
+      if (STATIC) return;
       const t = e.target as HTMLElement | null;
       if (t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;

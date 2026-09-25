@@ -278,9 +278,13 @@ test.describe("the board draws the columns the operator chooses", () => {
     + "scroller can still be widened again", async ({ page }) => {
       await openChooser(page);
       await setDrawn(page, ["epl", "laliga", "mls", "ligamx"]);
-      /* Four columns do not scroll, so the loop and its ribbon are gone
-         — correctly, there is nothing to page through. */
-      await expect(page.getByTestId("league-ribbon")).toHaveCount(0);
+      /* Four columns do not scroll, so there is nothing to page through:
+         RESTATED 2026-09-24 — the strip no longer goes with the loop, it
+         goes STATIC (every pill lit, nothing to step to), the same strip
+         a four-column board of either mode now carries. */
+      await expect(page.getByTestId("ribbon-pill")).toHaveCount(4);
+      await expect(page.locator('[data-testid="ribbon-pill"][aria-selected="true"]'))
+        .toHaveCount(4);
       /* If the chooser had gone with it, this is where the reader would
          be stranded. */
       await expect(page.getByTestId("column-chooser")).toBeVisible();

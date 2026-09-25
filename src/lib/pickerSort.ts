@@ -33,7 +33,8 @@ export type SortDir = "asc" | "desc";
 export type SortModeId =
   | "gdg" | "kickoff" | "ppg" | "rank"
   | "tier_ovr" | "tier_atk" | "tier_def" | "shape"
-  | "ask" | "spread" | "depth";
+  | "ask" | "spread" | "depth"
+  | "headline" | "field_rank";
 
 export interface SortMode {
   id: SortModeId;
@@ -168,8 +169,38 @@ export interface ColumnSort { mode: SortModeId; dir: SortDir; }
  *  fixtures kicking off together still fall in the old order. */
 export const DEFAULT_SORT: ColumnSort = { mode: "kickoff", dir: "asc" };
 
+/** THE NATIONAL COLUMNS' SORT KEYS (2026-09-24) — only keys a national
+ *  row CARRIES. A national team has no league table, so every Stage-1 gap
+ *  a club column sorts on (GD/g, ppg, rank) is null on every card there,
+ *  and a menu offering them offers an ordering that cannot order anything.
+ *  What the rows do carry:
+ *    kickoff     the board's default, unchanged;
+ *    headline    the card's own headline figure — the backend's `headline`
+ *                when it sends one, the interim venue-adjusted Elo gap
+ *                otherwise (pickerApi.venueAdjusted puts either on
+ *                `row.headline`, so this reads one field);
+ *    field_rank  the gap between the two sides' ranks on the
+ *                competition's own field, the pair the card prints.
+ *  A SEPARATE LIST, NOT A FILTER OF SORT_MODES: the club menu is that
+ *  list, verbatim, and nothing here can change a byte of it. */
+export const NATIONAL_SORT_MODES: SortMode[] = [
+  SORT_MODES.find((m) => m.id === "kickoff")!,
+  { id: "headline", label: "headline gap", defaultDir: "desc",
+    value: (r) => magnitude(r.headline?.value),
+    nullNote: "no headline figure sorts last", nullNoteOnlyWhenPresent: true,
+    orderNote: (d) => `|headline gap| ${d === "desc" ? "descending" : "ascending"}` },
+  { id: "field_rank", label: "field rank gap", defaultDir: "desc",
+    value: (r) => {
+      const o = (r.field ?? r.field_partial)?.axes?.ovr;
+      return o ? Math.abs(o.opp.rank - o.fav.rank) : null;
+    },
+    nullNote: "no field rank sorts last", nullNoteOnlyWhenPresent: true,
+    orderNote: (d) => `|field rank gap| ${d === "desc" ? "descending" : "ascending"}` },
+];
+
 export const modeById = (id: string): SortMode | undefined =>
-  SORT_MODES.find((m) => m.id === id);
+  SORT_MODES.find((m) => m.id === id)
+  ?? NATIONAL_SORT_MODES.find((m) => m.id === id);
 
 export const isDefaultSort = (s: ColumnSort): boolean =>
   s.mode === DEFAULT_SORT.mode && s.dir === DEFAULT_SORT.dir;

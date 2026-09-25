@@ -354,9 +354,21 @@ function plateClass(read: ReadLike): string {
  *  — and once inside each piece through `data-w` + `::after`, which never
  *  enters textContent and so can never be matched a second time. The
  *  geometry lives in globals.css under THE SHAPE CHIP. */
-export function ShapeChip({ read }: { read: ReadLike }) {
+export function ShapeChip({ read, quiet = [] }: {
+  read: ReadLike;
+  /** axes whose below-floor verdict is universal in the column (see
+   *  TierGaps `quietFloor`). A CUT names the unit that gave way; on an
+   *  axis the column header already calls indicative for every team, a
+   *  red tear through the word asserts exactly the unit verdict that
+   *  evidence cannot carry — the "SP|LIT" the operator read as a bug on
+   *  the national board (2026-09-24). So the tear is withheld there and
+   *  the word keeps its plate; a club card passes nothing and is cut as
+   *  it always was. */
+  quiet?: readonly FieldAxisKey[];
+}) {
   const shape = read.shape;
-  const cut = cutOf(read);
+  const raw = cutOf(read);
+  const cut = raw && quiet.includes(raw.axis === "h" ? "atk" : "def") ? null : raw;
   const plate = plateClass(read);
   const ink =
     shape === "CLEAN" ? "text-up"
@@ -365,6 +377,7 @@ export function ShapeChip({ read }: { read: ReadLike }) {
   if (!cut) {
     return (
       <span data-testid="shape-chip" data-cut="none"
+        {...(raw && !cut ? { "data-cut-withheld": raw.axis } : {})}
         className={`sc sc-intact ${plate} ${ink} font-mono text-[10px] uppercase tracking-[0.16em]`}>
         <span className="sc-w">{shape}</span>
       </span>
@@ -431,7 +444,12 @@ function effectiveRead(read: ReadLike, block?: FieldBlockLike | null,
        attack, because there is no axis for the club to be missing
        from. So the row's own reading is kept, and the trio draws the
        axis nowhere. */
-    if (!axis) return read.tiers[k][side === "fav" ? 0 : 1];
+    /* …AND A ROW MAY CARRY NO READING FOR THAT AXIS EITHER (2026-09-24,
+       the Championships board): a national team measured on Elo alone
+       rides under `field_partial` with `tiers.atk: null`, and indexing
+       that null threw inside the card. The axis is not drawn either
+       way; what is kept is the named absence, never a number. */
+    if (!axis) return read.tiers[k]?.[side === "fav" ? 0 : 1] ?? "no band";
     /* NO FALLBACK NUMBER. An empty set is a club the payload placed in
        no band at all; printing its `tier` would invent exactly the
        placement the set exists to refuse. */
@@ -804,8 +822,18 @@ function measureTitle(
 }
 
 export function TierGaps({ read, dense = false, field, partial,
-                          floorNote }: {
+                          floorNote, values = true, quietFloor = [] }: {
   read: ReadLike;
+  /** DRAW THE VALUE ± HALF-WIDTH UNDER EACH TIER. True everywhere it has
+   *  been drawn; a national card passes false and keeps the values behind
+   *  the `#` panel, the way a league card keeps its tiers alone. */
+  values?: boolean;
+  /** AXES WHOSE BELOW-FLOOR VERDICT IS UNIVERSAL IN THIS COLUMN, and so
+   *  said ONCE in the column header rather than as a dagger on every
+   *  cell. Derived by the column from its own rows (see LeagueColumn),
+   *  never typed: an axis where even one side clears the floor is not
+   *  here, and its cells keep their per-cell marks. */
+  quietFloor?: readonly FieldAxisKey[];
   /** WHERE THESE TWO CLUBS STAND IN THE COMPETITION'S OWN FIELD, when
    *  somebody has measured one (pickerApi.RowField). It substitutes the
    *  DATA and adds exactly one mark: the tier trio prints the field's
@@ -887,7 +915,18 @@ export function TierGaps({ read, dense = false, field, partial,
             <TierCell key={label} label={label} gap={gap} />
           ))}
         </span>
-        <ShapeChip read={r} />
+        {/* A SHAPE THE BACKEND WITHHELD IS SAID, NOT DRAWN EMPTY. A partial
+            block carries no shape and — on a national row measured on
+            Elo alone — neither does the row: CLEAN/HOLLOW/SPLIT is read
+            off three gaps and this fixture has one. The chip's plate
+            with nothing in it would read as a shape that failed to
+            load; the backend's own sentence says why there is none. */}
+        {r.shape ? <ShapeChip read={r} quiet={quietFloor} /> : (
+          <span data-testid="shape-absent" title={absent?.why ?? undefined}
+            className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+            no shape
+          </span>
+        )}
         {/* THE TRIO AND ITS `#`, AS ONE FLEX ITEM (2026-09-09). This row
             is `flex-wrap`, so as separate items the circle wrapped onto
             the line BELOW the trio in a narrow track and sat adrift in
@@ -950,7 +989,10 @@ export function TierGaps({ read, dense = false, field, partial,
                one-axis block's tier with no figure beside it for
                exactly the leagues this key exists to serve. */
             const side = block?.axes[lbl];
-            const m = bothMeasured(side);
+            const m = values ? bothMeasured(side) : null;
+            /* a universal verdict is in the header; a cell repeating it
+               carries no information */
+            const quiet = quietFloor.includes(lbl);
             return (
             <span key={lbl} data-tier={lbl} data-dissent={dissents(gap)}
               data-fav-set={side ? side.fav.tier_set.join(",") : undefined}
@@ -999,11 +1041,11 @@ export function TierGaps({ read, dense = false, field, partial,
                   is a claim about, so it is addressable rather than
                   inferred from everything the cell happens to contain. */}
               <span data-tier-pair={lbl} className="whitespace-nowrap">
-                {pr[0]}{side && (side.fav.below_floor || side.fav.straddles)
+                {pr[0]}{side && !quiet && (side.fav.below_floor || side.fav.straddles)
                   && <FloorMark note={side.fav.below_floor
                     ? floorNote
                     : `the 95% interval touches bands ${side.fav.tier_set.join("·")} — ${side.fav.tier} is where the estimate falls, not a band the evidence will narrow to`} />}v{pr[1]}
-                {side && (side.opp.below_floor || side.opp.straddles)
+                {side && !quiet && (side.opp.below_floor || side.opp.straddles)
                   && <FloorMark note={side.opp.below_floor
                     ? floorNote
                     : `the 95% interval touches bands ${side.opp.tier_set.join("·")} — ${side.opp.tier} is where the estimate falls, not a band the evidence will narrow to`} />}
@@ -1156,7 +1198,13 @@ export function TierGaps({ read, dense = false, field, partial,
  *  or an event with no live quote, STAYS on the board and says which of
  *  the two it is: "no kalshi event" and "listed · no quote" are different
  *  facts, and collapsing them into one blank hides a mapping failure. */
-export function KalshiCell({ quote }: { quote: KalshiQuote | null | undefined }) {
+export function KalshiCell({ quote, side }: {
+  quote: KalshiQuote | null | undefined;
+  /** WHOSE yes this is, as a short prefix — drawn only where the caller
+   *  names it (a national card, whose book quotes one of two named
+   *  teams). A club card passes nothing and draws exactly what it drew. */
+  side?: { code: string; name: string } | null;
+}) {
   const k = quote;
   if (!k) {
     return (
@@ -1183,6 +1231,12 @@ export function KalshiCell({ quote }: { quote: KalshiQuote | null | undefined })
   }
   return (
     <span className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] tabular-nums text-ink-mid">
+      {side && (
+        <span data-testid="price-side" className="text-ink-low"
+          title={`the price is ${side.name}'s yes on Kalshi`}>
+          {side.code}
+        </span>
+      )}
       <span className="text-ink-hi">ask {k.ask_c}¢</span>
       <span>bid {k.bid_c == null ? "—" : `${k.bid_c}¢`}</span>
       <span>spread {k.spread_c == null ? "—" : `${k.spread_c}¢`}</span>

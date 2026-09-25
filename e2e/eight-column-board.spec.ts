@@ -129,13 +129,28 @@ test.describe("eight columns on a four-column board", () => {
     expect(vals).not.toContain(inks.cup);
   });
 
-  test("the window is a NO-OP at four columns — today's board is untouched",
+  /* RESTATED 2026-09-24. This read "the window is a NO-OP at four columns"
+     and asserted NO ribbon. The operator then asked for the same strip on
+     every declared board — "if the app's rule is 'no ribbon when every
+     column fits', apply that rule identically to both modes, or show the
+     pills without the loop" — and the Championships board has four. So a
+     four-column board now carries the STATIC strip: its pills, all lit,
+     and nothing to step to. What the old test protected still holds and
+     is asserted: the four columns do not move. */
+  test("at four columns the strip is STATIC — all lit, and nothing moves",
     async ({ page }) => {
       const four = { ...BOARD_EIGHT, leagues: Object.fromEntries(
         Object.entries(BOARD_EIGHT.leagues).slice(0, 4)) };
       await serveEight(page, four);
       await expect(page.locator('[data-testid="league-col"]')).toHaveCount(4);
-      await expect(page.locator('[data-testid="league-ribbon"]')).toHaveCount(0);
+      await expect(page.locator('[data-testid="ribbon-pill"]')).toHaveCount(4);
+      await expect(page.locator('[data-testid="ribbon-pill"][aria-selected="true"]'))
+        .toHaveCount(4);
+      const before = await onScreen(page);
+      await page.keyboard.press("ArrowRight");
+      await page.waitForTimeout(700);
+      expect(await onScreen(page)).toEqual(before);
+      expect(before).toHaveLength(4);
     });
 });
 
