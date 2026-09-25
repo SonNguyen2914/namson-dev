@@ -36,20 +36,8 @@
 // Nothing here widens the surface; PR #41's allowlists are the whole
 // admission rule.
 import type { NextApiRequest, NextApiResponse } from "next";
-import {
-  leagueRouteAllowed,
-  proxy,
-  refuseLeagueRoute,
-} from "../../../lib/suggesterProxy";
+import { proxyLeague } from "../../../lib/suggesterProxy";
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  const prefix = String(req.query.league ?? "");
-  const segs = ((req.query.path as string[]) || []).join("/");
-  if (req.method !== "GET" || !leagueRouteAllowed(prefix, segs)) {
-    // JSON, naming the competition and which of the two findings this
-    // is — never the HTML page, which cannot be told from a breakage.
-    return refuseLeagueRoute(res, prefix, segs);
-  }
-  const qs = req.url?.includes("?") ? "?" + req.url.split("?")[1] : "";
-  return proxy(req, res, `/api/${prefix}/${segs}${qs}`);
+  return proxyLeague(req, res, String(req.query.league ?? ""));
 }

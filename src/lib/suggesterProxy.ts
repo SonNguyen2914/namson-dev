@@ -90,6 +90,120 @@ export function statusForUnreadableAnswer(upstream: number): number {
   return upstream >= 200 && upstream < 300 ? 502 : upstream;
 }
 
+// --------------------------------------------------------------------
+// THE PATH A PROXY PUTS ON THE BACKEND SOCKET IS CONFINED (2026-09-25)
+//
+// Fifteen legacy WC26 routes built their backend path by interpolating
+// a query or path value straight into a template —
+// `/api/prediction/${match_id}` — and undici normalises `..` before it
+// sends. Measured against a logging stand-in that day:
+//
+//   /api/bet-suggester/prediction?match_id=../mls/risk%23
+//       -> GET /api/mls/risk
+//   /api/bet-suggester/team-info/..%2Fmls%2Fjournal
+//       -> GET /api/mls/journal
+//   /api/bet-suggester/timeline?match_id=../comp/ucl/drift%23
+//       -> GET /api/comp/ucl/drift
+//   /api/bet-suggester/prediction?match_id=../picker/board%3Fdays%3D30%23
+//       -> GET /api/picker/board?days=30
+//
+// So every route in LEAGUE_PROXY_WITHHELD — the journal, the paper
+// ledger, open exposure, the quota-spending `drift` — was one `../`
+// away, and so was the board, the one GET that WRITES. The allowlists
+// were presented as a control and could be walked straight past.
+//
+// TWO WALLS, EITHER OF WHICH IS ENOUGH ON ITS OWN:
+//
+//   1. every interpolated value is checked against a strict pattern for
+//      what it is (`SEGMENT`) and refused with a named 400 otherwise —
+//      a match id cannot carry a `/`, a `.`, a `%`, a `?` or a `#`;
+//   2. `proxy()` itself re-checks the FINAL path: it must be the path it
+//      normalises to (no `.`/`..` segments, no encoded separators, no
+//      fragment) and it must sit under the prefix the calling route
+//      declared. A route that forgets wall 1 still cannot leave its own
+//      prefix.
+//
+// e2e/proxy-traversal.spec.ts fires traversal payloads at every proxy
+// route in src/pages/api and reads the stand-in backend's own request
+// log to prove nothing arrived outside the route's prefix.
+
+/** What an interpolated value may look like, by what it is. */
+export const SEGMENT = {
+  /** ESPN event ids, fixture ids, league ids. */
+  numericId: /^\d{1,12}$/,
+  /** The WC26 archive's match ids: `M103`, `QF1`, `SF2`. */
+  matchId: /^[A-Za-z0-9_-]{1,32}$/,
+  /** Kalshi market tickers: `KXWCGAME-26JUL19ESPENG-ESP`. A dot is
+   *  allowed inside a ticker; a run of two is not, so no value can be a
+   *  `..` segment. */
+  marketId: /^(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/,
+  /** Competition keys and other slugs: `leagues-cup`, `ucl`. */
+  key: /^[a-z0-9-]{1,40}$/,
+} as const;
+export type SegmentKind = keyof typeof SEGMENT;
+
+/** The value, if it is ONE string of the named kind; otherwise null.
+ *  `req.query` values arrive as `string | string[] | undefined`, and a
+ *  repeated parameter is refused rather than one half of it chosen. */
+export function segment(value: unknown, kind: SegmentKind): string | null {
+  return typeof value === "string" && SEGMENT[kind].test(value)
+    ? value : null;
+}
+
+/** The named 400 for a value that is not what its parameter is. The
+ *  value is not echoed: it is attacker-supplied and the reason is the
+ *  pattern, not the bytes. */
+export function refuseParam(
+  res: NextApiResponse, parameter: string, kind: SegmentKind,
+) {
+  return res.status(400).json({
+    error: "invalid_parameter",
+    reason: "invalid_parameter",
+    parameter,
+    detail: `\`${parameter}\` must be ${SEGMENT_WORDS[kind]}. This refusal `
+      + "is authored here: no backend was contacted.",
+  });
+}
+
+const SEGMENT_WORDS: Record<SegmentKind, string> = {
+  numericId: "a numeric id (1-12 digits)",
+  matchId: "a match id (letters, digits, `_` or `-`, at most 32)",
+  marketId: "a market ticker (letters, digits, `_`, `-` or single dots)",
+  key: "a key (lower-case letters, digits or `-`, at most 40)",
+};
+
+/** Is `backendPath` a path that stays where its route said it would?
+ *  Returns null when it is, or the reason it is not. Exported so the
+ *  guard spec can hold the rule itself to account, not only the routes
+ *  that use it. */
+export function confinementBreach(
+  backendPath: string, within: string,
+): string | null {
+  const q = backendPath.indexOf("?");
+  const path = q === -1 ? backendPath : backendPath.slice(0, q);
+  const query = q === -1 ? "" : backendPath.slice(q + 1);
+  if (!path.startsWith("/")) return "the path is not absolute";
+  if (/[#\\]/.test(backendPath)) return "the path carries a `#` or `\\`";
+  // an encoded separator or dot is decoded by somebody downstream, so
+  // no legitimate path on this surface carries one in its PATH part
+  if (/%/.test(path)) return "the path part carries a percent-escape";
+  if (path.includes("//")) return "the path carries an empty segment";
+  if (path.split("/").some((s) => s === "." || s === ".."))
+    return "the path carries a `.` or `..` segment";
+  let normalised: string;
+  try {
+    normalised = new URL(path, "http://confinement.invalid").pathname;
+  } catch {
+    return "the path does not parse";
+  }
+  if (normalised !== path) return "the path is not its own normal form";
+  if (!(path === within || path.startsWith(within.endsWith("/")
+    ? within : `${within}/`)))
+    return `the path leaves its route's prefix ${within}`;
+  if (query && /[\s]/.test(query)) return "the query carries whitespace";
+  return null;
+}
+
 /** How long a proxy waits on the backend before it says so. The backend
  *  hung twice on 2026-09-25 (worker-pool starvation during a provider
  *  rate-limit storm); with no clock here every open tab held a
@@ -118,8 +232,20 @@ export function timeoutAnswer(what = "the backend") {
 export async function proxy(
   req: NextApiRequest,
   res: NextApiResponse,
-  backendPath: string
+  backendPath: string,
+  within: string,
 ) {
+  // WALL 2 — see the block above. Checked BEFORE any socket opens, so a
+  // refused path never reaches a backend at all.
+  const breach = confinementBreach(backendPath, within);
+  if (breach) {
+    return res.status(400).json({
+      error: "proxy_path_refused",
+      reason: "proxy_path_refused",
+      detail: `this proxy refused to forward: ${breach}. No backend was `
+        + "contacted.",
+    });
+  }
   let r: Response;
   try {
     r = await fetch(`${BACKEND}${backendPath}`, {
@@ -736,6 +862,89 @@ export async function reach(url: string, init?: RequestInit):
   } catch (err) {
     return { reached: false, detail: String(err), timedOut: isTimeout(err) };
   }
+}
+
+// --------------------------------------------------------------------
+// THE LEAGUE CATCH-ALLS, IN ONE FUNCTION
+//
+// Ten `pages/api/<prefix>/[...path].ts` handlers each rebuilt the same
+// four lines. They now call this, so the allowlist, the query bounds
+// and the confinement check are made once.
+
+/** THE NUMERIC QUERY PARAMETERS, BOUNDED TO WHAT THE BACKEND ACCEPTS
+ *  (read off api/main.py's `Query(ge=…, le=…)` on 2026-09-25). They used
+ *  to pass through unbounded — `mls/schedule?days=36500`,
+ *  `picker/review?back=99999` reached the backend verbatim — and
+ *  `championships/board` has no bound on the backend at all. An
+ *  out-of-range or non-integer value is refused here with a named 400
+ *  instead of costing a backend round trip. Matched against
+ *  `<prefix>/<sub-path>`. */
+export const QUERY_BOUNDS: ReadonlyArray<
+  [RegExp, Record<string, readonly [number, number]>]
+> = [
+  [/^(mls|epl|ligamx|laliga|friendlies)\/schedule$/, { days: [1, 14] }],
+  [/^friendlies\/fixtures(\/\d{1,12})?$/, { days: [1, 8] }],
+  [/^friendlies\/coverage$/, { days: [1, 14] }],
+  [/^comp\/[a-z][a-z-]{1,20}\/fixtures$/,
+   { days: [1, 60], season: [2020, 2030] }],
+  [/^picker\/board$/, { days: [1, 14] }],
+  [/^picker\/review$/, { back: [1, 30] }],
+  // the backend declares `days: int = 1` with no bound; the picker
+  // board's own ceiling is the sane one for its national twin
+  [/^championships\/board$/, { days: [1, 14] }],
+  [/^hunter\/findings$/, { limit: [1, 500] }],
+  [/^xg\/friendlies$/, { days: [1, 8] }],
+];
+
+/** Parameters that are integers wherever they appear, bounded or not. */
+const INTEGER_PARAMS = ["days", "back", "limit", "hours", "season"];
+
+/** Null when the query string is acceptable for this route, or the
+ *  reason it is not. */
+export function queryBreach(route: string, query: string): string | null {
+  const params = new URLSearchParams(query);
+  const bounds = QUERY_BOUNDS.find(([re]) => re.test(route))?.[1] ?? {};
+  const keys = new Set([...INTEGER_PARAMS, ...Object.keys(bounds)]);
+  for (const key of keys) {
+    const all = params.getAll(key);
+    if (all.length === 0) continue;
+    if (all.length > 1) return `\`${key}\` is given ${all.length} times`;
+    if (!/^\d{1,4}$/.test(all[0])) return `\`${key}\` is not an integer`;
+    const b = bounds[key];
+    const n = Number(all[0]);
+    if (b && (n < b[0] || n > b[1]))
+      return `\`${key}\` must be between ${b[0]} and ${b[1]}`;
+  }
+  return null;
+}
+
+/** A league/catch-all proxy, whole: method, allowlist, query bounds,
+ *  then `proxy()` confined to `/api/<prefix>/`. The query string is
+ *  forwarded VERBATIM once it passes — e2e/proxy-forwarding.ts asserts
+ *  exactly that. */
+export function proxyLeague(
+  req: NextApiRequest, res: NextApiResponse, prefix: string,
+) {
+  const segs = ((req.query.path as string[]) || []).join("/");
+  if (req.method !== "GET" || !leagueRouteAllowed(prefix, segs)) {
+    // JSON, naming the competition and which of the two findings this
+    // is — never Next's HTML 404 page, which cannot be told from a
+    // breakage.
+    return refuseLeagueRoute(res, prefix, segs);
+  }
+  const url = req.url ?? "";
+  const q = url.indexOf("?");
+  const qs = q === -1 ? "" : url.slice(q);
+  const bad = queryBreach(`${prefix}/${segs}`, qs.slice(1));
+  if (bad) {
+    return res.status(400).json({
+      error: "invalid_parameter",
+      reason: "invalid_parameter",
+      detail: `${bad} on ${prefix}/${segs}. This refusal is authored `
+        + "here: no backend was contacted.",
+    });
+  }
+  return proxy(req, res, `/api/${prefix}/${segs}${qs}`, `/api/${prefix}/`);
 }
 
 /** A response body, parsed, or a NAMED reason it could not be. `raw` is

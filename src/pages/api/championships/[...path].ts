@@ -11,17 +11,8 @@
 // lib/suggesterProxy.ts, spelled out rather than pattern-matched, for the
 // reasons pages/api/picker/[...path].ts gives.
 import type { NextApiRequest, NextApiResponse } from "next";
-import {
-  leagueRouteAllowed,
-  proxy,
-  refuseLeagueRoute,
-} from "../../../lib/suggesterProxy";
+import { proxyLeague } from "../../../lib/suggesterProxy";
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  const segs = ((req.query.path as string[]) || []).join("/");
-  if (req.method !== "GET" || !leagueRouteAllowed("championships", segs)) {
-    return refuseLeagueRoute(res, "championships", segs);
-  }
-  const qs = req.url?.includes("?") ? "?" + req.url.split("?")[1] : "";
-  return proxy(req, res, `/api/championships/${segs}${qs}`);
+  return proxyLeague(req, res, "championships");
 }
