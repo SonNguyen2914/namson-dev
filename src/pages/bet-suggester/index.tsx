@@ -1094,11 +1094,9 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   }
 
   return (
-    /* `data-tap-floor` — EVERY CONTROL IN HERE GETS A 44px HIT AREA AT
-       PHONE WIDTH. The rule is in globals.css and it is a subtree rule
-       rather than a class per control, so a control added to this page
-       tomorrow is floored without anybody remembering to. */
-    <div ref={pageRef} data-tap-floor
+    /* The 44px touch floor (`data-tap-floor`) is on the app shell in
+       _app.tsx, so this page, and every other, is inside it. */
+    <div ref={pageRef}
       className="min-h-screen bg-bs font-sans text-ink-mid">
       <Head><title>{pageTitle ?? "Picker board"} · namson.dev</title></Head>
       <RouteProgress />

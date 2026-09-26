@@ -50,7 +50,8 @@
  *  different offsets and calls a healthy control unreachable.
  */
 import { expect, test, devices, type Browser } from "@playwright/test";
-import { BOARD_EIGHT, REVIEW_EIGHT } from "./eight-columns";
+import { BOARD_EIGHT, REVIEW_EIGHT, routeEight } from "./eight-columns";
+import { pageRoutes, PAGE_COUNT } from "./page-routes";
 import { auditFloor } from "./the-touch-floor";
 
 /** iPad (gen 7) is 810x1080 portrait and 1080x810 landscape, which are
@@ -217,4 +218,93 @@ test.describe("the gate is the pointer, and this is how you know", () => {
       expect(fine.small, "and the mouse half keeps its small controls, which "
         + "is the desktop that shipped").toBeGreaterThan(0);
     });
+});
+
+// ─────────────────────── and the floor is on every page, not four ────
+
+/* EVERY ROUTE, AT A PHONE, WITH A FINGER (2026-09-25, audit F11).
+ *
+ * The floor shipped as a subtree rule on the board, and the board is
+ * what the tests above walk — so they stayed green while the floor
+ * covered four surfaces of nineteen. Measured on an iPhone 13 that
+ * morning: every control on the other fourteen routes was under 44px,
+ * the back link at 8x17 and the field link at 23x19.
+ *
+ * The routes come from the pages directory (e2e/page-routes.ts), never
+ * a list: a page added tomorrow is walked here without anybody
+ * remembering to. Each is read HERMETICALLY — the board from its
+ * eight-column recording, everything else in the failed-read state the
+ * stand-in backend gives every unmocked read, which is a real state the
+ * page has to be pressable in, and whose chrome is every page's. */
+const ROUTES = pageRoutes();
+
+test("the route walk is every page the app serves", () => {
+  expect(ROUTES.length, "pages under src/pages, one route each")
+    .toBe(PAGE_COUNT);
+  expect(new Set(ROUTES.map((r) => r.url)).size).toBe(ROUTES.length);
+});
+
+test.describe("a phone with a finger gets the floor on every route", () => {
+  for (const r of ROUTES) {
+    test(`${r.template} at 390: every control answers a press at the floor`,
+      async ({ browser }) => {
+        const phone: Record<string, unknown> = { ...devices["iPhone 13"] };
+        delete phone.defaultBrowserType;
+        const ctx = await browser.newContext({ ...phone,
+          reducedMotion: "reduce" });
+        const page = await ctx.newPage();
+        await routeEight(page);
+        await page.goto(r.url, { waitUntil: "load" });
+        await page.waitForSelector("header.topbar");
+        await page.waitForTimeout(700);
+        const vw = await page.evaluate(() => innerWidth);
+        const coarse = await page.evaluate(() =>
+          matchMedia("(any-pointer: coarse)").matches);
+        const a = await auditFloor(page);
+
+        expect(vw, "a phone is 390 across").toBe(390);
+        expect(coarse, "and reports a finger").toBe(true);
+        /* NON-VACUITY: every page carries the nav, so every page has
+           controls, and some of them were pressed. */
+        expect(a.census, `${r.template}: the audit found controls`)
+          .toBeGreaterThan(0);
+        expect(a.pressed, `${r.template}: controls were pressed`)
+          .toBeGreaterThan(0);
+
+        expect(a.examples, `${r.template}: controls under ${a.floor}px, or `
+          + `that did not answer a press at it`).toEqual([]);
+        expect(a.small, `${r.template}: controls under the floor`).toBe(0);
+        expect(a.pressFail, `${r.template}: presses at the floor that `
+          + `nothing answered`).toBe(0);
+        expect(a.thefts).toEqual([]);
+        expect(a.theft, `${r.template}: presses answered by the wrong `
+          + `control`).toBe(0);
+        /* AND IT MOVES NOTHING. The floor grows a hit area and nothing
+           else; a control that positions itself keeps its position. */
+        expect(a.repositioned, `${r.template}: controls the floor moved`)
+          .toEqual([]);
+        expect(a.doc, `${r.template}: no sideways scroll`)
+          .toBeLessThanOrEqual(a.vw + 1);
+        await ctx.close();
+
+        /* AND A MOUSE AT THE SAME 390 GETS NOTHING. The floor is on the
+           app shell now, so "the desktop is unchanged" is a claim about
+           every page, and it is checked on every page: no control
+           carries a hit area without a coarse pointer. */
+        const desk = mouse(390, 844);
+        delete desk.defaultBrowserType;
+        const m = await browser.newContext({ ...desk,
+          reducedMotion: "reduce" });
+        const mp = await m.newPage();
+        await routeEight(mp);
+        await mp.goto(r.url, { waitUntil: "load" });
+        await mp.waitForSelector("header.topbar");
+        const fine = await auditFloor(mp);
+        expect(fine.census, `${r.template}: the mouse half found controls`)
+          .toBeGreaterThan(0);
+        expect(fine.grown, `${r.template}: a mouse gets no hit areas`)
+          .toBe(0);
+        await m.close();
+      });
+  }
 });
