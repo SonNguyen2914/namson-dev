@@ -300,11 +300,30 @@
    control to answer. */
 :root { --tap-floor: 44px; }
 
-@media (any-pointer: coarse) {
-  [data-tap-floor] :where(a[href], button, summary, [role="tab"],
-                          [role="button"]) {
-    position: relative;
+/* THE CONTAINING BLOCK IS A DEFAULT, SO IT IS IN `base` (2026-09-25,
+   audit F11). The paragraph above says `:where()` lets "a control
+   Tailwind has positioned keep its own positioning", and that was never
+   true: Tailwind v4 puts its utilities in `@layer utilities`, and an
+   UNLAYERED rule beats every layered one whatever its specificity. So
+   `absolute` on a control lost to this `relative` — invisible while the
+   floor was on the board, whose controls sit in flow, and measured the
+   day the floor went on the app shell: the league carousel's previous /
+   next arrows (`absolute`, centred on the title) dropped into the flow
+   on every touch screen. In `base`, below `utilities`, a positioned
+   control keeps its position and is still the containing block for its
+   own `::after`; a control in flow gets `relative` exactly as before.
+   The rest of the floor stays unlayered: it has to win. Guarded by the
+   `repositioned` read in e2e/the-touch-floor.ts. */
+@layer base {
+  @media (any-pointer: coarse) {
+    [data-tap-floor] :where(a[href], button, summary, [role="tab"],
+                            [role="button"]) {
+      position: relative;
+    }
   }
+}
+
+@media (any-pointer: coarse) {
   [data-tap-floor] :where(a[href], button, summary, [role="tab"],
                           [role="button"])::after {
     content: "";
@@ -356,6 +375,19 @@
      move as `.tap-floor-room` above, for a table cell. */
   [data-tap-floor] th:has(> button) {
     height: var(--tap-floor);
+  }
+
+  /* A ROW OF CONTROLS CLOSER THAN THE FLOOR TAKES THE FLOOR AS ITS PITCH
+     (2026-09-25, audit F11). Two hit areas that overlap are decided by
+     paint order, so a 44px box around a 10px dot 8px from the next dot
+     answered the press aimed at its NEIGHBOUR's centre — measured on the
+     league carousel's dots, two thefts in four. Nothing about the ink
+     changes: the row declares its items' ink width as `--tap-ink`, and
+     the gap becomes the floor minus that, so centre to centre is the
+     floor and no box reaches the next control's centre. Coarse pointers
+     only; the desktop keeps the gap it was drawn with. */
+  [data-tap-floor] .tap-floor-pitch {
+    column-gap: calc(var(--tap-floor) - var(--tap-ink, 0px));
   }
 }
 

@@ -248,7 +248,7 @@ export default function FieldPage() {
   const flipClass = flip > 0 ? FLIP : "";
 
   return (
-    <div data-tap-floor className="min-h-screen bg-bs font-sans text-ink-mid">
+    <div className="min-h-screen bg-bs font-sans text-ink-mid">
       <Head>
         <title>The field, at the pinned pass · namson.dev</title>
         <meta name="description"

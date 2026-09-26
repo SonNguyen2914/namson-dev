@@ -376,7 +376,11 @@ export default function LeagueCarousel() {
                 </p>
               </div>
             </div>
-            <div className="mt-7 flex items-center justify-center gap-2">
+            {/* `tap-floor-pitch`: on a touch screen the dots sit a floor
+                apart, so a 44px hit area never reaches a neighbour's
+                centre. `--tap-ink` is a resting dot's width (w-2.5). */}
+            <div className="tap-floor-pitch mt-7 flex items-center justify-center gap-2"
+              style={{ ["--tap-ink" as string]: "0.625rem" }}>
               {LEAGUES.map((l, i) => (
                 <button key={l.id} aria-label={`switch to ${l.name}`}
                   onClick={() => goLeague(i)}

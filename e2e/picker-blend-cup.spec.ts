@@ -1533,8 +1533,10 @@ test("the league header follows the column when the rows scroll under it",
         '[data-testid="league-col"][data-league="mls"]')!;
       const h = document.querySelector<HTMLElement>(
         '[data-testid="col-head"][data-league="mls"]')!;
-      const root = document.querySelector<HTMLElement>("[data-tap-floor]")!;
-      const parked = parseFloat(getComputedStyle(root)
+      /* read off the column: `--topbar-h` inherits from the board's
+         own root, where it is measured, and `[data-tap-floor]` is the
+         app shell above that root since audit F11 */
+      const parked = parseFloat(getComputedStyle(c)
         .getPropertyValue("--topbar-h")) || 0;
       const top = c.getBoundingClientRect().top + window.scrollY;
       const room = c.offsetHeight - parked - h.offsetHeight - 20;

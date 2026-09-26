@@ -69,6 +69,11 @@ export type FloorAudit = {
   floor: number;
   examples: string[];
   thefts: string[];
+  /** controls the floor MOVED: positioned by their own styles (absolute,
+   *  fixed, sticky) and repositioned by the floor's `position: relative`.
+   *  The floor may only grow a hit area; a control it moves is a layout
+   *  change on every touch screen. */
+  repositioned: string[];
   doc: number;
   vw: number;
 };
@@ -83,11 +88,30 @@ export type FloorAudit = {
  *  thing the charter asks of the page. */
 export async function auditFloor(page: Page): Promise<FloorAudit> {
   return page.evaluate(async (SEL) => {
-    const root = document.querySelector<HTMLElement>("[data-tap-floor]")!;
     const floor = parseFloat(getComputedStyle(document.documentElement)
       .getPropertyValue("--tap-floor")) || 44;
-    const chrome = parseFloat(
-      getComputedStyle(root).getPropertyValue("--topbar-h")) || 0;
+    /* THE CHROME BAND IS READ OFF EACH CONTROL, because `--topbar-h`
+       inherits and is not one number: the board measures its nav plus
+       pills and sets the result on its own page root, while every other
+       page inherits `:root`'s declared `calc(3rem + 1px)`. It was read
+       off "the" `[data-tap-floor]` element while there was one per page;
+       with the floor on the app shell (audit F11) that element is the
+       shell, which sits ABOVE the board's own measurement. A `calc()` is
+       resolved by laying it out once, in a probe, rather than parsed. */
+    const bandCache = new Map<string, number>();
+    const bandOf = (e: HTMLElement) => {
+      const v = getComputedStyle(e).getPropertyValue("--topbar-h").trim();
+      if (!v) return 0;
+      if (/^[\d.]+px$/.test(v)) return parseFloat(v);
+      if (!bandCache.has(v)) {
+        const probe = document.createElement("div");
+        probe.style.cssText = `position:absolute;visibility:hidden;height:${v}`;
+        document.body.appendChild(probe);
+        bandCache.set(v, probe.getBoundingClientRect().height);
+        probe.remove();
+      }
+      return bandCache.get(v)!;
+    };
     const vis = (e: HTMLElement) => (e as unknown as {
       checkVisibility: (o?: unknown) => boolean }).checkVisibility({
         contentVisibilityAuto: true, opacityProperty: true,
@@ -117,11 +141,28 @@ export async function auditFloor(page: Page): Promise<FloorAudit> {
 
     const desc = (el: HTMLElement) => `<${el.tagName.toLowerCase()}`
       + `${el.dataset?.testid ? ` data-testid="${el.dataset.testid}"` : ""}>`
-      + ` "${(el.textContent || "").trim().slice(0, 20)}"`;
+      + ` "${((el.textContent || "").trim()
+        || el.getAttribute("aria-label") || "").slice(0, 20)}"`;
 
     let small = 0, smallInk = 0, grown = 0, pressed = 0, pressFail = 0,
       theft = 0;
     const examples: string[] = [], thefts: string[] = [];
+
+    /* THE FLOOR MUST NOT MOVE ANYTHING. Its rule gives every control
+       `position: relative` so the `::after` has a containing block, and
+       a control that positions ITSELF has to keep doing so. Read with
+       the floor and without it — the attribute taken off every shell
+       for one synchronous style read and put straight back — so this
+       is the rule's own effect and nothing else. */
+    const shells = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-tap-floor]"));
+    const posOn = all.map((e) => getComputedStyle(e).position);
+    shells.forEach((sh) => sh.removeAttribute("data-tap-floor"));
+    const posOff = all.map((e) => getComputedStyle(e).position);
+    shells.forEach((sh) => sh.setAttribute("data-tap-floor", ""));
+    const repositioned = all.flatMap((e, i) =>
+      posOff[i] !== "static" && posOff[i] !== posOn[i]
+        ? [`${desc(e)} ${posOff[i]} -> ${posOn[i]}`] : []);
 
     for (const e of all) {
       const b0 = e.getBoundingClientRect();
@@ -170,7 +211,7 @@ export async function auditFloor(page: Page): Promise<FloorAudit> {
          and is covered by design. Read off `position`, so a bar that
          stops being sticky stops being excused. */
       if (!chromeOwned(e)
-        && (b.top < chrome + floor || b.bottom > innerHeight - 2)) continue;
+        && (b.top < bandOf(e) + floor || b.bottom > innerHeight - 2)) continue;
       if (b.top < 2 || b.bottom > innerHeight - 2) continue;
       pressed++;
       const cx = b.x + b.width / 2, cy = b.y + b.height / 2;
@@ -201,7 +242,7 @@ export async function auditFloor(page: Page): Promise<FloorAudit> {
     }
     window.scrollTo(0, 0);
     return { census: all.length, small, smallInk, grown, pressed, pressFail,
-      theft, floor, examples, thefts,
+      theft, floor, examples, thefts, repositioned,
       doc: document.documentElement.scrollWidth,
       vw: document.documentElement.clientWidth };
   }, CONTROLS);
