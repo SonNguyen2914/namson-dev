@@ -131,7 +131,7 @@ test("a national card draws every mark a club card draws, in the same classes, "
 });
 
 test("the shape explainer is on the national card, and opens the same panel",
-  async ({ page }) => {
+  async ({ page, browser }) => {
     await nationalBoard(page);
     const card = page.locator('[data-testid="league-col"][data-league="unl"] [data-testid="picker-row"]')
       .filter({ has: page.locator('[data-testid="shape-chip"]') }).first();
@@ -140,6 +140,20 @@ test("the shape explainer is on the national card, and opens the same panel",
     await expect(card.getByTestId("shape-read")).toContainText(/Clean|Split|Hollow/);
     // the tiers it explains are the field's, and it says so
     await expect(card.getByTestId("shape-read")).toContainText(/bands of this competition's own field/);
+    // …of a TEAM's interval: the noun is the row's kind, never "club" here
+    await expect(card.getByTestId("shape-read")).toContainText("team's read is every band");
+    await expect(card.getByTestId("shape-read")).not.toContainText(/\bclub/);
+    await expect(card.locator('span[title^="tier bands in this competition"]'))
+      .toHaveAttribute("title", /every band the team's 95% interval touches/);
+    // and a club card's panel keeps "club" where it says it
+    // a fresh context: this one remembers the Championships mode
+    const p2 = await browser.newPage();
+    await clubBoard(p2);
+    const club = p2.locator('[data-testid="picker-row"]').first();
+    await club.getByTestId("tier-read").click();
+    await expect(club.getByTestId("shape-read")).toContainText(/Tiers are within-league quintiles/);
+    await expect(club.getByTestId("shape-read")).not.toContainText(/\bteam/);
+    await p2.close();
   });
 
 test("a SPLIT national card is torn along the unit that gave way, as a club card is",

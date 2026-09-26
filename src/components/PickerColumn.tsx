@@ -1153,6 +1153,7 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
       <div className="mt-3">
         <TierGaps read={row} dense={dense} field={field} partial={partial}
           values={!row.national} explain={row.national != null}
+          side={row.national ? "team" : "club"}
           quietFloor={row.national ? nat.quietFloor : []}
           floorNote={floorNote} />
       </div>

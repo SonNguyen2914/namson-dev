@@ -828,8 +828,12 @@ function measureTitle(
 
 export function TierGaps({ read, dense = false, field, partial,
                           floorNote, values = true, quietFloor = [],
-                          explain = false }: {
+                          explain = false, side = "club" }: {
   read: ReadLike;
+  /** WHAT ONE SIDE OF THIS FIXTURE IS CALLED in the prose around the
+   *  trio — "club", or "team" on a national card. The caller reads it off
+   *  the row's kind; the sentences are the same sentences. */
+  side?: "club" | "team";
   /** DRAW THE SHAPE EXPLAINER (the `i`) ON A FIELD-READ CARD TOO. A card
    *  with no field always carries it. A national card passes true: the
    *  Championships board copies the Leagues board's card (operator,
@@ -965,7 +969,7 @@ export function TierGaps({ read, dense = false, field, partial,
           className="inline-flex items-end gap-2.5 font-mono text-[10px] tabular-nums text-ink-low"
           title={block
             ? "tier bands in this competition's own field, favourite v"
-              + " opponent — every band the club's 95% interval touches,"
+              + ` opponent — every band the ${side}'s 95% interval touches,`
               + " so a set of two is a placement the evidence refuses to"
               + " narrow. A name in its own colour is a unit that does"
               + " not back the pick."
@@ -1206,7 +1210,7 @@ export function TierGaps({ read, dense = false, field, partial,
           <p className="mt-2 border-t border-line pt-2 text-[10px] text-ink-low">
             {block
               ? "Tiers are bands of this competition's own field, and a"
-                + " club's read is every band its 95% interval touches;"
+                + ` ${side}'s read is every band its 95% interval touches;`
                 + (drawn.some((k) => licensedRead(block.axes[k]))
                   ? " attack and defence are cut at the band count their"
                     + " resolution licenses;" : "")
