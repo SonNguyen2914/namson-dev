@@ -73,6 +73,7 @@ async function geometry(page: Page, card: Locator) {
       labels: [lab(trio.querySelector("[data-tier] > span")),
                lab(box?.querySelector("[data-rank-axis] > span") ?? null)],
       place: box?.getAttribute("data-place") ?? null,
+      prose: !!box?.querySelector('[data-testid="field-axes-absent"]'),
       btn: r(btn), trio: r(trio), chip: r(chip), box: r(box), row: r(row),
       price: r(price), card: r(el),
       hitIsButton: hit === btn || btn.contains(hit),
@@ -126,8 +127,13 @@ async function assertOnTheRow(page: Page, card: Locator, at: string) {
     expect(g.box!.r).toBeLessThanOrEqual(g.card!.r + 0.5);
   } else {
     const mid = (x: NonNullable<Box>) => (x.t + x.b) / 2;
-    expect(Math.abs(mid(g.box!) - mid(g.trio!)),
-      `${at}: the box's centre is on the trio row's centre`).toBeLessThanOrEqual(2);
+    /* A PARTIAL FIELD'S BOX also carries the backend's sentence for the
+       axes it lacks, so it is taller than the row by design (its format
+       is unchanged); there the label rows are what line up. */
+    if (!g.prose) {
+      expect(Math.abs(mid(g.box!) - mid(g.trio!)),
+        `${at}: the box's centre is on the trio row's centre`).toBeLessThanOrEqual(2);
+    }
     expect(Math.abs(g.labels[0]! - g.labels[1]!), `${at}: its label row is the trio's`)
       .toBeLessThanOrEqual(1);
     for (const [name, other] of [["chip", g.chip], ["trio", g.trio], ["#", g.btn]] as const) {
