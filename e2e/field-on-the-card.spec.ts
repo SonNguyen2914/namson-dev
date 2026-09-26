@@ -819,9 +819,16 @@ test("a click PINS it, and Escape or a click outside closes it",
     await expect(c.getByTestId("field-ranks")).toHaveCount(0);
   });
 
-test("the panel opens on the card's RIGHT-HAND SIDE, clear of the numbers "
-   + "it reads and clear of its own trigger, at every width",
+test("the panel opens ON ITS ROW beside the # (2026-09-25), and only on a "
+   + "phone below it on the card's right-hand side, at every width",
   async ({ page }) => {
+    /* SUPERSEDED IN PART, 2026-09-25: "keep this same format, just move
+       the whole box to be on the same line of SPLIT, tiers, and (#)
+       itself" (operator). Where the viewport has room beside the card the
+       box floats on the row (e2e/the-rank-box-sits-on-the-row.spec.ts
+       holds that rule at every width, three-digit ranks included); where
+       it has none it drops below the row, and THAT placement keeps every
+       assertion below. */
     /* THE PLACEMENT THE OPERATOR ASKED FOR, 2026-09-10: "the hover
        ranking must display on the right hand".
        WHAT IT REPLACES, measured before it moved: anchored `left-0
@@ -864,6 +871,15 @@ test("the panel opens on the card's RIGHT-HAND SIDE, clear of the numbers "
       const hit = document.elementFromPoint(t.left + t.width / 2,
                                             t.top + t.height / 2);
       return {
+        place: panel.getAttribute("data-place"),
+        /* THE LABEL ROWS: the trio's first label and the panel's. This
+           card's trio also carries the value ± half-width under each tier,
+           so its box is taller than the panel's and the two CENTRES differ
+           by design; the operator's rule is that the label rows line up */
+        labels: [
+          trigger.parentElement!.previousElementSibling!
+            .querySelector("[data-tier] > span")!.getBoundingClientRect().top,
+          panel.querySelector("[data-rank-axis] > span")!.getBoundingClientRect().top],
         // the card's CONTENT box: the panel is inside the padding, not
         // merely inside the border
         content: [cr.left + parseFloat(cs.borderLeftWidth)
@@ -891,6 +907,17 @@ test("the panel opens on the card's RIGHT-HAND SIDE, clear of the numbers "
       await expect(c.getByTestId("field-ranks")).toBeVisible();
       const g = await settled();
       const at = `at ${width}px`;
+      if (g.place !== "drop") {
+        // floated on the row: centred on the trio, clear of the #
+        expect(Math.abs(g.labels[0] - g.labels[1]), `${at}: the label rows line up`)
+          .toBeLessThanOrEqual(1);
+        expect(g.panel[0] >= g.trigger[1] || g.panel[1] <= g.content[0], `${at}: beside, not over`)
+          .toBe(true);
+        expect(g.hitIsTrigger, `${at}: the trigger is still under the pointer`).toBe(true);
+        await c.getByTestId("field-ranks-open").click();
+        await expect(c.getByTestId("field-ranks")).toHaveCount(0);
+        continue;
+      }
 
       // ON THE RIGHT-HAND SIDE: the panel's right edge IS the card's
       // content edge. Said as an equality, not as "inside the card" —

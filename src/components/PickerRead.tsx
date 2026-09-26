@@ -18,7 +18,7 @@
 //  - A MISSING PRICE IS A FACT WITH A NAME. "no kalshi event" and
 //    "listed · no quote" are different failures and never collapse into
 //    one blank.
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import {
   BlendWeights, BoardRowLive, FieldAxis, FieldAxisKey, FieldBlockLike,
   KalshiQuote, RowField, RowFieldPartial, Shape, THIN_ASK_SIZE,
@@ -566,8 +566,65 @@ function FieldRanks({ block, drawn, absent }: {
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const box = useRef<HTMLSpanElement>(null);
+  const panelRef = useRef<HTMLSpanElement>(null);
   const open = pinned || hovered || focused;
   const shut = () => { setPinned(false); setHovered(false); setFocused(false); };
+
+  /* WHERE THE BOX OPENS (operator, 2026-09-25: "keep this same format,
+     just move the whole box to be on the same line of SPLIT, tiers, and
+     (#) itself"). BESIDE THE `#`, ON THE ROW: its label row on the trio's
+     label row, its values on the trio's values, starting just past the
+     button — so it covers none of the chip, the trio or the `#`. The card
+     is too narrow for it on most boards, so it is an overlay, fixed to the
+     viewport above the neighbouring card, and the row does not move. If opening to the right would pass the viewport's
+     edge it opens to the LEFT of the card, ending at the card's left edge,
+     on the same line; where neither side has room (a one-column phone) it
+     drops below the row as it always did. Re-placed on scroll and resize
+     while open, because a fixed box does not travel with the board. */
+  const [place, setPlace] = useState<
+    { mode: "right" | "left" | "drop"; left: number; top: number } | null>(null);
+  const size = useRef<{ w: number; h: number } | null>(null);
+  useLayoutEffect(() => {
+    if (!open) return;
+    const GAP = 8, EDGE = 8;
+    const measure = () => {
+      const btn = box.current?.querySelector("button");
+      const trio = box.current?.previousElementSibling as HTMLElement | null;
+      const card = box.current?.closest('[data-testid="picker-row"], [data-testid="review-row"], article');
+      if (panelRef.current) {
+        const r = panelRef.current.getBoundingClientRect();
+        size.current = { w: r.width, h: r.height };
+      }
+      if (!btn || !trio || !card || !size.current) return;
+      const b = btn.getBoundingClientRect(), t = trio.getBoundingClientRect();
+      const c = card.getBoundingClientRect();
+      /* the box's first row starts one border and one padding (p-3) below
+         its top, so it is pulled up by exactly that much to put its label
+         row on the trio's */
+      const cs = panelRef.current ? getComputedStyle(panelRef.current) : null;
+      const inset = cs ? parseFloat(cs.paddingTop) + parseFloat(cs.borderTopWidth) : 13;
+      const top = t.top - inset;
+      const vw = document.documentElement.clientWidth;
+      const { w } = size.current;
+      if (b.right + GAP + w <= vw - EDGE) {
+        setPlace({ mode: "right", left: b.right + GAP, top });
+      } else if (c.left - GAP - w >= EDGE) {
+        setPlace({ mode: "left", left: c.left - GAP - w, top });
+      } else {
+        setPlace({ mode: "drop", left: 0, top: 0 });
+      }
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+      // closed: the next opening measures afresh, hidden until it has
+      size.current = null;
+      setPlace(null);
+    };
+  }, [open]);
 
   /* CLICK-OUTSIDE, AND ONLY WHILE IT IS PINNED. A hovered panel closes
      itself when the pointer leaves, so a listener for that state would
@@ -577,7 +634,8 @@ function FieldRanks({ block, drawn, absent }: {
   useEffect(() => {
     if (!pinned) return;
     const away = (e: PointerEvent) => {
-      if (!box.current?.contains(e.target as Node)) shut();
+      const t = e.target as Node;
+      if (!box.current?.contains(t) && !panelRef.current?.contains(t)) shut();
     };
     document.addEventListener("pointerdown", away, true);
     return () => document.removeEventListener("pointerdown", away, true);
@@ -602,6 +660,114 @@ function FieldRanks({ block, drawn, absent }: {
         ? `, and no ${absent.axes_absent.join(" or ")} axis — nobody has`
           + " measured one for these leagues, and the panel says why"
         : "");
+
+  /* THE BOX ITSELF — one element, drawn in one of two places (see
+     `place` above): floated beside the `#` on the row, or dropped
+     below the row where neither side of the card has room. */
+  const panelEl = (how: "float" | "drop") => (
+      <span data-testid="field-ranks" id={panelId} role="note"
+        /* ON THE CARD'S RIGHT-HAND SIDE, BELOW THE ROW IT READS
+           (operator, 2026-09-10: "the hover ranking must display on
+           the right hand").
+           It opened `left-0 top-0` on the TRIO — over the three tier
+           cells, and, measured at every step of the ladder, over its
+           own trigger as well: at 390px the panel spanned 143→279
+           with the circle at 245→260 underneath it. `z-30` on the
+           circle kept the CLICK working, which is why that shipped;
+           it does not make a panel drawn across the numbers it is a
+           second reading of a good place to put one.
+           `right-0` IS THE CARD'S OWN RIGHT EDGE, not the trio's:
+           the positioning context is TierGaps's block, which is one
+           card-content wide. So the panel can never leave the card on
+           the right, and `w-max max-w-full` keeps it from leaving on
+           the left — the 136px it measures against a 211px content
+           box has room to spare, and the cap holds even if a field of
+           three-digit ranks ever widens it.
+           `top-[calc(100%+7px)]` IS BELOW THE WHOLE BLOCK, and that is
+           the 2026-09-07 property kept in a stronger form. This row is
+           `flex-wrap`; a panel anchored inside it can be reached by a
+           wrapped trigger, which is exactly how the shape popover next
+           door came to swallow the click that closed it. Nothing that
+           is IN the block can be inside a box that starts below it, at
+           any width — the same reasoning, and the same offset, its
+           dense mode already uses. The trio's label row and the
+           panel's therefore no longer align, which was a real virtue
+           and is the price of opening on the right-hand side. (The
+           anchor's corner, asked for the same day, went back beside
+           the club names on 2026-09-11; this placement did not move
+           with it — the operator asked for it and has not disputed
+           it.) */
+        /* `w-max` FITS THE RANK PAIRS; PROSE NEEDS A COLUMN TO WRAP
+           IN. A sentence under `w-max` asks for one enormous line and
+           is then capped by `max-w-full` at whatever the card happens
+           to be, which at the board's widest track is a paragraph
+           three words deep. `w-64` when there is prose, still capped
+           by the card, so the panel is a readable column at every
+           width and unchanged where there is none. */
+        ref={how === "float" ? panelRef : undefined}
+        data-place={how === "float" ? (place?.mode ?? "measuring") : "drop"}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={how === "float" ? { position: "fixed", left: place?.left ?? 0,
+          top: place?.top ?? 0, visibility: place ? "visible" : "hidden" } : undefined}
+        className={`${how === "float" ? "z-[60]"
+          : "absolute right-0 top-[calc(100%+7px)] z-20 max-w-full"} rounded-lg border border-line-strong bg-elev2 p-3 shadow-xl ${
+          absent ? "w-64" : "w-max"}`}>
+        {/* `flex`, NOT `inline-flex`. An inline-flex is an atomic
+            inline and sits on its parent's baseline, so the strut's
+            descender pushed this row 12px below the trio's — the
+            alignment quietly off by exactly one line's leading. A
+            block-level flex has no baseline to sit on. */}
+        <span className="flex items-end gap-2.5 font-mono text-[10px] tabular-nums text-ink-low">
+          {axes.map(({ k, a }) => (
+            <span key={k} data-rank-axis={k}
+              className="inline-flex flex-col items-center gap-[2px] leading-none">
+              <span className="text-[7.5px] uppercase tracking-[0.12em] text-ink-faint">
+                {k}
+              </span>
+              {/* `#33v#7`, SET THE WAY THE TRIO SETS ITS OWN PAIR —
+                  `2·3v3·4`, no spaces around the v. The panel is the
+                  trio's second reading and sits directly on it, so a
+                  second idiom eight pixels away would read as a
+                  different kind of fact. It is also what makes the
+                  thing FIT: with spaces the panel is ~196px against a
+                  ~171px card six abreast, and it both left the card
+                  and covered its own trigger. */}
+              <span className="whitespace-nowrap">
+                #{a.fav.rank}v#{a.opp.rank}
+              </span>
+            </span>
+          ))}
+        </span>
+        {/* AND WHAT THIS FIELD DOES NOT MEASURE, IN THE BACKEND'S OWN
+            WORDS (backend #141, 2026-09-15).
+            THE TRIO CANNOT SAY IT, WHICH IS WHY IT IS HERE. An axis
+            nobody measured is drawn NOWHERE on this card — no cell,
+            no label, no band — because a cell for it would be a
+            claim about evidence that does not exist, and a blank one
+            would read as a club the field failed to place. But an
+            absence drawn nowhere is also an absence a reader cannot
+            ask about, so the account rides the one affordance that is
+            already the field's own detail on this card: the `#` the
+            trio it belongs to opens.
+            `shape_absent.why` VERBATIM, never summarised. It names
+            which axes are missing, says why no `shape` can be read
+            off what is left, and carries the registry's own account
+            of what this field IS — composed by the backend off the
+            reading, so a field that gains an axis tomorrow moves the
+            sentence with it. A sentence restated here would be this
+            surface asserting a measurement it did not make.
+            A WHOLE FIELD DRAWS NONE OF THIS: `absent` is null, and
+            the panel above is byte for byte what it was. */}
+        {absent && (
+          <span data-testid="field-axes-absent"
+            data-axes-absent={absent.axes_absent.join(",")}
+            className="mt-2.5 block border-t border-line pt-2 text-[10px] leading-relaxed text-ink-low">
+            {absent.why}
+          </span>
+        )}
+      </span>
+  );
 
   return (
     /* STILL NOT `relative`, and that is the property being preserved
@@ -661,103 +827,12 @@ function FieldRanks({ block, drawn, absent }: {
             : "border-line-strong text-ink-low hover:border-accent/40 hover:text-accent"}`}>
         #
       </button>
-      {open && (
-        <span data-testid="field-ranks" id={panelId} role="note"
-          /* ON THE CARD'S RIGHT-HAND SIDE, BELOW THE ROW IT READS
-             (operator, 2026-09-10: "the hover ranking must display on
-             the right hand").
-             It opened `left-0 top-0` on the TRIO — over the three tier
-             cells, and, measured at every step of the ladder, over its
-             own trigger as well: at 390px the panel spanned 143→279
-             with the circle at 245→260 underneath it. `z-30` on the
-             circle kept the CLICK working, which is why that shipped;
-             it does not make a panel drawn across the numbers it is a
-             second reading of a good place to put one.
-             `right-0` IS THE CARD'S OWN RIGHT EDGE, not the trio's:
-             the positioning context is TierGaps's block, which is one
-             card-content wide. So the panel can never leave the card on
-             the right, and `w-max max-w-full` keeps it from leaving on
-             the left — the 136px it measures against a 211px content
-             box has room to spare, and the cap holds even if a field of
-             three-digit ranks ever widens it.
-             `top-[calc(100%+7px)]` IS BELOW THE WHOLE BLOCK, and that is
-             the 2026-09-07 property kept in a stronger form. This row is
-             `flex-wrap`; a panel anchored inside it can be reached by a
-             wrapped trigger, which is exactly how the shape popover next
-             door came to swallow the click that closed it. Nothing that
-             is IN the block can be inside a box that starts below it, at
-             any width — the same reasoning, and the same offset, its
-             dense mode already uses. The trio's label row and the
-             panel's therefore no longer align, which was a real virtue
-             and is the price of opening on the right-hand side. (The
-             anchor's corner, asked for the same day, went back beside
-             the club names on 2026-09-11; this placement did not move
-             with it — the operator asked for it and has not disputed
-             it.) */
-          /* `w-max` FITS THE RANK PAIRS; PROSE NEEDS A COLUMN TO WRAP
-             IN. A sentence under `w-max` asks for one enormous line and
-             is then capped by `max-w-full` at whatever the card happens
-             to be, which at the board's widest track is a paragraph
-             three words deep. `w-64` when there is prose, still capped
-             by the card, so the panel is a readable column at every
-             width and unchanged where there is none. */
-          className={`absolute right-0 top-[calc(100%+7px)] z-20 max-w-full rounded-lg border border-line-strong bg-elev2 p-3 shadow-xl ${
-            absent ? "w-64" : "w-max"}`}>
-          {/* `flex`, NOT `inline-flex`. An inline-flex is an atomic
-              inline and sits on its parent's baseline, so the strut's
-              descender pushed this row 12px below the trio's — the
-              alignment quietly off by exactly one line's leading. A
-              block-level flex has no baseline to sit on. */}
-          <span className="flex items-end gap-2.5 font-mono text-[10px] tabular-nums text-ink-low">
-            {axes.map(({ k, a }) => (
-              <span key={k} data-rank-axis={k}
-                className="inline-flex flex-col items-center gap-[2px] leading-none">
-                <span className="text-[7.5px] uppercase tracking-[0.12em] text-ink-faint">
-                  {k}
-                </span>
-                {/* `#33v#7`, SET THE WAY THE TRIO SETS ITS OWN PAIR —
-                    `2·3v3·4`, no spaces around the v. The panel is the
-                    trio's second reading and sits directly on it, so a
-                    second idiom eight pixels away would read as a
-                    different kind of fact. It is also what makes the
-                    thing FIT: with spaces the panel is ~196px against a
-                    ~171px card six abreast, and it both left the card
-                    and covered its own trigger. */}
-                <span className="whitespace-nowrap">
-                  #{a.fav.rank}v#{a.opp.rank}
-                </span>
-              </span>
-            ))}
-          </span>
-          {/* AND WHAT THIS FIELD DOES NOT MEASURE, IN THE BACKEND'S OWN
-              WORDS (backend #141, 2026-09-15).
-              THE TRIO CANNOT SAY IT, WHICH IS WHY IT IS HERE. An axis
-              nobody measured is drawn NOWHERE on this card — no cell,
-              no label, no band — because a cell for it would be a
-              claim about evidence that does not exist, and a blank one
-              would read as a club the field failed to place. But an
-              absence drawn nowhere is also an absence a reader cannot
-              ask about, so the account rides the one affordance that is
-              already the field's own detail on this card: the `#` the
-              trio it belongs to opens.
-              `shape_absent.why` VERBATIM, never summarised. It names
-              which axes are missing, says why no `shape` can be read
-              off what is left, and carries the registry's own account
-              of what this field IS — composed by the backend off the
-              reading, so a field that gains an axis tomorrow moves the
-              sentence with it. A sentence restated here would be this
-              surface asserting a measurement it did not make.
-              A WHOLE FIELD DRAWS NONE OF THIS: `absent` is null, and
-              the panel above is byte for byte what it was. */}
-          {absent && (
-            <span data-testid="field-axes-absent"
-              data-axes-absent={absent.axes_absent.join(",")}
-              className="mt-2.5 block border-t border-line pt-2 text-[10px] leading-relaxed text-ink-low">
-              {absent.why}
-            </span>
-          )}
-        </span>
-      )}
+      {open && place?.mode === "drop" && panelEl("drop")}
+      {/* FIXED, BUT IN THE CARD'S OWN TREE: a fixed box is laid out
+          against the viewport and not clipped by the board track's
+          overflow, and staying inside the card keeps it the card's own
+          element — its hover, its click-outside, its guards. */}
+      {open && place?.mode !== "drop" && panelEl("float")}
     </span>
   );
 }
