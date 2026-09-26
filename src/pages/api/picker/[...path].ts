@@ -17,6 +17,11 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { proxyLeague } from "../../../lib/suggesterProxy";
 
+/** Room for the board's 45s proxy clock (PROXY_TIMEOUT_BY_ROUTE in
+ *  lib/suggesterProxy.ts). 60s is the most every Vercel plan allows
+ *  without Fluid compute, so this cannot be refused on any of them. */
+export const config = { maxDuration: 60 };
+
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   return proxyLeague(req, res, "picker");
 }

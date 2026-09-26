@@ -73,7 +73,8 @@ const useIsoLayoutEffect =
 import { FieldRead, fetchRatings } from "../../lib/fieldApi";
 import { TZ, dayLabel, localDay } from "../../lib/matchday";
 import {
-  Board, CUP_COMP_KEY, DEFAULT_DAYS, SEASON_BLEND_K, THIN_ASK_SIZE,
+  BOARD_RETRY_DELAY_MS, Board, BoardTimeout, CUP_COMP_KEY, DEFAULT_DAYS,
+  SEASON_BLEND_K, THIN_ASK_SIZE,
   WIDE_SPREAD_C, askHonoured, boardColumns, columnsOf, declarationOf,
   fetchBoard, fetchChampionships, leagueLabel,
   nationalColumn, venueAdjusted,
@@ -232,6 +233,9 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  /* The first read timed out at the proxy and the second is on its way:
+     a quiet line over the skeleton, never the red card. */
+  const [building, setBuilding] = useState(false);
   const [nonce, setNonce] = useState(0);
   // The finished tail rides on its OWN state, its own request and its own
   // window. A dead review must not blank the board, and a slow one must
@@ -309,14 +313,38 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   const load = useCallback(async (signal: AbortSignal) => {
     if (mode === null) return;
     setLoading(true);
+    setBuilding(false);
+    /* ONE ROUTE PER MODE, NEVER BOTH. The Leagues read is the string it
+       has always been; the Championships read is its own route, which
+       writes nothing. e2e/championships-board.spec.ts counts both. */
+    const read = () => mode === "championships"
+      ? fetchChampionships(days, signal)
+      : fetchBoard(days, signal, ask === "" ? undefined : ask.split(","));
     try {
-      /* ONE ROUTE PER MODE, NEVER BOTH. The Leagues read is the string it
-         has always been; the Championships read is its own route, which
-         writes nothing. e2e/championships-board.spec.ts counts both. */
-      const b = mode === "championships"
-        ? await fetchChampionships(days, signal)
-        : await fetchBoard(days, signal,
-                           ask === "" ? undefined : ask.split(","));
+      let b: Board;
+      try {
+        b = await read();
+      } catch (e) {
+        /* A PROXY TIMEOUT IS ASKED ONCE MORE, NOT SHOWN. The board is
+           rebuilt on the request path whenever its cache expires, and a
+           rebuild that outran the proxy's clock has usually landed by
+           the second ask. Only the proxy's own named 504 earns this —
+           every other failure goes straight to the card — and it is
+           ONE retry: a second timeout is the card, as before. Nothing
+           from an earlier board is drawn while it waits (`loading`
+           stays true). e2e/a-slow-board-is-not-a-dead-one.spec.ts. */
+        if (!(e instanceof BoardTimeout) || signal.aborted) throw e;
+        setBuilding(true);
+        await new Promise<void>((resolve) => {
+          const t = setTimeout(resolve, BOARD_RETRY_DELAY_MS);
+          signal.addEventListener("abort", () => {
+            clearTimeout(t);
+            resolve();
+          }, { once: true });
+        });
+        if (signal.aborted) return;
+        b = await read();
+      }
       if (signal.aborted) return;
       setBoard(b);
       setError("");
@@ -325,7 +353,10 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
       setBoard(null);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      if (!signal.aborted) setLoading(false);
+      if (!signal.aborted) {
+        setLoading(false);
+        setBuilding(false);
+      }
     }
   }, [days, ask, mode]);
 
@@ -1494,11 +1525,20 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                over the four hard-coded leagues, which read as the board
                naming its columns before it had been told what they are.
                Whatever the board declares replaces them wholesale. */
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-              {[0, 1, 2, 3].map((i) => (
-                <SkeletonRows key={i} rows={3} height="h-40" />
-              ))}
-            </div>
+            <>
+              {building && (
+                <p data-testid="board-building" role="status"
+                  className="mb-4 text-sm text-ink-low">
+                  Building the board — the data refreshes every few minutes,
+                  this can take a few seconds.
+                </p>
+              )}
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+                {[0, 1, 2, 3].map((i) => (
+                  <SkeletonRows key={i} rows={3} height="h-40" />
+                ))}
+              </div>
+            </>
           ) : error ? (
             <div data-testid="board-error"
               className="rounded-xl border border-live/30 bg-live/5 p-5">

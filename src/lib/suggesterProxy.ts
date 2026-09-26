@@ -211,6 +211,26 @@ export function confinementBreach(
  *  an HTML error page instead of a named JSON answer. */
 export const PROXY_TIMEOUT_MS = 15_000;
 
+/** THE ROUTES THAT MAY WAIT LONGER, BY NAME (2026-09-26). Keyed by the
+ *  league catch-all's `<prefix>/<sub-path>`; everything absent here keeps
+ *  PROXY_TIMEOUT_MS.
+ *
+ *  The two boards rebuild ON THE REQUEST PATH whenever their provider
+ *  cache expires (championships every 300s, the club board every 90s):
+ *  measured 3.0s, 4.9s and 8.5s cold, and past 15s under Kalshi
+ *  throttling. At 03:45 PT that day the 15s clock failed the
+ *  Championships board on a healthy backend that finished moments later.
+ *  45s covers the throttled rebuild and stays under the functions'
+ *  `maxDuration` (60s, set in each board's route file). */
+export const PROXY_TIMEOUT_BY_ROUTE: Readonly<Record<string, number>> = {
+  "championships/board": 45_000,
+  "picker/board": 45_000,
+};
+
+/** How long the proxy waits on `route` (`<prefix>/<sub-path>`). */
+export const proxyTimeoutMs = (route: string): number =>
+  PROXY_TIMEOUT_BY_ROUTE[route] ?? PROXY_TIMEOUT_MS;
+
 const isTimeout = (err: unknown) =>
   err instanceof Error
   && (err.name === "TimeoutError" || err.name === "AbortError");
@@ -218,11 +238,11 @@ const isTimeout = (err: unknown) =>
 /** The named 504 for a backend that did not answer in time. JSON, and
  *  distinct from `backend_unreachable`: the request may well have been
  *  delivered, and what is unknown is the answer. */
-export function timeoutAnswer(what = "the backend") {
+export function timeoutAnswer(what = "the backend", ms = PROXY_TIMEOUT_MS) {
   return {
     error: "backend_timeout",
     reason: "backend_timeout",
-    detail: `${what} did not answer within ${PROXY_TIMEOUT_MS / 1000}s, so `
+    detail: `${what} did not answer within ${ms / 1000}s, so `
       + "this proxy stopped waiting. The request may have been delivered; "
       + "what is unknown is the answer. This is not an unreachable "
       + "backend and not an empty payload.",
@@ -234,6 +254,7 @@ export async function proxy(
   res: NextApiResponse,
   backendPath: string,
   within: string,
+  timeoutMs: number = PROXY_TIMEOUT_MS,
 ) {
   // WALL 2 — see the block above. Checked BEFORE any socket opens, so a
   // refused path never reaches a backend at all.
@@ -252,10 +273,12 @@ export async function proxy(
       method: req.method,
       headers: { "Content-Type": "application/json" },
       body: ["POST", "PUT"].includes(req.method || "") ? JSON.stringify(req.body) : undefined,
-      signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
-    if (isTimeout(err)) return res.status(504).json(timeoutAnswer());
+    if (isTimeout(err)) {
+      return res.status(504).json(timeoutAnswer(undefined, timeoutMs));
+    }
     // NEVER REACHED. Nothing upstream is known, so there is no status
     // to relay and no body to quote. This is the only 502 below.
     return res.status(502).json({
@@ -273,7 +296,8 @@ export async function proxy(
     // then stalls is a timeout, named as one, with its status kept
     if (isTimeout(err)) {
       return res.status(504).json({
-        ...timeoutAnswer(`the backend answered ${r.status} and its body`),
+        ...timeoutAnswer(`the backend answered ${r.status} and its body`,
+                         timeoutMs),
         upstream_status: r.status,
       });
     }
@@ -944,7 +968,8 @@ export function proxyLeague(
         + "here: no backend was contacted.",
     });
   }
-  return proxy(req, res, `/api/${prefix}/${segs}${qs}`, `/api/${prefix}/`);
+  return proxy(req, res, `/api/${prefix}/${segs}${qs}`, `/api/${prefix}/`,
+               proxyTimeoutMs(`${prefix}/${segs}`));
 }
 
 /** A response body, parsed, or a NAMED reason it could not be. `raw` is
