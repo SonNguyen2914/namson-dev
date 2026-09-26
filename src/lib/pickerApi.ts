@@ -278,14 +278,11 @@ export function licensedRead(axis: FieldAxis | undefined | null): {
  *  exists carries none, and the card then draws exactly what it drew
  *  before — league ranks and league tiers — rather than a field with
  *  nothing in it. */
-/** One side's field rank on one axis, as a domestic league row carries it.
- *  `league_rank` / `league_size` ride along and are not drawn: the `#`
- *  panel prints field ranks only (operator, 2026-09-25). */
+/** One side's field rank on one axis, as a domestic league row carries it
+ *  (backend board-data-gaps, confirmed 2026-09-25). No tiers and no floor
+ *  flag ride on it, so a domestic `#` draws no dagger. */
 export interface FieldRankSide {
   rank: number;
-  league_rank?: number | null;
-  league_size?: number | null;
-  below_floor?: boolean;
 }
 export interface RowFieldRank {
   size: number;
@@ -296,17 +293,18 @@ export interface RowFieldRank {
 /** A DOMESTIC ROW'S FIELD RANKS, AS THE BLOCK THE `#` PANEL ALREADY READS.
  *  The panel (PickerRead.FieldRanks) prints `#fav v #opp` per axis of N
  *  off a FieldBlockLike; this carries exactly what it reads — the ranks
- *  and the size — and only the axes where BOTH sides are ranked, so the
- *  panel renders byte for byte as it does on a field-read card. It is
- *  handed to that panel alone: nothing else on the card reads it. */
+ *  and the size. A side the field cannot place is `null` on the wire and
+ *  stays null here (the panel draws "—", never 0); an axis with neither
+ *  side placed is not drawn. It is handed to that panel alone: nothing
+ *  else on the card reads it. */
 export function fieldRanksBlock(fr: RowFieldRank | null | undefined): FieldBlockLike | null {
   if (!fr) return null;
   const axes: Record<string, unknown> = {};
   for (const k of ["ovr", "atk", "def"] as const) {
     const a = fr.axes[k];
-    if (!a?.fav || !a?.opp) continue;
-    const side = (x: FieldRankSide) => ({ rank: x.rank, tier: 0, tier_set: [],
-      straddles: false, below_floor: x.below_floor === true });
+    if (!a?.fav && !a?.opp) continue;
+    const side = (x: FieldRankSide | null | undefined) => ({ rank: x?.rank ?? null,
+      tier: 0, tier_set: [], straddles: false, below_floor: false });
     axes[k] = { fav: side(a.fav), opp: side(a.opp), tier_gap: null };
   }
   if (Object.keys(axes).length === 0) return null;

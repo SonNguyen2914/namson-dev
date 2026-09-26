@@ -296,9 +296,9 @@ test("a result the providers dispute is drawn as unknown, not as W, D or L",
 
 /* ══ A LEAGUE CARD WITH FIELD RANKS GETS THE #, AND LOSES THE (i) ═════
  *  (operator, 2026-09-25: "I don't need that info in the (i)"). The row's
- *  `field_rank` is the backend's documented shape (src/picker/field_rank.py
- *  on board-data-gaps, not yet recorded): {size, axes: {ovr|atk|def:
- *  {fav|opp: {rank} | null}}}. The ranks below are the test's own, on a
+ *  `field_rank` is the backend's confirmed shape (src/picker/field_rank.py
+ *  on board-data-gaps, 2026-09-25; not yet in a recording): {size, axes:
+ *  {ovr|atk|def: {fav|opp: {rank} | null}}}. The ranks below are the test's own, on a
  *  recorded row; nothing else on the row is touched. */
 test("a league row carrying field_rank draws the # (the same panel) and no (i); "
    + "a row without it is unchanged", async ({ page }) => {
@@ -309,18 +309,26 @@ test("a league row carrying field_rank draws the # (the same panel) and no (i); 
       ovr: { fav: { rank: 21 }, opp: { rank: 25 } },
       atk: { fav: { rank: 48 }, opp: { rank: 83 } },
       def: { fav: { rank: 18 }, opp: null } } };   // a side the field cannot place
+    const bare = board.rows[2];
+    bare.field_rank = { size: 154, axes: { ovr: { fav: { rank: 3 }, opp: { rank: 9 } },
+      atk: { fav: null, opp: null } } };             // nothing placed on this axis
     await clubBoard(page, board);
     const card = page.locator(`[data-testid="picker-row"][data-event="${row.event_id}"]`);
     await expect(card.getByTestId("tier-read")).toHaveCount(0);
     const open = card.getByTestId("field-ranks-open");
     await expect(open).toHaveAttribute("data-size", "154");
-    // an axis with an unranked side is not drawn as half a pair
-    await expect(open).toHaveAttribute("data-axes", "ovr,atk");
+    await expect(open).toHaveAttribute("data-axes", "ovr,atk,def");
     await open.click();
     const panel = card.getByTestId("field-ranks");
     await expect(panel.locator('[data-rank-axis="ovr"]')).toHaveText(/ovr\s*#21v#25/i);
     await expect(panel.locator('[data-rank-axis="atk"]')).toHaveText(/atk\s*#48v#83/i);
-    await expect(panel.locator('[data-rank-axis="def"]')).toHaveCount(0);
+    // a side the field cannot place is a dash, never 0; the domestic key
+    // carries no floor flag, so no dagger either
+    await expect(panel.locator('[data-rank-axis="def"]')).toHaveText(/def\s*#18v\u2014/i);
+    await expect(panel.getByTestId("field-floor-mark")).toHaveCount(0);
+    // an axis with neither side placed is not drawn
+    await expect(page.locator(`[data-testid="picker-row"][data-event="${bare.event_id}"] [data-testid="field-ranks-open"]`))
+      .toHaveAttribute("data-axes", "ovr");
     // the league read is untouched: its own tier pairs, its own rank pair
     for (const k of ["ovr", "atk", "def"] as const) {
       await expect(card.locator(`[data-tier-pair="${k}"]`))

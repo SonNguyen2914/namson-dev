@@ -551,6 +551,11 @@ function FloorMark({ note }: { note?: string | null }) {
  *  Neutral line and ink at rest, accent only when it is open: it is an
  *  affordance, not an alert, and the traffic light stays on the
  *  numbers. */
+/** A RANK AS THE `#` WRITES IT: "#26", or a dash for a side the field
+ *  could not place (a domestic row's `field_rank` sends null) — never 0. */
+const rankOf = (n: number | null | undefined, none = "\u2014") =>
+  (n == null ? none : `#${n}`);
+
 function FieldRanks({ block, drawn, absent }: {
   block: FieldBlockLike;
   /** the axes this block CARRIES, in reading order — never AXIS_ORDER,
@@ -650,7 +655,7 @@ function FieldRanks({ block, drawn, absent }: {
     return a ? [{ k, a }] : [];
   });
   const label = "the field's ranks on each axis — "
-    + axes.map(({ k, a }) => `${k} #${a.fav.rank} v #${a.opp.rank}`).join(", ")
+    + axes.map(({ k, a }) => `${k} ${rankOf(a.fav.rank, "not placed")} v ${rankOf(a.opp.rank, "not placed")}`).join(", ")
     + `, of ${block.size}`
     /* AND THE AXES IT HAS NONE FOR, NAMED IN THE NAME. A reader who
        cannot see that the trio is one cell short is exactly the reader
@@ -734,7 +739,7 @@ function FieldRanks({ block, drawn, absent }: {
                   ~171px card six abreast, and it both left the card
                   and covered its own trigger. */}
               <span className="whitespace-nowrap">
-                #{a.fav.rank}v#{a.opp.rank}
+                {rankOf(a.fav.rank)}v{rankOf(a.opp.rank)}
               </span>
             </span>
           ))}
