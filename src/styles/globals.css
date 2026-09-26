@@ -24,8 +24,13 @@
   /* ink hierarchy — most text is gray; white is reserved */
   --ink-hi: #f5f5f7;
   --ink-mid: #a2a2ab;
-  --ink-low: #6e6e78;
-  --ink-faint: #4b4b54;
+  /* RAISED FOR CONTRAST (operator, option B, 2026-09-25; audit F12).
+     Against the card surface --bs-elev (#0b0b10): --ink-low 4.56:1, over
+     the 4.5:1 body-text bar, and --ink-faint 3.02:1; on the #050507 canvas
+     4.73:1 and 3.13:1. They were #6e6e78 (4.04:1 on the canvas) and
+     #4b4b54 (2.36:1). */
+  --ink-low: #797983;
+  --ink-faint: #5d5d67;
 
   /* the one accent */
   --accent: #f5c542;
