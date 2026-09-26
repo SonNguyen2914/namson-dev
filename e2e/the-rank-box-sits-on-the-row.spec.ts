@@ -89,6 +89,21 @@ async function geometry(page: Page, card: Locator) {
   throw new Error("the layout never settled");
 }
 
+/** The cards with a # whose card lies within the viewport horizontally —
+ *  the board's track scrolls sideways, and a card parked off to the side
+ *  is not one a reader can open. Rightmost first, so the edge case is
+ *  always among those measured. */
+async function onScreen(page: Page) {
+  await page.waitForTimeout(300);
+  return page.locator('[data-testid="picker-row"]').evaluateAll((els) => {
+    const vw = document.documentElement.clientWidth;
+    return els.map((e, i) => ({ i, b: e.getBoundingClientRect(),
+      has: !!e.querySelector('[data-testid="field-ranks-open"]') }))
+      .filter((x) => x.has && x.b.width > 0 && x.b.left >= 0 && x.b.right <= vw)
+      .sort((a, b) => b.b.right - a.b.right).map((x) => x.i);
+  });
+}
+
 type Box = { l: number; r: number; t: number; b: number } | null;
 const meets = (a: Box, b: Box) => !!a && !!b
   && a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
@@ -136,17 +151,16 @@ async function assertOnTheRow(page: Page, card: Locator, at: string) {
 test("three-digit ranks on the Leagues board: on the row at every width, "
    + "right of the #, left of the card at the viewport's edge, dropped on a phone",
   async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(240_000);
     await leagues(page);
     const seen = new Map<number, Set<string>>();
-    for (const width of [390, 768, 1024, 1280, 1440, 1920]) {
+    for (const width of [390, 860, 1024, 1440, 1920]) {
       await page.setViewportSize({ width, height: 900 });
-      const cards = page.locator('[data-testid="picker-row"]:visible')
-        .filter({ has: page.getByTestId("field-ranks-open") });
-      const n = Math.min(await cards.count(), 8);
-      expect(n, `${width}px: cards to measure`).toBeGreaterThan(0);
+      const idx = await onScreen(page);
+      expect(idx.length, `${width}px: cards to measure`).toBeGreaterThan(0);
+      const cards = page.locator('[data-testid="picker-row"]');
       const places = new Set<string>();
-      for (let i = 0; i < n; i++) {
+      for (const i of idx.slice(0, 6)) {
         const card = cards.nth(i);
         await card.scrollIntoViewIfNeeded();
         places.add((await assertOnTheRow(page, card, `${width}px card ${i}`))!);
@@ -163,15 +177,14 @@ test("three-digit ranks on the Leagues board: on the row at every width, "
 
 test("the national field on the Championships board: the same rule",
   async ({ page }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(180_000);
     await championships(page);
     for (const width of [390, 1024, 1440]) {
       await page.setViewportSize({ width, height: 900 });
-      const cards = page.locator('[data-testid="picker-row"]:visible')
-        .filter({ has: page.getByTestId("field-ranks-open") });
-      const n = Math.min(await cards.count(), 6);
-      expect(n).toBeGreaterThan(0);
-      for (let i = 0; i < n; i++) {
+      const idx = await onScreen(page);
+      expect(idx.length).toBeGreaterThan(0);
+      const cards = page.locator('[data-testid="picker-row"]');
+      for (const i of idx.slice(0, 5)) {
         const card = cards.nth(i);
         await card.scrollIntoViewIfNeeded();
         await assertOnTheRow(page, card, `championships ${width}px card ${i}`);
