@@ -39,7 +39,7 @@ const json = (body: unknown) => ({
 const ONLY_NATIONAL: Record<string, string> = {
   "group-chip": "a national fixture belongs to a group table; a club league fixture has none (a club cup tie names its competition in the same slot, `competition-badge`)",
   "xi-chip": "both starting XIs published — the national payload carries `lineups`; no club row does",
-  "field-ranks-open": "the `#`: a national card is read on its competition's own field, which ranks each team per axis; a league card's tiers are quintiles of one table with no per-axis rank",
+  "field-ranks-open": "the `#`: a national card is read on its competition's own field, which ranks each team per axis; a league card draws it only when its row carries `field_rank` (see the test below), which the recorded club board predates",
   "field-floor-mark": "the dagger on a band the placeability floor refused; only a field has a floor",
   "national-pts": "the group-table points gap; a club's table gap is `ppg`",
   "national-gp": "games played in the group table; a club's is `gp` off its league table",
@@ -48,6 +48,7 @@ const ONLY_NATIONAL: Record<string, string> = {
   "field-axes-absent": "the backend's sentence for the axes a partial field does not measure",
 };
 const ONLY_CLUB: Record<string, string> = {
+  "tier-read": "the shape (i): drawn only where no `#` is (the 2026-09-10 rule). Every national card has field ranks and so a `#`; a league row without `field_rank` keeps its (i)",
   "own-rates": "each club's own ppg / GD/g beside a withheld gap; a national team has no league rate",
   "gap-note": "why a club gap is withheld (cross-league); a national card withholds none",
   "competition-badge": "a cup tie folded into a league column; a national column is its own competition",
@@ -130,30 +131,22 @@ test("a national card draws every mark a club card draws, in the same classes, "
   }
 });
 
-test("the shape explainer is on the national card, and opens the same panel",
-  async ({ page, browser }) => {
+test("where the # is drawn the shape (i) is not: a national card carries the #, "
+   + "and speaks of a team", async ({ page }) => {
+    /* the 2026-09-10 rule, kept by the operator on 2026-09-25 ("there is
+       a (#) icon which show the ranking better"): the # is the one
+       ranking view, and a card that draws it draws no (i) */
     await nationalBoard(page);
-    const card = page.locator('[data-testid="league-col"][data-league="unl"] [data-testid="picker-row"]')
-      .filter({ has: page.locator('[data-testid="shape-chip"]') }).first();
-    await card.getByTestId("tier-read").click();
-    await expect(card.getByTestId("shape-read")).toBeVisible();
-    await expect(card.getByTestId("shape-read")).toContainText(/Clean|Split|Hollow/);
-    // the tiers it explains are the field's, and it says so
-    await expect(card.getByTestId("shape-read")).toContainText(/bands of this competition's own field/);
-    // …of a TEAM's interval: the noun is the row's kind, never "club" here
-    await expect(card.getByTestId("shape-read")).toContainText("team's read is every band");
-    await expect(card.getByTestId("shape-read")).not.toContainText(/\bclub/);
+    const cards = page.locator('[data-testid="picker-row"]');
+    const withHash = cards.filter({ has: page.getByTestId("field-ranks-open") });
+    expect(await withHash.count()).toBeGreaterThan(0);
+    await expect(withHash.getByTestId("tier-read")).toHaveCount(0);
+    const card = withHash.first();
+    await card.getByTestId("field-ranks-open").click();
+    await expect(card.getByTestId("field-ranks")).toContainText(/ovr\s*#\d+v#\d+/i);
+    // the prose that remains names a team, never a club
     await expect(card.locator('span[title^="tier bands in this competition"]'))
       .toHaveAttribute("title", /every band the team's 95% interval touches/);
-    // and a club card's panel keeps "club" where it says it
-    // a fresh context: this one remembers the Championships mode
-    const p2 = await browser.newPage();
-    await clubBoard(p2);
-    const club = p2.locator('[data-testid="picker-row"]').first();
-    await club.getByTestId("tier-read").click();
-    await expect(club.getByTestId("shape-read")).toContainText(/Tiers are within-league quintiles/);
-    await expect(club.getByTestId("shape-read")).not.toContainText(/\bteam/);
-    await p2.close();
   });
 
 test("a SPLIT national card is torn along the unit that gave way, as a club card is",
@@ -299,4 +292,43 @@ test("a result the providers dispute is drawn as unknown, not as W, D or L",
       await expect(c).not.toHaveClass(/bg-up|bg-neg|bg-line-strong/);
       await expect(c).toHaveAttribute("title", /disputed/);
     }
+  });
+
+/* ══ A LEAGUE CARD WITH FIELD RANKS GETS THE #, AND LOSES THE (i) ═════
+ *  (operator, 2026-09-25: "I don't need that info in the (i)"). The row's
+ *  `field_rank` is the backend's documented shape (src/picker/field_rank.py
+ *  on board-data-gaps, not yet recorded): {size, axes: {ovr|atk|def:
+ *  {fav|opp: {rank} | null}}}. The ranks below are the test's own, on a
+ *  recorded row; nothing else on the row is touched. */
+test("a league row carrying field_rank draws the # (the same panel) and no (i); "
+   + "a row without it is unchanged", async ({ page }) => {
+    const board = JSON.parse(JSON.stringify(CLUB_H2H_BOARD));
+    const row = board.rows[0];
+    const other = board.rows[1];
+    row.field_rank = { size: 154, axes: {
+      ovr: { fav: { rank: 21 }, opp: { rank: 25 } },
+      atk: { fav: { rank: 48 }, opp: { rank: 83 } },
+      def: { fav: { rank: 18 }, opp: null } } };   // a side the field cannot place
+    await clubBoard(page, board);
+    const card = page.locator(`[data-testid="picker-row"][data-event="${row.event_id}"]`);
+    await expect(card.getByTestId("tier-read")).toHaveCount(0);
+    const open = card.getByTestId("field-ranks-open");
+    await expect(open).toHaveAttribute("data-size", "154");
+    // an axis with an unranked side is not drawn as half a pair
+    await expect(open).toHaveAttribute("data-axes", "ovr,atk");
+    await open.click();
+    const panel = card.getByTestId("field-ranks");
+    await expect(panel.locator('[data-rank-axis="ovr"]')).toHaveText(/ovr\s*#21v#25/i);
+    await expect(panel.locator('[data-rank-axis="atk"]')).toHaveText(/atk\s*#48v#83/i);
+    await expect(panel.locator('[data-rank-axis="def"]')).toHaveCount(0);
+    // the league read is untouched: its own tier pairs, its own rank pair
+    for (const k of ["ovr", "atk", "def"] as const) {
+      await expect(card.locator(`[data-tier-pair="${k}"]`))
+        .toHaveText(`${row.tiers[k][0]}v${row.tiers[k][1]}`);
+    }
+    await expect(card.getByTestId("rank-pair")).toHaveAttribute("data-basis", "league");
+    // and a row without the key is the card it always was
+    const plain = page.locator(`[data-testid="picker-row"][data-event="${other.event_id}"]`);
+    await expect(plain.getByTestId("tier-read")).toHaveCount(1);
+    await expect(plain.getByTestId("field-ranks-open")).toHaveCount(0);
   });

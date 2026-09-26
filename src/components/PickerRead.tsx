@@ -828,22 +828,19 @@ function measureTitle(
 
 export function TierGaps({ read, dense = false, field, partial,
                           floorNote, values = true, quietFloor = [],
-                          explain = false, side = "club" }: {
+                          ranksOnly = null, side = "club" }: {
   read: ReadLike;
   /** WHAT ONE SIDE OF THIS FIXTURE IS CALLED in the prose around the
    *  trio — "club", or "team" on a national card. The caller reads it off
    *  the row's kind; the sentences are the same sentences. */
   side?: "club" | "team";
-  /** DRAW THE SHAPE EXPLAINER (the `i`) ON A FIELD-READ CARD TOO. A card
-   *  with no field always carries it. A national card passes true: the
-   *  Championships board copies the Leagues board's card (operator,
-   *  2026-09-25), and on a field-read card the panel prints the field's
-   *  own bands and gaps (`effectiveRead`) and says they are the field's,
-   *  so nothing in it is a within-league reading. A card whose field
-   *  carries no shape (a partial block) has nothing for it to explain
-   *  and draws none. Cup cards pass nothing: there the operator's
-   *  2026-09-10 rule ("keep the #, remove the i") stands. */
-  explain?: boolean;
+  /** FIELD RANKS WITHOUT A FIELD READ — a domestic league row's
+   *  `field_rank`, adapted by pickerApi.fieldRanksBlock. It feeds the `#`
+   *  panel ONLY: the tiers, cells and shape stay the league's. Where a `#`
+   *  is drawn the shape `i` is not (the 2026-09-10 rule), so a league card
+   *  that carries field ranks trades its `i` for the `#`, and one that
+   *  does not is exactly what it was. */
+  ranksOnly?: FieldBlockLike | null;
   /** DRAW THE VALUE ± HALF-WIDTH UNDER EACH TIER. True everywhere it has
    *  been drawn; a national card passes false and keeps the values behind
    *  the `#` panel, the way a league card keeps its tiers alone. */
@@ -902,6 +899,9 @@ export function TierGaps({ read, dense = false, field, partial,
      which is the ask whose absence made `field_partial` a separate key
      in the first place (backend #141). */
   const block: FieldBlockLike | null = field ?? partial ?? null;
+  /* WHAT THE `#` READS: the field this card is drawn on, or — on a
+     league card — the field ranks alone. */
+  const rankBlock: FieldBlockLike | null = block ?? ranksOnly;
   /* WHICH AXES ARE DRAWN AT ALL. A whole field answers all three and
      every mark renders exactly what it rendered before; a partial one
      answers fewer, and the axes it does not carry get no cell, no
@@ -1127,7 +1127,8 @@ export function TierGaps({ read, dense = false, field, partial,
             after the trio it belongs to, inside its group, and only
             when there is a field to open: an `i` over a competition
             nobody has measured would be an empty promise. */}
-        {block && <FieldRanks block={block} drawn={drawn} absent={absent} />}
+        {rankBlock && <FieldRanks block={rankBlock}
+          drawn={block ? drawn : axesPresent(rankBlock)} absent={absent} />}
         </span>
         {/* THE SHAPE POPOVER — ON A LEAGUE COLUMN ONLY (2026-09-10).
             The operator: "keep the #, remove the i since it is
@@ -1152,7 +1153,7 @@ export function TierGaps({ read, dense = false, field, partial,
             axis would put two within-league quintiles into a sentence
             about a cross-league fixture. That is the two-ladders defect
             the field exists to end, in prose. */}
-        {(!block || (explain && r.shape)) && (<>
+        {!rankBlock && (<>
         {/* THE POPOVER HANGS OFF THE BUTTON, NOT OFF THE ROW (2026-09-07).
             It was `absolute top-6` on the whole TierGaps block, which is
             24px below the block's top — fine while the row above it fits

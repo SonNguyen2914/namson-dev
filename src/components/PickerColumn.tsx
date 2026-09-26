@@ -44,7 +44,7 @@ import {
   LeagueMeta,
   HeadToHead, NationalBlock, NationalColumn, RatePair, RowField,
   RowFieldPartial, SEASON_BLEND_K,
-  columnsOf, homeBadge, leagueLabel, licensedRead, rowHref, rowIsInPlay, rowNoHrefWhy,
+  columnsOf, fieldRanksBlock, homeBadge, leagueLabel, licensedRead, rowHref, rowIsInPlay, rowNoHrefWhy,
   seasonDisagreement,
   seasonSpan, seasonSpanLabel, venueDisagreement,
 } from "../lib/pickerApi";
@@ -1152,7 +1152,8 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
           below the divider is THE SAME READ as one above it. */}
       <div className="mt-3">
         <TierGaps read={row} dense={dense} field={field} partial={partial}
-          values={!row.national} explain={row.national != null}
+          values={!row.national}
+          ranksOnly={fieldRanksBlock(row.field_rank)}
           side={row.national ? "team" : "club"}
           quietFloor={row.national ? nat.quietFloor : []}
           floorNote={floorNote} />
