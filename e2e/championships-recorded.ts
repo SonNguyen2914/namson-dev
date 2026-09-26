@@ -1,2024 +1,17529 @@
 /* THE CHAMPIONSHIPS BOARD, RECORDED OFF THE ROUTE — not off a brief.
  *
- * GET /api/championships/board on the backend branch
- * `championships-integrated`, assembled 2026-09-24T23:32:30.506453+00:00 (date
- * 2026-09-24, days 14) with the national-team ratings merged:
- * 206 ranked rows, 0 refusals, 17 off the board.
+ * `api.main.championships_board(date=20260925, days=14)` — the
+ * route's own handler, called IN PROCESS on the backend branch
+ * `board-data-gaps` (read-only; the route writes nothing), assembled
+ * 2026-09-25T23:48:22.023313+00:00: 178 ranked rows, 0 refusals,
+ * 24 off the board. Columns ["unl","cnl","afcon"]: on
+ * 2026-09-25 the AFC Asian Cup left the board (it starts in 2027), and the
+ * Arabian Gulf Cup that replaced it was dropped the same day (no Kalshi
+ * series lists it).
  *
- * HOW IT WAS TRIMMED, AND NOTHING ELSE WAS TOUCHED. The recording was cut
- * to the page's own ask (`days=8`) exactly as the backend's
- * `payload._in_window` cuts it, then to 19 rows — the first few of
- * each column by kickoff, both `field_partial` rows, one with the starting
- * XIs announced, one with no Kalshi book and one with no head-to-head on
- * ESPN's record — and three of the off-board entries. The per-competition
- * `competitions` block is cut to what a surface reads: each column's
- * stages, its derived group tables and the Asian Cup's next fixtures.
+ * WHAT THIS RECORDING CARRIES THAT THE LAST ONE DID NOT: the served
+ * `headline` on every card; attack and defence at the LICENSED band count
+ * (`field.axes.atk|def.licensed`) beside the declared five; the national
+ * head-to-head filled from our own corpus where ESPN lists no meeting
+ * (`source: "corpus_since_2018"`, with its `window`), including the
+ * measured absence ("no meeting since 2018 in our corpus").
+ *
+ * HOW IT WAS TRIMMED, AND NOTHING ELSE WAS TOUCHED. Cut to the page's own
+ * ask (`days=8`) exactly as `payload._in_window` cuts it, then to
+ * 19 rows — the first five of each declared column by kickoff, the
+ * `field_partial` rows, one whose group has started, a corpus meeting,
+ * two corpus absences, a form strip with a disputed result ("?"), two
+ * rows whose licensed pair differs from the
+ * five-band one, and the fixture SAMPLE_REFUSAL stands in for — and three
+ * of the off-board entries. `competitions` is cut to what a surface
+ * reads: stages, derived group tables, and the last column's next fixtures.
  * Every kept key, value and absence is the wire's.
- * `off_board_counts` is left as the backend counted it.
  *
- * The AFC Asian Cup has no fixture in this window (it starts 7 Jan 2027),
- * so its column is declared and empty — which is itself a case the board
- * must draw.
- *
- * SAMPLE_REFUSAL IS THE ROUTE'S OWN REFUSED CARD FOR A PAIR THE FIELD
- * CANNOT PLACE. The merged recording rates every side in its window and so
- * carries no refusal; this one was built by the backend's own code —
- * `stages.refused_row`, `payload._side_block`/`_record` and
- * `markets.card_quote`, called exactly as `payload._card` calls them on
- * that branch (backend aca990d, run read-only) — around the RECORDED
- * Georgia v Northern Ireland fixture's own facts: its event, venue, group
- * record, book, form, head-to-head and lineups. The test that uses it
- * swaps it in for that fixture's ranked row rather than inventing a
- * fixture. */
-export const CHAMP_CLOCK = "2026-09-24T23:32:30.506453+00:00";
+ * THREE CONSTANTS ARE KEPT FROM THE 2026-09-24 RECORDING, BY NAME:
+ *  - SAMPLE_REFUSAL, the route's own refused card for Georgia v Northern
+ *    Ireland ("401861049", in this window too), built by the backend's
+ *    own code at aca990d — see the spec that swaps it in;
+ *  - XI_LINEUPS, the `national.lineups` block of Dominican Republic v
+ *    Nicaragua (401900637) as recorded then with both XIs announced.
+ *    kept as the XI spec's fallback for a recording in which no fixture
+ *    has published an XI yet;
+ *  - INTERIM_DR_NIC, the whole ranked row of Dominican Republic v Nicaragua
+ *    (401900637) as served BEFORE the backend sent a headline, with
+ *    its clock INTERIM_CLOCK. Every card in this window carries the served
+ *    headline, so the card's interim venue-adjusted fallback — still the
+ *    path for a payload without one — is proved on the row it was built
+ *    for. */
+export const CHAMP_CLOCK = "2026-09-25T23:48:22.023313+00:00";
 
 export const CHAMP_BOARD = {
- "capture": {
-  "backend": "not_requested",
-  "writable": false
- },
+ "generated_at": "2026-09-25T23:48:22.023313+00:00",
+ "date": "2026-09-25",
+ "days": 8,
+ "mode": "championships",
  "columns": [
   "unl",
   "cnl",
-  "asiancup",
   "afcon"
  ],
- "competitions": {
-  "afcon": {
-   "structure": {
-    "stages": [
-     {
-      "dates": "25-31 Mar 2026",
-      "key": "preliminary-round",
-      "kind": "knockout",
-      "label": "Qualifying preliminary round (two legs)",
-      "on_provider": true
-     },
-     {
-      "dates": "MD1-2 24 Sep-6 Oct 2026, MD3-4 9-17 Nov 2026, MD5-6 22-30 Mar 2027",
-      "key": "group-stage",
-      "kind": "group",
-      "label": "Qualifying groups (12 groups of 4, home and away)",
-      "on_provider": true
-     },
-     {
-      "dates": "19 Jun-17 Jul 2027",
-      "key": "finals",
-      "kind": "finals",
-      "label": "Finals, Kenya / Uganda / Tanzania",
-      "on_provider": false
-     }
-    ]
-   },
-   "standings": {
-    "derived": {
-     "Group A": [
-      {
-       "d": 0,
-       "espn_id": "4231",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "gabon",
-       "l": 0,
-       "name": "Gabon",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "6640",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "lesotho",
-       "l": 0,
-       "name": "Lesotho",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2869",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "morocco",
-       "l": 0,
-       "name": "Morocco",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "8937",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "niger",
-       "l": 0,
-       "name": "Niger",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "Group B": [
-      {
-       "d": 0,
-       "espn_id": "653",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "angola",
-       "l": 0,
-       "name": "Angola",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2620",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "egypt",
-       "l": 0,
-       "name": "Egypt",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "4325",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "malawi",
-       "l": 0,
-       "name": "Malawi",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "14075",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "south-sudan",
-       "l": 0,
-       "name": "South Sudan",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "Group C": [
-      {
-       "d": 0,
-       "espn_id": "4789",
-       "ga": 0,
-       "gd": 2,
-       "gf": 2,
-       "gp": 1,
-       "key": "ivory-coast",
-       "l": 0,
-       "name": "Ivory Coast",
-       "position": 1,
-       "pts": 3,
-       "w": 1
-      },
-      {
-       "d": 0,
-       "espn_id": "7368",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "gambia",
-       "l": 0,
-       "name": "Gambia",
-       "position": 2,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "5776",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "somalia",
-       "l": 0,
-       "name": "Somalia",
-       "position": 3,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "4469",
-       "ga": 2,
-       "gd": -2,
-       "gf": 0,
-       "gp": 1,
-       "key": "ghana",
-       "l": 1,
-       "name": "Ghana",
-       "position": 4,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "Group D": [
-      {
-       "d": 0,
-       "espn_id": "5774",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "eritrea",
-       "l": 0,
-       "name": "Eritrea",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2847",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "guinea",
-       "l": 0,
-       "name": "Guinea",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2848",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "kenya",
-       "l": 0,
-       "name": "Kenya",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "467",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "south-africa",
-       "l": 0,
-       "name": "South Africa",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "Group E": [
-      {
-       "d": 0,
-       "espn_id": "2850",
-       "ga": 0,
-       "gd": 2,
-       "gf": 2,
-       "gp": 1,
-       "key": "congo-dr",
-       "l": 0,
-       "name": "Congo DR",
-       "position": 1,
-       "pts": 3,
-       "w": 1
-      },
-      {
-       "d": 0,
-       "espn_id": "4214",
-       "ga": 2,
-       "gd": 1,
-       "gf": 3,
-       "gp": 1,
-       "key": "zimbabwe",
-       "l": 0,
-       "name": "Zimbabwe",
-       "position": 2,
-       "pts": 3,
-       "w": 1
-      },
-      {
-       "d": 0,
-       "espn_id": "8600",
-       "ga": 3,
-       "gd": -1,
-       "gf": 2,
-       "gp": 1,
-       "key": "sierra-leone",
-       "l": 1,
-       "name": "Sierra Leone",
-       "position": 3,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "8938",
-       "ga": 2,
-       "gd": -2,
-       "gf": 0,
-       "gp": 1,
-       "key": "equatorial-guinea",
-       "l": 1,
-       "name": "Equatorial Guinea",
-       "position": 4,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "Group F": [
-      {
-       "d": 0,
-       "espn_id": "8940",
-       "ga": 1,
-       "gd": 2,
-       "gf": 3,
-       "gp": 1,
-       "key": "mauritania",
-       "l": 0,
-       "name": "Mauritania",
-       "position": 1,
-       "pts": 3,
-       "w": 1
-      },
-      {
-       "d": 0,
-       "espn_id": "2844",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "benin",
-       "l": 0,
-       "name": "Benin",
-       "position": 2,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2845",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "burkina-faso",
-       "l": 0,
-       "name": "Burkina Faso",
-       "position": 3,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "10528",
-       "ga": 3,
-       "gd": -2,
-       "gf": 1,
-       "gp": 1,
-       "key": "central-african-republic",
-       "l": 1,
-       "name": "Central African Republic",
-       "position": 4,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "Group G": [
-      {
-       "d": 0,
-       "espn_id": "656",
-       "ga": 1,
-       "gd": 2,
-       "gf": 3,
-       "gp": 1,
-       "key": "cameroon",
-       "l": 0,
-       "name": "Cameroon",
-       "position": 1,
-       "pts": 3,
-       "w": 1
-      },
-      {
-       "d": 0,
-       "espn_id": "6725",
-       "ga": 0,
-       "gd": 1,
-       "gf": 1,
-       "gp": 1,
-       "key": "namibia",
-       "l": 0,
-       "name": "Namibia",
-       "position": 2,
-       "pts": 3,
-       "w": 1
-      },
-      {
-       "d": 0,
-       "espn_id": "4276",
-       "ga": 1,
-       "gd": -1,
-       "gf": 0,
-       "gp": 1,
-       "key": "congo",
-       "l": 1,
-       "name": "Congo",
-       "position": 3,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "8601",
-       "ga": 3,
-       "gd": -2,
-       "gf": 1,
-       "gp": 1,
-       "key": "comoros",
-       "l": 1,
-       "name": "Comoros",
-       "position": 4,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "Group H": [
-      {
-       "d": 1,
-       "espn_id": "4245",
-       "ga": 2,
-       "gd": 0,
-       "gf": 2,
-       "gp": 1,
-       "key": "botswana",
-       "l": 0,
-       "name": "Botswana",
-       "position": 1,
-       "pts": 1,
-       "w": 0
-      },
-      {
-       "d": 1,
-       "espn_id": "2621",
-       "ga": 2,
-       "gd": 0,
-       "gf": 2,
-       "gp": 1,
-       "key": "libya",
-       "l": 0,
-       "name": "Libya",
-       "position": 2,
-       "pts": 1,
-       "w": 0
-      },
-      {
-       "d": 1,
-       "espn_id": "659",
-       "ga": 1,
-       "gd": 0,
-       "gf": 1,
-       "gp": 1,
-       "key": "tunisia",
-       "l": 0,
-       "name": "Tunisia",
-       "position": 3,
-       "pts": 1,
-       "w": 0
-      },
-      {
-       "d": 1,
-       "espn_id": "4211",
-       "ga": 1,
-       "gd": 0,
-       "gf": 1,
-       "gp": 1,
-       "key": "uganda",
-       "l": 0,
-       "name": "Uganda",
-       "position": 4,
-       "pts": 1,
-       "w": 0
-      }
-     ],
-     "Group I": [
-      {
-       "d": 0,
-       "espn_id": "624",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "algeria",
-       "l": 0,
-       "name": "Algeria",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "5779",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "burundi",
-       "l": 0,
-       "name": "Burundi",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "4356",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "togo",
-       "l": 0,
-       "name": "Togo",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "4277",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "zambia",
-       "l": 0,
-       "name": "Zambia",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "Group J": [
-      {
-       "d": 0,
-       "espn_id": "5777",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "ethiopia",
-       "l": 0,
-       "name": "Ethiopia",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "8939",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "mozambique",
-       "l": 0,
-       "name": "Mozambique",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "654",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "senegal",
-       "l": 0,
-       "name": "Senegal",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "4319",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "sudan",
-       "l": 0,
-       "name": "Sudan",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "Group K": [
-      {
-       "d": 0,
-       "espn_id": "2597",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "cape-verde",
-       "l": 0,
-       "name": "Cape Verde",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "4205",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "liberia",
-       "l": 0,
-       "name": "Liberia",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2849",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "mali",
-       "l": 0,
-       "name": "Mali",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2851",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "rwanda",
-       "l": 0,
-       "name": "Rwanda",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "Group L": [
-      {
-       "d": 0,
-       "espn_id": "8602",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "guinea-bissau",
-       "l": 0,
-       "name": "Guinea-Bissau",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "5533",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "madagascar",
-       "l": 0,
-       "name": "Madagascar",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "657",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "nigeria",
-       "l": 0,
-       "name": "Nigeria",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "5778",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "tanzania",
-       "l": 0,
-       "name": "Tanzania",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      }
-     ]
-    },
-    "ordering_note": "ordered by points, then goal difference, then goals scored, then name. THIS IS NOT THE GOVERNING BODY'S TIE-BREAK: UEFA, Concacaf, the AFC and CAF all break level points on head-to-head results first, so two teams level on points may legitimately sit in the other order on the official table. The NUMBERS are the claim here; the order on a points tie is not."
-   }
+ "leagues": {
+  "unl": {
+   "kind": "championship",
+   "display": "UEFA Nations League",
+   "edition": "2026-27",
+   "confederation": "UEFA",
+   "espn": [
+    "uefa.nations"
+   ],
+   "src": null,
+   "min_current_gp": null,
+   "clubs": 54,
+   "reg_time_note": "KXUEFANLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through."
   },
-  "asiancup": {
-   "structure": {
-    "stages": [
-     {
-      "dates": "7-20 Jan 2027",
-      "key": "group-stage",
-      "kind": "group",
-      "label": "Group stage (6 groups of 4)",
-      "on_provider": true
-     },
-     {
-      "dates": "22-25 Jan 2027",
-      "key": "round-of-16",
-      "kind": "knockout",
-      "label": "Round of 16",
-      "on_provider": true
-     },
-     {
-      "dates": "28-29 Jan 2027",
-      "key": "quarterfinals",
-      "kind": "knockout",
-      "label": "Quarter-finals",
-      "on_provider": true
-     },
-     {
-      "dates": "1-2 Feb 2027",
-      "key": "semifinals",
-      "kind": "knockout",
-      "label": "Semi-finals",
-      "on_provider": true
-     },
-     {
-      "dates": "5 Feb 2027",
-      "key": "final",
-      "kind": "knockout",
-      "label": "Final",
-      "on_provider": true
-     }
+  "cnl": {
+   "kind": "championship",
+   "display": "Concacaf Nations League",
+   "edition": "2026-27",
+   "confederation": "CONCACAF",
+   "espn": [
+    "concacaf.nations.league"
+   ],
+   "src": null,
+   "min_current_gp": null,
+   "clubs": 37,
+   "reg_time_note": "KXCONCACAFNLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through."
+  },
+  "afcon": {
+   "kind": "championship",
+   "display": "Africa Cup of Nations",
+   "edition": "2027",
+   "confederation": "CAF",
+   "espn": [
+    "caf.nations_qual",
+    "caf.nations"
+   ],
+   "src": null,
+   "min_current_gp": null,
+   "clubs": 48,
+   "reg_time_note": "KXAFCONGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through."
+  }
+ },
+ "rows": [
+  {
+   "refused": false,
+   "league": "unl",
+   "column": "unl",
+   "columns": [
+    "unl"
+   ],
+   "home": "Slovenia",
+   "away": "Scotland",
+   "favourite": "Slovenia",
+   "opponent": "Scotland",
+   "fav_side": "home",
+   "fav_source": "field",
+   "venue_favourite": {
+    "refused": true,
+    "reason": "no_gdg_gap",
+    "policy": "off",
+    "flipped": false,
+    "venue_class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "resolution": {
+    "Slovenia": "espn_id",
+    "Scotland": "espn_id"
+   },
+   "ppg_gap": null,
+   "gdg_gap": null,
+   "rank_gap": null,
+   "gp_current": {
+    "home": 0,
+    "away": 0,
+    "min": 0
+   },
+   "weights": null,
+   "src": "current",
+   "cross_league": false,
+   "rated_in": {
+    "home": "unl",
+    "away": "unl"
+   },
+   "table_notes": {
+    "home": null,
+    "away": null
+   },
+   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
+   "reg_time_note": "KXUEFANLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
+   "ranks": {
+    "fav": 23,
+    "opp": 22
+   },
+   "rates": {
+    "ppg": [
+     null,
+     null
+    ],
+    "gf": [
+     null,
+     null
+    ],
+    "ga": [
+     null,
+     null
+    ],
+    "gdg": [
+     null,
+     null
     ]
    },
-   "standings": {
-    "derived": {
-     "Group A": [
-      {
-       "d": 0,
-       "espn_id": "841",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "kuwait",
-       "l": 0,
-       "name": "Kuwait",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2841",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "oman",
-       "l": 0,
-       "name": "Oman",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "6167",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "palestine",
-       "l": 0,
-       "name": "Palestine",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "655",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "saudi-arabia",
-       "l": 0,
-       "name": "Saudi Arabia",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "Group B": [
-      {
-       "d": 0,
-       "espn_id": "4381",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "bahrain",
-       "l": 0,
-       "name": "Bahrain",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2917",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "jordan",
-       "l": 0,
-       "name": "Jordan",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "4860",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "north-korea",
-       "l": 0,
-       "name": "North Korea",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2570",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "uzbekistan",
-       "l": 0,
-       "name": "Uzbekistan",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "Group C": [
-      {
-       "d": 0,
-       "espn_id": "658",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "china",
-       "l": 0,
-       "name": "China",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "469",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "iran",
-       "l": 0,
-       "name": "Iran",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "6724",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "kyrgyz-republic",
-       "l": 0,
-       "name": "Kyrgyz Republic",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "4380",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "syria",
-       "l": 0,
-       "name": "Syria",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "Group D": [
-      {
-       "d": 0,
-       "espn_id": "628",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "australia",
-       "l": 0,
-       "name": "Australia",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "4375",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "iraq",
-       "l": 0,
-       "name": "Iraq",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "4384",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "singapore",
-       "l": 0,
-       "name": "Singapore",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "6723",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "tajikistan",
-       "l": 0,
-       "name": "Tajikistan",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "Group E": [
-      {
-       "d": 0,
-       "espn_id": "451",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "south-korea",
-       "l": 0,
-       "name": "South Korea",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "4397",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "united-arab-emirates",
-       "l": 0,
-       "name": "United Arab Emirates",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "7349",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "vietnam",
-       "l": 0,
-       "name": "Vietnam",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "6014",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "yemen",
-       "l": 0,
-       "name": "Yemen",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "Group F": [
-      {
-       "d": 0,
-       "espn_id": "4895",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "indonesia",
-       "l": 0,
-       "name": "Indonesia",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "627",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "japan",
-       "l": 0,
-       "name": "Japan",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "4398",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "qatar",
-       "l": 0,
-       "name": "Qatar",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "4396",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "thailand",
-       "l": 0,
-       "name": "Thailand",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      }
-     ]
-    },
-    "ordering_note": "ordered by points, then goal difference, then goals scored, then name. THIS IS NOT THE GOVERNING BODY'S TIE-BREAK: UEFA, Concacaf, the AFC and CAF all break level points on head-to-head results first, so two teams level on points may legitimately sit in the other order on the official table. The NUMBERS are the claim here; the order on a points tie is not."
+   "own_gdg": {
+    "diff": null,
+    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record."
    },
-   "teams": {
-    "australia": {
-     "name": "Australia",
-     "espn_id": "628",
-     "group": "Group D",
-     "next_fixture": {
-      "event_id": "401872242",
-      "kickoff": "2027-01-09T20:00Z",
-      "opponent": "Singapore"
+   "tiers": {
+    "ovr": [
+     2,
+     2
+    ],
+    "atk": [
+     2,
+     2
+    ],
+    "def": [
+     2,
+     2
+    ]
+   },
+   "tier_gaps": {
+    "ovr": 0,
+    "atk": 0,
+    "def": 0
+   },
+   "shape": "HOLLOW",
+   "current_only": null,
+   "field": {
+    "competition": "unl",
+    "clubs": {
+     "fav": "Slovenia",
+     "opp": "Scotland"
+    },
+    "size": 54,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 23,
+       "tier": 2,
+       "tier_set": [
+        2
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1680.3509317792189,
+       "half_width_95": 15.850958904382917,
+       "interval": [
+        1664.499972874836,
+        1696.2018906836017
+       ]
+      },
+      "opp": {
+       "rank": 22,
+       "tier": 2,
+       "tier_set": [
+        2
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1699.9591761507338,
+       "half_width_95": 28.87747144146387,
+       "interval": [
+        1671.0817047092698,
+        1728.8366475921978
+       ]
+      },
+      "tier_gap": 0,
+      "unit": "elo",
+      "label": "overall",
+      "floor": {
+       "below_floor": false,
+       "failing_condition": null
+      },
+      "field_size": 54,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 19.94094583055174,
+       "opp": 32.794278524768934
+      },
+      "signal_source": "elo"
+     },
+     "atk": {
+      "fav": {
+       "rank": 33,
+       "tier": 2,
+       "tier_set": [
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.29771379505986795,
+       "half_width_95": 0.30747364167255037,
+       "interval": [
+        -0.009759846612682421,
+        0.6051874367324184
+       ]
+      },
+      "opp": {
+       "rank": 23,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.4713141651248924,
+       "half_width_95": 0.30132724471881744,
+       "interval": [
+        0.16998692040607494,
+        0.7726414098437098
+       ]
+      },
+      "tier_gap": 0,
+      "unit": "log_goals",
+      "label": "attack",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 54,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.32128797590281827,
+       "opp": 0.31952513893504547
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "shots"
+      },
+      "licensed": {
+       "bands": 5,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 2,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 2,
+        "tier_set": [
+         1,
+         2,
+         3
+        ],
+        "straddles": true
+       }
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 23,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.40801093865298965,
+       "half_width_95": 0.3270633160101072,
+       "interval": [
+        0.08094762264288247,
+        0.7350742546630968
+       ]
+      },
+      "opp": {
+       "rank": 17,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.4983174553847277,
+       "half_width_95": 0.316702123099071,
+       "interval": [
+        0.18161533228565674,
+        0.8150195784837987
+       ]
+      },
+      "tier_gap": 0,
+      "unit": "log_goals",
+      "label": "defence",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 54,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.34105605674914247,
+       "opp": 0.3334465863090908
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "shots"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 2,
+        "tier_set": [
+         1,
+         2
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 1,
+        "tier_set": [
+         1,
+         2
+        ],
+        "straddles": true
+       }
+      }
      }
     },
-    "bahrain": {
-     "name": "Bahrain",
-     "espn_id": "4381",
-     "group": "Group B",
-     "next_fixture": {
-      "event_id": "401872239",
-      "kickoff": "2027-01-08T20:00Z",
-      "opponent": "North Korea"
+    "shape": "HOLLOW",
+    "axes_measured": [
+     "ovr",
+     "atk",
+     "def"
+    ],
+    "field_basis": "the UEFA Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus 5a2e1ce9c011, variant 'all', Elo pinned at 5 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals, measured from shots (xG, else shots on target, else goals, per match).",
+    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence."
+   },
+   "event_id": "401861057",
+   "competition_id": "401861057",
+   "kickoff": "2026-09-26T13:00Z",
+   "espn": "uefa.nations",
+   "state": "pre",
+   "in_play": false,
+   "venue": {
+    "name": "Stadion Stozice",
+    "city": "Ljubljana",
+    "country": "Slovenia"
+   },
+   "venue_class": {
+    "class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "kalshi": {
+    "event_ticker": "KXUEFANLGAME-26SEP26SLOSCO",
+    "ticker": "KXUEFANLGAME-26SEP26SLOSCO-SLO",
+    "ask_c": 37,
+    "bid_c": 36,
+    "spread_c": 1,
+    "ask_size": 17080,
+    "bid_size": 14860,
+    "flags": []
+   },
+   "form": {
+    "fav": "DLWDL",
+    "opp": "WWWLL",
+    "scope": "all senior internationals, friendlies marked",
+    "scope_is_cup": false
+   },
+   "h2h": {
+    "available": true,
+    "source": "seasonseries",
+    "meetings": [
+     {
+      "event_id": "152444",
+      "date": "2004-09-08T19:00:00Z",
+      "home": "Scotland",
+      "away": "Slovenia",
+      "home_score": 0,
+      "away_score": 0,
+      "completed": true,
+      "winner": "draw",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "178924",
+      "date": "2005-10-12T18:30:00Z",
+      "home": "Slovenia",
+      "away": "Scotland",
+      "home_score": 0,
+      "away_score": 3,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "337311",
+      "date": "2012-02-29T19:45:00Z",
+      "home": "Slovenia",
+      "away": "Scotland",
+      "home_score": 1,
+      "away_score": 1,
+      "completed": true,
+      "winner": "draw",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "431768",
+      "date": "2017-03-26T18:45:00Z",
+      "home": "Scotland",
+      "away": "Slovenia",
+      "home_score": 1,
+      "away_score": 0,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "431663",
+      "date": "2017-10-08T16:00:00Z",
+      "home": "Slovenia",
+      "away": "Scotland",
+      "home_score": 2,
+      "away_score": 2,
+      "completed": true,
+      "winner": "draw",
+      "winner_means": "this fixture's home/away sides"
+     }
+    ],
+    "tally": {
+     "home": 0,
+     "draw": 3,
+     "away": 2
+    },
+    "reason": null,
+    "window": null,
+    "last_meeting": {
+     "event_id": "431663",
+     "date": "2017-10-08T16:00:00Z",
+     "home": "Slovenia",
+     "away": "Scotland",
+     "home_score": 2,
+     "away_score": 2,
+     "completed": true,
+     "winner": "draw",
+     "winner_means": "this fixture's home/away sides"
+    },
+    "espn_reason": null
+   },
+   "national": {
+    "competition": "unl",
+    "stage": "league-phase",
+    "stage_kind": "unrecognised",
+    "group": "Group B1",
+    "leg": null,
+    "status_detail": "Sat, September 26th at 9:00 AM EDT",
+    "venue_country": "Slovenia",
+    "neutral_provider_flag": false,
+    "neutral": false,
+    "teams": {
+     "home": {
+      "key": "slovenia",
+      "espn_id": "472",
+      "name": "Slovenia",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "unl",
+       "axes": {
+        "ovr": {
+         "rank": 23,
+         "tier": 2,
+         "tier_set": [
+          2
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1680.3509317792189,
+         "half_width_95": 15.850958904382917,
+         "interval": [
+          1664.499972874836,
+          1696.2018906836017
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 19.94094583055174,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 33,
+         "tier": 2,
+         "tier_set": [
+          2,
+          3
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.29771379505986795,
+         "half_width_95": 0.30747364167255037,
+         "interval": [
+          -0.009759846612682421,
+          0.6051874367324184
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.32128797590281827,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 5,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 23,
+         "tier": 2,
+         "tier_set": [
+          1,
+          2,
+          3
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.40801093865298965,
+         "half_width_95": 0.3270633160101072,
+         "interval": [
+          0.08094762264288247,
+          0.7350742546630968
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.34105605674914247,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "DLWDL",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "724919",
+         "date": "2025-11-18T19:45Z",
+         "competition": "FIFA World Cup Qualifying - UEFA",
+         "kind": "competitive",
+         "opponent": "Sweden",
+         "venue": "away",
+         "gf": 1,
+         "ga": 1,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401857704",
+         "date": "2026-03-28T17:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Hungary",
+         "venue": "away",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401856620",
+         "date": "2026-03-31T16:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Montenegro",
+         "venue": "away",
+         "gf": 3,
+         "ga": 2,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401867323",
+         "date": "2026-06-04T16:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Cyprus",
+         "venue": "home",
+         "gf": 1,
+         "ga": 1,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401856623",
+         "date": "2026-06-07T18:45Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Croatia",
+         "venue": "away",
+         "gf": 1,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 4,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     },
+     "away": {
+      "key": "scotland",
+      "espn_id": "580",
+      "name": "Scotland",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "unl",
+       "axes": {
+        "ovr": {
+         "rank": 22,
+         "tier": 2,
+         "tier_set": [
+          2
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1699.9591761507338,
+         "half_width_95": 28.87747144146387,
+         "interval": [
+          1671.0817047092698,
+          1728.8366475921978
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 32.794278524768934,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 23,
+         "tier": 2,
+         "tier_set": [
+          1,
+          2,
+          3
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.4713141651248924,
+         "half_width_95": 0.30132724471881744,
+         "interval": [
+          0.16998692040607494,
+          0.7726414098437098
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.31952513893504547,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 5,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           1,
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 17,
+         "tier": 2,
+         "tier_set": [
+          1,
+          2,
+          3
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.4983174553847277,
+         "half_width_95": 0.316702123099071,
+         "interval": [
+          0.18161533228565674,
+          0.8150195784837987
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.3334465863090908,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 1,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "WWWLL",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "401856621",
+         "date": "2026-05-30T12:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Curaçao",
+         "venue": "home",
+         "gf": 4,
+         "ga": 1,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401868148",
+         "date": "2026-06-06T20:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Bolivia",
+         "venue": "away",
+         "gf": 4,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760418",
+         "date": "2026-06-14T01:00Z",
+         "competition": "FIFA World Cup",
+         "kind": "competitive",
+         "opponent": "Haiti",
+         "venue": "away",
+         "gf": 1,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760445",
+         "date": "2026-06-19T22:00Z",
+         "competition": "FIFA World Cup",
+         "kind": "competitive",
+         "opponent": "Morocco",
+         "venue": "home",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760465",
+         "date": "2026-06-24T22:00Z",
+         "competition": "FIFA World Cup",
+         "kind": "competitive",
+         "opponent": "Brazil",
+         "venue": "home",
+         "gf": 0,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 2,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
      }
     },
-    "china": {
-     "name": "China",
-     "espn_id": "658",
-     "group": "Group C",
-     "next_fixture": {
-      "event_id": "401872244",
-      "kickoff": "2027-01-09T20:00Z",
-      "opponent": "Iran"
-     }
+    "fixture_source": "espn",
+    "kickoff_status": null,
+    "apifootball": null,
+    "head_to_head": {
+     "available": true,
+     "source": "seasonseries",
+     "meetings": [
+      {
+       "event_id": "152444",
+       "date": "2004-09-08T19:00:00Z",
+       "home": "Scotland",
+       "away": "Slovenia",
+       "home_score": 0,
+       "away_score": 0,
+       "completed": true,
+       "winner": "draw",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "178924",
+       "date": "2005-10-12T18:30:00Z",
+       "home": "Slovenia",
+       "away": "Scotland",
+       "home_score": 0,
+       "away_score": 3,
+       "completed": true,
+       "winner": "away",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "337311",
+       "date": "2012-02-29T19:45:00Z",
+       "home": "Slovenia",
+       "away": "Scotland",
+       "home_score": 1,
+       "away_score": 1,
+       "completed": true,
+       "winner": "draw",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "431768",
+       "date": "2017-03-26T18:45:00Z",
+       "home": "Scotland",
+       "away": "Slovenia",
+       "home_score": 1,
+       "away_score": 0,
+       "completed": true,
+       "winner": "away",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "431663",
+       "date": "2017-10-08T16:00:00Z",
+       "home": "Slovenia",
+       "away": "Scotland",
+       "home_score": 2,
+       "away_score": 2,
+       "completed": true,
+       "winner": "draw",
+       "winner_means": "this fixture's home/away sides"
+      }
+     ],
+     "tally": {
+      "home": 0,
+      "draw": 3,
+      "away": 2
+     },
+     "reason": null,
+     "window": null,
+     "last_meeting": {
+      "event_id": "431663",
+      "date": "2017-10-08T16:00:00Z",
+      "home": "Slovenia",
+      "away": "Scotland",
+      "home_score": 2,
+      "away_score": 2,
+      "completed": true,
+      "winner": "draw",
+      "winner_means": "this fixture's home/away sides"
+     },
+     "espn_reason": null
     },
-    "indonesia": {
-     "name": "Indonesia",
-     "espn_id": "4895",
-     "group": "Group F",
-     "next_fixture": {
-      "event_id": "401872248",
-      "kickoff": "2027-01-11T20:00Z",
-      "opponent": "Japan"
-     }
+    "lineups": {
+     "announced": false,
+     "sides": {
+      "home": {
+       "team": "Slovenia",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      },
+      "away": {
+       "team": "Scotland",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      }
+     },
+     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff"
     },
-    "iran": {
-     "name": "Iran",
-     "espn_id": "469",
-     "group": "Group C",
-     "next_fixture": {
-      "event_id": "401872244",
-      "kickoff": "2027-01-09T20:00Z",
-      "opponent": "China"
-     }
+    "market": {
+     "status": "mapped",
+     "event_ticker": "KXUEFANLGAME-26SEP26SLOSCO",
+     "status_words": "one open Kalshi event names both teams on this date",
+     "title": "Slovenia vs Scotland",
+     "legs": {
+      "home": {
+       "event_ticker": "KXUEFANLGAME-26SEP26SLOSCO",
+       "ticker": "KXUEFANLGAME-26SEP26SLOSCO-SLO",
+       "ask_c": 37,
+       "bid_c": 36,
+       "spread_c": 1,
+       "ask_size": 17080,
+       "bid_size": 14860,
+       "flags": [],
+       "name": "Slovenia"
+      },
+      "tie": {
+       "event_ticker": "KXUEFANLGAME-26SEP26SLOSCO",
+       "ticker": "KXUEFANLGAME-26SEP26SLOSCO-TIE",
+       "ask_c": 31,
+       "bid_c": 30,
+       "spread_c": 1,
+       "ask_size": 22685,
+       "bid_size": 15050,
+       "flags": []
+      },
+      "away": {
+       "event_ticker": "KXUEFANLGAME-26SEP26SLOSCO",
+       "ticker": "KXUEFANLGAME-26SEP26SLOSCO-SCO",
+       "ask_c": 33,
+       "bid_c": 32,
+       "spread_c": 1,
+       "ask_size": 33052,
+       "bid_size": 5551,
+       "flags": [],
+       "name": "Scotland"
+      }
+     },
+     "orientation": "same"
     },
-    "iraq": {
-     "name": "Iraq",
-     "espn_id": "4375",
-     "group": "Group D",
-     "next_fixture": {
-      "event_id": "401872246",
-      "kickoff": "2027-01-10T20:00Z",
-      "opponent": "Tajikistan"
-     }
-    },
-    "japan": {
-     "name": "Japan",
-     "espn_id": "627",
-     "group": "Group F",
-     "next_fixture": {
-      "event_id": "401872248",
-      "kickoff": "2027-01-11T20:00Z",
-      "opponent": "Indonesia"
-     }
-    },
-    "jordan": {
-     "name": "Jordan",
-     "espn_id": "2917",
-     "group": "Group B",
-     "next_fixture": {
-      "event_id": "401872241",
-      "kickoff": "2027-01-08T20:00Z",
-      "opponent": "Uzbekistan"
-     }
-    },
-    "kuwait": {
-     "name": "Kuwait",
-     "espn_id": "841",
-     "group": "Group A",
-     "next_fixture": {
-      "event_id": "401872240",
-      "kickoff": "2027-01-08T20:00Z",
-      "opponent": "Oman"
-     }
-    },
-    "kyrgyz-republic": {
-     "name": "Kyrgyz Republic",
-     "espn_id": "6724",
-     "group": "Group C",
-     "next_fixture": {
-      "event_id": "401872243",
-      "kickoff": "2027-01-09T20:00Z",
-      "opponent": "Syria"
-     }
-    },
-    "north-korea": {
-     "name": "North Korea",
-     "espn_id": "4860",
-     "group": "Group B",
-     "next_fixture": {
-      "event_id": "401872239",
-      "kickoff": "2027-01-08T20:00Z",
-      "opponent": "Bahrain"
-     }
-    },
-    "oman": {
-     "name": "Oman",
-     "espn_id": "2841",
-     "group": "Group A",
-     "next_fixture": {
-      "event_id": "401872240",
-      "kickoff": "2027-01-08T20:00Z",
-      "opponent": "Kuwait"
-     }
-    },
-    "palestine": {
-     "name": "Palestine",
-     "espn_id": "6167",
-     "group": "Group A",
-     "next_fixture": {
-      "event_id": "401872238",
-      "kickoff": "2027-01-07T20:00Z",
-      "opponent": "Saudi Arabia"
-     }
-    },
-    "qatar": {
-     "name": "Qatar",
-     "espn_id": "4398",
-     "group": "Group F",
-     "next_fixture": {
-      "event_id": "401872247",
-      "kickoff": "2027-01-11T20:00Z",
-      "opponent": "Thailand"
-     }
-    },
-    "saudi-arabia": {
-     "name": "Saudi Arabia",
-     "espn_id": "655",
-     "group": "Group A",
-     "next_fixture": {
-      "event_id": "401872238",
-      "kickoff": "2027-01-07T20:00Z",
-      "opponent": "Palestine"
-     }
-    },
-    "singapore": {
-     "name": "Singapore",
-     "espn_id": "4384",
-     "group": "Group D",
-     "next_fixture": {
-      "event_id": "401872242",
-      "kickoff": "2027-01-09T20:00Z",
-      "opponent": "Australia"
-     }
-    },
-    "south-korea": {
-     "name": "South Korea",
-     "espn_id": "451",
-     "group": "Group E",
-     "next_fixture": {
-      "event_id": "401872245",
-      "kickoff": "2027-01-10T20:00Z",
-      "opponent": "Yemen"
-     }
-    },
-    "syria": {
-     "name": "Syria",
-     "espn_id": "4380",
-     "group": "Group C",
-     "next_fixture": {
-      "event_id": "401872243",
-      "kickoff": "2027-01-09T20:00Z",
-      "opponent": "Kyrgyz Republic"
-     }
-    },
-    "tajikistan": {
-     "name": "Tajikistan",
-     "espn_id": "6723",
-     "group": "Group D",
-     "next_fixture": {
-      "event_id": "401872246",
-      "kickoff": "2027-01-10T20:00Z",
-      "opponent": "Iraq"
-     }
-    },
-    "thailand": {
-     "name": "Thailand",
-     "espn_id": "4396",
-     "group": "Group F",
-     "next_fixture": {
-      "event_id": "401872247",
-      "kickoff": "2027-01-11T20:00Z",
-      "opponent": "Qatar"
-     }
-    },
-    "united-arab-emirates": {
-     "name": "United Arab Emirates",
-     "espn_id": "4397",
-     "group": "Group E",
-     "next_fixture": {
-      "event_id": "401872249",
-      "kickoff": "2027-01-11T20:00Z",
-      "opponent": "Vietnam"
-     }
-    },
-    "uzbekistan": {
-     "name": "Uzbekistan",
-     "espn_id": "2570",
-     "group": "Group B",
-     "next_fixture": {
-      "event_id": "401872241",
-      "kickoff": "2027-01-08T20:00Z",
-      "opponent": "Jordan"
-     }
-    },
-    "vietnam": {
-     "name": "Vietnam",
-     "espn_id": "7349",
-     "group": "Group E",
-     "next_fixture": {
-      "event_id": "401872249",
-      "kickoff": "2027-01-11T20:00Z",
-      "opponent": "United Arab Emirates"
-     }
-    },
-    "yemen": {
-     "name": "Yemen",
-     "espn_id": "6014",
-     "group": "Group E",
-     "next_fixture": {
-      "event_id": "401872245",
-      "kickoff": "2027-01-10T20:00Z",
-      "opponent": "South Korea"
-     }
+    "headline": {
+     "candidate": "b",
+     "label": "ELO GAP",
+     "unit": "Elo points",
+     "value": 45.4,
+     "favourite_side": "home",
+     "home_minus_away": 45.4,
+     "components": {
+      "elo": {
+       "home": 1680.4,
+       "away": 1700
+      },
+      "raw_gap_home_minus_away": -19.6,
+      "venue_term_home_minus_away": 65,
+      "venue_class": "TRUE_HOME",
+      "host_side": "home",
+      "venue_assumed": false
+     },
+     "raw_favourite_side": "away",
+     "venue_flips_raw_order": true,
+     "tie_broken_by_rank": false,
+     "basis": "The venue-adjusted Elo gap: the two teams' overall ratings on this competition's national-team field, differenced, plus the club home term given to the side whose country hosts, and nothing on neutral ground. The card's favourite and its quoted Kalshi leg are read off this same number. A preregistered out-of-sample bake-off chose it: no alternative beat it by a margin whose 95% interval excluded zero (see research_archive/national_headline_bakeoff_2026-09-25/RESULTS.json)."
     }
    }
   },
-  "cnl": {
-   "structure": {
-    "stages": [
-     {
-      "dates": "21 Sep-6 Oct 2026; League B also 9-17 Nov 2026",
-      "key": "group-stage",
-      "kind": "group",
-      "label": "Group stage (Leagues A, B, C)",
-      "on_provider": true
-     },
-     {
-      "dates": "9-17 Nov 2026",
-      "key": "quarterfinals",
-      "kind": "knockout",
-      "label": "League A quarter-finals (two legs)",
-      "on_provider": false
-     },
-     {
-      "dates": "25-28 Mar 2027",
-      "key": "finals",
-      "kind": "finals",
-      "label": "League A Finals, SoFi Stadium",
-      "on_provider": false
-     },
-     {
-      "dates": "22-30 Mar 2027",
-      "key": "league-bc-championships",
-      "kind": "finals",
-      "label": "League B and League C Championships",
-      "on_provider": false
-     }
+  {
+   "refused": false,
+   "league": "unl",
+   "column": "unl",
+   "columns": [
+    "unl"
+   ],
+   "home": "Iceland",
+   "away": "Estonia",
+   "favourite": "Iceland",
+   "opponent": "Estonia",
+   "fav_side": "home",
+   "fav_source": "field",
+   "venue_favourite": {
+    "refused": true,
+    "reason": "no_gdg_gap",
+    "policy": "off",
+    "flipped": false,
+    "venue_class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "resolution": {
+    "Iceland": "espn_id",
+    "Estonia": "espn_id"
+   },
+   "ppg_gap": null,
+   "gdg_gap": null,
+   "rank_gap": null,
+   "gp_current": {
+    "home": 0,
+    "away": 0,
+    "min": 0
+   },
+   "weights": null,
+   "src": "current",
+   "cross_league": false,
+   "rated_in": {
+    "home": "unl",
+    "away": "unl"
+   },
+   "table_notes": {
+    "home": null,
+    "away": null
+   },
+   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
+   "reg_time_note": "KXUEFANLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
+   "ranks": {
+    "fav": 34,
+    "opp": 42
+   },
+   "rates": {
+    "ppg": [
+     null,
+     null
+    ],
+    "gf": [
+     null,
+     null
+    ],
+    "ga": [
+     null,
+     null
+    ],
+    "gdg": [
+     null,
+     null
     ]
    },
-   "standings": {
-    "derived": {
-     "League A - Group A": [
-      {
-       "d": 0,
-       "espn_id": "214",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "costa-rica",
-       "l": 0,
-       "name": "Costa Rica",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "11678",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "curacao",
-       "l": 0,
-       "name": "Curaçao",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2649",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "dominican-republic",
-       "l": 0,
-       "name": "Dominican Republic",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2654",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "haiti",
-       "l": 0,
-       "name": "Haiti",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2658",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "nicaragua",
-       "l": 0,
-       "name": "Nicaragua",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2627",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "trinidad-and-tobago",
-       "l": 0,
-       "name": "Trinidad and Tobago",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "League A - Group B": [
-      {
-       "d": 0,
-       "espn_id": "2650",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "el-salvador",
-       "l": 0,
-       "name": "El Salvador",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2652",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "guatemala",
-       "l": 0,
-       "name": "Guatemala",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "215",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "honduras",
-       "l": 0,
-       "name": "Honduras",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "1038",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "jamaica",
-       "l": 0,
-       "name": "Jamaica",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2728",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "martinique",
-       "l": 0,
-       "name": "Martinique",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2664",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "suriname",
-       "l": 0,
-       "name": "Suriname",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "League B - Group A": [
-      {
-       "d": 0,
-       "espn_id": "2653",
-       "ga": 0,
-       "gd": 1,
-       "gf": 1,
-       "gp": 1,
-       "key": "guyana",
-       "l": 0,
-       "name": "Guyana",
-       "position": 1,
-       "pts": 3,
-       "w": 1
-      },
-      {
-       "d": 0,
-       "espn_id": "2646",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "cayman-islands",
-       "l": 0,
-       "name": "Cayman Islands",
-       "position": 2,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "13582",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "dominica",
-       "l": 0,
-       "name": "Dominica",
-       "position": 3,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "11766",
-       "ga": 1,
-       "gd": -1,
-       "gf": 0,
-       "gp": 1,
-       "key": "puerto-rico",
-       "l": 1,
-       "name": "Puerto Rico",
-       "position": 4,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "League B - Group B": [
-      {
-       "d": 0,
-       "espn_id": "2637",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "barbados",
-       "l": 0,
-       "name": "Barbados",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2643",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "bermuda",
-       "l": 0,
-       "name": "Bermuda",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "7657",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "guadeloupe",
-       "l": 0,
-       "name": "Guadeloupe",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2661",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "st-lucia",
-       "l": 0,
-       "name": "St. Lucia",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "League B - Group C": [
-      {
-       "d": 0,
-       "espn_id": "19314",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "bonaire",
-       "l": 0,
-       "name": "Bonaire",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2647",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "cuba",
-       "l": 0,
-       "name": "Cuba",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2651",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "grenada",
-       "l": 0,
-       "name": "Grenada",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2662",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "st-kitts-and-nevis",
-       "l": 0,
-       "name": "St. Kitts and Nevis",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "League B - Group D": [
-      {
-       "d": 0,
-       "espn_id": "2641",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "belize",
-       "l": 0,
-       "name": "Belize",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "10532",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "french-guiana",
-       "l": 0,
-       "name": "French Guiana",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "18243",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "sint-maarten",
-       "l": 0,
-       "name": "Sint Maarten",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "13584",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "st-vincent-and-the-grenadines",
-       "l": 0,
-       "name": "St. Vincent and the Grenadines",
-       "position": null,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "League C - Group A": [
-      {
-       "d": 0,
-       "espn_id": "2655",
-       "ga": 0,
-       "gd": 2,
-       "gf": 2,
-       "gp": 1,
-       "key": "montserrat",
-       "l": 0,
-       "name": "Montserrat",
-       "position": 1,
-       "pts": 3,
-       "w": 1
-      },
-      {
-       "d": 0,
-       "espn_id": "2644",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "british-virgin-islands",
-       "l": 0,
-       "name": "British Virgin Islands",
-       "position": 2,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2665",
-       "ga": 2,
-       "gd": -2,
-       "gf": 0,
-       "gp": 1,
-       "key": "turks-and-caicos-islands",
-       "l": 1,
-       "name": "Turks and Caicos Islands",
-       "position": 3,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "League C - Group B": [
-      {
-       "d": 0,
-       "espn_id": "2642",
-       "ga": 0,
-       "gd": 1,
-       "gf": 1,
-       "gp": 1,
-       "key": "aruba",
-       "l": 0,
-       "name": "Aruba",
-       "position": 1,
-       "pts": 3,
-       "w": 1
-      },
-      {
-       "d": 0,
-       "espn_id": "8942",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "anguilla",
-       "l": 0,
-       "name": "Anguilla",
-       "position": 2,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2638",
-       "ga": 1,
-       "gd": -1,
-       "gf": 0,
-       "gp": 1,
-       "key": "antigua-and-barbuda",
-       "l": 1,
-       "name": "Antigua and Barbuda",
-       "position": 3,
-       "pts": 0,
-       "w": 0
-      }
-     ],
-     "League C - Group C": [
-      {
-       "d": 0,
-       "espn_id": "10596",
-       "ga": 0,
-       "gd": 8,
-       "gf": 8,
-       "gp": 1,
-       "key": "st-martin",
-       "l": 0,
-       "name": "St. Martin",
-       "position": 1,
-       "pts": 3,
-       "w": 1
-      },
-      {
-       "d": 0,
-       "espn_id": "2645",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "us-virgin-islands",
-       "l": 0,
-       "name": "US Virgin Islands",
-       "position": 2,
-       "pts": 0,
-       "w": 0
-      },
-      {
-       "d": 0,
-       "espn_id": "2640",
-       "ga": 8,
-       "gd": -8,
-       "gf": 0,
-       "gp": 1,
-       "key": "bahamas",
-       "l": 1,
-       "name": "Bahamas",
-       "position": 3,
-       "pts": 0,
-       "w": 0
-      }
-     ]
+   "own_gdg": {
+    "diff": null,
+    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record."
+   },
+   "tiers": {
+    "ovr": [
+     3,
+     3
+    ],
+    "atk": [
+     2,
+     3
+    ],
+    "def": [
+     4,
+     4
+    ]
+   },
+   "tier_gaps": {
+    "ovr": 0,
+    "atk": 1,
+    "def": 0
+   },
+   "shape": "SPLIT",
+   "current_only": null,
+   "field": {
+    "competition": "unl",
+    "clubs": {
+     "fav": "Iceland",
+     "opp": "Estonia"
     },
-    "ordering_note": "ordered by points, then goal difference, then goals scored, then name. THIS IS NOT THE GOVERNING BODY'S TIE-BREAK: UEFA, Concacaf, the AFC and CAF all break level points on head-to-head results first, so two teams level on points may legitimately sit in the other order on the official table. The NUMBERS are the claim here; the order on a points tie is not."
+    "size": 54,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 34,
+       "tier": 3,
+       "tier_set": [
+        3
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1557.9406842870235,
+       "half_width_95": 29.467963761403677,
+       "interval": [
+        1528.4727205256197,
+        1587.4086480484273
+       ]
+      },
+      "opp": {
+       "rank": 42,
+       "tier": 3,
+       "tier_set": [
+        3
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1407.1153462997117,
+       "half_width_95": 13.860310336519568,
+       "interval": [
+        1393.255035963192,
+        1420.9756566362314
+       ]
+      },
+      "tier_gap": 0,
+      "unit": "elo",
+      "label": "overall",
+      "floor": {
+       "below_floor": false,
+       "failing_condition": null
+      },
+      "field_size": 54,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 33.18837777517045,
+       "opp": 17.780585341784562
+      },
+      "signal_source": "elo"
+     },
+     "atk": {
+      "fav": {
+       "rank": 21,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.4772426755359381,
+       "half_width_95": 0.3515049117159797,
+       "interval": [
+        0.12573776381995838,
+        0.8287475872519178
+       ]
+      },
+      "opp": {
+       "rank": 42,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.17167149679158972,
+       "half_width_95": 0.46939713544753475,
+       "interval": [
+        -0.6410686322391245,
+        0.29772563865594504
+       ]
+      },
+      "tier_gap": 1,
+      "unit": "log_goals",
+      "label": "attack",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 54,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.35359209777020584,
+       "opp": 0.47967770189311604
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "shots"
+      },
+      "licensed": {
+       "bands": 5,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 2,
+        "tier_set": [
+         1,
+         2,
+         3
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 3,
+        "tier_set": [
+         2,
+         3,
+         4
+        ],
+        "straddles": true
+       }
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 41,
+       "tier": 4,
+       "tier_set": [
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.02872704679885857,
+       "half_width_95": 0.2939158118747097,
+       "interval": [
+        -0.26518876507585115,
+        0.3226428586735683
+       ]
+      },
+      "opp": {
+       "rank": 48,
+       "tier": 4,
+       "tier_set": [
+        3,
+        4,
+        5
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.17464791131475726,
+       "half_width_95": 0.2624216323206335,
+       "interval": [
+        -0.43706954363539074,
+        0.08777372100587622
+       ]
+      },
+      "tier_gap": 0,
+      "unit": "log_goals",
+      "label": "defence",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 54,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.303019760816733,
+       "opp": 0.2790862026433804
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "shots"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 2,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 3,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       }
+      }
+     }
+    },
+    "shape": "SPLIT",
+    "axes_measured": [
+     "ovr",
+     "atk",
+     "def"
+    ],
+    "field_basis": "the UEFA Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus 5a2e1ce9c011, variant 'all', Elo pinned at 5 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals, measured from shots (xG, else shots on target, else goals, per match).",
+    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence."
+   },
+   "event_id": "401861058",
+   "competition_id": "401861058",
+   "kickoff": "2026-09-26T16:00Z",
+   "espn": "uefa.nations",
+   "state": "pre",
+   "in_play": false,
+   "venue": {
+    "name": "Laugardalsvöllur",
+    "city": "Reykjavik",
+    "country": "Iceland"
+   },
+   "venue_class": {
+    "class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "kalshi": {
+    "event_ticker": "KXUEFANLGAME-26SEP26ISLEST",
+    "ticker": "KXUEFANLGAME-26SEP26ISLEST-ISL",
+    "ask_c": 78,
+    "bid_c": 77,
+    "spread_c": 1,
+    "ask_size": 21850,
+    "bid_size": 3000,
+    "flags": []
+   },
+   "form": {
+    "fav": "LDDLL",
+    "opp": "DLWDL",
+    "scope": "all senior internationals, friendlies marked",
+    "scope_is_cup": false
+   },
+   "h2h": {
+    "available": true,
+    "source": "seasonseries",
+    "meetings": [
+     {
+      "event_id": "71227",
+      "date": "2002-11-20T16:00:00Z",
+      "home": "Estonia",
+      "away": "Iceland",
+      "home_score": 2,
+      "away_score": 0,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "392349",
+      "date": "2014-06-04T19:15:00Z",
+      "home": "Iceland",
+      "away": "Estonia",
+      "home_score": 1,
+      "away_score": 0,
+      "completed": true,
+      "winner": "home",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "418646",
+      "date": "2015-03-31T16:00:00Z",
+      "home": "Estonia",
+      "away": "Iceland",
+      "home_score": 1,
+      "away_score": 1,
+      "completed": true,
+      "winner": "draw",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "533551",
+      "date": "2019-01-15T16:45:00Z",
+      "home": "Iceland",
+      "away": "Estonia",
+      "home_score": 0,
+      "away_score": 0,
+      "completed": true,
+      "winner": "draw",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "658264",
+      "date": "2023-01-08T17:00:00Z",
+      "home": "Iceland",
+      "away": "Estonia",
+      "home_score": 1,
+      "away_score": 1,
+      "completed": true,
+      "winner": "draw",
+      "winner_means": "this fixture's home/away sides"
+     }
+    ],
+    "tally": {
+     "home": 1,
+     "draw": 3,
+     "away": 1
+    },
+    "reason": null,
+    "window": null,
+    "last_meeting": {
+     "event_id": "658264",
+     "date": "2023-01-08T17:00:00Z",
+     "home": "Iceland",
+     "away": "Estonia",
+     "home_score": 1,
+     "away_score": 1,
+     "completed": true,
+     "winner": "draw",
+     "winner_means": "this fixture's home/away sides"
+    },
+    "espn_reason": null
+   },
+   "national": {
+    "competition": "unl",
+    "stage": "league-phase",
+    "stage_kind": "unrecognised",
+    "group": "Group C4",
+    "leg": null,
+    "status_detail": "Sat, September 26th at 12:00 PM EDT",
+    "venue_country": "Iceland",
+    "neutral_provider_flag": false,
+    "neutral": false,
+    "teams": {
+     "home": {
+      "key": "iceland",
+      "espn_id": "470",
+      "name": "Iceland",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "unl",
+       "axes": {
+        "ovr": {
+         "rank": 34,
+         "tier": 3,
+         "tier_set": [
+          3
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1557.9406842870235,
+         "half_width_95": 29.467963761403677,
+         "interval": [
+          1528.4727205256197,
+          1587.4086480484273
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 33.18837777517045,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 21,
+         "tier": 2,
+         "tier_set": [
+          1,
+          2,
+          3
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.4772426755359381,
+         "half_width_95": 0.3515049117159797,
+         "interval": [
+          0.12573776381995838,
+          0.8287475872519178
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.35359209777020584,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 5,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           1,
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 41,
+         "tier": 4,
+         "tier_set": [
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.02872704679885857,
+         "half_width_95": 0.2939158118747097,
+         "interval": [
+          -0.26518876507585115,
+          0.3226428586735683
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.303019760816733,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "LDDLL",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "401842389",
+         "date": "2026-02-26T02:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Mexico",
+         "venue": "away",
+         "gf": 0,
+         "ga": 4,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401856638",
+         "date": "2026-03-28T17:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Canada",
+         "venue": "away",
+         "gf": 2,
+         "ga": 2,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401856641",
+         "date": "2026-03-31T17:35Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Haiti",
+         "venue": "away",
+         "gf": 1,
+         "ga": 1,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401867618",
+         "date": "2026-05-31T10:25Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Japan",
+         "venue": "away",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401867950",
+         "date": "2026-06-10T01:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Argentina",
+         "venue": "away",
+         "gf": 0,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 5,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     },
+     "away": {
+      "key": "estonia",
+      "espn_id": "444",
+      "name": "Estonia",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "unl",
+       "axes": {
+        "ovr": {
+         "rank": 42,
+         "tier": 3,
+         "tier_set": [
+          3
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1407.1153462997117,
+         "half_width_95": 13.860310336519568,
+         "interval": [
+          1393.255035963192,
+          1420.9756566362314
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 17.780585341784562,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 42,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.17167149679158972,
+         "half_width_95": 0.46939713544753475,
+         "interval": [
+          -0.6410686322391245,
+          0.29772563865594504
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.47967770189311604,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 5,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 3,
+          "tier_set": [
+           2,
+           3,
+           4
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 48,
+         "tier": 4,
+         "tier_set": [
+          3,
+          4,
+          5
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.17464791131475726,
+         "half_width_95": 0.2624216323206335,
+         "interval": [
+          -0.43706954363539074,
+          0.08777372100587622
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.2790862026433804,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 3,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "DLWDL",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "724872",
+         "date": "2025-10-14T16:00Z",
+         "competition": "FIFA World Cup Qualifying - UEFA",
+         "kind": "competitive",
+         "opponent": "Moldova",
+         "venue": "home",
+         "gf": 1,
+         "ga": 1,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "724875",
+         "date": "2025-11-13T17:00Z",
+         "competition": "FIFA World Cup Qualifying - UEFA",
+         "kind": "competitive",
+         "opponent": "Norway",
+         "venue": "away",
+         "gf": 1,
+         "ga": 4,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "731578",
+         "date": "2025-11-18T17:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Cyprus",
+         "venue": "away",
+         "gf": 4,
+         "ga": 2,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401862401",
+         "date": "2026-03-27T16:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Kenya",
+         "venue": "away",
+         "gf": 1,
+         "ga": 1,
+         "letter": "D",
+         "provider_letter": "W",
+         "provider_agrees": false,
+         "shootout": {
+          "for": 5,
+          "against": 4,
+          "note": "level after play, decided on penalties; the letter is the scoreline's, D"
+         }
+        },
+        {
+         "event_id": "401866740",
+         "date": "2026-03-30T17:30Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Rwanda",
+         "venue": "away",
+         "gf": 0,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 3,
+       "provider_disagreements": 1,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     }
+    },
+    "fixture_source": "espn",
+    "kickoff_status": null,
+    "apifootball": null,
+    "head_to_head": {
+     "available": true,
+     "source": "seasonseries",
+     "meetings": [
+      {
+       "event_id": "71227",
+       "date": "2002-11-20T16:00:00Z",
+       "home": "Estonia",
+       "away": "Iceland",
+       "home_score": 2,
+       "away_score": 0,
+       "completed": true,
+       "winner": "away",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "392349",
+       "date": "2014-06-04T19:15:00Z",
+       "home": "Iceland",
+       "away": "Estonia",
+       "home_score": 1,
+       "away_score": 0,
+       "completed": true,
+       "winner": "home",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "418646",
+       "date": "2015-03-31T16:00:00Z",
+       "home": "Estonia",
+       "away": "Iceland",
+       "home_score": 1,
+       "away_score": 1,
+       "completed": true,
+       "winner": "draw",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "533551",
+       "date": "2019-01-15T16:45:00Z",
+       "home": "Iceland",
+       "away": "Estonia",
+       "home_score": 0,
+       "away_score": 0,
+       "completed": true,
+       "winner": "draw",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "658264",
+       "date": "2023-01-08T17:00:00Z",
+       "home": "Iceland",
+       "away": "Estonia",
+       "home_score": 1,
+       "away_score": 1,
+       "completed": true,
+       "winner": "draw",
+       "winner_means": "this fixture's home/away sides"
+      }
+     ],
+     "tally": {
+      "home": 1,
+      "draw": 3,
+      "away": 1
+     },
+     "reason": null,
+     "window": null,
+     "last_meeting": {
+      "event_id": "658264",
+      "date": "2023-01-08T17:00:00Z",
+      "home": "Iceland",
+      "away": "Estonia",
+      "home_score": 1,
+      "away_score": 1,
+      "completed": true,
+      "winner": "draw",
+      "winner_means": "this fixture's home/away sides"
+     },
+     "espn_reason": null
+    },
+    "lineups": {
+     "announced": false,
+     "sides": {
+      "home": {
+       "team": "Iceland",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      },
+      "away": {
+       "team": "Estonia",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      }
+     },
+     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff"
+    },
+    "market": {
+     "status": "mapped",
+     "event_ticker": "KXUEFANLGAME-26SEP26ISLEST",
+     "status_words": "one open Kalshi event names both teams on this date",
+     "title": "Iceland vs Estonia",
+     "legs": {
+      "home": {
+       "event_ticker": "KXUEFANLGAME-26SEP26ISLEST",
+       "ticker": "KXUEFANLGAME-26SEP26ISLEST-ISL",
+       "ask_c": 78,
+       "bid_c": 77,
+       "spread_c": 1,
+       "ask_size": 21850,
+       "bid_size": 3000,
+       "flags": [],
+       "name": "Iceland"
+      },
+      "tie": {
+       "event_ticker": "KXUEFANLGAME-26SEP26ISLEST",
+       "ticker": "KXUEFANLGAME-26SEP26ISLEST-TIE",
+       "ask_c": 16,
+       "bid_c": 15,
+       "spread_c": 1,
+       "ask_size": 20388,
+       "bid_size": 1488,
+       "flags": []
+      },
+      "away": {
+       "event_ticker": "KXUEFANLGAME-26SEP26ISLEST",
+       "ticker": "KXUEFANLGAME-26SEP26ISLEST-EST",
+       "ask_c": 8,
+       "bid_c": 7,
+       "spread_c": 1,
+       "ask_size": 13871,
+       "bid_size": 9905,
+       "flags": [],
+       "name": "Estonia"
+      }
+     },
+     "orientation": "same"
+    },
+    "headline": {
+     "candidate": "b",
+     "label": "ELO GAP",
+     "unit": "Elo points",
+     "value": 215.8,
+     "favourite_side": "home",
+     "home_minus_away": 215.8,
+     "components": {
+      "elo": {
+       "home": 1557.9,
+       "away": 1407.1
+      },
+      "raw_gap_home_minus_away": 150.8,
+      "venue_term_home_minus_away": 65,
+      "venue_class": "TRUE_HOME",
+      "host_side": "home",
+      "venue_assumed": false
+     },
+     "raw_favourite_side": "home",
+     "venue_flips_raw_order": false,
+     "tie_broken_by_rank": false,
+     "basis": "The venue-adjusted Elo gap: the two teams' overall ratings on this competition's national-team field, differenced, plus the club home term given to the side whose country hosts, and nothing on neutral ground. The card's favourite and its quoted Kalshi leg are read off this same number. A preregistered out-of-sample bake-off chose it: no alternative beat it by a margin whose 95% interval excluded zero (see research_archive/national_headline_bakeoff_2026-09-25/RESULTS.json)."
+    }
    }
   },
+  {
+   "refused": false,
+   "league": "unl",
+   "column": "unl",
+   "columns": [
+    "unl"
+   ],
+   "home": "San Marino",
+   "away": "Finland",
+   "favourite": "Finland",
+   "opponent": "San Marino",
+   "fav_side": "away",
+   "fav_source": "field",
+   "venue_favourite": {
+    "refused": true,
+    "reason": "no_gdg_gap",
+    "policy": "off",
+    "flipped": false,
+    "venue_class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "resolution": {
+    "San Marino": "espn_id",
+    "Finland": "espn_id"
+   },
+   "ppg_gap": null,
+   "gdg_gap": null,
+   "rank_gap": null,
+   "gp_current": {
+    "home": 0,
+    "away": 0,
+    "min": 0
+   },
+   "weights": null,
+   "src": "current",
+   "cross_league": false,
+   "rated_in": {
+    "home": "unl",
+    "away": "unl"
+   },
+   "table_notes": {
+    "home": null,
+    "away": null
+   },
+   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
+   "reg_time_note": "KXUEFANLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
+   "ranks": {
+    "fav": 36,
+    "opp": 54
+   },
+   "rates": {
+    "ppg": [
+     null,
+     null
+    ],
+    "gf": [
+     null,
+     null
+    ],
+    "ga": [
+     null,
+     null
+    ],
+    "gdg": [
+     null,
+     null
+    ]
+   },
+   "own_gdg": {
+    "diff": null,
+    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record."
+   },
+   "tiers": {
+    "ovr": [
+     3,
+     5
+    ],
+    "atk": [
+     2,
+     4
+    ],
+    "def": [
+     3,
+     5
+    ]
+   },
+   "tier_gaps": {
+    "ovr": 2,
+    "atk": 2,
+    "def": 2
+   },
+   "shape": "CLEAN",
+   "current_only": null,
+   "field": {
+    "competition": "unl",
+    "clubs": {
+     "fav": "Finland",
+     "opp": "San Marino"
+    },
+    "size": 54,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 36,
+       "tier": 3,
+       "tier_set": [
+        3
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1543.6142852667072,
+       "half_width_95": 27.627898732215655,
+       "interval": [
+        1515.9863865344914,
+        1571.2421839989229
+       ]
+      },
+      "opp": {
+       "rank": 54,
+       "tier": 5,
+       "tier_set": [
+        5
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 923.062738785647,
+       "half_width_95": 32.805499933510696,
+       "interval": [
+        890.2572388521363,
+        955.8682387191576
+       ]
+      },
+      "tier_gap": 2,
+      "unit": "elo",
+      "label": "overall",
+      "floor": {
+       "below_floor": false,
+       "failing_condition": null
+      },
+      "field_size": 54,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 29.647683077325745,
+       "opp": 35.22246163362113
+      },
+      "signal_source": "elo"
+     },
+     "atk": {
+      "fav": {
+       "rank": 34,
+       "tier": 2,
+       "tier_set": [
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.2325430827062404,
+       "half_width_95": 0.3617340370719922,
+       "interval": [
+        -0.1291909543657518,
+        0.5942771197782326
+       ]
+      },
+      "opp": {
+       "rank": 51,
+       "tier": 4,
+       "tier_set": [
+        4,
+        5
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.8569688616230563,
+       "half_width_95": 0.40304737113683936,
+       "interval": [
+        -1.2600162327598956,
+        -0.45392149048621694
+       ]
+      },
+      "tier_gap": 2,
+      "unit": "log_goals",
+      "label": "attack",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 54,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.37810973420305266,
+       "opp": 0.417033246904103
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "shots"
+      },
+      "licensed": {
+       "bands": 5,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 2,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 4,
+        "tier_set": [
+         4,
+         5
+        ],
+        "straddles": true
+       }
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 36,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.15313083635157504,
+       "half_width_95": 0.27151394101886983,
+       "interval": [
+        -0.11838310466729479,
+        0.42464477737044487
+       ]
+      },
+      "opp": {
+       "rank": 54,
+       "tier": 5,
+       "tier_set": [
+        5
+       ],
+       "straddles": false,
+       "below_floor": true,
+       "value": -0.6169307951226548,
+       "half_width_95": 0.29619835711775133,
+       "interval": [
+        -0.9131291522404061,
+        -0.3207324380049035
+       ]
+      },
+      "tier_gap": 2,
+      "unit": "log_goals",
+      "label": "defence",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 54,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.28245692829725244,
+       "opp": 0.3058479333094007
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "shots"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 2,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 3,
+        "tier_set": [
+         3
+        ],
+        "straddles": false
+       }
+      }
+     }
+    },
+    "shape": "CLEAN",
+    "axes_measured": [
+     "ovr",
+     "atk",
+     "def"
+    ],
+    "field_basis": "the UEFA Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus 5a2e1ce9c011, variant 'all', Elo pinned at 5 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals, measured from shots (xG, else shots on target, else goals, per match).",
+    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence."
+   },
+   "event_id": "401861059",
+   "competition_id": "401861059",
+   "kickoff": "2026-09-26T16:00Z",
+   "espn": "uefa.nations",
+   "state": "pre",
+   "in_play": false,
+   "venue": {
+    "name": "San Marino Stadium",
+    "city": "Serravalle",
+    "country": "San Marino"
+   },
+   "venue_class": {
+    "class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "kalshi": {
+    "event_ticker": "KXUEFANLGAME-26SEP26SMRFIN",
+    "ticker": "KXUEFANLGAME-26SEP26SMRFIN-FIN",
+    "ask_c": 91,
+    "bid_c": 90,
+    "spread_c": 1,
+    "ask_size": 14664,
+    "bid_size": 75,
+    "flags": []
+   },
+   "form": {
+    "fav": "WWDLL",
+    "opp": "LLDLL",
+    "scope": "all senior internationals, friendlies marked",
+    "scope_is_cup": false
+   },
+   "h2h": {
+    "available": true,
+    "source": "seasonseries",
+    "meetings": [
+     {
+      "event_id": "299382",
+      "date": "2010-11-17T16:30:00Z",
+      "home": "Finland",
+      "away": "San Marino",
+      "home_score": 8,
+      "away_score": 0,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "299413",
+      "date": "2011-06-03T18:30:00Z",
+      "home": "San Marino",
+      "away": "Finland",
+      "home_score": 0,
+      "away_score": 1,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "655318",
+      "date": "2023-06-19T16:00:00Z",
+      "home": "Finland",
+      "away": "San Marino",
+      "home_score": 6,
+      "away_score": 0,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "655466",
+      "date": "2023-11-20T19:45:00Z",
+      "home": "San Marino",
+      "away": "Finland",
+      "home_score": 1,
+      "away_score": 2,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     }
+    ],
+    "tally": {
+     "home": 0,
+     "draw": 0,
+     "away": 4
+    },
+    "reason": null,
+    "window": null,
+    "last_meeting": {
+     "event_id": "655466",
+     "date": "2023-11-20T19:45:00Z",
+     "home": "San Marino",
+     "away": "Finland",
+     "home_score": 1,
+     "away_score": 2,
+     "completed": true,
+     "winner": "away",
+     "winner_means": "this fixture's home/away sides"
+    },
+    "espn_reason": null
+   },
+   "national": {
+    "competition": "unl",
+    "stage": "league-phase",
+    "stage_kind": "unrecognised",
+    "group": "Group C1",
+    "leg": null,
+    "status_detail": "Sat, September 26th at 12:00 PM EDT",
+    "venue_country": "San Marino",
+    "neutral_provider_flag": false,
+    "neutral": false,
+    "teams": {
+     "home": {
+      "key": "san-marino",
+      "espn_id": "588",
+      "name": "San Marino",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "unl",
+       "axes": {
+        "ovr": {
+         "rank": 54,
+         "tier": 5,
+         "tier_set": [
+          5
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 923.062738785647,
+         "half_width_95": 32.805499933510696,
+         "interval": [
+          890.2572388521363,
+          955.8682387191576
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 35.22246163362113,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 51,
+         "tier": 4,
+         "tier_set": [
+          4,
+          5
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.8569688616230563,
+         "half_width_95": 0.40304737113683936,
+         "interval": [
+          -1.2600162327598956,
+          -0.45392149048621694
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.417033246904103,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 5,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 4,
+          "tier_set": [
+           4,
+           5
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 54,
+         "tier": 5,
+         "tier_set": [
+          5
+         ],
+         "straddles": false,
+         "below_floor": true,
+         "value": -0.6169307951226548,
+         "half_width_95": 0.29619835711775133,
+         "interval": [
+          -0.9131291522404061,
+          -0.3207324380049035
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.3058479333094007,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 3,
+          "tier_set": [
+           3
+          ],
+          "straddles": false
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "LLDLL",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "724920",
+         "date": "2025-11-18T19:45Z",
+         "competition": "FIFA World Cup Qualifying - UEFA",
+         "kind": "competitive",
+         "opponent": "Romania",
+         "venue": "away",
+         "gf": 1,
+         "ga": 7,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401865146",
+         "date": "2026-03-28T14:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Faroe Islands",
+         "venue": "home",
+         "gf": 1,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401860868",
+         "date": "2026-03-31T16:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Andorra",
+         "venue": "home",
+         "gf": 0,
+         "ga": 0,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401873734",
+         "date": "2026-06-05T17:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Bangladesh",
+         "venue": "home",
+         "gf": 1,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401871580",
+         "date": "2026-06-09T18:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Azerbaijan",
+         "venue": "away",
+         "gf": 1,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 4,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     },
+     "away": {
+      "key": "finland",
+      "espn_id": "458",
+      "name": "Finland",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "unl",
+       "axes": {
+        "ovr": {
+         "rank": 36,
+         "tier": 3,
+         "tier_set": [
+          3
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1543.6142852667072,
+         "half_width_95": 27.627898732215655,
+         "interval": [
+          1515.9863865344914,
+          1571.2421839989229
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 29.647683077325745,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 34,
+         "tier": 2,
+         "tier_set": [
+          2,
+          3
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.2325430827062404,
+         "half_width_95": 0.3617340370719922,
+         "interval": [
+          -0.1291909543657518,
+          0.5942771197782326
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.37810973420305266,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 5,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 36,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.15313083635157504,
+         "half_width_95": 0.27151394101886983,
+         "interval": [
+          -0.11838310466729479,
+          0.42464477737044487
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.28245692829725244,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "WWDLL",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "733166",
+         "date": "2025-11-17T17:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Andorra",
+         "venue": "home",
+         "gf": 4,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401856601",
+         "date": "2026-03-27T06:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "New Zealand",
+         "venue": "away",
+         "gf": 2,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401856602",
+         "date": "2026-03-30T03:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Cape Verde",
+         "venue": "away",
+         "gf": 1,
+         "ga": 1,
+         "letter": "D",
+         "provider_letter": "L",
+         "provider_agrees": false,
+         "shootout": {
+          "for": 2,
+          "against": 4,
+          "note": "level after play, decided on penalties; the letter is the scoreline's, D"
+         }
+        },
+        {
+         "event_id": "758381",
+         "date": "2026-05-31T18:45Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Germany",
+         "venue": "away",
+         "gf": 0,
+         "ga": 4,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401861779",
+         "date": "2026-06-05T17:45Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Hungary",
+         "venue": "away",
+         "gf": 1,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 5,
+       "provider_disagreements": 1,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     }
+    },
+    "fixture_source": "espn",
+    "kickoff_status": null,
+    "apifootball": null,
+    "head_to_head": {
+     "available": true,
+     "source": "seasonseries",
+     "meetings": [
+      {
+       "event_id": "299382",
+       "date": "2010-11-17T16:30:00Z",
+       "home": "Finland",
+       "away": "San Marino",
+       "home_score": 8,
+       "away_score": 0,
+       "completed": true,
+       "winner": "away",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "299413",
+       "date": "2011-06-03T18:30:00Z",
+       "home": "San Marino",
+       "away": "Finland",
+       "home_score": 0,
+       "away_score": 1,
+       "completed": true,
+       "winner": "away",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "655318",
+       "date": "2023-06-19T16:00:00Z",
+       "home": "Finland",
+       "away": "San Marino",
+       "home_score": 6,
+       "away_score": 0,
+       "completed": true,
+       "winner": "away",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "655466",
+       "date": "2023-11-20T19:45:00Z",
+       "home": "San Marino",
+       "away": "Finland",
+       "home_score": 1,
+       "away_score": 2,
+       "completed": true,
+       "winner": "away",
+       "winner_means": "this fixture's home/away sides"
+      }
+     ],
+     "tally": {
+      "home": 0,
+      "draw": 0,
+      "away": 4
+     },
+     "reason": null,
+     "window": null,
+     "last_meeting": {
+      "event_id": "655466",
+      "date": "2023-11-20T19:45:00Z",
+      "home": "San Marino",
+      "away": "Finland",
+      "home_score": 1,
+      "away_score": 2,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     },
+     "espn_reason": null
+    },
+    "lineups": {
+     "announced": false,
+     "sides": {
+      "home": {
+       "team": "San Marino",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      },
+      "away": {
+       "team": "Finland",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      }
+     },
+     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff"
+    },
+    "market": {
+     "status": "mapped",
+     "event_ticker": "KXUEFANLGAME-26SEP26SMRFIN",
+     "status_words": "one open Kalshi event names both teams on this date",
+     "title": "San Marino vs Finland",
+     "legs": {
+      "home": {
+       "event_ticker": "KXUEFANLGAME-26SEP26SMRFIN",
+       "ticker": "KXUEFANLGAME-26SEP26SMRFIN-SMR",
+       "ask_c": 3,
+       "bid_c": 2,
+       "spread_c": 1,
+       "ask_size": 6161,
+       "bid_size": 9967,
+       "flags": [],
+       "name": "San Marino"
+      },
+      "tie": {
+       "event_ticker": "KXUEFANLGAME-26SEP26SMRFIN",
+       "ticker": "KXUEFANLGAME-26SEP26SMRFIN-TIE",
+       "ask_c": 8,
+       "bid_c": 7,
+       "spread_c": 1,
+       "ask_size": 13297,
+       "bid_size": 4326,
+       "flags": []
+      },
+      "away": {
+       "event_ticker": "KXUEFANLGAME-26SEP26SMRFIN",
+       "ticker": "KXUEFANLGAME-26SEP26SMRFIN-FIN",
+       "ask_c": 91,
+       "bid_c": 90,
+       "spread_c": 1,
+       "ask_size": 14664,
+       "bid_size": 75,
+       "flags": [],
+       "name": "Finland"
+      }
+     },
+     "orientation": "same"
+    },
+    "headline": {
+     "candidate": "b",
+     "label": "ELO GAP",
+     "unit": "Elo points",
+     "value": 555.6,
+     "favourite_side": "away",
+     "home_minus_away": -555.6,
+     "components": {
+      "elo": {
+       "home": 923.1,
+       "away": 1543.6
+      },
+      "raw_gap_home_minus_away": -620.6,
+      "venue_term_home_minus_away": 65,
+      "venue_class": "TRUE_HOME",
+      "host_side": "home",
+      "venue_assumed": false
+     },
+     "raw_favourite_side": "away",
+     "venue_flips_raw_order": false,
+     "tie_broken_by_rank": false,
+     "basis": "The venue-adjusted Elo gap: the two teams' overall ratings on this competition's national-team field, differenced, plus the club home term given to the side whose country hosts, and nothing on neutral ground. The card's favourite and its quoted Kalshi leg are read off this same number. A preregistered out-of-sample bake-off chose it: no alternative beat it by a margin whose 95% interval excluded zero (see research_archive/national_headline_bakeoff_2026-09-25/RESULTS.json)."
+    }
+   }
+  },
+  {
+   "refused": false,
+   "league": "unl",
+   "column": "unl",
+   "columns": [
+    "unl"
+   ],
+   "home": "Faroe Islands",
+   "away": "Kazakhstan",
+   "favourite": "Kazakhstan",
+   "opponent": "Faroe Islands",
+   "fav_side": "away",
+   "fav_source": "field",
+   "venue_favourite": {
+    "refused": true,
+    "reason": "no_gdg_gap",
+    "policy": "off",
+    "flipped": false,
+    "venue_class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "resolution": {
+    "Faroe Islands": "espn_id",
+    "Kazakhstan": "espn_id"
+   },
+   "ppg_gap": null,
+   "gdg_gap": null,
+   "rank_gap": null,
+   "gp_current": {
+    "home": 0,
+    "away": 0,
+    "min": 0
+   },
+   "weights": null,
+   "src": "current",
+   "cross_league": false,
+   "rated_in": {
+    "home": "unl",
+    "away": "unl"
+   },
+   "table_notes": {
+    "home": null,
+    "away": null
+   },
+   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
+   "reg_time_note": "KXUEFANLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
+   "ranks": {
+    "fav": 41,
+    "opp": 45
+   },
+   "rates": {
+    "ppg": [
+     null,
+     null
+    ],
+    "gf": [
+     null,
+     null
+    ],
+    "ga": [
+     null,
+     null
+    ],
+    "gdg": [
+     null,
+     null
+    ]
+   },
+   "own_gdg": {
+    "diff": null,
+    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record."
+   },
+   "tiers": {
+    "ovr": [
+     3,
+     4
+    ],
+    "atk": [
+     3,
+     3
+    ],
+    "def": [
+     4,
+     4
+    ]
+   },
+   "tier_gaps": {
+    "ovr": 1,
+    "atk": 0,
+    "def": 0
+   },
+   "shape": "HOLLOW",
+   "current_only": null,
+   "field": {
+    "competition": "unl",
+    "clubs": {
+     "fav": "Kazakhstan",
+     "opp": "Faroe Islands"
+    },
+    "size": 54,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 41,
+       "tier": 3,
+       "tier_set": [
+        3
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1436.8535230387054,
+       "half_width_95": 37.78064983116059,
+       "interval": [
+        1399.0728732075447,
+        1474.634172869866
+       ]
+      },
+      "opp": {
+       "rank": 45,
+       "tier": 4,
+       "tier_set": [
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "value": 1371.3664284067236,
+       "half_width_95": 4.69740702153115,
+       "interval": [
+        1366.6690213851923,
+        1376.0638354282548
+       ]
+      },
+      "tier_gap": 1,
+      "unit": "elo",
+      "label": "overall",
+      "floor": {
+       "below_floor": false,
+       "failing_condition": null
+      },
+      "field_size": 54,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 42.32641755515065,
+       "opp": 11.74070486895078
+      },
+      "signal_source": "elo"
+     },
+     "atk": {
+      "fav": {
+       "rank": 48,
+       "tier": 3,
+       "tier_set": [
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.3351664809331327,
+       "half_width_95": 0.272029456200858,
+       "interval": [
+        -0.6071959371339908,
+        -0.06313702473227473
+       ]
+      },
+      "opp": {
+       "rank": 46,
+       "tier": 3,
+       "tier_set": [
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.3014787234128804,
+       "half_width_95": 0.22560033528936177,
+       "interval": [
+        -0.5270790587022421,
+        -0.07587838812351863
+       ]
+      },
+      "tier_gap": 0,
+      "unit": "log_goals",
+      "label": "attack",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 54,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.2886802332531289,
+       "opp": 0.24658321935159339
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "shots"
+      },
+      "licensed": {
+       "bands": 5,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 3,
+        "tier_set": [
+         3,
+         4
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 3,
+        "tier_set": [
+         3,
+         4
+        ],
+        "straddles": true
+       }
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 46,
+       "tier": 4,
+       "tier_set": [
+        3,
+        4,
+        5
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.13668942653152244,
+       "half_width_95": 0.23273988079769953,
+       "interval": [
+        -0.36942930732922197,
+        0.09605045426617709
+       ]
+      },
+      "opp": {
+       "rank": 39,
+       "tier": 4,
+       "tier_set": [
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.04623804109925897,
+       "half_width_95": 0.3068125070666189,
+       "interval": [
+        -0.2605744659673599,
+        0.3530505481658779
+       ]
+      },
+      "tier_gap": 0,
+      "unit": "log_goals",
+      "label": "defence",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 54,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.24611613165330784,
+       "opp": 0.3110964751469065
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "shots"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 3,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 2,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       }
+      }
+     }
+    },
+    "shape": "HOLLOW",
+    "axes_measured": [
+     "ovr",
+     "atk",
+     "def"
+    ],
+    "field_basis": "the UEFA Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus 5a2e1ce9c011, variant 'all', Elo pinned at 5 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals, measured from shots (xG, else shots on target, else goals, per match).",
+    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence."
+   },
+   "event_id": "401861060",
+   "competition_id": "401861060",
+   "kickoff": "2026-09-26T16:00Z",
+   "espn": "uefa.nations",
+   "state": "pre",
+   "in_play": false,
+   "venue": {
+    "name": "Tórsvollur",
+    "city": "Tórshavn",
+    "country": "Faroe Islands"
+   },
+   "venue_class": {
+    "class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "kalshi": {
+    "event_ticker": "KXUEFANLGAME-26SEP26FROKAZ",
+    "ticker": "KXUEFANLGAME-26SEP26FROKAZ-KAZ",
+    "ask_c": 29,
+    "bid_c": 28,
+    "spread_c": 1,
+    "ask_size": 2730,
+    "bid_size": 1708,
+    "flags": []
+   },
+   "form": {
+    "fav": "LWWDL",
+    "opp": "WWLWW",
+    "scope": "all senior internationals, friendlies marked",
+    "scope_is_cup": false
+   },
+   "h2h": {
+    "available": true,
+    "source": "seasonseries",
+    "meetings": [
+     {
+      "event_id": "334751",
+      "date": "2013-09-06T15:00:00Z",
+      "home": "Kazakhstan",
+      "away": "Faroe Islands",
+      "home_score": 2,
+      "away_score": 1,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "334791",
+      "date": "2013-10-11T17:00:00Z",
+      "home": "Faroe Islands",
+      "away": "Kazakhstan",
+      "home_score": 1,
+      "away_score": 1,
+      "completed": true,
+      "winner": "draw",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "760047",
+      "date": "2025-11-18T17:00:00Z",
+      "home": "Faroe Islands",
+      "away": "Kazakhstan",
+      "home_score": 1,
+      "away_score": 0,
+      "completed": true,
+      "winner": "home",
+      "winner_means": "this fixture's home/away sides"
+     }
+    ],
+    "tally": {
+     "home": 1,
+     "draw": 1,
+     "away": 1
+    },
+    "reason": null,
+    "window": null,
+    "last_meeting": {
+     "event_id": "760047",
+     "date": "2025-11-18T17:00:00Z",
+     "home": "Faroe Islands",
+     "away": "Kazakhstan",
+     "home_score": 1,
+     "away_score": 0,
+     "completed": true,
+     "winner": "home",
+     "winner_means": "this fixture's home/away sides"
+    },
+    "espn_reason": null
+   },
+   "national": {
+    "competition": "unl",
+    "stage": "league-phase",
+    "stage_kind": "unrecognised",
+    "group": "Group C3",
+    "leg": null,
+    "status_detail": "Sat, September 26th at 12:00 PM EDT",
+    "venue_country": "Faroe Islands",
+    "neutral_provider_flag": false,
+    "neutral": false,
+    "teams": {
+     "home": {
+      "key": "faroe-islands",
+      "espn_id": "447",
+      "name": "Faroe Islands",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "unl",
+       "axes": {
+        "ovr": {
+         "rank": 45,
+         "tier": 4,
+         "tier_set": [
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": false,
+         "value": 1371.3664284067236,
+         "half_width_95": 4.69740702153115,
+         "interval": [
+          1366.6690213851923,
+          1376.0638354282548
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 11.74070486895078,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 46,
+         "tier": 3,
+         "tier_set": [
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.3014787234128804,
+         "half_width_95": 0.22560033528936177,
+         "interval": [
+          -0.5270790587022421,
+          -0.07587838812351863
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.24658321935159339,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 5,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 3,
+          "tier_set": [
+           3,
+           4
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 39,
+         "tier": 4,
+         "tier_set": [
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.04623804109925897,
+         "half_width_95": 0.3068125070666189,
+         "interval": [
+          -0.2605744659673599,
+          0.3530505481658779
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.3110964751469065,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "WWLWW",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "724831",
+         "date": "2025-10-09T18:45Z",
+         "competition": "FIFA World Cup Qualifying - UEFA",
+         "kind": "competitive",
+         "opponent": "Montenegro",
+         "venue": "home",
+         "gf": 4,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "724852",
+         "date": "2025-10-12T16:00Z",
+         "competition": "FIFA World Cup Qualifying - UEFA",
+         "kind": "competitive",
+         "opponent": "Czechia",
+         "venue": "home",
+         "gf": 2,
+         "ga": 1,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "724887",
+         "date": "2025-11-14T19:45Z",
+         "competition": "FIFA World Cup Qualifying - UEFA",
+         "kind": "competitive",
+         "opponent": "Croatia",
+         "venue": "away",
+         "gf": 1,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760047",
+         "date": "2025-11-18T17:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Kazakhstan",
+         "venue": "home",
+         "gf": 1,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401865146",
+         "date": "2026-03-28T14:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "San Marino",
+         "venue": "away",
+         "gf": 2,
+         "ga": 1,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 2,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     },
+     "away": {
+      "key": "kazakhstan",
+      "espn_id": "2619",
+      "name": "Kazakhstan",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "unl",
+       "axes": {
+        "ovr": {
+         "rank": 41,
+         "tier": 3,
+         "tier_set": [
+          3
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1436.8535230387054,
+         "half_width_95": 37.78064983116059,
+         "interval": [
+          1399.0728732075447,
+          1474.634172869866
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 42.32641755515065,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 48,
+         "tier": 3,
+         "tier_set": [
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.3351664809331327,
+         "half_width_95": 0.272029456200858,
+         "interval": [
+          -0.6071959371339908,
+          -0.06313702473227473
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.2886802332531289,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 5,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 3,
+          "tier_set": [
+           3,
+           4
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 46,
+         "tier": 4,
+         "tier_set": [
+          3,
+          4,
+          5
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.13668942653152244,
+         "half_width_95": 0.23273988079769953,
+         "interval": [
+          -0.36942930732922197,
+          0.09605045426617709
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.24611613165330784,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 3,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "LWWDL",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "760047",
+         "date": "2025-11-18T17:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Faroe Islands",
+         "venue": "away",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401866497",
+         "date": "2026-03-25T12:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Namibia",
+         "venue": "home",
+         "gf": 2,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401859221",
+         "date": "2026-03-31T12:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Comoros",
+         "venue": "home",
+         "gf": 1,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401866137",
+         "date": "2026-06-06T14:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Armenia",
+         "venue": "away",
+         "gf": 1,
+         "ga": 1,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401861661",
+         "date": "2026-06-09T17:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Hungary",
+         "venue": "away",
+         "gf": 1,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 5,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     }
+    },
+    "fixture_source": "espn",
+    "kickoff_status": null,
+    "apifootball": null,
+    "head_to_head": {
+     "available": true,
+     "source": "seasonseries",
+     "meetings": [
+      {
+       "event_id": "334751",
+       "date": "2013-09-06T15:00:00Z",
+       "home": "Kazakhstan",
+       "away": "Faroe Islands",
+       "home_score": 2,
+       "away_score": 1,
+       "completed": true,
+       "winner": "away",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "334791",
+       "date": "2013-10-11T17:00:00Z",
+       "home": "Faroe Islands",
+       "away": "Kazakhstan",
+       "home_score": 1,
+       "away_score": 1,
+       "completed": true,
+       "winner": "draw",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "760047",
+       "date": "2025-11-18T17:00:00Z",
+       "home": "Faroe Islands",
+       "away": "Kazakhstan",
+       "home_score": 1,
+       "away_score": 0,
+       "completed": true,
+       "winner": "home",
+       "winner_means": "this fixture's home/away sides"
+      }
+     ],
+     "tally": {
+      "home": 1,
+      "draw": 1,
+      "away": 1
+     },
+     "reason": null,
+     "window": null,
+     "last_meeting": {
+      "event_id": "760047",
+      "date": "2025-11-18T17:00:00Z",
+      "home": "Faroe Islands",
+      "away": "Kazakhstan",
+      "home_score": 1,
+      "away_score": 0,
+      "completed": true,
+      "winner": "home",
+      "winner_means": "this fixture's home/away sides"
+     },
+     "espn_reason": null
+    },
+    "lineups": {
+     "announced": false,
+     "sides": {
+      "home": {
+       "team": "Faroe Islands",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      },
+      "away": {
+       "team": "Kazakhstan",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      }
+     },
+     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff"
+    },
+    "market": {
+     "status": "mapped",
+     "event_ticker": "KXUEFANLGAME-26SEP26FROKAZ",
+     "status_words": "one open Kalshi event names both teams on this date",
+     "title": "Faroe Islands vs Kazakhstan",
+     "legs": {
+      "home": {
+       "event_ticker": "KXUEFANLGAME-26SEP26FROKAZ",
+       "ticker": "KXUEFANLGAME-26SEP26FROKAZ-FRO",
+       "ask_c": 41,
+       "bid_c": 40,
+       "spread_c": 1,
+       "ask_size": 130,
+       "bid_size": 2437,
+       "flags": [],
+       "name": "Faroe Islands"
+      },
+      "tie": {
+       "event_ticker": "KXUEFANLGAME-26SEP26FROKAZ",
+       "ticker": "KXUEFANLGAME-26SEP26FROKAZ-TIE",
+       "ask_c": 31,
+       "bid_c": 30,
+       "spread_c": 1,
+       "ask_size": 984,
+       "bid_size": 3683,
+       "flags": []
+      },
+      "away": {
+       "event_ticker": "KXUEFANLGAME-26SEP26FROKAZ",
+       "ticker": "KXUEFANLGAME-26SEP26FROKAZ-KAZ",
+       "ask_c": 29,
+       "bid_c": 28,
+       "spread_c": 1,
+       "ask_size": 2730,
+       "bid_size": 1708,
+       "flags": [],
+       "name": "Kazakhstan"
+      }
+     },
+     "orientation": "same"
+    },
+    "headline": {
+     "candidate": "b",
+     "label": "ELO GAP",
+     "unit": "Elo points",
+     "value": 0.5,
+     "favourite_side": "away",
+     "home_minus_away": -0.5,
+     "components": {
+      "elo": {
+       "home": 1371.4,
+       "away": 1436.9
+      },
+      "raw_gap_home_minus_away": -65.5,
+      "venue_term_home_minus_away": 65,
+      "venue_class": "TRUE_HOME",
+      "host_side": "home",
+      "venue_assumed": false
+     },
+     "raw_favourite_side": "away",
+     "venue_flips_raw_order": false,
+     "tie_broken_by_rank": false,
+     "basis": "The venue-adjusted Elo gap: the two teams' overall ratings on this competition's national-team field, differenced, plus the club home term given to the side whose country hosts, and nothing on neutral ground. The card's favourite and its quoted Kalshi leg are read off this same number. A preregistered out-of-sample bake-off chose it: no alternative beat it by a margin whose 95% interval excluded zero (see research_archive/national_headline_bakeoff_2026-09-25/RESULTS.json)."
+    }
+   }
+  },
+  {
+   "refused": false,
+   "league": "unl",
+   "column": "unl",
+   "columns": [
+    "unl"
+   ],
+   "home": "Bulgaria",
+   "away": "Luxembourg",
+   "favourite": "Bulgaria",
+   "opponent": "Luxembourg",
+   "fav_side": "home",
+   "fav_source": "field",
+   "venue_favourite": {
+    "refused": true,
+    "reason": "no_gdg_gap",
+    "policy": "off",
+    "flipped": false,
+    "venue_class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "resolution": {
+    "Bulgaria": "espn_id",
+    "Luxembourg": "espn_id"
+   },
+   "ppg_gap": null,
+   "gdg_gap": null,
+   "rank_gap": null,
+   "gp_current": {
+    "home": 0,
+    "away": 0,
+    "min": 0
+   },
+   "weights": null,
+   "src": "current",
+   "cross_league": false,
+   "rated_in": {
+    "home": "unl",
+    "away": "unl"
+   },
+   "table_notes": {
+    "home": null,
+    "away": null
+   },
+   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
+   "reg_time_note": "KXUEFANLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
+   "ranks": {
+    "fav": 39,
+    "opp": 40
+   },
+   "rates": {
+    "ppg": [
+     null,
+     null
+    ],
+    "gf": [
+     null,
+     null
+    ],
+    "ga": [
+     null,
+     null
+    ],
+    "gdg": [
+     null,
+     null
+    ]
+   },
+   "own_gdg": {
+    "diff": null,
+    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record."
+   },
+   "tiers": {
+    "ovr": [
+     3,
+     3
+    ],
+    "atk": [
+     3,
+     3
+    ],
+    "def": [
+     3,
+     3
+    ]
+   },
+   "tier_gaps": {
+    "ovr": 0,
+    "atk": 0,
+    "def": 0
+   },
+   "shape": "HOLLOW",
+   "current_only": null,
+   "field": {
+    "competition": "unl",
+    "clubs": {
+     "fav": "Bulgaria",
+     "opp": "Luxembourg"
+    },
+    "size": 54,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 39,
+       "tier": 3,
+       "tier_set": [
+        3
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1477.8946644105104,
+       "half_width_95": 30.68544959884152,
+       "interval": [
+        1447.2092148116687,
+        1508.580114009352
+       ]
+      },
+      "opp": {
+       "rank": 40,
+       "tier": 3,
+       "tier_set": [
+        3
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1453.902881244118,
+       "half_width_95": 7.0108543888298716,
+       "interval": [
+        1446.8920268552881,
+        1460.9137356329477
+       ]
+      },
+      "tier_gap": 0,
+      "unit": "elo",
+      "label": "overall",
+      "floor": {
+       "below_floor": false,
+       "failing_condition": null
+      },
+      "field_size": 54,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 32.88354832502811,
+       "opp": 13.416962776623903
+      },
+      "signal_source": "elo"
+     },
+     "atk": {
+      "fav": {
+       "rank": 40,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.016257333837550847,
+       "half_width_95": 0.37704601007608585,
+       "interval": [
+        -0.3933033439136367,
+        0.360788676238535
+       ]
+      },
+      "opp": {
+       "rank": 49,
+       "tier": 3,
+       "tier_set": [
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.351907317193616,
+       "half_width_95": 0.39732435929895943,
+       "interval": [
+        -0.7492316764925755,
+        0.04541704210534342
+       ]
+      },
+      "tier_gap": 0,
+      "unit": "log_goals",
+      "label": "attack",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 54,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.3780672684402188,
+       "opp": 0.4094437518036951
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "shots"
+      },
+      "licensed": {
+       "bands": 5,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 3,
+        "tier_set": [
+         2,
+         3,
+         4
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 3,
+        "tier_set": [
+         3,
+         4
+        ],
+        "straddles": true
+       }
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 37,
+       "tier": 3,
+       "tier_set": [
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.11255523992570188,
+       "half_width_95": 0.2395163468342034,
+       "interval": [
+        -0.12696110690850151,
+        0.35207158675990524
+       ]
+      },
+      "opp": {
+       "rank": 28,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.32033923281763454,
+       "half_width_95": 0.29801309618677263,
+       "interval": [
+        0.022326136630861915,
+        0.6183523290044072
+       ]
+      },
+      "tier_gap": 0,
+      "unit": "log_goals",
+      "label": "defence",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 54,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.268994784093188,
+       "opp": 0.31252007025388756
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "shots"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 2,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 2,
+        "tier_set": [
+         1,
+         2
+        ],
+        "straddles": true
+       }
+      }
+     }
+    },
+    "shape": "HOLLOW",
+    "axes_measured": [
+     "ovr",
+     "atk",
+     "def"
+    ],
+    "field_basis": "the UEFA Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus 5a2e1ce9c011, variant 'all', Elo pinned at 5 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals, measured from shots (xG, else shots on target, else goals, per match).",
+    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence."
+   },
+   "event_id": "401861061",
+   "competition_id": "401861061",
+   "kickoff": "2026-09-26T16:00Z",
+   "espn": "uefa.nations",
+   "state": "pre",
+   "in_play": false,
+   "venue": {
+    "name": "Hristo Botev Stadium, Plovdiv",
+    "city": "Plovdiv",
+    "country": "Bulgaria"
+   },
+   "venue_class": {
+    "class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "kalshi": {
+    "event_ticker": "KXUEFANLGAME-26SEP26BULLUX",
+    "ticker": "KXUEFANLGAME-26SEP26BULLUX-BUL",
+    "ask_c": 42,
+    "bid_c": 41,
+    "spread_c": 1,
+    "ask_size": 13818,
+    "bid_size": 5319,
+    "flags": []
+   },
+   "form": {
+    "fav": "WWWLD",
+    "opp": "LWWLW",
+    "scope": "all senior internationals, friendlies marked",
+    "scope_is_cup": false
+   },
+   "h2h": {
+    "available": true,
+    "source": "seasonseries",
+    "meetings": [
+     {
+      "event_id": "431869",
+      "date": "2016-09-06T18:45:00Z",
+      "home": "Bulgaria",
+      "away": "Luxembourg",
+      "home_score": 4,
+      "away_score": 3,
+      "completed": true,
+      "winner": "home",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "431642",
+      "date": "2017-10-10T18:45:00Z",
+      "home": "Luxembourg",
+      "away": "Bulgaria",
+      "home_score": 1,
+      "away_score": 1,
+      "completed": true,
+      "winner": "draw",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "653323",
+      "date": "2022-11-20T14:00:00Z",
+      "home": "Luxembourg",
+      "away": "Bulgaria",
+      "home_score": 0,
+      "away_score": 0,
+      "completed": true,
+      "winner": "draw",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "698953",
+      "date": "2024-10-12T16:00:00Z",
+      "home": "Bulgaria",
+      "away": "Luxembourg",
+      "home_score": 0,
+      "away_score": 0,
+      "completed": true,
+      "winner": "draw",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "698996",
+      "date": "2024-11-15T19:45:00Z",
+      "home": "Luxembourg",
+      "away": "Bulgaria",
+      "home_score": 0,
+      "away_score": 1,
+      "completed": true,
+      "winner": "home",
+      "winner_means": "this fixture's home/away sides"
+     }
+    ],
+    "tally": {
+     "home": 2,
+     "draw": 3,
+     "away": 0
+    },
+    "reason": null,
+    "window": null,
+    "last_meeting": {
+     "event_id": "698996",
+     "date": "2024-11-15T19:45:00Z",
+     "home": "Luxembourg",
+     "away": "Bulgaria",
+     "home_score": 0,
+     "away_score": 1,
+     "completed": true,
+     "winner": "home",
+     "winner_means": "this fixture's home/away sides"
+    },
+    "espn_reason": null
+   },
+   "national": {
+    "competition": "unl",
+    "stage": "league-phase",
+    "stage_kind": "unrecognised",
+    "group": "Group C4",
+    "leg": null,
+    "status_detail": "Sat, September 26th at 12:00 PM EDT",
+    "venue_country": "Bulgaria",
+    "neutral_provider_flag": false,
+    "neutral": false,
+    "teams": {
+     "home": {
+      "key": "bulgaria",
+      "espn_id": "462",
+      "name": "Bulgaria",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "unl",
+       "axes": {
+        "ovr": {
+         "rank": 39,
+         "tier": 3,
+         "tier_set": [
+          3
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1477.8946644105104,
+         "half_width_95": 30.68544959884152,
+         "interval": [
+          1447.2092148116687,
+          1508.580114009352
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 32.88354832502811,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 40,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.016257333837550847,
+         "half_width_95": 0.37704601007608585,
+         "interval": [
+          -0.3933033439136367,
+          0.360788676238535
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.3780672684402188,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 5,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 3,
+          "tier_set": [
+           2,
+           3,
+           4
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 37,
+         "tier": 3,
+         "tier_set": [
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.11255523992570188,
+         "half_width_95": 0.2395163468342034,
+         "interval": [
+          -0.12696110690850151,
+          0.35207158675990524
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.268994784093188,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "WWWLD",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "724916",
+         "date": "2025-11-18T19:45Z",
+         "competition": "FIFA World Cup Qualifying - UEFA",
+         "kind": "competitive",
+         "opponent": "Georgia",
+         "venue": "home",
+         "gf": 2,
+         "ga": 1,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401861601",
+         "date": "2026-03-27T08:30Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Solomon Islands",
+         "venue": "away",
+         "gf": 10,
+         "ga": 2,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401866865",
+         "date": "2026-03-30T13:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Indonesia",
+         "venue": "away",
+         "gf": 1,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401869442",
+         "date": "2026-06-01T16:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Montenegro",
+         "venue": "home",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401867937",
+         "date": "2026-06-05T17:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Moldova",
+         "venue": "away",
+         "gf": 2,
+         "ga": 2,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 4,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     },
+     "away": {
+      "key": "luxembourg",
+      "espn_id": "582",
+      "name": "Luxembourg",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "unl",
+       "axes": {
+        "ovr": {
+         "rank": 40,
+         "tier": 3,
+         "tier_set": [
+          3
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1453.902881244118,
+         "half_width_95": 7.0108543888298716,
+         "interval": [
+          1446.8920268552881,
+          1460.9137356329477
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 13.416962776623903,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 49,
+         "tier": 3,
+         "tier_set": [
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.351907317193616,
+         "half_width_95": 0.39732435929895943,
+         "interval": [
+          -0.7492316764925755,
+          0.04541704210534342
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.4094437518036951,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 5,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 3,
+          "tier_set": [
+           3,
+           4
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 28,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.32033923281763454,
+         "half_width_95": 0.29801309618677263,
+         "interval": [
+          0.022326136630861915,
+          0.6183523290044072
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.31252007025388756,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "LWWLW",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "724910",
+         "date": "2025-11-17T19:45Z",
+         "competition": "FIFA World Cup Qualifying - UEFA",
+         "kind": "competitive",
+         "opponent": "Northern Ireland",
+         "venue": "away",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "723733",
+         "date": "2026-03-26T17:00Z",
+         "competition": "UEFA Nations League",
+         "kind": "competitive",
+         "opponent": "Malta",
+         "venue": "away",
+         "gf": 2,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "723734",
+         "date": "2026-03-31T16:00Z",
+         "competition": "UEFA Nations League",
+         "kind": "competitive",
+         "opponent": "Malta",
+         "venue": "home",
+         "gf": 3,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401869325",
+         "date": "2026-06-03T18:45Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Italy",
+         "venue": "home",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401870098",
+         "date": "2026-06-06T18:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Albania",
+         "venue": "away",
+         "gf": 1,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 2,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     }
+    },
+    "fixture_source": "espn",
+    "kickoff_status": null,
+    "apifootball": null,
+    "head_to_head": {
+     "available": true,
+     "source": "seasonseries",
+     "meetings": [
+      {
+       "event_id": "431869",
+       "date": "2016-09-06T18:45:00Z",
+       "home": "Bulgaria",
+       "away": "Luxembourg",
+       "home_score": 4,
+       "away_score": 3,
+       "completed": true,
+       "winner": "home",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "431642",
+       "date": "2017-10-10T18:45:00Z",
+       "home": "Luxembourg",
+       "away": "Bulgaria",
+       "home_score": 1,
+       "away_score": 1,
+       "completed": true,
+       "winner": "draw",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "653323",
+       "date": "2022-11-20T14:00:00Z",
+       "home": "Luxembourg",
+       "away": "Bulgaria",
+       "home_score": 0,
+       "away_score": 0,
+       "completed": true,
+       "winner": "draw",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "698953",
+       "date": "2024-10-12T16:00:00Z",
+       "home": "Bulgaria",
+       "away": "Luxembourg",
+       "home_score": 0,
+       "away_score": 0,
+       "completed": true,
+       "winner": "draw",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "698996",
+       "date": "2024-11-15T19:45:00Z",
+       "home": "Luxembourg",
+       "away": "Bulgaria",
+       "home_score": 0,
+       "away_score": 1,
+       "completed": true,
+       "winner": "home",
+       "winner_means": "this fixture's home/away sides"
+      }
+     ],
+     "tally": {
+      "home": 2,
+      "draw": 3,
+      "away": 0
+     },
+     "reason": null,
+     "window": null,
+     "last_meeting": {
+      "event_id": "698996",
+      "date": "2024-11-15T19:45:00Z",
+      "home": "Luxembourg",
+      "away": "Bulgaria",
+      "home_score": 0,
+      "away_score": 1,
+      "completed": true,
+      "winner": "home",
+      "winner_means": "this fixture's home/away sides"
+     },
+     "espn_reason": null
+    },
+    "lineups": {
+     "announced": false,
+     "sides": {
+      "home": {
+       "team": "Bulgaria",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      },
+      "away": {
+       "team": "Luxembourg",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      }
+     },
+     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff"
+    },
+    "market": {
+     "status": "mapped",
+     "event_ticker": "KXUEFANLGAME-26SEP26BULLUX",
+     "status_words": "one open Kalshi event names both teams on this date",
+     "title": "Bulgaria vs Luxembourg",
+     "legs": {
+      "home": {
+       "event_ticker": "KXUEFANLGAME-26SEP26BULLUX",
+       "ticker": "KXUEFANLGAME-26SEP26BULLUX-BUL",
+       "ask_c": 42,
+       "bid_c": 41,
+       "spread_c": 1,
+       "ask_size": 13818,
+       "bid_size": 5319,
+       "flags": [],
+       "name": "Bulgaria"
+      },
+      "tie": {
+       "event_ticker": "KXUEFANLGAME-26SEP26BULLUX",
+       "ticker": "KXUEFANLGAME-26SEP26BULLUX-TIE",
+       "ask_c": 30,
+       "bid_c": 29,
+       "spread_c": 1,
+       "ask_size": 1693,
+       "bid_size": 10561,
+       "flags": []
+      },
+      "away": {
+       "event_ticker": "KXUEFANLGAME-26SEP26BULLUX",
+       "ticker": "KXUEFANLGAME-26SEP26BULLUX-LUX",
+       "ask_c": 29,
+       "bid_c": 28,
+       "spread_c": 1,
+       "ask_size": 18002,
+       "bid_size": 1746,
+       "flags": [],
+       "name": "Luxembourg"
+      }
+     },
+     "orientation": "same"
+    },
+    "headline": {
+     "candidate": "b",
+     "label": "ELO GAP",
+     "unit": "Elo points",
+     "value": 89,
+     "favourite_side": "home",
+     "home_minus_away": 89,
+     "components": {
+      "elo": {
+       "home": 1477.9,
+       "away": 1453.9
+      },
+      "raw_gap_home_minus_away": 24,
+      "venue_term_home_minus_away": 65,
+      "venue_class": "TRUE_HOME",
+      "host_side": "home",
+      "venue_assumed": false
+     },
+     "raw_favourite_side": "home",
+     "venue_flips_raw_order": false,
+     "tie_broken_by_rank": false,
+     "basis": "The venue-adjusted Elo gap: the two teams' overall ratings on this competition's national-team field, differenced, plus the club home term given to the side whose country hosts, and nothing on neutral ground. The card's favourite and its quoted Kalshi leg are read off this same number. A preregistered out-of-sample bake-off chose it: no alternative beat it by a margin whose 95% interval excluded zero (see research_archive/national_headline_bakeoff_2026-09-25/RESULTS.json)."
+    }
+   }
+  },
+  {
+   "refused": false,
+   "league": "unl",
+   "column": "unl",
+   "columns": [
+    "unl"
+   ],
+   "home": "Slovakia",
+   "away": "Moldova",
+   "favourite": "Slovakia",
+   "opponent": "Moldova",
+   "fav_side": "home",
+   "fav_source": "field",
+   "venue_favourite": {
+    "refused": true,
+    "reason": "no_gdg_gap",
+    "policy": "off",
+    "flipped": false,
+    "venue_class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "resolution": {
+    "Slovakia": "espn_id",
+    "Moldova": "espn_id"
+   },
+   "ppg_gap": null,
+   "gdg_gap": null,
+   "rank_gap": null,
+   "gp_current": {
+    "home": 0,
+    "away": 0,
+    "min": 0
+   },
+   "weights": null,
+   "src": "current",
+   "cross_league": false,
+   "rated_in": {
+    "home": "unl",
+    "away": "unl"
+   },
+   "table_notes": {
+    "home": null,
+    "away": null
+   },
+   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
+   "reg_time_note": "KXUEFANLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
+   "ranks": {
+    "fav": 26,
+    "opp": 48
+   },
+   "rates": {
+    "ppg": [
+     null,
+     null
+    ],
+    "gf": [
+     null,
+     null
+    ],
+    "ga": [
+     null,
+     null
+    ],
+    "gdg": [
+     null,
+     null
+    ]
+   },
+   "own_gdg": {
+    "diff": null,
+    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record."
+   },
+   "tiers": {
+    "ovr": [
+     2,
+     4
+    ],
+    "atk": [
+     2,
+     3
+    ],
+    "def": [
+     3,
+     5
+    ]
+   },
+   "tier_gaps": {
+    "ovr": 2,
+    "atk": 1,
+    "def": 2
+   },
+   "shape": "CLEAN",
+   "current_only": null,
+   "field": {
+    "competition": "unl",
+    "clubs": {
+     "fav": "Slovakia",
+     "opp": "Moldova"
+    },
+    "size": 54,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 26,
+       "tier": 2,
+       "tier_set": [
+        2
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1635.3911441013277,
+       "half_width_95": 5.63235313504874,
+       "interval": [
+        1629.7587909662789,
+        1641.0234972363764
+       ]
+      },
+      "opp": {
+       "rank": 48,
+       "tier": 4,
+       "tier_set": [
+        4
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1320.9776580661953,
+       "half_width_95": 10.923172220840655,
+       "interval": [
+        1310.0544858453547,
+        1331.900830287036
+       ]
+      },
+      "tier_gap": 2,
+      "unit": "elo",
+      "label": "overall",
+      "floor": {
+       "below_floor": false,
+       "failing_condition": null
+      },
+      "field_size": 54,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 13.084116722991782,
+       "opp": 15.872524628597166
+      },
+      "signal_source": "elo"
+     },
+     "atk": {
+      "fav": {
+       "rank": 26,
+       "tier": 2,
+       "tier_set": [
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.396569020457504,
+       "half_width_95": 0.2281419108165383,
+       "interval": [
+        0.16842710964096566,
+        0.6247109312740423
+       ]
+      },
+      "opp": {
+       "rank": 44,
+       "tier": 3,
+       "tier_set": [
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.20465181369503754,
+       "half_width_95": 0.35656703378827853,
+       "interval": [
+        -0.5612188474833161,
+        0.151915220093241
+       ]
+      },
+      "tier_gap": 1,
+      "unit": "log_goals",
+      "label": "attack",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 54,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.248718733181186,
+       "opp": 0.3722564171446534
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "shots"
+      },
+      "licensed": {
+       "bands": 5,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 2,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 3,
+        "tier_set": [
+         3,
+         4
+        ],
+        "straddles": true
+       }
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 33,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.2260406289269722,
+       "half_width_95": 0.25620455100155065,
+       "interval": [
+        -0.030163922074578464,
+        0.48224517992852284
+       ]
+      },
+      "opp": {
+       "rank": 51,
+       "tier": 5,
+       "tier_set": [
+        4,
+        5
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.29962274989430354,
+       "half_width_95": 0.30126304410650306,
+       "interval": [
+        -0.6008857940008066,
+        0.0016402942121995223
+       ]
+      },
+      "tier_gap": 2,
+      "unit": "log_goals",
+      "label": "defence",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 54,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.27337816754533556,
+       "opp": 0.3187976499277787
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "shots"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 2,
+        "tier_set": [
+         2
+        ],
+        "straddles": false
+       },
+       "opp": {
+        "tier": 3,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       }
+      }
+     }
+    },
+    "shape": "CLEAN",
+    "axes_measured": [
+     "ovr",
+     "atk",
+     "def"
+    ],
+    "field_basis": "the UEFA Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus 5a2e1ce9c011, variant 'all', Elo pinned at 5 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals, measured from shots (xG, else shots on target, else goals, per match).",
+    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence."
+   },
+   "event_id": "401861064",
+   "competition_id": "401861064",
+   "kickoff": "2026-09-26T18:45Z",
+   "espn": "uefa.nations",
+   "state": "pre",
+   "in_play": false,
+   "venue": {
+    "name": "Futbal Tatran Arena",
+    "city": "Prešov",
+    "country": "Slovakia"
+   },
+   "venue_class": {
+    "class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "kalshi": {
+    "event_ticker": "KXUEFANLGAME-26SEP26SVKMDA",
+    "ticker": "KXUEFANLGAME-26SEP26SVKMDA-SVK",
+    "ask_c": 83,
+    "bid_c": 82,
+    "spread_c": 1,
+    "ask_size": 5483,
+    "bid_size": 10803,
+    "flags": []
+   },
+   "form": {
+    "fav": "LLWWD",
+    "opp": "LLLDD",
+    "scope": "all senior internationals, friendlies marked",
+    "scope_is_cup": false
+   },
+   "h2h": {
+    "available": false,
+    "source": "corpus_since_2018",
+    "window": {
+     "from": "2018-01-01",
+     "to": "2026-09-24T22:40:32+00:00",
+     "label": "since 2018, corpus to 2026-09-24"
+    },
+    "meetings": [],
+    "last_meeting": null,
+    "tally": {
+     "home": 0,
+     "draw": 0,
+     "away": 0
+    },
+    "reason": "no meeting since 2018 in our corpus (senior internationals to 2026-09-24). A measured absence over that window, not a claim the two teams never met",
+    "espn_reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met"
+   },
+   "national": {
+    "competition": "unl",
+    "stage": "league-phase",
+    "stage_kind": "unrecognised",
+    "group": "Group C3",
+    "leg": null,
+    "status_detail": "Sat, September 26th at 2:45 PM EDT",
+    "venue_country": "Slovakia",
+    "neutral_provider_flag": false,
+    "neutral": false,
+    "teams": {
+     "home": {
+      "key": "slovakia",
+      "espn_id": "468",
+      "name": "Slovakia",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "unl",
+       "axes": {
+        "ovr": {
+         "rank": 26,
+         "tier": 2,
+         "tier_set": [
+          2
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1635.3911441013277,
+         "half_width_95": 5.63235313504874,
+         "interval": [
+          1629.7587909662789,
+          1641.0234972363764
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 13.084116722991782,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 26,
+         "tier": 2,
+         "tier_set": [
+          2,
+          3
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.396569020457504,
+         "half_width_95": 0.2281419108165383,
+         "interval": [
+          0.16842710964096566,
+          0.6247109312740423
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.248718733181186,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 5,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 33,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.2260406289269722,
+         "half_width_95": 0.25620455100155065,
+         "interval": [
+          -0.030163922074578464,
+          0.48224517992852284
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.27337816754533556,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           2
+          ],
+          "straddles": false
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "LLWWD",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "724911",
+         "date": "2025-11-17T19:45Z",
+         "competition": "FIFA World Cup Qualifying - UEFA",
+         "kind": "competitive",
+         "opponent": "Germany",
+         "venue": "away",
+         "gf": 0,
+         "ga": 6,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "761382",
+         "date": "2026-03-26T19:45Z",
+         "competition": "FIFA World Cup Qualifying - UEFA",
+         "kind": "competitive",
+         "opponent": "Kosovo",
+         "venue": "home",
+         "gf": 3,
+         "ga": 4,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401866739",
+         "date": "2026-03-31T18:45Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Romania",
+         "venue": "home",
+         "gf": 2,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401869443",
+         "date": "2026-06-01T16:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Malta",
+         "venue": "home",
+         "gf": 2,
+         "ga": 1,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401869444",
+         "date": "2026-06-05T16:30Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Montenegro",
+         "venue": "home",
+         "gf": 2,
+         "ga": 2,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 3,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     },
+     "away": {
+      "key": "moldova",
+      "espn_id": "483",
+      "name": "Moldova",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "unl",
+       "axes": {
+        "ovr": {
+         "rank": 48,
+         "tier": 4,
+         "tier_set": [
+          4
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1320.9776580661953,
+         "half_width_95": 10.923172220840655,
+         "interval": [
+          1310.0544858453547,
+          1331.900830287036
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 15.872524628597166,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 44,
+         "tier": 3,
+         "tier_set": [
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.20465181369503754,
+         "half_width_95": 0.35656703378827853,
+         "interval": [
+          -0.5612188474833161,
+          0.151915220093241
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.3722564171446534,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 5,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 3,
+          "tier_set": [
+           3,
+           4
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 51,
+         "tier": 5,
+         "tier_set": [
+          4,
+          5
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.29962274989430354,
+         "half_width_95": 0.30126304410650306,
+         "interval": [
+          -0.6008857940008066,
+          0.0016402942121995223
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.3187976499277787,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 3,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "LLLDD",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "724905",
+         "date": "2025-11-16T19:45Z",
+         "competition": "FIFA World Cup Qualifying - UEFA",
+         "kind": "competitive",
+         "opponent": "Israel",
+         "venue": "away",
+         "gf": 1,
+         "ga": 4,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401851163",
+         "date": "2026-03-26T15:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Lithuania",
+         "venue": "home",
+         "gf": 0,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401850919",
+         "date": "2026-03-30T16:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Cyprus",
+         "venue": "away",
+         "gf": 2,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401867937",
+         "date": "2026-06-05T17:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Bulgaria",
+         "venue": "home",
+         "gf": 2,
+         "ga": 2,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401866138",
+         "date": "2026-06-09T15:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Armenia",
+         "venue": "away",
+         "gf": 1,
+         "ga": 1,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 4,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     }
+    },
+    "fixture_source": "espn",
+    "kickoff_status": null,
+    "apifootball": null,
+    "head_to_head": {
+     "available": false,
+     "source": "corpus_since_2018",
+     "window": {
+      "from": "2018-01-01",
+      "to": "2026-09-24T22:40:32+00:00",
+      "label": "since 2018, corpus to 2026-09-24"
+     },
+     "meetings": [],
+     "last_meeting": null,
+     "tally": {
+      "home": 0,
+      "draw": 0,
+      "away": 0
+     },
+     "reason": "no meeting since 2018 in our corpus (senior internationals to 2026-09-24). A measured absence over that window, not a claim the two teams never met",
+     "espn_reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met"
+    },
+    "lineups": {
+     "announced": false,
+     "sides": {
+      "home": {
+       "team": "Slovakia",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      },
+      "away": {
+       "team": "Moldova",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      }
+     },
+     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff"
+    },
+    "market": {
+     "status": "mapped",
+     "event_ticker": "KXUEFANLGAME-26SEP26SVKMDA",
+     "status_words": "one open Kalshi event names both teams on this date",
+     "title": "Slovakia vs Moldova",
+     "legs": {
+      "home": {
+       "event_ticker": "KXUEFANLGAME-26SEP26SVKMDA",
+       "ticker": "KXUEFANLGAME-26SEP26SVKMDA-SVK",
+       "ask_c": 83,
+       "bid_c": 82,
+       "spread_c": 1,
+       "ask_size": 5483,
+       "bid_size": 10803,
+       "flags": [],
+       "name": "Slovakia"
+      },
+      "tie": {
+       "event_ticker": "KXUEFANLGAME-26SEP26SVKMDA",
+       "ticker": "KXUEFANLGAME-26SEP26SVKMDA-TIE",
+       "ask_c": 13,
+       "bid_c": 12,
+       "spread_c": 1,
+       "ask_size": 13072,
+       "bid_size": 1228,
+       "flags": []
+      },
+      "away": {
+       "event_ticker": "KXUEFANLGAME-26SEP26SVKMDA",
+       "ticker": "KXUEFANLGAME-26SEP26SVKMDA-MDA",
+       "ask_c": 6,
+       "bid_c": 5,
+       "spread_c": 1,
+       "ask_size": 11647,
+       "bid_size": 3585,
+       "flags": [],
+       "name": "Moldova"
+      }
+     },
+     "orientation": "same"
+    },
+    "headline": {
+     "candidate": "b",
+     "label": "ELO GAP",
+     "unit": "Elo points",
+     "value": 379.4,
+     "favourite_side": "home",
+     "home_minus_away": 379.4,
+     "components": {
+      "elo": {
+       "home": 1635.4,
+       "away": 1321
+      },
+      "raw_gap_home_minus_away": 314.4,
+      "venue_term_home_minus_away": 65,
+      "venue_class": "TRUE_HOME",
+      "host_side": "home",
+      "venue_assumed": false
+     },
+     "raw_favourite_side": "home",
+     "venue_flips_raw_order": false,
+     "tie_broken_by_rank": false,
+     "basis": "The venue-adjusted Elo gap: the two teams' overall ratings on this competition's national-team field, differenced, plus the club home term given to the side whose country hosts, and nothing on neutral ground. The card's favourite and its quoted Kalshi leg are read off this same number. A preregistered out-of-sample bake-off chose it: no alternative beat it by a margin whose 95% interval excluded zero (see research_archive/national_headline_bakeoff_2026-09-25/RESULTS.json)."
+    }
+   }
+  },
+  {
+   "refused": false,
+   "league": "unl",
+   "column": "unl",
+   "columns": [
+    "unl"
+   ],
+   "home": "North Macedonia",
+   "away": "Switzerland",
+   "favourite": "Switzerland",
+   "opponent": "North Macedonia",
+   "fav_side": "away",
+   "fav_source": "field",
+   "venue_favourite": {
+    "refused": true,
+    "reason": "no_gdg_gap",
+    "policy": "off",
+    "flipped": false,
+    "venue_class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "resolution": {
+    "North Macedonia": "espn_id",
+    "Switzerland": "espn_id"
+   },
+   "ppg_gap": null,
+   "gdg_gap": null,
+   "rank_gap": null,
+   "gp_current": {
+    "home": 0,
+    "away": 0,
+    "min": 0
+   },
+   "weights": null,
+   "src": "current",
+   "cross_league": false,
+   "rated_in": {
+    "home": "unl",
+    "away": "unl"
+   },
+   "table_notes": {
+    "home": null,
+    "away": null
+   },
+   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
+   "reg_time_note": "KXUEFANLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
+   "ranks": {
+    "fav": 11,
+    "opp": 35
+   },
+   "rates": {
+    "ppg": [
+     null,
+     null
+    ],
+    "gf": [
+     null,
+     null
+    ],
+    "ga": [
+     null,
+     null
+    ],
+    "gdg": [
+     null,
+     null
+    ]
+   },
+   "own_gdg": {
+    "diff": null,
+    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record."
+   },
+   "tiers": {
+    "ovr": [
+     1,
+     3
+    ],
+    "atk": [
+     2,
+     3
+    ],
+    "def": [
+     2,
+     3
+    ]
+   },
+   "tier_gaps": {
+    "ovr": 2,
+    "atk": 1,
+    "def": 1
+   },
+   "shape": "CLEAN",
+   "current_only": null,
+   "field": {
+    "competition": "unl",
+    "clubs": {
+     "fav": "Switzerland",
+     "opp": "North Macedonia"
+    },
+    "size": 54,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 11,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "value": 1831.0878075530911,
+       "half_width_95": 33.872709504160845,
+       "interval": [
+        1797.2150980489303,
+        1864.960517057252
+       ]
+      },
+      "opp": {
+       "rank": 35,
+       "tier": 3,
+       "tier_set": [
+        3
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1555.2283219078952,
+       "half_width_95": 13.389279519675354,
+       "interval": [
+        1541.83904238822,
+        1568.6176014275704
+       ]
+      },
+      "tier_gap": 2,
+      "unit": "elo",
+      "label": "overall",
+      "floor": {
+       "below_floor": false,
+       "failing_condition": null
+      },
+      "field_size": 54,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 37.686563211780715,
+       "opp": 19.205269978544962
+      },
+      "signal_source": "elo"
+     },
+     "atk": {
+      "fav": {
+       "rank": 15,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.6126095124190893,
+       "half_width_95": 0.2793766003960558,
+       "interval": [
+        0.33323291202303357,
+        0.8919861128151452
+       ]
+      },
+      "opp": {
+       "rank": 41,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.03783486560276961,
+       "half_width_95": 0.31559092180923537,
+       "interval": [
+        -0.353425787412005,
+        0.27775605620646576
+       ]
+      },
+      "tier_gap": 1,
+      "unit": "log_goals",
+      "label": "attack",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 54,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.2925076372217161,
+       "opp": 0.335030809111292
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "shots"
+      },
+      "licensed": {
+       "bands": 5,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 2,
+        "tier_set": [
+         1,
+         2
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 3,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       }
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 9,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.6839163834473458,
+       "half_width_95": 0.2847755763009092,
+       "interval": [
+        0.3991408071464366,
+        0.9686919597482551
+       ]
+      },
+      "opp": {
+       "rank": 38,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.0875255145712254,
+       "half_width_95": 0.34782917549039816,
+       "interval": [
+        -0.2603036609191728,
+        0.43535469006162353
+       ]
+      },
+      "tier_gap": 1,
+      "unit": "log_goals",
+      "label": "defence",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 54,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.3044317812288735,
+       "opp": 0.3659777390510645
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "shots"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 1,
+        "tier_set": [
+         1,
+         2
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 2,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       }
+      }
+     }
+    },
+    "shape": "CLEAN",
+    "axes_measured": [
+     "ovr",
+     "atk",
+     "def"
+    ],
+    "field_basis": "the UEFA Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus 5a2e1ce9c011, variant 'all', Elo pinned at 5 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals, measured from shots (xG, else shots on target, else goals, per match).",
+    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence."
+   },
+   "event_id": "401861065",
+   "competition_id": "401861065",
+   "kickoff": "2026-09-26T18:45Z",
+   "espn": "uefa.nations",
+   "state": "pre",
+   "in_play": false,
+   "venue": {
+    "name": "Toše Proeski Arena",
+    "city": "Skopje",
+    "country": "North Macedonia"
+   },
+   "venue_class": {
+    "class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "kalshi": {
+    "event_ticker": "KXUEFANLGAME-26SEP26MKDSUI",
+    "ticker": "KXUEFANLGAME-26SEP26MKDSUI-SUI",
+    "ask_c": 71,
+    "bid_c": 70,
+    "spread_c": 1,
+    "ask_size": 24770,
+    "bid_size": 3455,
+    "flags": []
+   },
+   "form": {
+    "fav": "WWWDL",
+    "opp": "LLDDL",
+    "scope": "all senior internationals, friendlies marked",
+    "scope_is_cup": false
+   },
+   "h2h": {
+    "available": false,
+    "source": "corpus_since_2018",
+    "window": {
+     "from": "2018-01-01",
+     "to": "2026-09-24T22:40:32+00:00",
+     "label": "since 2018, corpus to 2026-09-24"
+    },
+    "meetings": [],
+    "last_meeting": null,
+    "tally": {
+     "home": 0,
+     "draw": 0,
+     "away": 0
+    },
+    "reason": "no meeting since 2018 in our corpus (senior internationals to 2026-09-24). A measured absence over that window, not a claim the two teams never met",
+    "espn_reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met"
+   },
+   "national": {
+    "competition": "unl",
+    "stage": "league-phase",
+    "stage_kind": "unrecognised",
+    "group": "Group B1",
+    "leg": null,
+    "status_detail": "Sat, September 26th at 2:45 PM EDT",
+    "venue_country": "North Macedonia",
+    "neutral_provider_flag": false,
+    "neutral": false,
+    "teams": {
+     "home": {
+      "key": "north-macedonia",
+      "espn_id": "463",
+      "name": "North Macedonia",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "unl",
+       "axes": {
+        "ovr": {
+         "rank": 35,
+         "tier": 3,
+         "tier_set": [
+          3
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1555.2283219078952,
+         "half_width_95": 13.389279519675354,
+         "interval": [
+          1541.83904238822,
+          1568.6176014275704
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 19.205269978544962,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 41,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.03783486560276961,
+         "half_width_95": 0.31559092180923537,
+         "interval": [
+          -0.353425787412005,
+          0.27775605620646576
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.335030809111292,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 5,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 3,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 38,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.0875255145712254,
+         "half_width_95": 0.34782917549039816,
+         "interval": [
+          -0.2603036609191728,
+          0.43535469006162353
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.3659777390510645,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "LLDDL",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "724918",
+         "date": "2025-11-18T19:45Z",
+         "competition": "FIFA World Cup Qualifying - UEFA",
+         "kind": "competitive",
+         "opponent": "Wales",
+         "venue": "away",
+         "gf": 1,
+         "ga": 7,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "761379",
+         "date": "2026-03-26T19:45Z",
+         "competition": "FIFA World Cup Qualifying - UEFA",
+         "kind": "competitive",
+         "opponent": "Denmark",
+         "venue": "away",
+         "gf": 0,
+         "ga": 4,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401866866",
+         "date": "2026-03-31T18:45Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Republic of Ireland",
+         "venue": "away",
+         "gf": 0,
+         "ga": 0,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401869326",
+         "date": "2026-05-29T18:30Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Bosnia-Herzegovina",
+         "venue": "away",
+         "gf": 0,
+         "ga": 0,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401871359",
+         "date": "2026-06-01T17:30Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Türkiye",
+         "venue": "away",
+         "gf": 0,
+         "ga": 4,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 3,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     },
+     "away": {
+      "key": "switzerland",
+      "espn_id": "475",
+      "name": "Switzerland",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "unl",
+       "axes": {
+        "ovr": {
+         "rank": 11,
+         "tier": 1,
+         "tier_set": [
+          1,
+          2
+         ],
+         "straddles": true,
+         "below_floor": false,
+         "value": 1831.0878075530911,
+         "half_width_95": 33.872709504160845,
+         "interval": [
+          1797.2150980489303,
+          1864.960517057252
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 37.686563211780715,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 15,
+         "tier": 2,
+         "tier_set": [
+          1,
+          2
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.6126095124190893,
+         "half_width_95": 0.2793766003960558,
+         "interval": [
+          0.33323291202303357,
+          0.8919861128151452
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.2925076372217161,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 5,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 9,
+         "tier": 2,
+         "tier_set": [
+          1,
+          2
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.6839163834473458,
+         "half_width_95": 0.2847755763009092,
+         "interval": [
+          0.3991408071464366,
+          0.9686919597482551
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.3044317812288735,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 1,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "WWWDL",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "760439",
+         "date": "2026-06-18T19:00Z",
+         "competition": "FIFA World Cup",
+         "kind": "competitive",
+         "opponent": "Bosnia-Herzegovina",
+         "venue": "home",
+         "gf": 4,
+         "ga": 1,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760463",
+         "date": "2026-06-24T19:00Z",
+         "competition": "FIFA World Cup",
+         "kind": "competitive",
+         "opponent": "Canada",
+         "venue": "home",
+         "gf": 2,
+         "ga": 1,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760498",
+         "date": "2026-07-03T03:00Z",
+         "competition": "FIFA World Cup",
+         "kind": "competitive",
+         "opponent": "Algeria",
+         "venue": "home",
+         "gf": 2,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760508",
+         "date": "2026-07-07T20:00Z",
+         "competition": "FIFA World Cup",
+         "kind": "competitive",
+         "opponent": "Colombia",
+         "venue": "home",
+         "gf": 0,
+         "ga": 0,
+         "letter": "D",
+         "provider_letter": "W",
+         "provider_agrees": false,
+         "shootout": {
+          "for": 4,
+          "against": 3,
+          "note": "level after play, decided on penalties; the letter is the scoreline's, D"
+         }
+        },
+        {
+         "event_id": "760513",
+         "date": "2026-07-12T01:00Z",
+         "competition": "FIFA World Cup",
+         "kind": "competitive",
+         "opponent": "Argentina",
+         "venue": "away",
+         "gf": 1,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 0,
+       "provider_disagreements": 1,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     }
+    },
+    "fixture_source": "espn",
+    "kickoff_status": null,
+    "apifootball": null,
+    "head_to_head": {
+     "available": false,
+     "source": "corpus_since_2018",
+     "window": {
+      "from": "2018-01-01",
+      "to": "2026-09-24T22:40:32+00:00",
+      "label": "since 2018, corpus to 2026-09-24"
+     },
+     "meetings": [],
+     "last_meeting": null,
+     "tally": {
+      "home": 0,
+      "draw": 0,
+      "away": 0
+     },
+     "reason": "no meeting since 2018 in our corpus (senior internationals to 2026-09-24). A measured absence over that window, not a claim the two teams never met",
+     "espn_reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met"
+    },
+    "lineups": {
+     "announced": false,
+     "sides": {
+      "home": {
+       "team": "North Macedonia",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      },
+      "away": {
+       "team": "Switzerland",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      }
+     },
+     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff"
+    },
+    "market": {
+     "status": "mapped",
+     "event_ticker": "KXUEFANLGAME-26SEP26MKDSUI",
+     "status_words": "one open Kalshi event names both teams on this date",
+     "title": "North Macedonia vs Switzerland",
+     "legs": {
+      "home": {
+       "event_ticker": "KXUEFANLGAME-26SEP26MKDSUI",
+       "ticker": "KXUEFANLGAME-26SEP26MKDSUI-MKD",
+       "ask_c": 11,
+       "bid_c": 10,
+       "spread_c": 1,
+       "ask_size": 1029,
+       "bid_size": 25688,
+       "flags": [],
+       "name": "North Macedonia"
+      },
+      "tie": {
+       "event_ticker": "KXUEFANLGAME-26SEP26MKDSUI",
+       "ticker": "KXUEFANLGAME-26SEP26MKDSUI-TIE",
+       "ask_c": 20,
+       "bid_c": 19,
+       "spread_c": 1,
+       "ask_size": 25065,
+       "bid_size": 211,
+       "flags": []
+      },
+      "away": {
+       "event_ticker": "KXUEFANLGAME-26SEP26MKDSUI",
+       "ticker": "KXUEFANLGAME-26SEP26MKDSUI-SUI",
+       "ask_c": 71,
+       "bid_c": 70,
+       "spread_c": 1,
+       "ask_size": 24770,
+       "bid_size": 3455,
+       "flags": [],
+       "name": "Switzerland"
+      }
+     },
+     "orientation": "same"
+    },
+    "headline": {
+     "candidate": "b",
+     "label": "ELO GAP",
+     "unit": "Elo points",
+     "value": 210.9,
+     "favourite_side": "away",
+     "home_minus_away": -210.9,
+     "components": {
+      "elo": {
+       "home": 1555.2,
+       "away": 1831.1
+      },
+      "raw_gap_home_minus_away": -275.9,
+      "venue_term_home_minus_away": 65,
+      "venue_class": "TRUE_HOME",
+      "host_side": "home",
+      "venue_assumed": false
+     },
+     "raw_favourite_side": "away",
+     "venue_flips_raw_order": false,
+     "tie_broken_by_rank": false,
+     "basis": "The venue-adjusted Elo gap: the two teams' overall ratings on this competition's national-team field, differenced, plus the club home term given to the side whose country hosts, and nothing on neutral ground. The card's favourite and its quoted Kalshi leg are read off this same number. A preregistered out-of-sample bake-off chose it: no alternative beat it by a margin whose 95% interval excluded zero (see research_archive/national_headline_bakeoff_2026-09-25/RESULTS.json)."
+    }
+   }
+  },
+  {
+   "refused": false,
+   "league": "cnl",
+   "column": "cnl",
+   "columns": [
+    "cnl"
+   ],
+   "home": "Bonaire",
+   "away": "St. Kitts and Nevis",
+   "favourite": "St. Kitts and Nevis",
+   "opponent": "Bonaire",
+   "fav_side": "away",
+   "fav_source": "field",
+   "venue_favourite": {
+    "refused": true,
+    "reason": "no_gdg_gap",
+    "policy": "off",
+    "flipped": false,
+    "venue_class": "OPPONENT_COUNTRY",
+    "home_side": "away"
+   },
+   "resolution": {
+    "Bonaire": "espn_id",
+    "St. Kitts and Nevis": "espn_id"
+   },
+   "ppg_gap": null,
+   "gdg_gap": null,
+   "rank_gap": null,
+   "gp_current": {
+    "home": 0,
+    "away": 0,
+    "min": 0
+   },
+   "weights": null,
+   "src": "current",
+   "cross_league": false,
+   "rated_in": {
+    "home": "cnl",
+    "away": "cnl"
+   },
+   "table_notes": {
+    "home": null,
+    "away": null
+   },
+   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
+   "reg_time_note": "KXCONCACAFNLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
+   "ranks": {
+    "fav": 26,
+    "opp": 30
+   },
+   "rates": {
+    "ppg": [
+     null,
+     null
+    ],
+    "gf": [
+     null,
+     null
+    ],
+    "ga": [
+     null,
+     null
+    ],
+    "gdg": [
+     null,
+     null
+    ]
+   },
+   "own_gdg": {
+    "diff": null,
+    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record."
+   },
+   "tiers": {
+    "ovr": [
+     4,
+     4
+    ],
+    "atk": [
+     3,
+     3
+    ],
+    "def": [
+     3,
+     4
+    ]
+   },
+   "tier_gaps": {
+    "ovr": 0,
+    "atk": 0,
+    "def": 1
+   },
+   "shape": "SPLIT",
+   "current_only": null,
+   "field": {
+    "competition": "cnl",
+    "clubs": {
+     "fav": "St. Kitts and Nevis",
+     "opp": "Bonaire"
+    },
+    "size": 37,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 26,
+       "tier": 4,
+       "tier_set": [
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "value": 1295.7294514093028,
+       "half_width_95": 31.007473455505504,
+       "interval": [
+        1264.7219779537972,
+        1326.7369248648083
+       ]
+      },
+      "opp": {
+       "rank": 30,
+       "tier": 4,
+       "tier_set": [
+        4
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1199.3363771126044,
+       "half_width_95": 12.251210851049109,
+       "interval": [
+        1187.0851662615553,
+        1211.5875879636535
+       ]
+      },
+      "tier_gap": 0,
+      "unit": "elo",
+      "label": "overall",
+      "floor": {
+       "below_floor": false,
+       "failing_condition": null
+      },
+      "field_size": 37,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 34.600193802981416,
+       "opp": 15.100135024788413
+      },
+      "signal_source": "elo"
+     },
+     "atk": {
+      "fav": {
+       "rank": 25,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.45723199085527133,
+       "half_width_95": 0.3857685333831612,
+       "interval": [
+        -0.8430005242384325,
+        -0.07146345747211014
+       ]
+      },
+      "opp": {
+       "rank": 28,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.6168968145602325,
+       "half_width_95": 0.39243734949437575,
+       "interval": [
+        -1.0093341640546083,
+        -0.22445946506585673
+       ]
+      },
+      "tier_gap": 0,
+      "unit": "log_goals",
+      "label": "attack",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 37,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.4172604581286715,
+       "opp": 0.42463176874518854
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "goals"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 2,
+        "tier_set": [
+         1,
+         2,
+         3
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 2,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       }
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 20,
+       "tier": 3,
+       "tier_set": [
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.5088707378177916,
+       "half_width_95": 0.2532027508652312,
+       "interval": [
+        -0.7620734886830227,
+        -0.2556679869525604
+       ]
+      },
+      "opp": {
+       "rank": 30,
+       "tier": 4,
+       "tier_set": [
+        3,
+        4,
+        5
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.8865531465242209,
+       "half_width_95": 0.5339344997048451,
+       "interval": [
+        -1.4204876462290659,
+        -0.3526186468193758
+       ]
+      },
+      "tier_gap": 1,
+      "unit": "log_goals",
+      "label": "defence",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 37,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.2875869562970411,
+       "opp": 0.5476741601946167
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "goals"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 2,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 3,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       }
+      }
+     }
+    },
+    "shape": "SPLIT",
+    "axes_measured": [
+     "ovr",
+     "atk",
+     "def"
+    ],
+    "field_basis": "the CONCACAF Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus 5a2e1ce9c011, variant 'all', Elo pinned at 5 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals, measured from shots (xG, else shots on target, else goals, per match).",
+    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence."
+   },
+   "event_id": "401900627",
+   "competition_id": "401900627",
+   "kickoff": "2026-09-26T00:00Z",
+   "espn": "concacaf.nations.league",
+   "state": "pre",
+   "in_play": false,
+   "venue": {
+    "name": "SKNFA Technical Centre",
+    "city": "Basseterre",
+    "country": "St Kitts and Nevis"
+   },
+   "venue_class": {
+    "class": "OPPONENT_COUNTRY",
+    "home_side": "away"
+   },
+   "kalshi": {
+    "event_ticker": "KXCONCACAFNLGAME-26SEP25BONKNA",
+    "ticker": "KXCONCACAFNLGAME-26SEP25BONKNA-KNA",
+    "ask_c": 73,
+    "bid_c": 53,
+    "spread_c": 20,
+    "ask_size": 3,
+    "bid_size": 0,
+    "flags": [
+     "WIDE",
+     "THIN"
+    ]
+   },
+   "form": {
+    "fav": "LDLLW",
+    "opp": "LLLWL",
+    "scope": "all senior internationals, friendlies marked",
+    "scope_is_cup": false
+   },
+   "h2h": {
+    "available": false,
+    "source": "corpus_since_2018",
+    "window": {
+     "from": "2018-01-01",
+     "to": "2026-09-24T22:40:32+00:00",
+     "label": "since 2018, corpus to 2026-09-24"
+    },
+    "meetings": [],
+    "last_meeting": null,
+    "tally": {
+     "home": 0,
+     "draw": 0,
+     "away": 0
+    },
+    "reason": "no meeting since 2018 in our corpus (senior internationals to 2026-09-24). A measured absence over that window, not a claim the two teams never met",
+    "espn_reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met"
+   },
+   "national": {
+    "competition": "cnl",
+    "stage": "group-stage",
+    "stage_kind": "group",
+    "group": "League B, Group C",
+    "leg": null,
+    "status_detail": "Fri, September 25th at 8:00 PM EDT",
+    "venue_country": "St Kitts and Nevis",
+    "neutral_provider_flag": false,
+    "neutral": false,
+    "teams": {
+     "home": {
+      "key": "bonaire",
+      "espn_id": "19314",
+      "name": "Bonaire",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "cnl",
+       "axes": {
+        "ovr": {
+         "rank": 30,
+         "tier": 4,
+         "tier_set": [
+          4
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1199.3363771126044,
+         "half_width_95": 12.251210851049109,
+         "interval": [
+          1187.0851662615553,
+          1211.5875879636535
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 15.100135024788413,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 28,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.6168968145602325,
+         "half_width_95": 0.39243734949437575,
+         "interval": [
+          -1.0093341640546083,
+          -0.22445946506585673
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.42463176874518854,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 30,
+         "tier": 4,
+         "tier_set": [
+          3,
+          4,
+          5
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.8865531465242209,
+         "half_width_95": 0.5339344997048451,
+         "interval": [
+          -1.4204876462290659,
+          -0.3526186468193758
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.5476741601946167,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 3,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "LLLWL",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "734512",
+         "date": "2025-03-25T20:30Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Niger",
+         "venue": "away",
+         "gf": 0,
+         "ga": 6,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760871",
+         "date": "2025-11-12T20:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Barbados",
+         "venue": "away",
+         "gf": 2,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760889",
+         "date": "2025-11-15T23:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Guyana",
+         "venue": "away",
+         "gf": 1,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401866384",
+         "date": "2026-03-27T00:30Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "St. Vincent and the Grenadines",
+         "venue": "home",
+         "gf": 3,
+         "ga": 1,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401866392",
+         "date": "2026-03-30T00:30Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "St. Martin",
+         "venue": "home",
+         "gf": 0,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 5,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     },
+     "away": {
+      "key": "st-kitts-and-nevis",
+      "espn_id": "2662",
+      "name": "St. Kitts and Nevis",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "cnl",
+       "axes": {
+        "ovr": {
+         "rank": 26,
+         "tier": 4,
+         "tier_set": [
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": false,
+         "value": 1295.7294514093028,
+         "half_width_95": 31.007473455505504,
+         "interval": [
+          1264.7219779537972,
+          1326.7369248648083
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 34.600193802981416,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 25,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.45723199085527133,
+         "half_width_95": 0.3857685333831612,
+         "interval": [
+          -0.8430005242384325,
+          -0.07146345747211014
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.4172604581286715,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           1,
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 20,
+         "tier": 3,
+         "tier_set": [
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.5088707378177916,
+         "half_width_95": 0.2532027508652312,
+         "interval": [
+          -0.7620734886830227,
+          -0.2556679869525604
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.2875869562970411,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "LDLLW",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "698192",
+         "date": "2025-06-10T19:00Z",
+         "competition": "FIFA World Cup Qualifying - Concacaf",
+         "kind": "competitive",
+         "opponent": "Grenada",
+         "venue": "home",
+         "gf": 2,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "761047",
+         "date": "2025-11-12T23:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Sint Maarten",
+         "venue": "home",
+         "gf": 0,
+         "ga": 0,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "761286",
+         "date": "2025-11-18T21:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Belize",
+         "venue": "home",
+         "gf": 2,
+         "ga": 6,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401861602",
+         "date": "2026-03-27T13:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Indonesia",
+         "venue": "away",
+         "gf": 0,
+         "ga": 4,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401867001",
+         "date": "2026-03-30T08:30Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Solomon Islands",
+         "venue": "home",
+         "gf": 4,
+         "ga": 2,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 4,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     }
+    },
+    "fixture_source": "espn",
+    "kickoff_status": null,
+    "apifootball": null,
+    "head_to_head": {
+     "available": false,
+     "source": "corpus_since_2018",
+     "window": {
+      "from": "2018-01-01",
+      "to": "2026-09-24T22:40:32+00:00",
+      "label": "since 2018, corpus to 2026-09-24"
+     },
+     "meetings": [],
+     "last_meeting": null,
+     "tally": {
+      "home": 0,
+      "draw": 0,
+      "away": 0
+     },
+     "reason": "no meeting since 2018 in our corpus (senior internationals to 2026-09-24). A measured absence over that window, not a claim the two teams never met",
+     "espn_reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met"
+    },
+    "lineups": {
+     "announced": true,
+     "sides": {
+      "home": {
+       "team": "Bonaire",
+       "formation": "4-4-2",
+       "announced": true,
+       "starters": [
+        {
+         "name": "Denyor Cicilia",
+         "jersey": "1",
+         "position": "G"
+        },
+        {
+         "name": "Milan Blanken",
+         "jersey": "14",
+         "position": "CD-L"
+        },
+        {
+         "name": "Jevairo Pengel",
+         "jersey": "18",
+         "position": "CD-R"
+        },
+        {
+         "name": "Jaydelmar Jansen",
+         "jersey": "2",
+         "position": "LB"
+        },
+        {
+         "name": "Shedwin Martina",
+         "jersey": "15",
+         "position": "RB"
+        },
+        {
+         "name": "Berry Sonnenschein",
+         "jersey": "8",
+         "position": "CM-L"
+        },
+        {
+         "name": "Ayrton Cicilia",
+         "jersey": "9",
+         "position": "CM-R"
+        },
+        {
+         "name": "Myron Bostdorp",
+         "jersey": "17",
+         "position": "LM"
+        },
+        {
+         "name": "Robin Cijntje",
+         "jersey": "19",
+         "position": "RM"
+        },
+        {
+         "name": "Suerainy Efhraim Angel Naïm Coffy",
+         "jersey": "6",
+         "position": "CF-L"
+        },
+        {
+         "name": "Siginho Gerardo",
+         "jersey": "10",
+         "position": "CF-R"
+        }
+       ],
+       "bench": 11
+      },
+      "away": {
+       "team": "St. Kitts and Nevis",
+       "formation": "4-2-3-1",
+       "announced": true,
+       "starters": [
+        {
+         "name": "Julani Archibald",
+         "jersey": "18",
+         "position": "G"
+        },
+        {
+         "name": "Omari Sterling-James",
+         "jersey": "22",
+         "position": "CD-L"
+        },
+        {
+         "name": "Jordan Bowery",
+         "jersey": "6",
+         "position": "CD-R"
+        },
+        {
+         "name": "Micaah Dominique Gladwin Garnette",
+         "jersey": "12",
+         "position": "LB"
+        },
+        {
+         "name": "Rico Browne",
+         "jersey": "3",
+         "position": "RB"
+        },
+        {
+         "name": "Harry Panayiotou",
+         "jersey": "10",
+         "position": "AM"
+        },
+        {
+         "name": "Kyle Kelly",
+         "jersey": "20",
+         "position": "LM"
+        },
+        {
+         "name": "Romaine Sawyers",
+         "jersey": "19",
+         "position": "RM"
+        },
+        {
+         "name": "Tyreece Simpson",
+         "jersey": "9",
+         "position": "F"
+        },
+        {
+         "name": "Theo Wharton",
+         "jersey": "14",
+         "position": "AM-L"
+        },
+        {
+         "name": "Tiquanny Williams",
+         "jersey": "7",
+         "position": "AM-R"
+        }
+       ],
+       "bench": 10
+      }
+     },
+     "reason": null
+    },
+    "market": {
+     "status": "mapped",
+     "event_ticker": "KXCONCACAFNLGAME-26SEP25BONKNA",
+     "status_words": "one open Kalshi event names both teams on this date",
+     "title": "Bonaire vs Saint Kitts and Nevis",
+     "legs": {
+      "home": {
+       "event_ticker": "KXCONCACAFNLGAME-26SEP25BONKNA",
+       "ticker": "KXCONCACAFNLGAME-26SEP25BONKNA-BON",
+       "ask_c": 50,
+       "bid_c": 25,
+       "spread_c": 25,
+       "ask_size": 30,
+       "bid_size": 4,
+       "flags": [
+        "WIDE",
+        "THIN"
+       ],
+       "name": "Bonaire"
+      },
+      "tie": {
+       "event_ticker": "KXCONCACAFNLGAME-26SEP25BONKNA",
+       "ticker": "KXCONCACAFNLGAME-26SEP25BONKNA-TIE",
+       "ask_c": 26,
+       "bid_c": 18,
+       "spread_c": 8,
+       "ask_size": 4,
+       "bid_size": 4,
+       "flags": [
+        "WIDE",
+        "THIN"
+       ]
+      },
+      "away": {
+       "event_ticker": "KXCONCACAFNLGAME-26SEP25BONKNA",
+       "ticker": "KXCONCACAFNLGAME-26SEP25BONKNA-KNA",
+       "ask_c": 73,
+       "bid_c": 53,
+       "spread_c": 20,
+       "ask_size": 3,
+       "bid_size": 0,
+       "flags": [
+        "WIDE",
+        "THIN"
+       ],
+       "name": "Saint Kitts and Nevis"
+      }
+     },
+     "orientation": "same"
+    },
+    "headline": {
+     "candidate": "b",
+     "label": "ELO GAP",
+     "unit": "Elo points",
+     "value": 161.4,
+     "favourite_side": "away",
+     "home_minus_away": -161.4,
+     "components": {
+      "elo": {
+       "home": 1199.3,
+       "away": 1295.7
+      },
+      "raw_gap_home_minus_away": -96.4,
+      "venue_term_home_minus_away": -65,
+      "venue_class": "OPPONENT_COUNTRY",
+      "host_side": "away",
+      "venue_assumed": false
+     },
+     "raw_favourite_side": "away",
+     "venue_flips_raw_order": false,
+     "tie_broken_by_rank": false,
+     "basis": "The venue-adjusted Elo gap: the two teams' overall ratings on this competition's national-team field, differenced, plus the club home term given to the side whose country hosts, and nothing on neutral ground. The card's favourite and its quoted Kalshi leg are read off this same number. A preregistered out-of-sample bake-off chose it: no alternative beat it by a margin whose 95% interval excluded zero (see research_archive/national_headline_bakeoff_2026-09-25/RESULTS.json)."
+    }
+   }
+  },
+  {
+   "refused": false,
+   "league": "cnl",
+   "column": "cnl",
+   "columns": [
+    "cnl"
+   ],
+   "home": "Barbados",
+   "away": "St. Lucia",
+   "favourite": "St. Lucia",
+   "opponent": "Barbados",
+   "fav_side": "away",
+   "fav_source": "field",
+   "venue_favourite": {
+    "refused": true,
+    "reason": "no_gdg_gap",
+    "policy": "off",
+    "flipped": false,
+    "venue_class": "OPPONENT_COUNTRY",
+    "home_side": "away"
+   },
+   "resolution": {
+    "Barbados": "espn_id",
+    "St. Lucia": "espn_id"
+   },
+   "ppg_gap": null,
+   "gdg_gap": null,
+   "rank_gap": null,
+   "gp_current": {
+    "home": 0,
+    "away": 0,
+    "min": 0
+   },
+   "weights": null,
+   "src": "current",
+   "cross_league": false,
+   "rated_in": {
+    "home": "cnl",
+    "away": "cnl"
+   },
+   "table_notes": {
+    "home": null,
+    "away": null
+   },
+   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
+   "reg_time_note": "KXCONCACAFNLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
+   "ranks": {
+    "fav": 24,
+    "opp": 29
+   },
+   "rates": {
+    "ppg": [
+     null,
+     null
+    ],
+    "gf": [
+     null,
+     null
+    ],
+    "ga": [
+     null,
+     null
+    ],
+    "gdg": [
+     null,
+     null
+    ]
+   },
+   "own_gdg": {
+    "diff": null,
+    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record."
+   },
+   "tiers": {
+    "ovr": [
+     3,
+     4
+    ],
+    "atk": [
+     2,
+     3
+    ],
+    "def": [
+     3,
+     4
+    ]
+   },
+   "tier_gaps": {
+    "ovr": 1,
+    "atk": 1,
+    "def": 1
+   },
+   "shape": "CLEAN",
+   "current_only": null,
+   "field": {
+    "competition": "cnl",
+    "clubs": {
+     "fav": "St. Lucia",
+     "opp": "Barbados"
+    },
+    "size": 37,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 24,
+       "tier": 3,
+       "tier_set": [
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "value": 1307.7305748698388,
+       "half_width_95": 19.2869531650953,
+       "interval": [
+        1288.4436217047435,
+        1327.0175280349342
+       ]
+      },
+      "opp": {
+       "rank": 29,
+       "tier": 4,
+       "tier_set": [
+        4
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1218.128322493046,
+       "half_width_95": 4.9701796766124895,
+       "interval": [
+        1213.1581428164334,
+        1223.0985021696586
+       ]
+      },
+      "tier_gap": 1,
+      "unit": "elo",
+      "label": "overall",
+      "floor": {
+       "below_floor": false,
+       "failing_condition": null
+      },
+      "field_size": 37,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 21.22709192450022,
+       "opp": 11.920883318190718
+      },
+      "signal_source": "elo"
+     },
+     "atk": {
+      "fav": {
+       "rank": 19,
+       "tier": 2,
+       "tier_set": [
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.27875450755929204,
+       "half_width_95": 0.3040205985964387,
+       "interval": [
+        -0.5827751061557307,
+        0.025266091037146665
+       ]
+      },
+      "opp": {
+       "rank": 30,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.6638112810640575,
+       "half_width_95": 0.4215340007947988,
+       "interval": [
+        -1.0853452818588563,
+        -0.2422772802692587
+       ]
+      },
+      "tier_gap": 1,
+      "unit": "log_goals",
+      "label": "attack",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 37,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.33523569608890724,
+       "opp": 0.44130510160642666
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "goals",
+       "opp": "goals"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 2,
+        "tier_set": [
+         1,
+         2
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 2,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       }
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 18,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.41653532535233684,
+       "half_width_95": 0.26802985932294676,
+       "interval": [
+        -0.6845651846752836,
+        -0.14850546602939008
+       ]
+      },
+      "opp": {
+       "rank": 27,
+       "tier": 4,
+       "tier_set": [
+        3,
+        4,
+        5
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.7865305301282592,
+       "half_width_95": 0.33410014248614134,
+       "interval": [
+        -1.1206306726144006,
+        -0.4524303876421179
+       ]
+      },
+      "tier_gap": 1,
+      "unit": "log_goals",
+      "label": "defence",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 37,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.2967852110435332,
+       "opp": 0.3428098253647509
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "goals",
+       "opp": "goals"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 2,
+        "tier_set": [
+         2
+        ],
+        "straddles": false
+       },
+       "opp": {
+        "tier": 3,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       }
+      }
+     }
+    },
+    "shape": "CLEAN",
+    "axes_measured": [
+     "ovr",
+     "atk",
+     "def"
+    ],
+    "field_basis": "the CONCACAF Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus 5a2e1ce9c011, variant 'all', Elo pinned at 5 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals, measured from shots (xG, else shots on target, else goals, per match).",
+    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence."
+   },
+   "event_id": "401900629",
+   "competition_id": "401900629",
+   "kickoff": "2026-09-26T00:00Z",
+   "espn": "concacaf.nations.league",
+   "state": "pre",
+   "in_play": false,
+   "venue": {
+    "name": "Beausejour Stadium",
+    "city": "Gros Islet",
+    "country": "St Lucia"
+   },
+   "venue_class": {
+    "class": "OPPONENT_COUNTRY",
+    "home_side": "away"
+   },
+   "kalshi": {
+    "event_ticker": "KXCONCACAFNLGAME-26SEP25BARLCA",
+    "ticker": "KXCONCACAFNLGAME-26SEP25BARLCA-LCA",
+    "ask_c": 45,
+    "bid_c": 44,
+    "spread_c": 1,
+    "ask_size": 395,
+    "bid_size": 1845,
+    "flags": []
+   },
+   "form": {
+    "fav": "LWLLL",
+    "opp": "LWLLL",
+    "scope": "all senior internationals, friendlies marked",
+    "scope_is_cup": false
+   },
+   "h2h": {
+    "available": true,
+    "source": "seasonseries",
+    "meetings": [
+     {
+      "event_id": "487750",
+      "date": "2017-07-02T21:30:00Z",
+      "home": "Barbados",
+      "away": "St. Lucia",
+      "home_score": 1,
+      "away_score": 1,
+      "completed": true,
+      "winner": "draw",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "537111",
+      "date": "2019-03-06T21:00:00Z",
+      "home": "St. Lucia",
+      "away": "Barbados",
+      "home_score": 0,
+      "away_score": 2,
+      "completed": true,
+      "winner": "home",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "698196",
+      "date": "2025-06-10T22:00:00Z",
+      "home": "St. Lucia",
+      "away": "Barbados",
+      "home_score": 2,
+      "away_score": 1,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     }
+    ],
+    "tally": {
+     "home": 1,
+     "draw": 1,
+     "away": 1
+    },
+    "reason": null,
+    "window": null,
+    "last_meeting": {
+     "event_id": "698196",
+     "date": "2025-06-10T22:00:00Z",
+     "home": "St. Lucia",
+     "away": "Barbados",
+     "home_score": 2,
+     "away_score": 1,
+     "completed": true,
+     "winner": "away",
+     "winner_means": "this fixture's home/away sides"
+    },
+    "espn_reason": null
+   },
+   "national": {
+    "competition": "cnl",
+    "stage": "group-stage",
+    "stage_kind": "group",
+    "group": "League B, Group B",
+    "leg": null,
+    "status_detail": "Fri, September 25th at 8:00 PM EDT",
+    "venue_country": "St Lucia",
+    "neutral_provider_flag": false,
+    "neutral": false,
+    "teams": {
+     "home": {
+      "key": "barbados",
+      "espn_id": "2637",
+      "name": "Barbados",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "cnl",
+       "axes": {
+        "ovr": {
+         "rank": 29,
+         "tier": 4,
+         "tier_set": [
+          4
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1218.128322493046,
+         "half_width_95": 4.9701796766124895,
+         "interval": [
+          1213.1581428164334,
+          1223.0985021696586
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 11.920883318190718,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 30,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.6638112810640575,
+         "half_width_95": 0.4215340007947988,
+         "interval": [
+          -1.0853452818588563,
+          -0.2422772802692587
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.44130510160642666,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 27,
+         "tier": 4,
+         "tier_set": [
+          3,
+          4,
+          5
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.7865305301282592,
+         "half_width_95": 0.33410014248614134,
+         "interval": [
+          -1.1206306726144006,
+          -0.4524303876421179
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.3428098253647509,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 3,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "LWLLL",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "698196",
+         "date": "2025-06-10T22:00Z",
+         "competition": "FIFA World Cup Qualifying - Concacaf",
+         "kind": "competitive",
+         "opponent": "St. Lucia",
+         "venue": "away",
+         "gf": 1,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760871",
+         "date": "2025-11-12T20:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Bonaire",
+         "venue": "home",
+         "gf": 3,
+         "ga": 2,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760887",
+         "date": "2025-11-15T20:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Aruba",
+         "venue": "home",
+         "gf": 0,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401866381",
+         "date": "2026-03-26T22:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "St. Martin",
+         "venue": "away",
+         "gf": 1,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401866388",
+         "date": "2026-03-29T20:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "St. Vincent and the Grenadines",
+         "venue": "home",
+         "gf": 2,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 4,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     },
+     "away": {
+      "key": "st-lucia",
+      "espn_id": "2661",
+      "name": "St. Lucia",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "cnl",
+       "axes": {
+        "ovr": {
+         "rank": 24,
+         "tier": 3,
+         "tier_set": [
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": false,
+         "value": 1307.7305748698388,
+         "half_width_95": 19.2869531650953,
+         "interval": [
+          1288.4436217047435,
+          1327.0175280349342
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 21.22709192450022,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 19,
+         "tier": 2,
+         "tier_set": [
+          2,
+          3
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.27875450755929204,
+         "half_width_95": 0.3040205985964387,
+         "interval": [
+          -0.5827751061557307,
+          0.025266091037146665
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.33523569608890724,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 18,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.41653532535233684,
+         "half_width_95": 0.26802985932294676,
+         "interval": [
+          -0.6845651846752836,
+          -0.14850546602939008
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.2967852110435332,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           2
+          ],
+          "straddles": false
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "LWLLL",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "698176",
+         "date": "2025-06-06T23:30Z",
+         "competition": "FIFA World Cup Qualifying - Concacaf",
+         "kind": "competitive",
+         "opponent": "Curaçao",
+         "venue": "away",
+         "gf": 0,
+         "ga": 4,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "698196",
+         "date": "2025-06-10T22:00Z",
+         "competition": "FIFA World Cup Qualifying - Concacaf",
+         "kind": "competitive",
+         "opponent": "Barbados",
+         "venue": "home",
+         "gf": 2,
+         "ga": 1,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "761046",
+         "date": "2025-11-12T21:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Cuba",
+         "venue": "away",
+         "gf": 0,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "761284",
+         "date": "2025-11-16T00:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "St. Vincent and the Grenadines",
+         "venue": "away",
+         "gf": 1,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401861921",
+         "date": "2026-03-27T15:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Azerbaijan",
+         "venue": "away",
+         "gf": 1,
+         "ga": 6,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 3,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     }
+    },
+    "fixture_source": "espn",
+    "kickoff_status": null,
+    "apifootball": null,
+    "head_to_head": {
+     "available": true,
+     "source": "seasonseries",
+     "meetings": [
+      {
+       "event_id": "487750",
+       "date": "2017-07-02T21:30:00Z",
+       "home": "Barbados",
+       "away": "St. Lucia",
+       "home_score": 1,
+       "away_score": 1,
+       "completed": true,
+       "winner": "draw",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "537111",
+       "date": "2019-03-06T21:00:00Z",
+       "home": "St. Lucia",
+       "away": "Barbados",
+       "home_score": 0,
+       "away_score": 2,
+       "completed": true,
+       "winner": "home",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "698196",
+       "date": "2025-06-10T22:00:00Z",
+       "home": "St. Lucia",
+       "away": "Barbados",
+       "home_score": 2,
+       "away_score": 1,
+       "completed": true,
+       "winner": "away",
+       "winner_means": "this fixture's home/away sides"
+      }
+     ],
+     "tally": {
+      "home": 1,
+      "draw": 1,
+      "away": 1
+     },
+     "reason": null,
+     "window": null,
+     "last_meeting": {
+      "event_id": "698196",
+      "date": "2025-06-10T22:00:00Z",
+      "home": "St. Lucia",
+      "away": "Barbados",
+      "home_score": 2,
+      "away_score": 1,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     },
+     "espn_reason": null
+    },
+    "lineups": {
+     "announced": true,
+     "sides": {
+      "home": {
+       "team": "Barbados",
+       "formation": "5-4-1",
+       "announced": true,
+       "starters": [
+        {
+         "name": "Jamal Blackman",
+         "jersey": "1",
+         "position": "G"
+        },
+        {
+         "name": "Andre Applewhaite",
+         "jersey": "3",
+         "position": "CD"
+        },
+        {
+         "name": "Ajani Jamel Banton",
+         "jersey": "14",
+         "position": "CD-L"
+        },
+        {
+         "name": "Mario Williams",
+         "jersey": "4",
+         "position": "CD-R"
+        },
+        {
+         "name": "Zachary Applewhite",
+         "jersey": "22",
+         "position": "LB"
+        },
+        {
+         "name": "Tyrique Bailey-Edwards",
+         "jersey": "20",
+         "position": "RB"
+        },
+        {
+         "name": "Omani Leacock",
+         "jersey": "8",
+         "position": "CM-L"
+        },
+        {
+         "name": "Jaheim Neblett",
+         "jersey": "5",
+         "position": "CM-R"
+        },
+        {
+         "name": "Thierry Gale",
+         "jersey": "11",
+         "position": "LM"
+        },
+        {
+         "name": "Niall Reid-Stephen",
+         "jersey": "10",
+         "position": "RM"
+        },
+        {
+         "name": "Colin Griffith",
+         "jersey": "19",
+         "position": "F"
+        }
+       ],
+       "bench": 11
+      },
+      "away": {
+       "team": "St. Lucia",
+       "formation": "4-1-4-1",
+       "announced": true,
+       "starters": [
+        {
+         "name": "Vino Barclett",
+         "jersey": "1",
+         "position": "G"
+        },
+        {
+         "name": "Kurt Frederick",
+         "jersey": "2",
+         "position": "CD-L"
+        },
+        {
+         "name": "Melvin Doxilly",
+         "jersey": "6",
+         "position": "CD-R"
+        },
+        {
+         "name": "Ajani Louis",
+         "jersey": "3",
+         "position": "DM"
+        },
+        {
+         "name": "Terell Thomas",
+         "jersey": "4",
+         "position": "LB"
+        },
+        {
+         "name": "Shevon Byron",
+         "jersey": "19",
+         "position": "RB"
+        },
+        {
+         "name": "Yanic Noel",
+         "jersey": "9",
+         "position": "CM-L"
+        },
+        {
+         "name": "Lester Joseph",
+         "jersey": "8",
+         "position": "CM-R"
+        },
+        {
+         "name": "Gregson President",
+         "jersey": "21",
+         "position": "LM"
+        },
+        {
+         "name": "Doneal Lionel",
+         "jersey": "5",
+         "position": "RM"
+        },
+        {
+         "name": "Caniggia Elva",
+         "jersey": "14",
+         "position": "F"
+        }
+       ],
+       "bench": 12
+      }
+     },
+     "reason": null
+    },
+    "market": {
+     "status": "mapped",
+     "event_ticker": "KXCONCACAFNLGAME-26SEP25BARLCA",
+     "status_words": "one open Kalshi event names both teams on this date",
+     "title": "Barbados vs Saint Lucia",
+     "legs": {
+      "home": {
+       "event_ticker": "KXCONCACAFNLGAME-26SEP25BARLCA",
+       "ticker": "KXCONCACAFNLGAME-26SEP25BARLCA-BAR",
+       "ask_c": 29,
+       "bid_c": 28,
+       "spread_c": 1,
+       "ask_size": 712,
+       "bid_size": 1887,
+       "flags": [],
+       "name": "Barbados"
+      },
+      "tie": {
+       "event_ticker": "KXCONCACAFNLGAME-26SEP25BARLCA",
+       "ticker": "KXCONCACAFNLGAME-26SEP25BARLCA-TIE",
+       "ask_c": 27,
+       "bid_c": 26,
+       "spread_c": 1,
+       "ask_size": 362,
+       "bid_size": 753,
+       "flags": []
+      },
+      "away": {
+       "event_ticker": "KXCONCACAFNLGAME-26SEP25BARLCA",
+       "ticker": "KXCONCACAFNLGAME-26SEP25BARLCA-LCA",
+       "ask_c": 45,
+       "bid_c": 44,
+       "spread_c": 1,
+       "ask_size": 395,
+       "bid_size": 1845,
+       "flags": [],
+       "name": "Saint Lucia"
+      }
+     },
+     "orientation": "same"
+    },
+    "headline": {
+     "candidate": "b",
+     "label": "ELO GAP",
+     "unit": "Elo points",
+     "value": 154.6,
+     "favourite_side": "away",
+     "home_minus_away": -154.6,
+     "components": {
+      "elo": {
+       "home": 1218.1,
+       "away": 1307.7
+      },
+      "raw_gap_home_minus_away": -89.6,
+      "venue_term_home_minus_away": -65,
+      "venue_class": "OPPONENT_COUNTRY",
+      "host_side": "away",
+      "venue_assumed": false
+     },
+     "raw_favourite_side": "away",
+     "venue_flips_raw_order": false,
+     "tie_broken_by_rank": false,
+     "basis": "The venue-adjusted Elo gap: the two teams' overall ratings on this competition's national-team field, differenced, plus the club home term given to the side whose country hosts, and nothing on neutral ground. The card's favourite and its quoted Kalshi leg are read off this same number. A preregistered out-of-sample bake-off chose it: no alternative beat it by a margin whose 95% interval excluded zero (see research_archive/national_headline_bakeoff_2026-09-25/RESULTS.json)."
+    }
+   }
+  },
+  {
+   "refused": false,
+   "league": "cnl",
+   "column": "cnl",
+   "columns": [
+    "cnl"
+   ],
+   "home": "Jamaica",
+   "away": "Guatemala",
+   "favourite": "Jamaica",
+   "opponent": "Guatemala",
+   "fav_side": "home",
+   "fav_source": "field",
+   "venue_favourite": {
+    "refused": true,
+    "reason": "no_gdg_gap",
+    "policy": "off",
+    "flipped": false,
+    "venue_class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "resolution": {
+    "Jamaica": "espn_id",
+    "Guatemala": "espn_id"
+   },
+   "ppg_gap": null,
+   "gdg_gap": null,
+   "rank_gap": null,
+   "gp_current": {
+    "home": 0,
+    "away": 0,
+    "min": 0
+   },
+   "weights": null,
+   "src": "current",
+   "cross_league": false,
+   "rated_in": {
+    "home": "cnl",
+    "away": "cnl"
+   },
+   "table_notes": {
+    "home": null,
+    "away": null
+   },
+   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
+   "reg_time_note": "KXCONCACAFNLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
+   "ranks": {
+    "fav": 2,
+    "opp": 5
+   },
+   "rates": {
+    "ppg": [
+     null,
+     null
+    ],
+    "gf": [
+     null,
+     null
+    ],
+    "ga": [
+     null,
+     null
+    ],
+    "gdg": [
+     null,
+     null
+    ]
+   },
+   "own_gdg": {
+    "diff": null,
+    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record."
+   },
+   "tiers": {
+    "ovr": [
+     1,
+     1
+    ],
+    "atk": [
+     1,
+     1
+    ],
+    "def": [
+     1,
+     1
+    ]
+   },
+   "tier_gaps": {
+    "ovr": 0,
+    "atk": 0,
+    "def": 0
+   },
+   "shape": "HOLLOW",
+   "current_only": null,
+   "field": {
+    "competition": "cnl",
+    "clubs": {
+     "fav": "Jamaica",
+     "opp": "Guatemala"
+    },
+    "size": 37,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 2,
+       "tier": 1,
+       "tier_set": [
+        1
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1618.891661915762,
+       "half_width_95": 29.543294252970785,
+       "interval": [
+        1589.3483676627911,
+        1648.4349561687327
+       ]
+      },
+      "opp": {
+       "rank": 5,
+       "tier": 1,
+       "tier_set": [
+        1
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1573.4687264587872,
+       "half_width_95": 23.823922802985514,
+       "interval": [
+        1549.6448036558018,
+        1597.2926492617726
+       ]
+      },
+      "tier_gap": 0,
+      "unit": "elo",
+      "label": "overall",
+      "floor": {
+       "below_floor": false,
+       "failing_condition": null
+      },
+      "field_size": 37,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 35.4854714625729,
+       "opp": 30.073916066444163
+      },
+      "signal_source": "elo"
+     },
+     "atk": {
+      "fav": {
+       "rank": 8,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.10883001256005584,
+       "half_width_95": 0.24410664607682167,
+       "interval": [
+        -0.13527663351676583,
+        0.3529366586368775
+       ]
+      },
+      "opp": {
+       "rank": 5,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.25722873364011456,
+       "half_width_95": 0.2816399444780588,
+       "interval": [
+        -0.02441121083794423,
+        0.5388686781181733
+       ]
+      },
+      "tier_gap": 0,
+      "unit": "log_goals",
+      "label": "attack",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 37,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.2664380465436152,
+       "opp": 0.30177218460220856
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "goals"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 1,
+        "tier_set": [
+         1
+        ],
+        "straddles": false
+       },
+       "opp": {
+        "tier": 1,
+        "tier_set": [
+         1
+        ],
+        "straddles": false
+       }
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 4,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.28758743465038517,
+       "half_width_95": 0.2589158654951738,
+       "interval": [
+        0.02867156915521135,
+        0.546503300145559
+       ]
+      },
+      "opp": {
+       "rank": 1,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.49489448455483,
+       "half_width_95": 0.3925744774718665,
+       "interval": [
+        0.10232000708296346,
+        0.8874689620266965
+       ]
+      },
+      "tier_gap": 0,
+      "unit": "log_goals",
+      "label": "defence",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 37,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.27018392145584474,
+       "opp": 0.38895181254027333
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "goals"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 1,
+        "tier_set": [
+         1
+        ],
+        "straddles": false
+       },
+       "opp": {
+        "tier": 1,
+        "tier_set": [
+         1
+        ],
+        "straddles": false
+       }
+      }
+     }
+    },
+    "shape": "HOLLOW",
+    "axes_measured": [
+     "ovr",
+     "atk",
+     "def"
+    ],
+    "field_basis": "the CONCACAF Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus 5a2e1ce9c011, variant 'all', Elo pinned at 5 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals, measured from shots (xG, else shots on target, else goals, per match).",
+    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence."
+   },
+   "event_id": "401900631",
+   "competition_id": "401900631",
+   "kickoff": "2026-09-26T00:00Z",
+   "espn": "concacaf.nations.league",
+   "state": "pre",
+   "in_play": false,
+   "venue": {
+    "name": "Independence Park",
+    "city": "Sabina Park",
+    "country": "Jamaica"
+   },
+   "venue_class": {
+    "class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "kalshi": {
+    "event_ticker": "KXCONCACAFNLGAME-26SEP25JAMGTM",
+    "ticker": "KXCONCACAFNLGAME-26SEP25JAMGTM-JAM",
+    "ask_c": 56,
+    "bid_c": 55,
+    "spread_c": 1,
+    "ask_size": 6182,
+    "bid_size": 574,
+    "flags": []
+   },
+   "form": {
+    "fav": "WLWL?",
+    "opp": "WLLLL",
+    "scope": "all senior internationals, friendlies marked",
+    "scope_is_cup": false
+   },
+   "h2h": {
+    "available": true,
+    "source": "seasonseries",
+    "meetings": [
+     {
+      "event_id": "333969",
+      "date": "2012-10-13T02:00:00Z",
+      "home": "Guatemala",
+      "away": "Jamaica",
+      "home_score": 2,
+      "away_score": 1,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "678985",
+      "date": "2023-07-09T21:00:00Z",
+      "home": "Guatemala",
+      "away": "Jamaica",
+      "home_score": 0,
+      "away_score": 1,
+      "completed": true,
+      "winner": "home",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "690105",
+      "date": "2023-11-12T00:00:00Z",
+      "home": "Guatemala",
+      "away": "Jamaica",
+      "home_score": 0,
+      "away_score": 0,
+      "completed": true,
+      "winner": "draw",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "698194",
+      "date": "2025-06-10T23:00:00Z",
+      "home": "Jamaica",
+      "away": "Guatemala",
+      "home_score": 3,
+      "away_score": 0,
+      "completed": true,
+      "winner": "home",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "735323",
+      "date": "2025-06-17T02:00:00Z",
+      "home": "Jamaica",
+      "away": "Guatemala",
+      "home_score": 0,
+      "away_score": 1,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     }
+    ],
+    "tally": {
+     "home": 2,
+     "draw": 1,
+     "away": 2
+    },
+    "reason": null,
+    "window": null,
+    "last_meeting": {
+     "event_id": "735323",
+     "date": "2025-06-17T02:00:00Z",
+     "home": "Jamaica",
+     "away": "Guatemala",
+     "home_score": 0,
+     "away_score": 1,
+     "completed": true,
+     "winner": "away",
+     "winner_means": "this fixture's home/away sides"
+    },
+    "espn_reason": null
+   },
+   "national": {
+    "competition": "cnl",
+    "stage": "group-stage",
+    "stage_kind": "group",
+    "group": "League A, Group B",
+    "leg": null,
+    "status_detail": "Fri, September 25th at 8:00 PM EDT",
+    "venue_country": "Jamaica",
+    "neutral_provider_flag": false,
+    "neutral": false,
+    "teams": {
+     "home": {
+      "key": "jamaica",
+      "espn_id": "1038",
+      "name": "Jamaica",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "cnl",
+       "axes": {
+        "ovr": {
+         "rank": 2,
+         "tier": 1,
+         "tier_set": [
+          1
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1618.891661915762,
+         "half_width_95": 29.543294252970785,
+         "interval": [
+          1589.3483676627911,
+          1648.4349561687327
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 35.4854714625729,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 8,
+         "tier": 1,
+         "tier_set": [
+          1,
+          2
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.10883001256005584,
+         "half_width_95": 0.24410664607682167,
+         "interval": [
+          -0.13527663351676583,
+          0.3529366586368775
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.2664380465436152,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 1,
+          "tier_set": [
+           1
+          ],
+          "straddles": false
+         }
+        },
+        "def": {
+         "rank": 4,
+         "tier": 1,
+         "tier_set": [
+          1,
+          2
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.28758743465038517,
+         "half_width_95": 0.2589158654951738,
+         "interval": [
+          0.02867156915521135,
+          0.546503300145559
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.27018392145584474,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 1,
+          "tier_set": [
+           1
+          ],
+          "straddles": false
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "WLWL?",
+       "disputed": 1,
+       "withheld": 1,
+       "games": [
+        {
+         "event_id": "761388",
+         "date": "2026-03-27T03:00Z",
+         "competition": "FIFA World Cup Qualifying - Playoff Tournament",
+         "kind": "competitive",
+         "opponent": "New Caledonia",
+         "venue": "away",
+         "gf": 1,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "761389",
+         "date": "2026-03-31T21:00Z",
+         "competition": "FIFA World Cup Qualifying - Playoff Tournament",
+         "kind": "competitive",
+         "opponent": "Congo DR",
+         "venue": "away",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401873506",
+         "date": "2026-05-27T18:30Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "India",
+         "venue": "home",
+         "gf": 2,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "D",
+         "provider_agrees": false
+        },
+        {
+         "event_id": "401874104",
+         "date": "2026-05-30T18:30Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Nigeria",
+         "venue": "home",
+         "gf": 0,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401875160",
+         "date": "2026-06-06T21:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "South Africa",
+         "venue": "home",
+         "gf": 0,
+         "ga": 1,
+         "letter": "?",
+         "provider_letter": "L",
+         "provider_agrees": true,
+         "letter_if_espn": "L",
+         "disputed": {
+          "letter": "?",
+          "why": "the providers disagree on this match's score, so no letter is drawn as if it were certain; both readings are below, each lettered from this team's side",
+          "source": "research_archive/national_team_field_v2_2026-09-25/fill_report.json",
+          "espn": {
+           "score": [
+            0,
+            1
+           ],
+           "for": 0,
+           "against": 1,
+           "letter": "L"
+          },
+          "apifootball": {
+           "score": [
+            1,
+            1
+           ],
+           "for": 1,
+           "against": 1,
+           "letter": "D",
+           "status": null,
+           "fixture": 1550809
+          },
+          "score_is": "home-away of that match, as ESPN lists its sides"
+         }
+        }
+       ],
+       "friendlies": 3,
+       "provider_disagreements": 1,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     },
+     "away": {
+      "key": "guatemala",
+      "espn_id": "2652",
+      "name": "Guatemala",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "cnl",
+       "axes": {
+        "ovr": {
+         "rank": 5,
+         "tier": 1,
+         "tier_set": [
+          1
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1573.4687264587872,
+         "half_width_95": 23.823922802985514,
+         "interval": [
+          1549.6448036558018,
+          1597.2926492617726
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 30.073916066444163,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 5,
+         "tier": 1,
+         "tier_set": [
+          1,
+          2
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.25722873364011456,
+         "half_width_95": 0.2816399444780588,
+         "interval": [
+          -0.02441121083794423,
+          0.5388686781181733
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.30177218460220856,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 1,
+          "tier_set": [
+           1
+          ],
+          "straddles": false
+         }
+        },
+        "def": {
+         "rank": 1,
+         "tier": 1,
+         "tier_set": [
+          1,
+          2
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.49489448455483,
+         "half_width_95": 0.3925744774718665,
+         "interval": [
+          0.10232000708296346,
+          0.8874689620266965
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.38895181254027333,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 1,
+          "tier_set": [
+           1
+          ],
+          "straddles": false
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "WLLLL",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "754269",
+         "date": "2025-11-19T01:00Z",
+         "competition": "FIFA World Cup Qualifying - Concacaf",
+         "kind": "competitive",
+         "opponent": "Suriname",
+         "venue": "home",
+         "gf": 3,
+         "ga": 1,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401844264",
+         "date": "2026-01-18T03:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Canada",
+         "venue": "away",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401862318",
+         "date": "2026-03-27T19:30Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Algeria",
+         "venue": "away",
+         "gf": 0,
+         "ga": 7,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401870095",
+         "date": "2026-06-05T00:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Czechia",
+         "venue": "away",
+         "gf": 1,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401870000",
+         "date": "2026-06-07T20:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Ecuador",
+         "venue": "away",
+         "gf": 0,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 4,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     }
+    },
+    "fixture_source": "espn",
+    "kickoff_status": null,
+    "apifootball": null,
+    "head_to_head": {
+     "available": true,
+     "source": "seasonseries",
+     "meetings": [
+      {
+       "event_id": "333969",
+       "date": "2012-10-13T02:00:00Z",
+       "home": "Guatemala",
+       "away": "Jamaica",
+       "home_score": 2,
+       "away_score": 1,
+       "completed": true,
+       "winner": "away",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "678985",
+       "date": "2023-07-09T21:00:00Z",
+       "home": "Guatemala",
+       "away": "Jamaica",
+       "home_score": 0,
+       "away_score": 1,
+       "completed": true,
+       "winner": "home",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "690105",
+       "date": "2023-11-12T00:00:00Z",
+       "home": "Guatemala",
+       "away": "Jamaica",
+       "home_score": 0,
+       "away_score": 0,
+       "completed": true,
+       "winner": "draw",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "698194",
+       "date": "2025-06-10T23:00:00Z",
+       "home": "Jamaica",
+       "away": "Guatemala",
+       "home_score": 3,
+       "away_score": 0,
+       "completed": true,
+       "winner": "home",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "735323",
+       "date": "2025-06-17T02:00:00Z",
+       "home": "Jamaica",
+       "away": "Guatemala",
+       "home_score": 0,
+       "away_score": 1,
+       "completed": true,
+       "winner": "away",
+       "winner_means": "this fixture's home/away sides"
+      }
+     ],
+     "tally": {
+      "home": 2,
+      "draw": 1,
+      "away": 2
+     },
+     "reason": null,
+     "window": null,
+     "last_meeting": {
+      "event_id": "735323",
+      "date": "2025-06-17T02:00:00Z",
+      "home": "Jamaica",
+      "away": "Guatemala",
+      "home_score": 0,
+      "away_score": 1,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     },
+     "espn_reason": null
+    },
+    "lineups": {
+     "announced": true,
+     "sides": {
+      "home": {
+       "team": "Jamaica",
+       "formation": "4-2-3-1",
+       "announced": true,
+       "starters": [
+        {
+         "name": "Andre Blake",
+         "jersey": "1",
+         "position": "G"
+        },
+        {
+         "name": "Damion Lowe",
+         "jersey": "17",
+         "position": "CD-L"
+        },
+        {
+         "name": "Richard King",
+         "jersey": "6",
+         "position": "CD-R"
+        },
+        {
+         "name": "Ronaldo Webster",
+         "jersey": "22",
+         "position": "LB"
+        },
+        {
+         "name": "Joel Latibeaudiere",
+         "jersey": "15",
+         "position": "RB"
+        },
+        {
+         "name": "Kasey Palmer",
+         "jersey": "8",
+         "position": "AM"
+        },
+        {
+         "name": "Rumarn Burrell",
+         "jersey": "21",
+         "position": "LM"
+        },
+        {
+         "name": "Isaac Hayden",
+         "jersey": "14",
+         "position": "RM"
+        },
+        {
+         "name": "Javon East",
+         "jersey": "12",
+         "position": "F"
+        },
+        {
+         "name": "Tyreece Campbell",
+         "jersey": "11",
+         "position": "AM-L"
+        },
+        {
+         "name": "Karoy Anderson",
+         "jersey": "16",
+         "position": "AM-R"
+        }
+       ],
+       "bench": 12
+      },
+      "away": {
+       "team": "Guatemala",
+       "formation": "4-2-3-1",
+       "announced": true,
+       "starters": [
+        {
+         "name": "Kenderson Navarro",
+         "jersey": "12",
+         "position": "G"
+        },
+        {
+         "name": "Allen Yanes",
+         "jersey": "15",
+         "position": "D"
+        },
+        {
+         "name": "Aaron Herrera",
+         "jersey": "7",
+         "position": "D"
+        },
+        {
+         "name": "Nicolás Samayoa",
+         "jersey": "3",
+         "position": "D"
+        },
+        {
+         "name": "José Morales",
+         "jersey": "16",
+         "position": "D"
+        },
+        {
+         "name": "José Rosales",
+         "jersey": "5",
+         "position": "M"
+        },
+        {
+         "name": "Jorge Aparicio",
+         "jersey": "23",
+         "position": "M"
+        },
+        {
+         "name": "Rubio Rubín",
+         "jersey": "9",
+         "position": "M"
+        },
+        {
+         "name": "Rudy Muñoz",
+         "jersey": "11",
+         "position": "M"
+        },
+        {
+         "name": "Óscar Santis",
+         "jersey": "18",
+         "position": "M"
+        },
+        {
+         "name": "Darwin Lom",
+         "jersey": "14",
+         "position": "F"
+        }
+       ],
+       "bench": 12
+      }
+     },
+     "reason": null
+    },
+    "market": {
+     "status": "mapped",
+     "event_ticker": "KXCONCACAFNLGAME-26SEP25JAMGTM",
+     "status_words": "one open Kalshi event names both teams on this date",
+     "title": "Jamaica vs Guatemala",
+     "legs": {
+      "home": {
+       "event_ticker": "KXCONCACAFNLGAME-26SEP25JAMGTM",
+       "ticker": "KXCONCACAFNLGAME-26SEP25JAMGTM-JAM",
+       "ask_c": 56,
+       "bid_c": 55,
+       "spread_c": 1,
+       "ask_size": 6182,
+       "bid_size": 574,
+       "flags": [],
+       "name": "Jamaica"
+      },
+      "tie": {
+       "event_ticker": "KXCONCACAFNLGAME-26SEP25JAMGTM",
+       "ticker": "KXCONCACAFNLGAME-26SEP25JAMGTM-TIE",
+       "ask_c": 25,
+       "bid_c": 24,
+       "spread_c": 1,
+       "ask_size": 1659,
+       "bid_size": 954,
+       "flags": []
+      },
+      "away": {
+       "event_ticker": "KXCONCACAFNLGAME-26SEP25JAMGTM",
+       "ticker": "KXCONCACAFNLGAME-26SEP25JAMGTM-GTM",
+       "ask_c": 22,
+       "bid_c": 20,
+       "spread_c": 2,
+       "ask_size": 60,
+       "bid_size": 4589,
+       "flags": [
+        "THIN"
+       ],
+       "name": "Guatemala"
+      }
+     },
+     "orientation": "same"
+    },
+    "headline": {
+     "candidate": "b",
+     "label": "ELO GAP",
+     "unit": "Elo points",
+     "value": 110.4,
+     "favourite_side": "home",
+     "home_minus_away": 110.4,
+     "components": {
+      "elo": {
+       "home": 1618.9,
+       "away": 1573.5
+      },
+      "raw_gap_home_minus_away": 45.4,
+      "venue_term_home_minus_away": 65,
+      "venue_class": "TRUE_HOME",
+      "host_side": "home",
+      "venue_assumed": false
+     },
+     "raw_favourite_side": "home",
+     "venue_flips_raw_order": false,
+     "tie_broken_by_rank": false,
+     "basis": "The venue-adjusted Elo gap: the two teams' overall ratings on this competition's national-team field, differenced, plus the club home term given to the side whose country hosts, and nothing on neutral ground. The card's favourite and its quoted Kalshi leg are read off this same number. A preregistered out-of-sample bake-off chose it: no alternative beat it by a margin whose 95% interval excluded zero (see research_archive/national_headline_bakeoff_2026-09-25/RESULTS.json)."
+    }
+   }
+  },
+  {
+   "refused": false,
+   "league": "cnl",
+   "column": "cnl",
+   "columns": [
+    "cnl"
+   ],
+   "home": "Honduras",
+   "away": "Suriname",
+   "favourite": "Honduras",
+   "opponent": "Suriname",
+   "fav_side": "home",
+   "fav_source": "field",
+   "venue_favourite": {
+    "refused": true,
+    "reason": "no_gdg_gap",
+    "policy": "off",
+    "flipped": false,
+    "venue_class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "resolution": {
+    "Honduras": "espn_id",
+    "Suriname": "espn_id"
+   },
+   "ppg_gap": null,
+   "gdg_gap": null,
+   "rank_gap": null,
+   "gp_current": {
+    "home": 0,
+    "away": 0,
+    "min": 0
+   },
+   "weights": null,
+   "src": "current",
+   "cross_league": false,
+   "rated_in": {
+    "home": "cnl",
+    "away": "cnl"
+   },
+   "table_notes": {
+    "home": null,
+    "away": null
+   },
+   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
+   "reg_time_note": "KXCONCACAFNLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
+   "ranks": {
+    "fav": 3,
+    "opp": 6
+   },
+   "rates": {
+    "ppg": [
+     null,
+     null
+    ],
+    "gf": [
+     null,
+     null
+    ],
+    "ga": [
+     null,
+     null
+    ],
+    "gdg": [
+     null,
+     null
+    ]
+   },
+   "own_gdg": {
+    "diff": null,
+    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record."
+   },
+   "tiers": {
+    "ovr": [
+     1,
+     1
+    ],
+    "atk": [
+     1,
+     2
+    ],
+    "def": [
+     1,
+     2
+    ]
+   },
+   "tier_gaps": {
+    "ovr": 0,
+    "atk": 1,
+    "def": 1
+   },
+   "shape": "SPLIT",
+   "current_only": null,
+   "field": {
+    "competition": "cnl",
+    "clubs": {
+     "fav": "Honduras",
+     "opp": "Suriname"
+    },
+    "size": 37,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 3,
+       "tier": 1,
+       "tier_set": [
+        1
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1609.7221851754666,
+       "half_width_95": 18.471362835618276,
+       "interval": [
+        1591.2508223398484,
+        1628.1935480110849
+       ]
+      },
+      "opp": {
+       "rank": 6,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "value": 1545.4590060753458,
+       "half_width_95": 21.057420681693387,
+       "interval": [
+        1524.4015853936523,
+        1566.5164267570392
+       ]
+      },
+      "tier_gap": 0,
+      "unit": "elo",
+      "label": "overall",
+      "floor": {
+       "below_floor": false,
+       "failing_condition": null
+      },
+      "field_size": 37,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 26.067508514543423,
+       "opp": 27.783523931597088
+      },
+      "signal_source": "elo"
+     },
+     "atk": {
+      "fav": {
+       "rank": 2,
+       "tier": 1,
+       "tier_set": [
+        1
+       ],
+       "straddles": false,
+       "below_floor": true,
+       "value": 0.4087233846456625,
+       "half_width_95": 0.3017719990133148,
+       "interval": [
+        0.10695138563234768,
+        0.7104953836589774
+       ]
+      },
+      "opp": {
+       "rank": 12,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.017378623584883207,
+       "half_width_95": 0.2569478458431311,
+       "interval": [
+        -0.2743264694280143,
+        0.23956922225824787
+       ]
+      },
+      "tier_gap": 1,
+      "unit": "log_goals",
+      "label": "attack",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 37,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.3058315901678289,
+       "opp": 0.2774441405696797
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "goals"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 1,
+        "tier_set": [
+         1
+        ],
+        "straddles": false
+       },
+       "opp": {
+        "tier": 1,
+        "tier_set": [
+         1,
+         2
+        ],
+        "straddles": true
+       }
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 3,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.36239530614130566,
+       "half_width_95": 0.28969398046125533,
+       "interval": [
+        0.07270132568005033,
+        0.6520892866025609
+       ]
+      },
+      "opp": {
+       "rank": 12,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.05065436634459272,
+       "half_width_95": 0.316522124040958,
+       "interval": [
+        -0.36717649038555067,
+        0.2658677576963653
+       ]
+      },
+      "tier_gap": 1,
+      "unit": "log_goals",
+      "label": "defence",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 37,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.3065288765904071,
+       "opp": 0.3295016385686674
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "goals"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 1,
+        "tier_set": [
+         1
+        ],
+        "straddles": false
+       },
+       "opp": {
+        "tier": 1,
+        "tier_set": [
+         1,
+         2
+        ],
+        "straddles": true
+       }
+      }
+     }
+    },
+    "shape": "SPLIT",
+    "axes_measured": [
+     "ovr",
+     "atk",
+     "def"
+    ],
+    "field_basis": "the CONCACAF Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus 5a2e1ce9c011, variant 'all', Elo pinned at 5 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals, measured from shots (xG, else shots on target, else goals, per match).",
+    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence."
+   },
+   "event_id": "401900633",
+   "competition_id": "401900633",
+   "kickoff": "2026-09-26T01:00Z",
+   "espn": "concacaf.nations.league",
+   "state": "pre",
+   "in_play": false,
+   "venue": {
+    "name": "Estadio José de la Paz Herrera Uclés",
+    "city": "Estadio Nacional Chelato Uclés",
+    "country": "Honduras"
+   },
+   "venue_class": {
+    "class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "kalshi": {
+    "event_ticker": "KXCONCACAFNLGAME-26SEP25HNDSUR",
+    "ticker": "KXCONCACAFNLGAME-26SEP25HNDSUR-HND",
+    "ask_c": 60,
+    "bid_c": 59,
+    "spread_c": 1,
+    "ask_size": 30746,
+    "bid_size": 4364,
+    "flags": []
+   },
+   "form": {
+    "fav": "WLDDL",
+    "opp": "DDWLL",
+    "scope": "all senior internationals, friendlies marked",
+    "scope_is_cup": false
+   },
+   "h2h": {
+    "available": false,
+    "source": "corpus_since_2018",
+    "window": {
+     "from": "2018-01-01",
+     "to": "2026-09-24T22:40:32+00:00",
+     "label": "since 2018, corpus to 2026-09-24"
+    },
+    "meetings": [],
+    "last_meeting": null,
+    "tally": {
+     "home": 0,
+     "draw": 0,
+     "away": 0
+    },
+    "reason": "no meeting since 2018 in our corpus (senior internationals to 2026-09-24). A measured absence over that window, not a claim the two teams never met",
+    "espn_reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met"
+   },
+   "national": {
+    "competition": "cnl",
+    "stage": "group-stage",
+    "stage_kind": "group",
+    "group": "League A, Group B",
+    "leg": null,
+    "status_detail": "Fri, September 25th at 9:00 PM EDT",
+    "venue_country": "Honduras",
+    "neutral_provider_flag": false,
+    "neutral": false,
+    "teams": {
+     "home": {
+      "key": "honduras",
+      "espn_id": "215",
+      "name": "Honduras",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "cnl",
+       "axes": {
+        "ovr": {
+         "rank": 3,
+         "tier": 1,
+         "tier_set": [
+          1
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1609.7221851754666,
+         "half_width_95": 18.471362835618276,
+         "interval": [
+          1591.2508223398484,
+          1628.1935480110849
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 26.067508514543423,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 2,
+         "tier": 1,
+         "tier_set": [
+          1
+         ],
+         "straddles": false,
+         "below_floor": true,
+         "value": 0.4087233846456625,
+         "half_width_95": 0.3017719990133148,
+         "interval": [
+          0.10695138563234768,
+          0.7104953836589774
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.3058315901678289,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 1,
+          "tier_set": [
+           1
+          ],
+          "straddles": false
+         }
+        },
+        "def": {
+         "rank": 3,
+         "tier": 1,
+         "tier_set": [
+          1,
+          2
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.36239530614130566,
+         "half_width_95": 0.28969398046125533,
+         "interval": [
+          0.07270132568005033,
+          0.6520892866025609
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.3065288765904071,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 1,
+          "tier_set": [
+           1
+          ],
+          "straddles": false
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "WLDDL",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "754255",
+         "date": "2025-10-14T00:00Z",
+         "competition": "FIFA World Cup Qualifying - Concacaf",
+         "kind": "competitive",
+         "opponent": "Haiti",
+         "venue": "home",
+         "gf": 3,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "754261",
+         "date": "2025-11-14T02:00Z",
+         "competition": "FIFA World Cup Qualifying - Concacaf",
+         "kind": "competitive",
+         "opponent": "Nicaragua",
+         "venue": "away",
+         "gf": 0,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "754270",
+         "date": "2025-11-19T01:00Z",
+         "competition": "FIFA World Cup Qualifying - Concacaf",
+         "kind": "competitive",
+         "opponent": "Costa Rica",
+         "venue": "away",
+         "gf": 0,
+         "ga": 0,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401862402",
+         "date": "2026-03-31T18:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Peru",
+         "venue": "away",
+         "gf": 2,
+         "ga": 2,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401868047",
+         "date": "2026-06-07T00:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Argentina",
+         "venue": "away",
+         "gf": 0,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 2,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     },
+     "away": {
+      "key": "suriname",
+      "espn_id": "2664",
+      "name": "Suriname",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "cnl",
+       "axes": {
+        "ovr": {
+         "rank": 6,
+         "tier": 1,
+         "tier_set": [
+          1,
+          2
+         ],
+         "straddles": true,
+         "below_floor": false,
+         "value": 1545.4590060753458,
+         "half_width_95": 21.057420681693387,
+         "interval": [
+          1524.4015853936523,
+          1566.5164267570392
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 27.783523931597088,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 12,
+         "tier": 2,
+         "tier_set": [
+          1,
+          2
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.017378623584883207,
+         "half_width_95": 0.2569478458431311,
+         "interval": [
+          -0.2743264694280143,
+          0.23956922225824787
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.2774441405696797,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 1,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 12,
+         "tier": 2,
+         "tier_set": [
+          1,
+          2,
+          3
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.05065436634459272,
+         "half_width_95": 0.316522124040958,
+         "interval": [
+          -0.36717649038555067,
+          0.2658677576963653
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.3295016385686674,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 1,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "DDWLL",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "754253",
+         "date": "2025-10-10T21:00Z",
+         "competition": "FIFA World Cup Qualifying - Concacaf",
+         "kind": "competitive",
+         "opponent": "Guatemala",
+         "venue": "home",
+         "gf": 1,
+         "ga": 1,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "754257",
+         "date": "2025-10-15T01:00Z",
+         "competition": "FIFA World Cup Qualifying - Concacaf",
+         "kind": "competitive",
+         "opponent": "Panama",
+         "venue": "away",
+         "gf": 1,
+         "ga": 1,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "754260",
+         "date": "2025-11-13T22:00Z",
+         "competition": "FIFA World Cup Qualifying - Concacaf",
+         "kind": "competitive",
+         "opponent": "El Salvador",
+         "venue": "home",
+         "gf": 4,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "754269",
+         "date": "2025-11-19T01:00Z",
+         "competition": "FIFA World Cup Qualifying - Concacaf",
+         "kind": "competitive",
+         "opponent": "Guatemala",
+         "venue": "away",
+         "gf": 1,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "761387",
+         "date": "2026-03-26T22:00Z",
+         "competition": "FIFA World Cup Qualifying - Playoff Tournament",
+         "kind": "competitive",
+         "opponent": "Bolivia",
+         "venue": "away",
+         "gf": 1,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 0,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     }
+    },
+    "fixture_source": "espn",
+    "kickoff_status": null,
+    "apifootball": null,
+    "head_to_head": {
+     "available": false,
+     "source": "corpus_since_2018",
+     "window": {
+      "from": "2018-01-01",
+      "to": "2026-09-24T22:40:32+00:00",
+      "label": "since 2018, corpus to 2026-09-24"
+     },
+     "meetings": [],
+     "last_meeting": null,
+     "tally": {
+      "home": 0,
+      "draw": 0,
+      "away": 0
+     },
+     "reason": "no meeting since 2018 in our corpus (senior internationals to 2026-09-24). A measured absence over that window, not a claim the two teams never met",
+     "espn_reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met"
+    },
+    "lineups": {
+     "announced": false,
+     "sides": {
+      "home": {
+       "team": "Honduras",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      },
+      "away": {
+       "team": "Suriname",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      }
+     },
+     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff"
+    },
+    "market": {
+     "status": "mapped",
+     "event_ticker": "KXCONCACAFNLGAME-26SEP25HNDSUR",
+     "status_words": "one open Kalshi event names both teams on this date",
+     "title": "Honduras vs Suriname",
+     "legs": {
+      "home": {
+       "event_ticker": "KXCONCACAFNLGAME-26SEP25HNDSUR",
+       "ticker": "KXCONCACAFNLGAME-26SEP25HNDSUR-HND",
+       "ask_c": 60,
+       "bid_c": 59,
+       "spread_c": 1,
+       "ask_size": 30746,
+       "bid_size": 4364,
+       "flags": [],
+       "name": "Honduras"
+      },
+      "tie": {
+       "event_ticker": "KXCONCACAFNLGAME-26SEP25HNDSUR",
+       "ticker": "KXCONCACAFNLGAME-26SEP25HNDSUR-TIE",
+       "ask_c": 26,
+       "bid_c": 25,
+       "spread_c": 1,
+       "ask_size": 13220,
+       "bid_size": 280,
+       "flags": []
+      },
+      "away": {
+       "event_ticker": "KXCONCACAFNLGAME-26SEP25HNDSUR",
+       "ticker": "KXCONCACAFNLGAME-26SEP25HNDSUR-SUR",
+       "ask_c": 17,
+       "bid_c": 16,
+       "spread_c": 1,
+       "ask_size": 4197,
+       "bid_size": 3948,
+       "flags": [],
+       "name": "Suriname"
+      }
+     },
+     "orientation": "same"
+    },
+    "headline": {
+     "candidate": "b",
+     "label": "ELO GAP",
+     "unit": "Elo points",
+     "value": 129.3,
+     "favourite_side": "home",
+     "home_minus_away": 129.3,
+     "components": {
+      "elo": {
+       "home": 1609.7,
+       "away": 1545.5
+      },
+      "raw_gap_home_minus_away": 64.3,
+      "venue_term_home_minus_away": 65,
+      "venue_class": "TRUE_HOME",
+      "host_side": "home",
+      "venue_assumed": false
+     },
+     "raw_favourite_side": "home",
+     "venue_flips_raw_order": false,
+     "tie_broken_by_rank": false,
+     "basis": "The venue-adjusted Elo gap: the two teams' overall ratings on this competition's national-team field, differenced, plus the club home term given to the side whose country hosts, and nothing on neutral ground. The card's favourite and its quoted Kalshi leg are read off this same number. A preregistered out-of-sample bake-off chose it: no alternative beat it by a margin whose 95% interval excluded zero (see research_archive/national_headline_bakeoff_2026-09-25/RESULTS.json)."
+    }
+   }
+  },
+  {
+   "refused": false,
+   "league": "cnl",
+   "column": "cnl",
+   "columns": [
+    "cnl"
+   ],
+   "home": "El Salvador",
+   "away": "Martinique",
+   "favourite": "El Salvador",
+   "opponent": "Martinique",
+   "fav_side": "home",
+   "fav_source": "field",
+   "venue_favourite": {
+    "refused": true,
+    "reason": "no_gdg_gap",
+    "policy": "off",
+    "flipped": false,
+    "venue_class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "resolution": {
+    "El Salvador": "espn_id",
+    "Martinique": "espn_id"
+   },
+   "ppg_gap": null,
+   "gdg_gap": null,
+   "rank_gap": null,
+   "gp_current": {
+    "home": 0,
+    "away": 0,
+    "min": 0
+   },
+   "weights": null,
+   "src": "current",
+   "cross_league": false,
+   "rated_in": {
+    "home": "cnl",
+    "away": "cnl"
+   },
+   "table_notes": {
+    "home": null,
+    "away": null
+   },
+   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
+   "reg_time_note": "KXCONCACAFNLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
+   "ranks": {
+    "fav": 9,
+    "opp": 12
+   },
+   "rates": {
+    "ppg": [
+     null,
+     null
+    ],
+    "gf": [
+     null,
+     null
+    ],
+    "ga": [
+     null,
+     null
+    ],
+    "gdg": [
+     null,
+     null
+    ]
+   },
+   "own_gdg": {
+    "diff": null,
+    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record."
+   },
+   "tiers": {
+    "ovr": [
+     2,
+     2
+    ],
+    "atk": [
+     2,
+     1
+    ],
+    "def": [
+     1,
+     2
+    ]
+   },
+   "tier_gaps": {
+    "ovr": 0,
+    "atk": -1,
+    "def": 1
+   },
+   "shape": "SPLIT",
+   "current_only": null,
+   "field": {
+    "competition": "cnl",
+    "clubs": {
+     "fav": "El Salvador",
+     "opp": "Martinique"
+    },
+    "size": 37,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 9,
+       "tier": 2,
+       "tier_set": [
+        2
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1484.5806761877063,
+       "half_width_95": 14.607990457107574,
+       "interval": [
+        1469.9726857305989,
+        1499.1886666448138
+       ]
+      },
+      "opp": {
+       "rank": 12,
+       "tier": 2,
+       "tier_set": [
+        2
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1470.597524028651,
+       "half_width_95": 5.687364744285085,
+       "interval": [
+        1464.9101592843658,
+        1476.284888772936
+       ]
+      },
+      "tier_gap": 0,
+      "unit": "elo",
+      "label": "overall",
+      "floor": {
+       "below_floor": false,
+       "failing_condition": null
+      },
+      "field_size": 37,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 22.110186319329873,
+       "opp": 15.429424729688574
+      },
+      "signal_source": "elo"
+     },
+     "atk": {
+      "fav": {
+       "rank": 18,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.20336648115566852,
+       "half_width_95": 0.38393357296452346,
+       "interval": [
+        -0.587300054120192,
+        0.18056709180885494
+       ]
+      },
+      "opp": {
+       "rank": 4,
+       "tier": 1,
+       "tier_set": [
+        1
+       ],
+       "straddles": false,
+       "below_floor": true,
+       "value": 0.3706193519055657,
+       "half_width_95": 0.2728831799917205,
+       "interval": [
+        0.0977361719138452,
+        0.6435025318972862
+       ]
+      },
+      "tier_gap": -1,
+      "unit": "log_goals",
+      "label": "attack",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 37,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.39515700934895637,
+       "opp": 0.2967008372198139
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "shots"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 2,
+        "tier_set": [
+         1,
+         2
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 1,
+        "tier_set": [
+         1
+        ],
+        "straddles": false
+       }
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 5,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.2621300241076153,
+       "half_width_95": 0.23737427445576112,
+       "interval": [
+        0.024755749651854203,
+        0.4995042985633764
+       ]
+      },
+      "opp": {
+       "rank": 15,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.12878939717559532,
+       "half_width_95": 0.33356821502930195,
+       "interval": [
+        -0.46235761220489724,
+        0.20477881785370664
+       ]
+      },
+      "tier_gap": 1,
+      "unit": "log_goals",
+      "label": "defence",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 37,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.251704093896381,
+       "opp": 0.35524731065537674
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "shots",
+       "opp": "shots"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 1,
+        "tier_set": [
+         1
+        ],
+        "straddles": false
+       },
+       "opp": {
+        "tier": 2,
+        "tier_set": [
+         1,
+         2
+        ],
+        "straddles": true
+       }
+      }
+     }
+    },
+    "shape": "SPLIT",
+    "axes_measured": [
+     "ovr",
+     "atk",
+     "def"
+    ],
+    "field_basis": "the CONCACAF Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus 5a2e1ce9c011, variant 'all', Elo pinned at 5 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals, measured from shots (xG, else shots on target, else goals, per match).",
+    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence."
+   },
+   "event_id": "401900632",
+   "competition_id": "401900632",
+   "kickoff": "2026-09-26T03:00Z",
+   "espn": "concacaf.nations.league",
+   "state": "pre",
+   "in_play": false,
+   "venue": {
+    "name": "Estadio Mágico González",
+    "city": "San Salvador",
+    "country": "El Salvador"
+   },
+   "venue_class": {
+    "class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "kalshi": {
+    "event_ticker": "KXCONCACAFNLGAME-26SEP25SLVMTQ",
+    "ticker": "KXCONCACAFNLGAME-26SEP25SLVMTQ-SLV",
+    "ask_c": 53,
+    "bid_c": 52,
+    "spread_c": 1,
+    "ask_size": 4527,
+    "bid_size": 906,
+    "flags": []
+   },
+   "form": {
+    "fav": "LDWLD",
+    "opp": "LLDDL",
+    "scope": "all senior internationals, friendlies marked",
+    "scope_is_cup": false
+   },
+   "h2h": {
+    "available": true,
+    "source": "seasonseries",
+    "meetings": [
+     {
+      "event_id": "668481",
+      "date": "2023-06-26T22:30:00Z",
+      "home": "El Salvador",
+      "away": "Martinique",
+      "home_score": 1,
+      "away_score": 2,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "680551",
+      "date": "2023-10-13T23:00:00Z",
+      "home": "Martinique",
+      "away": "El Salvador",
+      "home_score": 1,
+      "away_score": 0,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "680557",
+      "date": "2023-10-18T01:00:00Z",
+      "home": "El Salvador",
+      "away": "Martinique",
+      "home_score": 0,
+      "away_score": 0,
+      "completed": true,
+      "winner": "draw",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "401866387",
+      "date": "2026-03-29T19:00:00Z",
+      "home": "Martinique",
+      "away": "El Salvador",
+      "home_score": 0,
+      "away_score": 1,
+      "completed": true,
+      "winner": "home",
+      "winner_means": "this fixture's home/away sides"
+     }
+    ],
+    "tally": {
+     "home": 1,
+     "draw": 1,
+     "away": 2
+    },
+    "reason": null,
+    "window": null,
+    "last_meeting": {
+     "event_id": "401866387",
+     "date": "2026-03-29T19:00:00Z",
+     "home": "Martinique",
+     "away": "El Salvador",
+     "home_score": 0,
+     "away_score": 1,
+     "completed": true,
+     "winner": "home",
+     "winner_means": "this fixture's home/away sides"
+    },
+    "espn_reason": null
+   },
+   "national": {
+    "competition": "cnl",
+    "stage": "group-stage",
+    "stage_kind": "group",
+    "group": "League A, Group B",
+    "leg": null,
+    "status_detail": "Fri, September 25th at 11:00 PM EDT",
+    "venue_country": "El Salvador",
+    "neutral_provider_flag": false,
+    "neutral": false,
+    "teams": {
+     "home": {
+      "key": "el-salvador",
+      "espn_id": "2650",
+      "name": "El Salvador",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "cnl",
+       "axes": {
+        "ovr": {
+         "rank": 9,
+         "tier": 2,
+         "tier_set": [
+          2
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1484.5806761877063,
+         "half_width_95": 14.607990457107574,
+         "interval": [
+          1469.9726857305989,
+          1499.1886666448138
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 22.110186319329873,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 18,
+         "tier": 2,
+         "tier_set": [
+          1,
+          2,
+          3
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.20336648115566852,
+         "half_width_95": 0.38393357296452346,
+         "interval": [
+          -0.587300054120192,
+          0.18056709180885494
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.39515700934895637,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 5,
+         "tier": 1,
+         "tier_set": [
+          1,
+          2
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.2621300241076153,
+         "half_width_95": 0.23737427445576112,
+         "interval": [
+          0.024755749651854203,
+          0.4995042985633764
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.251704093896381,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 1,
+          "tier_set": [
+           1
+          ],
+          "straddles": false
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "LDWLD",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "754266",
+         "date": "2025-11-19T01:00Z",
+         "competition": "FIFA World Cup Qualifying - Concacaf",
+         "kind": "competitive",
+         "opponent": "Panama",
+         "venue": "away",
+         "gf": 0,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401866383",
+         "date": "2026-03-27T00:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Dominican Republic",
+         "venue": "away",
+         "gf": 2,
+         "ga": 2,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401866387",
+         "date": "2026-03-29T19:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Martinique",
+         "venue": "away",
+         "gf": 1,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401871496",
+         "date": "2026-06-04T01:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "South Korea",
+         "venue": "away",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401870103",
+         "date": "2026-06-06T20:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Qatar",
+         "venue": "away",
+         "gf": 0,
+         "ga": 0,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 4,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     },
+     "away": {
+      "key": "martinique",
+      "espn_id": "2728",
+      "name": "Martinique",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "cnl",
+       "axes": {
+        "ovr": {
+         "rank": 12,
+         "tier": 2,
+         "tier_set": [
+          2
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1470.597524028651,
+         "half_width_95": 5.687364744285085,
+         "interval": [
+          1464.9101592843658,
+          1476.284888772936
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 15.429424729688574,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 4,
+         "tier": 1,
+         "tier_set": [
+          1
+         ],
+         "straddles": false,
+         "below_floor": true,
+         "value": 0.3706193519055657,
+         "half_width_95": 0.2728831799917205,
+         "interval": [
+          0.0977361719138452,
+          0.6435025318972862
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.2967008372198139,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 1,
+          "tier_set": [
+           1
+          ],
+          "straddles": false
+         }
+        },
+        "def": {
+         "rank": 15,
+         "tier": 2,
+         "tier_set": [
+          1,
+          2,
+          3
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.12878939717559532,
+         "half_width_95": 0.33356821502930195,
+         "interval": [
+          -0.46235761220489724,
+          0.20477881785370664
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.35524731065537674,
+         "signal_source": "shots",
+         "signal": "shots",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "LLDDL",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "734186",
+         "date": "2025-03-25T23:00Z",
+         "competition": "Concacaf Gold Cup Qualifying",
+         "kind": "competitive",
+         "opponent": "Suriname",
+         "venue": "home",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "761285",
+         "date": "2025-11-16T00:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Cuba",
+         "venue": "home",
+         "gf": 0,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760901",
+         "date": "2025-11-18T23:30Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Dominican Republic",
+         "venue": "away",
+         "gf": 0,
+         "ga": 0,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401866380",
+         "date": "2026-03-26T21:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Cuba",
+         "venue": "home",
+         "gf": 2,
+         "ga": 2,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401866387",
+         "date": "2026-03-29T19:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "El Salvador",
+         "venue": "home",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 4,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     }
+    },
+    "fixture_source": "espn",
+    "kickoff_status": null,
+    "apifootball": null,
+    "head_to_head": {
+     "available": true,
+     "source": "seasonseries",
+     "meetings": [
+      {
+       "event_id": "668481",
+       "date": "2023-06-26T22:30:00Z",
+       "home": "El Salvador",
+       "away": "Martinique",
+       "home_score": 1,
+       "away_score": 2,
+       "completed": true,
+       "winner": "away",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "680551",
+       "date": "2023-10-13T23:00:00Z",
+       "home": "Martinique",
+       "away": "El Salvador",
+       "home_score": 1,
+       "away_score": 0,
+       "completed": true,
+       "winner": "away",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "680557",
+       "date": "2023-10-18T01:00:00Z",
+       "home": "El Salvador",
+       "away": "Martinique",
+       "home_score": 0,
+       "away_score": 0,
+       "completed": true,
+       "winner": "draw",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "401866387",
+       "date": "2026-03-29T19:00:00Z",
+       "home": "Martinique",
+       "away": "El Salvador",
+       "home_score": 0,
+       "away_score": 1,
+       "completed": true,
+       "winner": "home",
+       "winner_means": "this fixture's home/away sides"
+      }
+     ],
+     "tally": {
+      "home": 1,
+      "draw": 1,
+      "away": 2
+     },
+     "reason": null,
+     "window": null,
+     "last_meeting": {
+      "event_id": "401866387",
+      "date": "2026-03-29T19:00:00Z",
+      "home": "Martinique",
+      "away": "El Salvador",
+      "home_score": 0,
+      "away_score": 1,
+      "completed": true,
+      "winner": "home",
+      "winner_means": "this fixture's home/away sides"
+     },
+     "espn_reason": null
+    },
+    "lineups": {
+     "announced": false,
+     "sides": {
+      "home": {
+       "team": "El Salvador",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      },
+      "away": {
+       "team": "Martinique",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      }
+     },
+     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff"
+    },
+    "market": {
+     "status": "mapped",
+     "event_ticker": "KXCONCACAFNLGAME-26SEP25SLVMTQ",
+     "status_words": "one open Kalshi event names both teams on this date",
+     "title": "El Salvador vs Martinique",
+     "legs": {
+      "home": {
+       "event_ticker": "KXCONCACAFNLGAME-26SEP25SLVMTQ",
+       "ticker": "KXCONCACAFNLGAME-26SEP25SLVMTQ-SLV",
+       "ask_c": 53,
+       "bid_c": 52,
+       "spread_c": 1,
+       "ask_size": 4527,
+       "bid_size": 906,
+       "flags": [],
+       "name": "El Salvador"
+      },
+      "tie": {
+       "event_ticker": "KXCONCACAFNLGAME-26SEP25SLVMTQ",
+       "ticker": "KXCONCACAFNLGAME-26SEP25SLVMTQ-TIE",
+       "ask_c": 27,
+       "bid_c": 26,
+       "spread_c": 1,
+       "ask_size": 2324,
+       "bid_size": 1788,
+       "flags": []
+      },
+      "away": {
+       "event_ticker": "KXCONCACAFNLGAME-26SEP25SLVMTQ",
+       "ticker": "KXCONCACAFNLGAME-26SEP25SLVMTQ-MTQ",
+       "ask_c": 21,
+       "bid_c": 20,
+       "spread_c": 1,
+       "ask_size": 1975,
+       "bid_size": 2774,
+       "flags": [],
+       "name": "Martinique"
+      }
+     },
+     "orientation": "same"
+    },
+    "headline": {
+     "candidate": "b",
+     "label": "ELO GAP",
+     "unit": "Elo points",
+     "value": 79,
+     "favourite_side": "home",
+     "home_minus_away": 79,
+     "components": {
+      "elo": {
+       "home": 1484.6,
+       "away": 1470.6
+      },
+      "raw_gap_home_minus_away": 14,
+      "venue_term_home_minus_away": 65,
+      "venue_class": "TRUE_HOME",
+      "host_side": "home",
+      "venue_assumed": false
+     },
+     "raw_favourite_side": "home",
+     "venue_flips_raw_order": false,
+     "tie_broken_by_rank": false,
+     "basis": "The venue-adjusted Elo gap: the two teams' overall ratings on this competition's national-team field, differenced, plus the club home term given to the side whose country hosts, and nothing on neutral ground. The card's favourite and its quoted Kalshi leg are read off this same number. A preregistered out-of-sample bake-off chose it: no alternative beat it by a margin whose 95% interval excluded zero (see research_archive/national_headline_bakeoff_2026-09-25/RESULTS.json)."
+    }
+   }
+  },
+  {
+   "refused": false,
+   "league": "cnl",
+   "column": "cnl",
+   "columns": [
+    "cnl"
+   ],
+   "home": "Montserrat",
+   "away": "British Virgin Islands",
+   "favourite": "Montserrat",
+   "opponent": "British Virgin Islands",
+   "fav_side": "home",
+   "fav_source": "field",
+   "venue_favourite": {
+    "refused": true,
+    "reason": "no_gdg_gap",
+    "policy": "off",
+    "flipped": false,
+    "venue_class": "NEUTRAL",
+    "home_side": null
+   },
+   "resolution": {
+    "Montserrat": "espn_id",
+    "British Virgin Islands": "espn_id"
+   },
+   "ppg_gap": null,
+   "gdg_gap": null,
+   "rank_gap": null,
+   "gp_current": {
+    "home": 1,
+    "away": 0,
+    "min": 0
+   },
+   "weights": null,
+   "src": "current",
+   "cross_league": false,
+   "rated_in": {
+    "home": "cnl",
+    "away": "cnl"
+   },
+   "table_notes": {
+    "home": null,
+    "away": null
+   },
+   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
+   "reg_time_note": "KXCONCACAFNLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
+   "ranks": {
+    "fav": 19,
+    "opp": 34
+   },
+   "rates": {
+    "ppg": [
+     3,
+     null
+    ],
+    "gf": [
+     2,
+     null
+    ],
+    "ga": [
+     0,
+     null
+    ],
+    "gdg": [
+     2,
+     null
+    ]
+   },
+   "own_gdg": {
+    "diff": null,
+    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record."
+   },
+   "tiers": {
+    "ovr": [
+     3,
+     5
+    ],
+    "atk": [
+     2,
+     5
+    ],
+    "def": [
+     3,
+     5
+    ]
+   },
+   "tier_gaps": {
+    "ovr": 2,
+    "atk": 3,
+    "def": 2
+   },
+   "shape": "CLEAN",
+   "current_only": null,
+   "field": {
+    "competition": "cnl",
+    "clubs": {
+     "fav": "Montserrat",
+     "opp": "British Virgin Islands"
+    },
+    "size": 37,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 19,
+       "tier": 3,
+       "tier_set": [
+        3
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1351.925316321585,
+       "half_width_95": 5.32922046162652,
+       "interval": [
+        1346.5960958599583,
+        1357.2545367832115
+       ]
+      },
+      "opp": {
+       "rank": 34,
+       "tier": 5,
+       "tier_set": [
+        5
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1106.443730228283,
+       "half_width_95": 26.247310351536804,
+       "interval": [
+        1080.1964198767462,
+        1132.6910405798196
+       ]
+      },
+      "tier_gap": 2,
+      "unit": "elo",
+      "label": "overall",
+      "floor": {
+       "below_floor": false,
+       "failing_condition": null
+      },
+      "field_size": 37,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 11.881047730080242,
+       "opp": 29.28674043853181
+      },
+      "signal_source": "elo"
+     },
+     "atk": {
+      "fav": {
+       "rank": 20,
+       "tier": 2,
+       "tier_set": [
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.29265824152334186,
+       "half_width_95": 0.3819325738783774,
+       "interval": [
+        -0.6745908154017193,
+        0.08927433235503557
+       ]
+      },
+      "opp": {
+       "rank": 35,
+       "tier": 5,
+       "tier_set": [
+        4,
+        5
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -1.2929278406504578,
+       "half_width_95": 0.4484625902479296,
+       "interval": [
+        -1.7413904308983874,
+        -0.8444652504025283
+       ]
+      },
+      "tier_gap": 3,
+      "unit": "log_goals",
+      "label": "attack",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 37,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.4126488869080883,
+       "opp": 0.48982734797255273
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "goals",
+       "opp": "goals"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 2,
+        "tier_set": [
+         1,
+         2
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 3,
+        "tier_set": [
+         3
+        ],
+        "straddles": false
+       }
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 21,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.5309151637403463,
+       "half_width_95": 0.2931111743036538,
+       "interval": [
+        -0.824026338044,
+        -0.2378039894366925
+       ]
+      },
+      "opp": {
+       "rank": 34,
+       "tier": 5,
+       "tier_set": [
+        4,
+        5
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -1.028478146650849,
+       "half_width_95": 0.33131060020905573,
+       "interval": [
+        -1.3597887468599048,
+        -0.6971675464417932
+       ]
+      },
+      "tier_gap": 2,
+      "unit": "log_goals",
+      "label": "defence",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 37,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.3098546195779769,
+       "opp": 0.35460595903564207
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "goals",
+       "opp": "goals"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 2,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 3,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       }
+      }
+     }
+    },
+    "shape": "CLEAN",
+    "axes_measured": [
+     "ovr",
+     "atk",
+     "def"
+    ],
+    "field_basis": "the CONCACAF Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus 5a2e1ce9c011, variant 'all', Elo pinned at 5 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals, measured from shots (xG, else shots on target, else goals, per match).",
+    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence."
+   },
+   "event_id": "401900624",
+   "competition_id": "401900624",
+   "kickoff": "2026-09-26T19:00Z",
+   "espn": "concacaf.nations.league",
+   "state": "pre",
+   "in_play": false,
+   "venue": {
+    "name": "TCIFA National Stadium",
+    "city": "Providenciales",
+    "country": "Turks and Caicos Islands"
+   },
+   "venue_class": {
+    "class": "NEUTRAL",
+    "home_side": null
+   },
+   "kalshi": {
+    "event_ticker": "KXCONCACAFNLGAME-26SEP26MSRIVB",
+    "ticker": "KXCONCACAFNLGAME-26SEP26MSRIVB-MSR",
+    "ask_c": 79,
+    "bid_c": 72,
+    "spread_c": 7,
+    "ask_size": 10,
+    "bid_size": 30,
+    "flags": [
+     "WIDE",
+     "THIN"
+    ]
+   },
+   "form": {
+    "fav": "LLWLW",
+    "opp": "WWDWL",
+    "scope": "all senior internationals, friendlies marked",
+    "scope_is_cup": false
+   },
+   "h2h": {
+    "available": false,
+    "source": "corpus_since_2018",
+    "window": {
+     "from": "2018-01-01",
+     "to": "2026-09-24T22:40:32+00:00",
+     "label": "since 2018, corpus to 2026-09-24"
+    },
+    "meetings": [],
+    "last_meeting": null,
+    "tally": {
+     "home": 0,
+     "draw": 0,
+     "away": 0
+    },
+    "reason": "no meeting since 2018 in our corpus (senior internationals to 2026-09-24). A measured absence over that window, not a claim the two teams never met",
+    "espn_reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met"
+   },
+   "national": {
+    "competition": "cnl",
+    "stage": "group-stage",
+    "stage_kind": "group",
+    "group": "League C, Group A",
+    "leg": null,
+    "status_detail": "Sat, September 26th at 3:00 PM EDT",
+    "venue_country": "Turks and Caicos Islands",
+    "neutral_provider_flag": false,
+    "neutral": true,
+    "teams": {
+     "home": {
+      "key": "montserrat",
+      "espn_id": "2655",
+      "name": "Montserrat",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "cnl",
+       "axes": {
+        "ovr": {
+         "rank": 19,
+         "tier": 3,
+         "tier_set": [
+          3
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1351.925316321585,
+         "half_width_95": 5.32922046162652,
+         "interval": [
+          1346.5960958599583,
+          1357.2545367832115
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 11.881047730080242,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 20,
+         "tier": 2,
+         "tier_set": [
+          2,
+          3
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.29265824152334186,
+         "half_width_95": 0.3819325738783774,
+         "interval": [
+          -0.6745908154017193,
+          0.08927433235503557
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.4126488869080883,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 21,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.5309151637403463,
+         "half_width_95": 0.2931111743036538,
+         "interval": [
+          -0.824026338044,
+          -0.2378039894366925
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.3098546195779769,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "LLWLW",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "702806",
+         "date": "2024-11-14T20:00Z",
+         "competition": "Concacaf Nations League",
+         "kind": "competitive",
+         "opponent": "St. Vincent and the Grenadines",
+         "venue": "home",
+         "gf": 1,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "702815",
+         "date": "2024-11-18T01:00Z",
+         "competition": "Concacaf Nations League",
+         "kind": "competitive",
+         "opponent": "El Salvador",
+         "venue": "away",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "698173",
+         "date": "2025-06-04T21:00Z",
+         "competition": "FIFA World Cup Qualifying - Concacaf",
+         "kind": "competitive",
+         "opponent": "Belize",
+         "venue": "home",
+         "gf": 1,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "698191",
+         "date": "2025-06-11T00:00Z",
+         "competition": "FIFA World Cup Qualifying - Concacaf",
+         "kind": "competitive",
+         "opponent": "Guyana",
+         "venue": "away",
+         "gf": 0,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401900641",
+         "date": "2026-09-23T19:00Z",
+         "competition": "Concacaf Nations League",
+         "kind": "competitive",
+         "opponent": "Turks and Caicos Islands",
+         "venue": "away",
+         "gf": 2,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 0,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     },
+     "away": {
+      "key": "british-virgin-islands",
+      "espn_id": "2644",
+      "name": "British Virgin Islands",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "cnl",
+       "axes": {
+        "ovr": {
+         "rank": 34,
+         "tier": 5,
+         "tier_set": [
+          5
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1106.443730228283,
+         "half_width_95": 26.247310351536804,
+         "interval": [
+          1080.1964198767462,
+          1132.6910405798196
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 29.28674043853181,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 35,
+         "tier": 5,
+         "tier_set": [
+          4,
+          5
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -1.2929278406504578,
+         "half_width_95": 0.4484625902479296,
+         "interval": [
+          -1.7413904308983874,
+          -0.8444652504025283
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.48982734797255273,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 3,
+          "tier_set": [
+           3
+          ],
+          "straddles": false
+         }
+        },
+        "def": {
+         "rank": 34,
+         "tier": 5,
+         "tier_set": [
+          4,
+          5
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -1.028478146650849,
+         "half_width_95": 0.33131060020905573,
+         "interval": [
+          -1.3597887468599048,
+          -0.6971675464417932
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.35460595903564207,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 3,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "WWDWL",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "760874",
+         "date": "2025-11-13T00:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Cayman Islands",
+         "venue": "away",
+         "gf": 2,
+         "ga": 1,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760888",
+         "date": "2025-11-15T21:30Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Bahamas",
+         "venue": "away",
+         "gf": 6,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401866382",
+         "date": "2026-03-27T00:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Cayman Islands",
+         "venue": "away",
+         "gf": 1,
+         "ga": 1,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401866389",
+         "date": "2026-03-29T21:30Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Anguilla",
+         "venue": "home",
+         "gf": 4,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401872614",
+         "date": "2026-06-03T17:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Gibraltar",
+         "venue": "away",
+         "gf": 0,
+         "ga": 4,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 5,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     }
+    },
+    "fixture_source": "espn",
+    "kickoff_status": null,
+    "apifootball": null,
+    "head_to_head": {
+     "available": false,
+     "source": "corpus_since_2018",
+     "window": {
+      "from": "2018-01-01",
+      "to": "2026-09-24T22:40:32+00:00",
+      "label": "since 2018, corpus to 2026-09-24"
+     },
+     "meetings": [],
+     "last_meeting": null,
+     "tally": {
+      "home": 0,
+      "draw": 0,
+      "away": 0
+     },
+     "reason": "no meeting since 2018 in our corpus (senior internationals to 2026-09-24). A measured absence over that window, not a claim the two teams never met",
+     "espn_reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met"
+    },
+    "lineups": {
+     "announced": false,
+     "sides": {
+      "home": {
+       "team": "Montserrat",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      },
+      "away": {
+       "team": "British Virgin Islands",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      }
+     },
+     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff"
+    },
+    "market": {
+     "status": "mapped",
+     "event_ticker": "KXCONCACAFNLGAME-26SEP26MSRIVB",
+     "status_words": "one open Kalshi event names both teams on this date",
+     "title": "Montserrat vs Virgin Islands, British",
+     "legs": {
+      "home": {
+       "event_ticker": "KXCONCACAFNLGAME-26SEP26MSRIVB",
+       "ticker": "KXCONCACAFNLGAME-26SEP26MSRIVB-MSR",
+       "ask_c": 79,
+       "bid_c": 72,
+       "spread_c": 7,
+       "ask_size": 10,
+       "bid_size": 30,
+       "flags": [
+        "WIDE",
+        "THIN"
+       ],
+       "name": "Montserrat"
+      },
+      "tie": {
+       "event_ticker": "KXCONCACAFNLGAME-26SEP26MSRIVB",
+       "ticker": "KXCONCACAFNLGAME-26SEP26MSRIVB-TIE",
+       "ask_c": 19,
+       "bid_c": 7,
+       "spread_c": 12,
+       "ask_size": 5,
+       "bid_size": 72,
+       "flags": [
+        "WIDE",
+        "THIN"
+       ]
+      },
+      "away": {
+       "event_ticker": "KXCONCACAFNLGAME-26SEP26MSRIVB",
+       "ticker": "KXCONCACAFNLGAME-26SEP26MSRIVB-IVB",
+       "ask_c": 13,
+       "bid_c": 6,
+       "spread_c": 7,
+       "ask_size": 8,
+       "bid_size": 343,
+       "flags": [
+        "WIDE",
+        "THIN"
+       ],
+       "name": "Virgin Islands, British"
+      }
+     },
+     "orientation": "same"
+    },
+    "headline": {
+     "candidate": "b",
+     "label": "ELO GAP",
+     "unit": "Elo points",
+     "value": 245.5,
+     "favourite_side": "home",
+     "home_minus_away": 245.5,
+     "components": {
+      "elo": {
+       "home": 1351.9,
+       "away": 1106.4
+      },
+      "raw_gap_home_minus_away": 245.5,
+      "venue_term_home_minus_away": 0,
+      "venue_class": "NEUTRAL",
+      "host_side": null,
+      "venue_assumed": false
+     },
+     "raw_favourite_side": "home",
+     "venue_flips_raw_order": false,
+     "tie_broken_by_rank": false,
+     "basis": "The venue-adjusted Elo gap: the two teams' overall ratings on this competition's national-team field, differenced, plus the club home term given to the side whose country hosts, and nothing on neutral ground. The card's favourite and its quoted Kalshi leg are read off this same number. A preregistered out-of-sample bake-off chose it: no alternative beat it by a margin whose 95% interval excluded zero (see research_archive/national_headline_bakeoff_2026-09-25/RESULTS.json)."
+    }
+   }
+  },
+  {
+   "refused": false,
+   "league": "afcon",
+   "column": "afcon",
+   "columns": [
+    "afcon"
+   ],
+   "home": "South Africa",
+   "away": "Guinea",
+   "favourite": "South Africa",
+   "opponent": "Guinea",
+   "fav_side": "home",
+   "fav_source": "field",
+   "venue_favourite": {
+    "refused": true,
+    "reason": "no_gdg_gap",
+    "policy": "off",
+    "flipped": false,
+    "venue_class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "resolution": {
+    "South Africa": "espn_id",
+    "Guinea": "espn_id"
+   },
+   "ppg_gap": null,
+   "gdg_gap": null,
+   "rank_gap": null,
+   "gp_current": {
+    "home": 0,
+    "away": 0,
+    "min": 0
+   },
+   "weights": null,
+   "src": "current",
+   "cross_league": false,
+   "rated_in": {
+    "home": "afcon",
+    "away": "afcon"
+   },
+   "table_notes": {
+    "home": null,
+    "away": null
+   },
+   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
+   "reg_time_note": "KXAFCONGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
+   "ranks": {
+    "fav": 13,
+    "opp": 20
+   },
+   "rates": {
+    "ppg": [
+     null,
+     null
+    ],
+    "gf": [
+     null,
+     null
+    ],
+    "ga": [
+     null,
+     null
+    ],
+    "gdg": [
+     null,
+     null
+    ]
+   },
+   "own_gdg": {
+    "diff": null,
+    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record."
+   },
+   "tiers": {
+    "ovr": [
+     3,
+     4
+    ],
+    "atk": [
+     2,
+     3
+    ],
+    "def": [
+     3,
+     3
+    ]
+   },
+   "tier_gaps": {
+    "ovr": 1,
+    "atk": 1,
+    "def": 0
+   },
+   "shape": "SPLIT",
+   "current_only": null,
+   "field": {
+    "competition": "afconq",
+    "clubs": {
+     "fav": "South Africa",
+     "opp": "Guinea"
+    },
+    "size": 48,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 13,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "value": 1622.504197195422,
+       "half_width_95": 38.42372180255895,
+       "interval": [
+        1584.080475392863,
+        1660.927918997981
+       ]
+      },
+      "opp": {
+       "rank": 20,
+       "tier": 4,
+       "tier_set": [
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "value": 1534.1110612015761,
+       "half_width_95": 20.5537773872117,
+       "interval": [
+        1513.5572838143644,
+        1554.664838588788
+       ]
+      },
+      "tier_gap": 1,
+      "unit": "elo",
+      "label": "overall",
+      "floor": {
+       "below_floor": false,
+       "failing_condition": null
+      },
+      "field_size": 48,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 42.08827604598037,
+       "opp": 23.45807609641644
+      },
+      "signal_source": "elo"
+     },
+     "atk": {
+      "fav": {
+       "rank": 12,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.387319846591821,
+       "half_width_95": 0.3285789272426485,
+       "interval": [
+        0.05874091934917253,
+        0.7158987738344695
+       ]
+      },
+      "opp": {
+       "rank": 28,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3,
+        4,
+        5
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.06148527595717511,
+       "half_width_95": 0.35973838508235173,
+       "interval": [
+        -0.42122366103952685,
+        0.2982531091251766
+       ]
+      },
+      "tier_gap": 1,
+      "unit": "log_goals",
+      "label": "attack",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 47,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.33973788613675515,
+       "opp": 0.3790461474655317
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "goals",
+       "opp": "goals"
+      },
+      "licensed": {
+       "bands": 2,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 1,
+        "tier_set": [
+         1,
+         2
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 2,
+        "tier_set": [
+         1,
+         2
+        ],
+        "straddles": true
+       }
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 17,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.2516054289841171,
+       "half_width_95": 0.3969198015739894,
+       "interval": [
+        -0.1453143725898723,
+        0.6485252305581064
+       ]
+      },
+      "opp": {
+       "rank": 18,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.14905745451182426,
+       "half_width_95": 0.4212564602776592,
+       "interval": [
+        -0.2721990057658349,
+        0.5703139147894835
+       ]
+      },
+      "tier_gap": 0,
+      "unit": "log_goals",
+      "label": "defence",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 47,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.4108616182357666,
+       "opp": 0.4318590273733757
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "goals",
+       "opp": "goals"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 2,
+        "tier_set": [
+         1,
+         2
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 2,
+        "tier_set": [
+         1,
+         2,
+         3
+        ],
+        "straddles": true
+       }
+      }
+     }
+    },
+    "shape": "SPLIT",
+    "axes_measured": [
+     "ovr",
+     "atk",
+     "def"
+    ],
+    "field_basis": "the AFCON 2027 qualifying field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus 5a2e1ce9c011, variant 'all', Elo pinned at 5 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals, measured from shots (xG, else shots on target, else goals, per match).",
+    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence."
+   },
+   "event_id": "401920034",
+   "competition_id": "401920034",
+   "kickoff": "2026-09-26T13:00Z",
+   "espn": "caf.nations_qual",
+   "state": "pre",
+   "in_play": false,
+   "venue": {
+    "name": "Orlando Stadium",
+    "city": "Johannesburg",
+    "country": "South Africa"
+   },
+   "venue_class": {
+    "class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "kalshi": {
+    "event_ticker": "KXAFCONGAME-26SEP26RSAGUI",
+    "ticker": "KXAFCONGAME-26SEP26RSAGUI-RSA",
+    "ask_c": 51,
+    "bid_c": 50,
+    "spread_c": 1,
+    "ask_size": 1290,
+    "bid_size": 1221,
+    "flags": []
+   },
+   "form": {
+    "fav": "?LDWL",
+    "opp": "WDDLL",
+    "scope": "all senior internationals, friendlies marked",
+    "scope_is_cup": false
+   },
+   "h2h": {
+    "available": true,
+    "source": "seasonseries",
+    "meetings": [
+     {
+      "event_id": "190226",
+      "date": "2006-01-22T18:00:00Z",
+      "home": "South Africa",
+      "away": "Guinea",
+      "home_score": 0,
+      "away_score": 2,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "632920",
+      "date": "2022-03-25T17:00:00Z",
+      "home": "South Africa",
+      "away": "Guinea",
+      "home_score": 0,
+      "away_score": 0,
+      "completed": true,
+      "winner": "draw",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "748079",
+      "date": "2025-08-11T14:00:00Z",
+      "home": "South Africa",
+      "away": "Guinea",
+      "home_score": 2,
+      "away_score": 1,
+      "completed": true,
+      "winner": "home",
+      "winner_means": "this fixture's home/away sides"
+     }
+    ],
+    "tally": {
+     "home": 1,
+     "draw": 1,
+     "away": 1
+    },
+    "reason": null,
+    "window": null,
+    "last_meeting": {
+     "event_id": "748079",
+     "date": "2025-08-11T14:00:00Z",
+     "home": "South Africa",
+     "away": "Guinea",
+     "home_score": 2,
+     "away_score": 1,
+     "completed": true,
+     "winner": "home",
+     "winner_means": "this fixture's home/away sides"
+    },
+    "espn_reason": null
+   },
+   "national": {
+    "competition": "afcon",
+    "stage": "group-stage",
+    "stage_kind": "group",
+    "group": "Group D",
+    "leg": null,
+    "status_detail": "Sat, September 26th at 9:00 AM EDT",
+    "venue_country": "South Africa",
+    "neutral_provider_flag": false,
+    "neutral": false,
+    "teams": {
+     "home": {
+      "key": "south-africa",
+      "espn_id": "467",
+      "name": "South Africa",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "afconq",
+       "axes": {
+        "ovr": {
+         "rank": 13,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3
+         ],
+         "straddles": true,
+         "below_floor": false,
+         "value": 1622.504197195422,
+         "half_width_95": 38.42372180255895,
+         "interval": [
+          1584.080475392863,
+          1660.927918997981
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 42.08827604598037,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 12,
+         "tier": 2,
+         "tier_set": [
+          1,
+          2,
+          3
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.387319846591821,
+         "half_width_95": 0.3285789272426485,
+         "interval": [
+          0.05874091934917253,
+          0.7158987738344695
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.33973788613675515,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 2,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 1,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 17,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.2516054289841171,
+         "half_width_95": 0.3969198015739894,
+         "interval": [
+          -0.1453143725898723,
+          0.6485252305581064
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.4108616182357666,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "?LDWL",
+       "disputed": 1,
+       "withheld": 1,
+       "games": [
+        {
+         "event_id": "401875160",
+         "date": "2026-06-06T21:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Jamaica",
+         "venue": "away",
+         "gf": 1,
+         "ga": 0,
+         "letter": "?",
+         "provider_letter": "W",
+         "provider_agrees": true,
+         "letter_if_espn": "W",
+         "disputed": {
+          "letter": "?",
+          "why": "the providers disagree on this match's score, so no letter is drawn as if it were certain; both readings are below, each lettered from this team's side",
+          "source": "research_archive/national_team_field_v2_2026-09-25/fill_report.json",
+          "espn": {
+           "score": [
+            0,
+            1
+           ],
+           "for": 1,
+           "against": 0,
+           "letter": "W"
+          },
+          "apifootball": {
+           "score": [
+            1,
+            1
+           ],
+           "for": 1,
+           "against": 1,
+           "letter": "D",
+           "status": null,
+           "fixture": 1550809
+          },
+          "score_is": "home-away of that match, as ESPN lists its sides"
+         }
+        },
+        {
+         "event_id": "760415",
+         "date": "2026-06-11T19:00Z",
+         "competition": "FIFA World Cup",
+         "kind": "competitive",
+         "opponent": "Mexico",
+         "venue": "away",
+         "gf": 0,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760438",
+         "date": "2026-06-18T16:00Z",
+         "competition": "FIFA World Cup",
+         "kind": "competitive",
+         "opponent": "Czechia",
+         "venue": "away",
+         "gf": 1,
+         "ga": 1,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760466",
+         "date": "2026-06-25T01:00Z",
+         "competition": "FIFA World Cup",
+         "kind": "competitive",
+         "opponent": "South Korea",
+         "venue": "home",
+         "gf": 1,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760486",
+         "date": "2026-06-28T19:00Z",
+         "competition": "FIFA World Cup",
+         "kind": "competitive",
+         "opponent": "Canada",
+         "venue": "home",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 1,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     },
+     "away": {
+      "key": "guinea",
+      "espn_id": "2847",
+      "name": "Guinea",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "afconq",
+       "axes": {
+        "ovr": {
+         "rank": 20,
+         "tier": 4,
+         "tier_set": [
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": false,
+         "value": 1534.1110612015761,
+         "half_width_95": 20.5537773872117,
+         "interval": [
+          1513.5572838143644,
+          1554.664838588788
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 23.45807609641644,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 28,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3,
+          4,
+          5
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.06148527595717511,
+         "half_width_95": 0.35973838508235173,
+         "interval": [
+          -0.42122366103952685,
+          0.2982531091251766
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.3790461474655317,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 2,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 18,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.14905745451182426,
+         "half_width_95": 0.4212564602776592,
+         "interval": [
+          -0.2721990057658349,
+          0.5703139147894835
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.4318590273733757,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           1,
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "WDDLL",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "761131",
+         "date": "2025-11-15T16:30Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Liberia",
+         "venue": "home",
+         "gf": 2,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760897",
+         "date": "2025-11-18T15:30Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Niger",
+         "venue": "home",
+         "gf": 1,
+         "ga": 1,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401866400",
+         "date": "2026-03-27T15:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Togo",
+         "venue": "away",
+         "gf": 2,
+         "ga": 2,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401866399",
+         "date": "2026-03-31T18:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Benin",
+         "venue": "home",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401871360",
+         "date": "2026-06-04T16:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Northern Ireland",
+         "venue": "away",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 5,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     }
+    },
+    "fixture_source": "espn",
+    "kickoff_status": null,
+    "apifootball": null,
+    "head_to_head": {
+     "available": true,
+     "source": "seasonseries",
+     "meetings": [
+      {
+       "event_id": "190226",
+       "date": "2006-01-22T18:00:00Z",
+       "home": "South Africa",
+       "away": "Guinea",
+       "home_score": 0,
+       "away_score": 2,
+       "completed": true,
+       "winner": "away",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "632920",
+       "date": "2022-03-25T17:00:00Z",
+       "home": "South Africa",
+       "away": "Guinea",
+       "home_score": 0,
+       "away_score": 0,
+       "completed": true,
+       "winner": "draw",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "748079",
+       "date": "2025-08-11T14:00:00Z",
+       "home": "South Africa",
+       "away": "Guinea",
+       "home_score": 2,
+       "away_score": 1,
+       "completed": true,
+       "winner": "home",
+       "winner_means": "this fixture's home/away sides"
+      }
+     ],
+     "tally": {
+      "home": 1,
+      "draw": 1,
+      "away": 1
+     },
+     "reason": null,
+     "window": null,
+     "last_meeting": {
+      "event_id": "748079",
+      "date": "2025-08-11T14:00:00Z",
+      "home": "South Africa",
+      "away": "Guinea",
+      "home_score": 2,
+      "away_score": 1,
+      "completed": true,
+      "winner": "home",
+      "winner_means": "this fixture's home/away sides"
+     },
+     "espn_reason": null
+    },
+    "lineups": {
+     "announced": false,
+     "sides": {
+      "home": {
+       "team": "South Africa",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      },
+      "away": {
+       "team": "Guinea",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      }
+     },
+     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff"
+    },
+    "market": {
+     "status": "mapped",
+     "event_ticker": "KXAFCONGAME-26SEP26RSAGUI",
+     "status_words": "one open Kalshi event names both teams on this date",
+     "title": "South Africa vs Guinea",
+     "legs": {
+      "home": {
+       "event_ticker": "KXAFCONGAME-26SEP26RSAGUI",
+       "ticker": "KXAFCONGAME-26SEP26RSAGUI-RSA",
+       "ask_c": 51,
+       "bid_c": 50,
+       "spread_c": 1,
+       "ask_size": 1290,
+       "bid_size": 1221,
+       "flags": [],
+       "name": "South Africa"
+      },
+      "tie": {
+       "event_ticker": "KXAFCONGAME-26SEP26RSAGUI",
+       "ticker": "KXAFCONGAME-26SEP26RSAGUI-TIE",
+       "ask_c": 31,
+       "bid_c": 30,
+       "spread_c": 1,
+       "ask_size": 4,
+       "bid_size": 504,
+       "flags": [
+        "THIN"
+       ]
+      },
+      "away": {
+       "event_ticker": "KXAFCONGAME-26SEP26RSAGUI",
+       "ticker": "KXAFCONGAME-26SEP26RSAGUI-GUI",
+       "ask_c": 20,
+       "bid_c": 19,
+       "spread_c": 1,
+       "ask_size": 960,
+       "bid_size": 249,
+       "flags": [],
+       "name": "Guinea"
+      }
+     },
+     "orientation": "same"
+    },
+    "headline": {
+     "candidate": "b",
+     "label": "ELO GAP",
+     "unit": "Elo points",
+     "value": 153.4,
+     "favourite_side": "home",
+     "home_minus_away": 153.4,
+     "components": {
+      "elo": {
+       "home": 1622.5,
+       "away": 1534.1
+      },
+      "raw_gap_home_minus_away": 88.4,
+      "venue_term_home_minus_away": 65,
+      "venue_class": "TRUE_HOME",
+      "host_side": "home",
+      "venue_assumed": false
+     },
+     "raw_favourite_side": "home",
+     "venue_flips_raw_order": false,
+     "tie_broken_by_rank": false,
+     "basis": "The venue-adjusted Elo gap: the two teams' overall ratings on this competition's national-team field, differenced, plus the club home term given to the side whose country hosts, and nothing on neutral ground. The card's favourite and its quoted Kalshi leg are read off this same number. A preregistered out-of-sample bake-off chose it: no alternative beat it by a margin whose 95% interval excluded zero (see research_archive/national_headline_bakeoff_2026-09-25/RESULTS.json)."
+    }
+   }
+  },
+  {
+   "refused": false,
+   "league": "afcon",
+   "column": "afcon",
+   "columns": [
+    "afcon"
+   ],
+   "home": "Kenya",
+   "away": "Eritrea",
+   "favourite": "Kenya",
+   "opponent": "Eritrea",
+   "fav_side": "home",
+   "fav_source": "field",
+   "venue_favourite": {
+    "refused": true,
+    "reason": "no_gdg_gap",
+    "policy": "off",
+    "flipped": false,
+    "venue_class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "resolution": {
+    "Kenya": "espn_id",
+    "Eritrea": "espn_id"
+   },
+   "ppg_gap": null,
+   "gdg_gap": null,
+   "rank_gap": null,
+   "gp_current": {
+    "home": 0,
+    "away": 0,
+    "min": 0
+   },
+   "weights": null,
+   "src": "current",
+   "cross_league": false,
+   "rated_in": {
+    "home": "afcon",
+    "away": "afcon"
+   },
+   "table_notes": {
+    "home": null,
+    "away": null
+   },
+   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
+   "reg_time_note": "KXAFCONGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
+   "ranks": {
+    "fav": 23,
+    "opp": 38
+   },
+   "rates": {
+    "ppg": [
+     null,
+     null
+    ],
+    "gf": [
+     null,
+     null
+    ],
+    "ga": [
+     null,
+     null
+    ],
+    "gdg": [
+     null,
+     null
+    ]
+   },
+   "own_gdg": {
+    "diff": null,
+    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record."
+   },
+   "tiers": {
+    "ovr": [
+     4,
+     4
+    ],
+    "atk": null,
+    "def": null
+   },
+   "tier_gaps": {
+    "ovr": 0,
+    "atk": null,
+    "def": null
+   },
+   "shape": null,
+   "current_only": null,
+   "field_partial": {
+    "competition": "afconq",
+    "clubs": {
+     "fav": "Kenya",
+     "opp": "Eritrea"
+    },
+    "size": 48,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 23,
+       "tier": 4,
+       "tier_set": [
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "value": 1522.7789787886122,
+       "half_width_95": 21.074143130083286,
+       "interval": [
+        1501.704835658529,
+        1543.8531219186955
+       ]
+      },
+      "opp": {
+       "rank": 38,
+       "tier": 4,
+       "tier_set": [
+        4
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1442.0052662819621,
+       "half_width_95": 7.511878205841013,
+       "interval": [
+        1434.4933880761212,
+        1449.517144487803
+       ]
+      },
+      "tier_gap": 0,
+      "unit": "elo",
+      "label": "overall",
+      "floor": {
+       "below_floor": false,
+       "failing_condition": null
+      },
+      "field_size": 48,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 24.74544507497767,
+       "opp": 7.2943279069119304
+      },
+      "signal_source": "elo"
+     }
+    },
+    "shape_absent": {
+     "axes_absent": [
+      "atk",
+      "def"
+     ],
+     "why": "`shape` is CLEAN/HOLLOW/SPLIT read off all 3 of ['ovr', 'atk', 'def'] together, and one of these two teams has no measured atk or def. A label composed from fewer gaps would be a sentence about the fixture no measurement stands behind."
+    },
+    "axes_measured": [
+     "ovr"
+    ],
+    "field_basis": "the AFCON 2027 qualifying field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus 5a2e1ce9c011, variant 'all', Elo pinned at 5 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals, measured from shots (xG, else shots on target, else goals, per match).",
+    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
+    "why_not_field": "THE FIELD PLACED BOTH TEAMS ON FEWER AXES THAN `field` IS DEFINED ON: one of them has no measured attack or defence (the goals estimator's own refusal, named on its rating). This key is not `field` because `field` is a three-axis contract its readers walk unguarded. Nothing is padded: an axis a team was not measured on is absent, not a pair of nulls. `shape_absent` says which axes are missing and why."
+   },
+   "event_id": "401920035",
+   "competition_id": "401920035",
+   "kickoff": "2026-09-26T13:00Z",
+   "espn": "caf.nations_qual",
+   "state": "pre",
+   "in_play": false,
+   "venue": {
+    "name": "Nyayo National Stadium",
+    "city": "Nairobi",
+    "country": "Kenya"
+   },
+   "venue_class": {
+    "class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "kalshi": {
+    "event_ticker": "KXAFCONGAME-26SEP26KENERI",
+    "ticker": "KXAFCONGAME-26SEP26KENERI-KEN",
+    "ask_c": 74,
+    "bid_c": 73,
+    "spread_c": 1,
+    "ask_size": 2566,
+    "bid_size": 367,
+    "flags": []
+   },
+   "form": {
+    "fav": "LDWDW",
+    "opp": "LLLWW",
+    "scope": "all senior internationals, friendlies marked",
+    "scope_is_cup": false
+   },
+   "h2h": {
+    "available": true,
+    "source": "corpus_since_2018",
+    "window": {
+     "from": "2018-01-01",
+     "to": "2026-09-24T22:40:32+00:00",
+     "label": "since 2018, corpus to 2026-09-24"
+    },
+    "meetings": [
+     {
+      "event_id": "apif-362511",
+      "date": "2019-12-17T10:00:00+00:00",
+      "home": "Kenya",
+      "away": "Eritrea",
+      "home_score": 1,
+      "away_score": 4,
+      "completed": true,
+      "competition": "apif.competitive",
+      "kind": "competitive",
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     }
+    ],
+    "last_meeting": {
+     "event_id": "apif-362511",
+     "date": "2019-12-17T10:00:00+00:00",
+     "home": "Kenya",
+     "away": "Eritrea",
+     "home_score": 1,
+     "away_score": 4,
+     "completed": true,
+     "competition": "apif.competitive",
+     "kind": "competitive",
+     "winner": "away",
+     "winner_means": "this fixture's home/away sides"
+    },
+    "tally": {
+     "home": 0,
+     "draw": 0,
+     "away": 1
+    },
+    "reason": null,
+    "espn_reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met"
+   },
+   "national": {
+    "competition": "afcon",
+    "stage": "group-stage",
+    "stage_kind": "group",
+    "group": "Group D",
+    "leg": null,
+    "status_detail": "Sat, September 26th at 9:00 AM EDT",
+    "venue_country": "Kenya",
+    "neutral_provider_flag": false,
+    "neutral": false,
+    "teams": {
+     "home": {
+      "key": "kenya",
+      "espn_id": "2848",
+      "name": "Kenya",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "afconq",
+       "axes": {
+        "ovr": {
+         "rank": 23,
+         "tier": 4,
+         "tier_set": [
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": false,
+         "value": 1522.7789787886122,
+         "half_width_95": 21.074143130083286,
+         "interval": [
+          1501.704835658529,
+          1543.8531219186955
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 24.74544507497767,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 30,
+         "tier": 4,
+         "tier_set": [
+          2,
+          3,
+          4,
+          5
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.06894316139479342,
+         "half_width_95": 0.5608157080751855,
+         "interval": [
+          -0.6297588694699789,
+          0.49187254668039215
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.5646458467862586,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 2,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 38,
+         "tier": 4,
+         "tier_set": [
+          3,
+          4,
+          5
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.2474102702168519,
+         "half_width_95": 0.5749522487626619,
+         "interval": [
+          -0.8223625189795138,
+          0.32754197854581
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.5850274974006331,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 3,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "LDWDW",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "760824",
+         "date": "2025-11-18T15:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Senegal",
+         "venue": "away",
+         "gf": 0,
+         "ga": 8,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401862401",
+         "date": "2026-03-27T16:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Estonia",
+         "venue": "home",
+         "gf": 1,
+         "ga": 1,
+         "letter": "D",
+         "provider_letter": "L",
+         "provider_agrees": false,
+         "shootout": {
+          "for": 4,
+          "against": 5,
+          "note": "level after play, decided on penalties; the letter is the scoreline's, D"
+         }
+        },
+        {
+         "event_id": "401866741",
+         "date": "2026-03-30T14:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Grenada",
+         "venue": "away",
+         "gf": 3,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401874168",
+         "date": "2026-06-04T13:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Lesotho",
+         "venue": "away",
+         "gf": 1,
+         "ga": 1,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401874169",
+         "date": "2026-06-07T13:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Lesotho",
+         "venue": "home",
+         "gf": 4,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 5,
+       "provider_disagreements": 1,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     },
+     "away": {
+      "key": "eritrea",
+      "espn_id": "5774",
+      "name": "Eritrea",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "afconq",
+       "axes": {
+        "ovr": {
+         "rank": 38,
+         "tier": 4,
+         "tier_set": [
+          4
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1442.0052662819621,
+         "half_width_95": 7.511878205841013,
+         "interval": [
+          1434.4933880761212,
+          1449.517144487803
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 7.2943279069119304,
+         "signal_source": "elo"
+        }
+       },
+       "axes_absent": [
+        "atk",
+        "def"
+       ],
+       "not_measured_because": "in a fitted league but in no domestic block — no club deviation, refused rather than set to the league average"
+      },
+      "form": {
+       "available": true,
+       "letters": "LLLWW",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "436345",
+         "date": "2015-10-13T17:00Z",
+         "competition": "FIFA World Cup Qualifying - CAF",
+         "kind": "competitive",
+         "opponent": "Botswana",
+         "venue": "away",
+         "gf": 1,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "554680",
+         "date": "2019-09-04T13:00Z",
+         "competition": "FIFA World Cup Qualifying - CAF",
+         "kind": "competitive",
+         "opponent": "Namibia",
+         "venue": "home",
+         "gf": 1,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "554664",
+         "date": "2019-09-10T17:00Z",
+         "competition": "FIFA World Cup Qualifying - CAF",
+         "kind": "competitive",
+         "opponent": "Namibia",
+         "venue": "away",
+         "gf": 0,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401850985",
+         "date": "2026-03-25T16:00Z",
+         "competition": "Africa Cup of Nations Qualifying",
+         "kind": "competitive",
+         "opponent": "Eswatini",
+         "venue": "home",
+         "gf": 2,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401850990",
+         "date": "2026-03-31T14:00Z",
+         "competition": "Africa Cup of Nations Qualifying",
+         "kind": "competitive",
+         "opponent": "Eswatini",
+         "venue": "away",
+         "gf": 2,
+         "ga": 1,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 0,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     }
+    },
+    "fixture_source": "espn",
+    "kickoff_status": null,
+    "apifootball": null,
+    "head_to_head": {
+     "available": true,
+     "source": "corpus_since_2018",
+     "window": {
+      "from": "2018-01-01",
+      "to": "2026-09-24T22:40:32+00:00",
+      "label": "since 2018, corpus to 2026-09-24"
+     },
+     "meetings": [
+      {
+       "event_id": "apif-362511",
+       "date": "2019-12-17T10:00:00+00:00",
+       "home": "Kenya",
+       "away": "Eritrea",
+       "home_score": 1,
+       "away_score": 4,
+       "completed": true,
+       "competition": "apif.competitive",
+       "kind": "competitive",
+       "winner": "away",
+       "winner_means": "this fixture's home/away sides"
+      }
+     ],
+     "last_meeting": {
+      "event_id": "apif-362511",
+      "date": "2019-12-17T10:00:00+00:00",
+      "home": "Kenya",
+      "away": "Eritrea",
+      "home_score": 1,
+      "away_score": 4,
+      "completed": true,
+      "competition": "apif.competitive",
+      "kind": "competitive",
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     },
+     "tally": {
+      "home": 0,
+      "draw": 0,
+      "away": 1
+     },
+     "reason": null,
+     "espn_reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met"
+    },
+    "lineups": {
+     "announced": false,
+     "sides": {
+      "home": {
+       "team": "Kenya",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      },
+      "away": {
+       "team": "Eritrea",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      }
+     },
+     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff"
+    },
+    "market": {
+     "status": "mapped",
+     "event_ticker": "KXAFCONGAME-26SEP26KENERI",
+     "status_words": "one open Kalshi event names both teams on this date",
+     "title": "Kenya vs Eritrea",
+     "legs": {
+      "home": {
+       "event_ticker": "KXAFCONGAME-26SEP26KENERI",
+       "ticker": "KXAFCONGAME-26SEP26KENERI-KEN",
+       "ask_c": 74,
+       "bid_c": 73,
+       "spread_c": 1,
+       "ask_size": 2566,
+       "bid_size": 367,
+       "flags": [],
+       "name": "Kenya"
+      },
+      "tie": {
+       "event_ticker": "KXAFCONGAME-26SEP26KENERI",
+       "ticker": "KXAFCONGAME-26SEP26KENERI-TIE",
+       "ask_c": 20,
+       "bid_c": 19,
+       "spread_c": 1,
+       "ask_size": 2314,
+       "bid_size": 249,
+       "flags": []
+      },
+      "away": {
+       "event_ticker": "KXAFCONGAME-26SEP26KENERI",
+       "ticker": "KXAFCONGAME-26SEP26KENERI-ERI",
+       "ask_c": 8,
+       "bid_c": 7,
+       "spread_c": 1,
+       "ask_size": 606,
+       "bid_size": 3414,
+       "flags": [],
+       "name": "Eritrea"
+      }
+     },
+     "orientation": "same"
+    },
+    "headline": {
+     "candidate": "b",
+     "label": "ELO GAP",
+     "unit": "Elo points",
+     "value": 145.8,
+     "favourite_side": "home",
+     "home_minus_away": 145.8,
+     "components": {
+      "elo": {
+       "home": 1522.8,
+       "away": 1442
+      },
+      "raw_gap_home_minus_away": 80.8,
+      "venue_term_home_minus_away": 65,
+      "venue_class": "TRUE_HOME",
+      "host_side": "home",
+      "venue_assumed": false
+     },
+     "raw_favourite_side": "home",
+     "venue_flips_raw_order": false,
+     "tie_broken_by_rank": false,
+     "basis": "The venue-adjusted Elo gap: the two teams' overall ratings on this competition's national-team field, differenced, plus the club home term given to the side whose country hosts, and nothing on neutral ground. The card's favourite and its quoted Kalshi leg are read off this same number. A preregistered out-of-sample bake-off chose it: no alternative beat it by a margin whose 95% interval excluded zero (see research_archive/national_headline_bakeoff_2026-09-25/RESULTS.json)."
+    }
+   }
+  },
+  {
+   "refused": false,
+   "league": "afcon",
+   "column": "afcon",
+   "columns": [
+    "afcon"
+   ],
+   "home": "Zimbabwe",
+   "away": "Congo DR",
+   "favourite": "Congo DR",
+   "opponent": "Zimbabwe",
+   "fav_side": "away",
+   "fav_source": "field",
+   "venue_favourite": {
+    "refused": true,
+    "reason": "no_gdg_gap",
+    "policy": "off",
+    "flipped": false,
+    "venue_class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "resolution": {
+    "Zimbabwe": "espn_id",
+    "Congo DR": "espn_id"
+   },
+   "ppg_gap": null,
+   "gdg_gap": null,
+   "rank_gap": null,
+   "gp_current": {
+    "home": 1,
+    "away": 1,
+    "min": 1
+   },
+   "weights": null,
+   "src": "current",
+   "cross_league": false,
+   "rated_in": {
+    "home": "afcon",
+    "away": "afcon"
+   },
+   "table_notes": {
+    "home": null,
+    "away": null
+   },
+   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
+   "reg_time_note": "KXAFCONGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
+   "ranks": {
+    "fav": 7,
+    "opp": 26
+   },
+   "rates": {
+    "ppg": [
+     3,
+     3
+    ],
+    "gf": [
+     2,
+     3
+    ],
+    "ga": [
+     0,
+     2
+    ],
+    "gdg": [
+     2,
+     1
+    ]
+   },
+   "own_gdg": {
+    "diff": 1,
+    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record."
+   },
+   "tiers": {
+    "ovr": [
+     2,
+     4
+    ],
+    "atk": [
+     2,
+     3
+    ],
+    "def": [
+     1,
+     3
+    ]
+   },
+   "tier_gaps": {
+    "ovr": 2,
+    "atk": 1,
+    "def": 2
+   },
+   "shape": "CLEAN",
+   "current_only": null,
+   "field": {
+    "competition": "afconq",
+    "clubs": {
+     "fav": "Congo DR",
+     "opp": "Zimbabwe"
+    },
+    "size": 48,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 7,
+       "tier": 2,
+       "tier_set": [
+        2
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1696.0991586154955,
+       "half_width_95": 30.878675665595587,
+       "interval": [
+        1665.2204829498999,
+        1726.9778342810912
+       ]
+      },
+      "opp": {
+       "rank": 26,
+       "tier": 4,
+       "tier_set": [
+        4
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1506.6490985121868,
+       "half_width_95": 26.775125468718848,
+       "interval": [
+        1479.873973043468,
+        1533.4242239809057
+       ]
+      },
+      "tier_gap": 2,
+      "unit": "elo",
+      "label": "overall",
+      "floor": {
+       "below_floor": false,
+       "failing_condition": null
+      },
+      "field_size": 48,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 34.43993658391481,
+       "opp": 30.40738756179544
+      },
+      "signal_source": "elo"
+     },
+     "atk": {
+      "fav": {
+       "rank": 11,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.3913413420812138,
+       "half_width_95": 0.2621554237736156,
+       "interval": [
+        0.12918591830759818,
+        0.6534967658548294
+       ]
+      },
+      "opp": {
+       "rank": 26,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3,
+        4,
+        5
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.010076452081634785,
+       "half_width_95": 0.386761562150925,
+       "interval": [
+        -0.39683801423255977,
+        0.37668511006929023
+       ]
+      },
+      "tier_gap": 1,
+      "unit": "log_goals",
+      "label": "attack",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 47,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.2786894321534872,
+       "opp": 0.3896314311511124
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "goals",
+       "opp": "goals"
+      },
+      "licensed": {
+       "bands": 2,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 1,
+        "tier_set": [
+         1
+        ],
+        "straddles": false
+       },
+       "opp": {
+        "tier": 2,
+        "tier_set": [
+         1,
+         2
+        ],
+        "straddles": true
+       }
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 3,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.8160887050955432,
+       "half_width_95": 0.4624387308431383,
+       "interval": [
+        0.3536499742524049,
+        1.2785274359386816
+       ]
+      },
+      "opp": {
+       "rank": 26,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.025216077984835245,
+       "half_width_95": 0.34804074410333574,
+       "interval": [
+        -0.32282466611850047,
+        0.373256822088171
+       ]
+      },
+      "tier_gap": 2,
+      "unit": "log_goals",
+      "label": "defence",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 47,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.4810739238784542,
+       "opp": 0.36873680166514244
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "goals",
+       "opp": "goals"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 1,
+        "tier_set": [
+         1,
+         2
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 2,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       }
+      }
+     }
+    },
+    "shape": "CLEAN",
+    "axes_measured": [
+     "ovr",
+     "atk",
+     "def"
+    ],
+    "field_basis": "the AFCON 2027 qualifying field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus 5a2e1ce9c011, variant 'all', Elo pinned at 5 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals, measured from shots (xG, else shots on target, else goals, per match).",
+    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence."
+   },
+   "event_id": "401920031",
+   "competition_id": "401920031",
+   "kickoff": "2026-09-28T16:00Z",
+   "espn": "caf.nations_qual",
+   "state": "pre",
+   "in_play": false,
+   "venue": {
+    "name": "Harare National Sports Stadium",
+    "city": "Harare",
+    "country": "Zimbabwe"
+   },
+   "venue_class": {
+    "class": "TRUE_HOME",
+    "home_side": "home"
+   },
+   "kalshi": {
+    "event_ticker": "KXAFCONGAME-26SEP28ZIMCOD",
+    "ticker": "KXAFCONGAME-26SEP28ZIMCOD-COD",
+    "ask_c": 70,
+    "bid_c": 21,
+    "spread_c": 49,
+    "ask_size": 13,
+    "bid_size": 2,
+    "flags": [
+     "WIDE",
+     "THIN"
+    ]
+   },
+   "form": {
+    "fav": "DLWLW",
+    "opp": "LWLWW",
+    "scope": "all senior internationals, friendlies marked",
+    "scope_is_cup": false
+   },
+   "h2h": {
+    "available": true,
+    "source": "seasonseries",
+    "meetings": [
+     {
+      "event_id": "501795",
+      "date": "2018-10-13T17:30:00Z",
+      "home": "Congo DR",
+      "away": "Zimbabwe",
+      "home_score": 1,
+      "away_score": 2,
+      "completed": true,
+      "winner": "home",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "501753",
+      "date": "2018-10-16T17:00:00Z",
+      "home": "Zimbabwe",
+      "away": "Congo DR",
+      "home_score": 1,
+      "away_score": 1,
+      "completed": true,
+      "winner": "draw",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "539288",
+      "date": "2019-06-30T19:00:00Z",
+      "home": "Zimbabwe",
+      "away": "Congo DR",
+      "home_score": 0,
+      "away_score": 4,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     }
+    ],
+    "tally": {
+     "home": 1,
+     "draw": 1,
+     "away": 1
+    },
+    "reason": null,
+    "window": null,
+    "last_meeting": {
+     "event_id": "539288",
+     "date": "2019-06-30T19:00:00Z",
+     "home": "Zimbabwe",
+     "away": "Congo DR",
+     "home_score": 0,
+     "away_score": 4,
+     "completed": true,
+     "winner": "away",
+     "winner_means": "this fixture's home/away sides"
+    },
+    "espn_reason": null
+   },
+   "national": {
+    "competition": "afcon",
+    "stage": "group-stage",
+    "stage_kind": "group",
+    "group": "Group E",
+    "leg": null,
+    "status_detail": "Mon, September 28th at 12:00 PM EDT",
+    "venue_country": "Zimbabwe",
+    "neutral_provider_flag": false,
+    "neutral": false,
+    "teams": {
+     "home": {
+      "key": "zimbabwe",
+      "espn_id": "4214",
+      "name": "Zimbabwe",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "afconq",
+       "axes": {
+        "ovr": {
+         "rank": 26,
+         "tier": 4,
+         "tier_set": [
+          4
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1506.6490985121868,
+         "half_width_95": 26.775125468718848,
+         "interval": [
+          1479.873973043468,
+          1533.4242239809057
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 30.40738756179544,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 26,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3,
+          4,
+          5
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.010076452081634785,
+         "half_width_95": 0.386761562150925,
+         "interval": [
+          -0.39683801423255977,
+          0.37668511006929023
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.3896314311511124,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 2,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 26,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.025216077984835245,
+         "half_width_95": 0.34804074410333574,
+         "interval": [
+          -0.32282466611850047,
+          0.373256822088171
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.36873680166514244,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "LWLWW",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "732159",
+         "date": "2025-12-29T16:00Z",
+         "competition": "Africa Cup of Nations",
+         "kind": "competitive",
+         "opponent": "South Africa",
+         "venue": "home",
+         "gf": 2,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401867105",
+         "date": "2026-03-31T16:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Zambia",
+         "venue": "home",
+         "gf": 1,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401867936",
+         "date": "2026-05-26T18:30Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Nigeria",
+         "venue": "away",
+         "gf": 0,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401874051",
+         "date": "2026-05-30T13:30Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "India",
+         "venue": "home",
+         "gf": 1,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401920051",
+         "date": "2026-09-24T19:00Z",
+         "competition": "Africa Cup of Nations Qualifying",
+         "kind": "competitive",
+         "opponent": "Sierra Leone",
+         "venue": "away",
+         "gf": 3,
+         "ga": 2,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 3,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     },
+     "away": {
+      "key": "congo-dr",
+      "espn_id": "2850",
+      "name": "Congo DR",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "afconq",
+       "axes": {
+        "ovr": {
+         "rank": 7,
+         "tier": 2,
+         "tier_set": [
+          2
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1696.0991586154955,
+         "half_width_95": 30.878675665595587,
+         "interval": [
+          1665.2204829498999,
+          1726.9778342810912
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 34.43993658391481,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 11,
+         "tier": 2,
+         "tier_set": [
+          1,
+          2,
+          3
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.3913413420812138,
+         "half_width_95": 0.2621554237736156,
+         "interval": [
+          0.12918591830759818,
+          0.6534967658548294
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.2786894321534872,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 2,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 1,
+          "tier_set": [
+           1
+          ],
+          "straddles": false
+         }
+        },
+        "def": {
+         "rank": 3,
+         "tier": 1,
+         "tier_set": [
+          1,
+          2
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.8160887050955432,
+         "half_width_95": 0.4624387308431383,
+         "interval": [
+          0.3536499742524049,
+          1.2785274359386816
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.4810739238784542,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 1,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "DLWLW",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "760435",
+         "date": "2026-06-17T17:00Z",
+         "competition": "FIFA World Cup",
+         "kind": "competitive",
+         "opponent": "Portugal",
+         "venue": "away",
+         "gf": 1,
+         "ga": 1,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760459",
+         "date": "2026-06-24T02:00Z",
+         "competition": "FIFA World Cup",
+         "kind": "competitive",
+         "opponent": "Colombia",
+         "venue": "away",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760482",
+         "date": "2026-06-27T23:30Z",
+         "competition": "FIFA World Cup",
+         "kind": "competitive",
+         "opponent": "Uzbekistan",
+         "venue": "home",
+         "gf": 3,
+         "ga": 1,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760495",
+         "date": "2026-07-01T16:00Z",
+         "competition": "FIFA World Cup",
+         "kind": "competitive",
+         "opponent": "England",
+         "venue": "away",
+         "gf": 1,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401920055",
+         "date": "2026-09-24T16:00Z",
+         "competition": "Africa Cup of Nations Qualifying",
+         "kind": "competitive",
+         "opponent": "Equatorial Guinea",
+         "venue": "home",
+         "gf": 2,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 0,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     }
+    },
+    "fixture_source": "espn",
+    "kickoff_status": null,
+    "apifootball": null,
+    "head_to_head": {
+     "available": true,
+     "source": "seasonseries",
+     "meetings": [
+      {
+       "event_id": "501795",
+       "date": "2018-10-13T17:30:00Z",
+       "home": "Congo DR",
+       "away": "Zimbabwe",
+       "home_score": 1,
+       "away_score": 2,
+       "completed": true,
+       "winner": "home",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "501753",
+       "date": "2018-10-16T17:00:00Z",
+       "home": "Zimbabwe",
+       "away": "Congo DR",
+       "home_score": 1,
+       "away_score": 1,
+       "completed": true,
+       "winner": "draw",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "539288",
+       "date": "2019-06-30T19:00:00Z",
+       "home": "Zimbabwe",
+       "away": "Congo DR",
+       "home_score": 0,
+       "away_score": 4,
+       "completed": true,
+       "winner": "away",
+       "winner_means": "this fixture's home/away sides"
+      }
+     ],
+     "tally": {
+      "home": 1,
+      "draw": 1,
+      "away": 1
+     },
+     "reason": null,
+     "window": null,
+     "last_meeting": {
+      "event_id": "539288",
+      "date": "2019-06-30T19:00:00Z",
+      "home": "Zimbabwe",
+      "away": "Congo DR",
+      "home_score": 0,
+      "away_score": 4,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     },
+     "espn_reason": null
+    },
+    "lineups": {
+     "announced": false,
+     "sides": {
+      "home": {
+       "team": "Zimbabwe",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      },
+      "away": {
+       "team": "Congo DR",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      }
+     },
+     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff"
+    },
+    "market": {
+     "status": "mapped",
+     "event_ticker": "KXAFCONGAME-26SEP28ZIMCOD",
+     "status_words": "one open Kalshi event names both teams on this date",
+     "title": "Zimbabwe vs Congo DR",
+     "legs": {
+      "home": {
+       "event_ticker": "KXAFCONGAME-26SEP28ZIMCOD",
+       "ticker": "KXAFCONGAME-26SEP28ZIMCOD-ZIM",
+       "ask_c": 69,
+       "bid_c": 6,
+       "spread_c": 63,
+       "ask_size": 5,
+       "bid_size": 1959,
+       "flags": [
+        "WIDE",
+        "THIN"
+       ],
+       "name": "Zimbabwe"
+      },
+      "tie": {
+       "event_ticker": "KXAFCONGAME-26SEP28ZIMCOD",
+       "ticker": "KXAFCONGAME-26SEP28ZIMCOD-TIE",
+       "ask_c": 69,
+       "bid_c": 6,
+       "spread_c": 63,
+       "ask_size": 5,
+       "bid_size": 1959,
+       "flags": [
+        "WIDE",
+        "THIN"
+       ]
+      },
+      "away": {
+       "event_ticker": "KXAFCONGAME-26SEP28ZIMCOD",
+       "ticker": "KXAFCONGAME-26SEP28ZIMCOD-COD",
+       "ask_c": 70,
+       "bid_c": 21,
+       "spread_c": 49,
+       "ask_size": 13,
+       "bid_size": 2,
+       "flags": [
+        "WIDE",
+        "THIN"
+       ],
+       "name": "Congo DR"
+      }
+     },
+     "orientation": "same"
+    },
+    "headline": {
+     "candidate": "b",
+     "label": "ELO GAP",
+     "unit": "Elo points",
+     "value": 124.5,
+     "favourite_side": "away",
+     "home_minus_away": -124.5,
+     "components": {
+      "elo": {
+       "home": 1506.6,
+       "away": 1696.1
+      },
+      "raw_gap_home_minus_away": -189.5,
+      "venue_term_home_minus_away": 65,
+      "venue_class": "TRUE_HOME",
+      "host_side": "home",
+      "venue_assumed": false
+     },
+     "raw_favourite_side": "away",
+     "venue_flips_raw_order": false,
+     "tie_broken_by_rank": false,
+     "basis": "The venue-adjusted Elo gap: the two teams' overall ratings on this competition's national-team field, differenced, plus the club home term given to the side whose country hosts, and nothing on neutral ground. The card's favourite and its quoted Kalshi leg are read off this same number. A preregistered out-of-sample bake-off chose it: no alternative beat it by a margin whose 95% interval excluded zero (see research_archive/national_headline_bakeoff_2026-09-25/RESULTS.json)."
+    }
+   }
+  },
+  {
+   "refused": false,
+   "league": "afcon",
+   "column": "afcon",
+   "columns": [
+    "afcon"
+   ],
+   "home": "Central African Republic",
+   "away": "Burkina Faso",
+   "favourite": "Burkina Faso",
+   "opponent": "Central African Republic",
+   "fav_side": "away",
+   "fav_source": "field",
+   "venue_favourite": {
+    "refused": true,
+    "reason": "no_gdg_gap",
+    "policy": "off",
+    "flipped": false,
+    "venue_class": "NEUTRAL",
+    "home_side": null
+   },
+   "resolution": {
+    "Central African Republic": "espn_id",
+    "Burkina Faso": "espn_id"
+   },
+   "ppg_gap": null,
+   "gdg_gap": null,
+   "rank_gap": null,
+   "gp_current": {
+    "home": 1,
+    "away": 1,
+    "min": 1
+   },
+   "weights": null,
+   "src": "current",
+   "cross_league": false,
+   "rated_in": {
+    "home": "afcon",
+    "away": "afcon"
+   },
+   "table_notes": {
+    "home": null,
+    "away": null
+   },
+   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
+   "reg_time_note": "KXAFCONGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
+   "ranks": {
+    "fav": 12,
+    "opp": 44
+   },
+   "rates": {
+    "ppg": [
+     1,
+     0
+    ],
+    "gf": [
+     1,
+     1
+    ],
+    "ga": [
+     1,
+     3
+    ],
+    "gdg": [
+     0,
+     -2
+    ]
+   },
+   "own_gdg": {
+    "diff": 2,
+    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record."
+   },
+   "tiers": {
+    "ovr": [
+     3,
+     5
+    ],
+    "atk": [
+     2,
+     4
+    ],
+    "def": [
+     3,
+     4
+    ]
+   },
+   "tier_gaps": {
+    "ovr": 2,
+    "atk": 2,
+    "def": 1
+   },
+   "shape": "CLEAN",
+   "current_only": null,
+   "field": {
+    "competition": "afconq",
+    "clubs": {
+     "fav": "Burkina Faso",
+     "opp": "Central African Republic"
+    },
+    "size": 48,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 12,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "value": 1651.5581238973518,
+       "half_width_95": 12.270212506033682,
+       "interval": [
+        1639.2879113913182,
+        1663.8283364033855
+       ]
+      },
+      "opp": {
+       "rank": 44,
+       "tier": 5,
+       "tier_set": [
+        5
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1403.1355207272643,
+       "half_width_95": 10.247501530432361,
+       "interval": [
+        1392.888019196832,
+        1413.3830222576967
+       ]
+      },
+      "tier_gap": 2,
+      "unit": "elo",
+      "label": "overall",
+      "floor": {
+       "below_floor": false,
+       "failing_condition": null
+      },
+      "field_size": 48,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 16.159782583833948,
+       "opp": 16.0241576238026
+      },
+      "signal_source": "elo"
+     },
+     "atk": {
+      "fav": {
+       "rank": 6,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.5204930993174943,
+       "half_width_95": 0.27442368677662066,
+       "interval": [
+        0.24606941254087367,
+        0.794916786094115
+       ]
+      },
+      "opp": {
+       "rank": 38,
+       "tier": 4,
+       "tier_set": [
+        2,
+        3,
+        4,
+        5
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.27261220110633627,
+       "half_width_95": 0.5527108169512234,
+       "interval": [
+        -0.8253230180575597,
+        0.2800986158448871
+       ]
+      },
+      "tier_gap": 2,
+      "unit": "log_goals",
+      "label": "attack",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 47,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.2820256443245015,
+       "opp": 0.561384485890229
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "goals",
+       "opp": "goals"
+      },
+      "licensed": {
+       "bands": 2,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 1,
+        "tier_set": [
+         1
+        ],
+        "straddles": false
+       },
+       "opp": {
+        "tier": 2,
+        "tier_set": [
+         1,
+         2
+        ],
+        "straddles": true
+       }
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 12,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.3120532113837916,
+       "half_width_95": 0.37404312306982396,
+       "interval": [
+        -0.06198991168603235,
+        0.6860963344536155
+       ]
+      },
+      "opp": {
+       "rank": 45,
+       "tier": 4,
+       "tier_set": [
+        3,
+        4,
+        5
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.4076265862120835,
+       "half_width_95": 0.38120424878136605,
+       "interval": [
+        -0.7888308349934495,
+        -0.026422337430717424
+       ]
+      },
+      "tier_gap": 1,
+      "unit": "log_goals",
+      "label": "defence",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 47,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.3744825828075929,
+       "opp": 0.3944944679007192
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "goals",
+       "opp": "goals"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 2,
+        "tier_set": [
+         1,
+         2
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 3,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       }
+      }
+     }
+    },
+    "shape": "CLEAN",
+    "axes_measured": [
+     "ovr",
+     "atk",
+     "def"
+    ],
+    "field_basis": "the AFCON 2027 qualifying field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus 5a2e1ce9c011, variant 'all', Elo pinned at 5 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals, measured from shots (xG, else shots on target, else goals, per match).",
+    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence."
+   },
+   "event_id": "401920032",
+   "competition_id": "401920032",
+   "kickoff": "2026-09-28T16:00Z",
+   "espn": "caf.nations_qual",
+   "state": "pre",
+   "in_play": false,
+   "venue": {
+    "name": "Stade Larbi Zaouli",
+    "city": "Casablanca",
+    "country": "Morocco"
+   },
+   "venue_class": {
+    "class": "NEUTRAL",
+    "home_side": null
+   },
+   "kalshi": {
+    "event_ticker": "KXAFCONGAME-26SEP28CAFBUR",
+    "ticker": "KXAFCONGAME-26SEP28CAFBUR-BUR",
+    "ask_c": 68,
+    "bid_c": 11,
+    "spread_c": 57,
+    "ask_size": 5,
+    "bid_size": 5,
+    "flags": [
+     "WIDE",
+     "THIN"
+    ]
+   },
+   "form": {
+    "fav": "LWLLD",
+    "opp": "LLWLL",
+    "scope": "all senior internationals, friendlies marked",
+    "scope_is_cup": false
+   },
+   "h2h": {
+    "available": true,
+    "source": "seasonseries",
+    "meetings": [
+     {
+      "event_id": "748069",
+      "date": "2025-08-06T14:00:00Z",
+      "home": "Burkina Faso",
+      "away": "Central African Republic",
+      "home_score": 4,
+      "away_score": 2,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     }
+    ],
+    "tally": {
+     "home": 0,
+     "draw": 0,
+     "away": 1
+    },
+    "reason": null,
+    "window": null,
+    "last_meeting": {
+     "event_id": "748069",
+     "date": "2025-08-06T14:00:00Z",
+     "home": "Burkina Faso",
+     "away": "Central African Republic",
+     "home_score": 4,
+     "away_score": 2,
+     "completed": true,
+     "winner": "away",
+     "winner_means": "this fixture's home/away sides"
+    },
+    "espn_reason": null
+   },
+   "national": {
+    "competition": "afcon",
+    "stage": "group-stage",
+    "stage_kind": "group",
+    "group": "Group F",
+    "leg": null,
+    "status_detail": "Mon, September 28th at 12:00 PM EDT",
+    "venue_country": "Morocco",
+    "neutral_provider_flag": false,
+    "neutral": true,
+    "teams": {
+     "home": {
+      "key": "central-african-republic",
+      "espn_id": "10528",
+      "name": "Central African Republic",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "afconq",
+       "axes": {
+        "ovr": {
+         "rank": 44,
+         "tier": 5,
+         "tier_set": [
+          5
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1403.1355207272643,
+         "half_width_95": 10.247501530432361,
+         "interval": [
+          1392.888019196832,
+          1413.3830222576967
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 16.0241576238026,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 38,
+         "tier": 4,
+         "tier_set": [
+          2,
+          3,
+          4,
+          5
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.27261220110633627,
+         "half_width_95": 0.5527108169512234,
+         "interval": [
+          -0.8253230180575597,
+          0.2800986158448871
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.561384485890229,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 2,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 45,
+         "tier": 4,
+         "tier_set": [
+          3,
+          4,
+          5
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.4076265862120835,
+         "half_width_95": 0.38120424878136605,
+         "interval": [
+          -0.7888308349934495,
+          -0.026422337430717424
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.3944944679007192,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 3,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "LLWLL",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "687379",
+         "date": "2025-09-07T16:00Z",
+         "competition": "FIFA World Cup Qualifying - CAF",
+         "kind": "competitive",
+         "opponent": "Comoros",
+         "venue": "home",
+         "gf": 0,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "687369",
+         "date": "2025-10-08T16:00Z",
+         "competition": "FIFA World Cup Qualifying - CAF",
+         "kind": "competitive",
+         "opponent": "Ghana",
+         "venue": "home",
+         "gf": 0,
+         "ga": 5,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "687380",
+         "date": "2025-10-12T16:00Z",
+         "competition": "FIFA World Cup Qualifying - CAF",
+         "kind": "competitive",
+         "opponent": "Chad",
+         "venue": "away",
+         "gf": 3,
+         "ga": 2,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401873740",
+         "date": "2026-06-09T17:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Angola",
+         "venue": "away",
+         "gf": 0,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401920054",
+         "date": "2026-09-24T16:00Z",
+         "competition": "Africa Cup of Nations Qualifying",
+         "kind": "competitive",
+         "opponent": "Mauritania",
+         "venue": "away",
+         "gf": 1,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 1,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     },
+     "away": {
+      "key": "burkina-faso",
+      "espn_id": "2845",
+      "name": "Burkina Faso",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "afconq",
+       "axes": {
+        "ovr": {
+         "rank": 12,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3
+         ],
+         "straddles": true,
+         "below_floor": false,
+         "value": 1651.5581238973518,
+         "half_width_95": 12.270212506033682,
+         "interval": [
+          1639.2879113913182,
+          1663.8283364033855
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 16.159782583833948,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 6,
+         "tier": 2,
+         "tier_set": [
+          1,
+          2
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.5204930993174943,
+         "half_width_95": 0.27442368677662066,
+         "interval": [
+          0.24606941254087367,
+          0.794916786094115
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.2820256443245015,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 2,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 1,
+          "tier_set": [
+           1
+          ],
+          "straddles": false
+         }
+        },
+        "def": {
+         "rank": 12,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.3120532113837916,
+         "half_width_95": 0.37404312306982396,
+         "interval": [
+          -0.06198991168603235,
+          0.6860963344536155
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.3744825828075929,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "LWLLD",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "732153",
+         "date": "2025-12-28T17:30Z",
+         "competition": "Africa Cup of Nations",
+         "kind": "competitive",
+         "opponent": "Algeria",
+         "venue": "away",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "732166",
+         "date": "2025-12-31T16:00Z",
+         "competition": "Africa Cup of Nations",
+         "kind": "competitive",
+         "opponent": "Sudan",
+         "venue": "away",
+         "gf": 2,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "732176",
+         "date": "2026-01-06T19:00Z",
+         "competition": "Africa Cup of Nations",
+         "kind": "competitive",
+         "opponent": "Ivory Coast",
+         "venue": "away",
+         "gf": 0,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401870854",
+         "date": "2026-06-05T17:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Russia",
+         "venue": "away",
+         "gf": 0,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401871492",
+         "date": "2026-06-09T16:30Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Belarus",
+         "venue": "away",
+         "gf": 2,
+         "ga": 2,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 2,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     }
+    },
+    "fixture_source": "espn",
+    "kickoff_status": null,
+    "apifootball": null,
+    "head_to_head": {
+     "available": true,
+     "source": "seasonseries",
+     "meetings": [
+      {
+       "event_id": "748069",
+       "date": "2025-08-06T14:00:00Z",
+       "home": "Burkina Faso",
+       "away": "Central African Republic",
+       "home_score": 4,
+       "away_score": 2,
+       "completed": true,
+       "winner": "away",
+       "winner_means": "this fixture's home/away sides"
+      }
+     ],
+     "tally": {
+      "home": 0,
+      "draw": 0,
+      "away": 1
+     },
+     "reason": null,
+     "window": null,
+     "last_meeting": {
+      "event_id": "748069",
+      "date": "2025-08-06T14:00:00Z",
+      "home": "Burkina Faso",
+      "away": "Central African Republic",
+      "home_score": 4,
+      "away_score": 2,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     },
+     "espn_reason": null
+    },
+    "lineups": {
+     "announced": false,
+     "sides": {
+      "home": {
+       "team": "Central African Republic",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      },
+      "away": {
+       "team": "Burkina Faso",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      }
+     },
+     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff"
+    },
+    "market": {
+     "status": "mapped",
+     "event_ticker": "KXAFCONGAME-26SEP28CAFBUR",
+     "status_words": "one open Kalshi event names both teams on this date",
+     "title": "Central African Republic vs Burkina Faso",
+     "legs": {
+      "home": {
+       "event_ticker": "KXAFCONGAME-26SEP28CAFBUR",
+       "ticker": "KXAFCONGAME-26SEP28CAFBUR-CAF",
+       "ask_c": 68,
+       "bid_c": 7,
+       "spread_c": 61,
+       "ask_size": 5,
+       "bid_size": 5,
+       "flags": [
+        "WIDE",
+        "THIN"
+       ],
+       "name": "Central African Republic"
+      },
+      "tie": {
+       "event_ticker": "KXAFCONGAME-26SEP28CAFBUR",
+       "ticker": "KXAFCONGAME-26SEP28CAFBUR-TIE",
+       "ask_c": 68,
+       "bid_c": 7,
+       "spread_c": 61,
+       "ask_size": 5,
+       "bid_size": 5,
+       "flags": [
+        "WIDE",
+        "THIN"
+       ]
+      },
+      "away": {
+       "event_ticker": "KXAFCONGAME-26SEP28CAFBUR",
+       "ticker": "KXAFCONGAME-26SEP28CAFBUR-BUR",
+       "ask_c": 68,
+       "bid_c": 11,
+       "spread_c": 57,
+       "ask_size": 5,
+       "bid_size": 5,
+       "flags": [
+        "WIDE",
+        "THIN"
+       ],
+       "name": "Burkina Faso"
+      }
+     },
+     "orientation": "same"
+    },
+    "headline": {
+     "candidate": "b",
+     "label": "ELO GAP",
+     "unit": "Elo points",
+     "value": 248.4,
+     "favourite_side": "away",
+     "home_minus_away": -248.4,
+     "components": {
+      "elo": {
+       "home": 1403.1,
+       "away": 1651.6
+      },
+      "raw_gap_home_minus_away": -248.4,
+      "venue_term_home_minus_away": 0,
+      "venue_class": "NEUTRAL",
+      "host_side": null,
+      "venue_assumed": false
+     },
+     "raw_favourite_side": "away",
+     "venue_flips_raw_order": false,
+     "tie_broken_by_rank": false,
+     "basis": "The venue-adjusted Elo gap: the two teams' overall ratings on this competition's national-team field, differenced, plus the club home term given to the side whose country hosts, and nothing on neutral ground. The card's favourite and its quoted Kalshi leg are read off this same number. A preregistered out-of-sample bake-off chose it: no alternative beat it by a margin whose 95% interval excluded zero (see research_archive/national_headline_bakeoff_2026-09-25/RESULTS.json)."
+    }
+   }
+  },
+  {
+   "refused": false,
+   "league": "afcon",
+   "column": "afcon",
+   "columns": [
+    "afcon"
+   ],
+   "home": "Equatorial Guinea",
+   "away": "Sierra Leone",
+   "favourite": "Equatorial Guinea",
+   "opponent": "Sierra Leone",
+   "fav_side": "home",
+   "fav_source": "field",
+   "venue_favourite": {
+    "refused": true,
+    "reason": "no_gdg_gap",
+    "policy": "off",
+    "flipped": false,
+    "venue_class": "NEUTRAL",
+    "home_side": null
+   },
+   "resolution": {
+    "Equatorial Guinea": "espn_id",
+    "Sierra Leone": "espn_id"
+   },
+   "ppg_gap": null,
+   "gdg_gap": null,
+   "rank_gap": null,
+   "gp_current": {
+    "home": 1,
+    "away": 1,
+    "min": 1
+   },
+   "weights": null,
+   "src": "current",
+   "cross_league": false,
+   "rated_in": {
+    "home": "afcon",
+    "away": "afcon"
+   },
+   "table_notes": {
+    "home": null,
+    "away": null
+   },
+   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
+   "reg_time_note": "KXAFCONGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
+   "ranks": {
+    "fav": 28,
+    "opp": 37
+   },
+   "rates": {
+    "ppg": [
+     0,
+     0
+    ],
+    "gf": [
+     0,
+     2
+    ],
+    "ga": [
+     2,
+     3
+    ],
+    "gdg": [
+     -2,
+     -1
+    ]
+   },
+   "own_gdg": {
+    "diff": -1,
+    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record."
+   },
+   "tiers": {
+    "ovr": [
+     4,
+     4
+    ],
+    "atk": [
+     4,
+     3
+    ],
+    "def": [
+     3,
+     3
+    ]
+   },
+   "tier_gaps": {
+    "ovr": 0,
+    "atk": -1,
+    "def": 0
+   },
+   "shape": "HOLLOW",
+   "current_only": null,
+   "field": {
+    "competition": "afconq",
+    "clubs": {
+     "fav": "Equatorial Guinea",
+     "opp": "Sierra Leone"
+    },
+    "size": 48,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 28,
+       "tier": 4,
+       "tier_set": [
+        4
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1489.2218602998273,
+       "half_width_95": 16.463641022860884,
+       "interval": [
+        1472.7582192769664,
+        1505.6855013226882
+       ]
+      },
+      "opp": {
+       "rank": 37,
+       "tier": 4,
+       "tier_set": [
+        4
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1444.6251054949425,
+       "half_width_95": 4.431452356218468,
+       "interval": [
+        1440.1936531387241,
+        1449.056557851161
+       ]
+      },
+      "tier_gap": 0,
+      "unit": "elo",
+      "label": "overall",
+      "floor": {
+       "below_floor": false,
+       "failing_condition": null
+      },
+      "field_size": 48,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 20.008898717798772,
+       "opp": 10.952070472077484
+      },
+      "signal_source": "elo"
+     },
+     "atk": {
+      "fav": {
+       "rank": 37,
+       "tier": 4,
+       "tier_set": [
+        3,
+        4,
+        5
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.261845040970055,
+       "half_width_95": 0.38105510287162336,
+       "interval": [
+        -0.6429001438416784,
+        0.11921006190156835
+       ]
+      },
+      "opp": {
+       "rank": 27,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3,
+        4,
+        5
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.05132036526145457,
+       "half_width_95": 0.49762894432924243,
+       "interval": [
+        -0.548949309590697,
+        0.44630857906778787
+       ]
+      },
+      "tier_gap": -1,
+      "unit": "log_goals",
+      "label": "attack",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 47,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.40210092948209786,
+       "opp": 0.5191063923189487
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "goals",
+       "opp": "goals"
+      },
+      "licensed": {
+       "bands": 2,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 2,
+        "tier_set": [
+         1,
+         2
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 2,
+        "tier_set": [
+         1,
+         2
+        ],
+        "straddles": true
+       }
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 30,
+       "tier": 3,
+       "tier_set": [
+        3,
+        4
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": -0.040727684153137184,
+       "half_width_95": 0.2890050771760687,
+       "interval": [
+        -0.3297327613292059,
+        0.24827739302293153
+       ]
+      },
+      "opp": {
+       "rank": 24,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3,
+        4,
+        5
+       ],
+       "straddles": true,
+       "below_floor": true,
+       "value": 0.04937724705276233,
+       "half_width_95": 0.5843399504807101,
+       "interval": [
+        -0.5349627034279477,
+        0.6337171975334724
+       ]
+      },
+      "tier_gap": 0,
+      "unit": "log_goals",
+      "label": "defence",
+      "floor": {
+       "below_floor": true,
+       "failing_condition": "G3"
+      },
+      "field_size": 47,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 0.30360840874583966,
+       "opp": 0.5995587063756126
+      },
+      "signal_source": "shots",
+      "signal": {
+       "fav": "goals",
+       "opp": "goals"
+      },
+      "licensed": {
+       "bands": 3,
+       "below_floor": true,
+       "failing_condition": "G3",
+       "fav": {
+        "tier": 2,
+        "tier_set": [
+         2,
+         3
+        ],
+        "straddles": true
+       },
+       "opp": {
+        "tier": 2,
+        "tier_set": [
+         1,
+         2,
+         3
+        ],
+        "straddles": true
+       }
+      }
+     }
+    },
+    "shape": "HOLLOW",
+    "axes_measured": [
+     "ovr",
+     "atk",
+     "def"
+    ],
+    "field_basis": "the AFCON 2027 qualifying field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus 5a2e1ce9c011, variant 'all', Elo pinned at 5 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals, measured from shots (xG, else shots on target, else goals, per match).",
+    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence."
+   },
+   "event_id": "401920033",
+   "competition_id": "401920033",
+   "kickoff": "2026-09-28T16:00Z",
+   "espn": "caf.nations_qual",
+   "state": "pre",
+   "in_play": false,
+   "venue": {
+    "name": "Stade Omnisport Ahmadou Ahidjo",
+    "city": "Yaoundé",
+    "country": "Cameroon"
+   },
+   "venue_class": {
+    "class": "NEUTRAL",
+    "home_side": null
+   },
+   "kalshi": {
+    "event_ticker": "KXAFCONGAME-26SEP28GEQSLE",
+    "ticker": "KXAFCONGAME-26SEP28GEQSLE-GEQ",
+    "ask_c": 68,
+    "bid_c": 7,
+    "spread_c": 61,
+    "ask_size": 5,
+    "bid_size": 5,
+    "flags": [
+     "WIDE",
+     "THIN"
+    ]
+   },
+   "form": {
+    "fav": "LLWLL",
+    "opp": "LWDLL",
+    "scope": "all senior internationals, friendlies marked",
+    "scope_is_cup": false
+   },
+   "h2h": {
+    "available": true,
+    "source": "seasonseries",
+    "meetings": [
+     {
+      "event_id": "233497",
+      "date": "2008-06-01T14:30:00Z",
+      "home": "Equatorial Guinea",
+      "away": "Sierra Leone",
+      "home_score": 2,
+      "away_score": 0,
+      "completed": true,
+      "winner": "home",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "233505",
+      "date": "2008-09-06T16:30:00Z",
+      "home": "Sierra Leone",
+      "away": "Equatorial Guinea",
+      "home_score": 2,
+      "away_score": 1,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "334414",
+      "date": "2012-06-09T17:00:00Z",
+      "home": "Equatorial Guinea",
+      "away": "Sierra Leone",
+      "home_score": 2,
+      "away_score": 2,
+      "completed": true,
+      "winner": "draw",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "334451",
+      "date": "2013-09-07T16:30:00Z",
+      "home": "Sierra Leone",
+      "away": "Equatorial Guinea",
+      "home_score": 3,
+      "away_score": 2,
+      "completed": true,
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "event_id": "618240",
+      "date": "2022-01-20T16:00:00Z",
+      "home": "Sierra Leone",
+      "away": "Equatorial Guinea",
+      "home_score": 0,
+      "away_score": 1,
+      "completed": true,
+      "winner": "home",
+      "winner_means": "this fixture's home/away sides"
+     }
+    ],
+    "tally": {
+     "home": 2,
+     "draw": 1,
+     "away": 2
+    },
+    "reason": null,
+    "window": null,
+    "last_meeting": {
+     "event_id": "618240",
+     "date": "2022-01-20T16:00:00Z",
+     "home": "Sierra Leone",
+     "away": "Equatorial Guinea",
+     "home_score": 0,
+     "away_score": 1,
+     "completed": true,
+     "winner": "home",
+     "winner_means": "this fixture's home/away sides"
+    },
+    "espn_reason": null
+   },
+   "national": {
+    "competition": "afcon",
+    "stage": "group-stage",
+    "stage_kind": "group",
+    "group": "Group E",
+    "leg": null,
+    "status_detail": "Mon, September 28th at 12:00 PM EDT",
+    "venue_country": "Cameroon",
+    "neutral_provider_flag": false,
+    "neutral": true,
+    "teams": {
+     "home": {
+      "key": "equatorial-guinea",
+      "espn_id": "8938",
+      "name": "Equatorial Guinea",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "afconq",
+       "axes": {
+        "ovr": {
+         "rank": 28,
+         "tier": 4,
+         "tier_set": [
+          4
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1489.2218602998273,
+         "half_width_95": 16.463641022860884,
+         "interval": [
+          1472.7582192769664,
+          1505.6855013226882
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 20.008898717798772,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 37,
+         "tier": 4,
+         "tier_set": [
+          3,
+          4,
+          5
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.261845040970055,
+         "half_width_95": 0.38105510287162336,
+         "interval": [
+          -0.6429001438416784,
+          0.11921006190156835
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.40210092948209786,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 2,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 30,
+         "tier": 3,
+         "tier_set": [
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.040727684153137184,
+         "half_width_95": 0.2890050771760687,
+         "interval": [
+          -0.3297327613292059,
+          0.24827739302293153
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.30360840874583966,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "LLWLL",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "732154",
+         "date": "2025-12-28T15:00Z",
+         "competition": "Africa Cup of Nations",
+         "kind": "competitive",
+         "opponent": "Sudan",
+         "venue": "home",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "732165",
+         "date": "2025-12-31T16:00Z",
+         "competition": "Africa Cup of Nations",
+         "kind": "competitive",
+         "opponent": "Algeria",
+         "venue": "home",
+         "gf": 1,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401866395",
+         "date": "2026-03-25T14:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Kyrgyz Republic",
+         "venue": "away",
+         "gf": 1,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401873676",
+         "date": "2026-06-09T16:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Comoros",
+         "venue": "home",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401920055",
+         "date": "2026-09-24T16:00Z",
+         "competition": "Africa Cup of Nations Qualifying",
+         "kind": "competitive",
+         "opponent": "Congo DR",
+         "venue": "away",
+         "gf": 0,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 2,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     },
+     "away": {
+      "key": "sierra-leone",
+      "espn_id": "8600",
+      "name": "Sierra Leone",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "afconq",
+       "axes": {
+        "ovr": {
+         "rank": 37,
+         "tier": 4,
+         "tier_set": [
+          4
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1444.6251054949425,
+         "half_width_95": 4.431452356218468,
+         "interval": [
+          1440.1936531387241,
+          1449.056557851161
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 10.952070472077484,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 27,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3,
+          4,
+          5
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": -0.05132036526145457,
+         "half_width_95": 0.49762894432924243,
+         "interval": [
+          -0.548949309590697,
+          0.44630857906778787
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.5191063923189487,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 2,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 24,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3,
+          4,
+          5
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.04937724705276233,
+         "half_width_95": 0.5843399504807101,
+         "interval": [
+          -0.5349627034279477,
+          0.6337171975334724
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.5995587063756126,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           1,
+           2,
+           3
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "LWDLL",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "687129",
+         "date": "2025-10-08T16:00Z",
+         "competition": "FIFA World Cup Qualifying - CAF",
+         "kind": "competitive",
+         "opponent": "Burkina Faso",
+         "venue": "home",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "687140",
+         "date": "2025-10-12T19:00Z",
+         "competition": "FIFA World Cup Qualifying - CAF",
+         "kind": "competitive",
+         "opponent": "Djibouti",
+         "venue": "away",
+         "gf": 2,
+         "ga": 1,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401866531",
+         "date": "2026-03-30T15:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Azerbaijan",
+         "venue": "away",
+         "gf": 1,
+         "ga": 1,
+         "letter": "D",
+         "provider_letter": "L",
+         "provider_agrees": false,
+         "shootout": {
+          "for": 1,
+          "against": 2,
+          "note": "level after play, decided on penalties; the letter is the scoreline's, D"
+         }
+        },
+        {
+         "event_id": "401875461",
+         "date": "2026-06-09T18:30Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Liberia",
+         "venue": "away",
+         "gf": 1,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401920051",
+         "date": "2026-09-24T19:00Z",
+         "competition": "Africa Cup of Nations Qualifying",
+         "kind": "competitive",
+         "opponent": "Zimbabwe",
+         "venue": "home",
+         "gf": 2,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 2,
+       "provider_disagreements": 1,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     }
+    },
+    "fixture_source": "espn",
+    "kickoff_status": null,
+    "apifootball": null,
+    "head_to_head": {
+     "available": true,
+     "source": "seasonseries",
+     "meetings": [
+      {
+       "event_id": "233497",
+       "date": "2008-06-01T14:30:00Z",
+       "home": "Equatorial Guinea",
+       "away": "Sierra Leone",
+       "home_score": 2,
+       "away_score": 0,
+       "completed": true,
+       "winner": "home",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "233505",
+       "date": "2008-09-06T16:30:00Z",
+       "home": "Sierra Leone",
+       "away": "Equatorial Guinea",
+       "home_score": 2,
+       "away_score": 1,
+       "completed": true,
+       "winner": "away",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "334414",
+       "date": "2012-06-09T17:00:00Z",
+       "home": "Equatorial Guinea",
+       "away": "Sierra Leone",
+       "home_score": 2,
+       "away_score": 2,
+       "completed": true,
+       "winner": "draw",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "334451",
+       "date": "2013-09-07T16:30:00Z",
+       "home": "Sierra Leone",
+       "away": "Equatorial Guinea",
+       "home_score": 3,
+       "away_score": 2,
+       "completed": true,
+       "winner": "away",
+       "winner_means": "this fixture's home/away sides"
+      },
+      {
+       "event_id": "618240",
+       "date": "2022-01-20T16:00:00Z",
+       "home": "Sierra Leone",
+       "away": "Equatorial Guinea",
+       "home_score": 0,
+       "away_score": 1,
+       "completed": true,
+       "winner": "home",
+       "winner_means": "this fixture's home/away sides"
+      }
+     ],
+     "tally": {
+      "home": 2,
+      "draw": 1,
+      "away": 2
+     },
+     "reason": null,
+     "window": null,
+     "last_meeting": {
+      "event_id": "618240",
+      "date": "2022-01-20T16:00:00Z",
+      "home": "Sierra Leone",
+      "away": "Equatorial Guinea",
+      "home_score": 0,
+      "away_score": 1,
+      "completed": true,
+      "winner": "home",
+      "winner_means": "this fixture's home/away sides"
+     },
+     "espn_reason": null
+    },
+    "lineups": {
+     "announced": false,
+     "sides": {
+      "home": {
+       "team": "Equatorial Guinea",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      },
+      "away": {
+       "team": "Sierra Leone",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      }
+     },
+     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff"
+    },
+    "market": {
+     "status": "mapped",
+     "event_ticker": "KXAFCONGAME-26SEP28GEQSLE",
+     "status_words": "one open Kalshi event names both teams on this date",
+     "title": "Equatorial Guinea vs Sierra Leone",
+     "legs": {
+      "home": {
+       "event_ticker": "KXAFCONGAME-26SEP28GEQSLE",
+       "ticker": "KXAFCONGAME-26SEP28GEQSLE-GEQ",
+       "ask_c": 68,
+       "bid_c": 7,
+       "spread_c": 61,
+       "ask_size": 5,
+       "bid_size": 5,
+       "flags": [
+        "WIDE",
+        "THIN"
+       ],
+       "name": "Equatorial Guinea"
+      },
+      "tie": {
+       "event_ticker": "KXAFCONGAME-26SEP28GEQSLE",
+       "ticker": "KXAFCONGAME-26SEP28GEQSLE-TIE",
+       "ask_c": 68,
+       "bid_c": 7,
+       "spread_c": 61,
+       "ask_size": 5,
+       "bid_size": 5,
+       "flags": [
+        "WIDE",
+        "THIN"
+       ]
+      },
+      "away": {
+       "event_ticker": "KXAFCONGAME-26SEP28GEQSLE",
+       "ticker": "KXAFCONGAME-26SEP28GEQSLE-SLE",
+       "ask_c": 68,
+       "bid_c": 11,
+       "spread_c": 57,
+       "ask_size": 5,
+       "bid_size": 5,
+       "flags": [
+        "WIDE",
+        "THIN"
+       ],
+       "name": "Sierra Leone"
+      }
+     },
+     "orientation": "same"
+    },
+    "headline": {
+     "candidate": "b",
+     "label": "ELO GAP",
+     "unit": "Elo points",
+     "value": 44.6,
+     "favourite_side": "home",
+     "home_minus_away": 44.6,
+     "components": {
+      "elo": {
+       "home": 1489.2,
+       "away": 1444.6
+      },
+      "raw_gap_home_minus_away": 44.6,
+      "venue_term_home_minus_away": 0,
+      "venue_class": "NEUTRAL",
+      "host_side": null,
+      "venue_assumed": false
+     },
+     "raw_favourite_side": "home",
+     "venue_flips_raw_order": false,
+     "tie_broken_by_rank": false,
+     "basis": "The venue-adjusted Elo gap: the two teams' overall ratings on this competition's national-team field, differenced, plus the club home term given to the side whose country hosts, and nothing on neutral ground. The card's favourite and its quoted Kalshi leg are read off this same number. A preregistered out-of-sample bake-off chose it: no alternative beat it by a margin whose 95% interval excluded zero (see research_archive/national_headline_bakeoff_2026-09-25/RESULTS.json)."
+    }
+   }
+  },
+  {
+   "refused": false,
+   "league": "afcon",
+   "column": "afcon",
+   "columns": [
+    "afcon"
+   ],
+   "home": "Eritrea",
+   "away": "South Africa",
+   "favourite": "South Africa",
+   "opponent": "Eritrea",
+   "fav_side": "away",
+   "fav_source": "field",
+   "venue_favourite": {
+    "refused": true,
+    "reason": "no_gdg_gap",
+    "policy": "off",
+    "flipped": false,
+    "venue_class": "NEUTRAL",
+    "home_side": null
+   },
+   "resolution": {
+    "Eritrea": "espn_id",
+    "South Africa": "espn_id"
+   },
+   "ppg_gap": null,
+   "gdg_gap": null,
+   "rank_gap": null,
+   "gp_current": {
+    "home": 0,
+    "away": 0,
+    "min": 0
+   },
+   "weights": null,
+   "src": "current",
+   "cross_league": false,
+   "rated_in": {
+    "home": "afcon",
+    "away": "afcon"
+   },
+   "table_notes": {
+    "home": null,
+    "away": null
+   },
+   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
+   "reg_time_note": "KXAFCONGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
+   "ranks": {
+    "fav": 13,
+    "opp": 38
+   },
+   "rates": {
+    "ppg": [
+     null,
+     null
+    ],
+    "gf": [
+     null,
+     null
+    ],
+    "ga": [
+     null,
+     null
+    ],
+    "gdg": [
+     null,
+     null
+    ]
+   },
+   "own_gdg": {
+    "diff": null,
+    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record."
+   },
+   "tiers": {
+    "ovr": [
+     3,
+     4
+    ],
+    "atk": null,
+    "def": null
+   },
+   "tier_gaps": {
+    "ovr": 1,
+    "atk": null,
+    "def": null
+   },
+   "shape": null,
+   "current_only": null,
+   "field_partial": {
+    "competition": "afconq",
+    "clubs": {
+     "fav": "South Africa",
+     "opp": "Eritrea"
+    },
+    "size": 48,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 13,
+       "tier": 3,
+       "tier_set": [
+        2,
+        3
+       ],
+       "straddles": true,
+       "below_floor": false,
+       "value": 1622.504197195422,
+       "half_width_95": 38.42372180255895,
+       "interval": [
+        1584.080475392863,
+        1660.927918997981
+       ]
+      },
+      "opp": {
+       "rank": 38,
+       "tier": 4,
+       "tier_set": [
+        4
+       ],
+       "straddles": false,
+       "below_floor": false,
+       "value": 1442.0052662819621,
+       "half_width_95": 7.511878205841013,
+       "interval": [
+        1434.4933880761212,
+        1449.517144487803
+       ]
+      },
+      "tier_gap": 1,
+      "unit": "elo",
+      "label": "overall",
+      "floor": {
+       "below_floor": false,
+       "failing_condition": null
+      },
+      "field_size": 48,
+      "band": "within_confederation",
+      "half_width_95_cross_confederation": {
+       "fav": 42.08827604598037,
+       "opp": 7.2943279069119304
+      },
+      "signal_source": "elo"
+     }
+    },
+    "shape_absent": {
+     "axes_absent": [
+      "atk",
+      "def"
+     ],
+     "why": "`shape` is CLEAN/HOLLOW/SPLIT read off all 3 of ['ovr', 'atk', 'def'] together, and one of these two teams has no measured atk or def. A label composed from fewer gaps would be a sentence about the fixture no measurement stands behind."
+    },
+    "axes_measured": [
+     "ovr"
+    ],
+    "field_basis": "the AFCON 2027 qualifying field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus 5a2e1ce9c011, variant 'all', Elo pinned at 5 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals, measured from shots (xG, else shots on target, else goals, per match).",
+    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
+    "why_not_field": "THE FIELD PLACED BOTH TEAMS ON FEWER AXES THAN `field` IS DEFINED ON: one of them has no measured attack or defence (the goals estimator's own refusal, named on its rating). This key is not `field` because `field` is a three-axis contract its readers walk unguarded. Nothing is padded: an axis a team was not measured on is absent, not a pair of nulls. `shape_absent` says which axes are missing and why."
+   },
+   "event_id": "401919991",
+   "competition_id": "401919991",
+   "kickoff": "2026-09-30T16:00Z",
+   "espn": "caf.nations_qual",
+   "state": "pre",
+   "in_play": false,
+   "venue": {
+    "name": "Al Salam Stadium",
+    "city": "Cairo",
+    "country": "Egypt"
+   },
+   "venue_class": {
+    "class": "NEUTRAL",
+    "home_side": null
+   },
+   "kalshi": {
+    "event_ticker": "KXAFCONGAME-26SEP30ERIRSA",
+    "ticker": "KXAFCONGAME-26SEP30ERIRSA-RSA",
+    "ask_c": 70,
+    "bid_c": 11,
+    "spread_c": 59,
+    "ask_size": 21,
+    "bid_size": 5,
+    "flags": [
+     "WIDE",
+     "THIN"
+    ]
+   },
+   "form": {
+    "fav": "?LDWL",
+    "opp": "LLLWW",
+    "scope": "all senior internationals, friendlies marked",
+    "scope_is_cup": false
+   },
+   "h2h": {
+    "available": false,
+    "source": "corpus_since_2018",
+    "window": {
+     "from": "2018-01-01",
+     "to": "2026-09-24T22:40:32+00:00",
+     "label": "since 2018, corpus to 2026-09-24"
+    },
+    "meetings": [],
+    "last_meeting": null,
+    "tally": {
+     "home": 0,
+     "draw": 0,
+     "away": 0
+    },
+    "reason": "no meeting since 2018 in our corpus (senior internationals to 2026-09-24). A measured absence over that window, not a claim the two teams never met",
+    "espn_reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met"
+   },
+   "national": {
+    "competition": "afcon",
+    "stage": "group-stage",
+    "stage_kind": "group",
+    "group": "Group D",
+    "leg": null,
+    "status_detail": "Wed, September 30th at 12:00 PM EDT",
+    "venue_country": "Egypt",
+    "neutral_provider_flag": false,
+    "neutral": true,
+    "teams": {
+     "home": {
+      "key": "eritrea",
+      "espn_id": "5774",
+      "name": "Eritrea",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "afconq",
+       "axes": {
+        "ovr": {
+         "rank": 38,
+         "tier": 4,
+         "tier_set": [
+          4
+         ],
+         "straddles": false,
+         "below_floor": false,
+         "value": 1442.0052662819621,
+         "half_width_95": 7.511878205841013,
+         "interval": [
+          1434.4933880761212,
+          1449.517144487803
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 7.2943279069119304,
+         "signal_source": "elo"
+        }
+       },
+       "axes_absent": [
+        "atk",
+        "def"
+       ],
+       "not_measured_because": "in a fitted league but in no domestic block — no club deviation, refused rather than set to the league average"
+      },
+      "form": {
+       "available": true,
+       "letters": "LLLWW",
+       "disputed": 0,
+       "withheld": 0,
+       "games": [
+        {
+         "event_id": "436345",
+         "date": "2015-10-13T17:00Z",
+         "competition": "FIFA World Cup Qualifying - CAF",
+         "kind": "competitive",
+         "opponent": "Botswana",
+         "venue": "away",
+         "gf": 1,
+         "ga": 3,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "554680",
+         "date": "2019-09-04T13:00Z",
+         "competition": "FIFA World Cup Qualifying - CAF",
+         "kind": "competitive",
+         "opponent": "Namibia",
+         "venue": "home",
+         "gf": 1,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "554664",
+         "date": "2019-09-10T17:00Z",
+         "competition": "FIFA World Cup Qualifying - CAF",
+         "kind": "competitive",
+         "opponent": "Namibia",
+         "venue": "away",
+         "gf": 0,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401850985",
+         "date": "2026-03-25T16:00Z",
+         "competition": "Africa Cup of Nations Qualifying",
+         "kind": "competitive",
+         "opponent": "Eswatini",
+         "venue": "home",
+         "gf": 2,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "401850990",
+         "date": "2026-03-31T14:00Z",
+         "competition": "Africa Cup of Nations Qualifying",
+         "kind": "competitive",
+         "opponent": "Eswatini",
+         "venue": "away",
+         "gf": 2,
+         "ga": 1,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 0,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     },
+     "away": {
+      "key": "south-africa",
+      "espn_id": "467",
+      "name": "South Africa",
+      "rating": {
+       "available": true,
+       "source": "src.picker.national_team_axes",
+       "competition": "afconq",
+       "axes": {
+        "ovr": {
+         "rank": 13,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3
+         ],
+         "straddles": true,
+         "below_floor": false,
+         "value": 1622.504197195422,
+         "half_width_95": 38.42372180255895,
+         "interval": [
+          1584.080475392863,
+          1660.927918997981
+         ],
+         "unit": "elo",
+         "floor": {
+          "below_floor": false,
+          "failing_condition": null
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 42.08827604598037,
+         "signal_source": "elo"
+        },
+        "atk": {
+         "rank": 12,
+         "tier": 2,
+         "tier_set": [
+          1,
+          2,
+          3
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.387319846591821,
+         "half_width_95": 0.3285789272426485,
+         "interval": [
+          0.05874091934917253,
+          0.7158987738344695
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.33973788613675515,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 2,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 1,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        },
+        "def": {
+         "rank": 17,
+         "tier": 3,
+         "tier_set": [
+          2,
+          3,
+          4
+         ],
+         "straddles": true,
+         "below_floor": true,
+         "value": 0.2516054289841171,
+         "half_width_95": 0.3969198015739894,
+         "interval": [
+          -0.1453143725898723,
+          0.6485252305581064
+         ],
+         "unit": "log_goals",
+         "floor": {
+          "below_floor": true,
+          "failing_condition": "G3"
+         },
+         "band": "within_confederation",
+         "half_width_95_cross_confederation": 0.4108616182357666,
+         "signal_source": "shots",
+         "signal": "goals",
+         "licensed": {
+          "bands": 3,
+          "below_floor": true,
+          "failing_condition": "G3",
+          "tier": 2,
+          "tier_set": [
+           1,
+           2
+          ],
+          "straddles": true
+         }
+        }
+       },
+       "axes_absent": []
+      },
+      "form": {
+       "available": true,
+       "letters": "?LDWL",
+       "disputed": 1,
+       "withheld": 1,
+       "games": [
+        {
+         "event_id": "401875160",
+         "date": "2026-06-06T21:00Z",
+         "competition": "International Friendly",
+         "kind": "friendly",
+         "opponent": "Jamaica",
+         "venue": "away",
+         "gf": 1,
+         "ga": 0,
+         "letter": "?",
+         "provider_letter": "W",
+         "provider_agrees": true,
+         "letter_if_espn": "W",
+         "disputed": {
+          "letter": "?",
+          "why": "the providers disagree on this match's score, so no letter is drawn as if it were certain; both readings are below, each lettered from this team's side",
+          "source": "research_archive/national_team_field_v2_2026-09-25/fill_report.json",
+          "espn": {
+           "score": [
+            0,
+            1
+           ],
+           "for": 1,
+           "against": 0,
+           "letter": "W"
+          },
+          "apifootball": {
+           "score": [
+            1,
+            1
+           ],
+           "for": 1,
+           "against": 1,
+           "letter": "D",
+           "status": null,
+           "fixture": 1550809
+          },
+          "score_is": "home-away of that match, as ESPN lists its sides"
+         }
+        },
+        {
+         "event_id": "760415",
+         "date": "2026-06-11T19:00Z",
+         "competition": "FIFA World Cup",
+         "kind": "competitive",
+         "opponent": "Mexico",
+         "venue": "away",
+         "gf": 0,
+         "ga": 2,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760438",
+         "date": "2026-06-18T16:00Z",
+         "competition": "FIFA World Cup",
+         "kind": "competitive",
+         "opponent": "Czechia",
+         "venue": "away",
+         "gf": 1,
+         "ga": 1,
+         "letter": "D",
+         "provider_letter": "D",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760466",
+         "date": "2026-06-25T01:00Z",
+         "competition": "FIFA World Cup",
+         "kind": "competitive",
+         "opponent": "South Korea",
+         "venue": "home",
+         "gf": 1,
+         "ga": 0,
+         "letter": "W",
+         "provider_letter": "W",
+         "provider_agrees": true
+        },
+        {
+         "event_id": "760486",
+         "date": "2026-06-28T19:00Z",
+         "competition": "FIFA World Cup",
+         "kind": "competitive",
+         "opponent": "Canada",
+         "venue": "home",
+         "gf": 0,
+         "ga": 1,
+         "letter": "L",
+         "provider_letter": "L",
+         "provider_agrees": true
+        }
+       ],
+       "friendlies": 1,
+       "provider_disagreements": 0,
+       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+      }
+     }
+    },
+    "fixture_source": "espn",
+    "kickoff_status": null,
+    "apifootball": null,
+    "head_to_head": {
+     "available": false,
+     "source": "corpus_since_2018",
+     "window": {
+      "from": "2018-01-01",
+      "to": "2026-09-24T22:40:32+00:00",
+      "label": "since 2018, corpus to 2026-09-24"
+     },
+     "meetings": [],
+     "last_meeting": null,
+     "tally": {
+      "home": 0,
+      "draw": 0,
+      "away": 0
+     },
+     "reason": "no meeting since 2018 in our corpus (senior internationals to 2026-09-24). A measured absence over that window, not a claim the two teams never met",
+     "espn_reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met"
+    },
+    "lineups": {
+     "announced": false,
+     "sides": {
+      "home": {
+       "team": "Eritrea",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      },
+      "away": {
+       "team": "South Africa",
+       "formation": null,
+       "announced": false,
+       "starters": [],
+       "bench": 0
+      }
+     },
+     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff"
+    },
+    "market": {
+     "status": "mapped",
+     "event_ticker": "KXAFCONGAME-26SEP30ERIRSA",
+     "status_words": "one open Kalshi event names both teams on this date",
+     "title": "Eritrea vs South Africa",
+     "legs": {
+      "home": {
+       "event_ticker": "KXAFCONGAME-26SEP30ERIRSA",
+       "ticker": "KXAFCONGAME-26SEP30ERIRSA-ERI",
+       "ask_c": 9,
+       "bid_c": 5,
+       "spread_c": 4,
+       "ask_size": 5,
+       "bid_size": 472,
+       "flags": [
+        "WIDE",
+        "THIN"
+       ],
+       "name": "Eritrea"
+      },
+      "tie": {
+       "event_ticker": "KXAFCONGAME-26SEP30ERIRSA",
+       "ticker": "KXAFCONGAME-26SEP30ERIRSA-TIE",
+       "ask_c": 70,
+       "bid_c": 5,
+       "spread_c": 65,
+       "ask_size": 55,
+       "bid_size": 606,
+       "flags": [
+        "WIDE",
+        "THIN"
+       ]
+      },
+      "away": {
+       "event_ticker": "KXAFCONGAME-26SEP30ERIRSA",
+       "ticker": "KXAFCONGAME-26SEP30ERIRSA-RSA",
+       "ask_c": 70,
+       "bid_c": 11,
+       "spread_c": 59,
+       "ask_size": 21,
+       "bid_size": 5,
+       "flags": [
+        "WIDE",
+        "THIN"
+       ],
+       "name": "South Africa"
+      }
+     },
+     "orientation": "same"
+    },
+    "headline": {
+     "candidate": "b",
+     "label": "ELO GAP",
+     "unit": "Elo points",
+     "value": 180.5,
+     "favourite_side": "away",
+     "home_minus_away": -180.5,
+     "components": {
+      "elo": {
+       "home": 1442,
+       "away": 1622.5
+      },
+      "raw_gap_home_minus_away": -180.5,
+      "venue_term_home_minus_away": 0,
+      "venue_class": "NEUTRAL",
+      "host_side": null,
+      "venue_assumed": false
+     },
+     "raw_favourite_side": "away",
+     "venue_flips_raw_order": false,
+     "tie_broken_by_rank": false,
+     "basis": "The venue-adjusted Elo gap: the two teams' overall ratings on this competition's national-team field, differenced, plus the club home term given to the side whose country hosts, and nothing on neutral ground. The card's favourite and its quoted Kalshi leg are read off this same number. A preregistered out-of-sample bake-off chose it: no alternative beat it by a margin whose 95% interval excluded zero (see research_archive/national_headline_bakeoff_2026-09-25/RESULTS.json)."
+    }
+   }
+  }
+ ],
+ "refusals": [],
+ "off_board": [
+  {
+   "event_id": "401861049",
+   "competition_id": "401861049",
+   "kickoff": "2026-09-25T16:00Z",
+   "state": "post",
+   "home": "Georgia",
+   "away": "Northern Ireland",
+   "code": "finished",
+   "why": "the provider's own status says this match is OVER. This is now the ONLY way a fixture leaves the board, and it is the one departure that hands the reader a surface needing no token: a finished fixture is read on the picker REVIEW surface (GET /api/picker/review), which exists for exactly this — 'once a match finished I have no way to access it to see where could I do better' — and the frontend stacks it in the SAME column, under a divider, so the league's story stays continuous",
+   "league": "unl"
+  },
+  {
+   "event_id": "401861050",
+   "competition_id": "401861050",
+   "kickoff": "2026-09-25T16:00Z",
+   "state": "post",
+   "home": "Armenia",
+   "away": "Latvia",
+   "code": "finished",
+   "why": "the provider's own status says this match is OVER. This is now the ONLY way a fixture leaves the board, and it is the one departure that hands the reader a surface needing no token: a finished fixture is read on the picker REVIEW surface (GET /api/picker/review), which exists for exactly this — 'once a match finished I have no way to access it to see where could I do better' — and the frontend stacks it in the SAME column, under a divider, so the league's story stays continuous",
+   "league": "unl"
+  },
+  {
+   "event_id": "401861051",
+   "competition_id": "401861051",
+   "kickoff": "2026-09-25T18:45Z",
+   "state": "post",
+   "home": "Sweden",
+   "away": "Romania",
+   "code": "finished",
+   "why": "the provider's own status says this match is OVER. This is now the ONLY way a fixture leaves the board, and it is the one departure that hands the reader a surface needing no token: a finished fixture is read on the picker REVIEW surface (GET /api/picker/review), which exists for exactly this — 'once a match finished I have no way to access it to see where could I do better' — and the frontend stacks it in the SAME column, under a divider, so the league's story stays continuous",
+   "league": "unl"
+  }
+ ],
+ "off_board_counts": {
+  "kicked_off": 0,
+  "finished": 24,
+  "not_yet_kicked_off": 0,
+  "state_unrecognised": 0,
+  "no_state": 0,
+  "event_unreadable": 0
+ },
+ "competitions": {
   "unl": {
    "structure": {
     "stages": [
      {
-      "dates": "MD1 24-26 Sep, MD2 27-29 Sep, MD3 30 Sep-3 Oct, MD4 4-6 Oct, MD5 12-14 Nov, MD6 15-17 Nov 2026",
       "key": "group-stage",
-      "kind": "group",
       "label": "League phase (Leagues A-D)",
+      "kind": "group",
+      "dates": "MD1 24-26 Sep, MD2 27-29 Sep, MD3 30 Sep-3 Oct, MD4 4-6 Oct, MD5 12-14 Nov, MD6 15-17 Nov 2026",
       "on_provider": true
      },
      {
-      "dates": "25-30 Mar 2027",
       "key": "quarterfinals",
-      "kind": "knockout",
       "label": "League A quarter-finals (two legs)",
-      "on_provider": false
-     },
-     {
+      "kind": "knockout",
       "dates": "25-30 Mar 2027",
+      "on_provider": false
+     },
+     {
       "key": "promotion-relegation-playoffs",
-      "kind": "playoff",
       "label": "League A/B and B/C promotion/relegation play-offs",
-      "on_provider": false
-     },
-     {
-      "dates": "9-13 Jun 2027",
-      "key": "finals",
-      "kind": "finals",
-      "label": "Final tournament (four teams)",
-      "on_provider": false
-     },
-     {
-      "dates": "23-28 Mar 2028",
-      "key": "league-cd-playoffs",
       "kind": "playoff",
+      "dates": "25-30 Mar 2027",
+      "on_provider": false
+     },
+     {
+      "key": "finals",
+      "label": "Final tournament (four teams)",
+      "kind": "finals",
+      "dates": "9-13 Jun 2027",
+      "on_provider": false
+     },
+     {
+      "key": "league-cd-playoffs",
       "label": "League C/D play-offs",
+      "kind": "playoff",
+      "dates": "23-28 Mar 2028",
       "on_provider": false
      }
     ]
@@ -2027,13899 +17532,2592 @@ export const CHAMP_BOARD = {
     "derived": {
      "Group A1": [
       {
-       "d": 0,
        "espn_id": "459",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "belgium",
-       "l": 0,
        "name": "Belgium",
-       "position": null,
+       "key": "belgium",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "478",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "france",
-       "l": 0,
        "name": "France",
-       "position": null,
+       "key": "france",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "162",
+       "name": "Italy",
+       "key": "italy",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
        "ga": 0,
        "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "italy",
-       "l": 0,
-       "name": "Italy",
-       "position": null,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "465",
+       "name": "Türkiye",
+       "key": "turkiye",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
        "ga": 0,
        "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "turkiye",
-       "l": 0,
-       "name": "Türkiye",
-       "position": null,
        "pts": 0,
-       "w": 0
+       "position": null
       }
      ],
      "Group A2": [
       {
-       "d": 0,
-       "espn_id": "455",
-       "ga": 1,
-       "gd": 1,
-       "gf": 2,
-       "gp": 1,
-       "key": "greece",
-       "l": 0,
-       "name": "Greece",
-       "position": 1,
-       "pts": 3,
-       "w": 1
-      },
-      {
-       "d": 1,
        "espn_id": "481",
-       "ga": 1,
-       "gd": 0,
-       "gf": 1,
-       "gp": 1,
-       "key": "germany",
-       "l": 0,
        "name": "Germany",
-       "position": 2,
-       "pts": 1,
-       "w": 0
-      },
-      {
-       "d": 1,
-       "espn_id": "449",
-       "ga": 1,
-       "gd": 0,
-       "gf": 1,
-       "gp": 1,
-       "key": "netherlands",
-       "l": 0,
-       "name": "Netherlands",
-       "position": 3,
-       "pts": 1,
-       "w": 0
-      },
-      {
+       "key": "germany",
+       "gp": 0,
+       "w": 0,
        "d": 0,
-       "espn_id": "6757",
-       "ga": 2,
-       "gd": -1,
-       "gf": 1,
-       "gp": 1,
-       "key": "serbia",
-       "l": 1,
-       "name": "Serbia",
-       "position": 4,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
+      },
+      {
+       "espn_id": "455",
+       "name": "Greece",
+       "key": "greece",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
+      },
+      {
+       "espn_id": "449",
+       "name": "Netherlands",
+       "key": "netherlands",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
+      },
+      {
+       "espn_id": "6757",
+       "name": "Serbia",
+       "key": "serbia",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
       }
      ],
      "Group A3": [
       {
-       "d": 0,
        "espn_id": "477",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "croatia",
-       "l": 0,
        "name": "Croatia",
-       "position": null,
+       "key": "croatia",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "450",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "czechia",
-       "l": 0,
        "name": "Czechia",
-       "position": null,
+       "key": "czechia",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "448",
+       "name": "England",
+       "key": "england",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
        "ga": 0,
        "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "england",
-       "l": 0,
-       "name": "England",
-       "position": null,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "164",
+       "name": "Spain",
+       "key": "spain",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
        "ga": 0,
        "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "spain",
-       "l": 0,
-       "name": "Spain",
-       "position": null,
        "pts": 0,
-       "w": 0
+       "position": null
       }
      ],
      "Group A4": [
       {
-       "d": 0,
-       "espn_id": "464",
-       "ga": 2,
-       "gd": 1,
-       "gf": 3,
-       "gp": 1,
-       "key": "norway",
-       "l": 0,
-       "name": "Norway",
-       "position": 1,
-       "pts": 3,
-       "w": 1
-      },
-      {
-       "d": 0,
-       "espn_id": "482",
-       "ga": 0,
-       "gd": 1,
-       "gf": 1,
-       "gp": 1,
-       "key": "portugal",
-       "l": 0,
-       "name": "Portugal",
-       "position": 2,
-       "pts": 3,
-       "w": 1
-      },
-      {
-       "d": 0,
        "espn_id": "479",
-       "ga": 3,
-       "gd": -1,
-       "gf": 2,
-       "gp": 1,
-       "key": "denmark",
-       "l": 1,
        "name": "Denmark",
-       "position": 3,
+       "key": "denmark",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
+       "espn_id": "464",
+       "name": "Norway",
+       "key": "norway",
+       "gp": 0,
+       "w": 0,
        "d": 0,
-       "espn_id": "578",
-       "ga": 1,
-       "gd": -1,
+       "l": 0,
        "gf": 0,
-       "gp": 1,
-       "key": "wales",
-       "l": 1,
-       "name": "Wales",
-       "position": 4,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
+      },
+      {
+       "espn_id": "482",
+       "name": "Portugal",
+       "key": "portugal",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
+      },
+      {
+       "espn_id": "578",
+       "name": "Wales",
+       "key": "wales",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
       }
      ],
      "Group B1": [
       {
-       "d": 0,
        "espn_id": "463",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "north-macedonia",
-       "l": 0,
        "name": "North Macedonia",
-       "position": null,
+       "key": "north-macedonia",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "580",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "scotland",
-       "l": 0,
        "name": "Scotland",
-       "position": null,
+       "key": "scotland",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "472",
+       "name": "Slovenia",
+       "key": "slovenia",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
        "ga": 0,
        "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "slovenia",
-       "l": 0,
-       "name": "Slovenia",
-       "position": null,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "475",
+       "name": "Switzerland",
+       "key": "switzerland",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
        "ga": 0,
        "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "switzerland",
-       "l": 0,
-       "name": "Switzerland",
-       "position": null,
        "pts": 0,
-       "w": 0
+       "position": null
       }
      ],
      "Group B2": [
       {
-       "d": 0,
        "espn_id": "584",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "georgia",
-       "l": 0,
        "name": "Georgia",
-       "position": null,
+       "key": "georgia",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "480",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "hungary",
-       "l": 0,
        "name": "Hungary",
-       "position": null,
+       "key": "hungary",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "586",
+       "name": "Northern Ireland",
+       "key": "northern-ireland",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
        "ga": 0,
        "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "northern-ireland",
-       "l": 0,
-       "name": "Northern Ireland",
-       "position": null,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "457",
+       "name": "Ukraine",
+       "key": "ukraine",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
        "ga": 0,
        "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "ukraine",
-       "l": 0,
-       "name": "Ukraine",
-       "position": null,
        "pts": 0,
-       "w": 0
+       "position": null
       }
      ],
      "Group B3": [
       {
-       "d": 0,
        "espn_id": "474",
-       "ga": 1,
-       "gd": 2,
-       "gf": 3,
-       "gp": 1,
-       "key": "austria",
-       "l": 0,
        "name": "Austria",
-       "position": 1,
-       "pts": 3,
-       "w": 1
-      },
-      {
+       "key": "austria",
+       "gp": 0,
+       "w": 0,
        "d": 0,
-       "espn_id": "18272",
-       "ga": 0,
-       "gd": 1,
-       "gf": 1,
-       "gp": 1,
-       "key": "kosovo",
        "l": 0,
-       "name": "Kosovo",
-       "position": 2,
-       "pts": 3,
-       "w": 1
-      },
-      {
-       "d": 0,
-       "espn_id": "476",
-       "ga": 1,
-       "gd": -1,
        "gf": 0,
-       "gp": 1,
-       "key": "republic-of-ireland",
-       "l": 1,
-       "name": "Republic of Ireland",
-       "position": 3,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "461",
-       "ga": 3,
-       "gd": -2,
-       "gf": 1,
-       "gp": 1,
-       "key": "israel",
-       "l": 1,
        "name": "Israel",
-       "position": 4,
+       "key": "israel",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
+      },
+      {
+       "espn_id": "18272",
+       "name": "Kosovo",
+       "key": "kosovo",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
+      },
+      {
+       "espn_id": "476",
+       "name": "Republic of Ireland",
+       "key": "republic-of-ireland",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
       }
      ],
      "Group B4": [
       {
-       "d": 0,
        "espn_id": "452",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "bosnia-herzegovina",
-       "l": 0,
        "name": "Bosnia-Herzegovina",
-       "position": null,
+       "key": "bosnia-herzegovina",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "471",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "poland",
-       "l": 0,
        "name": "Poland",
-       "position": null,
+       "key": "poland",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "473",
+       "name": "Romania",
+       "key": "romania",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
        "ga": 0,
        "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "romania",
-       "l": 0,
-       "name": "Romania",
-       "position": null,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "466",
+       "name": "Sweden",
+       "key": "sweden",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
        "ga": 0,
        "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "sweden",
-       "l": 0,
-       "name": "Sweden",
-       "position": null,
        "pts": 0,
-       "w": 0
+       "position": null
       }
      ],
      "Group C1": [
       {
-       "d": 0,
        "espn_id": "585",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "albania",
-       "l": 0,
        "name": "Albania",
-       "position": null,
+       "key": "albania",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "583",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "belarus",
-       "l": 0,
        "name": "Belarus",
-       "position": null,
+       "key": "belarus",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "458",
+       "name": "Finland",
+       "key": "finland",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
        "ga": 0,
        "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "finland",
-       "l": 0,
-       "name": "Finland",
-       "position": null,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "588",
+       "name": "San Marino",
+       "key": "san-marino",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
        "ga": 0,
        "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "san-marino",
-       "l": 0,
-       "name": "San Marino",
-       "position": null,
        "pts": 0,
-       "w": 0
+       "position": null
       }
      ],
      "Group C2": [
       {
-       "d": 0,
        "espn_id": "579",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "armenia",
-       "l": 0,
        "name": "Armenia",
-       "position": null,
+       "key": "armenia",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "445",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "cyprus",
-       "l": 0,
        "name": "Cyprus",
-       "position": null,
+       "key": "cyprus",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "456",
+       "name": "Latvia",
+       "key": "latvia",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
        "ga": 0,
        "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "latvia",
-       "l": 0,
-       "name": "Latvia",
-       "position": null,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "6775",
+       "name": "Montenegro",
+       "key": "montenegro",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
        "ga": 0,
        "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "montenegro",
-       "l": 0,
-       "name": "Montenegro",
-       "position": null,
        "pts": 0,
-       "w": 0
+       "position": null
       }
      ],
      "Group C3": [
       {
-       "d": 0,
        "espn_id": "447",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "faroe-islands",
-       "l": 0,
        "name": "Faroe Islands",
-       "position": null,
+       "key": "faroe-islands",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "2619",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "kazakhstan",
-       "l": 0,
        "name": "Kazakhstan",
-       "position": null,
+       "key": "kazakhstan",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "483",
+       "name": "Moldova",
+       "key": "moldova",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
        "ga": 0,
        "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "moldova",
-       "l": 0,
-       "name": "Moldova",
-       "position": null,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "468",
+       "name": "Slovakia",
+       "key": "slovakia",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
        "ga": 0,
        "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "slovakia",
-       "l": 0,
-       "name": "Slovakia",
-       "position": null,
        "pts": 0,
-       "w": 0
+       "position": null
       }
      ],
      "Group C4": [
       {
-       "d": 0,
        "espn_id": "462",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "bulgaria",
-       "l": 0,
        "name": "Bulgaria",
-       "position": null,
+       "key": "bulgaria",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "444",
-       "ga": 0,
-       "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "estonia",
-       "l": 0,
        "name": "Estonia",
-       "position": null,
+       "key": "estonia",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "470",
+       "name": "Iceland",
+       "key": "iceland",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
        "ga": 0,
        "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "iceland",
-       "l": 0,
-       "name": "Iceland",
-       "position": null,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "582",
+       "name": "Luxembourg",
+       "key": "luxembourg",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
        "ga": 0,
        "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "luxembourg",
-       "l": 0,
-       "name": "Luxembourg",
-       "position": null,
        "pts": 0,
-       "w": 0
+       "position": null
       }
      ],
      "Group D1": [
       {
+       "espn_id": "587",
+       "name": "Andorra",
+       "key": "andorra",
+       "gp": 0,
+       "w": 0,
        "d": 0,
-       "espn_id": "453",
-       "ga": 1,
-       "gd": 1,
-       "gf": 2,
-       "gp": 1,
-       "key": "malta",
        "l": 0,
-       "name": "Malta",
-       "position": 1,
-       "pts": 3,
-       "w": 1
-      },
-      {
-       "d": 0,
-       "espn_id": "16721",
+       "gf": 0,
        "ga": 0,
        "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "gibraltar",
-       "l": 0,
-       "name": "Gibraltar",
-       "position": 2,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
+       "espn_id": "16721",
+       "name": "Gibraltar",
+       "key": "gibraltar",
+       "gp": 0,
+       "w": 0,
        "d": 0,
-       "espn_id": "587",
-       "ga": 2,
-       "gd": -1,
-       "gf": 1,
-       "gp": 1,
-       "key": "andorra",
-       "l": 1,
-       "name": "Andorra",
-       "position": 3,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
+      },
+      {
+       "espn_id": "453",
+       "name": "Malta",
+       "key": "malta",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
       }
      ],
      "Group D2": [
       {
-       "d": 0,
-       "espn_id": "460",
-       "ga": 0,
-       "gd": 2,
-       "gf": 2,
-       "gp": 1,
-       "key": "lithuania",
-       "l": 0,
-       "name": "Lithuania",
-       "position": 1,
-       "pts": 3,
-       "w": 1
-      },
-      {
-       "d": 0,
        "espn_id": "581",
+       "name": "Azerbaijan",
+       "key": "azerbaijan",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
        "ga": 0,
        "gd": 0,
-       "gf": 0,
-       "gp": 0,
-       "key": "azerbaijan",
-       "l": 0,
-       "name": "Azerbaijan",
-       "position": 2,
        "pts": 0,
-       "w": 0
+       "position": null
       },
       {
-       "d": 0,
        "espn_id": "589",
-       "ga": 2,
-       "gd": -2,
-       "gf": 0,
-       "gp": 1,
-       "key": "liechtenstein",
-       "l": 1,
        "name": "Liechtenstein",
-       "position": 3,
+       "key": "liechtenstein",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
        "pts": 0,
-       "w": 0
+       "position": null
+      },
+      {
+       "espn_id": "460",
+       "name": "Lithuania",
+       "key": "lithuania",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
       }
      ]
     },
     "ordering_note": "ordered by points, then goal difference, then goals scored, then name. THIS IS NOT THE GOVERNING BODY'S TIE-BREAK: UEFA, Concacaf, the AFC and CAF all break level points on head-to-head results first, so two teams level on points may legitimately sit in the other order on the official table. The NUMBERS are the claim here; the order on a points tie is not."
    }
+  },
+  "cnl": {
+   "structure": {
+    "stages": [
+     {
+      "key": "group-stage",
+      "label": "Group stage (Leagues A, B, C)",
+      "kind": "group",
+      "dates": "21 Sep-6 Oct 2026; League B also 9-17 Nov 2026",
+      "on_provider": true
+     },
+     {
+      "key": "quarterfinals",
+      "label": "League A quarter-finals (two legs)",
+      "kind": "knockout",
+      "dates": "9-17 Nov 2026",
+      "on_provider": false
+     },
+     {
+      "key": "finals",
+      "label": "League A Finals, SoFi Stadium",
+      "kind": "finals",
+      "dates": "25-28 Mar 2027",
+      "on_provider": false
+     },
+     {
+      "key": "league-bc-championships",
+      "label": "League B and League C Championships",
+      "kind": "finals",
+      "dates": "22-30 Mar 2027",
+      "on_provider": false
+     }
+    ]
+   },
+   "standings": {
+    "derived": {
+     "League A, Group A": [
+      {
+       "espn_id": "11678",
+       "name": "Curaçao",
+       "key": "curacao",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 4,
+       "ga": 3,
+       "gd": 1,
+       "pts": 3,
+       "position": 1
+      },
+      {
+       "espn_id": "2649",
+       "name": "Dominican Republic",
+       "key": "dominican-republic",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 3,
+       "ga": 2,
+       "gd": 1,
+       "pts": 3,
+       "position": 2
+      },
+      {
+       "espn_id": "2654",
+       "name": "Haiti",
+       "key": "haiti",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 3,
+       "ga": 2,
+       "gd": 1,
+       "pts": 3,
+       "position": 3
+      },
+      {
+       "espn_id": "214",
+       "name": "Costa Rica",
+       "key": "costa-rica",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 3,
+       "ga": 4,
+       "gd": -1,
+       "pts": 0,
+       "position": 4
+      },
+      {
+       "espn_id": "2658",
+       "name": "Nicaragua",
+       "key": "nicaragua",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 2,
+       "ga": 3,
+       "gd": -1,
+       "pts": 0,
+       "position": 5
+      },
+      {
+       "espn_id": "2627",
+       "name": "Trinidad and Tobago",
+       "key": "trinidad-and-tobago",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 2,
+       "ga": 3,
+       "gd": -1,
+       "pts": 0,
+       "position": 6
+      }
+     ],
+     "League A, Group B": [
+      {
+       "espn_id": "2650",
+       "name": "El Salvador",
+       "key": "el-salvador",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
+      },
+      {
+       "espn_id": "2652",
+       "name": "Guatemala",
+       "key": "guatemala",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
+      },
+      {
+       "espn_id": "215",
+       "name": "Honduras",
+       "key": "honduras",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
+      },
+      {
+       "espn_id": "1038",
+       "name": "Jamaica",
+       "key": "jamaica",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
+      },
+      {
+       "espn_id": "2728",
+       "name": "Martinique",
+       "key": "martinique",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
+      },
+      {
+       "espn_id": "2664",
+       "name": "Suriname",
+       "key": "suriname",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
+      }
+     ],
+     "League B, Group A": [
+      {
+       "espn_id": "2653",
+       "name": "Guyana",
+       "key": "guyana",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 1,
+       "ga": 0,
+       "gd": 1,
+       "pts": 3,
+       "position": 1
+      },
+      {
+       "espn_id": "2646",
+       "name": "Cayman Islands",
+       "key": "cayman-islands",
+       "gp": 1,
+       "w": 0,
+       "d": 1,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 1,
+       "position": 2
+      },
+      {
+       "espn_id": "13582",
+       "name": "Dominica",
+       "key": "dominica",
+       "gp": 1,
+       "w": 0,
+       "d": 1,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 1,
+       "position": 3
+      },
+      {
+       "espn_id": "11766",
+       "name": "Puerto Rico",
+       "key": "puerto-rico",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 0,
+       "ga": 1,
+       "gd": -1,
+       "pts": 0,
+       "position": 4
+      }
+     ],
+     "League B, Group B": [
+      {
+       "espn_id": "7657",
+       "name": "Guadeloupe",
+       "key": "guadeloupe",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 2,
+       "ga": 1,
+       "gd": 1,
+       "pts": 3,
+       "position": 1
+      },
+      {
+       "espn_id": "2637",
+       "name": "Barbados",
+       "key": "barbados",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": 2
+      },
+      {
+       "espn_id": "2661",
+       "name": "St. Lucia",
+       "key": "st-lucia",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": 3
+      },
+      {
+       "espn_id": "2643",
+       "name": "Bermuda",
+       "key": "bermuda",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 1,
+       "ga": 2,
+       "gd": -1,
+       "pts": 0,
+       "position": 4
+      }
+     ],
+     "League B, Group C": [
+      {
+       "espn_id": "2647",
+       "name": "Cuba",
+       "key": "cuba",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 3,
+       "ga": 0,
+       "gd": 3,
+       "pts": 3,
+       "position": 1
+      },
+      {
+       "espn_id": "19314",
+       "name": "Bonaire",
+       "key": "bonaire",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": 2
+      },
+      {
+       "espn_id": "2662",
+       "name": "St. Kitts and Nevis",
+       "key": "st-kitts-and-nevis",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": 3
+      },
+      {
+       "espn_id": "2651",
+       "name": "Grenada",
+       "key": "grenada",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 0,
+       "ga": 3,
+       "gd": -3,
+       "pts": 0,
+       "position": 4
+      }
+     ],
+     "League B, Group D": [
+      {
+       "espn_id": "2641",
+       "name": "Belize",
+       "key": "belize",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
+      },
+      {
+       "espn_id": "10532",
+       "name": "French Guiana",
+       "key": "french-guiana",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
+      },
+      {
+       "espn_id": "18243",
+       "name": "Sint Maarten",
+       "key": "sint-maarten",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
+      },
+      {
+       "espn_id": "13584",
+       "name": "St. Vincent and the Grenadines",
+       "key": "st-vincent-and-the-grenadines",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
+      }
+     ],
+     "League C, Group A": [
+      {
+       "espn_id": "2655",
+       "name": "Montserrat",
+       "key": "montserrat",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 2,
+       "ga": 0,
+       "gd": 2,
+       "pts": 3,
+       "position": 1
+      },
+      {
+       "espn_id": "2644",
+       "name": "British Virgin Islands",
+       "key": "british-virgin-islands",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": 2
+      },
+      {
+       "espn_id": "2665",
+       "name": "Turks and Caicos Islands",
+       "key": "turks-and-caicos-islands",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 0,
+       "ga": 2,
+       "gd": -2,
+       "pts": 0,
+       "position": 3
+      }
+     ],
+     "League C, Group B": [
+      {
+       "espn_id": "2642",
+       "name": "Aruba",
+       "key": "aruba",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 1,
+       "ga": 0,
+       "gd": 1,
+       "pts": 3,
+       "position": 1
+      },
+      {
+       "espn_id": "8942",
+       "name": "Anguilla",
+       "key": "anguilla",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": 2
+      },
+      {
+       "espn_id": "2638",
+       "name": "Antigua and Barbuda",
+       "key": "antigua-and-barbuda",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 0,
+       "ga": 1,
+       "gd": -1,
+       "pts": 0,
+       "position": 3
+      }
+     ],
+     "League C, Group C": [
+      {
+       "espn_id": "10596",
+       "name": "St. Martin",
+       "key": "st-martin",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 8,
+       "ga": 0,
+       "gd": 8,
+       "pts": 3,
+       "position": 1
+      },
+      {
+       "espn_id": "2645",
+       "name": "US Virgin Islands",
+       "key": "us-virgin-islands",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": 2
+      },
+      {
+       "espn_id": "2640",
+       "name": "Bahamas",
+       "key": "bahamas",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 0,
+       "ga": 8,
+       "gd": -8,
+       "pts": 0,
+       "position": 3
+      }
+     ]
+    },
+    "ordering_note": "ordered by points, then goal difference, then goals scored, then name. THIS IS NOT THE GOVERNING BODY'S TIE-BREAK: UEFA, Concacaf, the AFC and CAF all break level points on head-to-head results first, so two teams level on points may legitimately sit in the other order on the official table. The NUMBERS are the claim here; the order on a points tie is not."
+   }
+  },
+  "afcon": {
+   "structure": {
+    "stages": [
+     {
+      "key": "preliminary-round",
+      "label": "Qualifying preliminary round (two legs)",
+      "kind": "knockout",
+      "dates": "25-31 Mar 2026",
+      "on_provider": true
+     },
+     {
+      "key": "group-stage",
+      "label": "Qualifying groups (12 groups of 4, home and away)",
+      "kind": "group",
+      "dates": "MD1-2 24 Sep-6 Oct 2026, MD3-4 9-17 Nov 2026, MD5-6 22-30 Mar 2027",
+      "on_provider": true
+     },
+     {
+      "key": "finals",
+      "label": "Finals, Kenya / Uganda / Tanzania",
+      "kind": "finals",
+      "dates": "19 Jun-17 Jul 2027",
+      "on_provider": false
+     }
+    ]
+   },
+   "standings": {
+    "derived": {
+     "Group A": [
+      {
+       "espn_id": "2869",
+       "name": "Morocco",
+       "key": "morocco",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 2,
+       "ga": 0,
+       "gd": 2,
+       "pts": 3,
+       "position": 1
+      },
+      {
+       "espn_id": "8937",
+       "name": "Niger",
+       "key": "niger",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 2,
+       "ga": 1,
+       "gd": 1,
+       "pts": 3,
+       "position": 2
+      },
+      {
+       "espn_id": "6640",
+       "name": "Lesotho",
+       "key": "lesotho",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 1,
+       "ga": 2,
+       "gd": -1,
+       "pts": 0,
+       "position": 3
+      },
+      {
+       "espn_id": "4231",
+       "name": "Gabon",
+       "key": "gabon",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 0,
+       "ga": 2,
+       "gd": -2,
+       "pts": 0,
+       "position": 4
+      }
+     ],
+     "Group B": [
+      {
+       "espn_id": "4325",
+       "name": "Malawi",
+       "key": "malawi",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 2,
+       "ga": 1,
+       "gd": 1,
+       "pts": 3,
+       "position": 1
+      },
+      {
+       "espn_id": "653",
+       "name": "Angola",
+       "key": "angola",
+       "gp": 1,
+       "w": 0,
+       "d": 1,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 1,
+       "position": 2
+      },
+      {
+       "espn_id": "2620",
+       "name": "Egypt",
+       "key": "egypt",
+       "gp": 1,
+       "w": 0,
+       "d": 1,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 1,
+       "position": 3
+      },
+      {
+       "espn_id": "14075",
+       "name": "South Sudan",
+       "key": "south-sudan",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 1,
+       "ga": 2,
+       "gd": -1,
+       "pts": 0,
+       "position": 4
+      }
+     ],
+     "Group C": [
+      {
+       "espn_id": "4789",
+       "name": "Ivory Coast",
+       "key": "ivory-coast",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 2,
+       "ga": 0,
+       "gd": 2,
+       "pts": 3,
+       "position": 1
+      },
+      {
+       "espn_id": "7368",
+       "name": "Gambia",
+       "key": "gambia",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 2,
+       "ga": 1,
+       "gd": 1,
+       "pts": 3,
+       "position": 2
+      },
+      {
+       "espn_id": "5776",
+       "name": "Somalia",
+       "key": "somalia",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 1,
+       "ga": 2,
+       "gd": -1,
+       "pts": 0,
+       "position": 3
+      },
+      {
+       "espn_id": "4469",
+       "name": "Ghana",
+       "key": "ghana",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 0,
+       "ga": 2,
+       "gd": -2,
+       "pts": 0,
+       "position": 4
+      }
+     ],
+     "Group D": [
+      {
+       "espn_id": "5774",
+       "name": "Eritrea",
+       "key": "eritrea",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
+      },
+      {
+       "espn_id": "2847",
+       "name": "Guinea",
+       "key": "guinea",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
+      },
+      {
+       "espn_id": "2848",
+       "name": "Kenya",
+       "key": "kenya",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
+      },
+      {
+       "espn_id": "467",
+       "name": "South Africa",
+       "key": "south-africa",
+       "gp": 0,
+       "w": 0,
+       "d": 0,
+       "l": 0,
+       "gf": 0,
+       "ga": 0,
+       "gd": 0,
+       "pts": 0,
+       "position": null
+      }
+     ],
+     "Group E": [
+      {
+       "espn_id": "2850",
+       "name": "Congo DR",
+       "key": "congo-dr",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 2,
+       "ga": 0,
+       "gd": 2,
+       "pts": 3,
+       "position": 1
+      },
+      {
+       "espn_id": "4214",
+       "name": "Zimbabwe",
+       "key": "zimbabwe",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 3,
+       "ga": 2,
+       "gd": 1,
+       "pts": 3,
+       "position": 2
+      },
+      {
+       "espn_id": "8600",
+       "name": "Sierra Leone",
+       "key": "sierra-leone",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 2,
+       "ga": 3,
+       "gd": -1,
+       "pts": 0,
+       "position": 3
+      },
+      {
+       "espn_id": "8938",
+       "name": "Equatorial Guinea",
+       "key": "equatorial-guinea",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 0,
+       "ga": 2,
+       "gd": -2,
+       "pts": 0,
+       "position": 4
+      }
+     ],
+     "Group F": [
+      {
+       "espn_id": "8940",
+       "name": "Mauritania",
+       "key": "mauritania",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 3,
+       "ga": 1,
+       "gd": 2,
+       "pts": 3,
+       "position": 1
+      },
+      {
+       "espn_id": "2844",
+       "name": "Benin",
+       "key": "benin",
+       "gp": 1,
+       "w": 0,
+       "d": 1,
+       "l": 0,
+       "gf": 1,
+       "ga": 1,
+       "gd": 0,
+       "pts": 1,
+       "position": 2
+      },
+      {
+       "espn_id": "2845",
+       "name": "Burkina Faso",
+       "key": "burkina-faso",
+       "gp": 1,
+       "w": 0,
+       "d": 1,
+       "l": 0,
+       "gf": 1,
+       "ga": 1,
+       "gd": 0,
+       "pts": 1,
+       "position": 3
+      },
+      {
+       "espn_id": "10528",
+       "name": "Central African Republic",
+       "key": "central-african-republic",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 1,
+       "ga": 3,
+       "gd": -2,
+       "pts": 0,
+       "position": 4
+      }
+     ],
+     "Group G": [
+      {
+       "espn_id": "656",
+       "name": "Cameroon",
+       "key": "cameroon",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 3,
+       "ga": 1,
+       "gd": 2,
+       "pts": 3,
+       "position": 1
+      },
+      {
+       "espn_id": "6725",
+       "name": "Namibia",
+       "key": "namibia",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 1,
+       "ga": 0,
+       "gd": 1,
+       "pts": 3,
+       "position": 2
+      },
+      {
+       "espn_id": "4276",
+       "name": "Congo",
+       "key": "congo",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 0,
+       "ga": 1,
+       "gd": -1,
+       "pts": 0,
+       "position": 3
+      },
+      {
+       "espn_id": "8601",
+       "name": "Comoros",
+       "key": "comoros",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 1,
+       "ga": 3,
+       "gd": -2,
+       "pts": 0,
+       "position": 4
+      }
+     ],
+     "Group H": [
+      {
+       "espn_id": "4245",
+       "name": "Botswana",
+       "key": "botswana",
+       "gp": 1,
+       "w": 0,
+       "d": 1,
+       "l": 0,
+       "gf": 2,
+       "ga": 2,
+       "gd": 0,
+       "pts": 1,
+       "position": 1
+      },
+      {
+       "espn_id": "2621",
+       "name": "Libya",
+       "key": "libya",
+       "gp": 1,
+       "w": 0,
+       "d": 1,
+       "l": 0,
+       "gf": 2,
+       "ga": 2,
+       "gd": 0,
+       "pts": 1,
+       "position": 2
+      },
+      {
+       "espn_id": "659",
+       "name": "Tunisia",
+       "key": "tunisia",
+       "gp": 1,
+       "w": 0,
+       "d": 1,
+       "l": 0,
+       "gf": 1,
+       "ga": 1,
+       "gd": 0,
+       "pts": 1,
+       "position": 3
+      },
+      {
+       "espn_id": "4211",
+       "name": "Uganda",
+       "key": "uganda",
+       "gp": 1,
+       "w": 0,
+       "d": 1,
+       "l": 0,
+       "gf": 1,
+       "ga": 1,
+       "gd": 0,
+       "pts": 1,
+       "position": 4
+      }
+     ],
+     "Group I": [
+      {
+       "espn_id": "624",
+       "name": "Algeria",
+       "key": "algeria",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 3,
+       "ga": 1,
+       "gd": 2,
+       "pts": 3,
+       "position": 1
+      },
+      {
+       "espn_id": "4356",
+       "name": "Togo",
+       "key": "togo",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 1,
+       "ga": 0,
+       "gd": 1,
+       "pts": 3,
+       "position": 2
+      },
+      {
+       "espn_id": "5779",
+       "name": "Burundi",
+       "key": "burundi",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 0,
+       "ga": 1,
+       "gd": -1,
+       "pts": 0,
+       "position": 3
+      },
+      {
+       "espn_id": "4277",
+       "name": "Zambia",
+       "key": "zambia",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 1,
+       "ga": 3,
+       "gd": -2,
+       "pts": 0,
+       "position": 4
+      }
+     ],
+     "Group J": [
+      {
+       "espn_id": "4319",
+       "name": "Sudan",
+       "key": "sudan",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 1,
+       "ga": 0,
+       "gd": 1,
+       "pts": 3,
+       "position": 1
+      },
+      {
+       "espn_id": "8939",
+       "name": "Mozambique",
+       "key": "mozambique",
+       "gp": 1,
+       "w": 0,
+       "d": 1,
+       "l": 0,
+       "gf": 1,
+       "ga": 1,
+       "gd": 0,
+       "pts": 1,
+       "position": 2
+      },
+      {
+       "espn_id": "654",
+       "name": "Senegal",
+       "key": "senegal",
+       "gp": 1,
+       "w": 0,
+       "d": 1,
+       "l": 0,
+       "gf": 1,
+       "ga": 1,
+       "gd": 0,
+       "pts": 1,
+       "position": 3
+      },
+      {
+       "espn_id": "5777",
+       "name": "Ethiopia",
+       "key": "ethiopia",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 0,
+       "ga": 1,
+       "gd": -1,
+       "pts": 0,
+       "position": 4
+      }
+     ],
+     "Group K": [
+      {
+       "espn_id": "2849",
+       "name": "Mali",
+       "key": "mali",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 3,
+       "ga": 1,
+       "gd": 2,
+       "pts": 3,
+       "position": 1
+      },
+      {
+       "espn_id": "2851",
+       "name": "Rwanda",
+       "key": "rwanda",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 3,
+       "ga": 1,
+       "gd": 2,
+       "pts": 3,
+       "position": 2
+      },
+      {
+       "espn_id": "2597",
+       "name": "Cape Verde",
+       "key": "cape-verde",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 1,
+       "ga": 3,
+       "gd": -2,
+       "pts": 0,
+       "position": 3
+      },
+      {
+       "espn_id": "4205",
+       "name": "Liberia",
+       "key": "liberia",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 1,
+       "ga": 3,
+       "gd": -2,
+       "pts": 0,
+       "position": 4
+      }
+     ],
+     "Group L": [
+      {
+       "espn_id": "8602",
+       "name": "Guinea-Bissau",
+       "key": "guinea-bissau",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 2,
+       "ga": 0,
+       "gd": 2,
+       "pts": 3,
+       "position": 1
+      },
+      {
+       "espn_id": "657",
+       "name": "Nigeria",
+       "key": "nigeria",
+       "gp": 1,
+       "w": 1,
+       "d": 0,
+       "l": 0,
+       "gf": 2,
+       "ga": 1,
+       "gd": 1,
+       "pts": 3,
+       "position": 2
+      },
+      {
+       "espn_id": "5533",
+       "name": "Madagascar",
+       "key": "madagascar",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 1,
+       "ga": 2,
+       "gd": -1,
+       "pts": 0,
+       "position": 3
+      },
+      {
+       "espn_id": "5778",
+       "name": "Tanzania",
+       "key": "tanzania",
+       "gp": 1,
+       "w": 0,
+       "d": 0,
+       "l": 1,
+       "gf": 0,
+       "ga": 2,
+       "gd": -2,
+       "pts": 0,
+       "position": 4
+      }
+     ]
+    },
+    "ordering_note": "ordered by points, then goal difference, then goals scored, then name. THIS IS NOT THE GOVERNING BODY'S TIE-BREAK: UEFA, Concacaf, the AFC and CAF all break level points on head-to-head results first, so two teams level on points may legitimately sit in the other order on the official table. The NUMBERS are the claim here; the order on a points tie is not."
+   },
+   "teams": {
+    "morocco": {
+     "name": "Morocco",
+     "espn_id": "2869",
+     "group": "Group A",
+     "next_fixture": {
+      "event_id": "401920006",
+      "kickoff": "2026-09-29T13:00Z",
+      "opponent": "Lesotho"
+     }
+    },
+    "niger": {
+     "name": "Niger",
+     "espn_id": "8937",
+     "group": "Group A",
+     "next_fixture": {
+      "event_id": "401919993",
+      "kickoff": "2026-09-29T19:00Z",
+      "opponent": "Gabon"
+     }
+    },
+    "lesotho": {
+     "name": "Lesotho",
+     "espn_id": "6640",
+     "group": "Group A",
+     "next_fixture": {
+      "event_id": "401920006",
+      "kickoff": "2026-09-29T13:00Z",
+      "opponent": "Morocco"
+     }
+    },
+    "gabon": {
+     "name": "Gabon",
+     "espn_id": "4231",
+     "group": "Group A",
+     "next_fixture": {
+      "event_id": "401919993",
+      "kickoff": "2026-09-29T19:00Z",
+      "opponent": "Niger"
+     }
+    },
+    "malawi": {
+     "name": "Malawi",
+     "espn_id": "4325",
+     "group": "Group B",
+     "next_fixture": {
+      "event_id": "401919990",
+      "kickoff": "2026-10-06T19:00Z",
+      "opponent": "Angola"
+     }
+    },
+    "angola": {
+     "name": "Angola",
+     "espn_id": "653",
+     "group": "Group B",
+     "next_fixture": {
+      "event_id": "401919990",
+      "kickoff": "2026-10-06T19:00Z",
+      "opponent": "Malawi"
+     }
+    },
+    "egypt": {
+     "name": "Egypt",
+     "espn_id": "2620",
+     "group": "Group B",
+     "next_fixture": {
+      "event_id": "401920027",
+      "kickoff": "2026-09-29T13:00Z",
+      "opponent": "South Sudan"
+     }
+    },
+    "south-sudan": {
+     "name": "South Sudan",
+     "espn_id": "14075",
+     "group": "Group B",
+     "next_fixture": {
+      "event_id": "401920027",
+      "kickoff": "2026-09-29T13:00Z",
+      "opponent": "Egypt"
+     }
+    },
+    "ivory-coast": {
+     "name": "Ivory Coast",
+     "espn_id": "4789",
+     "group": "Group C",
+     "next_fixture": {
+      "event_id": "401919996",
+      "kickoff": "2026-09-29T19:00Z",
+      "opponent": "Somalia"
+     }
+    },
+    "gambia": {
+     "name": "Gambia",
+     "espn_id": "7368",
+     "group": "Group C",
+     "next_fixture": {
+      "event_id": "401919999",
+      "kickoff": "2026-09-29T16:00Z",
+      "opponent": "Ghana"
+     }
+    },
+    "somalia": {
+     "name": "Somalia",
+     "espn_id": "5776",
+     "group": "Group C",
+     "next_fixture": {
+      "event_id": "401919996",
+      "kickoff": "2026-09-29T19:00Z",
+      "opponent": "Ivory Coast"
+     }
+    },
+    "ghana": {
+     "name": "Ghana",
+     "espn_id": "4469",
+     "group": "Group C",
+     "next_fixture": {
+      "event_id": "401919999",
+      "kickoff": "2026-09-29T16:00Z",
+      "opponent": "Gambia"
+     }
+    },
+    "eritrea": {
+     "name": "Eritrea",
+     "espn_id": "5774",
+     "group": "Group D",
+     "next_fixture": {
+      "event_id": "401920035",
+      "kickoff": "2026-09-26T13:00Z",
+      "opponent": "Kenya"
+     }
+    },
+    "guinea": {
+     "name": "Guinea",
+     "espn_id": "2847",
+     "group": "Group D",
+     "next_fixture": {
+      "event_id": "401920034",
+      "kickoff": "2026-09-26T13:00Z",
+      "opponent": "South Africa"
+     }
+    },
+    "kenya": {
+     "name": "Kenya",
+     "espn_id": "2848",
+     "group": "Group D",
+     "next_fixture": {
+      "event_id": "401920035",
+      "kickoff": "2026-09-26T13:00Z",
+      "opponent": "Eritrea"
+     }
+    },
+    "south-africa": {
+     "name": "South Africa",
+     "espn_id": "467",
+     "group": "Group D",
+     "next_fixture": {
+      "event_id": "401920034",
+      "kickoff": "2026-09-26T13:00Z",
+      "opponent": "Guinea"
+     }
+    },
+    "congo-dr": {
+     "name": "Congo DR",
+     "espn_id": "2850",
+     "group": "Group E",
+     "next_fixture": {
+      "event_id": "401920031",
+      "kickoff": "2026-09-28T16:00Z",
+      "opponent": "Zimbabwe"
+     }
+    },
+    "zimbabwe": {
+     "name": "Zimbabwe",
+     "espn_id": "4214",
+     "group": "Group E",
+     "next_fixture": {
+      "event_id": "401920031",
+      "kickoff": "2026-09-28T16:00Z",
+      "opponent": "Congo DR"
+     }
+    },
+    "sierra-leone": {
+     "name": "Sierra Leone",
+     "espn_id": "8600",
+     "group": "Group E",
+     "next_fixture": {
+      "event_id": "401920033",
+      "kickoff": "2026-09-28T16:00Z",
+      "opponent": "Equatorial Guinea"
+     }
+    },
+    "equatorial-guinea": {
+     "name": "Equatorial Guinea",
+     "espn_id": "8938",
+     "group": "Group E",
+     "next_fixture": {
+      "event_id": "401920033",
+      "kickoff": "2026-09-28T16:00Z",
+      "opponent": "Sierra Leone"
+     }
+    },
+    "mauritania": {
+     "name": "Mauritania",
+     "espn_id": "8940",
+     "group": "Group F",
+     "next_fixture": {
+      "event_id": "401919992",
+      "kickoff": "2026-09-29T19:00Z",
+      "opponent": "Benin"
+     }
+    },
+    "benin": {
+     "name": "Benin",
+     "espn_id": "2844",
+     "group": "Group F",
+     "next_fixture": {
+      "event_id": "401919992",
+      "kickoff": "2026-09-29T19:00Z",
+      "opponent": "Mauritania"
+     }
+    },
+    "burkina-faso": {
+     "name": "Burkina Faso",
+     "espn_id": "2845",
+     "group": "Group F",
+     "next_fixture": {
+      "event_id": "401920032",
+      "kickoff": "2026-09-28T16:00Z",
+      "opponent": "Central African Republic"
+     }
+    },
+    "central-african-republic": {
+     "name": "Central African Republic",
+     "espn_id": "10528",
+     "group": "Group F",
+     "next_fixture": {
+      "event_id": "401920032",
+      "kickoff": "2026-09-28T16:00Z",
+      "opponent": "Burkina Faso"
+     }
+    },
+    "cameroon": {
+     "name": "Cameroon",
+     "espn_id": "656",
+     "group": "Group G",
+     "next_fixture": {
+      "event_id": "401919995",
+      "kickoff": "2026-09-29T19:00Z",
+      "opponent": "Congo"
+     }
+    },
+    "namibia": {
+     "name": "Namibia",
+     "espn_id": "6725",
+     "group": "Group G",
+     "next_fixture": {
+      "event_id": "401920029",
+      "kickoff": "2026-09-29T12:00Z",
+      "opponent": "Comoros"
+     }
+    },
+    "congo": {
+     "name": "Congo",
+     "espn_id": "4276",
+     "group": "Group G",
+     "next_fixture": {
+      "event_id": "401919995",
+      "kickoff": "2026-09-29T19:00Z",
+      "opponent": "Cameroon"
+     }
+    },
+    "comoros": {
+     "name": "Comoros",
+     "espn_id": "8601",
+     "group": "Group G",
+     "next_fixture": {
+      "event_id": "401920029",
+      "kickoff": "2026-09-29T12:00Z",
+      "opponent": "Namibia"
+     }
+    },
+    "botswana": {
+     "name": "Botswana",
+     "espn_id": "4245",
+     "group": "Group H",
+     "next_fixture": {
+      "event_id": "401920030",
+      "kickoff": "2026-09-28T19:00Z",
+      "opponent": "Tunisia"
+     }
+    },
+    "libya": {
+     "name": "Libya",
+     "espn_id": "2621",
+     "group": "Group H",
+     "next_fixture": {
+      "event_id": "401920001",
+      "kickoff": "2026-09-29T16:00Z",
+      "opponent": "Uganda"
+     }
+    },
+    "tunisia": {
+     "name": "Tunisia",
+     "espn_id": "659",
+     "group": "Group H",
+     "next_fixture": {
+      "event_id": "401920030",
+      "kickoff": "2026-09-28T19:00Z",
+      "opponent": "Botswana"
+     }
+    },
+    "uganda": {
+     "name": "Uganda",
+     "espn_id": "4211",
+     "group": "Group H",
+     "next_fixture": {
+      "event_id": "401920001",
+      "kickoff": "2026-09-29T16:00Z",
+      "opponent": "Libya"
+     }
+    },
+    "algeria": {
+     "name": "Algeria",
+     "espn_id": "624",
+     "group": "Group I",
+     "next_fixture": {
+      "event_id": "401920028",
+      "kickoff": "2026-09-29T13:00Z",
+      "opponent": "Burundi"
+     }
+    },
+    "togo": {
+     "name": "Togo",
+     "espn_id": "4356",
+     "group": "Group I",
+     "next_fixture": {
+      "event_id": "401919998",
+      "kickoff": "2026-09-29T16:00Z",
+      "opponent": "Zambia"
+     }
+    },
+    "burundi": {
+     "name": "Burundi",
+     "espn_id": "5779",
+     "group": "Group I",
+     "next_fixture": {
+      "event_id": "401920028",
+      "kickoff": "2026-09-29T13:00Z",
+      "opponent": "Algeria"
+     }
+    },
+    "zambia": {
+     "name": "Zambia",
+     "espn_id": "4277",
+     "group": "Group I",
+     "next_fixture": {
+      "event_id": "401919998",
+      "kickoff": "2026-09-29T16:00Z",
+      "opponent": "Togo"
+     }
+    },
+    "sudan": {
+     "name": "Sudan",
+     "espn_id": "4319",
+     "group": "Group J",
+     "next_fixture": {
+      "event_id": "401920004",
+      "kickoff": "2026-09-29T13:00Z",
+      "opponent": "Mozambique"
+     }
+    },
+    "mozambique": {
+     "name": "Mozambique",
+     "espn_id": "8939",
+     "group": "Group J",
+     "next_fixture": {
+      "event_id": "401920004",
+      "kickoff": "2026-09-29T13:00Z",
+      "opponent": "Sudan"
+     }
+    },
+    "senegal": {
+     "name": "Senegal",
+     "espn_id": "654",
+     "group": "Group J",
+     "next_fixture": {
+      "event_id": "401920005",
+      "kickoff": "2026-09-29T13:00Z",
+      "opponent": "Ethiopia"
+     }
+    },
+    "ethiopia": {
+     "name": "Ethiopia",
+     "espn_id": "5777",
+     "group": "Group J",
+     "next_fixture": {
+      "event_id": "401920005",
+      "kickoff": "2026-09-29T13:00Z",
+      "opponent": "Senegal"
+     }
+    },
+    "mali": {
+     "name": "Mali",
+     "espn_id": "2849",
+     "group": "Group K",
+     "next_fixture": {
+      "event_id": "401919994",
+      "kickoff": "2026-09-29T19:00Z",
+      "opponent": "Liberia"
+     }
+    },
+    "rwanda": {
+     "name": "Rwanda",
+     "espn_id": "2851",
+     "group": "Group K",
+     "next_fixture": {
+      "event_id": "401920003",
+      "kickoff": "2026-09-29T16:00Z",
+      "opponent": "Cape Verde"
+     }
+    },
+    "cape-verde": {
+     "name": "Cape Verde",
+     "espn_id": "2597",
+     "group": "Group K",
+     "next_fixture": {
+      "event_id": "401920003",
+      "kickoff": "2026-09-29T16:00Z",
+      "opponent": "Rwanda"
+     }
+    },
+    "liberia": {
+     "name": "Liberia",
+     "espn_id": "4205",
+     "group": "Group K",
+     "next_fixture": {
+      "event_id": "401919994",
+      "kickoff": "2026-09-29T19:00Z",
+      "opponent": "Mali"
+     }
+    },
+    "guinea-bissau": {
+     "name": "Guinea-Bissau",
+     "espn_id": "8602",
+     "group": "Group L",
+     "next_fixture": {
+      "event_id": "401920000",
+      "kickoff": "2026-09-29T16:00Z",
+      "opponent": "Nigeria"
+     }
+    },
+    "nigeria": {
+     "name": "Nigeria",
+     "espn_id": "657",
+     "group": "Group L",
+     "next_fixture": {
+      "event_id": "401920000",
+      "kickoff": "2026-09-29T16:00Z",
+      "opponent": "Guinea-Bissau"
+     }
+    },
+    "madagascar": {
+     "name": "Madagascar",
+     "espn_id": "5533",
+     "group": "Group L",
+     "next_fixture": {
+      "event_id": "401920002",
+      "kickoff": "2026-09-29T14:00Z",
+      "opponent": "Tanzania"
+     }
+    },
+    "tanzania": {
+     "name": "Tanzania",
+     "espn_id": "5778",
+     "group": "Group L",
+     "next_fixture": {
+      "event_id": "401920002",
+      "kickoff": "2026-09-29T14:00Z",
+      "opponent": "Madagascar"
+     }
+    }
+   }
   }
  },
- "date": "2026-09-24",
- "days": 8,
- "field_floor_note": "REFUSED BY THE PLACEABILITY FLOOR ON THE FIRST READING. This team's confederation did not clear the floor on this axis for this competition's field — on the goal axes that is G3: the median entrant's 95% interval is wider than one equal-width band of the field. The value is measured and shown; the interval beside it IS the refusal, and it is what stops the rank being read as precision. It is ranked with everyone else, because a team the evidence cannot place is not thereby a worse team.",
- "field_unit_notes": {
-  "elo": "ELO, on the one cross-league scale this field is fitted on. Higher is better. It is a rating and not a rate: there is no per-match reading of it, which is why `rate` is null on this axis. The half-width beside it is a 95% half-width in the same elo points, so the interval is the value plus and minus it.",
-  "log_goals": "LOG-GOALS, quoted from the measurement that publishes them: \"attack = expected goals a club scores against an average cross-league defence at a neutral venue, logged; defence = the same for goals conceded, SIGNED so that higher is better\". So HIGHER IS BETTER ON BOTH, and a surface must not re-invert defence on the grounds that conceding less is better — the artifact already did it, and the ranks are built on the signed value. THE HALF-WIDTH IS ON THE LOG SCALE. The readable goals-per-match figure is exp() of this value and the interval does not belong to it; the two must never be printed as a point and its band."
- },
- "generated_at": "2026-09-24T23:32:30.506453+00:00",
  "identity": {
   "path": "src/data/national_teams.json",
   "teams": 173
  },
- "leagues": {
-  "afcon": {
-   "clubs": 48,
-   "confederation": "CAF",
-   "display": "Africa Cup of Nations",
-   "edition": "2027",
-   "espn": [
-    "caf.nations_qual",
-    "caf.nations"
-   ],
-   "kind": "championship",
-   "min_current_gp": null,
-   "reg_time_note": "KXAFCONGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "src": null
-  },
-  "asiancup": {
-   "clubs": 24,
-   "confederation": "AFC",
-   "display": "AFC Asian Cup",
-   "edition": "2027",
-   "espn": [
-    "afc.asian.cup"
-   ],
-   "kind": "championship",
-   "min_current_gp": null,
-   "reg_time_note": "KXAFCACGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "src": null
-  },
-  "cnl": {
-   "clubs": 37,
-   "confederation": "CONCACAF",
-   "display": "Concacaf Nations League",
-   "edition": "2026-27",
-   "espn": [
-    "concacaf.nations.league"
-   ],
-   "kind": "championship",
-   "min_current_gp": null,
-   "reg_time_note": "KXCONCACAFNLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "src": null
-  },
-  "unl": {
-   "clubs": 54,
-   "confederation": "UEFA",
-   "display": "UEFA Nations League",
-   "edition": "2026-27",
-   "espn": [
-    "uefa.nations"
-   ],
-   "kind": "championship",
-   "min_current_gp": null,
-   "reg_time_note": "KXUEFANLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "src": null
-  }
+ "source": "live",
+ "field_unit_notes": {
+  "elo": "ELO, on the one cross-league scale this field is fitted on. Higher is better. It is a rating and not a rate: there is no per-match reading of it, which is why `rate` is null on this axis. The half-width beside it is a 95% half-width in the same elo points, so the interval is the value plus and minus it.",
+  "log_goals": "LOG-GOALS, quoted from the measurement that publishes them: \"attack = expected goals a club scores against an average cross-league defence at a neutral venue, logged; defence = the same for goals conceded, SIGNED so that higher is better\". So HIGHER IS BETTER ON BOTH, and a surface must not re-invert defence on the grounds that conceding less is better — the artifact already did it, and the ranks are built on the signed value. THE HALF-WIDTH IS ON THE LOG SCALE. The readable goals-per-match figure is exp() of this value and the interval does not belong to it; the two must never be printed as a point and its band."
  },
- "mode": "championships",
- "off_board": [
-  {
-   "away": "Malta",
-   "code": "finished",
-   "competition_id": "401861047",
-   "event_id": "401861047",
-   "home": "Andorra",
-   "kickoff": "2026-09-24T16:00Z",
-   "league": "unl",
-   "state": "post",
-   "why": "the provider's own status says this match is OVER. This is now the ONLY way a fixture leaves the board, and it is the one departure that hands the reader a surface needing no token: a finished fixture is read on the picker REVIEW surface (GET /api/picker/review), which exists for exactly this — 'once a match finished I have no way to access it to see where could I do better' — and the frontend stacks it in the SAME column, under a divider, so the league's story stays continuous"
-  },
-  {
-   "away": "Germany",
-   "code": "finished",
-   "competition_id": "401861041",
-   "event_id": "401861041",
-   "home": "Netherlands",
-   "kickoff": "2026-09-24T18:45Z",
-   "league": "unl",
-   "state": "post",
-   "why": "the provider's own status says this match is OVER. This is now the ONLY way a fixture leaves the board, and it is the one departure that hands the reader a surface needing no token: a finished fixture is read on the picker REVIEW surface (GET /api/picker/review), which exists for exactly this — 'once a match finished I have no way to access it to see where could I do better' — and the frontend stacks it in the SAME column, under a divider, so the league's story stays continuous"
-  },
-  {
-   "away": "Greece",
-   "code": "finished",
-   "competition_id": "401861042",
-   "event_id": "401861042",
-   "home": "Serbia",
-   "kickoff": "2026-09-24T18:45Z",
-   "league": "unl",
-   "state": "post",
-   "why": "the provider's own status says this match is OVER. This is now the ONLY way a fixture leaves the board, and it is the one departure that hands the reader a surface needing no token: a finished fixture is read on the picker REVIEW surface (GET /api/picker/review), which exists for exactly this — 'once a match finished I have no way to access it to see where could I do better' — and the frontend stacks it in the SAME column, under a divider, so the league's story stays continuous"
-  }
- ],
- "off_board_counts": {
-  "event_unreadable": 0,
-  "finished": 17,
-  "kicked_off": 0,
-  "no_state": 0,
-  "not_yet_kicked_off": 0,
-  "state_unrecognised": 0
- },
- "refusals": [],
- "rows": [
-  {
-   "away": "Northern Ireland",
-   "column": "unl",
-   "columns": [
-    "unl"
-   ],
-   "competition_id": "401861049",
-   "cross_league": false,
-   "current_only": null,
-   "espn": "uefa.nations",
-   "event_id": "401861049",
-   "fav_side": "home",
-   "fav_source": "field",
-   "favourite": "Georgia",
-   "field": {
-    "axes": {
-     "atk": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.3505339402792876,
-       "interval": [
-        0.20264425597253716,
-        0.9037121365311123
-       ],
-       "rank": 25,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": 0.5531781962518247
-      },
-      "field_size": 54,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "attack",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.4681312450618206,
-       "interval": [
-        0.025489789275269348,
-        0.9617522793989105
-       ],
-       "rank": 27,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2,
-        3
-       ],
-       "value": 0.4936210343370899
-      },
-      "tier_gap": 0,
-      "unit": "log_goals"
-     },
-     "def": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.3888902300840509,
-       "interval": [
-        0.007624380064627512,
-        0.7854048402327293
-       ],
-       "rank": 28,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2,
-        3
-       ],
-       "value": 0.3965146101486784
-      },
-      "field_size": 54,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "defence",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.508658551872439,
-       "interval": [
-        0.10573175820915182,
-        1.1230488619540298
-       ],
-       "rank": 19,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2,
-        3
-       ],
-       "value": 0.6143903100815908
-      },
-      "tier_gap": 0,
-      "unit": "log_goals"
-     },
-     "ovr": {
-      "fav": {
-       "below_floor": false,
-       "half_width_95": 28.343159363309677,
-       "interval": [
-        1630.429858797688,
-        1687.1161775243074
-       ],
-       "rank": 25,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        2,
-        3
-       ],
-       "value": 1658.7730181609977
-      },
-      "field_size": 54,
-      "floor": {
-       "below_floor": false,
-       "failing_condition": null
-      },
-      "label": "overall",
-      "opp": {
-       "below_floor": false,
-       "half_width_95": 34.444644147682524,
-       "interval": [
-        1549.5160492620792,
-        1618.4053375574442
-       ],
-       "rank": 32,
-       "straddles": false,
-       "tier": 3,
-       "tier_set": [
-        3
-       ],
-       "value": 1583.9606934097617
-      },
-      "tier_gap": 1,
-      "unit": "elo"
-     }
-    },
-    "axes_measured": [
-     "ovr",
-     "atk",
-     "def"
-    ],
-    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
-    "clubs": {
-     "fav": "Georgia",
-     "opp": "Northern Ireland"
-    },
-    "competition": "unl",
-    "field_basis": "the UEFA Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus b89af5d2210e, variant 'all', Elo pinned at 10 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals.",
-    "shape": "HOLLOW",
-    "size": 54
-   },
-   "form": {
-    "fav": "LDWDW",
-    "opp": "WLDWL",
-    "scope": "all senior internationals, friendlies marked",
-    "scope_is_cup": false
-   },
-   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
-   "gdg_gap": null,
-   "gp_current": {
-    "away": 0,
-    "home": 0,
-    "min": 0
-   },
-   "home": "Georgia",
-   "in_play": false,
-   "kalshi": {
-    "ask_c": 53,
-    "ask_size": 12601,
-    "bid_c": 52,
-    "bid_size": 1000,
-    "event_ticker": "KXUEFANLGAME-26SEP25GEONIR",
-    "flags": [],
-    "spread_c": 1,
-    "ticker": "KXUEFANLGAME-26SEP25GEONIR-GEO"
-   },
-   "kickoff": "2026-09-25T16:00Z",
-   "league": "unl",
-   "national": {
-    "competition": "unl",
-    "group": "Group B2",
-    "head_to_head": {
-     "available": true,
-     "meetings": [
-      {
-       "away": "Georgia",
-       "away_score": 1,
-       "completed": true,
-       "date": "2008-03-26T19:45:00Z",
-       "event_id": "236855",
-       "home": "Northern Ireland",
-       "home_score": 4,
-       "winner": "away",
-       "winner_means": "this fixture's home/away sides"
-      }
-     ],
-     "reason": null,
-     "source": "seasonseries",
-     "tally": {
-      "away": 1,
-      "draw": 0,
-      "home": 0
-     }
-    },
-    "leg": null,
-    "lineups": {
-     "announced": false,
-     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff",
-     "sides": {
-      "away": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Northern Ireland"
-      },
-      "home": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Georgia"
-      }
-     }
-    },
-    "market": {
-     "event_ticker": "KXUEFANLGAME-26SEP25GEONIR",
-     "legs": {
-      "away": {
-       "ask_c": 22,
-       "ask_size": 13685,
-       "bid_c": 20,
-       "bid_size": 6388,
-       "event_ticker": "KXUEFANLGAME-26SEP25GEONIR",
-       "flags": [],
-       "name": "Northern Ireland",
-       "spread_c": 2,
-       "ticker": "KXUEFANLGAME-26SEP25GEONIR-NIR"
-      },
-      "home": {
-       "ask_c": 53,
-       "ask_size": 12601,
-       "bid_c": 52,
-       "bid_size": 1000,
-       "event_ticker": "KXUEFANLGAME-26SEP25GEONIR",
-       "flags": [],
-       "name": "Georgia",
-       "spread_c": 1,
-       "ticker": "KXUEFANLGAME-26SEP25GEONIR-GEO"
-      },
-      "tie": {
-       "ask_c": 27,
-       "ask_size": 88,
-       "bid_c": 26,
-       "bid_size": 7720,
-       "event_ticker": "KXUEFANLGAME-26SEP25GEONIR",
-       "flags": [
-        "THIN"
-       ],
-       "spread_c": 1,
-       "ticker": "KXUEFANLGAME-26SEP25GEONIR-TIE"
-      }
-     },
-     "orientation": "same",
-     "status": "mapped",
-     "status_words": "one open Kalshi event names both teams on this date",
-     "title": "Georgia vs Northern Ireland"
-    },
-    "neutral": false,
-    "neutral_provider_flag": false,
-    "stage": "group-stage",
-    "stage_kind": "group",
-    "status_detail": "Fri, September 25th at 12:00 PM EDT",
-    "teams": {
-     "away": {
-      "espn_id": "586",
-      "form": {
-       "available": true,
-       "friendlies": 3,
-       "games": [
-        {
-         "competition": "FIFA World Cup Qualifying - UEFA",
-         "date": "2025-11-17T19:45Z",
-         "event_id": "724910",
-         "ga": 0,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Luxembourg",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup Qualifying - UEFA",
-         "date": "2026-03-26T19:45Z",
-         "event_id": "761380",
-         "ga": 2,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Italy",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-31T18:45Z",
-         "event_id": "401866761",
-         "ga": 1,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Wales",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-04T16:00Z",
-         "event_id": "401871360",
-         "ga": 0,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Guinea",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-08T19:10Z",
-         "event_id": "401869804",
-         "ga": 3,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "France",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        }
-       ],
-       "letters": "WLDWL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "northern-ireland",
-      "name": "Northern Ireland",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.4681312450618206,
-         "interval": [
-          0.025489789275269348,
-          0.9617522793989105
-         ],
-         "rank": 27,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2,
-          3
-         ],
-         "unit": "log_goals",
-         "value": 0.4936210343370899
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.508658551872439,
-         "interval": [
-          0.10573175820915182,
-          1.1230488619540298
-         ],
-         "rank": 19,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2,
-          3
-         ],
-         "unit": "log_goals",
-         "value": 0.6143903100815908
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 34.444644147682524,
-         "interval": [
-          1549.5160492620792,
-          1618.4053375574442
-         ],
-         "rank": 32,
-         "straddles": false,
-         "tier": 3,
-         "tier_set": [
-          3
-         ],
-         "unit": "elo",
-         "value": 1583.9606934097617
-        }
-       },
-       "axes_absent": [],
-       "competition": "unl",
-       "source": "src.picker.national_team_axes"
-      }
-     },
-     "home": {
-      "espn_id": "584",
-      "form": {
-       "available": true,
-       "friendlies": 4,
-       "games": [
-        {
-         "competition": "FIFA World Cup Qualifying - UEFA",
-         "date": "2025-11-18T19:45Z",
-         "event_id": "724916",
-         "ga": 2,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Bulgaria",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-26T17:00Z",
-         "event_id": "763032",
-         "ga": 2,
-         "gf": 2,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Israel",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-29T13:00Z",
-         "event_id": "763033",
-         "ga": 0,
-         "gf": 2,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Lithuania",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-02T17:00Z",
-         "event_id": "401865145",
-         "ga": 1,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Romania",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-05T16:00Z",
-         "event_id": "401870001",
-         "ga": 0,
-         "gf": 2,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Bahrain",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        }
-       ],
-       "letters": "LDWDW",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "georgia",
-      "name": "Georgia",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.3505339402792876,
-         "interval": [
-          0.20264425597253716,
-          0.9037121365311123
-         ],
-         "rank": 25,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "log_goals",
-         "value": 0.5531781962518247
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.3888902300840509,
-         "interval": [
-          0.007624380064627512,
-          0.7854048402327293
-         ],
-         "rank": 28,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2,
-          3
-         ],
-         "unit": "log_goals",
-         "value": 0.3965146101486784
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 28.343159363309677,
-         "interval": [
-          1630.429858797688,
-          1687.1161775243074
-         ],
-         "rank": 25,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          2,
-          3
-         ],
-         "unit": "elo",
-         "value": 1658.7730181609977
-        }
-       },
-       "axes_absent": [],
-       "competition": "unl",
-       "source": "src.picker.national_team_axes"
-      }
-     }
-    },
-    "venue_country": "Georgia"
-   },
-   "opponent": "Northern Ireland",
-   "own_gdg": {
-    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record.",
-    "diff": null
-   },
-   "ppg_gap": null,
-   "rank_gap": null,
-   "ranks": {
-    "fav": 25,
-    "opp": 32
-   },
-   "rated_in": {
-    "away": "unl",
-    "home": "unl"
-   },
-   "rates": {
-    "ga": [
-     null,
-     null
-    ],
-    "gdg": [
-     null,
-     null
-    ],
-    "gf": [
-     null,
-     null
-    ],
-    "ppg": [
-     null,
-     null
-    ]
-   },
-   "refused": false,
-   "reg_time_note": "KXUEFANLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "resolution": {
-    "Georgia": "espn_id",
-    "Northern Ireland": "espn_id"
-   },
-   "shape": "HOLLOW",
-   "src": "current",
-   "state": "pre",
-   "table_notes": {
-    "away": null,
-    "home": null
-   },
-   "tier_gaps": {
-    "atk": 0,
-    "def": 0,
-    "ovr": 1
-   },
-   "tiers": {
-    "atk": [
-     2,
-     2
-    ],
-    "def": [
-     2,
-     2
-    ],
-    "ovr": [
-     2,
-     3
-    ]
-   },
-   "venue": {
-    "city": "Tbilisi",
-    "country": "Georgia",
-    "name": "Boris Paichadze Dinamo Arena"
-   },
-   "venue_class": {
-    "class": "TRUE_HOME",
-    "home_side": "home"
-   },
-   "venue_favourite": {
-    "flipped": false,
-    "home_side": "home",
-    "policy": "off",
-    "reason": "no_gdg_gap",
-    "refused": true,
-    "venue_class": "TRUE_HOME"
-   },
-   "weights": null
-  },
-  {
-   "away": "Latvia",
-   "column": "unl",
-   "columns": [
-    "unl"
-   ],
-   "competition_id": "401861050",
-   "cross_league": false,
-   "current_only": null,
-   "espn": "uefa.nations",
-   "event_id": "401861050",
-   "fav_side": "home",
-   "fav_source": "field",
-   "favourite": "Armenia",
-   "field": {
-    "axes": {
-     "atk": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.5461650198079696,
-       "interval": [
-        -0.45858135412358136,
-        0.6337486854923579
-       ],
-       "rank": 36,
-       "straddles": true,
-       "tier": 3,
-       "tier_set": [
-        2,
-        3
-       ],
-       "value": 0.08758366568438822
-      },
-      "field_size": 54,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "attack",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.4344354455138879,
-       "interval": [
-        -1.020358901682104,
-        -0.15148801065432826
-       ],
-       "rank": 49,
-       "straddles": true,
-       "tier": 4,
-       "tier_set": [
-        3,
-        4
-       ],
-       "value": -0.5859234561682162
-      },
-      "tier_gap": 1,
-      "unit": "log_goals"
-     },
-     "def": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.286613124733929,
-       "interval": [
-        -0.7734322388712598,
-        -0.20020598940340179
-       ],
-       "rank": 51,
-       "straddles": true,
-       "tier": 5,
-       "tier_set": [
-        4,
-        5
-       ],
-       "value": -0.4868191141373308
-      },
-      "field_size": 54,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "defence",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.49948067979257404,
-       "interval": [
-        -0.5825784145192461,
-        0.41638294506590207
-       ],
-       "rank": 44,
-       "straddles": true,
-       "tier": 4,
-       "tier_set": [
-        2,
-        3,
-        4,
-        5
-       ],
-       "value": -0.08309773472667198
-      },
-      "tier_gap": -1,
-      "unit": "log_goals"
-     },
-     "ovr": {
-      "fav": {
-       "below_floor": false,
-       "half_width_95": 18.549093545442293,
-       "interval": [
-        1370.1372255650224,
-        1407.2354126559069
-       ],
-       "rank": 46,
-       "straddles": false,
-       "tier": 4,
-       "tier_set": [
-        4
-       ],
-       "value": 1388.6863191104646
-      },
-      "field_size": 54,
-      "floor": {
-       "below_floor": false,
-       "failing_condition": null
-      },
-      "label": "overall",
-      "opp": {
-       "below_floor": false,
-       "half_width_95": 21.445019405859526,
-       "interval": [
-        1321.5493896848402,
-        1364.4394284965592
-       ],
-       "rank": 49,
-       "straddles": false,
-       "tier": 4,
-       "tier_set": [
-        4
-       ],
-       "value": 1342.9944090906997
-      },
-      "tier_gap": 0,
-      "unit": "elo"
-     }
-    },
-    "axes_measured": [
-     "ovr",
-     "atk",
-     "def"
-    ],
-    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
-    "clubs": {
-     "fav": "Armenia",
-     "opp": "Latvia"
-    },
-    "competition": "unl",
-    "field_basis": "the UEFA Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus b89af5d2210e, variant 'all', Elo pinned at 10 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals.",
-    "shape": "SPLIT",
-    "size": 54
-   },
-   "form": {
-    "fav": "LLLDD",
-    "opp": "LDLWW",
-    "scope": "all senior internationals, friendlies marked",
-    "scope_is_cup": false
-   },
-   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
-   "gdg_gap": null,
-   "gp_current": {
-    "away": 0,
-    "home": 0,
-    "min": 0
-   },
-   "home": "Armenia",
-   "in_play": false,
-   "kalshi": {
-    "ask_c": 54,
-    "ask_size": 150,
-    "bid_c": 53,
-    "bid_size": 4584,
-    "event_ticker": "KXUEFANLGAME-26SEP25ARMLAT",
-    "flags": [],
-    "spread_c": 1,
-    "ticker": "KXUEFANLGAME-26SEP25ARMLAT-ARM"
-   },
-   "kickoff": "2026-09-25T16:00Z",
-   "league": "unl",
-   "national": {
-    "competition": "unl",
-    "group": "Group C2",
-    "head_to_head": {
-     "available": true,
-     "meetings": [
-      {
-       "away": "Armenia",
-       "away_score": 0,
-       "completed": true,
-       "date": "2014-09-03T17:45:00Z",
-       "event_id": "404031",
-       "home": "Latvia",
-       "home_score": 2,
-       "winner": "away",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Latvia",
-       "away_score": 1,
-       "completed": true,
-       "date": "2023-06-19T16:00:00Z",
-       "event_id": "655316",
-       "home": "Armenia",
-       "home_score": 2,
-       "winner": "home",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Armenia",
-       "away_score": 0,
-       "completed": true,
-       "date": "2023-10-12T16:00:00Z",
-       "event_id": "655388",
-       "home": "Latvia",
-       "home_score": 2,
-       "winner": "away",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Latvia",
-       "away_score": 1,
-       "completed": true,
-       "date": "2024-09-07T16:00:00Z",
-       "event_id": "698900",
-       "home": "Armenia",
-       "home_score": 4,
-       "winner": "home",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Armenia",
-       "away_score": 2,
-       "completed": true,
-       "date": "2024-11-17T14:00:00Z",
-       "event_id": "699012",
-       "home": "Latvia",
-       "home_score": 1,
-       "winner": "home",
-       "winner_means": "this fixture's home/away sides"
-      }
-     ],
-     "reason": null,
-     "source": "seasonseries",
-     "tally": {
-      "away": 2,
-      "draw": 0,
-      "home": 3
-     }
-    },
-    "leg": null,
-    "lineups": {
-     "announced": false,
-     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff",
-     "sides": {
-      "away": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Latvia"
-      },
-      "home": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Armenia"
-      }
-     }
-    },
-    "market": {
-     "event_ticker": "KXUEFANLGAME-26SEP25ARMLAT",
-     "legs": {
-      "away": {
-       "ask_c": 21,
-       "ask_size": 9045,
-       "bid_c": 20,
-       "bid_size": 256,
-       "event_ticker": "KXUEFANLGAME-26SEP25ARMLAT",
-       "flags": [],
-       "name": "Latvia",
-       "spread_c": 1,
-       "ticker": "KXUEFANLGAME-26SEP25ARMLAT-LAT"
-      },
-      "home": {
-       "ask_c": 54,
-       "ask_size": 150,
-       "bid_c": 53,
-       "bid_size": 4584,
-       "event_ticker": "KXUEFANLGAME-26SEP25ARMLAT",
-       "flags": [],
-       "name": "Armenia",
-       "spread_c": 1,
-       "ticker": "KXUEFANLGAME-26SEP25ARMLAT-ARM"
-      },
-      "tie": {
-       "ask_c": 27,
-       "ask_size": 19199,
-       "bid_c": 26,
-       "bid_size": 10,
-       "event_ticker": "KXUEFANLGAME-26SEP25ARMLAT",
-       "flags": [],
-       "spread_c": 1,
-       "ticker": "KXUEFANLGAME-26SEP25ARMLAT-TIE"
-      }
-     },
-     "orientation": "same",
-     "status": "mapped",
-     "status_words": "one open Kalshi event names both teams on this date",
-     "title": "Armenia vs Latvia"
-    },
-    "neutral": false,
-    "neutral_provider_flag": false,
-    "stage": "group-stage",
-    "stage_kind": "group",
-    "status_detail": "Fri, September 25th at 12:00 PM EDT",
-    "teams": {
-     "away": {
-      "espn_id": "456",
-      "form": {
-       "available": true,
-       "friendlies": 1,
-       "games": [
-        {
-         "competition": "FIFA World Cup Qualifying - UEFA",
-         "date": "2025-10-14T18:45Z",
-         "event_id": "724871",
-         "ga": 5,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "England",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2025-11-13T17:00Z",
-         "event_id": "757628",
-         "ga": 0,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "North Macedonia",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup Qualifying - UEFA",
-         "date": "2025-11-16T17:00Z",
-         "event_id": "724903",
-         "ga": 2,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Serbia",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "UEFA Nations League",
-         "date": "2026-03-26T17:00Z",
-         "event_id": "723731",
-         "ga": 0,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Gibraltar",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "away"
-        },
-        {
-         "competition": "UEFA Nations League",
-         "date": "2026-03-31T16:00Z",
-         "event_id": "723732",
-         "ga": 0,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Gibraltar",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        }
-       ],
-       "letters": "LDLWW",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "latvia",
-      "name": "Latvia",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.4344354455138879,
-         "interval": [
-          -1.020358901682104,
-          -0.15148801065432826
-         ],
-         "rank": 49,
-         "straddles": true,
-         "tier": 4,
-         "tier_set": [
-          3,
-          4
-         ],
-         "unit": "log_goals",
-         "value": -0.5859234561682162
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.49948067979257404,
-         "interval": [
-          -0.5825784145192461,
-          0.41638294506590207
-         ],
-         "rank": 44,
-         "straddles": true,
-         "tier": 4,
-         "tier_set": [
-          2,
-          3,
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": -0.08309773472667198
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 21.445019405859526,
-         "interval": [
-          1321.5493896848402,
-          1364.4394284965592
-         ],
-         "rank": 49,
-         "straddles": false,
-         "tier": 4,
-         "tier_set": [
-          4
-         ],
-         "unit": "elo",
-         "value": 1342.9944090906997
-        }
-       },
-       "axes_absent": [],
-       "competition": "unl",
-       "source": "src.picker.national_team_axes"
-      }
-     },
-     "home": {
-      "espn_id": "579",
-      "form": {
-       "available": true,
-       "friendlies": 3,
-       "games": [
-        {
-         "competition": "FIFA World Cup Qualifying - UEFA",
-         "date": "2025-11-13T17:00Z",
-         "event_id": "724876",
-         "ga": 1,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Hungary",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup Qualifying - UEFA",
-         "date": "2025-11-16T14:00Z",
-         "event_id": "724900",
-         "ga": 9,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Portugal",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-29T14:00Z",
-         "event_id": "401858183",
-         "ga": 2,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Belarus",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-06T14:00Z",
-         "event_id": "401866137",
-         "ga": 1,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Kazakhstan",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-09T15:00Z",
-         "event_id": "401866138",
-         "ga": 1,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Moldova",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        }
-       ],
-       "letters": "LLLDD",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "armenia",
-      "name": "Armenia",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.5461650198079696,
-         "interval": [
-          -0.45858135412358136,
-          0.6337486854923579
-         ],
-         "rank": 36,
-         "straddles": true,
-         "tier": 3,
-         "tier_set": [
-          2,
-          3
-         ],
-         "unit": "log_goals",
-         "value": 0.08758366568438822
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.286613124733929,
-         "interval": [
-          -0.7734322388712598,
-          -0.20020598940340179
-         ],
-         "rank": 51,
-         "straddles": true,
-         "tier": 5,
-         "tier_set": [
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": -0.4868191141373308
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 18.549093545442293,
-         "interval": [
-          1370.1372255650224,
-          1407.2354126559069
-         ],
-         "rank": 46,
-         "straddles": false,
-         "tier": 4,
-         "tier_set": [
-          4
-         ],
-         "unit": "elo",
-         "value": 1388.6863191104646
-        }
-       },
-       "axes_absent": [],
-       "competition": "unl",
-       "source": "src.picker.national_team_axes"
-      }
-     }
-    },
-    "venue_country": "Armenia"
-   },
-   "opponent": "Latvia",
-   "own_gdg": {
-    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record.",
-    "diff": null
-   },
-   "ppg_gap": null,
-   "rank_gap": null,
-   "ranks": {
-    "fav": 46,
-    "opp": 49
-   },
-   "rated_in": {
-    "away": "unl",
-    "home": "unl"
-   },
-   "rates": {
-    "ga": [
-     null,
-     null
-    ],
-    "gdg": [
-     null,
-     null
-    ],
-    "gf": [
-     null,
-     null
-    ],
-    "ppg": [
-     null,
-     null
-    ]
-   },
-   "refused": false,
-   "reg_time_note": "KXUEFANLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "resolution": {
-    "Armenia": "espn_id",
-    "Latvia": "espn_id"
-   },
-   "shape": "SPLIT",
-   "src": "current",
-   "state": "pre",
-   "table_notes": {
-    "away": null,
-    "home": null
-   },
-   "tier_gaps": {
-    "atk": 1,
-    "def": -1,
-    "ovr": 0
-   },
-   "tiers": {
-    "atk": [
-     3,
-     4
-    ],
-    "def": [
-     5,
-     4
-    ],
-    "ovr": [
-     4,
-     4
-    ]
-   },
-   "venue": {
-    "city": "Yerevan",
-    "country": "Armenia",
-    "name": "Vazgen Sargsyan Republican Stadium"
-   },
-   "venue_class": {
-    "class": "TRUE_HOME",
-    "home_side": "home"
-   },
-   "venue_favourite": {
-    "flipped": false,
-    "home_side": "home",
-    "policy": "off",
-    "reason": "no_gdg_gap",
-    "refused": true,
-    "venue_class": "TRUE_HOME"
-   },
-   "weights": null
-  },
-  {
-   "away": "Romania",
-   "column": "unl",
-   "columns": [
-    "unl"
-   ],
-   "competition_id": "401861051",
-   "cross_league": false,
-   "current_only": null,
-   "espn": "uefa.nations",
-   "event_id": "401861051",
-   "fav_side": "home",
-   "fav_source": "field",
-   "favourite": "Sweden",
-   "field": {
-    "axes": {
-     "atk": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.3556941909978883,
-       "interval": [
-        0.519299805195087,
-        1.2306881871908637
-       ],
-       "rank": 13,
-       "straddles": true,
-       "tier": 1,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": 0.8749939961929754
-      },
-      "field_size": 54,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "attack",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.34807577062999884,
-       "interval": [
-        0.30084786118256956,
-        0.9969994024425672
-       ],
-       "rank": 21,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": 0.6489236318125684
-      },
-      "tier_gap": 1,
-      "unit": "log_goals"
-     },
-     "def": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.3175955775473188,
-       "interval": [
-        -0.0936801297698773,
-        0.5415110253247604
-       ],
-       "rank": 37,
-       "straddles": true,
-       "tier": 3,
-       "tier_set": [
-        2,
-        3,
-        4
-       ],
-       "value": 0.22391544777744152
-      },
-      "field_size": 54,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "defence",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.5350277015346563,
-       "interval": [
-        -0.05497701438485558,
-        1.015078388684457
-       ],
-       "rank": 24,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2,
-        3,
-        4
-       ],
-       "value": 0.4800506871498007
-      },
-      "tier_gap": -1,
-      "unit": "log_goals"
-     },
-     "ovr": {
-      "fav": {
-       "below_floor": false,
-       "half_width_95": 40.82279375021259,
-       "interval": [
-        1667.6724069026614,
-        1749.3179944030867
-       ],
-       "rank": 22,
-       "straddles": false,
-       "tier": 2,
-       "tier_set": [
-        2
-       ],
-       "value": 1708.495200652874
-      },
-      "field_size": 54,
-      "floor": {
-       "below_floor": false,
-       "failing_condition": null
-      },
-      "label": "overall",
-      "opp": {
-       "below_floor": false,
-       "half_width_95": 23.93034098225602,
-       "interval": [
-        1611.329441789994,
-        1659.190123754506
-       ],
-       "rank": 28,
-       "straddles": true,
-       "tier": 3,
-       "tier_set": [
-        2,
-        3
-       ],
-       "value": 1635.25978277225
-      },
-      "tier_gap": 1,
-      "unit": "elo"
-     }
-    },
-    "axes_measured": [
-     "ovr",
-     "atk",
-     "def"
-    ],
-    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
-    "clubs": {
-     "fav": "Sweden",
-     "opp": "Romania"
-    },
-    "competition": "unl",
-    "field_basis": "the UEFA Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus b89af5d2210e, variant 'all', Elo pinned at 10 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals.",
-    "shape": "SPLIT",
-    "size": 54
-   },
-   "form": {
-    "fav": "DWLDL",
-    "opp": "WLLDW",
-    "scope": "all senior internationals, friendlies marked",
-    "scope_is_cup": false
-   },
-   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
-   "gdg_gap": null,
-   "gp_current": {
-    "away": 0,
-    "home": 0,
-    "min": 0
-   },
-   "home": "Sweden",
-   "in_play": false,
-   "kalshi": {
-    "ask_c": 67,
-    "ask_size": 9146,
-    "bid_c": 66,
-    "bid_size": 3882,
-    "event_ticker": "KXUEFANLGAME-26SEP25SWEROU",
-    "flags": [],
-    "spread_c": 1,
-    "ticker": "KXUEFANLGAME-26SEP25SWEROU-SWE"
-   },
-   "kickoff": "2026-09-25T18:45Z",
-   "league": "unl",
-   "national": {
-    "competition": "unl",
-    "group": "Group B4",
-    "head_to_head": {
-     "available": true,
-     "meetings": [
-      {
-       "away": "Sweden",
-       "away_score": 2,
-       "completed": true,
-       "date": "1994-07-10T07:00:00Z",
-       "event_id": "198072",
-       "home": "Romania",
-       "home_score": 2,
-       "winner": "draw",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Sweden",
-       "away_score": 0,
-       "completed": true,
-       "date": "2018-03-27T18:30:00Z",
-       "event_id": "504725",
-       "home": "Romania",
-       "home_score": 1,
-       "winner": "away",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Romania",
-       "away_score": 1,
-       "completed": true,
-       "date": "2019-03-23T17:00:00Z",
-       "event_id": "529075",
-       "home": "Sweden",
-       "home_score": 2,
-       "winner": "home",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Sweden",
-       "away_score": 2,
-       "completed": true,
-       "date": "2019-11-15T19:45:00Z",
-       "event_id": "528884",
-       "home": "Romania",
-       "home_score": 0,
-       "winner": "home",
-       "winner_means": "this fixture's home/away sides"
-      }
-     ],
-     "reason": null,
-     "source": "seasonseries",
-     "tally": {
-      "away": 1,
-      "draw": 1,
-      "home": 2
-     }
-    },
-    "leg": null,
-    "lineups": {
-     "announced": false,
-     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff",
-     "sides": {
-      "away": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Romania"
-      },
-      "home": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Sweden"
-      }
-     }
-    },
-    "market": {
-     "event_ticker": "KXUEFANLGAME-26SEP25SWEROU",
-     "legs": {
-      "away": {
-       "ask_c": 15,
-       "ask_size": 10913,
-       "bid_c": 14,
-       "bid_size": 220,
-       "event_ticker": "KXUEFANLGAME-26SEP25SWEROU",
-       "flags": [],
-       "name": "Romania",
-       "spread_c": 1,
-       "ticker": "KXUEFANLGAME-26SEP25SWEROU-ROU"
-      },
-      "home": {
-       "ask_c": 67,
-       "ask_size": 9146,
-       "bid_c": 66,
-       "bid_size": 3882,
-       "event_ticker": "KXUEFANLGAME-26SEP25SWEROU",
-       "flags": [],
-       "name": "Sweden",
-       "spread_c": 1,
-       "ticker": "KXUEFANLGAME-26SEP25SWEROU-SWE"
-      },
-      "tie": {
-       "ask_c": 20,
-       "ask_size": 36,
-       "bid_c": 19,
-       "bid_size": 3361,
-       "event_ticker": "KXUEFANLGAME-26SEP25SWEROU",
-       "flags": [
-        "THIN"
-       ],
-       "spread_c": 1,
-       "ticker": "KXUEFANLGAME-26SEP25SWEROU-TIE"
-      }
-     },
-     "orientation": "same",
-     "status": "mapped",
-     "status_words": "one open Kalshi event names both teams on this date",
-     "title": "Sweden vs Romania"
-    },
-    "neutral": false,
-    "neutral_provider_flag": false,
-    "stage": "group-stage",
-    "stage_kind": "group",
-    "status_detail": "Fri, September 25th at 2:45 PM EDT",
-    "teams": {
-     "away": {
-      "espn_id": "473",
-      "form": {
-       "available": true,
-       "friendlies": 3,
-       "games": [
-        {
-         "competition": "FIFA World Cup Qualifying - UEFA",
-         "date": "2025-11-18T19:45Z",
-         "event_id": "724920",
-         "ga": 1,
-         "gf": 7,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "San Marino",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup Qualifying - UEFA",
-         "date": "2026-03-26T17:00Z",
-         "event_id": "761383",
-         "ga": 1,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Türkiye",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-31T18:45Z",
-         "event_id": "401866739",
-         "ga": 2,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Slovakia",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-02T17:00Z",
-         "event_id": "401865145",
-         "ga": 1,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Georgia",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-06T17:45Z",
-         "event_id": "401869206",
-         "ga": 1,
-         "gf": 2,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Wales",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        }
-       ],
-       "letters": "WLLDW",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "romania",
-      "name": "Romania",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.34807577062999884,
-         "interval": [
-          0.30084786118256956,
-          0.9969994024425672
-         ],
-         "rank": 21,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "log_goals",
-         "value": 0.6489236318125684
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.5350277015346563,
-         "interval": [
-          -0.05497701438485558,
-          1.015078388684457
-         ],
-         "rank": 24,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2,
-          3,
-          4
-         ],
-         "unit": "log_goals",
-         "value": 0.4800506871498007
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 23.93034098225602,
-         "interval": [
-          1611.329441789994,
-          1659.190123754506
-         ],
-         "rank": 28,
-         "straddles": true,
-         "tier": 3,
-         "tier_set": [
-          2,
-          3
-         ],
-         "unit": "elo",
-         "value": 1635.25978277225
-        }
-       },
-       "axes_absent": [],
-       "competition": "unl",
-       "source": "src.picker.national_team_axes"
-      }
-     },
-     "home": {
-      "espn_id": "466",
-      "form": {
-       "available": true,
-       "friendlies": 1,
-       "games": [
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-04T17:00Z",
-         "event_id": "401870034",
-         "ga": 2,
-         "gf": 2,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Greece",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-15T02:00Z",
-         "event_id": "760424",
-         "ga": 1,
-         "gf": 5,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Tunisia",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-20T17:00Z",
-         "event_id": "760447",
-         "ga": 5,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Netherlands",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-25T23:00Z",
-         "event_id": "760471",
-         "ga": 1,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "D",
-         "opponent": "Japan",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-30T21:00Z",
-         "event_id": "760492",
-         "ga": 3,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "France",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        }
-       ],
-       "letters": "DWLDL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "sweden",
-      "name": "Sweden",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.3556941909978883,
-         "interval": [
-          0.519299805195087,
-          1.2306881871908637
-         ],
-         "rank": 13,
-         "straddles": true,
-         "tier": 1,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "log_goals",
-         "value": 0.8749939961929754
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.3175955775473188,
-         "interval": [
-          -0.0936801297698773,
-          0.5415110253247604
-         ],
-         "rank": 37,
-         "straddles": true,
-         "tier": 3,
-         "tier_set": [
-          2,
-          3,
-          4
-         ],
-         "unit": "log_goals",
-         "value": 0.22391544777744152
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 40.82279375021259,
-         "interval": [
-          1667.6724069026614,
-          1749.3179944030867
-         ],
-         "rank": 22,
-         "straddles": false,
-         "tier": 2,
-         "tier_set": [
-          2
-         ],
-         "unit": "elo",
-         "value": 1708.495200652874
-        }
-       },
-       "axes_absent": [],
-       "competition": "unl",
-       "source": "src.picker.national_team_axes"
-      }
-     }
-    },
-    "venue_country": "Sweden"
-   },
-   "opponent": "Romania",
-   "own_gdg": {
-    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record.",
-    "diff": null
-   },
-   "ppg_gap": null,
-   "rank_gap": null,
-   "ranks": {
-    "fav": 22,
-    "opp": 28
-   },
-   "rated_in": {
-    "away": "unl",
-    "home": "unl"
-   },
-   "rates": {
-    "ga": [
-     null,
-     null
-    ],
-    "gdg": [
-     null,
-     null
-    ],
-    "gf": [
-     null,
-     null
-    ],
-    "ppg": [
-     null,
-     null
-    ]
-   },
-   "refused": false,
-   "reg_time_note": "KXUEFANLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "resolution": {
-    "Romania": "espn_id",
-    "Sweden": "espn_id"
-   },
-   "shape": "SPLIT",
-   "src": "current",
-   "state": "pre",
-   "table_notes": {
-    "away": null,
-    "home": null
-   },
-   "tier_gaps": {
-    "atk": 1,
-    "def": -1,
-    "ovr": 1
-   },
-   "tiers": {
-    "atk": [
-     1,
-     2
-    ],
-    "def": [
-     3,
-     2
-    ],
-    "ovr": [
-     2,
-     3
-    ]
-   },
-   "venue": {
-    "city": "Stockholm",
-    "country": "Sweden",
-    "name": "Friends Arena"
-   },
-   "venue_class": {
-    "class": "TRUE_HOME",
-    "home_side": "home"
-   },
-   "venue_favourite": {
-    "flipped": false,
-    "home_side": "home",
-    "policy": "off",
-    "reason": "no_gdg_gap",
-    "refused": true,
-    "venue_class": "TRUE_HOME"
-   },
-   "weights": null
-  },
-  {
-   "away": "Belgium",
-   "column": "unl",
-   "columns": [
-    "unl"
-   ],
-   "competition_id": "401861052",
-   "cross_league": false,
-   "current_only": null,
-   "espn": "uefa.nations",
-   "event_id": "401861052",
-   "fav_side": "home",
-   "fav_source": "field",
-   "favourite": "Italy",
-   "field": {
-    "axes": {
-     "atk": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.3577965771925674,
-       "interval": [
-        0.5740092011034782,
-        1.2896023554886131
-       ],
-       "rank": 11,
-       "straddles": true,
-       "tier": 1,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": 0.9318057782960456
-      },
-      "field_size": 54,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "attack",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.3965603707179892,
-       "interval": [
-        0.47073810775837444,
-        1.263858849194353
-       ],
-       "rank": 14,
-       "straddles": true,
-       "tier": 1,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": 0.8672984784763637
-      },
-      "tier_gap": 0,
-      "unit": "log_goals"
-     },
-     "def": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.42747737341096176,
-       "interval": [
-        0.23391183476637162,
-        1.0888665815882952
-       ],
-       "rank": 15,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2,
-        3
-       ],
-       "value": 0.6613892081773334
-      },
-      "field_size": 54,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "defence",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.4548703989845032,
-       "interval": [
-        0.13401582405658052,
-        1.043756622025587
-       ],
-       "rank": 20,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2,
-        3
-       ],
-       "value": 0.5888862230410837
-      },
-      "tier_gap": 0,
-      "unit": "log_goals"
-     },
-     "ovr": {
-      "fav": {
-       "below_floor": false,
-       "half_width_95": 29.69832941167836,
-       "interval": [
-        1833.4074795455076,
-        1892.8041383688642
-       ],
-       "rank": 9,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": 1863.105808957186
-      },
-      "field_size": 54,
-      "floor": {
-       "below_floor": false,
-       "failing_condition": null
-      },
-      "label": "overall",
-      "opp": {
-       "below_floor": false,
-       "half_width_95": 45.72787803777344,
-       "interval": [
-        1800.9865755274145,
-        1892.4423316029615
-       ],
-       "rank": 10,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": 1846.714453565188
-      },
-      "tier_gap": 0,
-      "unit": "elo"
-     }
-    },
-    "axes_measured": [
-     "ovr",
-     "atk",
-     "def"
-    ],
-    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
-    "clubs": {
-     "fav": "Italy",
-     "opp": "Belgium"
-    },
-    "competition": "unl",
-    "field_basis": "the UEFA Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus b89af5d2210e, variant 'all', Elo pinned at 10 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals.",
-    "shape": "HOLLOW",
-    "size": 54
-   },
-   "form": {
-    "fav": "LWDWW",
-    "opp": "DWWWL",
-    "scope": "all senior internationals, friendlies marked",
-    "scope_is_cup": false
-   },
-   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
-   "gdg_gap": null,
-   "gp_current": {
-    "away": 0,
-    "home": 0,
-    "min": 0
-   },
-   "home": "Italy",
-   "in_play": false,
-   "kalshi": {
-    "ask_c": 44,
-    "ask_size": 19884,
-    "bid_c": 43,
-    "bid_size": 100,
-    "event_ticker": "KXUEFANLGAME-26SEP25ITABEL",
-    "flags": [],
-    "spread_c": 1,
-    "ticker": "KXUEFANLGAME-26SEP25ITABEL-ITA"
-   },
-   "kickoff": "2026-09-25T18:45Z",
-   "league": "unl",
-   "national": {
-    "competition": "unl",
-    "group": "Group A1",
-    "head_to_head": {
-     "available": true,
-     "meetings": [
-      {
-       "away": "Italy",
-       "away_score": 2,
-       "completed": true,
-       "date": "2016-06-13T19:00:00Z",
-       "event_id": "438195",
-       "home": "Belgium",
-       "home_score": 0,
-       "winner": "home",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Italy",
-       "away_score": 2,
-       "completed": true,
-       "date": "2021-07-02T19:00:00Z",
-       "event_id": "560299",
-       "home": "Belgium",
-       "home_score": 1,
-       "winner": "home",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Belgium",
-       "away_score": 1,
-       "completed": true,
-       "date": "2021-10-10T13:00:00Z",
-       "event_id": "589984",
-       "home": "Italy",
-       "home_score": 2,
-       "winner": "home",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Belgium",
-       "away_score": 2,
-       "completed": true,
-       "date": "2024-10-10T18:45:00Z",
-       "event_id": "698939",
-       "home": "Italy",
-       "home_score": 2,
-       "winner": "draw",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Italy",
-       "away_score": 1,
-       "completed": true,
-       "date": "2024-11-14T19:45:00Z",
-       "event_id": "698988",
-       "home": "Belgium",
-       "home_score": 0,
-       "winner": "home",
-       "winner_means": "this fixture's home/away sides"
-      }
-     ],
-     "reason": null,
-     "source": "seasonseries",
-     "tally": {
-      "away": 0,
-      "draw": 1,
-      "home": 4
-     }
-    },
-    "leg": null,
-    "lineups": {
-     "announced": false,
-     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff",
-     "sides": {
-      "away": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Belgium"
-      },
-      "home": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Italy"
-      }
-     }
-    },
-    "market": {
-     "event_ticker": "KXUEFANLGAME-26SEP25ITABEL",
-     "legs": {
-      "away": {
-       "ask_c": 31,
-       "ask_size": 15513,
-       "bid_c": 30,
-       "bid_size": 3752,
-       "event_ticker": "KXUEFANLGAME-26SEP25ITABEL",
-       "flags": [],
-       "name": "Belgium",
-       "spread_c": 1,
-       "ticker": "KXUEFANLGAME-26SEP25ITABEL-BEL"
-      },
-      "home": {
-       "ask_c": 44,
-       "ask_size": 19884,
-       "bid_c": 43,
-       "bid_size": 100,
-       "event_ticker": "KXUEFANLGAME-26SEP25ITABEL",
-       "flags": [],
-       "name": "Italy",
-       "spread_c": 1,
-       "ticker": "KXUEFANLGAME-26SEP25ITABEL-ITA"
-      },
-      "tie": {
-       "ask_c": 27,
-       "ask_size": 12311,
-       "bid_c": 26,
-       "bid_size": 14975,
-       "event_ticker": "KXUEFANLGAME-26SEP25ITABEL",
-       "flags": [],
-       "spread_c": 1,
-       "ticker": "KXUEFANLGAME-26SEP25ITABEL-TIE"
-      }
-     },
-     "orientation": "same",
-     "status": "mapped",
-     "status_words": "one open Kalshi event names both teams on this date",
-     "title": "Italy vs Belgium"
-    },
-    "neutral": false,
-    "neutral_provider_flag": false,
-    "stage": "group-stage",
-    "stage_kind": "group",
-    "status_detail": "Fri, September 25th at 2:45 PM EDT",
-    "teams": {
-     "away": {
-      "espn_id": "459",
-      "form": {
-       "available": true,
-       "friendlies": 0,
-       "games": [
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-21T19:00Z",
-         "event_id": "760451",
-         "ga": 0,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "D",
-         "opponent": "Iran",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-27T03:00Z",
-         "event_id": "760477",
-         "ga": 1,
-         "gf": 5,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "New Zealand",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-07-01T20:00Z",
-         "event_id": "760493",
-         "ga": 2,
-         "gf": 3,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Senegal",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-07-07T00:00Z",
-         "event_id": "760507",
-         "ga": 1,
-         "gf": 4,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "United States",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-07-10T19:00Z",
-         "event_id": "760511",
-         "ga": 2,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Spain",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        }
-       ],
-       "letters": "DWWWL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "belgium",
-      "name": "Belgium",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.3965603707179892,
-         "interval": [
-          0.47073810775837444,
-          1.263858849194353
-         ],
-         "rank": 14,
-         "straddles": true,
-         "tier": 1,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "log_goals",
-         "value": 0.8672984784763637
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.4548703989845032,
-         "interval": [
-          0.13401582405658052,
-          1.043756622025587
-         ],
-         "rank": 20,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2,
-          3
-         ],
-         "unit": "log_goals",
-         "value": 0.5888862230410837
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 45.72787803777344,
-         "interval": [
-          1800.9865755274145,
-          1892.4423316029615
-         ],
-         "rank": 10,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "elo",
-         "value": 1846.714453565188
-        }
-       },
-       "axes_absent": [],
-       "competition": "unl",
-       "source": "src.picker.national_team_axes"
-      }
-     },
-     "home": {
-      "espn_id": "162",
-      "form": {
-       "available": true,
-       "friendlies": 2,
-       "games": [
-        {
-         "competition": "FIFA World Cup Qualifying - UEFA",
-         "date": "2025-11-16T19:45Z",
-         "event_id": "724906",
-         "ga": 4,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Norway",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup Qualifying - UEFA",
-         "date": "2026-03-26T19:45Z",
-         "event_id": "761380",
-         "ga": 0,
-         "gf": 2,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Northern Ireland",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup Qualifying - UEFA",
-         "date": "2026-03-31T18:45Z",
-         "event_id": "761952",
-         "ga": 1,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "D",
-         "opponent": "Bosnia-Herzegovina",
-         "provider_agrees": false,
-         "provider_letter": "L",
-         "shootout": {
-          "against": 4,
-          "for": 1,
-          "note": "level after play, decided on penalties; the letter is the scoreline's, D"
-         },
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-03T18:45Z",
-         "event_id": "401869325",
-         "ga": 0,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Luxembourg",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-07T19:00Z",
-         "event_id": "401870630",
-         "ga": 0,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Greece",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "away"
-        }
-       ],
-       "letters": "LWDWW",
-       "provider_disagreements": 1,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "italy",
-      "name": "Italy",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.3577965771925674,
-         "interval": [
-          0.5740092011034782,
-          1.2896023554886131
-         ],
-         "rank": 11,
-         "straddles": true,
-         "tier": 1,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "log_goals",
-         "value": 0.9318057782960456
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.42747737341096176,
-         "interval": [
-          0.23391183476637162,
-          1.0888665815882952
-         ],
-         "rank": 15,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2,
-          3
-         ],
-         "unit": "log_goals",
-         "value": 0.6613892081773334
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 29.69832941167836,
-         "interval": [
-          1833.4074795455076,
-          1892.8041383688642
-         ],
-         "rank": 9,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "elo",
-         "value": 1863.105808957186
-        }
-       },
-       "axes_absent": [],
-       "competition": "unl",
-       "source": "src.picker.national_team_axes"
-      }
-     }
-    },
-    "venue_country": "Italy"
-   },
-   "opponent": "Belgium",
-   "own_gdg": {
-    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record.",
-    "diff": null
-   },
-   "ppg_gap": null,
-   "rank_gap": null,
-   "ranks": {
-    "fav": 9,
-    "opp": 10
-   },
-   "rated_in": {
-    "away": "unl",
-    "home": "unl"
-   },
-   "rates": {
-    "ga": [
-     null,
-     null
-    ],
-    "gdg": [
-     null,
-     null
-    ],
-    "gf": [
-     null,
-     null
-    ],
-    "ppg": [
-     null,
-     null
-    ]
-   },
-   "refused": false,
-   "reg_time_note": "KXUEFANLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "resolution": {
-    "Belgium": "espn_id",
-    "Italy": "espn_id"
-   },
-   "shape": "HOLLOW",
-   "src": "current",
-   "state": "pre",
-   "table_notes": {
-    "away": null,
-    "home": null
-   },
-   "tier_gaps": {
-    "atk": 0,
-    "def": 0,
-    "ovr": 0
-   },
-   "tiers": {
-    "atk": [
-     1,
-     1
-    ],
-    "def": [
-     2,
-     2
-    ],
-    "ovr": [
-     2,
-     2
-    ]
-   },
-   "venue": {
-    "city": "Roma",
-    "country": "Italy",
-    "name": "Olimpico"
-   },
-   "venue_class": {
-    "class": "TRUE_HOME",
-    "home_side": "home"
-   },
-   "venue_favourite": {
-    "flipped": false,
-    "home_side": "home",
-    "policy": "off",
-    "reason": "no_gdg_gap",
-    "refused": true,
-    "venue_class": "TRUE_HOME"
-   },
-   "weights": null
-  },
-  {
-   "away": "France",
-   "column": "unl",
-   "columns": [
-    "unl"
-   ],
-   "competition_id": "401861053",
-   "cross_league": false,
-   "current_only": null,
-   "espn": "uefa.nations",
-   "event_id": "401861053",
-   "fav_side": "away",
-   "fav_source": "field",
-   "favourite": "France",
-   "field": {
-    "axes": {
-     "atk": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.3283153296980987,
-       "interval": [
-        0.8071467231186544,
-        1.463777382514852
-       ],
-       "rank": 7,
-       "straddles": true,
-       "tier": 1,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": 1.1354620528167532
-      },
-      "field_size": 54,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "attack",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.42461230624549157,
-       "interval": [
-        0.5381371842243019,
-        1.387361796715285
-       ],
-       "rank": 10,
-       "straddles": true,
-       "tier": 1,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": 0.9627494904697934
-      },
-      "tier_gap": 0,
-      "unit": "log_goals"
-     },
-     "def": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.5362318044047655,
-       "interval": [
-        0.21773959479343297,
-        1.2902032036029638
-       ],
-       "rank": 8,
-       "straddles": true,
-       "tier": 1,
-       "tier_set": [
-        1,
-        2,
-        3
-       ],
-       "value": 0.7539713991981984
-      },
-      "field_size": 54,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "defence",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.6800174362890935,
-       "interval": [
-        -0.027252014436459526,
-        1.3327828581417274
-       ],
-       "rank": 16,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2,
-        3
-       ],
-       "value": 0.652765421852634
-      },
-      "tier_gap": 1,
-      "unit": "log_goals"
-     },
-     "ovr": {
-      "fav": {
-       "below_floor": false,
-       "half_width_95": 58.17171607523273,
-       "interval": [
-        1919.101758712481,
-        2035.4451908629464
-       ],
-       "rank": 2,
-       "straddles": false,
-       "tier": 1,
-       "tier_set": [
-        1
-       ],
-       "value": 1977.2734747877137
-      },
-      "field_size": 54,
-      "floor": {
-       "below_floor": false,
-       "failing_condition": null
-      },
-      "label": "overall",
-      "opp": {
-       "below_floor": false,
-       "half_width_95": 56.91255939570981,
-       "interval": [
-        1776.5469098032056,
-        1890.3720285946254
-       ],
-       "rank": 12,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": 1833.4594691989155
-      },
-      "tier_gap": 1,
-      "unit": "elo"
-     }
-    },
-    "axes_measured": [
-     "ovr",
-     "atk",
-     "def"
-    ],
-    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
-    "clubs": {
-     "fav": "France",
-     "opp": "Türkiye"
-    },
-    "competition": "unl",
-    "field_basis": "the UEFA Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus b89af5d2210e, variant 'all', Elo pinned at 10 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals.",
-    "shape": "SPLIT",
-    "size": 54
-   },
-   "form": {
-    "fav": "WWWLL",
-    "opp": "WWLLW",
-    "scope": "all senior internationals, friendlies marked",
-    "scope_is_cup": false
-   },
-   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
-   "gdg_gap": null,
-   "gp_current": {
-    "away": 0,
-    "home": 0,
-    "min": 0
-   },
-   "home": "Türkiye",
-   "in_play": false,
-   "kalshi": {
-    "ask_c": 72,
-    "ask_size": 174116,
-    "bid_c": 71,
-    "bid_size": 15815,
-    "event_ticker": "KXUEFANLGAME-26SEP25TURFRA",
-    "flags": [],
-    "spread_c": 1,
-    "ticker": "KXUEFANLGAME-26SEP25TURFRA-FRA"
-   },
-   "kickoff": "2026-09-25T18:45Z",
-   "league": "unl",
-   "national": {
-    "competition": "unl",
-    "group": "Group A1",
-    "head_to_head": {
-     "available": true,
-     "meetings": [
-      {
-       "away": "Türkiye",
-       "away_score": 2,
-       "completed": true,
-       "date": "2003-06-26T19:00:00Z",
-       "event_id": "98518",
-       "home": "France",
-       "home_score": 3,
-       "winner": "away",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Türkiye",
-       "away_score": 0,
-       "completed": true,
-       "date": "2009-06-05T19:00:00Z",
-       "event_id": "266292",
-       "home": "France",
-       "home_score": 1,
-       "winner": "away",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "France",
-       "away_score": 0,
-       "completed": true,
-       "date": "2019-06-08T18:45:00Z",
-       "event_id": "529020",
-       "home": "Türkiye",
-       "home_score": 2,
-       "winner": "home",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Türkiye",
-       "away_score": 1,
-       "completed": true,
-       "date": "2019-10-14T18:45:00Z",
-       "event_id": "528909",
-       "home": "France",
-       "home_score": 1,
-       "winner": "draw",
-       "winner_means": "this fixture's home/away sides"
-      }
-     ],
-     "reason": null,
-     "source": "seasonseries",
-     "tally": {
-      "away": 2,
-      "draw": 1,
-      "home": 1
-     }
-    },
-    "leg": null,
-    "lineups": {
-     "announced": false,
-     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff",
-     "sides": {
-      "away": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "France"
-      },
-      "home": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Türkiye"
-      }
-     }
-    },
-    "market": {
-     "event_ticker": "KXUEFANLGAME-26SEP25TURFRA",
-     "legs": {
-      "away": {
-       "ask_c": 72,
-       "ask_size": 174116,
-       "bid_c": 71,
-       "bid_size": 15815,
-       "event_ticker": "KXUEFANLGAME-26SEP25TURFRA",
-       "flags": [],
-       "name": "France",
-       "spread_c": 1,
-       "ticker": "KXUEFANLGAME-26SEP25TURFRA-FRA"
-      },
-      "home": {
-       "ask_c": 12,
-       "ask_size": 126552,
-       "bid_c": 11,
-       "bid_size": 853,
-       "event_ticker": "KXUEFANLGAME-26SEP25TURFRA",
-       "flags": [],
-       "name": "Turkiye",
-       "spread_c": 1,
-       "ticker": "KXUEFANLGAME-26SEP25TURFRA-TUR"
-      },
-      "tie": {
-       "ask_c": 18,
-       "ask_size": 149,
-       "bid_c": 17,
-       "bid_size": 9432,
-       "event_ticker": "KXUEFANLGAME-26SEP25TURFRA",
-       "flags": [],
-       "spread_c": 1,
-       "ticker": "KXUEFANLGAME-26SEP25TURFRA-TIE"
-      }
-     },
-     "orientation": "same",
-     "status": "mapped",
-     "status_words": "one open Kalshi event names both teams on this date",
-     "title": "Turkiye vs France"
-    },
-    "neutral": false,
-    "neutral_provider_flag": false,
-    "stage": "group-stage",
-    "stage_kind": "group",
-    "status_detail": "Fri, September 25th at 2:45 PM EDT",
-    "teams": {
-     "away": {
-      "espn_id": "478",
-      "form": {
-       "available": true,
-       "friendlies": 0,
-       "games": [
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-30T21:00Z",
-         "event_id": "760492",
-         "ga": 0,
-         "gf": 3,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Sweden",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-07-04T21:00Z",
-         "event_id": "760503",
-         "ga": 0,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Paraguay",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-07-09T20:00Z",
-         "event_id": "760510",
-         "ga": 0,
-         "gf": 2,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Morocco",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-07-14T19:00Z",
-         "event_id": "760514",
-         "ga": 2,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Spain",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-07-18T21:00Z",
-         "event_id": "760516",
-         "ga": 6,
-         "gf": 4,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "England",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        }
-       ],
-       "letters": "WWWLL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "france",
-      "name": "France",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.3283153296980987,
-         "interval": [
-          0.8071467231186544,
-          1.463777382514852
-         ],
-         "rank": 7,
-         "straddles": true,
-         "tier": 1,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "log_goals",
-         "value": 1.1354620528167532
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.5362318044047655,
-         "interval": [
-          0.21773959479343297,
-          1.2902032036029638
-         ],
-         "rank": 8,
-         "straddles": true,
-         "tier": 1,
-         "tier_set": [
-          1,
-          2,
-          3
-         ],
-         "unit": "log_goals",
-         "value": 0.7539713991981984
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 58.17171607523273,
-         "interval": [
-          1919.101758712481,
-          2035.4451908629464
-         ],
-         "rank": 2,
-         "straddles": false,
-         "tier": 1,
-         "tier_set": [
-          1
-         ],
-         "unit": "elo",
-         "value": 1977.2734747877137
-        }
-       },
-       "axes_absent": [],
-       "competition": "unl",
-       "source": "src.picker.national_team_axes"
-      }
-     },
-     "home": {
-      "espn_id": "465",
-      "form": {
-       "available": true,
-       "friendlies": 2,
-       "games": [
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-01T17:30Z",
-         "event_id": "401871359",
-         "ga": 0,
-         "gf": 4,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "North Macedonia",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-06T22:00Z",
-         "event_id": "401871361",
-         "ga": 1,
-         "gf": 2,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Venezuela",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-14T04:00Z",
-         "event_id": "760421",
-         "ga": 2,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Australia",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-20T03:00Z",
-         "event_id": "760443",
-         "ga": 1,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Paraguay",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-26T02:00Z",
-         "event_id": "760470",
-         "ga": 2,
-         "gf": 3,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "United States",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        }
-       ],
-       "letters": "WWLLW",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "turkiye",
-      "name": "Türkiye",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.42461230624549157,
-         "interval": [
-          0.5381371842243019,
-          1.387361796715285
-         ],
-         "rank": 10,
-         "straddles": true,
-         "tier": 1,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "log_goals",
-         "value": 0.9627494904697934
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.6800174362890935,
-         "interval": [
-          -0.027252014436459526,
-          1.3327828581417274
-         ],
-         "rank": 16,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2,
-          3
-         ],
-         "unit": "log_goals",
-         "value": 0.652765421852634
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 56.91255939570981,
-         "interval": [
-          1776.5469098032056,
-          1890.3720285946254
-         ],
-         "rank": 12,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "elo",
-         "value": 1833.4594691989155
-        }
-       },
-       "axes_absent": [],
-       "competition": "unl",
-       "source": "src.picker.national_team_axes"
-      }
-     }
-    },
-    "venue_country": "Türkiye"
-   },
-   "opponent": "Türkiye",
-   "own_gdg": {
-    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record.",
-    "diff": null
-   },
-   "ppg_gap": null,
-   "rank_gap": null,
-   "ranks": {
-    "fav": 2,
-    "opp": 12
-   },
-   "rated_in": {
-    "away": "unl",
-    "home": "unl"
-   },
-   "rates": {
-    "ga": [
-     null,
-     null
-    ],
-    "gdg": [
-     null,
-     null
-    ],
-    "gf": [
-     null,
-     null
-    ],
-    "ppg": [
-     null,
-     null
-    ]
-   },
-   "refused": false,
-   "reg_time_note": "KXUEFANLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "resolution": {
-    "France": "espn_id",
-    "Türkiye": "espn_id"
-   },
-   "shape": "SPLIT",
-   "src": "current",
-   "state": "pre",
-   "table_notes": {
-    "away": null,
-    "home": null
-   },
-   "tier_gaps": {
-    "atk": 0,
-    "def": 1,
-    "ovr": 1
-   },
-   "tiers": {
-    "atk": [
-     1,
-     1
-    ],
-    "def": [
-     1,
-     2
-    ],
-    "ovr": [
-     1,
-     2
-    ]
-   },
-   "venue": {
-    "city": "Kocaeli",
-    "country": "Türkiye",
-    "name": "Yildiz Entegre Kocaeli Stadyumu"
-   },
-   "venue_class": {
-    "class": "TRUE_HOME",
-    "home_side": "home"
-   },
-   "venue_favourite": {
-    "flipped": false,
-    "home_side": "home",
-    "policy": "off",
-    "reason": "no_gdg_gap",
-    "refused": true,
-    "venue_class": "TRUE_HOME"
-   },
-   "weights": null
-  },
-  {
-   "away": "Ukraine",
-   "column": "unl",
-   "columns": [
-    "unl"
-   ],
-   "competition_id": "401861054",
-   "cross_league": false,
-   "current_only": null,
-   "espn": "uefa.nations",
-   "event_id": "401861054",
-   "fav_side": "away",
-   "fav_source": "field",
-   "favourite": "Ukraine",
-   "field": {
-    "axes": {
-     "atk": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.5040230868298657,
-       "interval": [
-        0.18432808922801258,
-        1.192374262887744
-       ],
-       "rank": 20,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": 0.6883511760578783
-      },
-      "field_size": 54,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "attack",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.42739182869614123,
-       "interval": [
-        -0.10577360042171896,
-        0.7490100569705636
-       ],
-       "rank": 30,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        2,
-        3
-       ],
-       "value": 0.32161822827442227
-      },
-      "tier_gap": 0,
-      "unit": "log_goals"
-     },
-     "def": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.400639482644058,
-       "interval": [
-        -0.062326780148120875,
-        0.7389521851399952
-       ],
-       "rank": 30,
-       "straddles": true,
-       "tier": 3,
-       "tier_set": [
-        2,
-        3,
-        4
-       ],
-       "value": 0.33831270249593715
-      },
-      "field_size": 54,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "defence",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.43564051874083337,
-       "interval": [
-        -0.03633110851760912,
-        0.8349499289640576
-       ],
-       "rank": 27,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2,
-        3
-       ],
-       "value": 0.39930941022322425
-      },
-      "tier_gap": -1,
-      "unit": "log_goals"
-     },
-     "ovr": {
-      "fav": {
-       "below_floor": false,
-       "half_width_95": 28.985386776955036,
-       "interval": [
-        1726.82553194851,
-        1784.79630550242
-       ],
-       "rank": 15,
-       "straddles": false,
-       "tier": 2,
-       "tier_set": [
-        2
-       ],
-       "value": 1755.810918725465
-      },
-      "field_size": 54,
-      "floor": {
-       "below_floor": false,
-       "failing_condition": null
-      },
-      "label": "overall",
-      "opp": {
-       "below_floor": false,
-       "half_width_95": 20.37983768144731,
-       "interval": [
-        1709.6730626015499,
-        1750.4327379644444
-       ],
-       "rank": 17,
-       "straddles": false,
-       "tier": 2,
-       "tier_set": [
-        2
-       ],
-       "value": 1730.0529002829971
-      },
-      "tier_gap": 0,
-      "unit": "elo"
-     }
-    },
-    "axes_measured": [
-     "ovr",
-     "atk",
-     "def"
-    ],
-    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
-    "clubs": {
-     "fav": "Ukraine",
-     "opp": "Hungary"
-    },
-    "competition": "unl",
-    "field_basis": "the UEFA Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus b89af5d2210e, variant 'all', Elo pinned at 10 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals.",
-    "shape": "HOLLOW",
-    "size": 54
-   },
-   "form": {
-    "fav": "WLWWL",
-    "opp": "LWDWW",
-    "scope": "all senior internationals, friendlies marked",
-    "scope_is_cup": false
-   },
-   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
-   "gdg_gap": null,
-   "gp_current": {
-    "away": 0,
-    "home": 0,
-    "min": 0
-   },
-   "home": "Hungary",
-   "in_play": false,
-   "kalshi": {
-    "ask_c": 30,
-    "ask_size": 8840,
-    "bid_c": 29,
-    "bid_size": 608,
-    "event_ticker": "KXUEFANLGAME-26SEP25HUNUKR",
-    "flags": [],
-    "spread_c": 1,
-    "ticker": "KXUEFANLGAME-26SEP25HUNUKR-UKR"
-   },
-   "kickoff": "2026-09-25T18:45Z",
-   "league": "unl",
-   "national": {
-    "competition": "unl",
-    "group": "Group B2",
-    "head_to_head": {
-     "available": false,
-     "meetings": [],
-     "reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met",
-     "source": null
-    },
-    "leg": null,
-    "lineups": {
-     "announced": false,
-     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff",
-     "sides": {
-      "away": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Ukraine"
-      },
-      "home": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Hungary"
-      }
-     }
-    },
-    "market": {
-     "event_ticker": "KXUEFANLGAME-26SEP25HUNUKR",
-     "legs": {
-      "away": {
-       "ask_c": 30,
-       "ask_size": 8840,
-       "bid_c": 29,
-       "bid_size": 608,
-       "event_ticker": "KXUEFANLGAME-26SEP25HUNUKR",
-       "flags": [],
-       "name": "Ukraine",
-       "spread_c": 1,
-       "ticker": "KXUEFANLGAME-26SEP25HUNUKR-UKR"
-      },
-      "home": {
-       "ask_c": 42,
-       "ask_size": 6204,
-       "bid_c": 41,
-       "bid_size": 3276,
-       "event_ticker": "KXUEFANLGAME-26SEP25HUNUKR",
-       "flags": [],
-       "name": "Hungary",
-       "spread_c": 1,
-       "ticker": "KXUEFANLGAME-26SEP25HUNUKR-HUN"
-      },
-      "tie": {
-       "ask_c": 30,
-       "ask_size": 11342,
-       "bid_c": 28,
-       "bid_size": 4051,
-       "event_ticker": "KXUEFANLGAME-26SEP25HUNUKR",
-       "flags": [],
-       "spread_c": 2,
-       "ticker": "KXUEFANLGAME-26SEP25HUNUKR-TIE"
-      }
-     },
-     "orientation": "same",
-     "status": "mapped",
-     "status_words": "one open Kalshi event names both teams on this date",
-     "title": "Hungary vs Ukraine"
-    },
-    "neutral": false,
-    "neutral_provider_flag": false,
-    "stage": "group-stage",
-    "stage_kind": "group",
-    "status_detail": "Fri, September 25th at 2:45 PM EDT",
-    "teams": {
-     "away": {
-      "espn_id": "457",
-      "form": {
-       "available": true,
-       "friendlies": 3,
-       "games": [
-        {
-         "competition": "FIFA World Cup Qualifying - UEFA",
-         "date": "2025-11-16T17:00Z",
-         "event_id": "724904",
-         "ga": 0,
-         "gf": 2,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Iceland",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup Qualifying - UEFA",
-         "date": "2026-03-26T19:45Z",
-         "event_id": "761384",
-         "ga": 3,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Sweden",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-31T18:45Z",
-         "event_id": "401866760",
-         "ga": 0,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Albania",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-05-31T15:30Z",
-         "event_id": "401872548",
-         "ga": 0,
-         "gf": 2,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Poland",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-07T16:30Z",
-         "event_id": "401871170",
-         "ga": 2,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Denmark",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        }
-       ],
-       "letters": "WLWWL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "ukraine",
-      "name": "Ukraine",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.5040230868298657,
-         "interval": [
-          0.18432808922801258,
-          1.192374262887744
-         ],
-         "rank": 20,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "log_goals",
-         "value": 0.6883511760578783
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.400639482644058,
-         "interval": [
-          -0.062326780148120875,
-          0.7389521851399952
-         ],
-         "rank": 30,
-         "straddles": true,
-         "tier": 3,
-         "tier_set": [
-          2,
-          3,
-          4
-         ],
-         "unit": "log_goals",
-         "value": 0.33831270249593715
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 28.985386776955036,
-         "interval": [
-          1726.82553194851,
-          1784.79630550242
-         ],
-         "rank": 15,
-         "straddles": false,
-         "tier": 2,
-         "tier_set": [
-          2
-         ],
-         "unit": "elo",
-         "value": 1755.810918725465
-        }
-       },
-       "axes_absent": [],
-       "competition": "unl",
-       "source": "src.picker.national_team_axes"
-      }
-     },
-     "home": {
-      "espn_id": "480",
-      "form": {
-       "available": true,
-       "friendlies": 4,
-       "games": [
-        {
-         "competition": "FIFA World Cup Qualifying - UEFA",
-         "date": "2025-11-16T14:00Z",
-         "event_id": "724899",
-         "ga": 3,
-         "gf": 2,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Republic of Ireland",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-28T17:00Z",
-         "event_id": "401857704",
-         "ga": 0,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Slovenia",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-31T17:00Z",
-         "event_id": "401857705",
-         "ga": 0,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Greece",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-05T17:45Z",
-         "event_id": "401861779",
-         "ga": 1,
-         "gf": 2,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Finland",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-09T17:00Z",
-         "event_id": "401861661",
-         "ga": 1,
-         "gf": 3,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Kazakhstan",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        }
-       ],
-       "letters": "LWDWW",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "hungary",
-      "name": "Hungary",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.42739182869614123,
-         "interval": [
-          -0.10577360042171896,
-          0.7490100569705636
-         ],
-         "rank": 30,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          2,
-          3
-         ],
-         "unit": "log_goals",
-         "value": 0.32161822827442227
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.43564051874083337,
-         "interval": [
-          -0.03633110851760912,
-          0.8349499289640576
-         ],
-         "rank": 27,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2,
-          3
-         ],
-         "unit": "log_goals",
-         "value": 0.39930941022322425
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 20.37983768144731,
-         "interval": [
-          1709.6730626015499,
-          1750.4327379644444
-         ],
-         "rank": 17,
-         "straddles": false,
-         "tier": 2,
-         "tier_set": [
-          2
-         ],
-         "unit": "elo",
-         "value": 1730.0529002829971
-        }
-       },
-       "axes_absent": [],
-       "competition": "unl",
-       "source": "src.picker.national_team_axes"
-      }
-     }
-    },
-    "venue_country": "Hungary"
-   },
-   "opponent": "Hungary",
-   "own_gdg": {
-    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record.",
-    "diff": null
-   },
-   "ppg_gap": null,
-   "rank_gap": null,
-   "ranks": {
-    "fav": 15,
-    "opp": 17
-   },
-   "rated_in": {
-    "away": "unl",
-    "home": "unl"
-   },
-   "rates": {
-    "ga": [
-     null,
-     null
-    ],
-    "gdg": [
-     null,
-     null
-    ],
-    "gf": [
-     null,
-     null
-    ],
-    "ppg": [
-     null,
-     null
-    ]
-   },
-   "refused": false,
-   "reg_time_note": "KXUEFANLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "resolution": {
-    "Hungary": "espn_id",
-    "Ukraine": "espn_id"
-   },
-   "shape": "HOLLOW",
-   "src": "current",
-   "state": "pre",
-   "table_notes": {
-    "away": null,
-    "home": null
-   },
-   "tier_gaps": {
-    "atk": 0,
-    "def": -1,
-    "ovr": 0
-   },
-   "tiers": {
-    "atk": [
-     2,
-     2
-    ],
-    "def": [
-     3,
-     2
-    ],
-    "ovr": [
-     2,
-     2
-    ]
-   },
-   "venue": {
-    "city": "Budapest",
-    "country": "Hungary",
-    "name": "Puskás Aréna"
-   },
-   "venue_class": {
-    "class": "TRUE_HOME",
-    "home_side": "home"
-   },
-   "venue_favourite": {
-    "flipped": false,
-    "home_side": "home",
-    "policy": "off",
-    "reason": "no_gdg_gap",
-    "refused": true,
-    "venue_class": "TRUE_HOME"
-   },
-   "weights": null
-  },
-  {
-   "away": "Azerbaijan",
-   "column": "unl",
-   "columns": [
-    "unl"
-   ],
-   "competition_id": "401861067",
-   "cross_league": false,
-   "current_only": null,
-   "espn": "uefa.nations",
-   "event_id": "401861067",
-   "fav_side": "away",
-   "fav_source": "field",
-   "favourite": "Azerbaijan",
-   "field": {
-    "axes": {
-     "atk": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.6447324219351562,
-       "interval": [
-        -1.3143303488197162,
-        -0.02486550494940387
-       ],
-       "rank": 50,
-       "straddles": true,
-       "tier": 4,
-       "tier_set": [
-        3,
-        4,
-        5
-       ],
-       "value": -0.6695979268845601
-      },
-      "field_size": 54,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "attack",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.4905172225027586,
-       "interval": [
-        -0.8335100274868288,
-        0.14752441751868844
-       ],
-       "rank": 46,
-       "straddles": true,
-       "tier": 3,
-       "tier_set": [
-        3,
-        4
-       ],
-       "value": -0.34299280498407014
-      },
-      "tier_gap": -1,
-      "unit": "log_goals"
-     },
-     "def": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.3391368406616741,
-       "interval": [
-        -0.5586560046774935,
-        0.11961767664585471
-       ],
-       "rank": 48,
-       "straddles": true,
-       "tier": 4,
-       "tier_set": [
-        3,
-        4,
-        5
-       ],
-       "value": -0.2195191640158194
-      },
-      "field_size": 54,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "defence",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.33449096479329327,
-       "interval": [
-        -0.21834621638359278,
-        0.4506357132029938
-       ],
-       "rank": 39,
-       "straddles": true,
-       "tier": 3,
-       "tier_set": [
-        2,
-        3,
-        4
-       ],
-       "value": 0.11614474840970049
-      },
-      "tier_gap": -1,
-      "unit": "log_goals"
-     },
-     "ovr": {
-      "fav": {
-       "below_floor": false,
-       "half_width_95": 50.919205997213275,
-       "interval": [
-        1366.989223728553,
-        1468.8276357229797
-       ],
-       "rank": 43,
-       "straddles": true,
-       "tier": 3,
-       "tier_set": [
-        3,
-        4
-       ],
-       "value": 1417.9084297257664
-      },
-      "field_size": 54,
-      "floor": {
-       "below_floor": false,
-       "failing_condition": null
-      },
-      "label": "overall",
-      "opp": {
-       "below_floor": false,
-       "half_width_95": 18.904289528697067,
-       "interval": [
-        1304.4860013973528,
-        1342.294580454747
-       ],
-       "rank": 50,
-       "straddles": false,
-       "tier": 4,
-       "tier_set": [
-        4
-       ],
-       "value": 1323.3902909260498
-      },
-      "tier_gap": 1,
-      "unit": "elo"
-     }
-    },
-    "axes_measured": [
-     "ovr",
-     "atk",
-     "def"
-    ],
-    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
-    "clubs": {
-     "fav": "Azerbaijan",
-     "opp": "Lithuania"
-    },
-    "competition": "unl",
-    "field_basis": "the UEFA Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus b89af5d2210e, variant 'all', Elo pinned at 10 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals.",
-    "shape": "HOLLOW",
-    "size": 54
-   },
-   "form": {
-    "fav": "WDLWW",
-    "opp": "LDLWL",
-    "scope": "all senior internationals, friendlies marked",
-    "scope_is_cup": false
-   },
-   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
-   "gdg_gap": null,
-   "gp_current": {
-    "away": 0,
-    "home": 1,
-    "min": 0
-   },
-   "home": "Lithuania",
-   "in_play": false,
-   "kalshi": {
-    "ask_c": 31,
-    "ask_size": 956,
-    "bid_c": 29,
-    "bid_size": 63,
-    "event_ticker": "KXUEFANLGAME-26SEP27LTUAZE",
-    "flags": [],
-    "spread_c": 2,
-    "ticker": "KXUEFANLGAME-26SEP27LTUAZE-AZE"
-   },
-   "kickoff": "2026-09-27T13:00Z",
-   "league": "unl",
-   "national": {
-    "competition": "unl",
-    "group": "Group D2",
-    "head_to_head": {
-     "available": true,
-     "meetings": [
-      {
-       "away": "Azerbaijan",
-       "away_score": 0,
-       "completed": true,
-       "date": "2008-03-26T17:00:00Z",
-       "event_id": "237441",
-       "home": "Lithuania",
-       "home_score": 1,
-       "winner": "home",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Lithuania",
-       "away_score": 0,
-       "completed": true,
-       "date": "2019-03-25T14:00:00Z",
-       "event_id": "501645",
-       "home": "Azerbaijan",
-       "home_score": 0,
-       "winner": "draw",
-       "winner_means": "this fixture's home/away sides"
-      }
-     ],
-     "reason": null,
-     "source": "seasonseries",
-     "tally": {
-      "away": 0,
-      "draw": 1,
-      "home": 1
-     }
-    },
-    "leg": null,
-    "lineups": {
-     "announced": false,
-     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff",
-     "sides": {
-      "away": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Azerbaijan"
-      },
-      "home": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Lithuania"
-      }
-     }
-    },
-    "market": {
-     "event_ticker": "KXUEFANLGAME-26SEP27LTUAZE",
-     "legs": {
-      "away": {
-       "ask_c": 31,
-       "ask_size": 956,
-       "bid_c": 29,
-       "bid_size": 63,
-       "event_ticker": "KXUEFANLGAME-26SEP27LTUAZE",
-       "flags": [],
-       "name": "Azerbaijan",
-       "spread_c": 2,
-       "ticker": "KXUEFANLGAME-26SEP27LTUAZE-AZE"
-      },
-      "home": {
-       "ask_c": 39,
-       "ask_size": 61,
-       "bid_c": 36,
-       "bid_size": 48,
-       "event_ticker": "KXUEFANLGAME-26SEP27LTUAZE",
-       "flags": [
-        "THIN"
-       ],
-       "name": "Lithuania",
-       "spread_c": 3,
-       "ticker": "KXUEFANLGAME-26SEP27LTUAZE-LTU"
-      },
-      "tie": {
-       "ask_c": 33,
-       "ask_size": 1415,
-       "bid_c": 29,
-       "bid_size": 62,
-       "event_ticker": "KXUEFANLGAME-26SEP27LTUAZE",
-       "flags": [
-        "WIDE"
-       ],
-       "spread_c": 4,
-       "ticker": "KXUEFANLGAME-26SEP27LTUAZE-TIE"
-      }
-     },
-     "orientation": "same",
-     "status": "mapped",
-     "status_words": "one open Kalshi event names both teams on this date",
-     "title": "Lithuania vs Azerbaijan"
-    },
-    "neutral": false,
-    "neutral_provider_flag": false,
-    "stage": "group-stage",
-    "stage_kind": "group",
-    "status_detail": "Sun, September 27th at 9:00 AM EDT",
-    "teams": {
-     "away": {
-      "espn_id": "581",
-      "form": {
-       "available": true,
-       "friendlies": 5,
-       "games": [
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-27T15:00Z",
-         "event_id": "401861921",
-         "ga": 1,
-         "gf": 6,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "St. Lucia",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-30T15:00Z",
-         "event_id": "401866531",
-         "ga": 1,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Sierra Leone",
-         "provider_agrees": false,
-         "provider_letter": "W",
-         "shootout": {
-          "against": 1,
-          "for": 2,
-          "note": "level after play, decided on penalties; the letter is the scoreline's, D"
-         },
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-05T18:00Z",
-         "event_id": "401871785",
-         "ga": 2,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Malta",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-09T18:00Z",
-         "event_id": "401871580",
-         "ga": 1,
-         "gf": 2,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "San Marino",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-09-23T16:00Z",
-         "event_id": "401898013",
-         "ga": 0,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Tajikistan",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        }
-       ],
-       "letters": "WDLWW",
-       "provider_disagreements": 1,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "azerbaijan",
-      "name": "Azerbaijan",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.6447324219351562,
-         "interval": [
-          -1.3143303488197162,
-          -0.02486550494940387
-         ],
-         "rank": 50,
-         "straddles": true,
-         "tier": 4,
-         "tier_set": [
-          3,
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": -0.6695979268845601
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.3391368406616741,
-         "interval": [
-          -0.5586560046774935,
-          0.11961767664585471
-         ],
-         "rank": 48,
-         "straddles": true,
-         "tier": 4,
-         "tier_set": [
-          3,
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": -0.2195191640158194
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 50.919205997213275,
-         "interval": [
-          1366.989223728553,
-          1468.8276357229797
-         ],
-         "rank": 43,
-         "straddles": true,
-         "tier": 3,
-         "tier_set": [
-          3,
-          4
-         ],
-         "unit": "elo",
-         "value": 1417.9084297257664
-        }
-       },
-       "axes_absent": [],
-       "competition": "unl",
-       "source": "src.picker.national_team_axes"
-      }
-     },
-     "home": {
-      "espn_id": "460",
-      "form": {
-       "available": true,
-       "friendlies": 3,
-       "games": [
-        {
-         "competition": "FIFA World Cup Qualifying - UEFA",
-         "date": "2025-10-12T18:45Z",
-         "event_id": "724858",
-         "ga": 2,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Poland",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2025-11-13T17:00Z",
-         "event_id": "755121",
-         "ga": 0,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Israel",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup Qualifying - UEFA",
-         "date": "2025-11-17T19:45Z",
-         "event_id": "724912",
-         "ga": 4,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Netherlands",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-26T15:00Z",
-         "event_id": "401851163",
-         "ga": 0,
-         "gf": 2,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Moldova",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-29T13:00Z",
-         "event_id": "763033",
-         "ga": 2,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Georgia",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        }
-       ],
-       "letters": "LDLWL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "lithuania",
-      "name": "Lithuania",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.4905172225027586,
-         "interval": [
-          -0.8335100274868288,
-          0.14752441751868844
-         ],
-         "rank": 46,
-         "straddles": true,
-         "tier": 3,
-         "tier_set": [
-          3,
-          4
-         ],
-         "unit": "log_goals",
-         "value": -0.34299280498407014
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.33449096479329327,
-         "interval": [
-          -0.21834621638359278,
-          0.4506357132029938
-         ],
-         "rank": 39,
-         "straddles": true,
-         "tier": 3,
-         "tier_set": [
-          2,
-          3,
-          4
-         ],
-         "unit": "log_goals",
-         "value": 0.11614474840970049
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 18.904289528697067,
-         "interval": [
-          1304.4860013973528,
-          1342.294580454747
-         ],
-         "rank": 50,
-         "straddles": false,
-         "tier": 4,
-         "tier_set": [
-          4
-         ],
-         "unit": "elo",
-         "value": 1323.3902909260498
-        }
-       },
-       "axes_absent": [],
-       "competition": "unl",
-       "source": "src.picker.national_team_axes"
-      }
-     }
-    },
-    "venue_country": "Lithuania"
-   },
-   "opponent": "Lithuania",
-   "own_gdg": {
-    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record.",
-    "diff": null
-   },
-   "ppg_gap": null,
-   "rank_gap": null,
-   "ranks": {
-    "fav": 43,
-    "opp": 50
-   },
-   "rated_in": {
-    "away": "unl",
-    "home": "unl"
-   },
-   "rates": {
-    "ga": [
-     null,
-     0
-    ],
-    "gdg": [
-     null,
-     2
-    ],
-    "gf": [
-     null,
-     2
-    ],
-    "ppg": [
-     null,
-     3
-    ]
-   },
-   "refused": false,
-   "reg_time_note": "KXUEFANLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "resolution": {
-    "Azerbaijan": "espn_id",
-    "Lithuania": "espn_id"
-   },
-   "shape": "HOLLOW",
-   "src": "current",
-   "state": "pre",
-   "table_notes": {
-    "away": null,
-    "home": null
-   },
-   "tier_gaps": {
-    "atk": -1,
-    "def": -1,
-    "ovr": 1
-   },
-   "tiers": {
-    "atk": [
-     4,
-     3
-    ],
-    "def": [
-     4,
-     3
-    ],
-    "ovr": [
-     3,
-     4
-    ]
-   },
-   "venue": {
-    "city": "Kaunas",
-    "country": "Lithuania",
-    "name": "S. Darius and S. Gireno Stadium"
-   },
-   "venue_class": {
-    "class": "TRUE_HOME",
-    "home_side": "home"
-   },
-   "venue_favourite": {
-    "flipped": false,
-    "home_side": "home",
-    "policy": "off",
-    "reason": "no_gdg_gap",
-    "refused": true,
-    "venue_class": "TRUE_HOME"
-   },
-   "weights": null
-  },
-  {
-   "away": "Nicaragua",
-   "column": "cnl",
-   "columns": [
-    "cnl"
-   ],
-   "competition_id": "401900637",
-   "cross_league": false,
-   "current_only": null,
-   "espn": "concacaf.nations.league",
-   "event_id": "401900637",
-   "fav_side": "away",
-   "fav_source": "field",
-   "favourite": "Nicaragua",
-   "field": {
-    "axes": {
-     "atk": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.31177945672676244,
-       "interval": [
-        -0.29202354267958996,
-        0.3315353707739349
-       ],
-       "rank": 7,
-       "straddles": true,
-       "tier": 1,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": 0.019755914047172474
-      },
-      "field_size": 37,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "attack",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.3237226825292346,
-       "interval": [
-        -0.47098372680160727,
-        0.1764616382568619
-       ],
-       "rank": 11,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": -0.1472610442723727
-      },
-      "tier_gap": 1,
-      "unit": "log_goals"
-     },
-     "def": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.42929433394837696,
-       "interval": [
-        -0.572330581596761,
-        0.2862580862999929
-       ],
-       "rank": 6,
-       "straddles": true,
-       "tier": 1,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": -0.14303624764838407
-      },
-      "field_size": 37,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "defence",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.6082841330787719,
-       "interval": [
-        -1.031420825845823,
-        0.18514744031172092
-       ],
-       "rank": 13,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2,
-        3
-       ],
-       "value": -0.423136692767051
-      },
-      "tier_gap": 1,
-      "unit": "log_goals"
-     },
-     "ovr": {
-      "fav": {
-       "below_floor": false,
-       "half_width_95": 28.04371263951985,
-       "interval": [
-        1446.3658843209873,
-        1502.4533096000268
-       ],
-       "rank": 11,
-       "straddles": false,
-       "tier": 2,
-       "tier_set": [
-        2
-       ],
-       "value": 1474.409596960507
-      },
-      "field_size": 37,
-      "floor": {
-       "below_floor": false,
-       "failing_condition": null
-      },
-      "label": "overall",
-      "opp": {
-       "below_floor": false,
-       "half_width_95": 21.094833608511905,
-       "interval": [
-        1417.5723271779498,
-        1459.7619943949735
-       ],
-       "rank": 13,
-       "straddles": false,
-       "tier": 2,
-       "tier_set": [
-        2
-       ],
-       "value": 1438.6671607864616
-      },
-      "tier_gap": 0,
-      "unit": "elo"
-     }
-    },
-    "axes_measured": [
-     "ovr",
-     "atk",
-     "def"
-    ],
-    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
-    "clubs": {
-     "fav": "Nicaragua",
-     "opp": "Dominican Republic"
-    },
-    "competition": "cnl",
-    "field_basis": "the CONCACAF Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus b89af5d2210e, variant 'all', Elo pinned at 10 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals.",
-    "shape": "SPLIT",
-    "size": 37
-   },
-   "form": {
-    "fav": "WLLDL",
-    "opp": "WDDDL",
-    "scope": "all senior internationals, friendlies marked",
-    "scope_is_cup": false
-   },
-   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
-   "gdg_gap": null,
-   "gp_current": {
-    "away": 0,
-    "home": 0,
-    "min": 0
-   },
-   "home": "Dominican Republic",
-   "in_play": false,
-   "kalshi": {
-    "ask_c": 19,
-    "ask_size": 24584,
-    "bid_c": 17,
-    "bid_size": 3480,
-    "event_ticker": "KXCONCACAFNLGAME-26SEP24DOMNIC",
-    "flags": [],
-    "spread_c": 2,
-    "ticker": "KXCONCACAFNLGAME-26SEP24DOMNIC-NIC"
-   },
-   "kickoff": "2026-09-25T00:00Z",
-   "league": "cnl",
-   "national": {
-    "competition": "cnl",
-    "group": "League A - Group A",
-    "head_to_head": {
-     "available": true,
-     "meetings": [
-      {
-       "away": "Dominican Republic",
-       "away_score": 3,
-       "completed": true,
-       "date": "2017-11-09T00:30:00Z",
-       "event_id": "498510",
-       "home": "Nicaragua",
-       "home_score": 0,
-       "winner": "home",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Nicaragua",
-       "away_score": 0,
-       "completed": true,
-       "date": "2017-11-11T20:00:00Z",
-       "event_id": "498534",
-       "home": "Dominican Republic",
-       "home_score": 1,
-       "winner": "home",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Nicaragua",
-       "away_score": 2,
-       "completed": true,
-       "date": "2023-09-08T23:00:00Z",
-       "event_id": "680806",
-       "home": "Dominican Republic",
-       "home_score": 0,
-       "winner": "away",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Dominican Republic",
-       "away_score": 0,
-       "completed": true,
-       "date": "2023-11-22T02:00:00Z",
-       "event_id": "680856",
-       "home": "Nicaragua",
-       "home_score": 0,
-       "winner": "draw",
-       "winner_means": "this fixture's home/away sides"
-      }
-     ],
-     "reason": null,
-     "source": "seasonseries",
-     "tally": {
-      "away": 1,
-      "draw": 1,
-      "home": 2
-     }
-    },
-    "leg": null,
-    "lineups": {
-     "announced": true,
-     "reason": null,
-     "sides": {
-      "away": {
-       "announced": true,
-       "bench": 10,
-       "formation": "5-4-1",
-       "starters": [
-        {
-         "jersey": "23",
-         "name": "Jason Vega",
-         "position": "G"
-        },
-        {
-         "jersey": "2",
-         "name": "Joab Gutiérrez",
-         "position": "D"
-        },
-        {
-         "jersey": "6",
-         "name": "Emmanuel Gómez",
-         "position": "D"
-        },
-        {
-         "jersey": "19",
-         "name": "Juan Rodriguez",
-         "position": "D"
-        },
-        {
-         "jersey": "5",
-         "name": "Justing Cano",
-         "position": "D"
-        },
-        {
-         "jersey": "4",
-         "name": "Marvin David Fletes",
-         "position": "D"
-        },
-        {
-         "jersey": "14",
-         "name": "Kadeem Cole",
-         "position": "M"
-        },
-        {
-         "jersey": "16",
-         "name": "Raheem Giusseppe Cole Martinez",
-         "position": "M"
-        },
-        {
-         "jersey": "20",
-         "name": "Jonathan Moncada",
-         "position": "M"
-        },
-        {
-         "jersey": "11",
-         "name": "Efraín Antonio Mejía Alfaro",
-         "position": "M"
-        },
-        {
-         "jersey": "9",
-         "name": "Jaime Moreno",
-         "position": "F"
-        }
-       ],
-       "team": "Nicaragua"
-      },
-      "home": {
-       "announced": true,
-       "bench": 11,
-       "formation": "4-3-3",
-       "starters": [
-        {
-         "jersey": "1",
-         "name": "Xavier Valdez",
-         "position": "G"
-        },
-        {
-         "jersey": "5",
-         "name": "Noah Dollenmayer",
-         "position": "D"
-        },
-        {
-         "jersey": "3",
-         "name": "Junior Firpo",
-         "position": "D"
-        },
-        {
-         "jersey": "21",
-         "name": "Juan Castillo",
-         "position": "D"
-        },
-        {
-         "jersey": "23",
-         "name": "Luiyi de Lucas",
-         "position": "D"
-        },
-        {
-         "jersey": "14",
-         "name": "Jean Carlos López",
-         "position": "M"
-        },
-        {
-         "jersey": "6",
-         "name": "Pablo Rosario",
-         "position": "M"
-        },
-        {
-         "jersey": "8",
-         "name": "Heinz Mörschel",
-         "position": "M"
-        },
-        {
-         "jersey": "19",
-         "name": "Peter Federico",
-         "position": "F"
-        },
-        {
-         "jersey": "9",
-         "name": "Mariano Díaz",
-         "position": "F"
-        },
-        {
-         "jersey": "11",
-         "name": "Edarlyn Reyes",
-         "position": "F"
-        }
-       ],
-       "team": "Dominican Republic"
-      }
-     }
-    },
-    "market": {
-     "event_ticker": "KXCONCACAFNLGAME-26SEP24DOMNIC",
-     "legs": {
-      "away": {
-       "ask_c": 19,
-       "ask_size": 24584,
-       "bid_c": 17,
-       "bid_size": 3480,
-       "event_ticker": "KXCONCACAFNLGAME-26SEP24DOMNIC",
-       "flags": [],
-       "name": "Nicaragua",
-       "spread_c": 2,
-       "ticker": "KXCONCACAFNLGAME-26SEP24DOMNIC-NIC"
-      },
-      "home": {
-       "ask_c": 62,
-       "ask_size": 43212,
-       "bid_c": 61,
-       "bid_size": 3656,
-       "event_ticker": "KXCONCACAFNLGAME-26SEP24DOMNIC",
-       "flags": [],
-       "name": "Dominican Republic",
-       "spread_c": 1,
-       "ticker": "KXCONCACAFNLGAME-26SEP24DOMNIC-DOM"
-      },
-      "tie": {
-       "ask_c": 22,
-       "ask_size": 7052,
-       "bid_c": 21,
-       "bid_size": 348,
-       "event_ticker": "KXCONCACAFNLGAME-26SEP24DOMNIC",
-       "flags": [],
-       "spread_c": 1,
-       "ticker": "KXCONCACAFNLGAME-26SEP24DOMNIC-TIE"
-      }
-     },
-     "orientation": "same",
-     "status": "mapped",
-     "status_words": "one open Kalshi event names both teams on this date",
-     "title": "Dominican Republic vs Nicaragua"
-    },
-    "neutral": false,
-    "neutral_provider_flag": false,
-    "stage": "group-stage",
-    "stage_kind": "group",
-    "status_detail": "Thu, September 24th at 8:00 PM EDT",
-    "teams": {
-     "away": {
-      "espn_id": "2658",
-      "form": {
-       "available": true,
-       "friendlies": 3,
-       "games": [
-        {
-         "competition": "FIFA World Cup Qualifying - Concacaf",
-         "date": "2025-11-14T02:00Z",
-         "event_id": "754261",
-         "ga": 0,
-         "gf": 2,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Honduras",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup Qualifying - Concacaf",
-         "date": "2025-11-19T01:00Z",
-         "event_id": "754268",
-         "ga": 2,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Haiti",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-27T16:30Z",
-         "event_id": "401862882",
-         "ga": 3,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Russia",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-05-29T16:00Z",
-         "event_id": "401871131",
-         "ga": 0,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "South Africa",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-05T22:45Z",
-         "event_id": "401871132",
-         "ga": 4,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Paraguay",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        }
-       ],
-       "letters": "WLLDL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "nicaragua",
-      "name": "Nicaragua",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.31177945672676244,
-         "interval": [
-          -0.29202354267958996,
-          0.3315353707739349
-         ],
-         "rank": 7,
-         "straddles": true,
-         "tier": 1,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "log_goals",
-         "value": 0.019755914047172474
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.42929433394837696,
-         "interval": [
-          -0.572330581596761,
-          0.2862580862999929
-         ],
-         "rank": 6,
-         "straddles": true,
-         "tier": 1,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "log_goals",
-         "value": -0.14303624764838407
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 28.04371263951985,
-         "interval": [
-          1446.3658843209873,
-          1502.4533096000268
-         ],
-         "rank": 11,
-         "straddles": false,
-         "tier": 2,
-         "tier_set": [
-          2
-         ],
-         "unit": "elo",
-         "value": 1474.409596960507
-        }
-       },
-       "axes_absent": [],
-       "competition": "cnl",
-       "source": "src.picker.national_team_axes"
-      }
-     },
-     "home": {
-      "espn_id": "2649",
-      "form": {
-       "available": true,
-       "friendlies": 5,
-       "games": [
-        {
-         "competition": "International Friendly",
-         "date": "2025-11-13T00:00Z",
-         "event_id": "760870",
-         "ga": 0,
-         "gf": 2,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "St. Vincent and the Grenadines",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2025-11-18T23:30Z",
-         "event_id": "760901",
-         "ga": 0,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Martinique",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-27T00:00Z",
-         "event_id": "401866383",
-         "ga": 2,
-         "gf": 2,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "El Salvador",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-29T22:00Z",
-         "event_id": "401866390",
-         "ga": 1,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Cuba",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-04T00:45Z",
-         "event_id": "401870075",
-         "ga": 4,
-         "gf": 2,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Panama",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        }
-       ],
-       "letters": "WDDDL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "dominican-republic",
-      "name": "Dominican Republic",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.3237226825292346,
-         "interval": [
-          -0.47098372680160727,
-          0.1764616382568619
-         ],
-         "rank": 11,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "log_goals",
-         "value": -0.1472610442723727
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.6082841330787719,
-         "interval": [
-          -1.031420825845823,
-          0.18514744031172092
-         ],
-         "rank": 13,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2,
-          3
-         ],
-         "unit": "log_goals",
-         "value": -0.423136692767051
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 21.094833608511905,
-         "interval": [
-          1417.5723271779498,
-          1459.7619943949735
-         ],
-         "rank": 13,
-         "straddles": false,
-         "tier": 2,
-         "tier_set": [
-          2
-         ],
-         "unit": "elo",
-         "value": 1438.6671607864616
-        }
-       },
-       "axes_absent": [],
-       "competition": "cnl",
-       "source": "src.picker.national_team_axes"
-      }
-     }
-    },
-    "venue_country": "Dominican Republic"
-   },
-   "opponent": "Dominican Republic",
-   "own_gdg": {
-    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record.",
-    "diff": null
-   },
-   "ppg_gap": null,
-   "rank_gap": null,
-   "ranks": {
-    "fav": 11,
-    "opp": 13
-   },
-   "rated_in": {
-    "away": "cnl",
-    "home": "cnl"
-   },
-   "rates": {
-    "ga": [
-     null,
-     null
-    ],
-    "gdg": [
-     null,
-     null
-    ],
-    "gf": [
-     null,
-     null
-    ],
-    "ppg": [
-     null,
-     null
-    ]
-   },
-   "refused": false,
-   "reg_time_note": "KXCONCACAFNLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "resolution": {
-    "Dominican Republic": "espn_id",
-    "Nicaragua": "espn_id"
-   },
-   "shape": "SPLIT",
-   "src": "current",
-   "state": "pre",
-   "table_notes": {
-    "away": null,
-    "home": null
-   },
-   "tier_gaps": {
-    "atk": 1,
-    "def": 1,
-    "ovr": 0
-   },
-   "tiers": {
-    "atk": [
-     1,
-     2
-    ],
-    "def": [
-     1,
-     2
-    ],
-    "ovr": [
-     2,
-     2
-    ]
-   },
-   "venue": {
-    "city": "Santiago",
-    "country": "Dominican Republic",
-    "name": "Estadio Cibao"
-   },
-   "venue_class": {
-    "class": "TRUE_HOME",
-    "home_side": "home"
-   },
-   "venue_favourite": {
-    "flipped": false,
-    "home_side": "home",
-    "policy": "off",
-    "reason": "no_gdg_gap",
-    "refused": true,
-    "venue_class": "TRUE_HOME"
-   },
-   "weights": null
-  },
-  {
-   "away": "Dominica",
-   "column": "cnl",
-   "columns": [
-    "cnl"
-   ],
-   "competition_id": "401900634",
-   "cross_league": false,
-   "current_only": null,
-   "espn": "concacaf.nations.league",
-   "event_id": "401900634",
-   "fav_side": "away",
-   "fav_source": "field",
-   "favourite": "Dominica",
-   "field": {
-    "axes": {
-     "atk": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.5499455258791347,
-       "interval": [
-        -1.5595855599693023,
-        -0.45969450821103275
-       ],
-       "rank": 31,
-       "straddles": true,
-       "tier": 4,
-       "tier_set": [
-        2,
-        3,
-        4,
-        5
-       ],
-       "value": -1.0096400340901674
-      },
-      "field_size": 37,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "attack",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.461207121166634,
-       "interval": [
-        -1.662894480430495,
-        -0.7404802380972271
-       ],
-       "rank": 32,
-       "straddles": true,
-       "tier": 4,
-       "tier_set": [
-        3,
-        4,
-        5
-       ],
-       "value": -1.201687359263861
-      },
-      "tier_gap": 0,
-      "unit": "log_goals"
-     },
-     "def": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.6041293299056487,
-       "interval": [
-        -1.6738273787072782,
-        -0.4655687188959807
-       ],
-       "rank": 26,
-       "straddles": true,
-       "tier": 4,
-       "tier_set": [
-        2,
-        3,
-        4,
-        5
-       ],
-       "value": -1.0696980488016294
-      },
-      "field_size": 37,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "defence",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.4768584372866395,
-       "interval": [
-        -1.9768753307054292,
-        -1.02315845613215
-       ],
-       "rank": 33,
-       "straddles": true,
-       "tier": 5,
-       "tier_set": [
-        3,
-        4,
-        5
-       ],
-       "value": -1.5000168934187896
-      },
-      "tier_gap": 1,
-      "unit": "log_goals"
-     },
-     "ovr": {
-      "fav": {
-       "below_floor": false,
-       "half_width_95": 16.785353018465205,
-       "interval": [
-        1196.4707323149403,
-        1230.0414383518707
-       ],
-       "rank": 28,
-       "straddles": false,
-       "tier": 4,
-       "tier_set": [
-        4
-       ],
-       "value": 1213.2560853334055
-      },
-      "field_size": 37,
-      "floor": {
-       "below_floor": false,
-       "failing_condition": null
-      },
-      "label": "overall",
-      "opp": {
-       "below_floor": false,
-       "half_width_95": 44.870161413015694,
-       "interval": [
-        1061.8212756857588,
-        1151.5615985117902
-       ],
-       "rank": 31,
-       "straddles": true,
-       "tier": 4,
-       "tier_set": [
-        4,
-        5
-       ],
-       "value": 1106.6914370987745
-      },
-      "tier_gap": 0,
-      "unit": "elo"
-     }
-    },
-    "axes_measured": [
-     "ovr",
-     "atk",
-     "def"
-    ],
-    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
-    "clubs": {
-     "fav": "Dominica",
-     "opp": "Cayman Islands"
-    },
-    "competition": "cnl",
-    "field_basis": "the CONCACAF Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus b89af5d2210e, variant 'all', Elo pinned at 10 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals.",
-    "shape": "SPLIT",
-    "size": 37
-   },
-   "form": {
-    "fav": "LLLDW",
-    "opp": "LWDWL",
-    "scope": "all senior internationals, friendlies marked",
-    "scope_is_cup": false
-   },
-   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
-   "gdg_gap": null,
-   "gp_current": {
-    "away": 0,
-    "home": 0,
-    "min": 0
-   },
-   "home": "Cayman Islands",
-   "in_play": false,
-   "kalshi": {
-    "ask_c": 62,
-    "ask_size": 1557,
-    "bid_c": 61,
-    "bid_size": 1460,
-    "event_ticker": "KXCONCACAFNLGAME-26SEP24CAYDMA",
-    "flags": [],
-    "spread_c": 1,
-    "ticker": "KXCONCACAFNLGAME-26SEP24CAYDMA-DMA"
-   },
-   "kickoff": "2026-09-25T00:10Z",
-   "league": "cnl",
-   "national": {
-    "competition": "cnl",
-    "group": "League B - Group A",
-    "head_to_head": {
-     "available": false,
-     "meetings": [],
-     "reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met",
-     "source": null
-    },
-    "leg": null,
-    "lineups": {
-     "announced": true,
-     "reason": null,
-     "sides": {
-      "away": {
-       "announced": true,
-       "bench": 8,
-       "formation": "5-4-1",
-       "starters": [
-        {
-         "jersey": "1",
-         "name": "Donte Newton",
-         "position": "G"
-        },
-        {
-         "jersey": "2",
-         "name": "Tobi Jnohope",
-         "position": "CD"
-        },
-        {
-         "jersey": "13",
-         "name": "Marcus Bredas",
-         "position": "CD-L"
-        },
-        {
-         "jersey": "4",
-         "name": "Eustace Marshall",
-         "position": "CD-R"
-        },
-        {
-         "jersey": "16",
-         "name": "Triston Sandy",
-         "position": "LB"
-        },
-        {
-         "jersey": "14",
-         "name": "Reon Cuffy",
-         "position": "RB"
-        },
-        {
-         "jersey": "19",
-         "name": "Briel Thomas",
-         "position": "CM-L"
-        },
-        {
-         "jersey": "9",
-         "name": "Javid George",
-         "position": "CM-R"
-        },
-        {
-         "jersey": "23",
-         "name": "Audel Laville",
-         "position": "LM"
-        },
-        {
-         "jersey": "20",
-         "name": "Lyan Edwards",
-         "position": "RM"
-        },
-        {
-         "jersey": "10",
-         "name": "Troy Jules",
-         "position": "F"
-        }
-       ],
-       "team": "Dominica"
-      },
-      "home": {
-       "announced": true,
-       "bench": 9,
-       "formation": "5-4-1",
-       "starters": [
-        {
-         "jersey": "1",
-         "name": "Lachlin Lambert",
-         "position": "G"
-        },
-        {
-         "jersey": "5",
-         "name": "Cameron Gray",
-         "position": "CD"
-        },
-        {
-         "jersey": "14",
-         "name": "Joshwa Campbell",
-         "position": "CD-L"
-        },
-        {
-         "jersey": "3",
-         "name": "D'Andre Rowe",
-         "position": "CD-R"
-        },
-        {
-         "jersey": "19",
-         "name": "Gunnar Studenthofft",
-         "position": "LB"
-        },
-        {
-         "jersey": "23",
-         "name": "Jabari Campbell",
-         "position": "RB"
-        },
-        {
-         "jersey": "8",
-         "name": "Jordan Bonilla",
-         "position": "CM-L"
-        },
-        {
-         "jersey": "10",
-         "name": "Zachary Scott",
-         "position": "CM-R"
-        },
-        {
-         "jersey": "7",
-         "name": "Elijah Seymour",
-         "position": "LM"
-        },
-        {
-         "jersey": "17",
-         "name": "Sebastian Martinez",
-         "position": "RM"
-        },
-        {
-         "jersey": "9",
-         "name": "Christopher Reeves",
-         "position": "F"
-        }
-       ],
-       "team": "Cayman Islands"
-      }
-     }
-    },
-    "market": {
-     "event_ticker": "KXCONCACAFNLGAME-26SEP24CAYDMA",
-     "legs": {
-      "away": {
-       "ask_c": 62,
-       "ask_size": 1557,
-       "bid_c": 61,
-       "bid_size": 1460,
-       "event_ticker": "KXCONCACAFNLGAME-26SEP24CAYDMA",
-       "flags": [],
-       "name": "Dominica",
-       "spread_c": 1,
-       "ticker": "KXCONCACAFNLGAME-26SEP24CAYDMA-DMA"
-      },
-      "home": {
-       "ask_c": 20,
-       "ask_size": 7524,
-       "bid_c": 19,
-       "bid_size": 24,
-       "event_ticker": "KXCONCACAFNLGAME-26SEP24CAYDMA",
-       "flags": [],
-       "name": "Cayman Islands",
-       "spread_c": 1,
-       "ticker": "KXCONCACAFNLGAME-26SEP24CAYDMA-CAY"
-      },
-      "tie": {
-       "ask_c": 21,
-       "ask_size": 603,
-       "bid_c": 20,
-       "bid_size": 342,
-       "event_ticker": "KXCONCACAFNLGAME-26SEP24CAYDMA",
-       "flags": [],
-       "spread_c": 1,
-       "ticker": "KXCONCACAFNLGAME-26SEP24CAYDMA-TIE"
-      }
-     },
-     "orientation": "same",
-     "status": "mapped",
-     "status_words": "one open Kalshi event names both teams on this date",
-     "title": "Cayman Islands vs Dominica"
-    },
-    "neutral": false,
-    "neutral_provider_flag": false,
-    "stage": "group-stage",
-    "stage_kind": "group",
-    "status_detail": "Thu, September 24th at 8:10 PM EDT",
-    "teams": {
-     "away": {
-      "espn_id": "13582",
-      "form": {
-       "available": true,
-       "friendlies": 5,
-       "games": [
-        {
-         "competition": "International Friendly",
-         "date": "2025-11-12T20:00Z",
-         "event_id": "761045",
-         "ga": 2,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "St. Martin",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2025-11-15T20:00Z",
-         "event_id": "761282",
-         "ga": 3,
-         "gf": 2,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Sint Maarten",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-27T19:00Z",
-         "event_id": "401866385",
-         "ga": 2,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Guyana",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-30T23:30Z",
-         "event_id": "401866394",
-         "ga": 0,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Sint Maarten",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-09-21T15:00Z",
-         "event_id": "401922037",
-         "ga": 0,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Anguilla",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        }
-       ],
-       "letters": "LLLDW",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "dominica",
-      "name": "Dominica",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.5499455258791347,
-         "interval": [
-          -1.5595855599693023,
-          -0.45969450821103275
-         ],
-         "rank": 31,
-         "straddles": true,
-         "tier": 4,
-         "tier_set": [
-          2,
-          3,
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": -1.0096400340901674
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.6041293299056487,
-         "interval": [
-          -1.6738273787072782,
-          -0.4655687188959807
-         ],
-         "rank": 26,
-         "straddles": true,
-         "tier": 4,
-         "tier_set": [
-          2,
-          3,
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": -1.0696980488016294
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 16.785353018465205,
-         "interval": [
-          1196.4707323149403,
-          1230.0414383518707
-         ],
-         "rank": 28,
-         "straddles": false,
-         "tier": 4,
-         "tier_set": [
-          4
-         ],
-         "unit": "elo",
-         "value": 1213.2560853334055
-        }
-       },
-       "axes_absent": [],
-       "competition": "cnl",
-       "source": "src.picker.national_team_axes"
-      }
-     },
-     "home": {
-      "espn_id": "2646",
-      "form": {
-       "available": true,
-       "friendlies": 5,
-       "games": [
-        {
-         "competition": "International Friendly",
-         "date": "2025-11-13T00:00Z",
-         "event_id": "760874",
-         "ga": 2,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "British Virgin Islands",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2025-11-16T00:00Z",
-         "event_id": "760890",
-         "ga": 0,
-         "gf": 4,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Anguilla",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-27T00:00Z",
-         "event_id": "401866382",
-         "ga": 1,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "British Virgin Islands",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-30T00:00Z",
-         "event_id": "401866391",
-         "ga": 0,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Bahamas",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-06T17:00Z",
-         "event_id": "401872613",
-         "ga": 4,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Gibraltar",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        }
-       ],
-       "letters": "LWDWL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "cayman-islands",
-      "name": "Cayman Islands",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.461207121166634,
-         "interval": [
-          -1.662894480430495,
-          -0.7404802380972271
-         ],
-         "rank": 32,
-         "straddles": true,
-         "tier": 4,
-         "tier_set": [
-          3,
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": -1.201687359263861
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.4768584372866395,
-         "interval": [
-          -1.9768753307054292,
-          -1.02315845613215
-         ],
-         "rank": 33,
-         "straddles": true,
-         "tier": 5,
-         "tier_set": [
-          3,
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": -1.5000168934187896
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 44.870161413015694,
-         "interval": [
-          1061.8212756857588,
-          1151.5615985117902
-         ],
-         "rank": 31,
-         "straddles": true,
-         "tier": 4,
-         "tier_set": [
-          4,
-          5
-         ],
-         "unit": "elo",
-         "value": 1106.6914370987745
-        }
-       },
-       "axes_absent": [],
-       "competition": "cnl",
-       "source": "src.picker.national_team_axes"
-      }
-     }
-    },
-    "venue_country": "Dominica"
-   },
-   "opponent": "Cayman Islands",
-   "own_gdg": {
-    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record.",
-    "diff": null
-   },
-   "ppg_gap": null,
-   "rank_gap": null,
-   "ranks": {
-    "fav": 28,
-    "opp": 31
-   },
-   "rated_in": {
-    "away": "cnl",
-    "home": "cnl"
-   },
-   "rates": {
-    "ga": [
-     null,
-     null
-    ],
-    "gdg": [
-     null,
-     null
-    ],
-    "gf": [
-     null,
-     null
-    ],
-    "ppg": [
-     null,
-     null
-    ]
-   },
-   "refused": false,
-   "reg_time_note": "KXCONCACAFNLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "resolution": {
-    "Cayman Islands": "espn_id",
-    "Dominica": "espn_id"
-   },
-   "shape": "SPLIT",
-   "src": "current",
-   "state": "pre",
-   "table_notes": {
-    "away": null,
-    "home": null
-   },
-   "tier_gaps": {
-    "atk": 0,
-    "def": 1,
-    "ovr": 0
-   },
-   "tiers": {
-    "atk": [
-     4,
-     4
-    ],
-    "def": [
-     4,
-     5
-    ],
-    "ovr": [
-     4,
-     4
-    ]
-   },
-   "venue": {
-    "city": "Roseau",
-    "country": "Dominica",
-    "name": "Windsor Park, Roseau"
-   },
-   "venue_class": {
-    "class": "OPPONENT_COUNTRY",
-    "home_side": "away"
-   },
-   "venue_favourite": {
-    "flipped": false,
-    "home_side": "away",
-    "policy": "off",
-    "reason": "no_gdg_gap",
-    "refused": true,
-    "venue_class": "OPPONENT_COUNTRY"
-   },
-   "weights": null
-  },
-  {
-   "away": "Trinidad and Tobago",
-   "column": "cnl",
-   "columns": [
-    "cnl"
-   ],
-   "competition_id": "401900636",
-   "cross_league": false,
-   "current_only": null,
-   "espn": "concacaf.nations.league",
-   "event_id": "401900636",
-   "fav_side": "home",
-   "fav_source": "field",
-   "favourite": "Haiti",
-   "field": {
-    "axes": {
-     "atk": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.46666958637005956,
-       "interval": [
-        -0.20842294274262974,
-        0.7249162299974894
-       ],
-       "rank": 3,
-       "straddles": true,
-       "tier": 1,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": 0.25824664362742983
-      },
-      "field_size": 37,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "attack",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.4291288965557644,
-       "interval": [
-        -0.41623400869337646,
-        0.4420237844181524
-       ],
-       "rank": 8,
-       "straddles": true,
-       "tier": 1,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": 0.01289488786238796
-      },
-      "tier_gap": 0,
-      "unit": "log_goals"
-     },
-     "def": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.32699952636265206,
-       "interval": [
-        -0.7345878310878842,
-        -0.08058877836258
-       ],
-       "rank": 12,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2,
-        3
-       ],
-       "value": -0.40758830472523205
-      },
-      "field_size": 37,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "defence",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.5801432800911851,
-       "interval": [
-        -0.8103134663006748,
-        0.34997309388169534
-       ],
-       "rank": 7,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2,
-        3
-       ],
-       "value": -0.23017018620948976
-      },
-      "tier_gap": 0,
-      "unit": "log_goals"
-     },
-     "ovr": {
-      "fav": {
-       "below_floor": false,
-       "half_width_95": 52.049410206531604,
-       "interval": [
-        1550.0310658124388,
-        1654.1298862255019
-       ],
-       "rank": 3,
-       "straddles": false,
-       "tier": 1,
-       "tier_set": [
-        1
-       ],
-       "value": 1602.0804760189703
-      },
-      "field_size": 37,
-      "floor": {
-       "below_floor": false,
-       "failing_condition": null
-      },
-      "label": "overall",
-      "opp": {
-       "below_floor": false,
-       "half_width_95": 35.39466819959713,
-       "interval": [
-        1474.0498632900346,
-        1544.839199689229
-       ],
-       "rank": 7,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": 1509.4445314896318
-      },
-      "tier_gap": 1,
-      "unit": "elo"
-     }
-    },
-    "axes_measured": [
-     "ovr",
-     "atk",
-     "def"
-    ],
-    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
-    "clubs": {
-     "fav": "Haiti",
-     "opp": "Trinidad and Tobago"
-    },
-    "competition": "cnl",
-    "field_basis": "the CONCACAF Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus b89af5d2210e, variant 'all', Elo pinned at 10 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals.",
-    "shape": "HOLLOW",
-    "size": 37
-   },
-   "form": {
-    "fav": "WLLLL",
-    "opp": "LDLLL",
-    "scope": "all senior internationals, friendlies marked",
-    "scope_is_cup": false
-   },
-   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
-   "gdg_gap": null,
-   "gp_current": {
-    "away": 0,
-    "home": 0,
-    "min": 0
-   },
-   "home": "Haiti",
-   "in_play": false,
-   "kalshi": {
-    "ask_c": 65,
-    "ask_size": 43873,
-    "bid_c": 64,
-    "bid_size": 9970,
-    "event_ticker": "KXCONCACAFNLGAME-26SEP24HTITTO",
-    "flags": [],
-    "spread_c": 1,
-    "ticker": "KXCONCACAFNLGAME-26SEP24HTITTO-HTI"
-   },
-   "kickoff": "2026-09-25T00:20Z",
-   "league": "cnl",
-   "national": {
-    "competition": "cnl",
-    "group": "League A - Group A",
-    "head_to_head": {
-     "available": true,
-     "meetings": [
-      {
-       "away": "Haiti",
-       "away_score": 0,
-       "completed": false,
-       "date": "2007-05-28T07:00:00Z",
-       "event_id": "221257",
-       "home": "Trinidad and Tobago",
-       "home_score": 0
-      },
-      {
-       "away": "Haiti",
-       "away_score": 2,
-       "completed": true,
-       "date": "2013-07-12T23:00:00Z",
-       "event_id": "370661",
-       "home": "Trinidad and Tobago",
-       "home_score": 0,
-       "winner": "home",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Haiti",
-       "away_score": 1,
-       "completed": true,
-       "date": "2016-01-08T22:30:00Z",
-       "event_id": "439858",
-       "home": "Trinidad and Tobago",
-       "home_score": 0,
-       "winner": "home",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Haiti",
-       "away_score": 1,
-       "completed": true,
-       "date": "2025-06-19T22:45:00Z",
-       "event_id": "735328",
-       "home": "Trinidad and Tobago",
-       "home_score": 1,
-       "winner": "draw",
-       "winner_means": "this fixture's home/away sides"
-      }
-     ],
-     "reason": null,
-     "source": "seasonseries",
-     "tally": {
-      "away": 0,
-      "draw": 1,
-      "home": 2
-     }
-    },
-    "leg": null,
-    "lineups": {
-     "announced": true,
-     "reason": null,
-     "sides": {
-      "away": {
-       "announced": true,
-       "bench": 10,
-       "formation": "4-2-3-1",
-       "starters": [
-        {
-         "jersey": "22",
-         "name": "Denzil Smith",
-         "position": "G"
-        },
-        {
-         "jersey": "17",
-         "name": "Justin Garcia",
-         "position": "CD-L"
-        },
-        {
-         "jersey": "5",
-         "name": "Josiah Trimmingham",
-         "position": "CD-R"
-        },
-        {
-         "jersey": "23",
-         "name": "Noah Powder",
-         "position": "LB"
-        },
-        {
-         "jersey": "19",
-         "name": "Rio Cardines",
-         "position": "RB"
-        },
-        {
-         "jersey": "8",
-         "name": "Daniel Phillips",
-         "position": "AM"
-        },
-        {
-         "jersey": "18",
-         "name": "Andre Rampersad",
-         "position": "LM"
-        },
-        {
-         "jersey": "14",
-         "name": "Wayne Frederick",
-         "position": "RM"
-        },
-        {
-         "jersey": "11",
-         "name": "Levi García",
-         "position": "F"
-        },
-        {
-         "jersey": "16",
-         "name": "Tyrese Spicer",
-         "position": "AM-L"
-        },
-        {
-         "jersey": "7",
-         "name": "Ryan Telfer",
-         "position": "AM-R"
-        }
-       ],
-       "team": "Trinidad and Tobago"
-      },
-      "home": {
-       "announced": true,
-       "bench": 11,
-       "formation": "4-4-2",
-       "starters": [
-        {
-         "jersey": "1",
-         "name": "Alexandre Pierre",
-         "position": "G"
-        },
-        {
-         "jersey": "5",
-         "name": "Hannes Delcroix",
-         "position": "CD-L"
-        },
-        {
-         "jersey": "4",
-         "name": "Garven Metusala",
-         "position": "CD-R"
-        },
-        {
-         "jersey": "8",
-         "name": "Martin Expérience",
-         "position": "LB"
-        },
-        {
-         "jersey": "2",
-         "name": "Carlens Arcus",
-         "position": "RB"
-        },
-        {
-         "jersey": "6",
-         "name": "Carl Sainté",
-         "position": "CM-L"
-        },
-        {
-         "jersey": "17",
-         "name": "Danley Jean Jacques",
-         "position": "CM-R"
-        },
-        {
-         "jersey": "7",
-         "name": "Fafà Picault",
-         "position": "LM"
-        },
-        {
-         "jersey": "11",
-         "name": "Louicius Deedson",
-         "position": "RM"
-        },
-        {
-         "jersey": "18",
-         "name": "Wilson Isidor",
-         "position": "CF-L"
-        },
-        {
-         "jersey": "21",
-         "name": "Dany Jean",
-         "position": "CF-R"
-        }
-       ],
-       "team": "Haiti"
-      }
-     }
-    },
-    "market": {
-     "event_ticker": "KXCONCACAFNLGAME-26SEP24HTITTO",
-     "legs": {
-      "away": {
-       "ask_c": 15,
-       "ask_size": 9942,
-       "bid_c": 14,
-       "bid_size": 2623,
-       "event_ticker": "KXCONCACAFNLGAME-26SEP24HTITTO",
-       "flags": [],
-       "name": "Trinidad and Tobago",
-       "spread_c": 1,
-       "ticker": "KXCONCACAFNLGAME-26SEP24HTITTO-TTO"
-      },
-      "home": {
-       "ask_c": 65,
-       "ask_size": 43873,
-       "bid_c": 64,
-       "bid_size": 9970,
-       "event_ticker": "KXCONCACAFNLGAME-26SEP24HTITTO",
-       "flags": [],
-       "name": "Haiti",
-       "spread_c": 1,
-       "ticker": "KXCONCACAFNLGAME-26SEP24HTITTO-HTI"
-      },
-      "tie": {
-       "ask_c": 21,
-       "ask_size": 1218,
-       "bid_c": 20,
-       "bid_size": 799,
-       "event_ticker": "KXCONCACAFNLGAME-26SEP24HTITTO",
-       "flags": [],
-       "spread_c": 1,
-       "ticker": "KXCONCACAFNLGAME-26SEP24HTITTO-TIE"
-      }
-     },
-     "orientation": "same",
-     "status": "mapped",
-     "status_words": "one open Kalshi event names both teams on this date",
-     "title": "Haiti vs Trinidad and Tobago"
-    },
-    "neutral": true,
-    "neutral_provider_flag": false,
-    "stage": "group-stage",
-    "stage_kind": "group",
-    "status_detail": "Thu, September 24th at 8:20 PM EDT",
-    "teams": {
-     "away": {
-      "espn_id": "2627",
-      "form": {
-       "available": true,
-       "friendlies": 5,
-       "games": [
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-27T10:00Z",
-         "event_id": "401861039",
-         "ga": 4,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Venezuela",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-30T10:00Z",
-         "event_id": "401866485",
-         "ga": 2,
-         "gf": 2,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Gabon",
-         "provider_agrees": false,
-         "provider_letter": "L",
-         "shootout": {
-          "against": 3,
-          "for": 2,
-          "note": "level after play, decided on penalties; the letter is the scoreline's, D"
-         },
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-05-31T01:00Z",
-         "event_id": "401872679",
-         "ga": 5,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "South Korea",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-09T17:00Z",
-         "event_id": "401870855",
-         "ga": 3,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Russia",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "Club Friendly",
-         "date": "2026-07-26T00:00Z",
-         "event_id": "401898835",
-         "ga": 1,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Louisville City FC",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        }
-       ],
-       "letters": "LDLLL",
-       "provider_disagreements": 1,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "trinidad-and-tobago",
-      "name": "Trinidad and Tobago",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.4291288965557644,
-         "interval": [
-          -0.41623400869337646,
-          0.4420237844181524
-         ],
-         "rank": 8,
-         "straddles": true,
-         "tier": 1,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "log_goals",
-         "value": 0.01289488786238796
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.5801432800911851,
-         "interval": [
-          -0.8103134663006748,
-          0.34997309388169534
-         ],
-         "rank": 7,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2,
-          3
-         ],
-         "unit": "log_goals",
-         "value": -0.23017018620948976
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 35.39466819959713,
-         "interval": [
-          1474.0498632900346,
-          1544.839199689229
-         ],
-         "rank": 7,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "elo",
-         "value": 1509.4445314896318
-        }
-       },
-       "axes_absent": [],
-       "competition": "cnl",
-       "source": "src.picker.national_team_axes"
-      }
-     },
-     "home": {
-      "espn_id": "2654",
-      "form": {
-       "available": true,
-       "friendlies": 2,
-       "games": [
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-03T00:36Z",
-         "event_id": "401871830",
-         "ga": 0,
-         "gf": 4,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "New Zealand",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-06T00:00Z",
-         "event_id": "401871781",
-         "ga": 2,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Peru",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-14T01:00Z",
-         "event_id": "760418",
-         "ga": 1,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Scotland",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-20T00:30Z",
-         "event_id": "760444",
-         "ga": 3,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Brazil",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-24T22:00Z",
-         "event_id": "760464",
-         "ga": 4,
-         "gf": 2,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Morocco",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        }
-       ],
-       "letters": "WLLLL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "haiti",
-      "name": "Haiti",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.46666958637005956,
-         "interval": [
-          -0.20842294274262974,
-          0.7249162299974894
-         ],
-         "rank": 3,
-         "straddles": true,
-         "tier": 1,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "log_goals",
-         "value": 0.25824664362742983
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.32699952636265206,
-         "interval": [
-          -0.7345878310878842,
-          -0.08058877836258
-         ],
-         "rank": 12,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2,
-          3
-         ],
-         "unit": "log_goals",
-         "value": -0.40758830472523205
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 52.049410206531604,
-         "interval": [
-          1550.0310658124388,
-          1654.1298862255019
-         ],
-         "rank": 3,
-         "straddles": false,
-         "tier": 1,
-         "tier_set": [
-          1
-         ],
-         "unit": "elo",
-         "value": 1602.0804760189703
-        }
-       },
-       "axes_absent": [],
-       "competition": "cnl",
-       "source": "src.picker.national_team_axes"
-      }
-     }
-    },
-    "venue_country": "Jamaica"
-   },
-   "opponent": "Trinidad and Tobago",
-   "own_gdg": {
-    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record.",
-    "diff": null
-   },
-   "ppg_gap": null,
-   "rank_gap": null,
-   "ranks": {
-    "fav": 3,
-    "opp": 7
-   },
-   "rated_in": {
-    "away": "cnl",
-    "home": "cnl"
-   },
-   "rates": {
-    "ga": [
-     null,
-     null
-    ],
-    "gdg": [
-     null,
-     null
-    ],
-    "gf": [
-     null,
-     null
-    ],
-    "ppg": [
-     null,
-     null
-    ]
-   },
-   "refused": false,
-   "reg_time_note": "KXCONCACAFNLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "resolution": {
-    "Haiti": "espn_id",
-    "Trinidad and Tobago": "espn_id"
-   },
-   "shape": "HOLLOW",
-   "src": "current",
-   "state": "pre",
-   "table_notes": {
-    "away": null,
-    "home": null
-   },
-   "tier_gaps": {
-    "atk": 0,
-    "def": 0,
-    "ovr": 1
-   },
-   "tiers": {
-    "atk": [
-     1,
-     1
-    ],
-    "def": [
-     2,
-     2
-    ],
-    "ovr": [
-     1,
-     2
-    ]
-   },
-   "venue": {
-    "city": "Sabina Park",
-    "country": "Jamaica",
-    "name": "Sabina Park"
-   },
-   "venue_class": {
-    "class": "NEUTRAL",
-    "home_side": null
-   },
-   "venue_favourite": {
-    "flipped": false,
-    "home_side": null,
-    "policy": "off",
-    "reason": "no_gdg_gap",
-    "refused": true,
-    "venue_class": "NEUTRAL"
-   },
-   "weights": null
-  },
-  {
-   "away": "Curaçao",
-   "column": "cnl",
-   "columns": [
-    "cnl"
-   ],
-   "competition_id": "401900638",
-   "cross_league": false,
-   "current_only": null,
-   "espn": "concacaf.nations.league",
-   "event_id": "401900638",
-   "fav_side": "home",
-   "fav_source": "field",
-   "favourite": "Costa Rica",
-   "field": {
-    "axes": {
-     "atk": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.4461433431937113,
-       "interval": [
-        -0.15306404644142774,
-        0.7392226399459949
-       ],
-       "rank": 1,
-       "straddles": true,
-       "tier": 1,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": 0.29307929675228356
-      },
-      "field_size": 37,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "attack",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.6849875773528515,
-       "interval": [
-        -0.9181009332593223,
-        0.4518742214463808
-       ],
-       "rank": 13,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2,
-        3
-       ],
-       "value": -0.23311335590647075
-      },
-      "tier_gap": 1,
-      "unit": "log_goals"
-     },
-     "def": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.6284492965856469,
-       "interval": [
-        -0.41898822984882167,
-        0.837910363322472
-       ],
-       "rank": 2,
-       "straddles": true,
-       "tier": 1,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": 0.20946106673682519
-      },
-      "field_size": 37,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "defence",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.3432319185392931,
-       "interval": [
-        -0.6605096019496686,
-        0.02595423512891759
-       ],
-       "rank": 9,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2,
-        3
-       ],
-       "value": -0.3172776834103755
-      },
-      "tier_gap": 1,
-      "unit": "log_goals"
-     },
-     "ovr": {
-      "fav": {
-       "below_floor": false,
-       "half_width_95": 41.14166983924553,
-       "interval": [
-        1638.297990298461,
-        1720.5813299769518
-       ],
-       "rank": 1,
-       "straddles": false,
-       "tier": 1,
-       "tier_set": [
-        1
-       ],
-       "value": 1679.4396601377064
-      },
-      "field_size": 37,
-      "floor": {
-       "below_floor": false,
-       "failing_condition": null
-      },
-      "label": "overall",
-      "opp": {
-       "below_floor": false,
-       "half_width_95": 48.31226303904964,
-       "interval": [
-        1449.3978120625122,
-        1546.0223381406115
-       ],
-       "rank": 8,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": 1497.7100751015619
-      },
-      "tier_gap": 1,
-      "unit": "elo"
-     }
-    },
-    "axes_measured": [
-     "ovr",
-     "atk",
-     "def"
-    ],
-    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
-    "clubs": {
-     "fav": "Costa Rica",
-     "opp": "Curaçao"
-    },
-    "competition": "cnl",
-    "field_basis": "the CONCACAF Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus b89af5d2210e, variant 'all', Elo pinned at 10 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals.",
-    "shape": "CLEAN",
-    "size": 37
-   },
-   "form": {
-    "fav": "DDLLL",
-    "opp": "LWLDL",
-    "scope": "all senior internationals, friendlies marked",
-    "scope_is_cup": false
-   },
-   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
-   "gdg_gap": null,
-   "gp_current": {
-    "away": 0,
-    "home": 0,
-    "min": 0
-   },
-   "home": "Costa Rica",
-   "in_play": false,
-   "kalshi": {
-    "ask_c": 60,
-    "ask_size": 355,
-    "bid_c": 59,
-    "bid_size": 2917,
-    "event_ticker": "KXCONCACAFNLGAME-26SEP24CRICUW",
-    "flags": [],
-    "spread_c": 1,
-    "ticker": "KXCONCACAFNLGAME-26SEP24CRICUW-CRI"
-   },
-   "kickoff": "2026-09-25T02:00Z",
-   "league": "cnl",
-   "national": {
-    "competition": "cnl",
-    "group": "League A - Group A",
-    "head_to_head": {
-     "available": true,
-     "meetings": [
-      {
-       "away": "Curaçao",
-       "away_score": 0,
-       "completed": true,
-       "date": "2019-10-14T00:00:00Z",
-       "event_id": "540352",
-       "home": "Costa Rica",
-       "home_score": 0,
-       "winner": "draw",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Costa Rica",
-       "away_score": 2,
-       "completed": true,
-       "date": "2019-11-14T23:30:00Z",
-       "event_id": "540347",
-       "home": "Curaçao",
-       "home_score": 1,
-       "winner": "home",
-       "winner_means": "this fixture's home/away sides"
-      }
-     ],
-     "reason": null,
-     "source": "seasonseries",
-     "tally": {
-      "away": 0,
-      "draw": 1,
-      "home": 1
-     }
-    },
-    "leg": null,
-    "lineups": {
-     "announced": false,
-     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff",
-     "sides": {
-      "away": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Curaçao"
-      },
-      "home": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Costa Rica"
-      }
-     }
-    },
-    "market": {
-     "event_ticker": "KXCONCACAFNLGAME-26SEP24CRICUW",
-     "legs": {
-      "away": {
-       "ask_c": 17,
-       "ask_size": 9,
-       "bid_c": 16,
-       "bid_size": 4386,
-       "event_ticker": "KXCONCACAFNLGAME-26SEP24CRICUW",
-       "flags": [
-        "THIN"
-       ],
-       "name": "Curacao",
-       "spread_c": 1,
-       "ticker": "KXCONCACAFNLGAME-26SEP24CRICUW-CUW"
-      },
-      "home": {
-       "ask_c": 60,
-       "ask_size": 355,
-       "bid_c": 59,
-       "bid_size": 2917,
-       "event_ticker": "KXCONCACAFNLGAME-26SEP24CRICUW",
-       "flags": [],
-       "name": "Costa Rica",
-       "spread_c": 1,
-       "ticker": "KXCONCACAFNLGAME-26SEP24CRICUW-CRI"
-      },
-      "tie": {
-       "ask_c": 26,
-       "ask_size": 6393,
-       "bid_c": 25,
-       "bid_size": 200,
-       "event_ticker": "KXCONCACAFNLGAME-26SEP24CRICUW",
-       "flags": [],
-       "spread_c": 1,
-       "ticker": "KXCONCACAFNLGAME-26SEP24CRICUW-TIE"
-      }
-     },
-     "orientation": "same",
-     "status": "mapped",
-     "status_words": "one open Kalshi event names both teams on this date",
-     "title": "Costa Rica vs Curacao"
-    },
-    "neutral": false,
-    "neutral_provider_flag": false,
-    "stage": "group-stage",
-    "stage_kind": "group",
-    "status_detail": "Thu, September 24th at 10:00 PM EDT",
-    "teams": {
-     "away": {
-      "espn_id": "11678",
-      "form": {
-       "available": true,
-       "friendlies": 2,
-       "games": [
-        {
-         "competition": "International Friendly",
-         "date": "2026-05-30T12:00Z",
-         "event_id": "401856621",
-         "ga": 4,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Scotland",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-07T00:00Z",
-         "event_id": "401873741",
-         "ga": 0,
-         "gf": 4,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Aruba",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-14T17:00Z",
-         "event_id": "760422",
-         "ga": 7,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Germany",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-21T00:00Z",
-         "event_id": "760446",
-         "ga": 0,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "D",
-         "opponent": "Ecuador",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-25T20:00Z",
-         "event_id": "760473",
-         "ga": 2,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Ivory Coast",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        }
-       ],
-       "letters": "LWLDL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "curacao",
-      "name": "Curaçao",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.6849875773528515,
-         "interval": [
-          -0.9181009332593223,
-          0.4518742214463808
-         ],
-         "rank": 13,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2,
-          3
-         ],
-         "unit": "log_goals",
-         "value": -0.23311335590647075
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.3432319185392931,
-         "interval": [
-          -0.6605096019496686,
-          0.02595423512891759
-         ],
-         "rank": 9,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2,
-          3
-         ],
-         "unit": "log_goals",
-         "value": -0.3172776834103755
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 48.31226303904964,
-         "interval": [
-          1449.3978120625122,
-          1546.0223381406115
-         ],
-         "rank": 8,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "elo",
-         "value": 1497.7100751015619
-        }
-       },
-       "axes_absent": [],
-       "competition": "cnl",
-       "source": "src.picker.national_team_axes"
-      }
-     },
-     "home": {
-      "espn_id": "214",
-      "form": {
-       "available": true,
-       "friendlies": 4,
-       "games": [
-        {
-         "competition": "FIFA World Cup Qualifying - Concacaf",
-         "date": "2025-11-19T01:00Z",
-         "event_id": "754270",
-         "ga": 0,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "D",
-         "opponent": "Honduras",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-27T17:30Z",
-         "event_id": "401862038",
-         "ga": 2,
-         "gf": 2,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Jordan",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-31T13:00Z",
-         "event_id": "401861778",
-         "ga": 5,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Iran",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-01T23:00Z",
-         "event_id": "401866134",
-         "ga": 3,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Colombia",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-10T21:00Z",
-         "event_id": "401860829",
-         "ga": 3,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "England",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        }
-       ],
-       "letters": "DDLLL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "costa-rica",
-      "name": "Costa Rica",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.4461433431937113,
-         "interval": [
-          -0.15306404644142774,
-          0.7392226399459949
-         ],
-         "rank": 1,
-         "straddles": true,
-         "tier": 1,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "log_goals",
-         "value": 0.29307929675228356
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.6284492965856469,
-         "interval": [
-          -0.41898822984882167,
-          0.837910363322472
-         ],
-         "rank": 2,
-         "straddles": true,
-         "tier": 1,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "log_goals",
-         "value": 0.20946106673682519
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 41.14166983924553,
-         "interval": [
-          1638.297990298461,
-          1720.5813299769518
-         ],
-         "rank": 1,
-         "straddles": false,
-         "tier": 1,
-         "tier_set": [
-          1
-         ],
-         "unit": "elo",
-         "value": 1679.4396601377064
-        }
-       },
-       "axes_absent": [],
-       "competition": "cnl",
-       "source": "src.picker.national_team_axes"
-      }
-     }
-    },
-    "venue_country": "Costa Rica"
-   },
-   "opponent": "Curaçao",
-   "own_gdg": {
-    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record.",
-    "diff": null
-   },
-   "ppg_gap": null,
-   "rank_gap": null,
-   "ranks": {
-    "fav": 1,
-    "opp": 8
-   },
-   "rated_in": {
-    "away": "cnl",
-    "home": "cnl"
-   },
-   "rates": {
-    "ga": [
-     null,
-     null
-    ],
-    "gdg": [
-     null,
-     null
-    ],
-    "gf": [
-     null,
-     null
-    ],
-    "ppg": [
-     null,
-     null
-    ]
-   },
-   "refused": false,
-   "reg_time_note": "KXCONCACAFNLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "resolution": {
-    "Costa Rica": "espn_id",
-    "Curaçao": "espn_id"
-   },
-   "shape": "CLEAN",
-   "src": "current",
-   "state": "pre",
-   "table_notes": {
-    "away": null,
-    "home": null
-   },
-   "tier_gaps": {
-    "atk": 1,
-    "def": 1,
-    "ovr": 1
-   },
-   "tiers": {
-    "atk": [
-     1,
-     2
-    ],
-    "def": [
-     1,
-     2
-    ],
-    "ovr": [
-     1,
-     2
-    ]
-   },
-   "venue": {
-    "city": "Estadio Nacional de Costa Rica",
-    "country": "Costa Rica",
-    "name": "Estadio Ricardo Saprissa"
-   },
-   "venue_class": {
-    "class": "TRUE_HOME",
-    "home_side": "home"
-   },
-   "venue_favourite": {
-    "flipped": false,
-    "home_side": "home",
-    "policy": "off",
-    "reason": "no_gdg_gap",
-    "refused": true,
-    "venue_class": "TRUE_HOME"
-   },
-   "weights": null
-  },
-  {
-   "away": "Guadeloupe",
-   "column": "cnl",
-   "columns": [
-    "cnl"
-   ],
-   "competition_id": "401900630",
-   "cross_league": false,
-   "current_only": null,
-   "espn": "concacaf.nations.league",
-   "event_id": "401900630",
-   "fav_side": "away",
-   "fav_source": "field",
-   "favourite": "Guadeloupe",
-   "field": {
-    "axes": {
-     "atk": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.49228078000243763,
-       "interval": [
-        -0.6492424090794187,
-        0.33531915092545655
-       ],
-       "rank": 12,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2,
-        3
-       ],
-       "value": -0.15696162907698108
-      },
-      "field_size": 37,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "attack",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.4669319593985057,
-       "interval": [
-        -1.228240970428486,
-        -0.2943770516314747
-       ],
-       "rank": 25,
-       "straddles": true,
-       "tier": 3,
-       "tier_set": [
-        2,
-        3,
-        4
-       ],
-       "value": -0.7613090110299804
-      },
-      "tier_gap": 1,
-      "unit": "log_goals"
-     },
-     "def": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.5711320836559003,
-       "interval": [
-        -0.945134682337066,
-        0.1971294849747346
-       ],
-       "rank": 11,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2,
-        3
-       ],
-       "value": -0.3740025986811657
-      },
-      "field_size": 37,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "defence",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.5366161896275132,
-       "interval": [
-        -1.4620361523160255,
-        -0.3888037730609991
-       ],
-       "rank": 20,
-       "straddles": true,
-       "tier": 3,
-       "tier_set": [
-        2,
-        3,
-        4
-       ],
-       "value": -0.9254199626885123
-      },
-      "tier_gap": 1,
-      "unit": "log_goals"
-     },
-     "ovr": {
-      "fav": {
-       "below_floor": false,
-       "half_width_95": 24.99565828375502,
-       "interval": [
-        1456.701518459375,
-        1506.6928350268852
-       ],
-       "rank": 9,
-       "straddles": false,
-       "tier": 2,
-       "tier_set": [
-        2
-       ],
-       "value": 1481.69717674313
-      },
-      "field_size": 37,
-      "floor": {
-       "below_floor": false,
-       "failing_condition": null
-      },
-      "label": "overall",
-      "opp": {
-       "below_floor": false,
-       "half_width_95": 21.98657824906775,
-       "interval": [
-        1272.9885624547826,
-        1316.9617189529183
-       ],
-       "rank": 24,
-       "straddles": false,
-       "tier": 3,
-       "tier_set": [
-        3
-       ],
-       "value": 1294.9751407038505
-      },
-      "tier_gap": 1,
-      "unit": "elo"
-     }
-    },
-    "axes_measured": [
-     "ovr",
-     "atk",
-     "def"
-    ],
-    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
-    "clubs": {
-     "fav": "Guadeloupe",
-     "opp": "Bermuda"
-    },
-    "competition": "cnl",
-    "field_basis": "the CONCACAF Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus b89af5d2210e, variant 'all', Elo pinned at 10 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals.",
-    "shape": "CLEAN",
-    "size": 37
-   },
-   "form": {
-    "fav": "WWLLL",
-    "opp": "LLLDL",
-    "scope": "all senior internationals, friendlies marked",
-    "scope_is_cup": false
-   },
-   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
-   "gdg_gap": null,
-   "gp_current": {
-    "away": 0,
-    "home": 0,
-    "min": 0
-   },
-   "home": "Bermuda",
-   "in_play": false,
-   "kalshi": {
-    "ask_c": 33,
-    "ask_size": 1239,
-    "bid_c": 32,
-    "bid_size": 943,
-    "event_ticker": "KXCONCACAFNLGAME-26SEP25BMUGLP",
-    "flags": [],
-    "spread_c": 1,
-    "ticker": "KXCONCACAFNLGAME-26SEP25BMUGLP-GLP"
-   },
-   "kickoff": "2026-09-25T19:00Z",
-   "league": "cnl",
-   "national": {
-    "competition": "cnl",
-    "group": "League B - Group B",
-    "head_to_head": {
-     "available": false,
-     "meetings": [],
-     "reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met",
-     "source": null
-    },
-    "leg": null,
-    "lineups": {
-     "announced": false,
-     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff",
-     "sides": {
-      "away": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Guadeloupe"
-      },
-      "home": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Bermuda"
-      }
-     }
-    },
-    "market": {
-     "event_ticker": "KXCONCACAFNLGAME-26SEP25BMUGLP",
-     "legs": {
-      "away": {
-       "ask_c": 33,
-       "ask_size": 1239,
-       "bid_c": 32,
-       "bid_size": 943,
-       "event_ticker": "KXCONCACAFNLGAME-26SEP25BMUGLP",
-       "flags": [],
-       "name": "Guadeloupe",
-       "spread_c": 1,
-       "ticker": "KXCONCACAFNLGAME-26SEP25BMUGLP-GLP"
-      },
-      "home": {
-       "ask_c": 39,
-       "ask_size": 434,
-       "bid_c": 38,
-       "bid_size": 2211,
-       "event_ticker": "KXCONCACAFNLGAME-26SEP25BMUGLP",
-       "flags": [],
-       "name": "Bermuda",
-       "spread_c": 1,
-       "ticker": "KXCONCACAFNLGAME-26SEP25BMUGLP-BMU"
-      },
-      "tie": {
-       "ask_c": 30,
-       "ask_size": 770,
-       "bid_c": 29,
-       "bid_size": 577,
-       "event_ticker": "KXCONCACAFNLGAME-26SEP25BMUGLP",
-       "flags": [],
-       "spread_c": 1,
-       "ticker": "KXCONCACAFNLGAME-26SEP25BMUGLP-TIE"
-      }
-     },
-     "orientation": "same",
-     "status": "mapped",
-     "status_words": "one open Kalshi event names both teams on this date",
-     "title": "Bermuda vs Guadeloupe"
-    },
-    "neutral": true,
-    "neutral_provider_flag": false,
-    "stage": "group-stage",
-    "stage_kind": "group",
-    "status_detail": "Fri, September 25th at 3:00 PM EDT",
-    "teams": {
-     "away": {
-      "espn_id": "7657",
-      "form": {
-       "available": true,
-       "friendlies": 0,
-       "games": [
-        {
-         "competition": "Concacaf Gold Cup Qualifying",
-         "date": "2025-03-22T00:00Z",
-         "event_id": "734182",
-         "ga": 0,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Nicaragua",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "Concacaf Gold Cup Qualifying",
-         "date": "2025-03-26T00:30Z",
-         "event_id": "734188",
-         "ga": 0,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Nicaragua",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "away"
-        },
-        {
-         "competition": "Concacaf Gold Cup",
-         "date": "2025-06-16T23:00Z",
-         "event_id": "735322",
-         "ga": 5,
-         "gf": 2,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Panama",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "Concacaf Gold Cup",
-         "date": "2025-06-20T23:45Z",
-         "event_id": "735330",
-         "ga": 2,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Jamaica",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "Concacaf Gold Cup",
-         "date": "2025-06-24T23:00Z",
-         "event_id": "735339",
-         "ga": 3,
-         "gf": 2,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Guatemala",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        }
-       ],
-       "letters": "WWLLL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "guadeloupe",
-      "name": "Guadeloupe",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.49228078000243763,
-         "interval": [
-          -0.6492424090794187,
-          0.33531915092545655
-         ],
-         "rank": 12,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2,
-          3
-         ],
-         "unit": "log_goals",
-         "value": -0.15696162907698108
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.5711320836559003,
-         "interval": [
-          -0.945134682337066,
-          0.1971294849747346
-         ],
-         "rank": 11,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2,
-          3
-         ],
-         "unit": "log_goals",
-         "value": -0.3740025986811657
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 24.99565828375502,
-         "interval": [
-          1456.701518459375,
-          1506.6928350268852
-         ],
-         "rank": 9,
-         "straddles": false,
-         "tier": 2,
-         "tier_set": [
-          2
-         ],
-         "unit": "elo",
-         "value": 1481.69717674313
-        }
-       },
-       "axes_absent": [],
-       "competition": "cnl",
-       "source": "src.picker.national_team_axes"
-      }
-     },
-     "home": {
-      "espn_id": "2643",
-      "form": {
-       "available": true,
-       "friendlies": 1,
-       "games": [
-        {
-         "competition": "FIFA World Cup Qualifying - Concacaf",
-         "date": "2025-10-10T22:00Z",
-         "event_id": "754250",
-         "ga": 3,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Trinidad and Tobago",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup Qualifying - Concacaf",
-         "date": "2025-10-15T00:00Z",
-         "event_id": "754258",
-         "ga": 4,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Jamaica",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup Qualifying - Concacaf",
-         "date": "2025-11-14T00:00Z",
-         "event_id": "754265",
-         "ga": 7,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Curaçao",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup Qualifying - Concacaf",
-         "date": "2025-11-19T01:00Z",
-         "event_id": "754271",
-         "ga": 2,
-         "gf": 2,
-         "kind": "competitive",
-         "letter": "D",
-         "opponent": "Trinidad and Tobago",
-         "provider_agrees": false,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-25T22:00Z",
-         "event_id": "401866396",
-         "ga": 2,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Congo DR",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        }
-       ],
-       "letters": "LLLDL",
-       "provider_disagreements": 1,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "bermuda",
-      "name": "Bermuda",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.4669319593985057,
-         "interval": [
-          -1.228240970428486,
-          -0.2943770516314747
-         ],
-         "rank": 25,
-         "straddles": true,
-         "tier": 3,
-         "tier_set": [
-          2,
-          3,
-          4
-         ],
-         "unit": "log_goals",
-         "value": -0.7613090110299804
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.5366161896275132,
-         "interval": [
-          -1.4620361523160255,
-          -0.3888037730609991
-         ],
-         "rank": 20,
-         "straddles": true,
-         "tier": 3,
-         "tier_set": [
-          2,
-          3,
-          4
-         ],
-         "unit": "log_goals",
-         "value": -0.9254199626885123
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 21.98657824906775,
-         "interval": [
-          1272.9885624547826,
-          1316.9617189529183
-         ],
-         "rank": 24,
-         "straddles": false,
-         "tier": 3,
-         "tier_set": [
-          3
-         ],
-         "unit": "elo",
-         "value": 1294.9751407038505
-        }
-       },
-       "axes_absent": [],
-       "competition": "cnl",
-       "source": "src.picker.national_team_axes"
-      }
-     }
-    },
-    "venue_country": "St Lucia"
-   },
-   "opponent": "Bermuda",
-   "own_gdg": {
-    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record.",
-    "diff": null
-   },
-   "ppg_gap": null,
-   "rank_gap": null,
-   "ranks": {
-    "fav": 9,
-    "opp": 24
-   },
-   "rated_in": {
-    "away": "cnl",
-    "home": "cnl"
-   },
-   "rates": {
-    "ga": [
-     null,
-     null
-    ],
-    "gdg": [
-     null,
-     null
-    ],
-    "gf": [
-     null,
-     null
-    ],
-    "ppg": [
-     null,
-     null
-    ]
-   },
-   "refused": false,
-   "reg_time_note": "KXCONCACAFNLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "resolution": {
-    "Bermuda": "espn_id",
-    "Guadeloupe": "espn_id"
-   },
-   "shape": "CLEAN",
-   "src": "current",
-   "state": "pre",
-   "table_notes": {
-    "away": null,
-    "home": null
-   },
-   "tier_gaps": {
-    "atk": 1,
-    "def": 1,
-    "ovr": 1
-   },
-   "tiers": {
-    "atk": [
-     2,
-     3
-    ],
-    "def": [
-     2,
-     3
-    ],
-    "ovr": [
-     2,
-     3
-    ]
-   },
-   "venue": {
-    "city": "Gros Islet",
-    "country": "St Lucia",
-    "name": "Beausejour Stadium"
-   },
-   "venue_class": {
-    "class": "NEUTRAL",
-    "home_side": null
-   },
-   "venue_favourite": {
-    "flipped": false,
-    "home_side": null,
-    "policy": "off",
-    "reason": "no_gdg_gap",
-    "refused": true,
-    "venue_class": "NEUTRAL"
-   },
-   "weights": null
-  },
-  {
-   "away": "Haiti",
-   "column": "cnl",
-   "columns": [
-    "cnl"
-   ],
-   "competition_id": "401900594",
-   "cross_league": false,
-   "current_only": null,
-   "espn": "concacaf.nations.league",
-   "event_id": "401900594",
-   "fav_side": "away",
-   "fav_source": "field",
-   "favourite": "Haiti",
-   "field": {
-    "axes": {
-     "atk": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.46666958637005956,
-       "interval": [
-        -0.20842294274262974,
-        0.7249162299974894
-       ],
-       "rank": 3,
-       "straddles": true,
-       "tier": 1,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": 0.25824664362742983
-      },
-      "field_size": 37,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "attack",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.3237226825292346,
-       "interval": [
-        -0.47098372680160727,
-        0.1764616382568619
-       ],
-       "rank": 11,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": -0.1472610442723727
-      },
-      "tier_gap": 1,
-      "unit": "log_goals"
-     },
-     "def": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.32699952636265206,
-       "interval": [
-        -0.7345878310878842,
-        -0.08058877836258
-       ],
-       "rank": 12,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2,
-        3
-       ],
-       "value": -0.40758830472523205
-      },
-      "field_size": 37,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "defence",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.6082841330787719,
-       "interval": [
-        -1.031420825845823,
-        0.18514744031172092
-       ],
-       "rank": 13,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2,
-        3
-       ],
-       "value": -0.423136692767051
-      },
-      "tier_gap": 0,
-      "unit": "log_goals"
-     },
-     "ovr": {
-      "fav": {
-       "below_floor": false,
-       "half_width_95": 52.049410206531604,
-       "interval": [
-        1550.0310658124388,
-        1654.1298862255019
-       ],
-       "rank": 3,
-       "straddles": false,
-       "tier": 1,
-       "tier_set": [
-        1
-       ],
-       "value": 1602.0804760189703
-      },
-      "field_size": 37,
-      "floor": {
-       "below_floor": false,
-       "failing_condition": null
-      },
-      "label": "overall",
-      "opp": {
-       "below_floor": false,
-       "half_width_95": 21.094833608511905,
-       "interval": [
-        1417.5723271779498,
-        1459.7619943949735
-       ],
-       "rank": 13,
-       "straddles": false,
-       "tier": 2,
-       "tier_set": [
-        2
-       ],
-       "value": 1438.6671607864616
-      },
-      "tier_gap": 1,
-      "unit": "elo"
-     }
-    },
-    "axes_measured": [
-     "ovr",
-     "atk",
-     "def"
-    ],
-    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
-    "clubs": {
-     "fav": "Haiti",
-     "opp": "Dominican Republic"
-    },
-    "competition": "cnl",
-    "field_basis": "the CONCACAF Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus b89af5d2210e, variant 'all', Elo pinned at 10 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals.",
-    "shape": "SPLIT",
-    "size": 37
-   },
-   "form": {
-    "fav": "WLLLL",
-    "opp": "WDDDL",
-    "scope": "all senior internationals, friendlies marked",
-    "scope_is_cup": false
-   },
-   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
-   "gdg_gap": null,
-   "gp_current": {
-    "away": 0,
-    "home": 0,
-    "min": 0
-   },
-   "home": "Dominican Republic",
-   "in_play": false,
-   "kalshi": null,
-   "kickoff": "2026-10-02T00:00Z",
-   "league": "cnl",
-   "national": {
-    "competition": "cnl",
-    "group": "League A - Group A",
-    "head_to_head": {
-     "available": false,
-     "meetings": [],
-     "reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met",
-     "source": null
-    },
-    "leg": null,
-    "lineups": {
-     "announced": false,
-     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff",
-     "sides": {
-      "away": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Haiti"
-      },
-      "home": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Dominican Republic"
-      }
-     }
-    },
-    "market": {
-     "status": "unmapped",
-     "status_words": "no open event on this series names both teams on this date. A settled book LEAVES the open list, so for a finished match this is expected"
-    },
-    "neutral": false,
-    "neutral_provider_flag": false,
-    "stage": "group-stage",
-    "stage_kind": "group",
-    "status_detail": "Thu, October 1st at 8:00 PM EDT",
-    "teams": {
-     "away": {
-      "espn_id": "2654",
-      "form": {
-       "available": true,
-       "friendlies": 2,
-       "games": [
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-03T00:36Z",
-         "event_id": "401871830",
-         "ga": 0,
-         "gf": 4,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "New Zealand",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-06T00:00Z",
-         "event_id": "401871781",
-         "ga": 2,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Peru",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-14T01:00Z",
-         "event_id": "760418",
-         "ga": 1,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Scotland",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-20T00:30Z",
-         "event_id": "760444",
-         "ga": 3,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Brazil",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-24T22:00Z",
-         "event_id": "760464",
-         "ga": 4,
-         "gf": 2,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Morocco",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        }
-       ],
-       "letters": "WLLLL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "haiti",
-      "name": "Haiti",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.46666958637005956,
-         "interval": [
-          -0.20842294274262974,
-          0.7249162299974894
-         ],
-         "rank": 3,
-         "straddles": true,
-         "tier": 1,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "log_goals",
-         "value": 0.25824664362742983
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.32699952636265206,
-         "interval": [
-          -0.7345878310878842,
-          -0.08058877836258
-         ],
-         "rank": 12,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2,
-          3
-         ],
-         "unit": "log_goals",
-         "value": -0.40758830472523205
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 52.049410206531604,
-         "interval": [
-          1550.0310658124388,
-          1654.1298862255019
-         ],
-         "rank": 3,
-         "straddles": false,
-         "tier": 1,
-         "tier_set": [
-          1
-         ],
-         "unit": "elo",
-         "value": 1602.0804760189703
-        }
-       },
-       "axes_absent": [],
-       "competition": "cnl",
-       "source": "src.picker.national_team_axes"
-      }
-     },
-     "home": {
-      "espn_id": "2649",
-      "form": {
-       "available": true,
-       "friendlies": 5,
-       "games": [
-        {
-         "competition": "International Friendly",
-         "date": "2025-11-13T00:00Z",
-         "event_id": "760870",
-         "ga": 0,
-         "gf": 2,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "St. Vincent and the Grenadines",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2025-11-18T23:30Z",
-         "event_id": "760901",
-         "ga": 0,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Martinique",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-27T00:00Z",
-         "event_id": "401866383",
-         "ga": 2,
-         "gf": 2,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "El Salvador",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-29T22:00Z",
-         "event_id": "401866390",
-         "ga": 1,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Cuba",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-04T00:45Z",
-         "event_id": "401870075",
-         "ga": 4,
-         "gf": 2,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Panama",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        }
-       ],
-       "letters": "WDDDL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "dominican-republic",
-      "name": "Dominican Republic",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.3237226825292346,
-         "interval": [
-          -0.47098372680160727,
-          0.1764616382568619
-         ],
-         "rank": 11,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "log_goals",
-         "value": -0.1472610442723727
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.6082841330787719,
-         "interval": [
-          -1.031420825845823,
-          0.18514744031172092
-         ],
-         "rank": 13,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2,
-          3
-         ],
-         "unit": "log_goals",
-         "value": -0.423136692767051
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 21.094833608511905,
-         "interval": [
-          1417.5723271779498,
-          1459.7619943949735
-         ],
-         "rank": 13,
-         "straddles": false,
-         "tier": 2,
-         "tier_set": [
-          2
-         ],
-         "unit": "elo",
-         "value": 1438.6671607864616
-        }
-       },
-       "axes_absent": [],
-       "competition": "cnl",
-       "source": "src.picker.national_team_axes"
-      }
-     }
-    },
-    "venue_country": "Dominican Republic"
-   },
-   "opponent": "Dominican Republic",
-   "own_gdg": {
-    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record.",
-    "diff": null
-   },
-   "ppg_gap": null,
-   "rank_gap": null,
-   "ranks": {
-    "fav": 3,
-    "opp": 13
-   },
-   "rated_in": {
-    "away": "cnl",
-    "home": "cnl"
-   },
-   "rates": {
-    "ga": [
-     null,
-     null
-    ],
-    "gdg": [
-     null,
-     null
-    ],
-    "gf": [
-     null,
-     null
-    ],
-    "ppg": [
-     null,
-     null
-    ]
-   },
-   "refused": false,
-   "reg_time_note": "KXCONCACAFNLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "resolution": {
-    "Dominican Republic": "espn_id",
-    "Haiti": "espn_id"
-   },
-   "shape": "SPLIT",
-   "src": "current",
-   "state": "pre",
-   "table_notes": {
-    "away": null,
-    "home": null
-   },
-   "tier_gaps": {
-    "atk": 1,
-    "def": 0,
-    "ovr": 1
-   },
-   "tiers": {
-    "atk": [
-     1,
-     2
-    ],
-    "def": [
-     2,
-     2
-    ],
-    "ovr": [
-     1,
-     2
-    ]
-   },
-   "venue": {
-    "city": "Santo Domingo",
-    "country": "Dominican Republic",
-    "name": "Stadio Olímpico Félix Sánchez"
-   },
-   "venue_class": {
-    "class": "TRUE_HOME",
-    "home_side": "home"
-   },
-   "venue_favourite": {
-    "flipped": false,
-    "home_side": "home",
-    "policy": "off",
-    "reason": "no_gdg_gap",
-    "refused": true,
-    "venue_class": "TRUE_HOME"
-   },
-   "weights": null
-  },
-  {
-   "away": "Senegal",
-   "column": "afcon",
-   "columns": [
-    "afcon"
-   ],
-   "competition_id": "401920048",
-   "cross_league": false,
-   "current_only": null,
-   "espn": "caf.nations_qual",
-   "event_id": "401920048",
-   "fav_side": "away",
-   "fav_source": "field",
-   "favourite": "Senegal",
-   "field": {
-    "axes": {
-     "atk": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.35712827511535206,
-       "interval": [
-        0.5173576942465525,
-        1.2316142444772566
-       ],
-       "rank": 1,
-       "straddles": true,
-       "tier": 1,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": 0.8744859693619046
-      },
-      "field_size": 47,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "attack",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.4524523439017298,
-       "interval": [
-        -0.21471089549002578,
-        0.6901937923134338
-       ],
-       "rank": 20,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2,
-        3,
-        4
-       ],
-       "value": 0.237741448411704
-      },
-      "tier_gap": 1,
-      "unit": "log_goals"
-     },
-     "def": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.7169734093274278,
-       "interval": [
-        0.03970318149668395,
-        1.4736500001515396
-       ],
-       "rank": 5,
-       "straddles": true,
-       "tier": 3,
-       "tier_set": [
-        1,
-        2,
-        3,
-        4
-       ],
-       "value": 0.7566765908241118
-      },
-      "field_size": 47,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "defence",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.41081436056461007,
-       "interval": [
-        -0.7040725415456639,
-        0.11755617958355624
-       ],
-       "rank": 36,
-       "straddles": true,
-       "tier": 5,
-       "tier_set": [
-        4,
-        5
-       ],
-       "value": -0.29325818098105383
-      },
-      "tier_gap": 2,
-      "unit": "log_goals"
-     },
-     "ovr": {
-      "fav": {
-       "below_floor": false,
-       "half_width_95": 56.400398941547046,
-       "interval": [
-        1739.7705261315182,
-        1852.5713240146124
-       ],
-       "rank": 4,
-       "straddles": true,
-       "tier": 1,
-       "tier_set": [
-        1,
-        2
-       ],
-       "value": 1796.1709250730653
-      },
-      "field_size": 48,
-      "floor": {
-       "below_floor": false,
-       "failing_condition": null
-      },
-      "label": "overall",
-      "opp": {
-       "below_floor": false,
-       "half_width_95": 31.9114484984195,
-       "interval": [
-        1480.3040565598753,
-        1544.1269535567144
-       ],
-       "rank": 28,
-       "straddles": true,
-       "tier": 3,
-       "tier_set": [
-        3,
-        4
-       ],
-       "value": 1512.2155050582949
-      },
-      "tier_gap": 2,
-      "unit": "elo"
-     }
-    },
-    "axes_measured": [
-     "ovr",
-     "atk",
-     "def"
-    ],
-    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
-    "clubs": {
-     "fav": "Senegal",
-     "opp": "Mozambique"
-    },
-    "competition": "afconq",
-    "field_basis": "the AFCON 2027 qualifying field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus b89af5d2210e, variant 'all', Elo pinned at 10 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals.",
-    "shape": "CLEAN",
-    "size": 48
-   },
-   "form": {
-    "fav": "DLLWL",
-    "opp": "WLLLL",
-    "scope": "all senior internationals, friendlies marked",
-    "scope_is_cup": false
-   },
-   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
-   "gdg_gap": null,
-   "gp_current": {
-    "away": 0,
-    "home": 0,
-    "min": 0
-   },
-   "home": "Mozambique",
-   "in_play": false,
-   "kalshi": {
-    "ask_c": 74,
-    "ask_size": 11,
-    "bid_c": 73,
-    "bid_size": 1236,
-    "event_ticker": "KXAFCONGAME-26SEP25MOZSEN",
-    "flags": [
-     "THIN"
-    ],
-    "spread_c": 1,
-    "ticker": "KXAFCONGAME-26SEP25MOZSEN-SEN"
-   },
-   "kickoff": "2026-09-25T13:00Z",
-   "league": "afcon",
-   "national": {
-    "competition": "afcon",
-    "group": "Group J",
-    "head_to_head": {
-     "available": true,
-     "meetings": [
-      {
-       "away": "Mozambique",
-       "away_score": 0,
-       "completed": true,
-       "date": "2021-07-09T13:00:00Z",
-       "event_id": "613391",
-       "home": "Senegal",
-       "home_score": 1,
-       "winner": "away",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Senegal",
-       "away_score": 1,
-       "completed": true,
-       "date": "2022-07-17T13:30:00Z",
-       "event_id": "649360",
-       "home": "Mozambique",
-       "home_score": 1,
-       "winner": "draw",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Mozambique",
-       "away_score": 1,
-       "completed": true,
-       "date": "2023-03-24T19:00:00Z",
-       "event_id": "634731",
-       "home": "Senegal",
-       "home_score": 5,
-       "winner": "away",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Senegal",
-       "away_score": 1,
-       "completed": true,
-       "date": "2023-03-28T16:00:00Z",
-       "event_id": "634745",
-       "home": "Mozambique",
-       "home_score": 0,
-       "winner": "away",
-       "winner_means": "this fixture's home/away sides"
-      }
-     ],
-     "reason": null,
-     "source": "seasonseries",
-     "tally": {
-      "away": 3,
-      "draw": 1,
-      "home": 0
-     }
-    },
-    "leg": null,
-    "lineups": {
-     "announced": false,
-     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff",
-     "sides": {
-      "away": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Senegal"
-      },
-      "home": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Mozambique"
-      }
-     }
-    },
-    "market": {
-     "event_ticker": "KXAFCONGAME-26SEP25MOZSEN",
-     "legs": {
-      "away": {
-       "ask_c": 74,
-       "ask_size": 11,
-       "bid_c": 73,
-       "bid_size": 1236,
-       "event_ticker": "KXAFCONGAME-26SEP25MOZSEN",
-       "flags": [
-        "THIN"
-       ],
-       "name": "Senegal",
-       "spread_c": 1,
-       "ticker": "KXAFCONGAME-26SEP25MOZSEN-SEN"
-      },
-      "home": {
-       "ask_c": 10,
-       "ask_size": 1278,
-       "bid_c": 9,
-       "bid_size": 237,
-       "event_ticker": "KXAFCONGAME-26SEP25MOZSEN",
-       "flags": [],
-       "name": "Mozambique",
-       "spread_c": 1,
-       "ticker": "KXAFCONGAME-26SEP25MOZSEN-MOZ"
-      },
-      "tie": {
-       "ask_c": 19,
-       "ask_size": 637,
-       "bid_c": 18,
-       "bid_size": 452,
-       "event_ticker": "KXAFCONGAME-26SEP25MOZSEN",
-       "flags": [],
-       "spread_c": 1,
-       "ticker": "KXAFCONGAME-26SEP25MOZSEN-TIE"
-      }
-     },
-     "orientation": "same",
-     "status": "mapped",
-     "status_words": "one open Kalshi event names both teams on this date",
-     "title": "Mozambique vs Senegal"
-    },
-    "neutral": false,
-    "neutral_provider_flag": false,
-    "stage": "group-stage",
-    "stage_kind": "group",
-    "status_detail": "Fri, September 25th at 9:00 AM EDT",
-    "teams": {
-     "away": {
-      "espn_id": "654",
-      "form": {
-       "available": true,
-       "friendlies": 1,
-       "games": [
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-09T23:00Z",
-         "event_id": "401871362",
-         "ga": 0,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Saudi Arabia",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-16T19:00Z",
-         "event_id": "760432",
-         "ga": 3,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "France",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-23T00:00Z",
-         "event_id": "760454",
-         "ga": 3,
-         "gf": 2,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Norway",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-26T19:00Z",
-         "event_id": "760474",
-         "ga": 0,
-         "gf": 5,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Iraq",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-07-01T20:00Z",
-         "event_id": "760493",
-         "ga": 3,
-         "gf": 2,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Belgium",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        }
-       ],
-       "letters": "DLLWL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "senegal",
-      "name": "Senegal",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.35712827511535206,
-         "interval": [
-          0.5173576942465525,
-          1.2316142444772566
-         ],
-         "rank": 1,
-         "straddles": true,
-         "tier": 1,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "log_goals",
-         "value": 0.8744859693619046
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.7169734093274278,
-         "interval": [
-          0.03970318149668395,
-          1.4736500001515396
-         ],
-         "rank": 5,
-         "straddles": true,
-         "tier": 3,
-         "tier_set": [
-          1,
-          2,
-          3,
-          4
-         ],
-         "unit": "log_goals",
-         "value": 0.7566765908241118
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 56.400398941547046,
-         "interval": [
-          1739.7705261315182,
-          1852.5713240146124
-         ],
-         "rank": 4,
-         "straddles": true,
-         "tier": 1,
-         "tier_set": [
-          1,
-          2
-         ],
-         "unit": "elo",
-         "value": 1796.1709250730653
-        }
-       },
-       "axes_absent": [],
-       "competition": "afconq",
-       "source": "src.picker.national_team_axes"
-      }
-     },
-     "home": {
-      "espn_id": "8939",
-      "form": {
-       "available": true,
-       "friendlies": 2,
-       "games": [
-        {
-         "competition": "Africa Cup of Nations",
-         "date": "2025-12-28T12:30Z",
-         "event_id": "732156",
-         "ga": 2,
-         "gf": 3,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Gabon",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "away"
-        },
-        {
-         "competition": "Africa Cup of Nations",
-         "date": "2025-12-31T19:00Z",
-         "event_id": "732168",
-         "ga": 2,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Cameroon",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "Africa Cup of Nations",
-         "date": "2026-01-05T19:00Z",
-         "event_id": "732174",
-         "ga": 4,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Nigeria",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-07T13:00Z",
-         "event_id": "401874917",
-         "ga": 4,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Oman",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-09T13:00Z",
-         "event_id": "401873677",
-         "ga": 1,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Indonesia",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        }
-       ],
-       "letters": "WLLLL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "mozambique",
-      "name": "Mozambique",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.4524523439017298,
-         "interval": [
-          -0.21471089549002578,
-          0.6901937923134338
-         ],
-         "rank": 20,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2,
-          3,
-          4
-         ],
-         "unit": "log_goals",
-         "value": 0.237741448411704
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.41081436056461007,
-         "interval": [
-          -0.7040725415456639,
-          0.11755617958355624
-         ],
-         "rank": 36,
-         "straddles": true,
-         "tier": 5,
-         "tier_set": [
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": -0.29325818098105383
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 31.9114484984195,
-         "interval": [
-          1480.3040565598753,
-          1544.1269535567144
-         ],
-         "rank": 28,
-         "straddles": true,
-         "tier": 3,
-         "tier_set": [
-          3,
-          4
-         ],
-         "unit": "elo",
-         "value": 1512.2155050582949
-        }
-       },
-       "axes_absent": [],
-       "competition": "afconq",
-       "source": "src.picker.national_team_axes"
-      }
-     }
-    },
-    "venue_country": "Mozambique"
-   },
-   "opponent": "Mozambique",
-   "own_gdg": {
-    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record.",
-    "diff": null
-   },
-   "ppg_gap": null,
-   "rank_gap": null,
-   "ranks": {
-    "fav": 4,
-    "opp": 28
-   },
-   "rated_in": {
-    "away": "afcon",
-    "home": "afcon"
-   },
-   "rates": {
-    "ga": [
-     null,
-     null
-    ],
-    "gdg": [
-     null,
-     null
-    ],
-    "gf": [
-     null,
-     null
-    ],
-    "ppg": [
-     null,
-     null
-    ]
-   },
-   "refused": false,
-   "reg_time_note": "KXAFCONGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "resolution": {
-    "Mozambique": "espn_id",
-    "Senegal": "espn_id"
-   },
-   "shape": "CLEAN",
-   "src": "current",
-   "state": "pre",
-   "table_notes": {
-    "away": null,
-    "home": null
-   },
-   "tier_gaps": {
-    "atk": 1,
-    "def": 2,
-    "ovr": 2
-   },
-   "tiers": {
-    "atk": [
-     1,
-     2
-    ],
-    "def": [
-     3,
-     5
-    ],
-    "ovr": [
-     1,
-     3
-    ]
-   },
-   "venue": {
-    "city": "Maputo",
-    "country": "Mozambique",
-    "name": "Estádio do Zimpeto"
-   },
-   "venue_class": {
-    "class": "TRUE_HOME",
-    "home_side": "home"
-   },
-   "venue_favourite": {
-    "flipped": false,
-    "home_side": "home",
-    "policy": "off",
-    "reason": "no_gdg_gap",
-    "refused": true,
-    "venue_class": "TRUE_HOME"
-   },
-   "weights": null
-  },
-  {
-   "away": "Guinea-Bissau",
-   "column": "afcon",
-   "columns": [
-    "afcon"
-   ],
-   "competition_id": "401920049",
-   "cross_league": false,
-   "current_only": null,
-   "espn": "caf.nations_qual",
-   "event_id": "401920049",
-   "fav_side": "home",
-   "fav_source": "field",
-   "favourite": "Tanzania",
-   "field": {
-    "axes": {
-     "atk": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.5692409054363342,
-       "interval": [
-        -0.8229623817900407,
-        0.31551942908262776
-       ],
-       "rank": 33,
-       "straddles": true,
-       "tier": 4,
-       "tier_set": [
-        2,
-        3,
-        4,
-        5
-       ],
-       "value": -0.25372147635370645
-      },
-      "field_size": 47,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "attack",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.6089944575957759,
-       "interval": [
-        -1.4214970902706046,
-        -0.20350817507905283
-       ],
-       "rank": 47,
-       "straddles": true,
-       "tier": 5,
-       "tier_set": [
-        4,
-        5
-       ],
-       "value": -0.8125026326748287
-      },
-      "tier_gap": 1,
-      "unit": "log_goals"
-     },
-     "def": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.3909090669207144,
-       "interval": [
-        -0.06346068864884352,
-        0.7183574451925854
-       ],
-       "rank": 11,
-       "straddles": true,
-       "tier": 3,
-       "tier_set": [
-        3,
-        4
-       ],
-       "value": 0.3274483782718709
-      },
-      "field_size": 47,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "defence",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.4536740060978313,
-       "interval": [
-        -0.6180875405249019,
-        0.28926047167076074
-       ],
-       "rank": 34,
-       "straddles": true,
-       "tier": 4,
-       "tier_set": [
-        3,
-        4,
-        5
-       ],
-       "value": -0.16441353442707057
-      },
-      "tier_gap": 1,
-      "unit": "log_goals"
-     },
-     "ovr": {
-      "fav": {
-       "below_floor": false,
-       "half_width_95": 60.2939749938449,
-       "interval": [
-        1402.8922166335553,
-        1523.480166621245
-       ],
-       "rank": 37,
-       "straddles": true,
-       "tier": 4,
-       "tier_set": [
-        3,
-        4
-       ],
-       "value": 1463.1861916274001
-      },
-      "field_size": 48,
-      "floor": {
-       "below_floor": false,
-       "failing_condition": null
-      },
-      "label": "overall",
-      "opp": {
-       "below_floor": false,
-       "half_width_95": 17.61484236000548,
-       "interval": [
-        1368.931444073039,
-        1404.16112879305
-       ],
-       "rank": 44,
-       "straddles": false,
-       "tier": 4,
-       "tier_set": [
-        4
-       ],
-       "value": 1386.5462864330445
-      },
-      "tier_gap": 0,
-      "unit": "elo"
-     }
-    },
-    "axes_measured": [
-     "ovr",
-     "atk",
-     "def"
-    ],
-    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
-    "clubs": {
-     "fav": "Tanzania",
-     "opp": "Guinea-Bissau"
-    },
-    "competition": "afconq",
-    "field_basis": "the AFCON 2027 qualifying field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus b89af5d2210e, variant 'all', Elo pinned at 10 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals.",
-    "shape": "SPLIT",
-    "size": 48
-   },
-   "form": {
-    "fav": "DDLLW",
-    "opp": "LDWLL",
-    "scope": "all senior internationals, friendlies marked",
-    "scope_is_cup": false
-   },
-   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
-   "gdg_gap": null,
-   "gp_current": {
-    "away": 0,
-    "home": 0,
-    "min": 0
-   },
-   "home": "Tanzania",
-   "in_play": false,
-   "kalshi": {
-    "ask_c": 42,
-    "ask_size": 488,
-    "bid_c": 40,
-    "bid_size": 1159,
-    "event_ticker": "KXAFCONGAME-26SEP25TANGBS",
-    "flags": [],
-    "spread_c": 2,
-    "ticker": "KXAFCONGAME-26SEP25TANGBS-TAN"
-   },
-   "kickoff": "2026-09-25T13:00Z",
-   "league": "afcon",
-   "national": {
-    "competition": "afcon",
-    "group": "Group L",
-    "head_to_head": {
-     "available": false,
-     "meetings": [],
-     "reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met",
-     "source": null
-    },
-    "leg": null,
-    "lineups": {
-     "announced": false,
-     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff",
-     "sides": {
-      "away": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Guinea-Bissau"
-      },
-      "home": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Tanzania"
-      }
-     }
-    },
-    "market": {
-     "event_ticker": "KXAFCONGAME-26SEP25TANGBS",
-     "legs": {
-      "away": {
-       "ask_c": 27,
-       "ask_size": 400,
-       "bid_c": 26,
-       "bid_size": 86,
-       "event_ticker": "KXAFCONGAME-26SEP25TANGBS",
-       "flags": [],
-       "name": "Guinea-Bissau",
-       "spread_c": 1,
-       "ticker": "KXAFCONGAME-26SEP25TANGBS-GBS"
-      },
-      "home": {
-       "ask_c": 42,
-       "ask_size": 488,
-       "bid_c": 40,
-       "bid_size": 1159,
-       "event_ticker": "KXAFCONGAME-26SEP25TANGBS",
-       "flags": [],
-       "name": "Tanzania",
-       "spread_c": 2,
-       "ticker": "KXAFCONGAME-26SEP25TANGBS-TAN"
-      },
-      "tie": {
-       "ask_c": 33,
-       "ask_size": 322,
-       "bid_c": 32,
-       "bid_size": 2,
-       "event_ticker": "KXAFCONGAME-26SEP25TANGBS",
-       "flags": [],
-       "spread_c": 1,
-       "ticker": "KXAFCONGAME-26SEP25TANGBS-TIE"
-      }
-     },
-     "orientation": "same",
-     "status": "mapped",
-     "status_words": "one open Kalshi event names both teams on this date",
-     "title": "Tanzania vs Guinea-Bissau"
-    },
-    "neutral": false,
-    "neutral_provider_flag": false,
-    "stage": "group-stage",
-    "stage_kind": "group",
-    "status_detail": "Fri, September 25th at 9:00 AM EDT",
-    "teams": {
-     "away": {
-      "espn_id": "8602",
-      "form": {
-       "available": true,
-       "friendlies": 1,
-       "games": [
-        {
-         "competition": "International Friendly",
-         "date": "2025-06-09T19:00Z",
-         "event_id": "736117",
-         "ga": 2,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Gabon",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup Qualifying - CAF",
-         "date": "2025-09-04T16:00Z",
-         "event_id": "687134",
-         "ga": 1,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "D",
-         "opponent": "Sierra Leone",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup Qualifying - CAF",
-         "date": "2025-09-08T16:00Z",
-         "event_id": "687135",
-         "ga": 0,
-         "gf": 2,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Djibouti",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup Qualifying - CAF",
-         "date": "2025-10-08T13:00Z",
-         "event_id": "687136",
-         "ga": 1,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Ethiopia",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup Qualifying - CAF",
-         "date": "2025-10-12T19:00Z",
-         "event_id": "687122",
-         "ga": 1,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Egypt",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        }
-       ],
-       "letters": "LDWLL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "guinea-bissau",
-      "name": "Guinea-Bissau",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.6089944575957759,
-         "interval": [
-          -1.4214970902706046,
-          -0.20350817507905283
-         ],
-         "rank": 47,
-         "straddles": true,
-         "tier": 5,
-         "tier_set": [
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": -0.8125026326748287
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.4536740060978313,
-         "interval": [
-          -0.6180875405249019,
-          0.28926047167076074
-         ],
-         "rank": 34,
-         "straddles": true,
-         "tier": 4,
-         "tier_set": [
-          3,
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": -0.16441353442707057
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 17.61484236000548,
-         "interval": [
-          1368.931444073039,
-          1404.16112879305
-         ],
-         "rank": 44,
-         "straddles": false,
-         "tier": 4,
-         "tier_set": [
-          4
-         ],
-         "unit": "elo",
-         "value": 1386.5462864330445
-        }
-       },
-       "axes_absent": [],
-       "competition": "afconq",
-       "source": "src.picker.national_team_axes"
-      }
-     },
-     "home": {
-      "espn_id": "5778",
-      "form": {
-       "available": true,
-       "friendlies": 2,
-       "games": [
-        {
-         "competition": "Africa Cup of Nations",
-         "date": "2025-12-27T17:30Z",
-         "event_id": "732151",
-         "ga": 1,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "D",
-         "opponent": "Uganda",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "away"
-        },
-        {
-         "competition": "Africa Cup of Nations",
-         "date": "2025-12-30T16:00Z",
-         "event_id": "732163",
-         "ga": 1,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "D",
-         "opponent": "Tunisia",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        },
-        {
-         "competition": "Africa Cup of Nations",
-         "date": "2026-01-04T16:00Z",
-         "event_id": "732171",
-         "ga": 1,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Morocco",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-26T14:30Z",
-         "event_id": "401862357",
-         "ga": 1,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Liechtenstein",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-29T13:00Z",
-         "event_id": "401866730",
-         "ga": 0,
-         "gf": 6,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Macau",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "away"
-        }
-       ],
-       "letters": "DDLLW",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "tanzania",
-      "name": "Tanzania",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.5692409054363342,
-         "interval": [
-          -0.8229623817900407,
-          0.31551942908262776
-         ],
-         "rank": 33,
-         "straddles": true,
-         "tier": 4,
-         "tier_set": [
-          2,
-          3,
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": -0.25372147635370645
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.3909090669207144,
-         "interval": [
-          -0.06346068864884352,
-          0.7183574451925854
-         ],
-         "rank": 11,
-         "straddles": true,
-         "tier": 3,
-         "tier_set": [
-          3,
-          4
-         ],
-         "unit": "log_goals",
-         "value": 0.3274483782718709
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 60.2939749938449,
-         "interval": [
-          1402.8922166335553,
-          1523.480166621245
-         ],
-         "rank": 37,
-         "straddles": true,
-         "tier": 4,
-         "tier_set": [
-          3,
-          4
-         ],
-         "unit": "elo",
-         "value": 1463.1861916274001
-        }
-       },
-       "axes_absent": [],
-       "competition": "afconq",
-       "source": "src.picker.national_team_axes"
-      }
-     }
-    },
-    "venue_country": "Tanzania"
-   },
-   "opponent": "Guinea-Bissau",
-   "own_gdg": {
-    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record.",
-    "diff": null
-   },
-   "ppg_gap": null,
-   "rank_gap": null,
-   "ranks": {
-    "fav": 37,
-    "opp": 44
-   },
-   "rated_in": {
-    "away": "afcon",
-    "home": "afcon"
-   },
-   "rates": {
-    "ga": [
-     null,
-     null
-    ],
-    "gdg": [
-     null,
-     null
-    ],
-    "gf": [
-     null,
-     null
-    ],
-    "ppg": [
-     null,
-     null
-    ]
-   },
-   "refused": false,
-   "reg_time_note": "KXAFCONGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "resolution": {
-    "Guinea-Bissau": "espn_id",
-    "Tanzania": "espn_id"
-   },
-   "shape": "SPLIT",
-   "src": "current",
-   "state": "pre",
-   "table_notes": {
-    "away": null,
-    "home": null
-   },
-   "tier_gaps": {
-    "atk": 1,
-    "def": 1,
-    "ovr": 0
-   },
-   "tiers": {
-    "atk": [
-     4,
-     5
-    ],
-    "def": [
-     3,
-     4
-    ],
-    "ovr": [
-     4,
-     4
-    ]
-   },
-   "venue": {
-    "city": "Amaan Stadium",
-    "country": "Tanzania",
-    "name": "Amaan Stadium"
-   },
-   "venue_class": {
-    "class": "TRUE_HOME",
-    "home_side": "home"
-   },
-   "venue_favourite": {
-    "flipped": false,
-    "home_side": "home",
-    "policy": "off",
-    "reason": "no_gdg_gap",
-    "refused": true,
-    "venue_class": "TRUE_HOME"
-   },
-   "weights": null
-  },
-  {
-   "away": "Lesotho",
-   "column": "afcon",
-   "columns": [
-    "afcon"
-   ],
-   "competition_id": "401920043",
-   "cross_league": false,
-   "current_only": null,
-   "espn": "caf.nations_qual",
-   "event_id": "401920043",
-   "fav_side": "home",
-   "fav_source": "field",
-   "favourite": "Niger",
-   "field": {
-    "axes": {
-     "atk": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.5340365306862761,
-       "interval": [
-        -0.11676212714453826,
-        0.9513109342280139
-       ],
-       "rank": 12,
-       "straddles": true,
-       "tier": 2,
-       "tier_set": [
-        1,
-        2,
-        3
-       ],
-       "value": 0.41727440354173784
-      },
-      "field_size": 47,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "attack",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.7800964218606496,
-       "interval": [
-        -1.406984201696671,
-        0.15320864202462836
-       ],
-       "rank": 45,
-       "straddles": true,
-       "tier": 5,
-       "tier_set": [
-        3,
-        4,
-        5
-       ],
-       "value": -0.6268877798360213
-      },
-      "tier_gap": 3,
-      "unit": "log_goals"
-     },
-     "def": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.45583645124797917,
-       "interval": [
-        -0.4655534089697857,
-        0.44611949352617264
-       ],
-       "rank": 25,
-       "straddles": true,
-       "tier": 4,
-       "tier_set": [
-        3,
-        4,
-        5
-       ],
-       "value": -0.009716957721806516
-      },
-      "field_size": 47,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "defence",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.5347527990848138,
-       "interval": [
-        -0.9408629208701323,
-        0.1286426772994952
-       ],
-       "rank": 41,
-       "straddles": true,
-       "tier": 5,
-       "tier_set": [
-        4,
-        5
-       ],
-       "value": -0.4061101217853186
-      },
-      "tier_gap": 1,
-      "unit": "log_goals"
-     },
-     "ovr": {
-      "fav": {
-       "below_floor": false,
-       "half_width_95": 23.581045504702143,
-       "interval": [
-        1463.3015851774715,
-        1510.4636761868758
-       ],
-       "rank": 33,
-       "straddles": true,
-       "tier": 4,
-       "tier_set": [
-        3,
-        4
-       ],
-       "value": 1486.8826306821736
-      },
-      "field_size": 48,
-      "floor": {
-       "below_floor": false,
-       "failing_condition": null
-      },
-      "label": "overall",
-      "opp": {
-       "below_floor": false,
-       "half_width_95": 20.493472112287304,
-       "interval": [
-        1376.4285393756168,
-        1417.4154836001912
-       ],
-       "rank": 43,
-       "straddles": false,
-       "tier": 4,
-       "tier_set": [
-        4
-       ],
-       "value": 1396.922011487904
-      },
-      "tier_gap": 0,
-      "unit": "elo"
-     }
-    },
-    "axes_measured": [
-     "ovr",
-     "atk",
-     "def"
-    ],
-    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
-    "clubs": {
-     "fav": "Niger",
-     "opp": "Lesotho"
-    },
-    "competition": "afconq",
-    "field_basis": "the AFCON 2027 qualifying field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus b89af5d2210e, variant 'all', Elo pinned at 10 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals.",
-    "shape": "SPLIT",
-    "size": 48
-   },
-   "form": {
-    "fav": "WLDDL",
-    "opp": "LDWDL",
-    "scope": "all senior internationals, friendlies marked",
-    "scope_is_cup": false
-   },
-   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
-   "gdg_gap": null,
-   "gp_current": {
-    "away": 0,
-    "home": 0,
-    "min": 0
-   },
-   "home": "Niger",
-   "in_play": false,
-   "kalshi": {
-    "ask_c": 58,
-    "ask_size": 1739,
-    "bid_c": 57,
-    "bid_size": 1194,
-    "event_ticker": "KXAFCONGAME-26SEP25NIGLES",
-    "flags": [],
-    "spread_c": 1,
-    "ticker": "KXAFCONGAME-26SEP25NIGLES-NIG"
-   },
-   "kickoff": "2026-09-25T15:00Z",
-   "league": "afcon",
-   "national": {
-    "competition": "afcon",
-    "group": "Group A",
-    "head_to_head": {
-     "available": false,
-     "meetings": [],
-     "reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met",
-     "source": null
-    },
-    "leg": null,
-    "lineups": {
-     "announced": false,
-     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff",
-     "sides": {
-      "away": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Lesotho"
-      },
-      "home": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Niger"
-      }
-     }
-    },
-    "market": {
-     "event_ticker": "KXAFCONGAME-26SEP25NIGLES",
-     "legs": {
-      "away": {
-       "ask_c": 18,
-       "ask_size": 779,
-       "bid_c": 17,
-       "bid_size": 208,
-       "event_ticker": "KXAFCONGAME-26SEP25NIGLES",
-       "flags": [],
-       "name": "Lesotho",
-       "spread_c": 1,
-       "ticker": "KXAFCONGAME-26SEP25NIGLES-LES"
-      },
-      "home": {
-       "ask_c": 58,
-       "ask_size": 1739,
-       "bid_c": 57,
-       "bid_size": 1194,
-       "event_ticker": "KXAFCONGAME-26SEP25NIGLES",
-       "flags": [],
-       "name": "Niger",
-       "spread_c": 1,
-       "ticker": "KXAFCONGAME-26SEP25NIGLES-NIG"
-      },
-      "tie": {
-       "ask_c": 27,
-       "ask_size": 806,
-       "bid_c": 26,
-       "bid_size": 486,
-       "event_ticker": "KXAFCONGAME-26SEP25NIGLES",
-       "flags": [],
-       "spread_c": 1,
-       "ticker": "KXAFCONGAME-26SEP25NIGLES-TIE"
-      }
-     },
-     "orientation": "same",
-     "status": "mapped",
-     "status_words": "one open Kalshi event names both teams on this date",
-     "title": "Niger vs Lesotho"
-    },
-    "neutral": true,
-    "neutral_provider_flag": false,
-    "stage": "group-stage",
-    "stage_kind": "group",
-    "status_detail": "Fri, September 25th at 11:00 AM EDT",
-    "teams": {
-     "away": {
-      "espn_id": "6640",
-      "form": {
-       "available": true,
-       "friendlies": 3,
-       "games": [
-        {
-         "competition": "International Friendly",
-         "date": "2025-11-18T14:00Z",
-         "event_id": "760898",
-         "ga": 1,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Malawi",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "Africa Cup of Nations Qualifying",
-         "date": "2026-03-26T14:00Z",
-         "event_id": "401850986",
-         "ga": 0,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "D",
-         "opponent": "Seychelles",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "away"
-        },
-        {
-         "competition": "Africa Cup of Nations Qualifying",
-         "date": "2026-03-29T15:00Z",
-         "event_id": "401850992",
-         "ga": 1,
-         "gf": 2,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Seychelles",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-04T13:00Z",
-         "event_id": "401874168",
-         "ga": 1,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Kenya",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-07T13:00Z",
-         "event_id": "401874169",
-         "ga": 4,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Kenya",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        }
-       ],
-       "letters": "LDWDL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "lesotho",
-      "name": "Lesotho",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.7800964218606496,
-         "interval": [
-          -1.406984201696671,
-          0.15320864202462836
-         ],
-         "rank": 45,
-         "straddles": true,
-         "tier": 5,
-         "tier_set": [
-          3,
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": -0.6268877798360213
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.5347527990848138,
-         "interval": [
-          -0.9408629208701323,
-          0.1286426772994952
-         ],
-         "rank": 41,
-         "straddles": true,
-         "tier": 5,
-         "tier_set": [
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": -0.4061101217853186
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 20.493472112287304,
-         "interval": [
-          1376.4285393756168,
-          1417.4154836001912
-         ],
-         "rank": 43,
-         "straddles": false,
-         "tier": 4,
-         "tier_set": [
-          4
-         ],
-         "unit": "elo",
-         "value": 1396.922011487904
-        }
-       },
-       "axes_absent": [],
-       "competition": "afconq",
-       "source": "src.picker.national_team_axes"
-      }
-     },
-     "home": {
-      "espn_id": "8937",
-      "form": {
-       "available": true,
-       "friendlies": 4,
-       "games": [
-        {
-         "competition": "FIFA World Cup Qualifying - CAF",
-         "date": "2025-10-12T13:00Z",
-         "event_id": "687250",
-         "ga": 0,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Zambia",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2025-11-14T19:00Z",
-         "event_id": "760878",
-         "ga": 3,
-         "gf": 2,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Burkina Faso",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2025-11-18T15:30Z",
-         "event_id": "760897",
-         "ga": 1,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Guinea",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-27T18:00Z",
-         "event_id": "401866402",
-         "ga": 0,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Libya",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-31T16:00Z",
-         "event_id": "401866403",
-         "ga": 1,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Togo",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        }
-       ],
-       "letters": "WLDDL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "niger",
-      "name": "Niger",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.5340365306862761,
-         "interval": [
-          -0.11676212714453826,
-          0.9513109342280139
-         ],
-         "rank": 12,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2,
-          3
-         ],
-         "unit": "log_goals",
-         "value": 0.41727440354173784
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.45583645124797917,
-         "interval": [
-          -0.4655534089697857,
-          0.44611949352617264
-         ],
-         "rank": 25,
-         "straddles": true,
-         "tier": 4,
-         "tier_set": [
-          3,
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": -0.009716957721806516
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 23.581045504702143,
-         "interval": [
-          1463.3015851774715,
-          1510.4636761868758
-         ],
-         "rank": 33,
-         "straddles": true,
-         "tier": 4,
-         "tier_set": [
-          3,
-          4
-         ],
-         "unit": "elo",
-         "value": 1486.8826306821736
-        }
-       },
-       "axes_absent": [],
-       "competition": "afconq",
-       "source": "src.picker.national_team_axes"
-      }
-     }
-    },
-    "venue_country": "Ghana"
-   },
-   "opponent": "Lesotho",
-   "own_gdg": {
-    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record.",
-    "diff": null
-   },
-   "ppg_gap": null,
-   "rank_gap": null,
-   "ranks": {
-    "fav": 33,
-    "opp": 43
-   },
-   "rated_in": {
-    "away": "afcon",
-    "home": "afcon"
-   },
-   "rates": {
-    "ga": [
-     null,
-     null
-    ],
-    "gdg": [
-     null,
-     null
-    ],
-    "gf": [
-     null,
-     null
-    ],
-    "ppg": [
-     null,
-     null
-    ]
-   },
-   "refused": false,
-   "reg_time_note": "KXAFCONGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "resolution": {
-    "Lesotho": "espn_id",
-    "Niger": "espn_id"
-   },
-   "shape": "SPLIT",
-   "src": "current",
-   "state": "pre",
-   "table_notes": {
-    "away": null,
-    "home": null
-   },
-   "tier_gaps": {
-    "atk": 3,
-    "def": 1,
-    "ovr": 0
-   },
-   "tiers": {
-    "atk": [
-     2,
-     5
-    ],
-    "def": [
-     4,
-     5
-    ],
-    "ovr": [
-     4,
-     4
-    ]
-   },
-   "venue": {
-    "city": "Accra",
-    "country": "Ghana",
-    "name": "Ohene Djan Stadium"
-   },
-   "venue_class": {
-    "class": "NEUTRAL",
-    "home_side": null
-   },
-   "venue_favourite": {
-    "flipped": false,
-    "home_side": null,
-    "policy": "off",
-    "reason": "no_gdg_gap",
-    "refused": true,
-    "venue_class": "NEUTRAL"
-   },
-   "weights": null
-  },
-  {
-   "away": "Ethiopia",
-   "column": "afcon",
-   "columns": [
-    "afcon"
-   ],
-   "competition_id": "401920041",
-   "cross_league": false,
-   "current_only": null,
-   "espn": "caf.nations_qual",
-   "event_id": "401920041",
-   "fav_side": "home",
-   "fav_source": "field",
-   "favourite": "Sudan",
-   "field": {
-    "axes": {
-     "atk": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.8098547189880808,
-       "interval": [
-        -1.333192618224135,
-        0.2865168197520268
-       ],
-       "rank": 43,
-       "straddles": true,
-       "tier": 5,
-       "tier_set": [
-        2,
-        3,
-        4,
-        5
-       ],
-       "value": -0.523337899236054
-      },
-      "field_size": 47,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "attack",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.8790899827850123,
-       "interval": [
-        -1.221917615656019,
-        0.5362623499140056
-       ],
-       "rank": 36,
-       "straddles": true,
-       "tier": 4,
-       "tier_set": [
-        2,
-        3,
-        4,
-        5
-       ],
-       "value": -0.34282763287100676
-      },
-      "tier_gap": -1,
-      "unit": "log_goals"
-     },
-     "def": {
-      "fav": {
-       "below_floor": true,
-       "half_width_95": 0.6606161526689599,
-       "interval": [
-        -0.4070865630474114,
-        0.9141457422905084
-       ],
-       "rank": 15,
-       "straddles": true,
-       "tier": 4,
-       "tier_set": [
-        2,
-        3,
-        4,
-        5
-       ],
-       "value": 0.2535295896215485
-      },
-      "field_size": 47,
-      "floor": {
-       "below_floor": true,
-       "failing_condition": "G3"
-      },
-      "label": "defence",
-      "opp": {
-       "below_floor": true,
-       "half_width_95": 0.499713705176615,
-       "interval": [
-        -0.879347034846703,
-        0.12008037550652712
-       ],
-       "rank": 39,
-       "straddles": true,
-       "tier": 5,
-       "tier_set": [
-        4,
-        5
-       ],
-       "value": -0.3796333296700879
-      },
-      "tier_gap": 1,
-      "unit": "log_goals"
-     },
-     "ovr": {
-      "fav": {
-       "below_floor": false,
-       "half_width_95": 25.477166188947276,
-       "interval": [
-        1477.3118793704484,
-        1528.2662117483428
-       ],
-       "rank": 30,
-       "straddles": true,
-       "tier": 3,
-       "tier_set": [
-        3,
-        4
-       ],
-       "value": 1502.7890455593956
-      },
-      "field_size": 48,
-      "floor": {
-       "below_floor": false,
-       "failing_condition": null
-      },
-      "label": "overall",
-      "opp": {
-       "below_floor": false,
-       "half_width_95": 29.633439975606993,
-       "interval": [
-        1401.1467292734865,
-        1460.4136092247004
-       ],
-       "rank": 39,
-       "straddles": false,
-       "tier": 4,
-       "tier_set": [
-        4
-       ],
-       "value": 1430.7801692490934
-      },
-      "tier_gap": 1,
-      "unit": "elo"
-     }
-    },
-    "axes_measured": [
-     "ovr",
-     "atk",
-     "def"
-    ],
-    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
-    "clubs": {
-     "fav": "Sudan",
-     "opp": "Ethiopia"
-    },
-    "competition": "afconq",
-    "field_basis": "the AFCON 2027 qualifying field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus b89af5d2210e, variant 'all', Elo pinned at 10 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals.",
-    "shape": "SPLIT",
-    "size": 48
-   },
-   "form": {
-    "fav": "LLWLL",
-    "opp": "LWWWD",
-    "scope": "all senior internationals, friendlies marked",
-    "scope_is_cup": false
-   },
-   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
-   "gdg_gap": null,
-   "gp_current": {
-    "away": 0,
-    "home": 0,
-    "min": 0
-   },
-   "home": "Sudan",
-   "in_play": false,
-   "kalshi": {
-    "ask_c": 52,
-    "ask_size": 411,
-    "bid_c": 51,
-    "bid_size": 645,
-    "event_ticker": "KXAFCONGAME-26SEP25SDNETH",
-    "flags": [],
-    "spread_c": 1,
-    "ticker": "KXAFCONGAME-26SEP25SDNETH-SDN"
-   },
-   "kickoff": "2026-09-25T16:00Z",
-   "league": "afcon",
-   "national": {
-    "competition": "afcon",
-    "group": "Group J",
-    "head_to_head": {
-     "available": true,
-     "meetings": [
-      {
-       "away": "Ethiopia",
-       "away_score": 3,
-       "completed": true,
-       "date": "2021-12-30T14:30:00Z",
-       "event_id": "625990",
-       "home": "Sudan",
-       "home_score": 2,
-       "winner": "away",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Sudan",
-       "away_score": 1,
-       "completed": true,
-       "date": "2022-09-23T13:00:00Z",
-       "event_id": "654039",
-       "home": "Ethiopia",
-       "home_score": 1,
-       "winner": "draw",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Sudan",
-       "away_score": 2,
-       "completed": true,
-       "date": "2022-09-26T13:00:00Z",
-       "event_id": "654048",
-       "home": "Ethiopia",
-       "home_score": 2,
-       "winner": "draw",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Sudan",
-       "away_score": 2,
-       "completed": true,
-       "date": "2024-12-22T14:00:00Z",
-       "event_id": "723248",
-       "home": "Ethiopia",
-       "home_score": 0,
-       "winner": "home",
-       "winner_means": "this fixture's home/away sides"
-      },
-      {
-       "away": "Ethiopia",
-       "away_score": 1,
-       "completed": true,
-       "date": "2024-12-25T14:00:00Z",
-       "event_id": "723249",
-       "home": "Sudan",
-       "home_score": 2,
-       "winner": "home",
-       "winner_means": "this fixture's home/away sides"
-      }
-     ],
-     "reason": null,
-     "source": "seasonseries",
-     "tally": {
-      "away": 1,
-      "draw": 2,
-      "home": 2
-     }
-    },
-    "leg": null,
-    "lineups": {
-     "announced": false,
-     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff",
-     "sides": {
-      "away": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Ethiopia"
-      },
-      "home": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Sudan"
-      }
-     }
-    },
-    "market": {
-     "event_ticker": "KXAFCONGAME-26SEP25SDNETH",
-     "legs": {
-      "away": {
-       "ask_c": 20,
-       "ask_size": 455,
-       "bid_c": 19,
-       "bid_size": 458,
-       "event_ticker": "KXAFCONGAME-26SEP25SDNETH",
-       "flags": [],
-       "name": "Ethiopia",
-       "spread_c": 1,
-       "ticker": "KXAFCONGAME-26SEP25SDNETH-ETH"
-      },
-      "home": {
-       "ask_c": 52,
-       "ask_size": 411,
-       "bid_c": 51,
-       "bid_size": 645,
-       "event_ticker": "KXAFCONGAME-26SEP25SDNETH",
-       "flags": [],
-       "name": "Sudan",
-       "spread_c": 1,
-       "ticker": "KXAFCONGAME-26SEP25SDNETH-SDN"
-      },
-      "tie": {
-       "ask_c": 30,
-       "ask_size": 276,
-       "bid_c": 28,
-       "bid_size": 559,
-       "event_ticker": "KXAFCONGAME-26SEP25SDNETH",
-       "flags": [],
-       "spread_c": 2,
-       "ticker": "KXAFCONGAME-26SEP25SDNETH-TIE"
-      }
-     },
-     "orientation": "same",
-     "status": "mapped",
-     "status_words": "one open Kalshi event names both teams on this date",
-     "title": "Sudan vs Ethiopia"
-    },
-    "neutral": true,
-    "neutral_provider_flag": false,
-    "stage": "group-stage",
-    "stage_kind": "group",
-    "status_detail": "Fri, September 25th at 12:00 PM EDT",
-    "teams": {
-     "away": {
-      "espn_id": "5777",
-      "form": {
-       "available": true,
-       "friendlies": 2,
-       "games": [
-        {
-         "competition": "FIFA World Cup Qualifying - CAF",
-         "date": "2025-10-12T19:00Z",
-         "event_id": "687130",
-         "ga": 3,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Burkina Faso",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "Africa Cup of Nations Qualifying",
-         "date": "2026-03-27T15:00Z",
-         "event_id": "401850988",
-         "ga": 0,
-         "gf": 3,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Sao Tome and Principe",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "away"
-        },
-        {
-         "competition": "Africa Cup of Nations Qualifying",
-         "date": "2026-03-31T13:00Z",
-         "event_id": "401850991",
-         "ga": 0,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Sao Tome and Principe",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-06T15:00Z",
-         "event_id": "401873737",
-         "ga": 0,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Malawi",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-09T15:00Z",
-         "event_id": "401873738",
-         "ga": 1,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Malawi",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "home"
-        }
-       ],
-       "letters": "LWWWD",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "ethiopia",
-      "name": "Ethiopia",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.8790899827850123,
-         "interval": [
-          -1.221917615656019,
-          0.5362623499140056
-         ],
-         "rank": 36,
-         "straddles": true,
-         "tier": 4,
-         "tier_set": [
-          2,
-          3,
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": -0.34282763287100676
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.499713705176615,
-         "interval": [
-          -0.879347034846703,
-          0.12008037550652712
-         ],
-         "rank": 39,
-         "straddles": true,
-         "tier": 5,
-         "tier_set": [
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": -0.3796333296700879
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 29.633439975606993,
-         "interval": [
-          1401.1467292734865,
-          1460.4136092247004
-         ],
-         "rank": 39,
-         "straddles": false,
-         "tier": 4,
-         "tier_set": [
-          4
-         ],
-         "unit": "elo",
-         "value": 1430.7801692490934
-        }
-       },
-       "axes_absent": [],
-       "competition": "afconq",
-       "source": "src.picker.national_team_axes"
-      }
-     },
-     "home": {
-      "espn_id": "4319",
-      "form": {
-       "available": true,
-       "friendlies": 1,
-       "games": [
-        {
-         "competition": "International Friendly",
-         "date": "2025-11-14T15:00Z",
-         "event_id": "760880",
-         "ga": 2,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Oman",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "Africa Cup of Nations",
-         "date": "2025-12-24T15:00Z",
-         "event_id": "732143",
-         "ga": 3,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Algeria",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "Africa Cup of Nations",
-         "date": "2025-12-28T15:00Z",
-         "event_id": "732154",
-         "ga": 0,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Equatorial Guinea",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "away"
-        },
-        {
-         "competition": "Africa Cup of Nations",
-         "date": "2025-12-31T16:00Z",
-         "event_id": "732166",
-         "ga": 2,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Burkina Faso",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "Africa Cup of Nations",
-         "date": "2026-01-03T16:00Z",
-         "event_id": "732170",
-         "ga": 3,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Senegal",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        }
-       ],
-       "letters": "LLWLL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "sudan",
-      "name": "Sudan",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.8098547189880808,
-         "interval": [
-          -1.333192618224135,
-          0.2865168197520268
-         ],
-         "rank": 43,
-         "straddles": true,
-         "tier": 5,
-         "tier_set": [
-          2,
-          3,
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": -0.523337899236054
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.6606161526689599,
-         "interval": [
-          -0.4070865630474114,
-          0.9141457422905084
-         ],
-         "rank": 15,
-         "straddles": true,
-         "tier": 4,
-         "tier_set": [
-          2,
-          3,
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": 0.2535295896215485
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 25.477166188947276,
-         "interval": [
-          1477.3118793704484,
-          1528.2662117483428
-         ],
-         "rank": 30,
-         "straddles": true,
-         "tier": 3,
-         "tier_set": [
-          3,
-          4
-         ],
-         "unit": "elo",
-         "value": 1502.7890455593956
-        }
-       },
-       "axes_absent": [],
-       "competition": "afconq",
-       "source": "src.picker.national_team_axes"
-      }
-     }
-    },
-    "venue_country": "South Sudan"
-   },
-   "opponent": "Ethiopia",
-   "own_gdg": {
-    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record.",
-    "diff": null
-   },
-   "ppg_gap": null,
-   "rank_gap": null,
-   "ranks": {
-    "fav": 30,
-    "opp": 39
-   },
-   "rated_in": {
-    "away": "afcon",
-    "home": "afcon"
-   },
-   "rates": {
-    "ga": [
-     null,
-     null
-    ],
-    "gdg": [
-     null,
-     null
-    ],
-    "gf": [
-     null,
-     null
-    ],
-    "ppg": [
-     null,
-     null
-    ]
-   },
-   "refused": false,
-   "reg_time_note": "KXAFCONGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "resolution": {
-    "Ethiopia": "espn_id",
-    "Sudan": "espn_id"
-   },
-   "shape": "SPLIT",
-   "src": "current",
-   "state": "pre",
-   "table_notes": {
-    "away": null,
-    "home": null
-   },
-   "tier_gaps": {
-    "atk": -1,
-    "def": 1,
-    "ovr": 1
-   },
-   "tiers": {
-    "atk": [
-     5,
-     4
-    ],
-    "def": [
-     4,
-     5
-    ],
-    "ovr": [
-     3,
-     4
-    ]
-   },
-   "venue": {
-    "city": "Juba National Stadium",
-    "country": "South Sudan",
-    "name": "Juba National Stadium"
-   },
-   "venue_class": {
-    "class": "NEUTRAL",
-    "home_side": null
-   },
-   "venue_favourite": {
-    "flipped": false,
-    "home_side": null,
-    "policy": "off",
-    "reason": "no_gdg_gap",
-    "refused": true,
-    "venue_class": "NEUTRAL"
-   },
-   "weights": null
-  },
-  {
-   "away": "Eritrea",
-   "column": "afcon",
-   "columns": [
-    "afcon"
-   ],
-   "competition_id": "401920035",
-   "cross_league": false,
-   "current_only": null,
-   "espn": "caf.nations_qual",
-   "event_id": "401920035",
-   "fav_side": "away",
-   "fav_source": "field",
-   "favourite": "Eritrea",
-   "field_partial": {
-    "axes": {
-     "ovr": {
-      "fav": {
-       "below_floor": false,
-       "half_width_95": 4.31377247080896,
-       "interval": [
-        1611.3213117245011,
-        1619.9488566661191
-       ],
-       "rank": 15,
-       "straddles": false,
-       "tier": 3,
-       "tier_set": [
-        3
-       ],
-       "value": 1615.6350841953101
-      },
-      "field_size": 48,
-      "floor": {
-       "below_floor": false,
-       "failing_condition": null
-      },
-      "label": "overall",
-      "opp": {
-       "below_floor": false,
-       "half_width_95": 33.91335070370768,
-       "interval": [
-        1481.547554157181,
-        1549.3742555645963
-       ],
-       "rank": 27,
-       "straddles": true,
-       "tier": 3,
-       "tier_set": [
-        3,
-        4
-       ],
-       "value": 1515.4609048608886
-      },
-      "tier_gap": 0,
-      "unit": "elo"
-     }
-    },
-    "axes_measured": [
-     "ovr"
-    ],
-    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
-    "clubs": {
-     "fav": "Eritrea",
-     "opp": "Kenya"
-    },
-    "competition": "afconq",
-    "field_basis": "the AFCON 2027 qualifying field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus b89af5d2210e, variant 'all', Elo pinned at 10 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals.",
-    "shape_absent": {
-     "axes_absent": [
-      "atk",
-      "def"
-     ],
-     "why": "`shape` is CLEAN/HOLLOW/SPLIT read off all 3 of ['ovr', 'atk', 'def'] together, and one of these two teams has no measured atk or def. A label composed from fewer gaps would be a sentence about the fixture no measurement stands behind."
-    },
-    "size": 48,
-    "why_not_field": "THE FIELD PLACED BOTH TEAMS ON FEWER AXES THAN `field` IS DEFINED ON: one of them has no measured attack or defence (the goals estimator's own refusal, named on its rating). This key is not `field` because `field` is a three-axis contract its readers walk unguarded. Nothing is padded: an axis a team was not measured on is absent, not a pair of nulls. `shape_absent` says which axes are missing and why."
-   },
-   "form": {
-    "fav": "LLLWW",
-    "opp": "LDWDW",
-    "scope": "all senior internationals, friendlies marked",
-    "scope_is_cup": false
-   },
-   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
-   "gdg_gap": null,
-   "gp_current": {
-    "away": 0,
-    "home": 0,
-    "min": 0
-   },
-   "home": "Kenya",
-   "in_play": false,
-   "kalshi": {
-    "ask_c": 11,
-    "ask_size": 1388,
-    "bid_c": 9,
-    "bid_size": 201,
-    "event_ticker": "KXAFCONGAME-26SEP26KENERI",
-    "flags": [],
-    "spread_c": 2,
-    "ticker": "KXAFCONGAME-26SEP26KENERI-ERI"
-   },
-   "kickoff": "2026-09-26T13:00Z",
-   "league": "afcon",
-   "national": {
-    "competition": "afcon",
-    "group": "Group D",
-    "head_to_head": {
-     "available": false,
-     "meetings": [],
-     "reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met",
-     "source": null
-    },
-    "leg": null,
-    "lineups": {
-     "announced": false,
-     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff",
-     "sides": {
-      "away": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Eritrea"
-      },
-      "home": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Kenya"
-      }
-     }
-    },
-    "market": {
-     "event_ticker": "KXAFCONGAME-26SEP26KENERI",
-     "legs": {
-      "away": {
-       "ask_c": 11,
-       "ask_size": 1388,
-       "bid_c": 9,
-       "bid_size": 201,
-       "event_ticker": "KXAFCONGAME-26SEP26KENERI",
-       "flags": [],
-       "name": "Eritrea",
-       "spread_c": 2,
-       "ticker": "KXAFCONGAME-26SEP26KENERI-ERI"
-      },
-      "home": {
-       "ask_c": 69,
-       "ask_size": 5,
-       "bid_c": 65,
-       "bid_size": 100,
-       "event_ticker": "KXAFCONGAME-26SEP26KENERI",
-       "flags": [
-        "WIDE",
-        "THIN"
-       ],
-       "name": "Kenya",
-       "spread_c": 4,
-       "ticker": "KXAFCONGAME-26SEP26KENERI-KEN"
-      },
-      "tie": {
-       "ask_c": 22,
-       "ask_size": 14,
-       "bid_c": 19,
-       "bid_size": 230,
-       "event_ticker": "KXAFCONGAME-26SEP26KENERI",
-       "flags": [
-        "THIN"
-       ],
-       "spread_c": 3,
-       "ticker": "KXAFCONGAME-26SEP26KENERI-TIE"
-      }
-     },
-     "orientation": "same",
-     "status": "mapped",
-     "status_words": "one open Kalshi event names both teams on this date",
-     "title": "Kenya vs Eritrea"
-    },
-    "neutral": false,
-    "neutral_provider_flag": false,
-    "stage": "group-stage",
-    "stage_kind": "group",
-    "status_detail": "Sat, September 26th at 9:00 AM EDT",
-    "teams": {
-     "away": {
-      "espn_id": "5774",
-      "form": {
-       "available": true,
-       "friendlies": 0,
-       "games": [
-        {
-         "competition": "FIFA World Cup Qualifying - CAF",
-         "date": "2015-10-13T17:00Z",
-         "event_id": "436345",
-         "ga": 3,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Botswana",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup Qualifying - CAF",
-         "date": "2019-09-04T13:00Z",
-         "event_id": "554680",
-         "ga": 2,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Namibia",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup Qualifying - CAF",
-         "date": "2019-09-10T17:00Z",
-         "event_id": "554664",
-         "ga": 2,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Namibia",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "Africa Cup of Nations Qualifying",
-         "date": "2026-03-25T16:00Z",
-         "event_id": "401850985",
-         "ga": 0,
-         "gf": 2,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Eswatini",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "Africa Cup of Nations Qualifying",
-         "date": "2026-03-31T14:00Z",
-         "event_id": "401850990",
-         "ga": 1,
-         "gf": 2,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Eswatini",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "away"
-        }
-       ],
-       "letters": "LLLWW",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "eritrea",
-      "name": "Eritrea",
-      "rating": {
-       "available": true,
-       "axes": {
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 4.31377247080896,
-         "interval": [
-          1611.3213117245011,
-          1619.9488566661191
-         ],
-         "rank": 15,
-         "straddles": false,
-         "tier": 3,
-         "tier_set": [
-          3
-         ],
-         "unit": "elo",
-         "value": 1615.6350841953101
-        }
-       },
-       "axes_absent": [
-        "atk",
-        "def"
-       ],
-       "competition": "afconq",
-       "not_measured_because": "in a fitted league but in no domestic block — no club deviation, refused rather than set to the league average",
-       "source": "src.picker.national_team_axes"
-      }
-     },
-     "home": {
-      "espn_id": "2848",
-      "form": {
-       "available": true,
-       "friendlies": 5,
-       "games": [
-        {
-         "competition": "International Friendly",
-         "date": "2025-11-18T15:00Z",
-         "event_id": "760824",
-         "ga": 8,
-         "gf": 0,
-         "kind": "friendly",
-         "letter": "L",
-         "opponent": "Senegal",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-27T16:00Z",
-         "event_id": "401862401",
-         "ga": 1,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Estonia",
-         "provider_agrees": false,
-         "provider_letter": "L",
-         "shootout": {
-          "against": 5,
-          "for": 4,
-          "note": "level after play, decided on penalties; the letter is the scoreline's, D"
-         },
-         "venue": "home"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-03-30T14:00Z",
-         "event_id": "401866741",
-         "ga": 0,
-         "gf": 3,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Grenada",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-04T13:00Z",
-         "event_id": "401874168",
-         "ga": 1,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "D",
-         "opponent": "Lesotho",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "away"
-        },
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-07T13:00Z",
-         "event_id": "401874169",
-         "ga": 0,
-         "gf": 4,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Lesotho",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        }
-       ],
-       "letters": "LDWDW",
-       "provider_disagreements": 1,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "kenya",
-      "name": "Kenya",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.5964643031716015,
-         "interval": [
-          -0.5702610705180562,
-          0.6226675358251468
-         ],
-         "rank": 28,
-         "straddles": true,
-         "tier": 3,
-         "tier_set": [
-          1,
-          2,
-          3,
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": 0.026203232653545298
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.575129259138015,
-         "interval": [
-          -0.9583823005187173,
-          0.19187621775731273
-         ],
-         "rank": 40,
-         "straddles": true,
-         "tier": 5,
-         "tier_set": [
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": -0.3832530413807023
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 33.91335070370768,
-         "interval": [
-          1481.547554157181,
-          1549.3742555645963
-         ],
-         "rank": 27,
-         "straddles": true,
-         "tier": 3,
-         "tier_set": [
-          3,
-          4
-         ],
-         "unit": "elo",
-         "value": 1515.4609048608886
-        }
-       },
-       "axes_absent": [],
-       "competition": "afconq",
-       "source": "src.picker.national_team_axes"
-      }
-     }
-    },
-    "venue_country": "Kenya"
-   },
-   "opponent": "Kenya",
-   "own_gdg": {
-    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record.",
-    "diff": null
-   },
-   "ppg_gap": null,
-   "rank_gap": null,
-   "ranks": {
-    "fav": 15,
-    "opp": 27
-   },
-   "rated_in": {
-    "away": "afcon",
-    "home": "afcon"
-   },
-   "rates": {
-    "ga": [
-     null,
-     null
-    ],
-    "gdg": [
-     null,
-     null
-    ],
-    "gf": [
-     null,
-     null
-    ],
-    "ppg": [
-     null,
-     null
-    ]
-   },
-   "refused": false,
-   "reg_time_note": "KXAFCONGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "resolution": {
-    "Eritrea": "espn_id",
-    "Kenya": "espn_id"
-   },
-   "shape": null,
-   "src": "current",
-   "state": "pre",
-   "table_notes": {
-    "away": null,
-    "home": null
-   },
-   "tier_gaps": {
-    "atk": null,
-    "def": null,
-    "ovr": 0
-   },
-   "tiers": {
-    "atk": null,
-    "def": null,
-    "ovr": [
-     3,
-     3
-    ]
-   },
-   "venue": {
-    "city": "Nairobi",
-    "country": "Kenya",
-    "name": "Nyayo National Stadium"
-   },
-   "venue_class": {
-    "class": "TRUE_HOME",
-    "home_side": "home"
-   },
-   "venue_favourite": {
-    "flipped": false,
-    "home_side": "home",
-    "policy": "off",
-    "reason": "no_gdg_gap",
-    "refused": true,
-    "venue_class": "TRUE_HOME"
-   },
-   "weights": null
-  },
-  {
-   "away": "South Africa",
-   "column": "afcon",
-   "columns": [
-    "afcon"
-   ],
-   "competition_id": "401919991",
-   "cross_league": false,
-   "current_only": null,
-   "espn": "caf.nations_qual",
-   "event_id": "401919991",
-   "fav_side": "away",
-   "fav_source": "field",
-   "favourite": "South Africa",
-   "field_partial": {
-    "axes": {
-     "ovr": {
-      "fav": {
-       "below_floor": false,
-       "half_width_95": 49.03056912744277,
-       "interval": [
-        1583.3189447820982,
-        1681.3800830369837
-       ],
-       "rank": 14,
-       "straddles": true,
-       "tier": 3,
-       "tier_set": [
-        2,
-        3
-       ],
-       "value": 1632.349513909541
-      },
-      "field_size": 48,
-      "floor": {
-       "below_floor": false,
-       "failing_condition": null
-      },
-      "label": "overall",
-      "opp": {
-       "below_floor": false,
-       "half_width_95": 4.31377247080896,
-       "interval": [
-        1611.3213117245011,
-        1619.9488566661191
-       ],
-       "rank": 15,
-       "straddles": false,
-       "tier": 3,
-       "tier_set": [
-        3
-       ],
-       "value": 1615.6350841953101
-      },
-      "tier_gap": 0,
-      "unit": "elo"
-     }
-    },
-    "axes_measured": [
-     "ovr"
-    ],
-    "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
-    "clubs": {
-     "fav": "South Africa",
-     "opp": "Eritrea"
-    },
-    "competition": "afconq",
-    "field_basis": "the AFCON 2027 qualifying field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus b89af5d2210e, variant 'all', Elo pinned at 10 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals.",
-    "shape_absent": {
-     "axes_absent": [
-      "atk",
-      "def"
-     ],
-     "why": "`shape` is CLEAN/HOLLOW/SPLIT read off all 3 of ['ovr', 'atk', 'def'] together, and one of these two teams has no measured atk or def. A label composed from fewer gaps would be a sentence about the fixture no measurement stands behind."
-    },
-    "size": 48,
-    "why_not_field": "THE FIELD PLACED BOTH TEAMS ON FEWER AXES THAN `field` IS DEFINED ON: one of them has no measured attack or defence (the goals estimator's own refusal, named on its rating). This key is not `field` because `field` is a three-axis contract its readers walk unguarded. Nothing is padded: an axis a team was not measured on is absent, not a pair of nulls. `shape_absent` says which axes are missing and why."
-   },
-   "form": {
-    "fav": "WLDWL",
-    "opp": "LLLWW",
-    "scope": "all senior internationals, friendlies marked",
-    "scope_is_cup": false
-   },
-   "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
-   "gdg_gap": null,
-   "gp_current": {
-    "away": 0,
-    "home": 0,
-    "min": 0
-   },
-   "home": "Eritrea",
-   "in_play": false,
-   "kalshi": {
-    "ask_c": 70,
-    "ask_size": 21,
-    "bid_c": 11,
-    "bid_size": 5,
-    "event_ticker": "KXAFCONGAME-26SEP30ERIRSA",
-    "flags": [
-     "WIDE",
-     "THIN"
-    ],
-    "spread_c": 59,
-    "ticker": "KXAFCONGAME-26SEP30ERIRSA-RSA"
-   },
-   "kickoff": "2026-09-30T16:00Z",
-   "league": "afcon",
-   "national": {
-    "competition": "afcon",
-    "group": "Group D",
-    "head_to_head": {
-     "available": false,
-     "meetings": [],
-     "reason": "ESPN's summary carries no head-to-head block for this pairing: it lists no previous meeting. That is the provider's record, not proof the two teams never met",
-     "source": null
-    },
-    "leg": null,
-    "lineups": {
-     "announced": false,
-     "reason": "ESPN's summary carries no starting XI for this fixture yet; XIs are published around kickoff",
-     "sides": {
-      "away": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "South Africa"
-      },
-      "home": {
-       "announced": false,
-       "bench": 0,
-       "formation": null,
-       "starters": [],
-       "team": "Eritrea"
-      }
-     }
-    },
-    "market": {
-     "event_ticker": "KXAFCONGAME-26SEP30ERIRSA",
-     "legs": {
-      "away": {
-       "ask_c": 70,
-       "ask_size": 21,
-       "bid_c": 11,
-       "bid_size": 5,
-       "event_ticker": "KXAFCONGAME-26SEP30ERIRSA",
-       "flags": [
-        "WIDE",
-        "THIN"
-       ],
-       "name": "South Africa",
-       "spread_c": 59,
-       "ticker": "KXAFCONGAME-26SEP30ERIRSA-RSA"
-      },
-      "home": {
-       "ask_c": 70,
-       "ask_size": 54,
-       "bid_c": 10,
-       "bid_size": 1,
-       "event_ticker": "KXAFCONGAME-26SEP30ERIRSA",
-       "flags": [
-        "WIDE",
-        "THIN"
-       ],
-       "name": "Eritrea",
-       "spread_c": 60,
-       "ticker": "KXAFCONGAME-26SEP30ERIRSA-ERI"
-      },
-      "tie": {
-       "ask_c": 69,
-       "ask_size": 5,
-       "bid_c": 6,
-       "bid_size": 700,
-       "event_ticker": "KXAFCONGAME-26SEP30ERIRSA",
-       "flags": [
-        "WIDE",
-        "THIN"
-       ],
-       "spread_c": 63,
-       "ticker": "KXAFCONGAME-26SEP30ERIRSA-TIE"
-      }
-     },
-     "orientation": "same",
-     "status": "mapped",
-     "status_words": "one open Kalshi event names both teams on this date",
-     "title": "Eritrea vs South Africa"
-    },
-    "neutral": true,
-    "neutral_provider_flag": false,
-    "stage": "group-stage",
-    "stage_kind": "group",
-    "status_detail": "Wed, September 30th at 12:00 PM EDT",
-    "teams": {
-     "away": {
-      "espn_id": "467",
-      "form": {
-       "available": true,
-       "friendlies": 1,
-       "games": [
-        {
-         "competition": "International Friendly",
-         "date": "2026-06-06T21:00Z",
-         "event_id": "401875160",
-         "ga": 0,
-         "gf": 1,
-         "kind": "friendly",
-         "letter": "W",
-         "opponent": "Jamaica",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-11T19:00Z",
-         "event_id": "760415",
-         "ga": 2,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Mexico",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-18T16:00Z",
-         "event_id": "760438",
-         "ga": 1,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "D",
-         "opponent": "Czechia",
-         "provider_agrees": true,
-         "provider_letter": "D",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-25T01:00Z",
-         "event_id": "760466",
-         "ga": 0,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "South Korea",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup",
-         "date": "2026-06-28T19:00Z",
-         "event_id": "760486",
-         "ga": 1,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Canada",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        }
-       ],
-       "letters": "WLDWL",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "south-africa",
-      "name": "South Africa",
-      "rating": {
-       "available": true,
-       "axes": {
-        "atk": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.39723401068539477,
-         "interval": [
-          0.06321226235300847,
-          0.857680283723798
-         ],
-         "rank": 8,
-         "straddles": true,
-         "tier": 2,
-         "tier_set": [
-          1,
-          2,
-          3
-         ],
-         "unit": "log_goals",
-         "value": 0.46044627303840324
-        },
-        "def": {
-         "below_floor": true,
-         "floor": {
-          "below_floor": true,
-          "failing_condition": "G3"
-         },
-         "half_width_95": 0.5080118902362225,
-         "interval": [
-          -0.4330655320348256,
-          0.5829582484376195
-         ],
-         "rank": 20,
-         "straddles": true,
-         "tier": 4,
-         "tier_set": [
-          3,
-          4,
-          5
-         ],
-         "unit": "log_goals",
-         "value": 0.07494635820139689
-        },
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 49.03056912744277,
-         "interval": [
-          1583.3189447820982,
-          1681.3800830369837
-         ],
-         "rank": 14,
-         "straddles": true,
-         "tier": 3,
-         "tier_set": [
-          2,
-          3
-         ],
-         "unit": "elo",
-         "value": 1632.349513909541
-        }
-       },
-       "axes_absent": [],
-       "competition": "afconq",
-       "source": "src.picker.national_team_axes"
-      }
-     },
-     "home": {
-      "espn_id": "5774",
-      "form": {
-       "available": true,
-       "friendlies": 0,
-       "games": [
-        {
-         "competition": "FIFA World Cup Qualifying - CAF",
-         "date": "2015-10-13T17:00Z",
-         "event_id": "436345",
-         "ga": 3,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Botswana",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "FIFA World Cup Qualifying - CAF",
-         "date": "2019-09-04T13:00Z",
-         "event_id": "554680",
-         "ga": 2,
-         "gf": 1,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Namibia",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "home"
-        },
-        {
-         "competition": "FIFA World Cup Qualifying - CAF",
-         "date": "2019-09-10T17:00Z",
-         "event_id": "554664",
-         "ga": 2,
-         "gf": 0,
-         "kind": "competitive",
-         "letter": "L",
-         "opponent": "Namibia",
-         "provider_agrees": true,
-         "provider_letter": "L",
-         "venue": "away"
-        },
-        {
-         "competition": "Africa Cup of Nations Qualifying",
-         "date": "2026-03-25T16:00Z",
-         "event_id": "401850985",
-         "ga": 0,
-         "gf": 2,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Eswatini",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "home"
-        },
-        {
-         "competition": "Africa Cup of Nations Qualifying",
-         "date": "2026-03-31T14:00Z",
-         "event_id": "401850990",
-         "ga": 1,
-         "gf": 2,
-         "kind": "competitive",
-         "letter": "W",
-         "opponent": "Eswatini",
-         "provider_agrees": true,
-         "provider_letter": "W",
-         "venue": "away"
-        }
-       ],
-       "letters": "LLLWW",
-       "provider_disagreements": 0,
-       "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
-      },
-      "key": "eritrea",
-      "name": "Eritrea",
-      "rating": {
-       "available": true,
-       "axes": {
-        "ovr": {
-         "below_floor": false,
-         "floor": {
-          "below_floor": false,
-          "failing_condition": null
-         },
-         "half_width_95": 4.31377247080896,
-         "interval": [
-          1611.3213117245011,
-          1619.9488566661191
-         ],
-         "rank": 15,
-         "straddles": false,
-         "tier": 3,
-         "tier_set": [
-          3
-         ],
-         "unit": "elo",
-         "value": 1615.6350841953101
-        }
-       },
-       "axes_absent": [
-        "atk",
-        "def"
-       ],
-       "competition": "afconq",
-       "not_measured_because": "in a fitted league but in no domestic block — no club deviation, refused rather than set to the league average",
-       "source": "src.picker.national_team_axes"
-      }
-     }
-    },
-    "venue_country": "Egypt"
-   },
-   "opponent": "Eritrea",
-   "own_gdg": {
-    "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record.",
-    "diff": null
-   },
-   "ppg_gap": null,
-   "rank_gap": null,
-   "ranks": {
-    "fav": 14,
-    "opp": 15
-   },
-   "rated_in": {
-    "away": "afcon",
-    "home": "afcon"
-   },
-   "rates": {
-    "ga": [
-     null,
-     null
-    ],
-    "gdg": [
-     null,
-     null
-    ],
-    "gf": [
-     null,
-     null
-    ],
-    "ppg": [
-     null,
-     null
-    ]
-   },
-   "refused": false,
-   "reg_time_note": "KXAFCONGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
-   "resolution": {
-    "Eritrea": "espn_id",
-    "South Africa": "espn_id"
-   },
-   "shape": null,
-   "src": "current",
-   "state": "pre",
-   "table_notes": {
-    "away": null,
-    "home": null
-   },
-   "tier_gaps": {
-    "atk": null,
-    "def": null,
-    "ovr": 0
-   },
-   "tiers": {
-    "atk": null,
-    "def": null,
-    "ovr": [
-     3,
-     3
-    ]
-   },
-   "venue": {
-    "city": "Cairo",
-    "country": "Egypt",
-    "name": "Al Salam Stadium"
-   },
-   "venue_class": {
-    "class": "NEUTRAL",
-    "home_side": null
-   },
-   "venue_favourite": {
-    "flipped": false,
-    "home_side": null,
-    "policy": "off",
-    "reason": "no_gdg_gap",
-    "refused": true,
-    "venue_class": "NEUTRAL"
-   },
-   "weights": null
-  }
- ],
- "source": "live"
+ "field_floor_note": "REFUSED BY THE PLACEABILITY FLOOR ON THE FIRST READING. This team's confederation did not clear the floor on this axis for this competition's field — on the goal axes that is G3: the median entrant's 95% interval is wider than one equal-width band of the field. The value is measured and shown; the interval beside it IS the refusal, and it is what stops the rank being read as precision. It is ranked with everyone else, because a team the evidence cannot place is not thereby a worse team.",
+ "capture": {
+  "backend": "not_requested",
+  "writable": false
+ }
 } as const;
 
 export const SAMPLE_REFUSAL = {
@@ -16307,4 +20505,949 @@ export const SAMPLE_REFUSAL = {
   },
   "venue_country": "Georgia"
  }
+} as const;
+
+export const XI_LINEUPS = {
+ "announced": true,
+ "reason": null,
+ "sides": {
+  "away": {
+   "announced": true,
+   "bench": 10,
+   "formation": "5-4-1",
+   "starters": [
+    {
+     "jersey": "23",
+     "name": "Jason Vega",
+     "position": "G"
+    },
+    {
+     "jersey": "2",
+     "name": "Joab Gutiérrez",
+     "position": "D"
+    },
+    {
+     "jersey": "6",
+     "name": "Emmanuel Gómez",
+     "position": "D"
+    },
+    {
+     "jersey": "19",
+     "name": "Juan Rodriguez",
+     "position": "D"
+    },
+    {
+     "jersey": "5",
+     "name": "Justing Cano",
+     "position": "D"
+    },
+    {
+     "jersey": "4",
+     "name": "Marvin David Fletes",
+     "position": "D"
+    },
+    {
+     "jersey": "14",
+     "name": "Kadeem Cole",
+     "position": "M"
+    },
+    {
+     "jersey": "16",
+     "name": "Raheem Giusseppe Cole Martinez",
+     "position": "M"
+    },
+    {
+     "jersey": "20",
+     "name": "Jonathan Moncada",
+     "position": "M"
+    },
+    {
+     "jersey": "11",
+     "name": "Efraín Antonio Mejía Alfaro",
+     "position": "M"
+    },
+    {
+     "jersey": "9",
+     "name": "Jaime Moreno",
+     "position": "F"
+    }
+   ],
+   "team": "Nicaragua"
+  },
+  "home": {
+   "announced": true,
+   "bench": 11,
+   "formation": "4-3-3",
+   "starters": [
+    {
+     "jersey": "1",
+     "name": "Xavier Valdez",
+     "position": "G"
+    },
+    {
+     "jersey": "5",
+     "name": "Noah Dollenmayer",
+     "position": "D"
+    },
+    {
+     "jersey": "3",
+     "name": "Junior Firpo",
+     "position": "D"
+    },
+    {
+     "jersey": "21",
+     "name": "Juan Castillo",
+     "position": "D"
+    },
+    {
+     "jersey": "23",
+     "name": "Luiyi de Lucas",
+     "position": "D"
+    },
+    {
+     "jersey": "14",
+     "name": "Jean Carlos López",
+     "position": "M"
+    },
+    {
+     "jersey": "6",
+     "name": "Pablo Rosario",
+     "position": "M"
+    },
+    {
+     "jersey": "8",
+     "name": "Heinz Mörschel",
+     "position": "M"
+    },
+    {
+     "jersey": "19",
+     "name": "Peter Federico",
+     "position": "F"
+    },
+    {
+     "jersey": "9",
+     "name": "Mariano Díaz",
+     "position": "F"
+    },
+    {
+     "jersey": "11",
+     "name": "Edarlyn Reyes",
+     "position": "F"
+    }
+   ],
+   "team": "Dominican Republic"
+  }
+ }
+} as const;
+
+export const INTERIM_CLOCK = "2026-09-24T23:32:30.506453+00:00";
+
+export const INTERIM_DR_NIC = {
+ "away": "Nicaragua",
+ "column": "cnl",
+ "columns": [
+  "cnl"
+ ],
+ "competition_id": "401900637",
+ "cross_league": false,
+ "current_only": null,
+ "espn": "concacaf.nations.league",
+ "event_id": "401900637",
+ "fav_side": "away",
+ "fav_source": "field",
+ "favourite": "Nicaragua",
+ "field": {
+  "axes": {
+   "atk": {
+    "fav": {
+     "below_floor": true,
+     "half_width_95": 0.31177945672676244,
+     "interval": [
+      -0.29202354267958996,
+      0.3315353707739349
+     ],
+     "rank": 7,
+     "straddles": true,
+     "tier": 1,
+     "tier_set": [
+      1,
+      2
+     ],
+     "value": 0.019755914047172474
+    },
+    "field_size": 37,
+    "floor": {
+     "below_floor": true,
+     "failing_condition": "G3"
+    },
+    "label": "attack",
+    "opp": {
+     "below_floor": true,
+     "half_width_95": 0.3237226825292346,
+     "interval": [
+      -0.47098372680160727,
+      0.1764616382568619
+     ],
+     "rank": 11,
+     "straddles": true,
+     "tier": 2,
+     "tier_set": [
+      1,
+      2
+     ],
+     "value": -0.1472610442723727
+    },
+    "tier_gap": 1,
+    "unit": "log_goals"
+   },
+   "def": {
+    "fav": {
+     "below_floor": true,
+     "half_width_95": 0.42929433394837696,
+     "interval": [
+      -0.572330581596761,
+      0.2862580862999929
+     ],
+     "rank": 6,
+     "straddles": true,
+     "tier": 1,
+     "tier_set": [
+      1,
+      2
+     ],
+     "value": -0.14303624764838407
+    },
+    "field_size": 37,
+    "floor": {
+     "below_floor": true,
+     "failing_condition": "G3"
+    },
+    "label": "defence",
+    "opp": {
+     "below_floor": true,
+     "half_width_95": 0.6082841330787719,
+     "interval": [
+      -1.031420825845823,
+      0.18514744031172092
+     ],
+     "rank": 13,
+     "straddles": true,
+     "tier": 2,
+     "tier_set": [
+      1,
+      2,
+      3
+     ],
+     "value": -0.423136692767051
+    },
+    "tier_gap": 1,
+    "unit": "log_goals"
+   },
+   "ovr": {
+    "fav": {
+     "below_floor": false,
+     "half_width_95": 28.04371263951985,
+     "interval": [
+      1446.3658843209873,
+      1502.4533096000268
+     ],
+     "rank": 11,
+     "straddles": false,
+     "tier": 2,
+     "tier_set": [
+      2
+     ],
+     "value": 1474.409596960507
+    },
+    "field_size": 37,
+    "floor": {
+     "below_floor": false,
+     "failing_condition": null
+    },
+    "label": "overall",
+    "opp": {
+     "below_floor": false,
+     "half_width_95": 21.094833608511905,
+     "interval": [
+      1417.5723271779498,
+      1459.7619943949735
+     ],
+     "rank": 13,
+     "straddles": false,
+     "tier": 2,
+     "tier_set": [
+      2
+     ],
+     "value": 1438.6671607864616
+    },
+    "tier_gap": 0,
+    "unit": "elo"
+   }
+  },
+  "axes_measured": [
+   "ovr",
+   "atk",
+   "def"
+  ],
+  "basis": "rated on the competition's own FIELD — its whole entrant set on one scale, the national-team field the club estimators measured — and not on any table: a national team has none. `field_basis` beside this says which field and how deeply it was measured. `straddles` and `below_floor` travel with each side, and each axis carries its confederation's floor verdict and the condition that failed, because a band published without them reads as a measurement of the team rather than of the evidence.",
+  "clubs": {
+   "fav": "Nicaragua",
+   "opp": "Dominican Republic"
+  },
+  "competition": "cnl",
+  "field_basis": "the CONCACAF Nations League 2026-27 field: every entrant of the competition on the national-team field the club estimators measured (src.picker.national_team_axes; corpus b89af5d2210e, variant 'all', Elo pinned at 10 passes), banded on this competition's own spread. Overall is Elo; attack and defence are log-goals.",
+  "shape": "SPLIT",
+  "size": 37
+ },
+ "form": {
+  "fav": "WLLDL",
+  "opp": "WDDDL",
+  "scope": "all senior internationals, friendlies marked",
+  "scope_is_cup": false
+ },
+ "gap_note": "NATIONAL-TEAM FIXTURE — ppg, GD/g and rank gaps withheld. A national team has no league table, so there is no table gap to measure. The two teams are compared on the competition's FIELD instead (`field`, or `field_partial` when one team lacks a goal axis): `ranks` are the two teams' OVERALL ranks in that field, and `tiers`, `tier_gaps` and `shape` are the field's own tiers — there is no within-league quintile for them to be. `rates` are each team's own record in this competition's current group, per game.",
+ "gdg_gap": null,
+ "gp_current": {
+  "away": 0,
+  "home": 0,
+  "min": 0
+ },
+ "home": "Dominican Republic",
+ "in_play": false,
+ "kalshi": {
+  "ask_c": 19,
+  "ask_size": 24584,
+  "bid_c": 17,
+  "bid_size": 3480,
+  "event_ticker": "KXCONCACAFNLGAME-26SEP24DOMNIC",
+  "flags": [],
+  "spread_c": 2,
+  "ticker": "KXCONCACAFNLGAME-26SEP24DOMNIC-NIC"
+ },
+ "kickoff": "2026-09-25T00:00Z",
+ "league": "cnl",
+ "national": {
+  "competition": "cnl",
+  "group": "League A - Group A",
+  "head_to_head": {
+   "available": true,
+   "meetings": [
+    {
+     "away": "Dominican Republic",
+     "away_score": 3,
+     "completed": true,
+     "date": "2017-11-09T00:30:00Z",
+     "event_id": "498510",
+     "home": "Nicaragua",
+     "home_score": 0,
+     "winner": "home",
+     "winner_means": "this fixture's home/away sides"
+    },
+    {
+     "away": "Nicaragua",
+     "away_score": 0,
+     "completed": true,
+     "date": "2017-11-11T20:00:00Z",
+     "event_id": "498534",
+     "home": "Dominican Republic",
+     "home_score": 1,
+     "winner": "home",
+     "winner_means": "this fixture's home/away sides"
+    },
+    {
+     "away": "Nicaragua",
+     "away_score": 2,
+     "completed": true,
+     "date": "2023-09-08T23:00:00Z",
+     "event_id": "680806",
+     "home": "Dominican Republic",
+     "home_score": 0,
+     "winner": "away",
+     "winner_means": "this fixture's home/away sides"
+    },
+    {
+     "away": "Dominican Republic",
+     "away_score": 0,
+     "completed": true,
+     "date": "2023-11-22T02:00:00Z",
+     "event_id": "680856",
+     "home": "Nicaragua",
+     "home_score": 0,
+     "winner": "draw",
+     "winner_means": "this fixture's home/away sides"
+    }
+   ],
+   "reason": null,
+   "source": "seasonseries",
+   "tally": {
+    "away": 1,
+    "draw": 1,
+    "home": 2
+   }
+  },
+  "leg": null,
+  "lineups": {
+   "announced": true,
+   "reason": null,
+   "sides": {
+    "away": {
+     "announced": true,
+     "bench": 10,
+     "formation": "5-4-1",
+     "starters": [
+      {
+       "jersey": "23",
+       "name": "Jason Vega",
+       "position": "G"
+      },
+      {
+       "jersey": "2",
+       "name": "Joab Gutiérrez",
+       "position": "D"
+      },
+      {
+       "jersey": "6",
+       "name": "Emmanuel Gómez",
+       "position": "D"
+      },
+      {
+       "jersey": "19",
+       "name": "Juan Rodriguez",
+       "position": "D"
+      },
+      {
+       "jersey": "5",
+       "name": "Justing Cano",
+       "position": "D"
+      },
+      {
+       "jersey": "4",
+       "name": "Marvin David Fletes",
+       "position": "D"
+      },
+      {
+       "jersey": "14",
+       "name": "Kadeem Cole",
+       "position": "M"
+      },
+      {
+       "jersey": "16",
+       "name": "Raheem Giusseppe Cole Martinez",
+       "position": "M"
+      },
+      {
+       "jersey": "20",
+       "name": "Jonathan Moncada",
+       "position": "M"
+      },
+      {
+       "jersey": "11",
+       "name": "Efraín Antonio Mejía Alfaro",
+       "position": "M"
+      },
+      {
+       "jersey": "9",
+       "name": "Jaime Moreno",
+       "position": "F"
+      }
+     ],
+     "team": "Nicaragua"
+    },
+    "home": {
+     "announced": true,
+     "bench": 11,
+     "formation": "4-3-3",
+     "starters": [
+      {
+       "jersey": "1",
+       "name": "Xavier Valdez",
+       "position": "G"
+      },
+      {
+       "jersey": "5",
+       "name": "Noah Dollenmayer",
+       "position": "D"
+      },
+      {
+       "jersey": "3",
+       "name": "Junior Firpo",
+       "position": "D"
+      },
+      {
+       "jersey": "21",
+       "name": "Juan Castillo",
+       "position": "D"
+      },
+      {
+       "jersey": "23",
+       "name": "Luiyi de Lucas",
+       "position": "D"
+      },
+      {
+       "jersey": "14",
+       "name": "Jean Carlos López",
+       "position": "M"
+      },
+      {
+       "jersey": "6",
+       "name": "Pablo Rosario",
+       "position": "M"
+      },
+      {
+       "jersey": "8",
+       "name": "Heinz Mörschel",
+       "position": "M"
+      },
+      {
+       "jersey": "19",
+       "name": "Peter Federico",
+       "position": "F"
+      },
+      {
+       "jersey": "9",
+       "name": "Mariano Díaz",
+       "position": "F"
+      },
+      {
+       "jersey": "11",
+       "name": "Edarlyn Reyes",
+       "position": "F"
+      }
+     ],
+     "team": "Dominican Republic"
+    }
+   }
+  },
+  "market": {
+   "event_ticker": "KXCONCACAFNLGAME-26SEP24DOMNIC",
+   "legs": {
+    "away": {
+     "ask_c": 19,
+     "ask_size": 24584,
+     "bid_c": 17,
+     "bid_size": 3480,
+     "event_ticker": "KXCONCACAFNLGAME-26SEP24DOMNIC",
+     "flags": [],
+     "name": "Nicaragua",
+     "spread_c": 2,
+     "ticker": "KXCONCACAFNLGAME-26SEP24DOMNIC-NIC"
+    },
+    "home": {
+     "ask_c": 62,
+     "ask_size": 43212,
+     "bid_c": 61,
+     "bid_size": 3656,
+     "event_ticker": "KXCONCACAFNLGAME-26SEP24DOMNIC",
+     "flags": [],
+     "name": "Dominican Republic",
+     "spread_c": 1,
+     "ticker": "KXCONCACAFNLGAME-26SEP24DOMNIC-DOM"
+    },
+    "tie": {
+     "ask_c": 22,
+     "ask_size": 7052,
+     "bid_c": 21,
+     "bid_size": 348,
+     "event_ticker": "KXCONCACAFNLGAME-26SEP24DOMNIC",
+     "flags": [],
+     "spread_c": 1,
+     "ticker": "KXCONCACAFNLGAME-26SEP24DOMNIC-TIE"
+    }
+   },
+   "orientation": "same",
+   "status": "mapped",
+   "status_words": "one open Kalshi event names both teams on this date",
+   "title": "Dominican Republic vs Nicaragua"
+  },
+  "neutral": false,
+  "neutral_provider_flag": false,
+  "stage": "group-stage",
+  "stage_kind": "group",
+  "status_detail": "Thu, September 24th at 8:00 PM EDT",
+  "teams": {
+   "away": {
+    "espn_id": "2658",
+    "form": {
+     "available": true,
+     "friendlies": 3,
+     "games": [
+      {
+       "competition": "FIFA World Cup Qualifying - Concacaf",
+       "date": "2025-11-14T02:00Z",
+       "event_id": "754261",
+       "ga": 0,
+       "gf": 2,
+       "kind": "competitive",
+       "letter": "W",
+       "opponent": "Honduras",
+       "provider_agrees": true,
+       "provider_letter": "W",
+       "venue": "home"
+      },
+      {
+       "competition": "FIFA World Cup Qualifying - Concacaf",
+       "date": "2025-11-19T01:00Z",
+       "event_id": "754268",
+       "ga": 2,
+       "gf": 0,
+       "kind": "competitive",
+       "letter": "L",
+       "opponent": "Haiti",
+       "provider_agrees": true,
+       "provider_letter": "L",
+       "venue": "away"
+      },
+      {
+       "competition": "International Friendly",
+       "date": "2026-03-27T16:30Z",
+       "event_id": "401862882",
+       "ga": 3,
+       "gf": 1,
+       "kind": "friendly",
+       "letter": "L",
+       "opponent": "Russia",
+       "provider_agrees": true,
+       "provider_letter": "L",
+       "venue": "away"
+      },
+      {
+       "competition": "International Friendly",
+       "date": "2026-05-29T16:00Z",
+       "event_id": "401871131",
+       "ga": 0,
+       "gf": 0,
+       "kind": "friendly",
+       "letter": "D",
+       "opponent": "South Africa",
+       "provider_agrees": true,
+       "provider_letter": "D",
+       "venue": "away"
+      },
+      {
+       "competition": "International Friendly",
+       "date": "2026-06-05T22:45Z",
+       "event_id": "401871132",
+       "ga": 4,
+       "gf": 0,
+       "kind": "friendly",
+       "letter": "L",
+       "opponent": "Paraguay",
+       "provider_agrees": true,
+       "provider_letter": "L",
+       "venue": "away"
+      }
+     ],
+     "letters": "WLLDL",
+     "provider_disagreements": 0,
+     "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+    },
+    "key": "nicaragua",
+    "name": "Nicaragua",
+    "rating": {
+     "available": true,
+     "axes": {
+      "atk": {
+       "below_floor": true,
+       "floor": {
+        "below_floor": true,
+        "failing_condition": "G3"
+       },
+       "half_width_95": 0.31177945672676244,
+       "interval": [
+        -0.29202354267958996,
+        0.3315353707739349
+       ],
+       "rank": 7,
+       "straddles": true,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "unit": "log_goals",
+       "value": 0.019755914047172474
+      },
+      "def": {
+       "below_floor": true,
+       "floor": {
+        "below_floor": true,
+        "failing_condition": "G3"
+       },
+       "half_width_95": 0.42929433394837696,
+       "interval": [
+        -0.572330581596761,
+        0.2862580862999929
+       ],
+       "rank": 6,
+       "straddles": true,
+       "tier": 1,
+       "tier_set": [
+        1,
+        2
+       ],
+       "unit": "log_goals",
+       "value": -0.14303624764838407
+      },
+      "ovr": {
+       "below_floor": false,
+       "floor": {
+        "below_floor": false,
+        "failing_condition": null
+       },
+       "half_width_95": 28.04371263951985,
+       "interval": [
+        1446.3658843209873,
+        1502.4533096000268
+       ],
+       "rank": 11,
+       "straddles": false,
+       "tier": 2,
+       "tier_set": [
+        2
+       ],
+       "unit": "elo",
+       "value": 1474.409596960507
+      }
+     },
+     "axes_absent": [],
+     "competition": "cnl",
+     "source": "src.picker.national_team_axes"
+    }
+   },
+   "home": {
+    "espn_id": "2649",
+    "form": {
+     "available": true,
+     "friendlies": 5,
+     "games": [
+      {
+       "competition": "International Friendly",
+       "date": "2025-11-13T00:00Z",
+       "event_id": "760870",
+       "ga": 0,
+       "gf": 2,
+       "kind": "friendly",
+       "letter": "W",
+       "opponent": "St. Vincent and the Grenadines",
+       "provider_agrees": true,
+       "provider_letter": "W",
+       "venue": "home"
+      },
+      {
+       "competition": "International Friendly",
+       "date": "2025-11-18T23:30Z",
+       "event_id": "760901",
+       "ga": 0,
+       "gf": 0,
+       "kind": "friendly",
+       "letter": "D",
+       "opponent": "Martinique",
+       "provider_agrees": true,
+       "provider_letter": "D",
+       "venue": "home"
+      },
+      {
+       "competition": "International Friendly",
+       "date": "2026-03-27T00:00Z",
+       "event_id": "401866383",
+       "ga": 2,
+       "gf": 2,
+       "kind": "friendly",
+       "letter": "D",
+       "opponent": "El Salvador",
+       "provider_agrees": true,
+       "provider_letter": "D",
+       "venue": "home"
+      },
+      {
+       "competition": "International Friendly",
+       "date": "2026-03-29T22:00Z",
+       "event_id": "401866390",
+       "ga": 1,
+       "gf": 1,
+       "kind": "friendly",
+       "letter": "D",
+       "opponent": "Cuba",
+       "provider_agrees": true,
+       "provider_letter": "D",
+       "venue": "home"
+      },
+      {
+       "competition": "International Friendly",
+       "date": "2026-06-04T00:45Z",
+       "event_id": "401870075",
+       "ga": 4,
+       "gf": 2,
+       "kind": "friendly",
+       "letter": "L",
+       "opponent": "Panama",
+       "provider_agrees": true,
+       "provider_letter": "L",
+       "venue": "away"
+      }
+     ],
+     "letters": "WDDDL",
+     "provider_disagreements": 0,
+     "source": "espn summary lastFiveGames (all senior internationals, friendlies marked)"
+    },
+    "key": "dominican-republic",
+    "name": "Dominican Republic",
+    "rating": {
+     "available": true,
+     "axes": {
+      "atk": {
+       "below_floor": true,
+       "floor": {
+        "below_floor": true,
+        "failing_condition": "G3"
+       },
+       "half_width_95": 0.3237226825292346,
+       "interval": [
+        -0.47098372680160727,
+        0.1764616382568619
+       ],
+       "rank": 11,
+       "straddles": true,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2
+       ],
+       "unit": "log_goals",
+       "value": -0.1472610442723727
+      },
+      "def": {
+       "below_floor": true,
+       "floor": {
+        "below_floor": true,
+        "failing_condition": "G3"
+       },
+       "half_width_95": 0.6082841330787719,
+       "interval": [
+        -1.031420825845823,
+        0.18514744031172092
+       ],
+       "rank": 13,
+       "straddles": true,
+       "tier": 2,
+       "tier_set": [
+        1,
+        2,
+        3
+       ],
+       "unit": "log_goals",
+       "value": -0.423136692767051
+      },
+      "ovr": {
+       "below_floor": false,
+       "floor": {
+        "below_floor": false,
+        "failing_condition": null
+       },
+       "half_width_95": 21.094833608511905,
+       "interval": [
+        1417.5723271779498,
+        1459.7619943949735
+       ],
+       "rank": 13,
+       "straddles": false,
+       "tier": 2,
+       "tier_set": [
+        2
+       ],
+       "unit": "elo",
+       "value": 1438.6671607864616
+      }
+     },
+     "axes_absent": [],
+     "competition": "cnl",
+     "source": "src.picker.national_team_axes"
+    }
+   }
+  },
+  "venue_country": "Dominican Republic"
+ },
+ "opponent": "Dominican Republic",
+ "own_gdg": {
+  "basis": "each team's own goal difference per game in THIS competition's current group, differenced. Two groups of different strength are not one scale, and a handful of games is a handful of games; the field above is the comparison, this is a record.",
+  "diff": null
+ },
+ "ppg_gap": null,
+ "rank_gap": null,
+ "ranks": {
+  "fav": 11,
+  "opp": 13
+ },
+ "rated_in": {
+  "away": "cnl",
+  "home": "cnl"
+ },
+ "rates": {
+  "ga": [
+   null,
+   null
+  ],
+  "gdg": [
+   null,
+   null
+  ],
+  "gf": [
+   null,
+   null
+  ],
+  "ppg": [
+   null,
+   null
+  ]
+ },
+ "refused": false,
+ "reg_time_note": "KXCONCACAFNLGAME: Important information: The following market is based on the outcome after 90 minutes plus stoppage time. This does not include extra time or penalties. In a knockout tie this is the price of the MATCH after 90 minutes, not of going through.",
+ "resolution": {
+  "Dominican Republic": "espn_id",
+  "Nicaragua": "espn_id"
+ },
+ "shape": "SPLIT",
+ "src": "current",
+ "state": "pre",
+ "table_notes": {
+  "away": null,
+  "home": null
+ },
+ "tier_gaps": {
+  "atk": 1,
+  "def": 1,
+  "ovr": 0
+ },
+ "tiers": {
+  "atk": [
+   1,
+   2
+  ],
+  "def": [
+   1,
+   2
+  ],
+  "ovr": [
+   2,
+   2
+  ]
+ },
+ "venue": {
+  "city": "Santiago",
+  "country": "Dominican Republic",
+  "name": "Estadio Cibao"
+ },
+ "venue_class": {
+  "class": "TRUE_HOME",
+  "home_side": "home"
+ },
+ "venue_favourite": {
+  "flipped": false,
+  "home_side": "home",
+  "policy": "off",
+  "reason": "no_gdg_gap",
+  "refused": true,
+  "venue_class": "TRUE_HOME"
+ },
+ "weights": null
 } as const;

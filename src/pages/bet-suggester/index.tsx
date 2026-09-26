@@ -75,7 +75,7 @@ import { TZ, dayLabel, localDay } from "../../lib/matchday";
 import {
   Board, CUP_COMP_KEY, DEFAULT_DAYS, SEASON_BLEND_K, THIN_ASK_SIZE,
   WIDE_SPREAD_C, askHonoured, boardColumns, columnsOf, declarationOf,
-  CHAMPIONSHIP_COLUMNS, fetchBoard, fetchChampionships, leagueLabel,
+  fetchBoard, fetchChampionships, leagueLabel,
   nationalColumn, venueAdjusted,
 } from "../../lib/pickerApi";
 import {
@@ -393,8 +393,10 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      the whole row is read from that side. The club board is untouched. */
   const rows = champ ? (board?.rows ?? []).map(venueAdjusted)
     : board?.rows ?? [];
-  const headlineLabel = rows.find((r) => r.headline)?.headline?.label
-    ?? "headline gap";
+  /* the menu's own case: every other option is lower-case words, and the
+     backend serves the label as the card prints it ("ELO GAP") */
+  const headlineLabel = (rows.find((r) => r.headline)?.headline?.label
+    ?? "headline gap").toLowerCase();
   const refusals = board?.refusals ?? [];
   const leaguesMap = board?.leagues ?? {};
 
@@ -1234,7 +1236,11 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                 `hueOf` answers each of them the same token this wrote.
                 Pinned by e2e/one-hue-lookup.spec.ts. */}
             <span aria-hidden className="flex items-center gap-1.5">
-              {(champ ? CHAMPIONSHIP_COLUMNS
+              {/* THE CHAMPIONSHIPS LIGHTS ARE THE PAYLOAD'S DECLARED COLUMNS
+                  (2026-09-25): a typed list here went stale twice in one
+                  day — the Asian Cup out, the Gulf Cup in, the Gulf Cup
+                  out. None before the payload lands. */}
+              {(champ ? columnSlugs
                 : ["mls", "epl", "laliga", "ligamx"] as const).map((s2) => (
                 <i key={s2} data-testid="hero-light" data-slug={s2}
                   className="h-1.5 w-1.5 rounded-full"
@@ -2066,7 +2072,12 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   competition&apos;s own field; the stats line is the field
                   ranks, the group points gap and games played once the
                   group has started, and the head-to-head (favourite
-                  won-drew-lost) when ESPN has a record. The group is the
+                  won-drew-lost) — ESPN&apos;s record where it lists a
+                  meeting, our own corpus of senior internationals since
+                  2018 where it does not, and &ldquo;none since 2018&rdquo;
+                  when neither has one. Attack and defence are tiered at
+                  the band count their resolution licenses, not the
+                  declared five. The group is the
                   chip beside the rank. A hollow form square is
                   a <span className="text-ink-mid">friendly</span> — a
                   national team&apos;s last five are every senior
@@ -2104,6 +2115,17 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                 board is grouped by MATCHDAY first — one date&apos;s fixtures
                 align across all four leagues — and each column opens ordered
                 by the absolute GD/g gap within each day, by nothing else.
+              </dd>
+            </div>
+            <div data-testid="legend-h2h">
+              <dt className="text-ink-hi">h2h 2-1-0</dt>
+              <dd className="mt-1">
+                Previous meetings between the two, signed from the
+                favourite&apos;s side: won, drew, lost. The same item on a
+                club card and a national one. Drawn only when there is a
+                record; its hover names the record it was read from and
+                the window that record covers. Annotation — it ranks
+                nothing.
               </dd>
             </div>
             <div>

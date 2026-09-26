@@ -1,8 +1,8 @@
 // Catch-all proxy for the Championships board (read-only GETs).
 //
 // ONE ROUTE: /api/championships/board — the four national-team columns
-// (UEFA Nations League, Concacaf Nations League, AFC Asian Cup, Africa
-// Cup of Nations) in the picker board's own payload shape. It WRITES
+// (UEFA Nations League, Concacaf Nations League and Africa Cup of
+// Nations since 2026-09-25; the declared set is the payload's `columns`) in the picker board's own payload shape. It WRITES
 // NOTHING on the backend, which is the difference that matters beside
 // /api/picker/board: that route freezes a snapshot row on every GET and
 // this one is held read-only by the backend's own tests.

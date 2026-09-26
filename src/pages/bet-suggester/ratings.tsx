@@ -357,10 +357,14 @@ export default function FieldPage() {
                     ? <>, because {N.friendly_only_bridge_teams} teams meet another
                       confederation only in friendlies</> : ""}; and{" "}
                   {goalRows.length && goalBelow === goalRows.length ? (
-                    <><b className="font-semibold text-ink-mid">attack and defence sit
-                      below the floor for every team</b>{" "}&mdash; a typical 95% band is
-                      wider than one band of the field, so those two are measured and
-                      shown but too wide to tier with confidence</>
+                    /* the WHY is the backend's own sentence, on hover — a
+                       width claim typed here was computed nowhere on the
+                       page (audit F9, 2026-09-25) */
+                    <><b className="font-semibold text-ink-mid"
+                      title={N.below_floor_note ?? undefined}
+                      data-testid="nation-floor-why">attack and defence sit
+                      below the floor for every team</b>{" "}&mdash; measured and shown,
+                      and not placed by the floor</>
                   ) : (
                     <>{goalBelow} of {goalRows.length} attack and defence rows sit
                       below the floor</>

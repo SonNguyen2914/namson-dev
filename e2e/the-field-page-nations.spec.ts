@@ -1,7 +1,8 @@
 // THE FIELD PAGE'S THIRD MODE — "National teams" (approved 2026-09-24).
 //
 // The four Championships competitions — UEFA and CONCACAF Nations
-// Leagues, the AFC Asian Cup, AFCON qualifying — one table each, drawn on
+// Leagues and AFCON qualifying since 2026-09-25 (the payload's own list:
+// the AFC Asian Cup left it that day) — one table each, drawn on
 // ONE SHARED AXIS because all four are cut from one national-team corpus
 // at one pass count. GET /api/field/nations.
 //
@@ -28,7 +29,7 @@
 //   g  the ≥2 note, the empty states, a failed read named
 //
 // Regenerating the recording: in the backend worktree (last taken on
-// `be-ship-2026-09-25` @ ef4b16c0), write GET /api/field/nations through
+// `board-data-gaps`, 2026-09-25), write GET /api/field/nations through
 // FastAPI's TestClient to a file and trim it by the rule in
 // nations-recorded.ts's header (drop rows only).
 import { expect, test, type Page, type Request } from "@playwright/test";
@@ -156,14 +157,14 @@ test("the Leagues and Cups views NEVER call /api/field/nations; the first "
 
 // ═════════════════════════ b · the pills ════════════════════════════════
 
-test("FOUR PILLS in the payload's order, the first alone lit, each on its "
+test("ONE PILL PER COMPETITION, in the payload's order, the first alone lit, each on its "
    + "own light", async ({ page }) => {
   await openNations(page);
   const pills = page.getByTestId("nation-pill");
   await expect(pills).toHaveCount(comps().length);
   expect(await pills.evaluateAll((els) => els.map((e) => e.getAttribute("data-key"))))
     .toEqual(comps().map((c) => c.key));
-  expect(comps().map((c) => c.key)).toEqual(["unl", "cnl", "asiancup", "afcon"]);
+  expect(comps().map((c) => c.key)).toEqual(["unl", "cnl", "afcon"]);
   // the arrival reveal settles first, then every label reads whole
   await expect(page.locator('[data-churn="1"]')).toHaveCount(0, { timeout: 5000 });
   for (const [i, c] of comps().entries()) {
@@ -172,16 +173,16 @@ test("FOUR PILLS in the payload's order, the first alone lit, each on its "
       e.querySelectorAll("[data-cell]")).map((x) => x.textContent).join("")))
       .toBe(c.display);
   }
-  // THE LIGHT IS THE TOKEN: each dot resolves to its --lg-* value, four
-  // distinct lights, none of them the brand gold every unknown key gets
+  // THE LIGHT IS THE TOKEN: each dot resolves to its --lg-* value, one
+  // distinct light each, none of them the brand gold every unknown key gets
   const tokens = await page.evaluate((keys) => keys.map((k) =>
     getComputedStyle(document.documentElement).getPropertyValue(`--lg-${k}`).trim()),
   comps().map((c) => c.key));
-  expect(tokens).toEqual(["#8192fd", "#ed5edf", "#95d147", "#e699cc"]);
+  expect(tokens).toEqual(["#8192fd", "#ed5edf", "#e699cc"]);
   const dots = await pills.evaluateAll((els) => els.map((e) =>
     getComputedStyle(e.querySelector('[data-testid="pill-dot"]')!).backgroundColor));
   expect(dots).toEqual(["rgb(129, 146, 253)", "rgb(237, 94, 223)",
-    "rgb(149, 209, 71)", "rgb(230, 153, 204)"]);
+    "rgb(230, 153, 204)"]);
   await expect(page.getByTestId("nation-section")).toHaveCount(1);
   await expect(section(page, "unl")).toBeVisible();
   // a pill toggles its own table
@@ -229,22 +230,22 @@ test("ONE SHARED AXIS: with all four selected every bar sits on the span of "
         .toBeCloseTo(want, 1);
     }
   }
-  // the Asian Cup's leader sits where the SHARED axis puts it — well away
-  // from where an axis of the Asian Cup's own would
-  const ac = byKey("asiancup");
+  // AFCON's leader sits where the SHARED axis puts it — well away from
+  // where an axis of AFCON's own would
+  const ac = byKey("afcon");
   const top = ac.axes.overall.rows[0];
   const alone = spanOf([ac]);
   const perTable = ((top.value as number) - alone.lo) / (alone.hi - alone.lo) * 100;
-  expect(Math.abs(await leftOf(page, "asiancup", top.team) - perTable))
+  expect(Math.abs(await leftOf(page, "afcon", top.team) - perTable))
     .toBeGreaterThan(5);
 });
 
 test("the axis follows the SELECTION: two competitions share the span of "
    + "those two, on attack as on overall", async ({ page }) => {
   await openNations(page);
-  await pill(page, "asiancup").click();
+  await pill(page, "cnl").click();
   await page.locator('[data-testid="nation-axis-button"][data-axis="attack"]').click();
-  const two = [byKey("unl"), byKey("asiancup")];
+  const two = [byKey("unl"), byKey("cnl")];
   const { lo, hi } = spanOf(two, "attack");
   for (const c of two) {
     for (const r of c.axes.attack.rows) {
@@ -290,7 +291,7 @@ test("the pass count, match count and window are READ, never typed",
     await openNations(page);
     const n = NATIONS;
     await expect(page.getByTestId("field-tag")).toContainText(`${n.passes} passes`);
-    await expect(page.getByTestId("field-tag")).toContainText("four competitions");
+    await expect(page.getByTestId("field-tag")).toContainText(`${["zero", "one", "two", "three", "four", "five"][comps().length]} competitions`);
     await expect(page.getByTestId("nations-passes")).toHaveText(`${n.passes} passes`);
     await expect(page.getByTestId("nations-corpus"))
       .toContainText(`${n.fixtures!.toLocaleString("en-US")} internationals`);

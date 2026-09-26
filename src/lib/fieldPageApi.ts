@@ -283,7 +283,7 @@ export interface NationNotMeasured {
 }
 
 export interface NationCompetition {
-  /** the Championships column key (unl, cnl, asiancup, afcon) */
+  /** the Championships column key (the payload's own `columns`) */
   key: string;
   field_key?: string;
   display: string;

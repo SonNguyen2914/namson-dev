@@ -220,6 +220,43 @@ export interface FieldAxis {
   /** the backend's own word for this axis — "overall" / "attack" /
    *  "defence" — carried rather than restated here */
   label?: string;
+  /** THIS AXIS CUT AT THE BAND COUNT ITS RESOLUTION LICENSES — national
+   *  attack and defence only (backend `payload._band_extras`). The five
+   *  declared bands stay in `fav` / `opp`; this is the same two teams on
+   *  the coarser cut the measurement supports (UNL atk 5 / def 3, CNL 3/3,
+   *  AFCON 2/3 on 2026-09-25). See `licensedRead`. */
+  licensed?: LicensedAxis | null;
+}
+
+export interface LicensedSide { tier: number; tier_set: number[]; straddles: boolean }
+export interface LicensedAxis {
+  bands: number;
+  below_floor: boolean;
+  failing_condition?: string | null;
+  fav?: LicensedSide | null;
+  opp?: LicensedSide | null;
+}
+
+/** THE AXIS AS THE CARD DRAWS IT: at the licensed count where the backend
+ *  serves one for BOTH sides, the declared five bands otherwise.
+ *
+ *  THE GAP IS THE BACKEND'S OWN DEFINITION, APPLIED TO THE TIERS DRAWN.
+ *  `tier_gap` is `opp.tier − fav.tier` on the tiers the backend read
+ *  (`payload._field_block`); a card that printed the licensed pair "2v2"
+ *  beside the five-band gap's green "ahead" would contradict itself in one
+ *  row. So the licensed pair carries the licensed difference, and the
+ *  shape is re-read off the three gaps drawn by the backend's own rule
+ *  (`shapeFromGaps`) — the same restatement the venue flip already uses.
+ *  Null when the axis has no licensed cut, or one side is missing from it:
+ *  half a licensed pair is not drawn beside half a declared one. */
+export function licensedRead(axis: FieldAxis | undefined | null): {
+  bands: number; below_floor: boolean; fav: LicensedSide; opp: LicensedSide;
+  tier_gap: number;
+} | null {
+  const l = axis?.licensed;
+  if (!l || !l.fav || !l.opp) return null;
+  return { bands: l.bands, below_floor: l.below_floor, fav: l.fav, opp: l.opp,
+           tier_gap: l.opp.tier - l.fav.tier };
 }
 
 /** THE FIELD BLOCK ON A CROSS-LEAGUE RATED ROW (backend, 2026-09-09).
@@ -241,6 +278,40 @@ export interface FieldAxis {
  *  exists carries none, and the card then draws exactly what it drew
  *  before — league ranks and league tiers — rather than a field with
  *  nothing in it. */
+/** One side's field rank on one axis, as a domestic league row carries it
+ *  (backend board-data-gaps, confirmed 2026-09-25). No tiers and no floor
+ *  flag ride on it, so a domestic `#` draws no dagger. */
+export interface FieldRankSide {
+  rank: number;
+}
+export interface RowFieldRank {
+  size: number;
+  competition?: string | null;
+  axes: Partial<Record<FieldAxisKey, { fav?: FieldRankSide | null; opp?: FieldRankSide | null } | null>>;
+}
+
+/** A DOMESTIC ROW'S FIELD RANKS, AS THE BLOCK THE `#` PANEL ALREADY READS.
+ *  The panel (PickerRead.FieldRanks) prints `#fav v #opp` per axis of N
+ *  off a FieldBlockLike; this carries exactly what it reads — the ranks
+ *  and the size. A side the field cannot place is `null` on the wire and
+ *  stays null here (the panel draws "—", never 0); an axis with neither
+ *  side placed is not drawn. It is handed to that panel alone: nothing
+ *  else on the card reads it. */
+export function fieldRanksBlock(fr: RowFieldRank | null | undefined): FieldBlockLike | null {
+  if (!fr) return null;
+  const axes: Record<string, unknown> = {};
+  for (const k of ["ovr", "atk", "def"] as const) {
+    const a = fr.axes[k];
+    if (!a?.fav && !a?.opp) continue;
+    const side = (x: FieldRankSide | null | undefined) => ({ rank: x?.rank ?? null,
+      tier: 0, tier_set: [], straddles: false, below_floor: false });
+    axes[k] = { fav: side(a.fav), opp: side(a.opp), tier_gap: null };
+  }
+  if (Object.keys(axes).length === 0) return null;
+  return { competition: fr.competition ?? undefined, size: fr.size,
+           axes } as unknown as FieldBlockLike;
+}
+
 export interface RowField {
   competition?: string;
   /** how many clubs the field holds — the N of the 1..N axis every rank
@@ -532,6 +603,13 @@ export interface BoardRow {
    *  picks the key off the block's own axis set, so a reading is one or
    *  the other and a card reads whichever it was given. */
   field_partial?: RowFieldPartial | null;
+  /** WHERE THE TWO CLUBS STAND IN THE CROSS-LEAGUE FIELD, on a DOMESTIC
+   *  league row (backend board-data-gaps, 2026-09-25; shape pending the
+   *  backend's confirmation) — see RowFieldRank and fieldRanksBlock. It
+   *  feeds the `#` panel and nothing else: the league card's tiers,
+   *  dumbbell and rank pair stay its league's. Absent on an older board,
+   *  and the card is then exactly what it was. */
+  field_rank?: RowFieldRank | null;
   league_gap?: LeagueGap | null;
   event_id: string;
   competition_id: string;
@@ -566,6 +644,9 @@ export interface BoardRow {
   /** A national-team fixture's own facts (Championships board only) —
    *  see NationalBlock. Absent on every club row. */
   national?: NationalBlock | null;
+  /** PREVIOUS MEETINGS on a club row, in the national block's own shape
+   *  (see HeadToHead). Absent on a board built before 2026-09-25. */
+  h2h?: HeadToHead | null;
   /** the national card's headline — the backend's when it sends one,
    *  else the interim venue-adjusted Elo gap (see venueAdjusted) */
   headline?: NationalHeadline | null;
@@ -984,7 +1065,7 @@ const neg = (n: number | null | undefined) => (n == null ? n : -n);
  *  tier gaps > 0; HOLLOW = attack and defence both <= 0; SPLIT otherwise.
  *  Null when an axis is absent — a shape nobody can read off three gaps
  *  is not composed from fewer. */
-const shapeOf = (g: Record<string, number | null | undefined>): Shape | null => {
+export const shapeFromGaps = (g: Record<string, number | null | undefined>): Shape | null => {
   const { ovr, atk, def } = g;
   if (ovr == null || atk == null || def == null) return null;
   if (ovr > 0 && atk > 0 && def > 0) return "CLEAN";
@@ -1048,11 +1129,16 @@ export function venueAdjusted(row: BoardRow): BoardRow {
     const axes: Record<string, unknown> = {};
     const gaps: Record<string, number | null | undefined> = {};
     for (const [k, a] of Object.entries(b.axes)) {
-      const x = a as { fav: unknown; opp: unknown; tier_gap?: number | null };
-      axes[k] = { ...x, fav: x.opp, opp: x.fav, tier_gap: neg(x.tier_gap) };
+      const x = a as { fav: unknown; opp: unknown; tier_gap?: number | null;
+                       licensed?: LicensedAxis | null };
+      /* the licensed cut names fav/opp too, and must turn with them */
+      const licensed = x.licensed
+        ? { ...x.licensed, fav: x.licensed.opp, opp: x.licensed.fav } : x.licensed;
+      axes[k] = { ...x, fav: x.opp, opp: x.fav, tier_gap: neg(x.tier_gap),
+                  ...(x.licensed !== undefined ? { licensed } : {}) };
       gaps[k] = neg(x.tier_gap);
     }
-    return { ...b, axes, ...("shape" in b ? { shape: shapeOf(gaps) } : {}) };
+    return { ...b, axes, ...("shape" in b ? { shape: shapeFromGaps(gaps) } : {}) };
   };
   const tierGaps = Object.fromEntries(
     Object.entries(row.tier_gaps ?? {}).map(([k, v]) => [k, neg(v as number | null)]));
@@ -1075,7 +1161,7 @@ export function venueAdjusted(row: BoardRow): BoardRow {
     field_partial: flipAxes(row.field_partial) ?? row.field_partial,
     tiers: tiers as unknown as BoardRow["tiers"],
     tier_gaps: tierGaps as unknown as BoardRow["tier_gaps"],
-    shape: (shapeOf(tierGaps) ?? row.shape) as BoardRow["shape"],
+    shape: (shapeFromGaps(tierGaps) ?? row.shape) as BoardRow["shape"],
     rank_gap: neg(row.rank_gap) ?? null,
     ranks: row.ranks ? { fav: row.ranks.opp, opp: row.ranks.fav } : row.ranks,
     rates: row.rates ? Object.fromEntries(Object.entries(row.rates)
@@ -1156,8 +1242,13 @@ export function nationalColumn(
       .map((t) => t.next_fixture?.kickoff).filter((k): k is string => !!k).sort();
     nextBeyond = kicks[0] ?? null;
     if (nextBeyond) {
+      /* "STARTS" ONLY FOR A COMPETITION NOBODY HAS PLAYED IN. A column can
+         also be empty between two stages of a tournament under way (the
+         between its group stage and its knockout rounds); there the
+         group tables hold results, and the chip says when it resumes. */
+      const played = Object.values(standings).some((g) => g.some((r) => r.gp > 0));
       const first = stages[0];
-      stage = { text: `starts ${DM.format(new Date(nextBeyond)).toLowerCase()}`,
+      stage = { text: `${played ? "next" : "starts"} ${DM.format(new Date(nextBeyond)).toLowerCase()}`,
                 title: `${first?.label ?? "the competition"} — ${first?.dates ?? ""}`.trim() };
     }
   } else {
@@ -1168,7 +1259,14 @@ export function nationalColumn(
     }
     const key = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
     const st = stages.find((x) => x.key === key);
-    const label = (st?.label ?? key ?? "").split(" (")[0].trim().toLowerCase();
+    /* A STAGE KEY THE STRUCTURE DOES NOT DECLARE IS NOT PRINTED AS A SLUG.
+       Recorded 2026-09-25 evening: ESPN began labelling the UEFA Nations
+       League rows `league-phase` while the backend's structure still
+       declares that stage as `group-stage`, and the chip read
+       "league-phase · md 1". With no declared stage to name, the chip says
+       the matchday alone and the hover names the key it could not match. */
+    const unmatched = !st && key ? key : null;
+    const label = (st?.label ?? "").split(" (")[0].trim().toLowerCase();
     let md: number | null = null;
     for (const r of rows) {
       const n = r.national;
@@ -1183,10 +1281,16 @@ export function nationalColumn(
     const totals = [...(st?.dates ?? "").matchAll(/MD\s?(\d+)(?:\s?-\s?(\d+))?/g)]
       .flatMap((m) => [Number(m[1]), ...(m[2] ? [Number(m[2])] : [])]);
     const total = totals.length ? Math.max(...totals) : null;
+    const mdText = md != null ? `md ${md}${total ? `/${total}` : ""}` : "";
     if (label) {
       stage = {
-        text: `${label}${md != null ? ` · md ${md}${total ? `/${total}` : ""}` : ""}`,
+        text: `${label}${mdText ? ` · ${mdText}` : ""}`,
         title: `${st?.label ?? label}${st?.dates ? ` — ${st.dates}` : ""}. The matchday is the earliest in this window, read off the group tables: one more than the games each side has played.`,
+      };
+    } else if (unmatched && mdText) {
+      stage = {
+        text: mdText,
+        title: `These fixtures carry the stage "${unmatched}", which this competition's structure does not declare, so no stage is named. The matchday is the earliest in this window, read off the group tables: one more than the games each side has played.`,
       };
     }
   }
@@ -1306,14 +1410,13 @@ export const LEAGUE_LABEL: Record<string, string> = {
   championship: "Championship",
   leagueone: "League One",
   leaguetwo: "League Two",
-  // THE CHAMPIONSHIPS BOARD'S FOUR COLUMNS (2026-09-24), keyed as the
+  // THE CHAMPIONSHIPS BOARD'S COLUMNS (2026-09-24), keyed as the
   // backend's `src/championships/registry.CHAMPIONSHIP_COLUMNS` keys them
   // and named as it names them — Concacaf is the confederation's own
   // spelling and ESPN's. They are never on the Leagues board: that board's
   // columns are `tables.BOARD_COLUMNS` and these are not in it.
   unl: "UEFA Nations League",
   cnl: "Concacaf Nations League",
-  asiancup: "AFC Asian Cup",
   afcon: "Africa Cup of Nations",
 };
 
@@ -1414,12 +1517,35 @@ export const CUP_COMP_KEY: Record<string, string> = {
   ucl: "ucl",
 };
 
-export const rowHref = (row: { league: string; event_id: string }) => {
+/** THE ROUTE TABLE, AS THE BUILD READ IT — see next.config.ts. Two
+ *  lists of page names that exist under /bet-suggester: the match hubs
+ *  (`<slug>/[eventId]`) and the static competition pages. */
+const listEnv = (v: string | undefined) => new Set((v ?? "").split(",").filter(Boolean));
+export const MATCH_HUBS = listEnv(process.env.TRIVELA_MATCH_HUBS);
+export const COMP_PAGES = listEnv(process.env.TRIVELA_COMP_PAGES);
+
+/** WHERE A CARD GOES WHEN OPENED — OR NOWHERE, SAID (audit F2, 2026-09-25).
+ *  In order: the league's match hub when one exists; the comp viewer for
+ *  a cup it serves (`CUP_COMP_KEY`, the dynamic `comp/[key]` page); the
+ *  competition's own static page when one exists under the league's name
+ *  ("eflcup" is `efl-cup`, compared without separators); otherwise NULL,
+ *  and the card is drawn unlinked with `rowNoHrefWhy` as its title. Every
+ *  target is a page the build found, never a pattern assumed to resolve —
+ *  the pattern sent Bundesliga, Serie A, Ligue 1, Eredivisie, the EFL Cup
+ *  and every national card to the 404. */
+export const rowHref = (row: { league: string; event_id: string }): string | null => {
+  if (MATCH_HUBS.has(row.league)) return `/bet-suggester/${row.league}/${row.event_id}`;
   const comp = CUP_COMP_KEY[row.league];
-  return comp
-    ? `/bet-suggester/comp/${comp}`
-    : `/bet-suggester/${row.league}/${row.event_id}`;
+  if (comp) return `/bet-suggester/comp/${comp}`;
+  const bare = (x: string) => x.replace(/[-_]/g, "");
+  const page = [...COMP_PAGES].find((p) => bare(p) === bare(row.league));
+  return page ? `/bet-suggester/${page}` : null;
 };
+
+/** The sentence an unlinked card carries: there is no page to open. */
+export const rowNoHrefWhy = (row: { league: string }) =>
+  `no match page exists for ${LEAGUE_LABEL[row.league] ?? row.league} fixtures yet, `
+  + "so this card does not link anywhere";
 
 /** THE READING ORDER OF THE COLUMNS THE BOARD DECLARES. It ORDERS; it
  *  never ADMITS.
@@ -1680,10 +1806,6 @@ export async function fetchChampionships(
   return readBoard(`/api/championships/board?days=${days}`, signal);
 }
 
-/** The backend's declared order, restated for the one reader that needs
- *  it before a payload lands (the hero's four lights). The payload's own
- *  `columns` stays the authority for what the board draws. */
-export const CHAMPIONSHIP_COLUMNS = ["unl", "cnl", "asiancup", "afcon"] as const;
 
 /* ── WHAT A NATIONAL CARD CARRIES BESIDES THE CLUB CARD'S KEYS ─────────
    Backend `src/championships/payload._card`, field for field. Every
@@ -1702,7 +1824,9 @@ export interface NationalFormGame {
   venue?: "home" | "away";
   gf?: number;
   ga?: number;
-  letter: "W" | "D" | "L" | null;
+  /** "?" when the providers disagree on the score (see `disputed`) */
+  letter: "W" | "D" | "L" | "?" | null;
+  disputed?: { letter?: string; why?: string } | null;
   why_no_letter?: string;
 }
 
@@ -1731,13 +1855,25 @@ export interface NationalTeam {
   form?: NationalForm | null;
 }
 
-export interface NationalHeadToHead {
+/** PREVIOUS MEETINGS, ONE SHAPE ON BOTH BOARDS: `national.head_to_head`
+ *  on a national card, `h2h` on a club row (backend board-data-gaps,
+ *  2026-09-25). `tally` is keyed by THIS fixture's home and away sides.
+ *  `source` names where the record was read — ESPN's `seasonseries` /
+ *  `headToHeadGames`, whose `window` is null, or one of our own corpora
+ *  (`corpus_since_2018` for national teams), whose `window` is the span
+ *  searched. A corpus that found nothing is `available: false` with a
+ *  tally of zeros and a `reason` the card quotes verbatim. */
+export interface HeadToHead {
   available?: boolean;
   source: string | null;
+  window?: { from?: string | null; to?: string | null; label?: string | null } | null;
   tally?: { home: number; draw: number; away: number } | null;
   meetings?: unknown[];
-  reason?: string;
+  last_meeting?: unknown;
+  reason?: string | null;
+  espn_reason?: string | null;
 }
+export type NationalHeadToHead = HeadToHead;
 
 /** THE NATIONAL CARD'S HEADLINE, AS DATA. A bake-off is choosing the
  *  signal by measurement and will serve it per card as this field; the

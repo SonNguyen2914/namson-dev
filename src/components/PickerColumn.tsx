@@ -42,9 +42,9 @@ import {
 import {
   BoardRefusal, BoardRow, FieldAxisKey, FieldBlockLike, KalshiQuote,
   LeagueMeta,
-  NationalBlock, NationalColumn, RatePair, RowField,
+  HeadToHead, NationalBlock, NationalColumn, RatePair, RowField,
   RowFieldPartial, SEASON_BLEND_K,
-  columnsOf, homeBadge, leagueLabel, rowHref, rowIsInPlay,
+  columnsOf, fieldRanksBlock, homeBadge, leagueLabel, licensedRead, rowHref, rowIsInPlay, rowNoHrefWhy,
   seasonDisagreement,
   seasonSpan, seasonSpanLabel, venueDisagreement,
 } from "../lib/pickerApi";
@@ -121,7 +121,7 @@ const LEAGUE_HUE: Record<string, string> = {
   eflcup: "var(--lg-eflcup)",
   // the Championships board (globals.css, beside the tokens)
   unl: "var(--lg-unl)", cnl: "var(--lg-cnl)",
-  asiancup: "var(--lg-asiancup)", afcon: "var(--lg-afcon)",
+  afcon: "var(--lg-afcon)",
   // THE EUROPA LEAGUE (2026-09-25), the field page's fourth cup pill.
   // Not a board column: it is measured against the pills it can sit
   // beside on the Cups strip — ucl, eflcup and the Campeones pill, whose
@@ -483,13 +483,17 @@ function FormStrip({ form, name, scope, cupScope, className = "",
     <span data-testid="form-strip" role="img"
       data-scope={scope}
       aria-label={`${name} — last ${form.length} in ${scope ?? "this competition"}`
-        + `, oldest to newest: ${form.split("").join(" ")}`}
+        + `, oldest to newest: ${form.split("").map((x) => x === "?" ? "disputed" : x).join(" ")}`}
       title={`${name} — last ${form.length} in ${scope ?? "this competition"}`
         + `, oldest→newest: ${form} (rightmost is latest)`}
       className={`inline-flex flex-none items-center gap-[2px] ${className}`}>
       {slots.map((c, i) => {
         const latest = i === FORM_SLOTS - 1 && c != null;
         const hollow = fr?.[i] === true && c != null;
+        /* A DISPUTED RESULT IS DRAWN AS UNKNOWN (backend 2026-09-25): the
+           providers' two scores give different letters, so the cell is
+           an empty dashed square and never a W/D/L colour. */
+        const unknown = c === "?";
         return (
           /* FIVE CELLS OF ONE SHAPE (2026-09-10). Two things made this
              read as ragged rather than as a strip. An empty slot was
@@ -506,8 +510,10 @@ function FormStrip({ form, name, scope, cupScope, className = "",
           <i key={i} data-r={c ?? ""}
             {...(fr ? { "data-friendly": hollow ? "1" : "0" } : {})}
             {...(hollow ? { title: `${c} — a friendly` } : {})}
+            {...(unknown ? { title: "disputed — the providers disagree on this result's score, so no letter is drawn" } : {})}
             className={`h-[7px] w-[7px] rounded-[1.5px] ${
-              hollow
+              unknown ? "border border-dashed border-ink-low"
+              : hollow
                 ? `border ${c === "W" ? "border-up/85" : c === "L"
                     ? "border-neg/75" : "border-ink-low"}`
               : c == null ? "bg-line"
@@ -572,21 +578,29 @@ export function priceSide(row: {
   kalshi?: (KalshiQuote & { side?: string | null }) | null;
   national?: NationalBlock | null;
   favourite?: string;
+  fav_side?: string | null;
   refused?: boolean;
 }): { code: string; name: string } | null {
   const k = row.kalshi;
   if (!k || !row.national) return null;
   const legs = (row.national.market as { legs?: Record<string,
     { ticker?: string | null; name?: string } | null> } | null)?.legs ?? {};
-  const name = k.side ?? Object.values(legs)
-    .find((l) => l?.ticker && l.ticker === k.ticker)?.name ?? null;
+  /* WHICH SIDE'S LEG THE QUOTE IS, BY TICKER — never by name. Kalshi
+     spells a team its own way ("Saint Kitts and Nevis", "Curacao",
+     "Virgin Islands, U.S.") and ESPN another ("St. Kitts and Nevis"), so a
+     name comparison called the favourite's own quote somebody else's and
+     prefixed it on 11 of 210 cards recorded on 2026-09-25. */
+  const legSide = (Object.entries(legs)
+    .find(([, l]) => l?.ticker && l.ticker === k.ticker)?.[0] ?? null) as string | null;
+  const name = k.side ?? (legSide ? legs[legSide]?.name : null) ?? null;
   if (!name) return null;
   /* A RANKED CARD'S PRICE IS THE FAVOURITE'S, and a club card says so by
      saying nothing — the price row under a favourite is that side's yes.
      The national card keeps that convention and names the side only when
      the quote is NOT the favourite's (a refused card has no favourite;
      its quote is the home side's). */
-  if (!row.refused && row.favourite && name === row.favourite) return null;
+  if (!row.refused && row.favourite
+      && (legSide ? legSide === row.fav_side : name === row.favourite)) return null;
   /* THE BOOK'S OWN CODE FOR THE SIDE — the ticker's last segment
      (…-GEONIR-GEO is Georgia's yes) — so the prefix costs three
      characters and the price row keeps the club row's one line. The
@@ -626,6 +640,74 @@ function XiChip({ national }: { national?: NationalBlock | null }) {
   );
 }
 
+/** WHERE A HEAD-TO-HEAD RECORD CAME FROM, in words for the hover. ESPN's
+ *  own block names (`seasonseries`, `headToHeadGames`) are the provider's
+ *  record; anything else the backend sends with a `window` is one of our
+ *  own corpora, and a record read there is a record OF that window — so it
+ *  is named by the window's own label ("since 2018, corpus to
+ *  2026-09-24"), never as a complete history. */
+export function h2hSourceWords(h: HeadToHead): string {
+  const src = h.source ?? "";
+  if (src === "seasonseries" || src === "headToHeadGames")
+    return `ESPN's ${src} record`;
+  const label = h.window?.label;
+  if (h.window) return `our match corpus${label ? `, ${label}` : ""}`;
+  return src ? `the ${src} record` : "an unnamed record";
+}
+
+/** WHEN A CORPUS WINDOW OPENS, as "none since …" states it: the year
+ *  when the window opens on 1 January ("2018", the national corpus), the
+ *  month otherwise ("2024-08", the first corpus season both clubs played —
+ *  which the backend states per pairing, so it is read, never assumed). */
+const windowSince = (h: HeadToHead) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(h.window?.from ?? "");
+  if (!m) return null;
+  return m[2] === "01" && m[3] === "01" ? m[1] : `${m[1]}-${m[2]}`;
+};
+
+/** THE HEAD-TO-HEAD, ONE COMPACT ITEM — THE SAME ON A CLUB CARD AND A
+ *  NATIONAL ONE (operator, 2026-09-25: the national card's "h2h 0-0-1"
+ *  goes on the club card in the same slot, style and component). Signed
+ *  from the favourite: won-drew-lost, off the tally the backend derived
+ *  from each meeting's two scores, keyed by THIS fixture's home and away.
+ *
+ *  WHEN IT IS DRAWN. With at least one meeting, always. With none, only
+ *  where the source searched a NAMED WINDOW of our own corpus: that answer
+ *  is a measurement ("none since 2018") and the hover quotes the backend's
+ *  `reason` verbatim — which is written never to say "never met". A
+ *  provider that lists no meeting, or a row with no block, draws nothing,
+ *  as the national card always has. The hover names the source and its
+ *  window either way. */
+export function H2hStat({ h2h, row }: {
+  h2h: HeadToHead | null | undefined;
+  row: { favourite: string; fav_side?: string | null };
+}) {
+  if (!h2h) return null;
+  const { fav, opp } = favSides(row);
+  const t = h2h.tally;
+  const met = t ? t.home + t.draw + t.away : 0;
+  const from = h2hSourceWords(h2h);
+  if (met === 0) {
+    if (!h2h.window || !t) return null;
+    const since = windowSince(h2h);
+    return (
+      <span data-testid="h2h" data-h2h-source={h2h.source ?? undefined}
+        data-h2h-met="0" className="text-ink-low"
+        title={h2h.reason || `no previous meeting in ${from}`}>
+        h2h <span className="text-ink-mid">none{since ? ` since ${since}` : ""}</span>
+      </span>
+    );
+  }
+  const w = t![fav], l = t![opp];
+  return (
+    <span data-testid="h2h" data-h2h-source={h2h.source ?? undefined}
+      data-h2h-met={met} className="text-ink-low"
+      title={`previous meetings in ${from}: ${row.favourite} won ${w}, drew ${t!.draw}, lost ${l}`}>
+      h2h <span className="text-ink-mid">{w}-{t!.draw}-{l}</span>
+    </span>
+  );
+}
+
 /** THE STATS LINE'S NATIONAL SLOTS — the points gap and games from the
  *  derived group table, and the head-to-head when ESPN has a record. Each is drawn only when it exists; a stat that cannot exist for
  *  a national team is never drawn as "n/a". */
@@ -639,9 +721,6 @@ function NationalStats({ row, col }: {
     table?.find((r) => r.espn_id === n.teams?.[s]?.espn_id);
   const fr = rec(fav), or = rec(opp);
   const played = fr && or && fr.gp + or.gp > 0;
-  const t = n.head_to_head?.tally;
-  const met = t ? t.home + t.draw + t.away : 0;
-  const w = t ? t[fav] : 0, l = t ? t[opp] : 0;
   return (
     <>
       {/* THE CLUB LINE'S SHAPE, PAIR FOR PAIR: a club card reads
@@ -663,12 +742,7 @@ function NationalStats({ row, col }: {
           gp {fr!.gp}/{or!.gp}
         </span>
       )}
-      {met > 0 && (
-        <span data-testid="national-h2h" className="text-ink-low"
-          title={`previous meetings on ESPN's ${n.head_to_head?.source ?? "record"}: ${row.favourite} won ${w}, drew ${t!.draw}, lost ${l}`}>
-          h2h <span className="text-ink-mid">{w}-{t!.draw}-{l}</span>
-        </span>
-      )}
+      <H2hStat h2h={row.h2h ?? n.head_to_head} row={row} />
     </>
   );
 }
@@ -718,6 +792,33 @@ export function seasonDeparture(
   if (w.basis.home === "current_only" || w.basis.away === "current_only")
     return "a side has no prior-season row and is rated on this season alone";
   return null;
+}
+
+/** THE WAY IN, OR A CARD THAT SAYS THERE IS NONE (audit F2, 2026-09-25).
+ *  `rowHref` answers only with a page the build found; where it finds
+ *  none — a league with no match hub, every national competition — the
+ *  same block is drawn as plain content with the reason on hover, rather
+ *  than as a link into the site's 404. Same classes either way, less the
+ *  hover ink a thing you cannot click must not wear. */
+export function CardLink({ row, className, children, label }: {
+  row: { league: string; event_id: string; favourite?: string; opponent?: string };
+  className: string; children: ReactNode; label?: string;
+}) {
+  const href = rowHref(row);
+  if (!href) {
+    return (
+      <div data-testid="card-unlinked" title={rowNoHrefWhy(row)} className={className}>
+        {children}
+      </div>
+    );
+  }
+  return (
+    <Link href={href}
+      aria-label={label ?? `open ${row.favourite} versus ${row.opponent}`}
+      className={`${className} hover:text-accent`}>
+      {children}
+    </Link>
+  );
 }
 
 /** THE BOARD'S READ OF ONE FIXTURE — the matchup line and its anchor,
@@ -848,10 +949,8 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
           its key under it, sized at max-content by `flex-none` — the
           width this card was drawn against, and the width the dense
           branch below stacks away entirely. */}
-      <Link
-        href={rowHref(row)}
-        aria-label={`open ${row.favourite} versus ${row.opponent}`}
-        className={`mt-2.5 flex items-start gap-3 rounded-md outline-none transition-colors hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bs${
+      <CardLink row={row}
+        className={`mt-2.5 flex items-start gap-3 rounded-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bs${
           // THE ANCHOR STOPS COMPETING WITH THE NAMES FOR ONE LINE. Side
           // by side in a ~200px track the figure takes ~60px of it and
           // "Manchester City" is left with room for "Man…". Stacked, the
@@ -955,7 +1054,11 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
               anchor.v === WITHHELD ? "font-normal text-ink-faint"
                 : anchor.dim ? "text-ink-faint" : "text-ink-hi"}`}
             {...(anchor.dim ? { "data-close": "1" } : {})}
-            {...(anchor.dim && !alt ? { title: `a close call: under ${CLOSE_ELO} Elo the named favourite won 35–44% of held-out national matches` } : {})}>
+            /* NO TYPED RATES (audit F9, 2026-09-25): the hit rates this
+               threshold was cut on are in the bake-off's archive, not in
+               the payload, so the hover says what the ink means and where
+               the measurement lives rather than restating its numbers */
+            {...(anchor.dim && !alt ? { title: `a close call: an Elo gap under ${CLOSE_ELO}, where the named favourite has not been a clear one in held-out national matches (research_archive/national_headline_bakeoff_2026-09-25)` } : {})}>
             {anchor.v}
           </span>
           {/* THE KEY, AND WHERE A SECOND LINE COMES FROM. Most anchors
@@ -973,7 +1076,7 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
             {anchor.k2 && <span className="block">{anchor.k2}</span>}
           </span>
         </span>
-      </Link>
+      </CardLink>
 
       <RankDumbbell ranks={ranks} />
 
@@ -1040,6 +1143,7 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
                 ? <>gp {row.gp_current.away} away · home not counted</>
                 : <>gp not counted</>}
         </span>
+        <H2hStat h2h={row.h2h} row={row} />
           </>)}
       </div>
 
@@ -1049,6 +1153,8 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
       <div className="mt-3">
         <TierGaps read={row} dense={dense} field={field} partial={partial}
           values={!row.national}
+          ranksOnly={fieldRanksBlock(row.field_rank)}
+          side={row.national ? "team" : "club"}
           quietFloor={row.national ? nat.quietFloor : []}
           floorNote={floorNote} />
       </div>
@@ -2728,6 +2834,10 @@ export function LeagueColumn({
     .filter((k) => {
       const sides = rows.flatMap((r) => {
         const ax = (r.field ?? r.field_partial)?.axes?.[k];
+        /* the verdict of the cut the card DRAWS: at the licensed count
+           the floor is that cut's own (pickerApi.licensedRead) */
+        const lic = licensedRead(ax);
+        if (lic) return [{ below_floor: lic.below_floor }, { below_floor: lic.below_floor }];
         return ax ? [ax.fav, ax.opp] : [];
       });
       return sides.length > 0 && sides.every((x) => x.below_floor);
@@ -2788,7 +2898,7 @@ export function LeagueColumn({
      column read as broken. It is NAMED in the header now. */
   const nothingAhead = rows.length === 0 && refusals.length === 0;
   /* A NATIONAL COLUMN WITH NOTHING IN THE WINDOW BUT A KNOWN NEXT FIXTURE
-     (the Asian Cup, until January) reads as a league on a rest week: a
+     (a competition between windows) reads as a league on a rest week: a
      rest-day cell per band naming when it next plays, not one box
      saying it has nothing. */
   const restNext = nothingAhead ? national?.nextBeyond ?? null : null;
