@@ -45,6 +45,10 @@ const errorCardSeen = (page: Page) => page.evaluate(
     .__boardErrorSeen));
 
 async function onChampionships(page: Page) {
+  // the club board is routed too, though this mode never asks it: a
+  // board GET that slipped through would WRITE a snapshot
+  // (e2e/the-board-writes-nothing.spec.ts)
+  await routeEight(page);
   await page.clock.install({ time: new Date(CHAMP_CLOCK) });
   await page.addInitScript(() => {
     try { window.localStorage.setItem("board-mode", "championships"); } catch { /* none */ }
