@@ -60,6 +60,23 @@ const server = http.createServer((req, res) => {
     req.on("close", () => res.destroy());
     return;
   }
+  // A BACKEND THAT IS SLOW BUT ALIVE, on request: answer 200 after
+  // `__standin_delay_ms` (at most 60s). This is the cold board rebuild —
+  // the provider cache expired and the next reader pays for it — and it
+  // is how e2e/a-slow-board-is-not-a-dead-one.spec.ts proves a board
+  // route waits longer than the proxy's default clock while every other
+  // route does not. The body names itself; it is not a payload.
+  const delay = /[?&]__standin_delay_ms=(\d{1,5})(&|$)/.exec(url);
+  if (delay) {
+    const ms = Math.min(Number(delay[1]), 60_000);
+    const t = setTimeout(() => sendJson(res, 200, {
+      e2e_stand_in: true, delayed_ms: ms,
+    }), ms);
+    // `res`, not `req`: a GET's request stream closes as soon as it is
+    // read, which would cancel every delay before it began
+    res.on("close", () => clearTimeout(t));
+    return;
+  }
   // READY, so the hold-out and anything that asks "is there a backend"
   // get a real answer about the stand-in rather than a refusal.
   if (url === "/api/ready") {

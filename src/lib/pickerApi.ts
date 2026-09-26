@@ -1733,6 +1733,22 @@ export async function fetchBoard(
   return readBoard(`/api/picker/board?days=${days}${ask}`, signal);
 }
 
+/** THE PROXY STOPPED WAITING — a named 504 (`reason: "backend_timeout"`)
+ *  from lib/suggesterProxy, and nothing else. A board read is asked once
+ *  more after this (BOARD_RETRY_DELAY_MS) before it is a failure: the
+ *  board rebuilds on the request path when its cache expires, and a
+ *  rebuild that outran the clock has usually landed by the second ask.
+ *  Any other 504, or any other failure, is not this. */
+export class BoardTimeout extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BoardTimeout";
+  }
+}
+
+/** How long the page waits before asking a timed-out board once more. */
+export const BOARD_RETRY_DELAY_MS = 2_000;
+
 /** ONE READER FOR BOTH BOARDS. Moved out of `fetchBoard` unchanged
  *  (2026-09-24) so the Championships board is read by the same code —
  *  the same abort screening, the same named failures, the same refusal
@@ -1756,11 +1772,14 @@ async function readBoard(path: string, signal?: AbortSignal): Promise<Board> {
     // unavailable") tells the reader something a generic "failed to
     // load" does not.
     let detail = "";
+    let timedOut = false;
     try {
       const body = await r.json();
       detail = body?.detail || body?.error || "";
+      timedOut = r.status === 504 && body?.reason === "backend_timeout";
     } catch { /* non-JSON body; the status is all we have */ }
-    throw new Error(detail || `board request failed (${r.status})`);
+    const message = detail || `board request failed (${r.status})`;
+    throw timedOut ? new BoardTimeout(message) : new Error(message);
   }
   // A 200 IS NOT A PAYLOAD. `return r.json()` folded three findings
   // into one: a SyntaxError in the browser's own vocabulary for a 204
