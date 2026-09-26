@@ -305,6 +305,7 @@ test("a league row carrying field_rank draws the # (the same panel) and no (i); 
     const board = JSON.parse(JSON.stringify(CLUB_H2H_BOARD));
     const row = board.rows[0];
     const other = board.rows[1];
+    delete other.field_rank;   // an older board: no key at all
     row.field_rank = { size: 154, axes: {
       ovr: { fav: { rank: 21 }, opp: { rank: 25 } },
       atk: { fav: { rank: 48 }, opp: { rank: 83 } },
@@ -339,4 +340,26 @@ test("a league row carrying field_rank draws the # (the same panel) and no (i); 
     const plain = page.locator(`[data-testid="picker-row"][data-event="${other.event_id}"]`);
     await expect(plain.getByTestId("tier-read")).toHaveCount(1);
     await expect(plain.getByTestId("field-ranks-open")).toHaveCount(0);
+  });
+
+test("the recorded field_rank reads as the backend's own reference pairing",
+  async ({ page }) => {
+    /* backend 585d813f's reference values, read off the RECORDING rather
+       than typed: Nottingham Forest (fav) ovr 21, atk 48, def 18; Crystal
+       Palace ovr 25, atk 83, def 16, of 154 */
+    type FR = { size: number; axes: Record<string, { fav: { rank: number } | null;
+      opp: { rank: number } | null } | null> };
+    const r = (CLUB_H2H_BOARD.rows as unknown as Array<{ event_id: string;
+      favourite: string; opponent: string; field_rank?: FR }>)
+      .find((x) => x.favourite === "Nottingham Forest" && x.opponent === "Crystal Palace")!;
+    expect(r.field_rank!.size).toBe(154);
+    await clubBoard(page);
+    const card = page.locator(`[data-testid="picker-row"][data-event="${r.event_id}"]`);
+    await expect(card.getByTestId("tier-read")).toHaveCount(0);
+    await card.getByTestId("field-ranks-open").click();
+    for (const k of ["ovr", "atk", "def"]) {
+      const a = r.field_rank!.axes[k]!;
+      await expect(card.locator(`[data-rank-axis="${k}"]`))
+        .toHaveText(new RegExp(`${k}\\s*#${a.fav!.rank}v#${a.opp!.rank}`, "i"));
+    }
   });

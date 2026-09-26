@@ -7,22 +7,24 @@
  * club_board/http_20261010_3d.json.gz), with every assembly forced to
  * `capture=False` and the snapshot capture made to raise: nothing was
  * written anywhere and no request reached this project's API. Assembled
- * 2026-09-25T23:48:06.497256+00:00: 58 ranked rows, 17 refusals.
+ * 2026-09-26T01:05:55.532199+00:00: 58 ranked rows, 17 refusals.
  *
- * Every row and refusal carries `h2h` (backend 2026-09-25, the national
+ * Every rated row carries `field_rank` (backend 585d813f): each side's rank
+ * in the league field on each axis, of `size`, a side the field cannot
+ * place as null. Every row and refusal carries `h2h` (backend 2026-09-25, the national
  * card's `head_to_head` shape): `source` "club_corpus+board_sweep" or
  * "club_corpus", its `window` stated per pairing, a tally keyed by THIS
  * fixture's home and away.
  *
- * TRIMMED to 18 rows — two per league, a measured absence, the
- * HOLLOW row and three SPLITs — and 3 refusals: one whose pairing
+ * TRIMMED to 19 rows — two per league, a measured absence, the
+ * HOLLOW row, three SPLITs, and Nottingham Forest v Crystal Palace — and 3 refusals: one whose pairing
  * met, one a measured absence, and one whose club the corpus REFUSED
  * (ambiguous or unknown, `window: null`). Every kept key, value and absence
  * is the wire's. */
-export const CLUB_H2H_CLOCK = "2026-09-25T23:48:06.497256+00:00";
+export const CLUB_H2H_CLOCK = "2026-09-26T01:05:55.532199+00:00";
 
 export const CLUB_H2H_BOARD = {
- "generated_at": "2026-09-25T23:48:06.497256+00:00",
+ "generated_at": "2026-09-26T01:05:55.532199+00:00",
  "date": "20261010",
  "days": 3,
  "leagues": {
@@ -229,6 +231,35 @@ export const CLUB_H2H_BOARD = {
     "favourite": "Bayern Munich",
     "signed_from": "Bayern Munich",
     "reoriented": false
+   },
+   "field_rank": {
+    "size": 154,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 1
+      },
+      "opp": {
+       "rank": 72
+      }
+     },
+     "atk": {
+      "fav": {
+       "rank": 1
+      },
+      "opp": {
+       "rank": 87
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 12
+      },
+      "opp": {
+       "rank": 97
+      }
+     }
+    }
    },
    "h2h": {
     "available": true,
@@ -467,6 +498,35 @@ export const CLUB_H2H_BOARD = {
     "signed_from": "Barcelona",
     "reoriented": false
    },
+   "field_rank": {
+    "size": 154,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 4
+      },
+      "opp": {
+       "rank": 67
+      }
+     },
+     "atk": {
+      "fav": {
+       "rank": 2
+      },
+      "opp": {
+       "rank": 134
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 29
+      },
+      "opp": {
+       "rank": 26
+      }
+     }
+    }
+   },
    "h2h": {
     "available": true,
     "source": "club_corpus+board_sweep",
@@ -703,6 +763,35 @@ export const CLUB_H2H_BOARD = {
     "favourite": "Internazionale",
     "signed_from": "Internazionale",
     "reoriented": false
+   },
+   "field_rank": {
+    "size": 154,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 11
+      },
+      "opp": {
+       "rank": 119
+      }
+     },
+     "atk": {
+      "fav": {
+       "rank": 8
+      },
+      "opp": {
+       "rank": 151
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 32
+      },
+      "opp": {
+       "rank": 70
+      }
+     }
+    }
    },
    "h2h": {
     "available": true,
@@ -941,6 +1030,35 @@ export const CLUB_H2H_BOARD = {
     "signed_from": "Nashville SC",
     "reoriented": false
    },
+   "field_rank": {
+    "size": 154,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 76
+      },
+      "opp": {
+       "rank": 133
+      }
+     },
+     "atk": {
+      "fav": {
+       "rank": 44
+      },
+      "opp": {
+       "rank": 115
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 3
+      },
+      "opp": {
+       "rank": 134
+      }
+     }
+    }
+   },
    "h2h": {
     "available": true,
     "source": "club_corpus+board_sweep",
@@ -1151,6 +1269,35 @@ export const CLUB_H2H_BOARD = {
     "favourite": "Tijuana",
     "signed_from": "Tijuana",
     "reoriented": false
+   },
+   "field_rank": {
+    "size": 154,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 127
+      },
+      "opp": {
+       "rank": 132
+      }
+     },
+     "atk": {
+      "fav": {
+       "rank": 109
+      },
+      "opp": {
+       "rank": 99
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 64
+      },
+      "opp": {
+       "rank": 130
+      }
+     }
+    }
    },
    "h2h": {
     "available": true,
@@ -1402,6 +1549,35 @@ export const CLUB_H2H_BOARD = {
     "signed_from": "Inter Miami CF",
     "reoriented": false
    },
+   "field_rank": {
+    "size": 154,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 40
+      },
+      "opp": {
+       "rank": 140
+      }
+     },
+     "atk": {
+      "fav": {
+       "rank": 16
+      },
+      "opp": {
+       "rank": 101
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 113
+      },
+      "opp": {
+       "rank": 103
+      }
+     }
+    }
+   },
    "h2h": {
     "available": true,
     "source": "club_corpus+board_sweep",
@@ -1652,6 +1828,35 @@ export const CLUB_H2H_BOARD = {
     "signed_from": "Brighton & Hove Albion",
     "reoriented": false
    },
+   "field_rank": {
+    "size": 154,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 12
+      },
+      "opp": {
+       "rank": 29
+      }
+     },
+     "atk": {
+      "fav": {
+       "rank": 36
+      },
+      "opp": {
+       "rank": 81
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 9
+      },
+      "opp": {
+       "rank": 11
+      }
+     }
+    }
+   },
    "h2h": {
     "available": true,
     "source": "club_corpus+board_sweep",
@@ -1863,6 +2068,35 @@ export const CLUB_H2H_BOARD = {
     "signed_from": "TSG Hoffenheim",
     "reoriented": false
    },
+   "field_rank": {
+    "size": 154,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 49
+      },
+      "opp": {
+       "rank": 77
+      }
+     },
+     "atk": {
+      "fav": {
+       "rank": 25
+      },
+      "opp": {
+       "rank": 113
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 69
+      },
+      "opp": {
+       "rank": 71
+      }
+     }
+    }
+   },
    "h2h": {
     "available": true,
     "source": "club_corpus+board_sweep",
@@ -2073,6 +2307,35 @@ export const CLUB_H2H_BOARD = {
     "favourite": "FC Twente",
     "signed_from": "FC Twente",
     "reoriented": false
+   },
+   "field_rank": {
+    "size": 154,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 62
+      },
+      "opp": {
+       "rank": 137
+      }
+     },
+     "atk": {
+      "fav": {
+       "rank": 94
+      },
+      "opp": {
+       "rank": 121
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 99
+      },
+      "opp": {
+       "rank": 151
+      }
+     }
+    }
    },
    "h2h": {
     "available": true,
@@ -2310,6 +2573,35 @@ export const CLUB_H2H_BOARD = {
     "favourite": "Guadalajara",
     "signed_from": "Guadalajara",
     "reoriented": false
+   },
+   "field_rank": {
+    "size": 154,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 95
+      },
+      "opp": {
+       "rank": 138
+      }
+     },
+     "atk": {
+      "fav": {
+       "rank": 66
+      },
+      "opp": {
+       "rank": 138
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 58
+      },
+      "opp": {
+       "rank": 117
+      }
+     }
+    }
    },
    "h2h": {
     "available": true,
@@ -2561,6 +2853,35 @@ export const CLUB_H2H_BOARD = {
     "signed_from": "Lille",
     "reoriented": false
    },
+   "field_rank": {
+    "size": 154,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 38
+      },
+      "opp": {
+       "rank": 107
+      }
+     },
+     "atk": {
+      "fav": {
+       "rank": 56
+      },
+      "opp": {
+       "rank": 140
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 21
+      },
+      "opp": {
+       "rank": 43
+      }
+     }
+    }
+   },
    "h2h": {
     "available": true,
     "source": "club_corpus+board_sweep",
@@ -2797,6 +3118,35 @@ export const CLUB_H2H_BOARD = {
     "favourite": "Go Ahead Eagles",
     "signed_from": "Go Ahead Eagles",
     "reoriented": false
+   },
+   "field_rank": {
+    "size": 154,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 126
+      },
+      "opp": {
+       "rank": 131
+      }
+     },
+     "atk": {
+      "fav": {
+       "rank": 108
+      },
+      "opp": {
+       "rank": 143
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 139
+      },
+      "opp": {
+       "rank": 148
+      }
+     }
+    }
    },
    "h2h": {
     "available": true,
@@ -3049,6 +3399,35 @@ export const CLUB_H2H_BOARD = {
     "signed_from": "Arsenal",
     "reoriented": false
    },
+   "field_rank": {
+    "size": 154,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 2
+      },
+      "opp": {
+       "rank": 22
+      }
+     },
+     "atk": {
+      "fav": {
+       "rank": 6
+      },
+      "opp": {
+       "rank": 45
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 1
+      },
+      "opp": {
+       "rank": 37
+      }
+     }
+    }
+   },
    "h2h": {
     "available": true,
     "source": "club_corpus+board_sweep",
@@ -3259,6 +3638,35 @@ export const CLUB_H2H_BOARD = {
     "favourite": "Real Betis",
     "signed_from": "Real Betis",
     "reoriented": false
+   },
+   "field_rank": {
+    "size": 154,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 32
+      },
+      "opp": {
+       "rank": 73
+      }
+     },
+     "atk": {
+      "fav": {
+       "rank": 24
+      },
+      "opp": {
+       "rank": 73
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 76
+      },
+      "opp": {
+       "rank": 81
+      }
+     }
+    }
    },
    "h2h": {
     "available": true,
@@ -3496,6 +3904,35 @@ export const CLUB_H2H_BOARD = {
     "favourite": "Strasbourg",
     "signed_from": "Strasbourg",
     "reoriented": false
+   },
+   "field_rank": {
+    "size": 154,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 45
+      },
+      "opp": {
+       "rank": 92
+      }
+     },
+     "atk": {
+      "fav": {
+       "rank": 35
+      },
+      "opp": {
+       "rank": 119
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 63
+      },
+      "opp": {
+       "rank": 112
+      }
+     }
+    }
    },
    "h2h": {
     "available": true,
@@ -3747,6 +4184,35 @@ export const CLUB_H2H_BOARD = {
     "signed_from": "AC Milan",
     "reoriented": false
    },
+   "field_rank": {
+    "size": 154,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 46
+      },
+      "opp": {
+       "rank": 101
+      }
+     },
+     "atk": {
+      "fav": {
+       "rank": 82
+      },
+      "opp": {
+       "rank": 106
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 25
+      },
+      "opp": {
+       "rank": 88
+      }
+     }
+    }
+   },
    "h2h": {
     "available": true,
     "source": "club_corpus+board_sweep",
@@ -3970,6 +4436,35 @@ export const CLUB_H2H_BOARD = {
     "favourite": "AZ Alkmaar",
     "signed_from": "Feyenoord Rotterdam",
     "reoriented": true
+   },
+   "field_rank": {
+    "size": 154,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 58
+      },
+      "opp": {
+       "rank": 64
+      }
+     },
+     "atk": {
+      "fav": {
+       "rank": 57
+      },
+      "opp": {
+       "rank": 97
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 121
+      },
+      "opp": {
+       "rank": 136
+      }
+     }
+    }
    },
    "h2h": {
     "available": true,
@@ -4208,6 +4703,35 @@ export const CLUB_H2H_BOARD = {
     "signed_from": "San Diego FC",
     "reoriented": true
    },
+   "field_rank": {
+    "size": 154,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 100
+      },
+      "opp": {
+       "rank": 123
+      }
+     },
+     "atk": {
+      "fav": {
+       "rank": 50
+      },
+      "opp": {
+       "rank": 105
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 90
+      },
+      "opp": {
+       "rank": 138
+      }
+     }
+    }
+   },
    "h2h": {
     "available": false,
     "source": "club_corpus+board_sweep",
@@ -4240,6 +4764,272 @@ export const CLUB_H2H_BOARD = {
      }
     },
     "reason": "no meeting in our corpus (since 2025-02, corpus to 2026-08-08; this season's results 2026-08-29 to 2026-10-10). A measured absence over that window, not a claim the clubs never met"
+   }
+  },
+  {
+   "refused": false,
+   "league": "epl",
+   "column": "epl",
+   "columns": [
+    "epl"
+   ],
+   "home": "Crystal Palace",
+   "away": "Nottingham Forest",
+   "favourite": "Nottingham Forest",
+   "opponent": "Crystal Palace",
+   "fav_side": "away",
+   "fav_source": "rank",
+   "venue_favourite": {
+    "refused": false,
+    "venue_class": "DOMESTIC",
+    "home_side": "home",
+    "gdg_gap_abs": 0.3894736842105264,
+    "threshold": 0.3553604953560369,
+    "threshold_source": "derived",
+    "policy": "off",
+    "favourite": "Nottingham Forest",
+    "side": "away",
+    "agrees": true,
+    "reason": "table_gap_beats_venue",
+    "flipped": false
+   },
+   "resolution": {
+    "Crystal Palace": "exact",
+    "Nottingham Forest": "exact"
+   },
+   "ppg_gap": 0.04912280701754401,
+   "gdg_gap": 0.3894736842105264,
+   "rank_gap": 1,
+   "gp_current": {
+    "home": 5,
+    "away": 5,
+    "min": 5
+   },
+   "weights": {
+    "home": 0.3333333333333333,
+    "away": 0.3333333333333333,
+    "min": 0.3333333333333333,
+    "k": 10,
+    "constant": null,
+    "basis": {
+     "home": "blend",
+     "away": "blend"
+    }
+   },
+   "src": "prior",
+   "cross_league": false,
+   "rated_in": {
+    "home": "epl",
+    "away": "epl"
+   },
+   "gap_note": null,
+   "reg_time_note": null,
+   "table_notes": {
+    "home": null,
+    "away": null
+   },
+   "ranks": {
+    "fav": 14,
+    "opp": 15
+   },
+   "rates": {
+    "ppg": [
+     1.105263157894737,
+     1.056140350877193
+    ],
+    "gf": [
+     1.1087719298245615,
+     1.1192982456140352
+    ],
+    "ga": [
+     1.2280701754385965,
+     1.6280701754385967
+    ],
+    "gdg": [
+     -0.11929824561403501,
+     -0.5087719298245614
+    ]
+   },
+   "own_gdg": {
+    "diff": 0.3894736842105264,
+    "basis": "EACH CLUB'S OWN GD/g, DIFFERENCED — how much more one club outscores its own league than the other does theirs. It is NOT the withheld `gdg_gap`: 2.0 GD/g in the Eredivisie is not 2.0 GD/g in La Liga, so this sets two own-league margins side by side and never says one side is this many goals a game better than the other."
+   },
+   "tiers": {
+    "ovr": [
+     4,
+     5
+    ],
+    "atk": [
+     5,
+     5
+    ],
+    "def": [
+     3,
+     5
+    ]
+   },
+   "tier_gaps": {
+    "ovr": 1,
+    "atk": 0,
+    "def": 2
+   },
+   "shape": "SPLIT",
+   "event_id": "401879266",
+   "competition_id": "401879266",
+   "kickoff": "2026-10-11T13:00Z",
+   "espn": "eng.1",
+   "state": "pre",
+   "in_play": false,
+   "venue": {
+    "name": "Selhurst Park",
+    "city": "London",
+    "country": "England"
+   },
+   "venue_class": {
+    "class": "DOMESTIC",
+    "home_side": "home"
+   },
+   "kalshi": null,
+   "form": {
+    "fav": "DDWL",
+    "opp": "WLD",
+    "scope": "EPL",
+    "scope_is_cup": false
+   },
+   "current_only": {
+    "ppg_gap": 0.19999999999999996,
+    "gdg_gap": 0.8000000000000003,
+    "rank_gap": 3,
+    "favourite": "Nottingham Forest",
+    "signed_from": "Nottingham Forest",
+    "reoriented": false
+   },
+   "field_rank": {
+    "size": 154,
+    "axes": {
+     "ovr": {
+      "fav": {
+       "rank": 21
+      },
+      "opp": {
+       "rank": 25
+      }
+     },
+     "atk": {
+      "fav": {
+       "rank": 48
+      },
+      "opp": {
+       "rank": 83
+      }
+     },
+     "def": {
+      "fav": {
+       "rank": 18
+      },
+      "opp": {
+       "rank": 16
+      }
+     }
+    }
+   },
+   "h2h": {
+    "available": true,
+    "source": "club_corpus+board_sweep",
+    "window": {
+     "from": "2024-08-13",
+     "to": "2026-10-10",
+     "corpus_from": "2024-08-13",
+     "corpus_to": "2026-05-24",
+     "sweep": {
+      "from": "2026-08-29",
+      "to": "2026-10-10"
+     },
+     "label": "since 2024-08, corpus to 2026-05-24; this season's results 2026-08-29 to 2026-10-10"
+    },
+    "tally": {
+     "home": 0,
+     "draw": 3,
+     "away": 1
+    },
+    "meetings": [
+     {
+      "date": "2024-10-21T19:00:00+00:00",
+      "home": "Nottingham Forest",
+      "away": "Crystal Palace",
+      "home_score": 1,
+      "away_score": 0,
+      "completed": true,
+      "competition": "epl",
+      "season": 2024,
+      "source": "club_corpus",
+      "winner": "away",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "date": "2025-05-05T19:00:00+00:00",
+      "home": "Crystal Palace",
+      "away": "Nottingham Forest",
+      "home_score": 1,
+      "away_score": 1,
+      "completed": true,
+      "competition": "epl",
+      "season": 2024,
+      "source": "club_corpus",
+      "winner": "draw",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "date": "2025-08-24T13:00:00+00:00",
+      "home": "Crystal Palace",
+      "away": "Nottingham Forest",
+      "home_score": 1,
+      "away_score": 1,
+      "completed": true,
+      "competition": "epl",
+      "season": 2025,
+      "source": "club_corpus",
+      "winner": "draw",
+      "winner_means": "this fixture's home/away sides"
+     },
+     {
+      "date": "2026-02-01T14:00:00+00:00",
+      "home": "Nottingham Forest",
+      "away": "Crystal Palace",
+      "home_score": 1,
+      "away_score": 1,
+      "completed": true,
+      "competition": "epl",
+      "season": 2025,
+      "source": "club_corpus",
+      "winner": "draw",
+      "winner_means": "this fixture's home/away sides"
+     }
+    ],
+    "last_meeting": {
+     "date": "2026-02-01T14:00:00+00:00",
+     "home": "Nottingham Forest",
+     "away": "Crystal Palace",
+     "home_score": 1,
+     "away_score": 1,
+     "completed": true,
+     "competition": "epl",
+     "season": 2025,
+     "source": "club_corpus",
+     "winner": "draw",
+     "winner_means": "this fixture's home/away sides"
+    },
+    "identity": {
+     "home": {
+      "corpus_name": "Crystal Palace",
+      "resolved_by": "exact"
+     },
+     "away": {
+      "corpus_name": "Nottingham Forest",
+      "resolved_by": "exact"
+     }
+    },
+    "reason": null
    }
   }
  ],
