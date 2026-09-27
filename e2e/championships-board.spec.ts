@@ -38,7 +38,7 @@ async function routeBoth(page: Page, champ: unknown = CHAMP_BOARD): Promise<Call
     if (u.pathname.startsWith("/api/championships")) calls.champ += 1;
   });
   await routeEight(page);
-  await page.route("**/api/championships/**",
+  await page.route("**/api/championships/board**",
     (r) => r.fulfill(json(champ)));
   return calls;
 }

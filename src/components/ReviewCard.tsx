@@ -1159,6 +1159,17 @@ export function ReviewTail({
         </p>
       )}
 
+      {/* WHERE THESE ROWS WERE READ FROM, when it is not the one place
+          (the national tail, 2026-09-27): the match archive, or ESPN's
+          scoreboard where the archive has nothing yet. The backend's own
+          sentence, drawn only when it gave one. */}
+      {meta?.source && meta.source !== "archive" && meta.source_note && (
+        <p data-testid="review-source-note" data-source={meta.source}
+          className="mt-1 font-mono text-[10px] leading-relaxed text-ink-faint">
+          {meta.source_note}
+        </p>
+      )}
+
       {storeNote && (
         <p data-testid="review-store-note"
           className="mt-2 rounded-md border border-skylive/30 bg-skylive/5 px-2.5 py-2 text-[11px] leading-relaxed text-skylive">

@@ -98,7 +98,7 @@ async function nationalBoard(page: Page) {
     try { window.localStorage.setItem("board-mode", "championships"); } catch { /* none */ }
   });
   await routeEight(page);
-  await page.route("**/api/championships/**", (r) => r.fulfill(json(CHAMP_BOARD)));
+  await page.route("**/api/championships/board**", (r) => r.fulfill(json(CHAMP_BOARD)));
   await page.goto("/bet-suggester");
   await page.waitForSelector('[data-testid="league-col"][data-league="unl"] [data-testid="picker-row"]');
   return anatomy(page);
