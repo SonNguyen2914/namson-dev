@@ -80,7 +80,8 @@ import {
   nationalColumn, venueAdjusted,
 } from "../../lib/pickerApi";
 import {
-  DEFAULT_BACK, Review, fetchReview, readHere, reviewAskHonoured,
+  DEFAULT_BACK, Review, fetchChampionshipsReview, fetchReview, readHere,
+  reviewAskHonoured,
 } from "../../lib/pickerReview";
 import {
   COLUMN_DEFAULT_SORT, ColumnSort, DEFAULT_SORT, NATIONAL_SORT_MODES,
@@ -265,6 +266,11 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   const applyDaySort = (day: string, next: ColumnSort) =>
     setDaySorts((prev) => ({ ...prev, [day]: next }));
   const [review, setReview] = useState<Review | null>(null);
+  /* WHICH BOARD THE HELD REVIEW ANSWERS. The two boards ask two review
+     routes, and a club review must never stand under national columns
+     (or the reverse) for the moment a switch takes to land — a review
+     for the other board is no review here. */
+  const [reviewFor, setReviewFor] = useState<string | null>(null);
   const [reviewError, setReviewError] = useState("");
   const [reviewLoading, setReviewLoading] = useState(true);
 
@@ -386,10 +392,16 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   const loadReview = useCallback(async (signal: AbortSignal) => {
     setReviewLoading(true);
     try {
-      const r = await fetchReview(back, signal,
-                                  ask === "" ? undefined : ask.split(","));
+      /* THE CHAMPIONSHIPS BOARD ASKS ITS OWN REVIEW (2026-09-27): the
+         national finished tail, read from the match archive. It is not
+         the club board's route and it writes nothing. */
+      const r = mode === "championships"
+        ? await fetchChampionshipsReview(back, signal)
+        : await fetchReview(back, signal,
+                            ask === "" ? undefined : ask.split(","));
       if (signal.aborted) return;
       setReview(r);
+      setReviewFor(mode);
       setReviewError("");
     } catch (e) {
       if (signal.aborted) return;
@@ -397,20 +409,20 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
       // DROPPED. A finished tail from an older window standing under a
       // fresh board is stale dressed as current.
       setReview(null);
+      setReviewFor(mode);
       setReviewError(e instanceof Error ? e.message : String(e));
     } finally {
       if (!signal.aborted) setReviewLoading(false);
     }
-  }, [back, ask]);
+  }, [back, ask, mode]);
 
   useEffect(() => {
     if (deepLink !== null) return;
-    /* THE FINISHED TAIL IS A CLUB-BOARD READ. There is no national-team
-       review route, so the Championships board asks for none — its
-       tails say they were never asked (see `champTail` below), and a
-       national match that finished leaves the board BY NAME in the
-       off-board strip. */
-    if (mode !== "leagues") return;
+    /* BOTH BOARDS ASK FOR THEIR FINISHED TAIL (2026-09-27). Until then
+       the Championships board asked for none and every national tail
+       said it was never asked; GET /api/championships/review now serves
+       the national one, off the match archive. */
+    if (mode === null) return;
     const ac = new AbortController();
     const t = setTimeout(() => { void loadReview(ac.signal); }, 0);
     return () => { clearTimeout(t); ac.abort(); };
@@ -431,9 +443,10 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   const refusals = board?.refusals ?? [];
   const leaguesMap = board?.leagues ?? {};
 
-  const finished = review?.finished ?? [];
-  const finishedRefusals = review?.refusals ?? [];
-  const reviewLeagues = review?.leagues ?? {};
+  const reviewHere = reviewFor === mode ? review : null;
+  const finished = reviewHere?.finished ?? [];
+  const finishedRefusals = reviewHere?.refusals ?? [];
+  const reviewLeagues = reviewHere?.leagues ?? {};
   /* THE WHOLE-BOARD FAILURE, SCREENED. `restructure.spec.ts` already
      keeps the browser's raw vocabulary off this box ("a dead network
      renders a sentence, not the browser's raw string"); the backend's
@@ -444,23 +457,13 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   // store reports it cannot write, EVERY read in every tail below is a
   // reconstruction by construction — say it once, at the top, rather than
   // leaving the reader to notice the pattern.
-  /* THE CHAMPIONSHIPS BOARD'S TAIL: NEVER ASKED, AND SAID SO. There is
-     no national-team review route, so the tail is state (2) of the three
-     `readHere` exists to keep apart — not a week in which nothing
-     finished. The finished matches themselves left the board by name in
-     the off-board strip above the columns. */
-  const champTail = {
-    rows: [], refusals: [], meta: undefined, back, loading: false, error: "",
-    read: false,
-    unreadWhy: "No finished-match read is served for the national-team "
-      + "competitions yet, so this tail was never asked. A match that "
-      + "finished in the window left the board by name, in the strip "
-      + "above the columns.",
-    storeNote: null,
-  };
-  const storeNote = review && review.store && review.store.writable === false
+  /* The club review's store note only: the national tail has no
+     reconstruction to fall back on, so the sentence below would be false
+     under a national column. */
+  const storeNote = !champ && reviewHere && reviewHere.store
+    && reviewHere.store.writable === false
     ? `No pre-kickoff read is being frozen on this deployment (snapshot `
-      + `store: ${review.store.backend}), so every read below is a `
+      + `store: ${reviewHere.store.backend}), so every read below is a `
       + `RECONSTRUCTION rebuilt from the season archive. That is a `
       + `property of the setup, not a coincidence, and it will stay true `
       + `until a store is configured.`
@@ -704,8 +707,8 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      blank, and an unexplained blank is what this surface refuses to
      leave. null while nothing has landed: an unanswered ask and an
      unmade one are not the same fact. */
-  const reviewAnswered = review && only
-    ? reviewAskHonoured(review, only) : null;
+  const reviewAnswered = reviewHere && only && !champ
+    ? reviewAskHonoured(reviewHere, only) : null;
 
   /* ── THE CROSS-LEAGUE FIELD, PER COLUMN THAT HAS ONE ────────────────
 
@@ -1968,7 +1971,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                     meta={leaguesMap[slug]}
                     rows={rows.filter((r) => columnsOf(r).includes(slug))}
                     refusals={refusals.filter((r) => columnsOf(r).includes(slug))}
-                    review={champ ? champTail : {
+                    review={{
                       rows: finished.filter((r) => columnsOf(r).includes(slug)),
                       refusals: finishedRefusals.filter((r) => columnsOf(r).includes(slug)),
                       meta: reviewLeagues[slug],
@@ -1976,7 +1979,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                       /* WAS THIS COMPETITION READ AT ALL? Off the
                          payload's own record, never inferred from an
                          empty row list. */
-                      read: readHere(review, slug),
+                      read: readHere(reviewHere, slug),
                       /* …and when it was not, why — if the page knows.
                          It knows exactly one reason: it asked and the
                          server did not answer the question. */

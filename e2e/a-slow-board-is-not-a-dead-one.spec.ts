@@ -112,7 +112,7 @@ test.describe("the board page on a slow rebuild", () => {
       await watchForErrorCard(page);
       await onChampionships(page);
       const upstream: number[] = [];
-      await page.route("**/api/championships/**", async (r: Route) => {
+      await page.route("**/api/championships/board**", async (r: Route) => {
         // the SAME request, sent through the app's own proxy to a
         // stand-in that takes 20s; the proxy's verdict decides what the
         // page gets
@@ -138,7 +138,7 @@ test.describe("the board page on a slow rebuild", () => {
         let asked = 0;
         if (mode === "championships") {
           await onChampionships(page);
-          await page.route("**/api/championships/**", (r) => {
+          await page.route("**/api/championships/board**", (r) => {
             asked += 1;
             return r.fulfill(asked === 1 ? TIMEOUT_504 : json(CHAMP_BOARD));
           });
@@ -167,7 +167,7 @@ test.describe("the board page on a slow rebuild", () => {
   test("two proxy timeouts show the red card, and only then", async ({ page }) => {
     await onChampionships(page);
     let asked = 0;
-    await page.route("**/api/championships/**", (r) => {
+    await page.route("**/api/championships/board**", (r) => {
       asked += 1;
       return r.fulfill(TIMEOUT_504);
     });

@@ -435,7 +435,9 @@ export const LEAGUE_PROXY_ALLOWED: Record<string, readonly string[]> = {
   // tests/test_championships_route.py makes the club assembly and its
   // capture raise and the route still answers). Forwarded AHEAD of the
   // backend's deploy (retired from LEAGUE_PROXY_AHEAD once 0b94886 deployed).
-  championships: ["board"],
+  // `review` (2026-09-27): the national finished tail, read from the
+  // backend's match archive — GET-only and it writes nothing either.
+  championships: ["board", "review"],
   // COMP HAS NO LITERAL ROUTES — every one of its paths begins with a
   // competition KEY, so its whole surface lives in the id-route table
   // below. It is listed here anyway, with an empty list, because THIS
@@ -528,6 +530,12 @@ export const LEAGUE_PROXY_ID_ROUTES: Record<string, readonly RegExp[]> = {
 export const LEAGUE_PROXY_AHEAD: Record<string, Record<string, string>> = {
   // Empty since backend 0b94886 (2026-09-25) deployed both
   // /api/championships/board and /api/field/nations.
+  championships: {
+    review: "the national finished tail (backend branch match-archive, "
+      + "2026-09-27) is not deployed yet; until it is, the Championships "
+      + "tails name a failed read, never an empty one. Retire this record "
+      + "when the deployed /openapi.json lists /api/championships/review.",
+  },
 };
 
 /** ROUTES THE BACKEND SERVES THAT THIS PROXY DELIBERATELY DOES NOT
@@ -916,6 +924,7 @@ export const QUERY_BOUNDS: ReadonlyArray<
   // the backend declares `days: int = 1` with no bound; the picker
   // board's own ceiling is the sane one for its national twin
   [/^championships\/board$/, { days: [1, 14] }],
+  [/^championships\/review$/, { back: [1, 30] }],
   [/^hunter\/findings$/, { limit: [1, 500] }],
   [/^xg\/friendlies$/, { days: [1, 8] }],
 ];

@@ -54,7 +54,7 @@ async function open(page: Page, b: typeof BOARDS[number]) {
   await page.route("**/api/**", (r) => r.fulfill(json({ detail: "hermetic" }, 503)));
   await page.route("**/api/picker/board**", (r) => r.fulfill(json(b.board)));
   await page.route("**/api/picker/review**", (r) => r.fulfill(json(b.review ?? EMPTY_REVIEW)));
-  await page.route("**/api/championships/**", (r) => r.fulfill(json(b.champ ? b.board : {}, b.champ ? 200 : 503)));
+  await page.route("**/api/championships/board**", (r) => r.fulfill(json(b.champ ? b.board : {}, b.champ ? 200 : 503)));
   await page.goto(b.path);
   await page.waitForSelector('[data-testid="picker-row"]');
   if (b.review) {

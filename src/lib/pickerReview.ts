@@ -228,6 +228,15 @@ export interface ReviewLeagueMeta {
   reconstructed: number;
   unavailable: number;
   error: string | null;
+  /** NATIONAL TAIL ONLY (GET /api/championships/review): where this
+   *  column's finished matches were read from — "archive", or ESPN's
+   *  scoreboard where the archive has nothing yet ("espn_fallback",
+   *  "archive+espn_fallback"), with the backend's own sentence. Absent on
+   *  the club review, which has one source. */
+  source?: string;
+  source_note?: string | null;
+  /** kicked off, not yet finalized by the archive */
+  awaiting_finalize?: number;
 }
 
 /** Which snapshot backend answered, and whether it can write at all. This
@@ -405,9 +414,36 @@ export async function fetchReview(
 ): Promise<Review> {
   const ask = leagues && leagues.length > 0
     ? `&leagues=${encodeURIComponent(leagues.join(","))}` : "";
+  return readReview(`/api/picker/review?back=${back}${ask}`, signal);
+}
+
+/** THE NATIONAL FINISHED TAIL (2026-09-27) — GET /api/championships/review.
+ *
+ *  The same payload shape as the club review, so the Championships
+ *  board's columns render their finished tail through the SAME
+ *  `ReviewTail` the league columns use, with every one of its states:
+ *  read and none finished, read and failed, never asked. The backend
+ *  reads it FROM THE MATCH ARCHIVE; where the archive has nothing yet it
+ *  reads ESPN's scoreboard and says so on the column's meta (`source`,
+ *  `source_note`) and on every such row (`result.source`). It writes
+ *  nothing, and it is not the club board: asking it costs no snapshot.
+ *
+ *  Before this route existed the Championships tails said they were
+ *  never asked. A backend deployed behind this frontend without the
+ *  route answers 404 through the proxy, which `readReview` turns into a
+ *  named failure — "could not be read", never "none finished". */
+export async function fetchChampionshipsReview(
+  back: number, signal?: AbortSignal,
+): Promise<Review> {
+  return readReview(`/api/championships/review?back=${back}`, signal);
+}
+
+/** One review request, read with every failure named. Shared by both
+ *  reviews so the two can never disagree about what a failure is. */
+async function readReview(url: string, signal?: AbortSignal): Promise<Review> {
   let r: Response;
   try {
-    r = await fetch(`/api/picker/review?back=${back}${ask}`, { signal });
+    r = await fetch(url, { signal });
   } catch (e) {
     // Same rule as the board's fetch: an abort is the caller's own
     // cancellation and is rethrown untouched; anything else is the
