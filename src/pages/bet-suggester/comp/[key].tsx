@@ -48,6 +48,25 @@ type Strength = {
   pair_confidence?: string; source?: string;
   home?: SideRating; away?: SideRating;
 };
+/** One absence as the provider reported it (backend src/live/team_news.py
+ *  `fixture_news`). A record the provider has stopped listing is KEPT and
+ *  flagged `still_reported: false`, not deleted. */
+type AbsenceRecord = {
+  player_name?: string | null; team_name?: string | null;
+  still_reported?: boolean | null;
+};
+/** The team-news block the backend attaches to fixtures inside 48h.
+ *  `absences` is an OBJECT — a record list plus the freshness state of the
+ *  read behind it — never a bare list. With the live plane off there is no
+ *  `absences` key at all, only `availability`. */
+type News = {
+  absences?: {
+    records?: AbsenceRecord[];
+    record_count?: number | null;
+    freshness?: { state?: string };
+  };
+  availability?: { state?: string };
+};
 type Fixture = {
   fixture_id: number; kickoff_utc?: string; status?: string;
   status_long?: string; elapsed?: number | null; round?: string | null;
@@ -71,7 +90,7 @@ type Fixture = {
                         l?: number; points?: number | null;
                         points_range?: number[] | null } };
   } | null;
-  news?: { absences?: unknown[]; status?: string } | null;
+  news?: News | null;
   weather?: { available?: boolean; place?: string;
               temperature_c?: number;
               precipitation_probability_pct?: number;
@@ -135,6 +154,101 @@ function Read({ s, home, away }: {
         </span>
       )}
     </span>
+  );
+}
+
+/* WHAT THE ABSENCE READ SAID — OR THAT NOBODY COULD SAY (2026-09-28).
+   ------------------------------------------------------------------
+   This tested `news.absences?.length > 0`, and the backend sends
+   `absences` as an OBJECT — `{provider, records, record_count,
+   freshness, …}` — which has no length, so "N reported absence(s)" could
+   never render. The count now comes off `records`, and only players the
+   provider STILL lists are counted: a retracted record stays on the wire
+   as information, not as an absence.
+   AND "COULD NOT ASK" IS NOT "NOBODY IS OUT". An empty list is the
+   provider listing no one, which the backend itself says is not evidence
+   that no player is unavailable. A failed fetch, a fixture never
+   captured and a dormant plane are all UNKNOWN, and none of them is
+   drawn as a zero. No block at all — a fixture more than 48h out, where
+   the backend attaches none — draws nothing. */
+type AbsenceRead =
+  | { state: "listed"; current: AbsenceRecord[]; retracted: number;
+      stale: boolean }
+  | { state: "none_listed"; retracted: number; stale: boolean }
+  | { state: "unknown"; why: string };
+
+function absenceRead(n?: News | null): AbsenceRead | null {
+  if (!n) return null;
+  const a = n.absences;
+  if (!a) {
+    return { state: "unknown",
+      why: n.availability?.state === "plane_dormant"
+        ? "the team-news plane is off, so nothing was asked"
+        : "this read carried no absence block" };
+  }
+  const st = a.freshness?.state;
+  if (st === "unavailable") {
+    return { state: "unknown", why: "the provider could not be read" };
+  }
+  if (st === "never_captured") {
+    return { state: "unknown", why: "not captured yet" };
+  }
+  // an unrecognised state is not folded into "none" or into a count
+  if (st !== "ok" && st !== "stale" && st !== "empty") {
+    return { state: "unknown",
+      why: "the read is in a state this page does not recognise" };
+  }
+  if (!Array.isArray(a.records)) {
+    return { state: "unknown", why: "the read carried no record list" };
+  }
+  const current = a.records.filter((r) => r.still_reported !== false);
+  const retracted = a.records.length - current.length;
+  const stale = st === "stale";
+  return current.length
+    ? { state: "listed", current, retracted, stale }
+    : { state: "none_listed", retracted, stale };
+}
+
+function Absences({ r }: { r: AbsenceRead }) {
+  if (r.state === "unknown") {
+    return (
+      <p data-testid="comp-absences" data-absence-state="unknown"
+        className="mt-1.5 font-mono text-[10px] leading-relaxed text-ink-faint">
+        absences unknown — {r.why}. Not the same as none reported.
+      </p>
+    );
+  }
+  const tail = (r.retracted ? ` · ${r.retracted} no longer listed` : "")
+    + (r.stale ? " · an old read, past the feed's tolerance" : "");
+  if (r.state === "none_listed") {
+    return (
+      <p data-testid="comp-absences" data-absence-state="none_listed"
+        className="mt-1.5 font-mono text-[10px] leading-relaxed text-ink-faint">
+        the provider lists no absences — not a claim that nobody is out{tail}
+      </p>
+    );
+  }
+  // grouped by club, in the provider's own names
+  const byClub = new Map<string, string[]>();
+  for (const x of r.current) {
+    const club = x.team_name || "club not named";
+    byClub.set(club, [...(byClub.get(club) ?? []),
+                      x.player_name || "unnamed player"]);
+  }
+  const n = r.current.length;
+  return (
+    <div data-testid="comp-absences" data-absence-state="listed"
+      className="mt-1.5 font-mono text-[10px] leading-relaxed">
+      <p className="uppercase tracking-wide text-accent">
+        {n} reported absence{n === 1 ? "" : "s"} · the provider&apos;s
+        list{tail}
+      </p>
+      {[...byClub].map(([club, names]) => (
+        <p key={club} className="text-ink-low">
+          {shortClub(club)} — {names.join(", ")}
+        </p>
+      ))}
+    </div>
   );
 }
 
@@ -445,7 +559,8 @@ export default function CompViewer() {
                         model input. Rendered ABOVE the numbers because
                         "second leg, trailing 3-1" changes how every
                         number below should be read. */}
-                    {(f.meaning?.tie?.means || f.meaning?.stakes) && (
+                    {(f.meaning?.tie?.means || f.meaning?.stakes
+                      || absenceRead(f.news)) && (
                       <div className="mt-3 rounded-xl border border-line bg-elev px-4 py-3">
                         {f.meaning?.tie?.means && (
                           <p className="text-sm leading-relaxed text-ink-mid">
@@ -513,12 +628,13 @@ export default function CompViewer() {
                             {f.weather.place && ` · ${f.weather.place}`}
                           </p>
                         )}
-                        {f.news && (f.news.absences?.length ?? 0) > 0 && (
-                          <p className="mt-1.5 font-mono text-[10px] uppercase tracking-wide text-accent">
-                            {f.news.absences?.length} reported absence(s) —
-                            see match news
-                          </p>
-                        )}
+                        {/* the absence read is not gated on `meaning`:
+                            a meaning that failed to build is no reason
+                            to hide who is out */}
+                        {(() => {
+                          const a = absenceRead(f.news);
+                          return a && <Absences r={a} />;
+                        })()}
                       </div>
                     )}
                     <MarketVsRead d={f.market_vs_read} s={f.strength} />
