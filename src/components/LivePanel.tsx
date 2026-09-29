@@ -15,9 +15,30 @@ import { TZ } from "../lib/matchday";
 // never change).
 import { useEffect, useState } from "react";
 import {
-  api, pct, LivePredictionResponse, LiveStateInput,
+  api, pct, LivePredictionResponse, LiveStateFetch, LiveStateInput,
 } from "../lib/suggesterApi";
 import { Eyebrow } from "./ui";
+
+/** THE API-FOOTBALL BUDGET, IN THE BACKEND'S OWN WORDS (2026-09-28).
+ *  With no key configured the backend sends `remaining: 0` — meaning "no
+ *  call can be made", not "today's calls are spent" — and says which zero
+ *  it is in `remaining_means` (live_feed.budget_status, fixed backend-side
+ *  2026-09-09). This printed the bare figure, so a keyless deployment
+ *  read "0 feed calls left today" on the very fill the keyless ESPN
+ *  reader had just answered. The sentence now travels with the number,
+ *  and with no key there is no number at all. */
+function budgetWords(b?: LiveStateFetch["budget"]): string {
+  if (!b) return "the feed budget was not reported";
+  if (b.key_configured === false) {
+    return b.remaining_means
+      ?? "no API-Football key is configured, so no call can be made — "
+       + "this is not a spent budget";
+  }
+  if (typeof b.remaining !== "number") {
+    return "the feed budget was not reported";
+  }
+  return `${b.remaining} ${b.remaining_means ?? "feed calls left today"}`;
+}
 
 // Match phases. 1st/2nd half drive the remaining-90 simulation; extra time
 // simulates the remaining ET then 50/50 pens; penalties is the coin flip
@@ -182,7 +203,7 @@ export default function LivePanel({ matchId, liveLevers }: {
         (filled.length
           ? `Filled from live feed: ${filled.join(", ")}${fin}`
           : `The live feed answered but carried none of the state${fin}`)
-        + `${gap} · ${s.budget.remaining} feed calls left today · saved locally`
+        + `${gap} · ${budgetWords(s.budget)} · saved locally`
       );
     } catch {
       setAutoMsg("Couldn't reach the live feed — enter the state manually.");

@@ -193,6 +193,9 @@ export interface LiveStateFetch {
   budget: {
     calls_today: number; daily_cap: number;
     remaining: number; key_configured: boolean;
+    /** which zero `remaining` is: with no key it is "no call can be
+     *  made", not a spent budget (backend live_feed.budget_status) */
+    remaining_means?: string;
   };
 }
 
