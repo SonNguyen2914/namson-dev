@@ -10,8 +10,7 @@
 //
 // League differences live in HubCfg and are COPY AND CAPABILITY, not
 // structure: which strings a dark model states, whether a per-player
-// strength feed exists, whether the xG shown is the simulator's, and
-// whether a suggestion-card competition exists. Payload-driven
+// strength feed exists, and whether a suggestion-card competition exists. Payload-driven
 // sections (xG duel, input quality, absences) render wherever the
 // data appears, so a league lighting up needs a config edit only for
 // its words.
@@ -100,8 +99,6 @@ export interface HubCfg {
    *  The union is SuggestionCard's own prop type — a league without a
    *  card-v1 backend cannot be wired here by accident. */
   suggestion?: "mls-2026" | "epl-2026" | "la-liga-2026";
-  /** the xG shown is the SIMULATOR's (no provider feed) */
-  simXg?: boolean;
   /** extra pill on the market section (Liga MX keeps its dark pill) */
   marketPill?: (run?: ModelRun) => string;
   /** the market section carries the temporal-basis panel */
@@ -335,14 +332,23 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
 
             </div>{/* /main column */}
             <aside className="min-w-0 lg:pt-4">
-            {/* ===== xG duel ===== */}
+            {/* ===== xG duel =====
+                THE SIMULATOR'S xG, IN EVERY LEAGUE, AND SAID SO. `run.xg`
+                is the model's Poisson means — each league's backend
+                model (src/live/model_{mls,epl,laliga,ligamx}.py) returns
+                the simulator's `out["xg"]` — never a provider's measured
+                xG. Only Liga MX said "sim"; it was a per-league switch,
+                and MLS, the one league with REAL measured xG elsewhere on
+                this page (official stats, xg/90 in the lineups), printed
+                its model means as plain "xG". What the number IS does
+                not vary by league, so the qualifier no longer can. */}
             {run?.xg && (
               <Reveal>
                 <section className="mt-8">
                   <div className="grid grid-cols-3 gap-3">
-                    <Stat label={`${m.home.abbrev}${cfg.simXg ? " sim" : ""} xG`}
+                    <Stat label={`${m.home.abbrev} sim xG`}
                       value={run.xg.home.toFixed(2)} />
-                    <Stat label={`${m.away.abbrev}${cfg.simXg ? " sim" : ""} xG`}
+                    <Stat label={`${m.away.abbrev} sim xG`}
                       value={run.xg.away.toFixed(2)} />
                     <Stat label="sims" value={run.n_simulations?.toLocaleString() ?? "—"} />
                   </div>
@@ -357,7 +363,7 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                         <div className="flex-1 rounded-full bg-elev2" />
                       </div>
                       <div className="mt-1 flex justify-between font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
-                        <span className="min-w-0 truncate">{m.home.abbrev} {pct(run.xg.home / (run.xg.home + run.xg.away))} of xG</span>
+                        <span className="min-w-0 truncate">{m.home.abbrev} {pct(run.xg.home / (run.xg.home + run.xg.away))} of sim xG</span>
                         <span className="min-w-0 truncate">{m.away.abbrev}</span>
                       </div>
                     </div>
@@ -1435,7 +1441,20 @@ function ScoutingSection({ m }: { m: Match }) {
   }
   return (
     <Reveal>
-      <Collapse eyebrow="scouting" title="ESPN form + H2H"
+      {/* FORM AND H2H WERE MEASURED, AND THEY DO NOT PREDICT. The label
+          sits in the HEADER, not inside the panel: the panel ships
+          collapsed, and a reader who never opens it still meets the
+          result — the way the card's style notes carry theirs. In the
+          title rather than a `title=` hover, so it is in the button's
+          accessible name too. */}
+      <Collapse eyebrow="scouting"
+        title={<>
+          ESPN form + H2H{" "}
+          <span data-testid="scouting-display-only"
+            className="ml-2 inline-block rounded-md border border-warn/40 px-1.5 py-0.5 align-middle font-mono text-[9px] font-normal uppercase tracking-[0.14em] text-warn">
+            display only — measured non-predictive
+          </span>
+        </>}
         defaultOpen={false} className="mt-8 mb-0">
         <div className="grid gap-4">
           {sc.last_five.map((t) => (
