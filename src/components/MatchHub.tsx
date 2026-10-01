@@ -27,6 +27,7 @@ import { FEE_NOT_MODELED, maxContractsForStake, orderCostDollars,
 import { Eyebrow, Reveal } from "./ui";
 import { Collapse, NavChip, TopBar, useScrollSpy } from "./chrome";
 import SuggestionCard from "./SuggestionCard";
+import ErrorBoundary from "./ErrorBoundary";
 
 type Side = { name?: string; abbrev?: string; logo?: string; score?: string;
   color?: string; alt_color?: string };
@@ -79,6 +80,14 @@ type ModelRun = { run_type?: string; captured_at?: string; seed?: number;
   scorelines?: Array<{ score: string; prob: number }>;
   props?: Record<string, number>; basis?: Basis;
   input_quality?: Record<string, boolean> | null };
+/** WHY `model` IS NULL, IN THE BACKEND'S OWN WORDS (2026-10-01). The
+ *  per-match route for a competition with no fitted model
+ *  (`/api/comp/{key}/match/{event_id}`, src/comp_match.py) sends
+ *  `model: null` beside `model_refusal` — a stated position, not a gap.
+ *  The four league planes never send it; their dark states stay in their
+ *  own configs. */
+export type ModelRefusal = { state?: string | null; why?: string | null;
+  instead?: string | null; note?: string | null };
 export type ModelInfo = { model_version?: string; shadow?: boolean;
   primary?: ModelRun; latest?: ModelRun; t10_lock?: ModelRun | null };
 
@@ -91,6 +100,10 @@ export interface HubCfg {
   /** title suffix + fallback words ("MLS" -> "MLS match") */
   tag: string;
   boardLabel: string;
+  /** where "back" falls back to on a direct load. Absent = the leagues
+   *  carousel at ?league=<boardQuery>, which only the four league planes
+   *  have a pane in; the hubs added 2026-10-01 go back to the board. */
+  back?: { href: string; label: string };
   accentVars: React.CSSProperties;
   accentHex: string;
   version: string;
@@ -156,6 +169,54 @@ function sideColor(s: Side, fallback: string): string {
   return fallback;
 }
 
+/** A PAYLOAD WITH A SECTION MISSING IS NOT A CRASH (2026-10-01).
+ *  The hubs added for the seven competitions without a fitted model read
+ *  a generic per-match route, and an earlier Safari crash came from
+ *  indexing a block that was not there. The arrays every section maps
+ *  over are made arrays here, once, and the two sides made objects — a
+ *  missing list is drawn as an empty one, which each section already
+ *  words ("no stats yet"), never as a thrown render. */
+function normalMatch(raw: Match): Match {
+  const side = (s: unknown): Side =>
+    s && typeof s === "object" ? (s as Side) : {};
+  return {
+    ...raw,
+    home: side(raw.home), away: side(raw.away),
+    stats: Array.isArray(raw.stats) ? raw.stats : [],
+    events: Array.isArray(raw.events) ? raw.events : [],
+    scouting: raw.scouting && typeof raw.scouting === "object" ? {
+      last_five: Array.isArray(raw.scouting.last_five)
+        ? raw.scouting.last_five.filter(Boolean)
+            .map((t) => ({ ...t, games: Array.isArray(t.games) ? t.games : [] }))
+        : [],
+      head_to_head: Array.isArray(raw.scouting.head_to_head)
+        ? raw.scouting.head_to_head : [],
+    } : undefined,
+  };
+}
+
+/** ONE SECTION THAT DID NOT DRAW TAKES ONLY ITSELF DOWN. Each block of
+ *  the hub sits in its own boundary (components/ErrorBoundary), so a
+ *  shape nobody anticipated costs that block and says so in plain ink —
+ *  never the whole page, and never a blank that reads as "nothing to
+ *  show". It retries on the next successful read. */
+function Guard({ name, k, children }: {
+  name: string; k: unknown; children: React.ReactNode;
+}) {
+  return (
+    <ErrorBoundary resetKey={k} fallback={() => (
+      <p data-testid="section-down" data-section={name}
+        className="mt-6 rounded-xl border border-dashed border-line px-4 py-3 font-mono text-[10px] leading-relaxed text-ink-faint">
+        {name} — this section could not be drawn from the payload received.
+        Nothing here is a claim about the match; the rest of the page does
+        not depend on it.
+      </p>
+    )}>
+      {children}
+    </ErrorBoundary>
+  );
+}
+
 /** THE ONE THING ON THE HUB THAT TICKS, IN A LEAF OF ITS OWN (2026-09-25).
  *  The 1s countdown clock used to be `now` state on the whole hub, so the
  *  entire 1,500-line tree re-rendered every second to move four digits
@@ -185,6 +246,7 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
   const [book, setBook] = useState<Book | null>(null);
   const [books, setBooks] = useState<Family[]>([]);
   const [model, setModel] = useState<ModelInfo | null>(null);
+  const [refusal, setRefusal] = useState<ModelRefusal | null>(null);
   const [lineups, setLineups] = useState<Lineups | null>(null);
   // THE FAILURE IS NAMED, NOT A BOOLEAN (2026-09-25). This was `err: true`
   // off `Promise.reject(r.status)` then `.catch(() => setErr(true))`, so
@@ -213,9 +275,14 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
     }
     const d = await r.json();
     if (signal.aborted) return "stop";
-    setM(d.match); setBook(d.book ?? null);
-    setBooks(d.books ?? []);
+    if (!d?.match || typeof d.match !== "object") {
+      setErr("the backend answered with no match block");
+      return "failed";
+    }
+    setM(normalMatch(d.match)); setBook(d.book ?? null);
+    setBooks(Array.isArray(d.books) ? d.books : []);
     setModel(d.model ?? null); setLineups(d.lineups ?? null);
+    setRefusal(d.model ? null : (d.model_refusal ?? null));
     setErr(null);
     setFetchedAt(Date.now());
     return d.match?.state === "post" ? "stop" : "ok";
@@ -238,7 +305,8 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
           : `${m.home.abbrev} vs ${m.away.abbrev} · ${cfg.tag}`) : `${cfg.tag} match`}
       </title></Head>
 
-      <TopBar back={{ href: `/bet-suggester/leagues?league=${cfg.boardQuery}`,
+      <TopBar back={cfg.back ?? {
+          href: `/bet-suggester/leagues?league=${cfg.boardQuery}`,
           label: cfg.boardLabel }}
         title={m ? `${m.home.abbrev} vs ${m.away.abbrev}` : cfg.tag}>
         {live && (
@@ -279,14 +347,17 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
           <p data-testid="feed-stale"
             className="mt-4 rounded-xl border border-warn/40 px-4 py-2.5 font-mono text-[10px] leading-relaxed text-warn">
             the last refresh FAILED ({err}) — every number below is held
-            from the previous successful fetch, not current. Retrying —
-            less often while it keeps failing.
+            from the previous successful fetch at {fmtTime(fetchedAt || undefined)},
+            not current, and is drawn dimmed until a read succeeds.
+            Retrying — less often while it keeps failing.
           </p>
         )}
 
         {m && (
-          <>
+          <div data-testid="hub-body" data-held={err ? "yes" : "no"}
+            className={err ? "opacity-60" : undefined}>
             {/* ===== the match-info box (the original hero card) ===== */}
+            <Guard name="match" k={fetchedAt}>
             <Reveal>
               <section className="mt-4 rounded-3xl border border-line bg-elev p-6">
                 <div className="mb-4 flex items-center justify-between gap-3">
@@ -318,24 +389,52 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                     </span>
                   )}
                 </div>
+                {/* THE MODEL'S ABSENCE, NAMED. A competition with no fitted
+                    model sends `model: null` with the backend's reason;
+                    drawing only an empty bar would leave a reader to guess
+                    whether a read is pending or was never going to exist. */}
+                {!model && refusal && (
+                  <div data-testid="model-refusal" data-state={refusal.state ?? ""}
+                    className="mt-3 rounded-xl border border-dashed border-line px-4 py-3">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
+                      no model read for this competition
+                    </p>
+                    {refusal.why && (
+                      <p className="mt-1 text-[12px] leading-relaxed text-ink-faint">
+                        {refusal.why}
+                      </p>
+                    )}
+                    {refusal.instead && (
+                      <p className="mt-1 text-[12px] leading-relaxed text-ink-faint">
+                        {refusal.instead}
+                      </p>
+                    )}
+                  </div>
+                )}
               </section>
             </Reveal>
+            </Guard>
 
             <div className="mt-2 grid items-start gap-x-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,21rem)]">
             <div className="min-w-0">
             {/* in play, the live read jumps the queue — see bottom */}
+            <Guard name="live read" k={fetchedAt}>
             {live && <LiveBlock m={m} promoted hex={cfg.accentHex} />}
+            </Guard>
 
             {/* ===== the suggestion card — every layer present or
                 refusing by name (card-v1) ===== */}
+            <Guard name="suggestion card" k={fetchedAt}>
             {eventId && cfg.suggestion && (
               <SuggestionCard key={eventId} competition={cfg.suggestion}
                 eventId={eventId} />
             )}
+            </Guard>
 
             </div>{/* /main column */}
             <aside className="min-w-0 lg:pt-4">
             {/* ===== xG duel ===== */}
+            <Guard name="xG" k={fetchedAt}>
             {run?.xg && (
               <Reveal>
                 <section className="mt-8">
@@ -365,19 +464,27 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                 </section>
               </Reveal>
             )}
+            </Guard>
 
             {/* ===== how they play — fitted ratings, no hand-waving ===== */}
+            <Guard name="how they play" k={fetchedAt}>
             <HowTheyPlay m={m} run={run} note={cfg.howTheyPlayNote} />
+            </Guard>
 
             {/* ===== team news: announced XI + notable absentees ===== */}
+            <Guard name="lineups" k={fetchedAt}>
             <LineupSection lu={lineups} m={m} run={run} cfg={cfg.lineups} />
+            </Guard>
 
             {/* ===== ESPN scouting: form + H2H ===== */}
+            <Guard name="scouting" k={fetchedAt}>
             <ScoutingSection m={m} />
+            </Guard>
 
             </aside>{/* /rail */}
             </div>{/* /grid — the decision flow continues full-main below */}
             {/* ===== market vs model — the aligned three-way bars ===== */}
+            <Guard name="market and model" k={fetchedAt}>
             <section id="markets" className="mt-10">
               <Reveal>
                 <div className="rounded-2xl border border-line bg-elev p-5">
@@ -407,8 +514,10 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                 </div>
               </Reveal>
             </section>
+            </Guard>
 
             {/* ===== model prediction: scorelines + chance chips ===== */}
+            <Guard name="model prediction" k={fetchedAt}>
             {run?.scorelines && run.scorelines.length > 0 && (
               <Reveal>
                 <Collapse id="prediction" eyebrow="pure model · shadow"
@@ -440,25 +549,32 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                 </Collapse>
               </Reveal>
             )}
+            </Guard>
 
             {/* ===== every market, right under the pure-model view ===== */}
+            <Guard name="every market" k={fetchedAt}>
             <MarketsTable m={m} run={run} book={book} families={books} cfg={cfg} />
+            </Guard>
 
             {/* ===== scenario engine ===== */}
+            <Guard name="scenario engine" k={fetchedAt}>
             <Reveal>
               <Collapse id="strategy" eyebrow="scenario engine"
                 title="Betting strategy" className="mt-10 mb-0" defaultOpen={false}>
                 <ScenarioSection book={book} />
               </Collapse>
             </Reveal>
+            </Guard>
 
             {/* ===== live stats + timeline (bottom slot when not live) ===== */}
+            <Guard name="live stats" k={fetchedAt}>
             {!live && <LiveBlock m={m} hex={cfg.accentHex} />}
+            </Guard>
 
             <p className="mt-12 text-center font-mono text-[10px] uppercase tracking-[0.15em] text-ink-faint">
               {cfg.footer}
             </p>
-          </>
+          </div>
         )}
       </div>
     </div>
