@@ -201,6 +201,53 @@ export interface ReviewRow {
   pre_kickoff: PreKickoff;
   shot_state: ShotState;
   fit: Fit;
+  /** The market at the T-10 lock, read by the backend from the match
+   *  archive's stored rung (2026-10-01). OPTIONAL in the type because an
+   *  older backend sends no such key; the card names that absence rather
+   *  than drawing a blank. */
+  market_t10?: MarketT10 | null;
+}
+
+export type MarketSide = "home" | "draw" | "away";
+
+export interface MarketLeg {
+  label: string | null;
+  ticker?: string | null;
+  ask_c: number | null;
+  mid_c: number | null;
+  bid_c?: number | null;
+}
+
+export interface MarketT10 {
+  status: "present" | "absent";
+  absent_reason: string | null;
+  absent_detail?: string | null;
+  absent_note: string | null;
+  source?: string;
+  rung?: string;
+  captured_at: string | null;
+  seconds_before_kickoff: number | null;
+  price_clock: {
+    quotes_captured_at: string | null;
+    seconds_before_kickoff: number | null;
+    basis?: string;
+  } | null;
+  event_ticker?: string | null;
+  legs: Partial<Record<MarketSide, MarketLeg | null>> | null;
+  ask_sum_c: number | null;
+  mid_sum_c: number | null;
+  overround_c: number | null;
+  overround_reason?: string | null;
+  market_favourite: {
+    side: MarketSide | null;
+    label: string | null;
+    basis: "mid" | "ask" | null;
+    price_c: number | null;
+    tie: boolean;
+    tied_sides: MarketSide[];
+    reason: string | null;
+  } | null;
+  picker_favourite: { side: MarketSide; label: string | null } | null;
 }
 
 /** A `post` fixture that did not actually complete — postponed, abandoned.
