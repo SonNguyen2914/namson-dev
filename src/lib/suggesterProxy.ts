@@ -529,13 +529,9 @@ export const LEAGUE_PROXY_ID_ROUTES: Record<string, readonly RegExp[]> = {
  *  the page names like any other failed read — never an empty board. */
 export const LEAGUE_PROXY_AHEAD: Record<string, Record<string, string>> = {
   // Empty since backend 0b94886 (2026-09-25) deployed both
-  // /api/championships/board and /api/field/nations.
-  championships: {
-    review: "the national finished tail (backend branch match-archive, "
-      + "2026-09-27) is not deployed yet; until it is, the Championships "
-      + "tails name a failed read, never an empty one. Retire this record "
-      + "when the deployed /openapi.json lists /api/championships/review.",
-  },
+  // /api/championships/board and /api/field/nations; the national finished
+  // tail's `review` record retired 2026-10-01, when the deployed backend
+  // (Oct-1 merge queue) listed /api/championships/review.
 };
 
 /** ROUTES THE BACKEND SERVES THAT THIS PROXY DELIBERATELY DOES NOT
