@@ -188,7 +188,7 @@ export default function RatingsBlock({ eventId }: { eventId: string }) {
         {RATINGS_COPY.read}. Each side&apos;s live player rating against what
         the same players were expected to rate, frozen at kickoff. Whether
         it says anything about the result beyond the score has not been
-        tested.
+        tested; a forward test is preregistered and is read once.
       </p>
     </section>
   );

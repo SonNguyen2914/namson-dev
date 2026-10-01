@@ -8,7 +8,8 @@ Working file; deleted in the final commit of this branch.
 - [x] MatchHub insertion (one line + one import)
 - [x] proxy: `live-performance` prefix, id route only
 - [x] specs (17 green; mutants red: 10 + 18) (mocked backend only)
-- [ ] tsc / build / suite
+- [ ] tsc / build / suite (full hermetic run in progress)
+- prereg: TRIVELA ratings-prereg, ledger row 29
 
 Finding: the backend publishes NO collection flag. LIVE_PERF_ENABLED is
 not in any public payload, so "collection is off" is inferred from the
