@@ -447,6 +447,11 @@ export const LEAGUE_PROXY_ALLOWED: Record<string, readonly string[]> = {
   // tree still carrying the defect the other eight were audited for.
   // See COMP_RESOURCES.
   comp: [],
+  // THE MATCH HUB'S MODEL-VS-MARKET SERIES (2026-10-01, round 5): one
+  // id route, `{key}/{event_id}`, read-only on the backend from stored
+  // rows (no provider call, no board assembly). Like comp, it has no
+  // literal routes; its one pattern is below.
+  minutes: [],
 };
 
 /** The comp proxy's resource set, as a pattern rather than a list.
@@ -502,6 +507,7 @@ export const LEAGUE_PROXY_ID_ROUTES: Record<string, readonly RegExp[]> = {
   picker: [],
   field: [],
   championships: [],
+  minutes: [new RegExp(`^${COMP_KEY}/\\d{1,12}$`)],
   comp: [
     new RegExp(`^${COMP_KEY}/(${COMP_RESOURCES.join("|")})$`),
     // the per-match live read — see COMP_RESOURCES for why this was the
