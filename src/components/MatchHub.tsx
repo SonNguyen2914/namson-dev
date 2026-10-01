@@ -27,6 +27,7 @@ import { FEE_NOT_MODELED, maxContractsForStake, orderCostDollars,
 import { Eyebrow, Reveal } from "./ui";
 import { Collapse, NavChip, TopBar, useScrollSpy } from "./chrome";
 import SuggestionCard from "./SuggestionCard";
+import RatingsBlock from "./RatingsBlock";
 
 type Side = { name?: string; abbrev?: string; logo?: string; score?: string;
   color?: string; alt_color?: string };
@@ -325,6 +326,7 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
             <div className="min-w-0">
             {/* in play, the live read jumps the queue — see bottom */}
             {live && <LiveBlock m={m} promoted hex={cfg.accentHex} />}
+            {live && eventId && <RatingsBlock eventId={eventId} />}
 
             {/* ===== the suggestion card — every layer present or
                 refusing by name (card-v1) ===== */}
