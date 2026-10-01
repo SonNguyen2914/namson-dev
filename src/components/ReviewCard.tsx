@@ -60,6 +60,7 @@ import {
 import {
   KalshiCell, SeasonWeight, TierGaps, dec, sign,
 } from "./PickerRead";
+import ErrorBoundary from "./ErrorBoundary";
 import { Eyebrow } from "./ui";
 
 // ---------------------------------------------------------------- bits
@@ -1281,7 +1282,24 @@ export function ReviewTail({
       ) : sorted.length > 0 ? (
         <div className="mt-3 space-y-3">
           {sorted.map((r, i) => (
-            <ReviewCard key={`${r.league}-${r.event_id}`} row={r} rank={i + 1} />
+            /* ONE CARD'S RENDER FAILURE COSTS THAT CARD, NOT THE PAGE
+               (2026-10-01: a null tier pair on one national row blanked
+               the whole board in Safari). The fallback names the match
+               and says the card could not be drawn; it retries when the
+               row changes. */
+            <ErrorBoundary key={`${r.league}-${r.event_id}`}
+              resetKey={r}
+              fallback={() => (
+                <div data-testid="review-card-error"
+                  className="rounded-xl border border-live/30 bg-live/5 px-3 py-2.5">
+                  <p className="font-mono text-[11px] leading-relaxed text-live">
+                    This finished card could not be drawn
+                    {r.home && r.away ? ` (${r.home} v ${r.away})` : ""}.
+                  </p>
+                </div>
+              )}>
+              <ReviewCard row={r} rank={i + 1} />
+            </ErrorBoundary>
           ))}
         </div>
       ) : (

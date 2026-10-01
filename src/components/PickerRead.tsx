@@ -989,7 +989,7 @@ export function TierGaps({ read, dense = false, field, partial,
      field failed to place, and a blank cell is how those two become
      one thing on a screen. With no block the trio keeps its three
      league quintiles, unchanged. */
-  const drawn: readonly FieldAxisKey[] =
+  const listed: readonly FieldAxisKey[] =
     block ? axesPresent(block) : AXIS_ORDER;
   /* ONE READ, DERIVED ONCE, AND EVERY MARK BELOW ASKS IT. Without a
      block this IS `read`, by identity — see effectiveRead — so the four
@@ -1002,6 +1002,18 @@ export function TierGaps({ read, dense = false, field, partial,
      shape stands, which is still the backend's word and not a label
      composed here out of one gap and two absences. */
   const r = effectiveRead(read, block, field?.shape ?? null);
+  /* …AND AN AXIS THE READ ITSELF CARRIES NO PAIR FOR IS DRAWN NOWHERE
+     (2026-10-01). With no block the trio used to draw all three axes off
+     `read`, and a national row from the finished tail carries
+     `tiers.atk: null` / `tiers.def: null` (an axis nobody measured for
+     national teams): indexing that null threw inside the card and, with
+     no boundary above it, took the whole board down in Safari's
+     remembered Championships view. effectiveRead already keeps that
+     absence on the block path (2026-09-24); this is the same rule on the
+     path without one. With a block every axis it lists has a reading,
+     so the filter changes nothing there. */
+  const drawn: readonly FieldAxisKey[] =
+    listed.filter((k) => r.tiers[k] != null);
   /* WHY AN AXIS IS NOT DRAWN, in the backend's own words. Only a
      partial block has any: a whole field is missing nothing. */
   const absent = partial?.shape_absent ?? null;
