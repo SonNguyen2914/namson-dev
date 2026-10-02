@@ -15,7 +15,9 @@ only) and never prints the key.
       state, payload normalisation, per-section ErrorBoundary, held data
       dimmed with its time
 - [x] M2: e2e/every-competition-has-a-hub.spec.ts 28/28 green
-- [ ] M2b: red/green proof (A: drop a hub page; B: drop proxy hub regex; C: drop refusal block)
+- [x] M2b red/green (each rebuilt): A seriea page removed -> 5 red; B proxy
+      hub regex removed -> 1 red (ligue1 refused); C refusal block disabled
+      -> 23 red; restored -> 28/28 green
 - [ ] M3: build + full suite, CI-style
 - Proxy: CORRECTED — COMP_KEY has no digits, so `ligue1/match/N` was refused.
   Added HUB_MATCH_KEYS + one regex for exactly the seven per-match paths.
