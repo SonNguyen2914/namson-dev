@@ -26,6 +26,7 @@
 // The read primitives (gap chips, shape sentence, the Kalshi cell) moved
 // to components/PickerRead.tsx so the tail renders THE SAME READ this
 // column does, rather than a hand-copied one free to drift from it.
+import { hueOf } from "../lib/leagueHue";
 import Link from "next/link";
 import {
   ReactNode, createContext, useContext, useEffect, useId, useState,
@@ -113,23 +114,12 @@ import { Eyebrow } from "./ui";
 // the four tiers it is rated on have no hue, so `hueOf` answers
 // --lg-cup for them and the gold is on the SAME CARD as this blue.
 // Full derivation in globals.css beside the token.
-const LEAGUE_HUE: Record<string, string> = {
-  mls: "var(--lg-mls)", epl: "var(--lg-epl)", laliga: "var(--lg-laliga)",
-  ligamx: "var(--lg-ligamx)", ucl: "var(--lg-ucl)",
-  bundesliga: "var(--lg-bundesliga)", seriea: "var(--lg-seriea)",
-  ligue1: "var(--lg-ligue1)", eredivisie: "var(--lg-eredivisie)",
-  eflcup: "var(--lg-eflcup)",
-  // the Championships board (globals.css, beside the tokens)
-  unl: "var(--lg-unl)", cnl: "var(--lg-cnl)",
-  afcon: "var(--lg-afcon)",
-  // THE EUROPA LEAGUE (2026-09-25), the field page's fourth cup pill.
-  // Not a board column: it is measured against the pills it can sit
-  // beside on the Cups strip — ucl, eflcup and the Campeones pill, whose
-  // ink is the brand gold — and clears gold by 67.1 dE. Derivation in
-  // globals.css beside the token.
-  uel: "var(--lg-uel)",
-};
-export const hueOf = (slug: string) => LEAGUE_HUE[slug] ?? "var(--lg-cup)";
+// THE MAP ITSELF LIVES IN lib/leagueHue.ts (2026-10-02) — unchanged,
+// moved so a page that needs only the lookup (the home page) does not
+// load this whole module to get it. It is re-exported here, so every
+// existing `import { hueOf } from "./PickerColumn"` still resolves to the
+// same single door.
+export { hueOf };
 
 /** The card's ANCHOR: the active sort metric, displayed signed the way
  *  the reader thinks about it — so a column scans as a ranked ladder of

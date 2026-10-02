@@ -1169,12 +1169,32 @@ test("an old ?league=wc26 link lands on the archive page, not on a league",
       .toBeVisible();
   });
 
-test("the site root is no longer the framework's starter page",
+test("the site root is TRIVELA's home page, and it leads to the board",
   async ({ page }) => {
+    /* CHANGED ON PURPOSE (2026-10-02). "/" redirected to the board until
+       the home page existed; now it IS the page, so the claim is that it
+       renders (with the shared chrome), names itself, ends at the
+       board's door — and fetches NOTHING. Every number on it is baked
+       at authoring time (lib/landingData.ts): a home page that read the
+       board would write a permanent snapshot row per visitor, and one
+       that read anything would go blank with the backend. */
+    const api: string[] = [];
+    page.on("request", (r) => {
+      if (new URL(r.url()).pathname.startsWith("/api/")) api.push(r.url());
+    });
     await page.goto("/");
-    await expect(page).toHaveURL(/\/bet-suggester$/);
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.locator("header.topbar")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 }))
+      .toHaveText(/every match,\s*made readable/i);
+    const cta = page.getByTestId("landing-cta");
+    await expect(cta).toHaveAttribute("href", "/bet-suggester");
+    // the model numbers on it travel with the board's own label
+    await expect(page.getByText("shadow · not advice").first()).toBeVisible();
     const body = (await page.textContent("body")) || "";
     expect(body).not.toContain("To get started, edit");
+    await page.waitForLoadState("networkidle");
+    expect(api, "the home page reached for the backend").toEqual([]);
   });
 
 test("the picker proxy forwards board — unmocked on purpose",

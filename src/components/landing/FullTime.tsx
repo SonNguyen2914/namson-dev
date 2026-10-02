@@ -1,0 +1,112 @@
+// THE THIRD SCROLL MOMENT: FULL TIME, REVIEWED.
+//
+// The board's review card, for the same match, unfolding as it crosses
+// the reading zone (scrubbed, not pinned). It answers what the board's
+// own ReviewCard answers, in the same order and with the same refusal:
+// what was said before kickoff, what the market said at the same moment,
+// and what happened — side by side, with NO verdict. No hit, no streak,
+// no "right": one finished match cannot tell a read from luck
+// (components/ReviewCard.tsx, "NO SCOREBOARD").
+//
+// The market column is the de-vigged three-way book from the stored
+// series — the newest quote at or before the T−10 lock — in percentage
+// points, because that is what the series stores. It is not an ask
+// price, and it is not printed in cents.
+import { useCallback, useRef } from "react";
+import {
+  DERBY, FINAL, MARKET_AT_LOCK, MINUS, OUTCOMES, PRIME, fmt1,
+} from "../../lib/landingData";
+import type { Outcome } from "../../lib/landingData";
+import { easeInOut, easeOut, span, useScrollScene } from "../../lib/useScrollScene";
+import s from "./landing.module.css";
+
+const NAME: Record<Outcome, string> = {
+  home: DERBY.home.name, draw: "Draw", away: DERBY.away.name };
+const utc = (iso: string) => new Date(iso).toISOString().slice(11, 16);
+const mins = (t: number) => `${MINUS}${Math.abs(t).toFixed(t % 1 ? 1 : 0)}`;
+
+export default function FullTime({ enabled }: { enabled: boolean }) {
+  const card = useRef<HTMLDivElement | null>(null);
+  const coda = useRef<HTMLParagraphElement | null>(null);
+
+  const draw = useCallback((p: number) => {
+    const unfold = easeInOut(span(p, 0, 0.7));
+    if (card.current) card.current.style.clipPath = `inset(0 0 ${(1 - unfold) * 100}% 0 round 14px)`;
+    card.current?.querySelectorAll<HTMLElement>("[data-row]").forEach((el, i) => {
+      const t = easeOut(span(p, 0.1 + i * 0.14, 0.42 + i * 0.14));
+      el.style.opacity = String(t);
+      el.style.transform = `translate3d(0, ${16 * (1 - t)}px, 0)`;
+    });
+    if (coda.current) coda.current.style.opacity = String(span(p, 0.75, 1));
+  }, []);
+  useScrollScene(card, draw, { mode: "pass", from: 0.98, to: 0.18, enabled });
+
+  const lock = DERBY.lock, mk = MARKET_AT_LOCK;
+  return (
+    <section aria-labelledby="landing-ft" className={`${s.wrap} ${s.still}`}>
+      <p className={s.eyebrow}>FT · the review</p>
+      <h2 id="landing-ft" className={`${s.display} ${s.h2}`}>What was said, what happened.</h2>
+
+      <div ref={card} className={s.review} data-testid="review-card">
+        <div data-row className={s.reviewHead}>
+          <span className={s.eyebrow}>La Liga · {DERBY.venue} · 20 Sep 2026</span>
+          <p className={`${s.display} ${s.final}`}>
+            <span>{DERBY.home.name}</span>
+            <b>{FINAL ? `${FINAL.home}–${FINAL.away}` : "—"}</b>
+            <span>{DERBY.away.name}</span>
+          </p>
+        </div>
+
+        <div className={s.reviewCols}>
+          <div data-row className={s.reviewCol}>
+            <h3 className={s.colHead}>Model at T{MINUS}10</h3>
+            <p className={s.colSub}>locked {utc(lock.at)} UTC · shadow · not advice</p>
+            <Triple v={lock.model} />
+          </div>
+          <div data-row className={s.reviewCol}>
+            <h3 className={s.colHead}>Market at T{MINUS}10</h3>
+            <p className={s.colSub}>
+              {mk ? <>newest stored quote before the lock (T{mins(mk.t)}) · de-vigged</> : "no stored quote"}
+            </p>
+            {mk ? <Triple v={mk.market} /> : <p className={s.colSub}>—</p>}
+          </div>
+          <div data-row className={s.reviewCol}>
+            <h3 className={s.colHead}>What happened</h3>
+            <p className={s.colSub}>from the score tape</p>
+            <ul className={s.events}>
+              {DERBY.events.map((e, i) => (
+                <li key={i}>
+                  <span className={s.evMin}>{e.m}{PRIME}</span>
+                  <i aria-hidden className={e.type === "goal" ? s.evGoal : s.evRed} />
+                  <span>
+                    {e.type === "goal" ? "Goal" : e.type === "red" ? "Red card" : e.type},{" "}
+                    {e.team === "home" ? DERBY.home.name : DERBY.away.name}
+                    {e.score ? ` · ${e.score.home}–${e.score.away}` : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <p ref={coda} className={s.coda}>
+        No hit count, no streak. One match cannot tell a read from luck — so
+        the review puts what was said beside what happened, and stops there.
+      </p>
+    </section>
+  );
+}
+
+function Triple({ v }: { v: { home: number; draw: number; away: number } }) {
+  return (
+    <dl className={s.triple}>
+      {OUTCOMES.map((o) => (
+        <div key={o}>
+          <dt>{NAME[o]}</dt>
+          <dd>{fmt1(v[o])}<small>%</small></dd>
+        </div>
+      ))}
+    </dl>
+  );
+}

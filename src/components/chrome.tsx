@@ -54,8 +54,12 @@ function FieldLink() {
   );
 }
 
-export function TopBar({ back, left, title, children }: {
+export function TopBar({ back, left, title, children, inner }: {
   back?: { href: string; label: string };
+  // The inner row's width and gutters. Every app page takes the default
+  // (the board's 5xl measure); the home page passes its own wider
+  // column so the bar's edges line up with the page under it.
+  inner?: string;
   // Far-left slot, ahead of the back link. The archive dropdown lives
   // here on the surfaces that have no "back" (the board is the root of
   // the app), so the top-left corner is either wayfinding OUT or
@@ -66,7 +70,7 @@ export function TopBar({ back, left, title, children }: {
 }) {
   return (
     <header className="topbar">
-      <div className="mx-auto flex h-12 max-w-5xl items-center gap-2 px-5 sm:gap-4">
+      <div className={`mx-auto flex h-12 items-center gap-2 sm:gap-4 ${inner ?? "max-w-5xl px-5"}`}>
         <FieldLink />
         {left}
         {back && (

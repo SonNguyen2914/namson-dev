@@ -128,6 +128,7 @@ test("no file under src/ builds a --lg-* token name from a value — the "
   expect(rel).toContain(join("pages", "bet-suggester", "index.tsx"));
   expect(rel).toContain(join("components", "LeagueTabs.tsx"));
   expect(rel).toContain(join("components", "PickerColumn.tsx"));
+  expect(rel).toContain(join("lib", "leagueHue.ts"));
 
   const offences = files.flatMap((f) =>
     builtHueNames(f).map((h) => `${relative(SRC, f)}:${h.line}  ${h.text}`));
@@ -221,7 +222,10 @@ test("the hero's four league lights are painted, and each is its own "
  *  LEAGUE_HUE and would go stale the first time a competition was added
  *  to the real one — which is the exact week this check matters. */
 function mappedSlugs(): string[] {
-  const file = join(SRC, "components", "PickerColumn.tsx");
+  /* the map moved out of PickerColumn.tsx on 2026-10-02 (it re-exports
+     hueOf from here) so a page needing only the lookup does not load the
+     whole column module; this reads it where it now lives. */
+  const file = join(SRC, "lib", "leagueHue.ts");
   const src = ts.createSourceFile(
     file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true,
     ts.ScriptKind.TSX);
@@ -254,7 +258,7 @@ test("every colour hueOf can answer resolves to a real one — a map entry "
      So the map's ANSWERS are resolved, in a browser, one probe each:
      the only place a `var()` that names nothing becomes visible. */
   const slugs = mappedSlugs();
-  expect(slugs.length, "LEAGUE_HUE was not found in PickerColumn.tsx — this "
+  expect(slugs.length, "LEAGUE_HUE was not found in lib/leagueHue.ts — this "
     + "check read an empty map and would pass on anything")
     .toBeGreaterThanOrEqual(10);
   expect(slugs).toContain("seriea");
