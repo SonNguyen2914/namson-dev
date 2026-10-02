@@ -485,6 +485,11 @@ export const LEAGUE_PROXY_ALLOWED: Record<string, readonly string[]> = {
  *  `/api/comp` can never reach a NON-optional catch-all, so this proxy
  *  could not forward it whatever the list said. */
 export const COMP_KEY = "[a-z][a-z-]{1,20}";
+/** The board column keys whose match hub reads `/api/comp/{key}/match/
+ *  {event_id}` (lib/compHub.ts NO_MODEL_HUBS; pinned equal by
+ *  e2e/every-competition-has-a-hub.spec.ts). */
+export const HUB_MATCH_KEYS = ["bundesliga", "seriea", "ligue1", "eredivisie",
+                               "unl", "cnl", "afcon"] as const;
 export const COMP_RESOURCES = ["fixtures", "markets", "ratings", "status",
                                "tournament"] as const;
 
@@ -507,6 +512,13 @@ export const LEAGUE_PROXY_ID_ROUTES: Record<string, readonly RegExp[]> = {
     // the per-match live read — see COMP_RESOURCES for why this was the
     // loudest of the three holes
     new RegExp(`^${COMP_KEY}/match/\\d{1,12}$`),
+    // THE SEVEN HUBS WITH NO MODEL (2026-10-01), by name. They read the
+    // per-match route above under the BOARD COLUMN key, and `ligue1`
+    // carries a digit COMP_KEY does not admit — so the Ligue 1 hub was
+    // refused here before any backend was asked. Named rather than
+    // widening COMP_KEY, which would open every comp resource to every
+    // digit-bearing key.
+    new RegExp(`^(${HUB_MATCH_KEYS.join("|")})/match/\\d{1,12}$`),
   ],
 };
 

@@ -88,6 +88,17 @@ type ModelRun = { run_type?: string; captured_at?: string; seed?: number;
  *  own configs. */
 export type ModelRefusal = { state?: string | null; why?: string | null;
   instead?: string | null; note?: string | null };
+/** The board's own frozen pre-kickoff read for a fixture, served READ
+ *  ONLY beside a `model_refusal` (TRIVELA src/match_hubs.py `board_read`,
+ *  labelled by the review card's own builder). Only its label, clock and
+ *  notes are drawn here; the hub never redraws the read's numbers. */
+export type BoardRead = { origin?: string | null; origin_label?: string | null;
+  origin_note?: string | null; captured_at?: string | null;
+  captured_lead_band_means?: string | null; corrections?: number | null };
+/** The backend's prose names a payload key in backticks; the reader gets
+ *  words, never the key. */
+const plainWords = (t: string) =>
+  t.replace(/`board_read`/g, "the board read below").replace(/`([^`]*)`/g, "$1");
 export type ModelInfo = { model_version?: string; shadow?: boolean;
   primary?: ModelRun; latest?: ModelRun; t10_lock?: ModelRun | null };
 
@@ -247,6 +258,7 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
   const [books, setBooks] = useState<Family[]>([]);
   const [model, setModel] = useState<ModelInfo | null>(null);
   const [refusal, setRefusal] = useState<ModelRefusal | null>(null);
+  const [boardRead, setBoardRead] = useState<BoardRead | null>(null);
   const [lineups, setLineups] = useState<Lineups | null>(null);
   // THE FAILURE IS NAMED, NOT A BOOLEAN (2026-09-25). This was `err: true`
   // off `Promise.reject(r.status)` then `.catch(() => setErr(true))`, so
@@ -283,6 +295,7 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
     setBooks(Array.isArray(d.books) ? d.books : []);
     setModel(d.model ?? null); setLineups(d.lineups ?? null);
     setRefusal(d.model ? null : (d.model_refusal ?? null));
+    setBoardRead(d.board_read && typeof d.board_read === "object" ? d.board_read : null);
     setErr(null);
     setFetchedAt(Date.now());
     return d.match?.state === "post" ? "stop" : "ok";
@@ -347,15 +360,13 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
           <p data-testid="feed-stale"
             className="mt-4 rounded-xl border border-warn/40 px-4 py-2.5 font-mono text-[10px] leading-relaxed text-warn">
             the last refresh FAILED ({err}) — every number below is held
-            from the previous successful fetch at {fmtTime(fetchedAt || undefined)},
-            not current, and is drawn dimmed until a read succeeds.
-            Retrying — less often while it keeps failing.
+            from the previous successful fetch, not current. Retrying —
+            less often while it keeps failing.
           </p>
         )}
 
         {m && (
-          <div data-testid="hub-body" data-held={err ? "yes" : "no"}
-            className={err ? "opacity-60" : undefined}>
+          <>
             {/* ===== the match-info box (the original hero card) ===== */}
             <Guard name="match" k={fetchedAt}>
             <Reveal>
@@ -401,14 +412,19 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                     </p>
                     {refusal.why && (
                       <p className="mt-1 text-[12px] leading-relaxed text-ink-faint">
-                        {refusal.why}
+                        {plainWords(refusal.why)}
                       </p>
                     )}
-                    {refusal.instead && (
-                      <p className="mt-1 text-[12px] leading-relaxed text-ink-faint">
-                        {refusal.instead}
-                      </p>
-                    )}
+                    <p data-testid="board-read" data-origin={boardRead?.origin ?? "absent"}
+                      className="mt-2 font-mono text-[10px] leading-relaxed text-ink-faint">
+                      {boardRead?.origin === "captured"
+                        ? <>board read · {boardRead.origin_label ?? "captured"}
+                            {boardRead.captured_at ? ` ${fmtTime(boardRead.captured_at)}` : ""}
+                            {boardRead.captured_lead_band_means ? ` · ${boardRead.captured_lead_band_means}` : ""}
+                            {" · "}{boardRead.origin_note} · a read, not a signal</>
+                        : <>no board read on record · {boardRead?.origin_note
+                            ?? "the payload carried no board read, so whether one was frozen is not known here"}</>}
+                    </p>
                   </div>
                 )}
               </section>
@@ -574,7 +590,7 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
             <p className="mt-12 text-center font-mono text-[10px] uppercase tracking-[0.15em] text-ink-faint">
               {cfg.footer}
             </p>
-          </div>
+          </>
         )}
       </div>
     </div>
