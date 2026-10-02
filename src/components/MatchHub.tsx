@@ -22,6 +22,7 @@ import { useEffect, useState } from "react";
 import { countdown, pct, signedPct } from "../lib/suggesterApi";
 import { failureOf, NEVER_ANSWERED } from "../lib/httpFailure";
 import { usePoll } from "../lib/usePoll";
+import ModelVsMarket from "./ModelVsMarket";
 import { FEE_NOT_MODELED, maxContractsForStake, orderCostDollars,
   unitFeeDollars } from "../lib/fee";
 import { Eyebrow, Reveal } from "./ui";
@@ -323,6 +324,8 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
 
             <div className="mt-2 grid items-start gap-x-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,21rem)]">
             <div className="min-w-0">
+            {/* ===== model vs market, minute by minute (round 5) ===== */}
+            {eventId && <ModelVsMarket api={cfg.api} eventId={eventId} match={m} />}
             {/* in play, the live read jumps the queue — see bottom */}
             {live && <LiveBlock m={m} promoted hex={cfg.accentHex} />}
 
