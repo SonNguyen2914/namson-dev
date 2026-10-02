@@ -157,7 +157,7 @@ function buildSeries(series: Series, match: MvmMatch, nowMs: number) {
     const cur = parseInt(String(match.minute ?? "").replace(/[^0-9].*$/, ""), 10);
     const nowM = mode === "held" && Number.isFinite(cur) ? Math.max(cur, last) : last;
     // the axis ends at NOW (or full time), so the line ends sit at the
-    // right edge with their labels beside them
+    // right-hand end with their labels beside them
     d0 = 0; d1 = Math.max(mode === "post" ? 90 : 10, nowM);
     steps = minutes.map((r) => r.m);
   }
