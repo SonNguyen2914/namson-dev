@@ -526,16 +526,47 @@
 @media (max-width: 767px) {
   .chartBox { height: clamp(170px, 27svh, 260px); }
 }
-.chartSvg, .chartLines, .chartLines svg { position: absolute; inset: 0; overflow: visible; }
-.chartLines { transition: clip-path 120ms linear; }
+.chartSvg { position: absolute; inset: 0; overflow: visible; }
+/* THE REVEAL WINDOW. Two composited layers moved in opposite directions
+   (MatchClock.tsx): the window's right edge is the clock, the ink inside
+   never moves, and nothing is repainted per frame. */
+.revealWin {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  will-change: transform;
+}
+.revealInner { position: absolute; inset: 0; will-change: transform; }
+.revealInner svg { position: absolute; inset: 0; overflow: visible; }
+.standLab {
+  position: absolute;
+  display: grid;
+  justify-items: start;
+  white-space: nowrap;
+  padding: 7px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: rgba(5, 5, 7, 0.88);
+  gap: 2px;
+  font-family: var(--font-geist-mono);
+  font-size: 10px;
+  line-height: 1.35;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-mid);
+  pointer-events: none;
+}
+.standLab span:first-child { color: var(--ink-hi); }
+.cellQuiet { color: var(--ink-low) !important; font-size: 11px; letter-spacing: 0.04em; white-space: nowrap; }
+@media (max-width: 767px) {
+  .standLab { font-size: 9px; letter-spacing: 0.05em; padding: 5px 7px; }
+}
 .chartTxt { font-family: var(--font-geist-mono); font-size: 10.5px; fill: var(--ink-low); }
-.ev { transition: opacity 200ms ease; }
 .cursor {
   position: absolute;
   left: 0;
   width: 0;
   border-left: 1px dashed rgba(245, 245, 247, 0.7);
-  transition: transform 120ms linear;
   will-change: transform;
 }
 .dotModel, .dotMarket {
@@ -545,7 +576,6 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  transition: transform 120ms linear;
   will-change: transform;
 }
 .dotModel { box-shadow: 0 0 0 1.5px var(--bs-bg); }
@@ -566,7 +596,7 @@
 .readout td { color: var(--ink-hi); width: 22%; }
 .note {
   margin: 8px 0 0;
-  min-height: 1.5em;
+  min-height: 3em;   /* two lines reserved: the longest note never moves the stage */
   font-size: 12px;
   line-height: 1.5;
   color: var(--ink-mid);
@@ -706,5 +736,5 @@
 /* ── reduced motion: nothing moves, nothing is withheld ─────────────── */
 @media (prefers-reduced-motion: reduce) {
   .caption { animation: none; }
-  .chartLines, .cursor, .dotModel, .dotMarket, .ev, .cta, .cta span { transition: none; }
+  .cta, .cta span { transition: none; }
 }
