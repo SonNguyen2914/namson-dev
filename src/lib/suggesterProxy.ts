@@ -452,6 +452,15 @@ export const LEAGUE_PROXY_ALLOWED: Record<string, readonly string[]> = {
   // rows (no provider call, no board assembly). Like comp, it has no
   // literal routes; its one pattern is below.
   minutes: [],
+  // THE LIVE PLAYER-RATINGS +/- (2026-10-01), read by the match hub's
+  // RatingsBlock. ONE ROUTE: `/api/live-performance/{event_id}`, the
+  // per-match view, which the backend serves read-only (no provider
+  // call, no write — TRIVELA tests/test_live_perf.py makes every
+  // provider path raise). No literal sub-path exists, so the list is
+  // empty and the route lives in the id table below; the bare
+  // `/api/live-performance` list route is not under this prefix and a
+  // non-optional catch-all could not forward it anyway.
+  "live-performance": [],
 };
 
 /** The comp proxy's resource set, as a pattern rather than a list.
@@ -508,6 +517,7 @@ export const LEAGUE_PROXY_ID_ROUTES: Record<string, readonly RegExp[]> = {
   field: [],
   championships: [],
   minutes: [new RegExp(`^${COMP_KEY}/\\d{1,12}$`)],
+  "live-performance": [/^\d{1,12}$/],
   comp: [
     new RegExp(`^${COMP_KEY}/(${COMP_RESOURCES.join("|")})$`),
     // the per-match live read — see COMP_RESOURCES for why this was the

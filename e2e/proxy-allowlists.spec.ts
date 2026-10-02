@@ -199,17 +199,19 @@ for (const [prefix, resource] of FOREIGN) {
 }
 
 /** Per prefix, one resource it really does forward: the first entry on
- *  its own list — a RULE, not a chosen pair. `comp` and `minutes` have
- *  no literal list (their whole surface is id routes under a
- *  competition key), so they probe the first of two id-shaped
- *  candidates under a real key that their OWN id routes admit:
- *  `{key}/{resource}` for comp, `{key}/{event_id}` for minutes. */
+ *  its own list — a RULE, not a chosen pair. A prefix with no literal
+ *  list has its whole surface in the id table, so it probes the first
+ *  id-shaped candidate its own patterns admit: `comp`'s
+ *  `{key}/{resource}` (the first COMP_RESOURCES entry under a real
+ *  competition key), `minutes`' `{key}/{event_id}`, and a bare numeric
+ *  id (`live-performance/{event_id}`). A prefix admitting none probes ""
+ *  and fails the census below. */
 const ID_PROBES = [`${OPENAPI_PROBE_VALUES.key}/${COMP_RESOURCES[0]}`,
-                   `${OPENAPI_PROBE_VALUES.key}/1`];
+                   `${OPENAPI_PROBE_VALUES.key}/1`, "1"];
 const PROBE: Array<[string, string]> = PREFIXES.map((prefix) => {
   const list = LEAGUE_PROXY_ALLOWED[prefix];
-  return [prefix, list.length ? list[0]
-    : ID_PROBES.find((p) => leagueRouteAllowed(prefix, p)) ?? ""];
+  if (list.length) return [prefix, list[0]];
+  return [prefix, ID_PROBES.find((c) => leagueRouteAllowed(prefix, c)) ?? ""];
 });
 
 test("every prefix is probed for forwarding, none skipped", async () => {
