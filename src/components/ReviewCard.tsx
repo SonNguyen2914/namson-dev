@@ -46,8 +46,8 @@ import { useEffect, useId, useState } from "react";
 import { fmtDate } from "../lib/matchday";
 import { leagueLabel, rowHref, rowNoHrefWhy } from "../lib/pickerApi";
 import {
-  Checkpoint, PreKickoff, ReviewLeagueMeta, ReviewRefusal, ReviewRow,
-  isRead, pct,
+  Checkpoint, MarketSide, MarketT10, PreKickoff, ReviewLeagueMeta,
+  ReviewRefusal, ReviewRow, isRead, pct,
 } from "../lib/pickerReview";
 import {
   REVIEW_DEFAULT_SORT, REVIEW_SORT_MODES, ReviewSort, isDefaultReviewSort,
@@ -554,6 +554,128 @@ function FavPip({ side, favSide }: {
 
 // ----------------------------------------------------------------- card
 
+// ------------------------------------------------- the market at T-10
+
+/* THE MARKET SIDE OF A FINISHED MATCH (Son, 2026-10-01). All three legs
+   of the book the match archive froze at the T-10 lock, in cents (ask and
+   mid), the price clock and the overround — and the market's favourite
+   named beside the picker's.
+
+   PLAIN INK, ON PURPOSE. Nothing here is coloured, weighted or ordered to
+   say who was right: the two favourites sit side by side in the same ink
+   and the reader compares them. A green "agrees" or a red "disagrees"
+   would be a verdict, and this line is a description of the book.
+
+   ABSENT IS NAMED. A row whose block says `absent` prints the backend's
+   own note; a payload with no block at all (an older backend) says so in
+   words. Neither draws a blank, and neither crashes the card. */
+
+const MARKET_SIDES: MarketSide[] = ["home", "draw", "away"];
+
+const cents = (v: number | null | undefined): string =>
+  v == null || !Number.isFinite(v) ? "—"
+    : Number.isInteger(v) ? `${v}¢` : `${v.toFixed(1)}¢`;
+
+const signedCents = (v: number): string =>
+  v > 0 ? `+${cents(v)}` : v < 0 ? `−${cents(-v)}` : cents(0);
+
+function marketFavourite(m: MarketT10, names: Record<MarketSide, string>):
+  string {
+  const f = m.market_favourite;
+  if (!f) return "none named";
+  if (f.tie) {
+    const tied = (f.tied_sides ?? []).map((s) => names[s] ?? s);
+    return `none — ${tied.length === 3 ? "three-way" : "level"} tie at ${
+      cents(f.price_c)} (${tied.join(", ")})`;
+  }
+  if (!f.side) return "none — the book is incomplete";
+  return `${f.label ?? names[f.side] ?? f.side} · ${cents(f.price_c)} ${
+    f.basis ?? ""}`.trim();
+}
+
+function MarketT10Line({ m, home, away, pickerFav }: {
+  m: MarketT10 | null | undefined; home: string | null; away: string | null;
+  pickerFav: string | null;
+}) {
+  const label = (
+    <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-faint">
+      market at T-10
+    </span>
+  );
+  if (!m) {
+    return (
+      <section data-testid="market-t10" data-status="missing"
+        className="mt-3 min-w-0 border-t border-line pt-2">
+        {label}
+        <p className="mt-1 text-[12px] leading-relaxed text-ink-low">
+          not in this payload — the backend that answered sends no T-10
+          market block for finished matches
+        </p>
+      </section>
+    );
+  }
+  if (m.status !== "present" || !m.legs) {
+    return (
+      <section data-testid="market-t10" data-status="absent"
+        data-reason={m.absent_reason ?? ""}
+        className="mt-3 min-w-0 border-t border-line pt-2">
+        {label}
+        <p data-testid="market-t10-absent"
+          className="mt-1 text-[12px] leading-relaxed text-ink-low">
+          {m.absent_note || "no T-10 book stored"}
+        </p>
+      </section>
+    );
+  }
+  const names: Record<MarketSide, string> = {
+    home: m.legs.home?.label ?? home ?? "home",
+    draw: "Draw",
+    away: m.legs.away?.label ?? away ?? "away",
+  };
+  const clock = m.price_clock;
+  const lead = beforeKickoff(clock?.seconds_before_kickoff
+    ?? m.seconds_before_kickoff ?? null);
+  return (
+    <section data-testid="market-t10" data-status="present"
+      className="mt-3 min-w-0 border-t border-line pt-2">
+      {label}
+      <ul className="mt-1 grid min-w-0 gap-x-4 gap-y-0.5 font-mono text-[11px] tabular-nums text-ink-mid sm:grid-cols-3">
+        {MARKET_SIDES.map((s) => {
+          const leg = m.legs?.[s] ?? null;
+          return (
+            <li key={s} data-testid="market-t10-leg" data-side={s}
+              className="min-w-0 break-words">
+              <span className="text-ink-hi">{names[s]}</span>{" "}
+              ask {cents(leg?.ask_c)} · mid {cents(leg?.mid_c)}
+            </li>
+          );
+        })}
+      </ul>
+      <p data-testid="market-t10-clock"
+        title={clock?.quotes_captured_at ?? undefined}
+        className="mt-1 font-mono text-[10px] leading-relaxed text-ink-low">
+        price clock · {lead ?? "time of read not recorded"}
+        {" · "}
+        <span data-testid="market-t10-overround">
+          overround {m.overround_c == null ? "— a leg has no ask"
+            : `${signedCents(m.overround_c)} (asks sum ${cents(m.ask_sum_c)})`}
+        </span>
+      </p>
+      <p className="mt-1 break-words text-[12px] leading-relaxed text-ink-mid">
+        <span data-testid="market-t10-fav">
+          market favourite: <span className="text-ink-hi">
+            {marketFavourite(m, names)}</span>
+        </span>
+        <span className="text-ink-faint"> · </span>
+        <span data-testid="market-t10-picker-fav">
+          picker&rsquo;s favourite: <span className="text-ink-hi">
+            {pickerFav ?? m.picker_favourite?.label ?? "none named"}</span>
+        </span>
+      </p>
+    </section>
+  );
+}
+
 export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
   const pre = row.pre_kickoff;
   const state = pre.state;
@@ -842,6 +964,12 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
           </p>
         ) : null}
       </section>
+
+      {/* The market at the T-10 lock, BESIDE the read and not inside it:
+          the read is the picker's, this is the book's, and a card that
+          drew one inside the other would make them one statement. */}
+      <MarketT10Line m={row.market_t10} home={row.home} away={row.away}
+        pickerFav={read?.favourite ?? null} />
 
       {/* ─────────────────────── 2 · what happened ───────────────────────── */}
       <section data-testid="what-happened" className="mt-3">
