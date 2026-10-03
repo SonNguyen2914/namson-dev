@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { Wordmark } from "./Wordmark";
+import { useOperatorTokenHeld } from "./OperatorToken";
 
 /** THE FIELD, FROM THE TOP-LEFT OF EVERY PAGE THAT CARRIES THE NAV.
  *
@@ -95,6 +96,37 @@ function HomeLogo() {
   );
 }
 
+/** THE TRADING CHIP — THE OPERATOR'S, AND NOBODY ELSE'S.
+ *
+ *  "Hidden chip + one token"                      (Son, 2026-10-03)
+ *
+ *  It exists only while this tab holds an operator token
+ *  (components/OperatorToken.tsx), and it is ABSENT otherwise — not
+ *  hidden, not sr-only, not in the DOM — so a visitor's page carries no
+ *  trace that the console exists. The server never holds a token, so it
+ *  never renders one, and the first client render agrees with it.
+ *
+ *  ONE PIECE OF CHROME, like the field link and the logo: it is drawn by
+ *  TopBar itself, at the head of the chip rail, so every page has it by
+ *  construction and it is the first chip in view on a rail that scrolls.
+ *  A `Link`, so the hop keeps the app shell — and the token in it. It
+ *  is drawn as every other chip is and says where it goes, nothing
+ *  else: no count, no P&L, no glow. */
+function TradingChip() {
+  const router = useRouter();
+  const here = router.pathname === "/ops/trading";
+  return (
+    <Link href="/ops/trading" data-testid="trading-chip"
+      aria-current={here ? "page" : undefined}
+      className={`whitespace-nowrap rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] transition-colors sm:px-2.5 ${
+        here
+          ? "border-accent/50 bg-accent/10 text-accent"
+          : "border-line text-ink-low hover:border-line-strong hover:text-ink-hi"}`}>
+      trading
+    </Link>
+  );
+}
+
 /** THE CHIP RAIL, AND WHERE IT RUNS OUT.
  *
  *  The rail scrolls inside its own box, and a scrollbar is hidden
@@ -178,9 +210,16 @@ export function TopBar({ back, left, title, children, inner, rail = "row" }: {
    *  short chip (the home page's "open the board") that fits there. */
   rail?: "row" | "inline";
 }) {
-  const row = children != null && rail === "row";
+  // THE OPERATOR'S CHIP JOINS THE RAIL, or makes one on a page that has
+  // none (the 404). An "inline" rail is one short chip sized to fit
+  // beside the logo; with a second chip it no longer fits there, so on a
+  // phone it takes the row under the bar like every other rail.
+  const operator = useOperatorTokenHeld();
+  const hasRail = children != null || operator;
+  const lane = operator ? "row" : rail;
+  const row = hasRail && lane === "row";
   return (
-    <header className="topbar" data-rail={children != null ? rail : undefined}>
+    <header className="topbar" data-rail={hasRail ? lane : undefined}>
       <div className={`mx-auto grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] grid-rows-[3rem] items-center gap-x-1 sm:gap-x-4 ${
         row ? "max-sm:grid-rows-[3rem_2.5rem]" : ""} ${inner ?? "max-w-5xl px-5"}`}>
         <div data-testid="topbar-left" className="flex min-w-0 items-center gap-2 sm:gap-4">
@@ -227,7 +266,12 @@ export function TopBar({ back, left, title, children, inner, rail = "row" }: {
         <HomeLogo />
         <div data-testid="topbar-right" className={`flex min-w-0 items-center justify-end ${
           row ? "max-sm:col-span-3 max-sm:row-start-2 max-sm:justify-start" : ""}`}>
-          {children != null && <Rail>{children}</Rail>}
+          {hasRail && (
+            <Rail>
+              {operator && <TradingChip />}
+              {children}
+            </Rail>
+          )}
         </div>
       </div>
     </header>

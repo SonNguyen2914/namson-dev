@@ -6,6 +6,7 @@ import "@fontsource-variable/archivo/wdth.css";
 import type { AppProps } from "next/app";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import { OperatorTokenProvider } from "@/components/OperatorToken";
 
 // Fonts come from the official `geist` npm package (files bundled — no
 // build-time Google Fonts fetch, so Vercel builds can't fail on it).
@@ -26,7 +27,13 @@ export default function App({ Component, pageProps }: AppProps) {
     // `app-shell`: where --font-archivo gets its Geist fallback, because
     // this element is where --font-geist-sans is defined (globals.css).
     <div data-tap-floor className={`app-shell ${GeistSans.variable} ${GeistMono.variable}`}>
-      <Component {...pageProps} />
+      {/* ONE OPERATOR TOKEN PER TAB (components/OperatorToken.tsx): held
+          here, above every page, so the token typed on the board is the
+          one the trading console reads after a client-side hop. React
+          state only — a reload forgets it. */}
+      <OperatorTokenProvider>
+        <Component {...pageProps} />
+      </OperatorTokenProvider>
     </div>
   );
 }

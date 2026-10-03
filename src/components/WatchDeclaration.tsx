@@ -50,6 +50,7 @@ import {
   WatchlistDeclareResponse, WatchlistResolveResponse, WatchlistState,
   WatchlistHeldView, watchlistApi,
 } from "../lib/suggesterApi";
+import { useOperatorToken } from "./OperatorToken";
 
 type ActResult =
   | { ok: true; res: WatchlistDeclareResponse }
@@ -119,7 +120,13 @@ export function WatchDeclarationProvider({ eventIds, children }: {
   eventIds: string[];
   children: React.ReactNode;
 }) {
-  const [token, setToken] = useState("");
+  // THE TOKEN IS THE TAB'S, NOT THIS PROVIDER'S (2026-10-03). It lives
+  // in components/OperatorToken.tsx, mounted once in pages/_app.tsx, so
+  // the trading console reads the token typed here without asking for it
+  // again, and coming back to the board finds it still in the field. It
+  // is still React state only and a reload still forgets it; the name
+  // stays here, because only a declaration carries one.
+  const [token, setToken] = useOperatorToken();
   const [actor, setActor] = useState("");
   const [state, setState] = useState<WatchlistState | null>(null);
   const [stateError, setStateError] = useState("");
@@ -724,7 +731,10 @@ function SyncConfirm() {
  *  pages/bet-suggester/index.tsx.
  *
  *  IT ADDS NO STORAGE AND NO WRITE. This returns the state the panel
- *  already keeps for the life of the tab; nothing is persisted by this
+ *  already keeps for the life of the tab (held app-wide since
+ *  2026-10-03, components/OperatorToken.tsx, but read here only INSIDE
+ *  the board's provider, so no other page starts an operator read off
+ *  it); nothing is persisted by this
  *  hook, no caller may set the token through it, and outside the
  *  provider it returns "" — which the strip renders as "no token is
  *  held", never as an error and never as an empty watchlist. */
