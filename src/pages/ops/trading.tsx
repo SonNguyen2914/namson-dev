@@ -12,20 +12,32 @@
 // field and makes no request at all. (Option B, a signed-in cookie, is
 // later work.)
 //
+// ONE TOKEN PER VISIT (2026-10-03). The state is the tab's, held in
+// components/OperatorToken.tsx above every page, so the token typed into
+// the board's watch panel is already here after the Trading chip's
+// client-side hop: it is used at once, with no second typing and no
+// debounce wait, because nobody is typing. The field stays for a direct
+// visit, and what is typed here is the board's token too.
+//
 // THE POLL. Every 15 s while a token is held, through lib/usePoll: no
 // overlap, nothing while the tab is hidden, backoff after failures. A 403
 // stops the poll until the token changes. The last good read stays on
 // screen after a failed one, dimmed with its age, never presented as
 // current.
 //
-// UNLINKED. No nav chip points here; it is bookmark-only, and noindex.
+// LINKED FOR THE OPERATOR ONLY. The header's Trading chip points here,
+// and it is drawn only while the tab holds a token (components/chrome.tsx
+// TradingChip); a visitor's pages carry no link to it. noindex. The way
+// OUT is every page's: the logo goes home, the back arrow and the chips
+// go to the board, the leagues and the field.
 //
 // EXPERIMENTAL, UNPROVEN. The agent's numbers are its own bookkeeping
 // of a small, capped experiment. Nothing on this page is advice and
 // nothing here is evidence of an edge.
 import Head from "next/head";
 import { useEffect, useState, type ReactNode } from "react";
-import { TopBar } from "../../components/chrome";
+import { NavChip, RouteProgress, TopBar } from "../../components/chrome";
+import { useOperatorToken } from "../../components/OperatorToken";
 import { Eyebrow } from "../../components/ui";
 import { usePoll, type PollOutcome } from "../../lib/usePoll";
 
@@ -477,23 +489,31 @@ function HowToStop() {
 // --------------------------------------------------------------- page
 
 export default function TradingConsole() {
-  const [token, setToken] = useState("");
-  const [armed, setArmed] = useState("");
+  // the TAB's token, shared with the board (components/OperatorToken.tsx)
+  const [token, setToken] = useOperatorToken();
+  const typed = token.trim();
+  // ARRIVING WITH A TOKEN IS NOT TYPING ONE. A token already held when
+  // the page mounts (the board's, carried by the Trading chip) is armed
+  // from the first render, so the first read goes out at once — one
+  // request, not one after a debounce for a token nobody is typing.
+  const [armed, setArmed] = useState(typed);
   const [read, setRead] = useState<Read>({ kind: "idle" });
   const [last, setLast] = useState<{ data: Obj; at: number } | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
   // A REAL DEBOUNCE: every keystroke restarts the clock, so a half-typed
   // token is never sent. Clearing the field disarms at once and drops
-  // what was read with the old token (in the change handler below).
+  // what was read with the old token (in the change handler below). On
+  // arrival with a held token this re-arms the same string, which
+  // changes nothing and asks nothing.
   useEffect(() => {
-    if (token === "") return;
-    const t = setTimeout(() => setArmed(token), TOKEN_DEBOUNCE_MS);
+    if (typed === "") return;
+    const t = setTimeout(() => setArmed(typed), TOKEN_DEBOUNCE_MS);
     return () => clearTimeout(t);
-  }, [token]);
+  }, [typed]);
   const onToken = (v: string) => {
     setToken(v);
-    if (v === "") {
+    if (v.trim() === "") {
       setArmed("");
       setRead({ kind: "idle" });
       setLast(null);
@@ -556,7 +576,18 @@ export default function TradingConsole() {
         <title>Trading console · namson.dev</title>
         <meta name="robots" content="noindex, nofollow" />
       </Head>
-      <TopBar title="trading console" />
+      <RouteProgress />
+      {/* THE WAY BACK TO EVERYTHING (Son, 2026-10-03): the logo goes
+          home and the field link to the field, as on every page; the
+          back arrow and the chips go to the board, the leagues and the
+          field. The Trading chip itself is TopBar's, drawn — and lit as
+          this page — only while the tab holds a token. */}
+      <TopBar back={{ href: "/bet-suggester", label: "board" }}
+        title="trading console">
+        <NavChip href="/bet-suggester">board</NavChip>
+        <NavChip href="/bet-suggester/leagues">leagues</NavChip>
+        <NavChip href="/bet-suggester/ratings">field</NavChip>
+      </TopBar>
       <main className="mx-auto max-w-5xl px-4 pb-24 pt-8 sm:px-5">
         <Eyebrow tone="warn">operator · experimental, unproven</Eyebrow>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink-hi">
