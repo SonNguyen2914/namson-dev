@@ -55,6 +55,7 @@
 .h1 { font-size: clamp(58px, 9.6vw, 164px); }
 .h2 { font-size: clamp(40px, 6.2vw, 100px); margin-top: 14px; }
 .h3 { font-size: clamp(34px, 4.6vw, 72px); margin-top: 12px; line-height: 0.9; }
+.team { white-space: nowrap; }
 .vs { color: var(--ink-low); font-stretch: 100%; font-weight: 500; font-size: 0.6em; vertical-align: 0.18em; padding-inline: 0.1em; }
 .eyebrow {
   margin: 0;
@@ -363,22 +364,42 @@
   line-height: 1.5;
   color: var(--ink-low);
 }
-.fieldNote .chip { color: var(--ink-hi); border-color: var(--ink-faint); }
 
 /* ── 3 · the board ──────────────────────────────────────────────────── */
 .boardGrid {
   display: grid;
-  gap: 8px 64px;
+  gap: 8px 48px;
   align-items: end;
 }
+/* the intro and the frames under it share ONE measure (1020px), so the
+   paragraph ends where the pictures end */
 @media (min-width: 1024px) {
-  .boardGrid { grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); }
+  .boardGrid { max-width: 1020px; grid-template-columns: minmax(0, 1fr) minmax(0, 21rem); }
   .boardGrid .body { margin-bottom: 6px; }
 }
-/* THE BOARD, BOTH HALVES (BoardShot.tsx). A switch above one frame; the
-   two captures share a grid cell, so the frame is always the taller one's
-   height and a switch moves no layout — opacity only. */
-.shot { margin: clamp(28px, 5vh, 48px) 0 0; max-width: 1020px; }
+/* THE BOARD, BOTH HALVES (BoardShot.tsx). Wide: two equal frames side by
+   side, still. Narrow: one frame under the board's switch; the two
+   captures share a grid cell, so a switch moves no layout — opacity
+   only. Below 1024px the figure is the card's own width (460px at most),
+   centred, and its caption keeps to that width. */
+.shot { margin: clamp(28px, 5vh, 48px) auto 0; max-width: 460px; }
+.shotPair { display: none; }
+.shotSolo { display: grid; justify-items: center; }
+@media (min-width: 1024px) {
+  .shot { margin-inline: 0; max-width: 1020px; }
+  .shotPair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  .shotSolo { display: none; }
+}
+.pairCell { min-width: 0; }
+.pairLabel {
+  margin: 0 0 10px;
+  font-family: var(--font-geist-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-mid);
+}
+.pairLabel b { font-weight: 500; color: var(--ink-hi); }
 .modeSwitch {
   display: inline-flex;
   gap: 3px;
@@ -397,13 +418,15 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.14em;
-  color: var(--ink-low);
+  /* ink-mid, not ink-low: 11px on the switch's ground needs AA (4.5:1),
+     and the unpressed label is the only cue that a second board exists */
+  color: var(--ink-mid);
   cursor: pointer;
   transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
 }
 .modeSwitch button:hover { color: var(--ink-hi); }
 .modeSwitch button[aria-pressed="true"] { border-color: var(--accent); background: var(--bs-bg); color: var(--ink-hi); }
-.shotBox { position: relative; margin-top: 14px; }
+.shotBox { position: relative; margin-top: 14px; justify-self: stretch; }
 .shotLine { position: absolute; left: 0; right: 0; top: 50%; height: 1px; pointer-events: none; }
 .shotFrame {
   display: grid;
@@ -411,11 +434,6 @@
   border: 1px solid var(--line-strong);
   border-radius: 10px;
   overflow: clip;
-}
-.shotNarrow { display: none; }
-@media (max-width: 1023px) {
-  .shotWide { display: none; }
-  .shotNarrow { display: grid; max-width: 460px; }
 }
 .shotLayer {
   grid-area: 1 / 1;
@@ -426,13 +444,11 @@
   transition: opacity 240ms ease;
 }
 .shotLayer[data-on="false"] { opacity: 0; pointer-events: none; }
-/* the Nations League capture is one column at the same scale as the
-   three club columns, centred; its last pixels fade into the frame so
-   the column's own ground has no hard edge */
-.shotColumn {
-  width: 43.86%;
-  -webkit-mask-image: linear-gradient(to right, #000 97.5%, transparent);
-  mask-image: linear-gradient(to right, #000 97.5%, transparent);
+/* the club crop shows the neighbouring columns' edges; they fade out, so
+   the frame reads as a window on a wider board rather than cut cards */
+.shotSides {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
 }
 .shotFade {
   -webkit-mask-image: linear-gradient(to bottom, #000 86%, transparent);
@@ -462,7 +478,6 @@
   justify-content: space-between;
   align-items: center;
   gap: 12px 24px;
-  max-width: 1020px;
   font-family: var(--font-geist-mono);
   font-size: 11px;
   letter-spacing: 0.04em;
@@ -489,7 +504,8 @@
   .clockText .h2 { font-size: 34px; }
   .clockNow { margin-top: 10px; }
   .minute { font-size: 60px; }
-  .caption { margin-top: 10px; font-size: 15px; min-height: 2.9em; }
+  .captionSlot { margin-top: 10px; }
+  .caption { font-size: 15px; }
   .clockGrid { gap: 10px; }
   .readout th, .readout td { padding: 3px 0; }
 }
@@ -502,7 +518,9 @@
 }
 .scoreline {
   display: grid;
-  grid-template-columns: auto auto auto;
+  /* the phase label spans every column; the trailing 1fr takes its extra
+     width, so "full time · recorded" never spreads the score apart */
+  grid-template-columns: auto auto auto 1fr;
   align-items: baseline;
   column-gap: 10px;
   padding-bottom: 4px;
@@ -521,15 +539,24 @@
   letter-spacing: 0.16em;
   color: var(--ink-low);
 }
-.caption {
+/* every caption in one grid cell (MatchClock.tsx): the slot is always
+   the tallest one's height, at every width, so a caption change never
+   moves the pinned stage */
+.captionSlot {
+  display: grid;
   margin: clamp(14px, 3vh, 34px) 0 0;
   max-width: 30rem;
-  /* the longest caption's height (two lines), reserved, so a caption
-     change never moves the chart beside it */
-  min-height: 2.9em;
+}
+.caption {
+  grid-area: 1 / 1;
+  margin: 0;
   font-size: clamp(16px, 1.3vw, 20px);
   line-height: 1.45;
   color: var(--ink-hi);
+  visibility: hidden;
+}
+.caption[data-on="true"] {
+  visibility: visible;
   animation: capIn 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .caption b, .timeline b { font-family: var(--font-geist-mono); font-weight: 600; font-size: 0.92em; }
@@ -549,9 +576,10 @@
 .clockChart { min-width: 0; }
 .chartHead {
   display: flex;
+  flex-wrap: wrap;           /* at 320px the label goes under the key, whole */
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 6px 12px;
   margin-bottom: 8px;
 }
 .legendInline {
@@ -637,7 +665,7 @@
 .readout th, .readout td { padding: 5px 0; text-align: right; font-weight: 400; }
 .readout thead th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-low); padding-bottom: 4px; }
 .readout tbody tr { border-top: 1px solid var(--line); }
-.readout tbody th { text-align: left; color: var(--ink-mid); }
+.readout tbody th { text-align: left; color: var(--ink-mid); white-space: nowrap; }
 .readout tbody th i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 10px; }
 .readout td { color: var(--ink-hi); width: 22%; }
 .note {
@@ -654,6 +682,21 @@
   letter-spacing: 0.06em;
   line-height: 1.6;
   color: var(--ink-low);
+}
+/* A SHORT PHONE — an SE, or any phone with its browser toolbars showing.
+   The stacked caption slot is the tallest caption (three lines at 360px
+   and below), and the pinned stage clips: so on a screen this short the
+   clock sets everything a step smaller rather than lose its last lines. */
+@media (max-width: 767px) and (max-height: 660px) {
+  .clockText .h2 { font-size: 28px; }
+  .clockNow { margin-top: 6px; }
+  .minute { font-size: 46px; }
+  .captionSlot { margin-top: 6px; }
+  .caption { font-size: 14px; }
+  .clockGrid { gap: 8px; }
+  .chartBox { height: clamp(130px, 24svh, 200px); }
+  .readout { margin-top: 6px; font-size: 12px; }
+  .readout th, .readout td { padding: 2px 0; }
 }
 .timeline {
   list-style: none;
@@ -685,7 +728,7 @@
   line-height: 0.95;
 }
 .final span:first-child { text-align: right; color: var(--ink-hi); }
-.final span:last-child { color: var(--ink-hi); }
+.final span:last-child { text-align: left; color: var(--ink-hi); }
 .final b {
   padding: 0.12em 0.32em;
   border: 1px solid var(--line-strong);
@@ -705,11 +748,14 @@
 .triple dd { margin: 0; font-family: var(--font-geist-mono); font-size: 18px; color: var(--ink-hi); font-variant-numeric: tabular-nums; }
 .triple small { font-size: 11px; color: var(--ink-low); margin-left: 2px; }
 .events { list-style: none; margin: 14px 0 0; padding: 0; }
+/* the events column has no sub-line, so on one row its list starts where
+   the other two columns' figures do */
+@media (min-width: 900px) { .colHead + .events { margin-top: calc(6px + 1.45 * 12px + 14px); } }
 .events li { display: grid; grid-template-columns: 3em 14px 1fr; align-items: center; gap: 6px; padding: 7px 0; border-top: 1px solid var(--line); font-size: 14px; color: var(--ink-mid); }
 .evMin { font-family: var(--font-geist-mono); font-size: 13px; color: var(--ink-hi); }
 .evGoal { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-hi); }
 .evRed { width: 6px; height: 10px; border-radius: 1px; background: var(--neg); margin-left: 1px; }
-.coda { margin: 22px 0 0; max-width: 38rem; font-size: clamp(15px, 1.15vw, 18px); line-height: 1.55; color: var(--ink-mid); }
+.coda { margin: 22px 0 0; max-width: 48rem; font-size: clamp(15px, 1.15vw, 18px); line-height: 1.55; color: var(--ink-mid); }
 
 /* ── 6 · the record ─────────────────────────────────────────────────── */
 .figures {
@@ -719,7 +765,9 @@
   border-top: 1px solid var(--line-strong);
 }
 @media (min-width: 1024px) { .figures { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.figures div { padding: 18px 16px 22px 0; border-bottom: 1px solid var(--line); display: flex; flex-direction: column-reverse; gap: 10px; }
+/* column-reverse puts the label under its number; flex-end (the TOP, in
+   a reversed column) keeps every number on one line when a label wraps */
+.figures div { padding: 18px 16px 22px 0; border-bottom: 1px solid var(--line); display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: 10px; }
 .figures dd { margin: 0; font-size: clamp(40px, 4.6vw, 76px); font-variant-numeric: tabular-nums; }
 .figures dt { font-family: var(--font-geist-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-low); }
 .findings {
@@ -731,9 +779,11 @@
   max-width: 54rem;
 }
 .findings li { display: grid; gap: 6px 32px; padding: 20px 0; border-top: 1px solid var(--line); }
+/* the figures' own bottom rule is the line above the first finding */
+.findings li:first-child { border-top: 0; padding-top: 0; }
 @media (min-width: 768px) { .findings li { grid-template-columns: 15rem 1fr; } }
 .findings p { margin: 0; font-size: clamp(17px, 1.4vw, 21px); line-height: 1.5; color: var(--ink-hi); }
-.findings b { font-family: var(--font-geist-mono); font-weight: 600; font-size: 0.9em; }
+.findings b { font-family: var(--font-geist-mono); font-weight: 600; font-size: 0.9em; white-space: nowrap; }
 .findTag { padding-top: 5px; font-family: var(--font-geist-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-low); }
 
 /* ── 7 · the door ───────────────────────────────────────────────────── */
@@ -781,7 +831,7 @@
 
 /* ── reduced motion: nothing moves, nothing is withheld ─────────────── */
 @media (prefers-reduced-motion: reduce) {
-  .caption { animation: none; }
+  .caption, .caption[data-on="true"] { animation: none; }
   .cta, .cta span { transition: none; }
   .shotLayer, .modeSwitch button { transition: none; }
 }

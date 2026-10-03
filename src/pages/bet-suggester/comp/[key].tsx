@@ -312,7 +312,7 @@ export default function CompViewer() {
       <RouteProgress />
       <TopBar left={<ArchiveMenu current={archiveKey} />}
         back={{ href: "/bet-suggester", label: "board" }}
-        title={`${d?.display || "Competition"} · market viewer`} />
+        title={d?.display || "Competition"} />
       <main className="mx-auto max-w-5xl px-5 pb-24 pt-10">
         <Eyebrow>{(d?.display || String(key || "competition")).toLowerCase()} · viewer</Eyebrow>
         {/* A FAILED READ IS NOT A LOADING ONE (audit F10). The H1 said

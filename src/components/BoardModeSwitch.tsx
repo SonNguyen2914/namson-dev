@@ -32,7 +32,10 @@ export function BoardModeSwitch({ mode, onChange }: {
             data-mode={m} aria-pressed={mode === m} onClick={() => onChange(m)}
             className={`rounded-[7px] border px-[18px] py-[9px] font-mono text-[11px] uppercase tracking-[0.14em] transition-colors ${
               mode === m ? "border-accent bg-bs text-ink-hi"
-                : "border-transparent text-ink-low hover:text-ink-hi"}`}>
+                // ink-mid, not ink-low (2026-10-03): 11px on bs-elev2 was
+                // ~4.3:1, under AA, and the unpressed label is the only
+                // cue that the other board exists
+                : "border-transparent text-ink-mid hover:text-ink-hi"}`}>
             {LABEL[m]}
           </button>
         ))}

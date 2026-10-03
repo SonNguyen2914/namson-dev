@@ -658,6 +658,15 @@ html {
    the bar, which is how this was first shipped. Read it from here rather
    than retyping it; e2e asserts the two agree. */
 :root { --topbar-h: calc(3rem + 1px); }
+/* AND ON A PHONE, A BAR WITH A CHIP RAIL IS TWO ROWS (round 9,
+   components/chrome.tsx TopBar `rail`): the rail runs full width under
+   the logo row, 2.5rem tall. Declared here, off the same `data-rail`
+   the bar renders on the server, so the very first paint already parks
+   everything below the taller bar; the board still measures its own
+   (bar plus pills) at runtime and writes it on its page root. */
+@media (width < 40rem) {
+  :root:has(header.topbar[data-rail="row"]) { --topbar-h: calc(3rem + 2.5rem + 1px); }
+}
 
 .topbar {
   position: sticky;
@@ -738,6 +747,28 @@ html {
 /* anchored sections land below the sticky bar */
 section[id], div[id] {
   scroll-margin-top: 84px;
+}
+/* …which is 2.5rem taller on a phone when it carries its chip rail */
+@media (width < 40rem) {
+  :root:has(header.topbar[data-rail="row"]) :is(section[id], div[id]) {
+    scroll-margin-top: calc(84px + 2.5rem);
+  }
+}
+
+/* THE RAIL FADES WHERE THERE IS MORE (chrome.tsx `Rail`): the right
+   edge while chips run on past it, the left edge once it has been
+   scrolled. An edge with nothing beyond it stays sharp. */
+.topbar-rail[data-fade="r"] {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+}
+.topbar-rail[data-fade="l"] {
+  -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent);
+}
+.topbar-rail[data-fade="lr"] {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent);
 }
 html {
   scroll-behavior: smooth;

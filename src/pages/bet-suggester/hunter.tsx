@@ -345,7 +345,7 @@ export default function HunterPanel() {
       <Head><title>Market Hunter · namson.dev</title></Head>
       <RouteProgress />
       <TopBar back={{ href: "/bet-suggester", label: "board" }}
-        title="TRIVELA · market hunter">
+        title="market hunter">
         <NavChip href="#heartbeat" active={activeSection === "heartbeat"}>
           Heartbeat</NavChip>
         <NavChip href="#denominators" active={activeSection === "denominators"}>

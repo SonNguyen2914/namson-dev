@@ -16,10 +16,25 @@
 //              travels from `from` to `to` (fractions of the viewport
 //              height), i.e. while it scrolls through the reading zone.
 //
-// Listeners are passive; frames are coalesced (one rAF in flight at
-// most); the callback runs once on mount so a page loaded mid-scroll
-// draws the right state at once. `enabled: false` (reduced motion)
-// attaches nothing at all.
+// ONE FRAME FOR EVERY SCENE, READS BEFORE WRITES (2026-10-03). Each
+// scene used to own a scroll listener and a rAF, and read its rect in
+// its own callback — after the scene before it had written styles, so
+// up to three forced style recalcs a frame — and every scene kept
+// drawing at the footer, the field rewriting ~95 elements per frame
+// off-screen. Now all scenes share ONE passive scroll listener and ONE
+// rAF: the frame reads every scene's rect first, then draws only the
+// scenes whose p actually changed. A scene parked at its clamped end
+// (p = 0 below the screen, 1 above it) costs one rect read and nothing
+// else. (Gating each scene on an IntersectionObserver was measured and
+// rejected: its callback lands a frame after a jump — the Home key, a
+// link to the top — so the field drew its zoomed-in end for a frame at
+// the top of the page, and Chrome then rastered the plane at that zoom
+// for the rest of the visit: 0.8 → 9 ms of raster per frame.)
+//
+// The callback still runs once on mount so a page loaded mid-scroll
+// draws the right state at once, and a new drawing (a resize re-laid
+// the scene out) is drawn at once too. `enabled: false` (reduced
+// motion) registers nothing at all.
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { RefObject } from "react";
 
@@ -35,6 +50,37 @@ export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 type Opts =
   | { mode: "pinned"; stage: RefObject<HTMLElement | null>; enabled: boolean }
   | { mode: "pass"; from: number; to: number; enabled: boolean };
+
+/* THE SHARED FRAME. Module state, browser-only (it is touched from
+   effects alone). */
+type Scene = { read: () => number; draw: (p: number) => void; measure: () => void; last: number };
+const scenes = new Set<Scene>();
+let frameId = 0;
+function frame() {
+  frameId = 0;
+  const list = [...scenes];
+  const ps = list.map((sc) => sc.read());            // every read first…
+  list.forEach((sc, i) => {                           // …then the writes
+    if (ps[i] !== sc.last) { sc.last = ps[i]; sc.draw(ps[i]); }
+  });
+}
+function ask() { if (!frameId) frameId = requestAnimationFrame(frame); }
+function onResize() { scenes.forEach((sc) => { sc.measure(); sc.last = NaN; }); ask(); }
+function register(sc: Scene) {
+  if (scenes.size === 0) {
+    window.addEventListener("scroll", ask, { passive: true });
+    window.addEventListener("resize", onResize, { passive: true });
+  }
+  scenes.add(sc);
+  return () => {
+    scenes.delete(sc);
+    if (scenes.size === 0) {
+      window.removeEventListener("scroll", ask);
+      window.removeEventListener("resize", onResize);
+      if (frameId) { cancelAnimationFrame(frameId); frameId = 0; }
+    }
+  };
+}
 
 export function useScrollScene(
   target: RefObject<HTMLElement | null>,
@@ -55,7 +101,6 @@ export function useScrollScene(
     if (!enabled) return;
     const el = target.current;
     if (!el) return;
-    let raf = 0;
     let stickyTop = 0, stageH = 0;
     const measure = () => {
       const st = stage?.current;
@@ -64,32 +109,22 @@ export function useScrollScene(
         stageH = st.offsetHeight;
       }
     };
-    const tick = () => {
-      raf = 0;
+    const read = () => {
       const r = el.getBoundingClientRect();
-      let p: number;
       if (mode === "pinned") {
         const travel = r.height - stageH;
-        p = travel > 0 ? clamp01((stickyTop - r.top) / travel) : 0;
-      } else {
-        const vh = window.innerHeight;
-        p = clamp01((vh * from - r.top) / (vh * (from - to)));
+        return travel > 0 ? clamp01((stickyTop - r.top) / travel) : 0;
       }
-      cb.current(p);
+      const vh = window.innerHeight;
+      return clamp01((vh * from - r.top) / (vh * (from - to)));
     };
-    const ask = () => { if (!raf) raf = requestAnimationFrame(tick); };
-    const onResize = () => { measure(); ask(); };
+    const sc: Scene = { read, measure, last: NaN, draw: (p) => cb.current(p) };
     measure();
-    tick();
-    kick.current = ask;
-    window.addEventListener("scroll", ask, { passive: true });
-    window.addEventListener("resize", onResize, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", ask);
-      window.removeEventListener("resize", onResize);
-      if (raf) cancelAnimationFrame(raf);
-      kick.current = null;
-    };
+    sc.last = read();
+    cb.current(sc.last);
+    kick.current = () => { sc.last = NaN; ask(); };
+    const off = register(sc);
+    return () => { off(); kick.current = null; };
   }, [enabled, mode, target, stage, from, to]);
 }
 

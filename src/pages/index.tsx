@@ -11,8 +11,10 @@
 // "Every match, made readable."
 //   1  the field — every club of the eight board leagues on one scale
 //   2  ↳ scroll moment 1: the camera moves in on one real match
-//   3  three hours before — the board (real screenshots, Leagues |
-//      Championships behind one switch; still — BoardShot.tsx)
+//   3  three hours before — the board (real screenshots: clubs and
+//      national teams side by side on a wide screen, behind the board's
+//      own Leagues | Championships switch on a narrow one; still —
+//      BoardShot.tsx)
 //   4  scroll moment 2: the match clock, model vs market, 0′→90′
 //   5  scroll moment 3: full time, the review card unfolds
 //   6  the record — scale, and the honest results in plain words
@@ -78,8 +80,12 @@ export default function Home() {
       {/* field · logo · board: the logo is the shared bar's own centre
           (components/chrome.tsx), so this page passes no wordmark and no
           title of its own */}
-      <TopBar inner="max-w-[calc(1240px+7rem)] px-4 sm:px-8 lg:px-14">
-        <NavChip href="/bet-suggester">open the board</NavChip>
+      {/* rail="inline": one short chip, and it fits beside the logo on a
+          phone — a second row here would only take height from the
+          pinned scenes, which are a screen tall */}
+      <TopBar inner="max-w-[calc(1240px+7rem)] px-4 sm:px-8 lg:px-14" rail="inline">
+        {/* below 340px the beside-the-logo track is ~118px: "board" */}
+        <NavChip href="/bet-suggester"><span className="max-[340px]:hidden">open the </span>board</NavChip>
       </TopBar>
 
       <main>
@@ -98,8 +104,8 @@ export default function Home() {
               <h2 id="landing-board" className={`${s.display} ${s.h2}`}>Every fixture, ranked.</h2>
             </div>
             <p className={s.body}>
-              Clubs and national teams, ranked by the gap between the sides.
-              It ranks — it never picks.
+              Clubs and national teams, ranked by the gap between the
+              sides — never picked.
             </p>
           </div>
           <BoardShot />
@@ -124,8 +130,8 @@ export default function Home() {
           <ol className={s.findings}>
             <li>
               <span className={s.findTag}>better than the old method</span>
-              <p>A learned model beats it by <b>+0.018 to +0.030</b> log-loss
-                per match in walk-forward tests.</p>
+              <p>A learned model cuts log-loss by <b>0.018–0.030</b> per
+                match in walk-forward tests.</p>
             </li>
             <li>
               <span className={s.findTag}>not yet confirmed</span>

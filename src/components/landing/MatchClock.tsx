@@ -92,9 +92,9 @@ const minuteAt = (q: number) => {
 type Cap = { id: string; from: number; to: number; tag: string; text: ReactNode };
 const pct = (v: number | undefined | null) => (v == null ? "—" : `${fmt1(v)}%`);
 const CAPS: Cap[] = (() => {
-  const k = at(0), m50 = at(50), m51 = at(51), g = at(53), m60 = at(60);
+  const m50 = at(50), m51 = at(51), g = at(53), m60 = at(60);
   return [
-    { id: "ko", from: 0, to: 1, tag: `0${PRIME}`, text: <>Kick-off. Model (T{MINUS}10 lock): Atlético <b>{pct(k.model?.home)}</b>. Market: <b>{pct(k.market?.home)}</b>.</> },
+    { id: "ko", from: 0, to: 1, tag: `0${PRIME}`, text: <>Kick-off. The model&rsquo;s read was locked ten minutes before.</> },
     { id: "play", from: 2, to: 44, tag: `2${PRIME}`, text: <>In play, model and market start within a point.</> },
     { id: "ht", from: 45, to: 45, tag: "HT", text: <>Half-time. No play, no read.</> },
     { id: "h2", from: 46, to: 50, tag: `46${PRIME}`, text: <>Still 0–0. Both lines lean toward the draw.</> },
@@ -102,7 +102,7 @@ const CAPS: Cap[] = (() => {
     { id: "goal1", from: 53, to: 53, tag: `53${PRIME}`, text: <>Goal, Atlético. {sc(53)}. Model <b>{pct(g.model?.home)}</b>, market <b>{pct(g.market?.home)}</b>.</> },
     { id: "red", from: 54, to: 59, tag: `54${PRIME}`, text: <>Red card, Real Madrid. The model stands down — it reads 11 v 11 only. The market reads on.</> },
     { id: "goal2", from: 60, to: 67, tag: `60${PRIME}`, text: <>{sc(60)} Atlético. Market: <b>{pct(m60.market?.home)}</b>.</> },
-    { id: "flat", from: 68, to: 89, tag: `68${PRIME}`, text: <>The market drifts toward certainty. The model&rsquo;s lines stay ended at 53{PRIME}.</> },
+    { id: "flat", from: 68, to: 89, tag: `68${PRIME}`, text: <>The model stays out. The market runs to full time.</> },
     { id: "ft", from: 90, to: 90, tag: `90${PRIME}`, text: <>Real Madrid pull one back. {sc(90)}, full time.</> },
   ];
 })();
@@ -305,12 +305,12 @@ export default function MatchClock({ mode, enabled }: {
   const row = at(m);
   const cap = capAt(m);
   const standing = STOP != null && m >= STOP.from;
-  const modelCell = (v: number | null | undefined) => {
-    if (v != null) return fmt1(v);
-    if (row.refused === "dismissal") return "stood down";
-    if (row.refused === "interval") return "no read";
-    return "—";
-  };
+  /* NO READ IS A DASH, AND IT IS SAID ONCE (2026-10-03). The cells said
+     "stood down" three times over, beside a caption, the band's own
+     label and a footnote that all said it too — five times in one
+     frame. The band label names the stand-down and the caption tells
+     it; the cells only show that there is no number. */
+  const modelCell = (v: number | null | undefined) => (v != null ? fmt1(v) : "—");
 
   return (
     <section ref={section} data-testid={`clock-${mode}`} aria-labelledby="landing-clock"
@@ -329,10 +329,27 @@ export default function MatchClock({ mode, enabled }: {
                 <em>{phase(m, fin && m === LAST)}</em>
               </span>
             </div>
+            {/* EVERY CAPTION, STACKED IN ONE CELL (2026-10-03). The slot
+                reserved a typed two lines, and the 54′ caption takes three
+                at 1024–1100px and at 360px and below — so the pinned
+                stage re-centred by 11–21px at the red card and back at
+                60′. All of them now share one grid cell and only the
+                current one is visible, so the slot is the tallest
+                caption's height at every width and in every font, and
+                no caption change can move the stage. */}
             {!still && (
-              <p key={cap.id} className={s.caption} data-testid="clock-caption">
-                {cap.text}
-              </p>
+              <div className={s.captionSlot} data-testid="clock-captions">
+                {CAPS.map((c) => {
+                  const on = c.id === cap.id;
+                  return (
+                    <p key={c.id} className={s.caption} data-on={on}
+                      aria-hidden={on ? undefined : true}
+                      data-testid={on ? "clock-caption" : undefined}>
+                      {c.text}
+                    </p>
+                  );
+                })}
+              </div>
             )}
           </div>
 
@@ -400,20 +417,15 @@ export default function MatchClock({ mode, enabled }: {
                 })}
               </tbody>
             </table>
-            {/* ONE FIXED SLOT, one line, for the model's absence, so the
-                chart never moves when it appears; the provenance line below
-                is constant. */}
+            {/* ONE FIXED SLOT, one line, so the chart never moves when it
+                changes. After the red card it goes back to the key: the
+                band's label already names the stand-down. */}
             <p className={s.note} data-testid="clock-note">
-              {standing
-                ? `Model stood down at the ${RED?.m ?? STOP?.from}${PRIME} red card.`
-                : row.model == null && m > 0
-                  ? (row.refused === "interval" ? "No model read at half-time." : "No model read this minute.")
-                  : `Gap = model ${MINUS} market, in points.`}
+              {!standing && row.model == null && m > 0
+                ? (row.refused === "interval" ? "No model read at half-time." : "No model read this minute.")
+                : `Gap = model ${MINUS} market, in points.`}
             </p>
-            <p className={s.provenance}>
-              a read, not a signal · stored series, not an illustration ·
-              market de-vigged
-            </p>
+            <p className={s.provenance}>a read, not a signal</p>
           </div>
         </div>
 

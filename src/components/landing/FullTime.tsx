@@ -12,7 +12,7 @@
 // series — the newest quote at or before the T−10 lock — in percentage
 // points, because that is what the series stores. It is not an ask
 // price, and it is not printed in cents.
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
   DERBY, FINAL, MARKET_AT_LOCK, MINUS, OUTCOMES, PRIME, fmt1,
 } from "../../lib/landingData";
@@ -23,7 +23,6 @@ import s from "./landing.module.css";
 const NAME: Record<Outcome, string> = {
   home: DERBY.home.name, draw: "Draw", away: DERBY.away.name };
 const utc = (iso: string) => new Date(iso).toISOString().slice(11, 16);
-const mins = (t: number) => `${MINUS}${Math.abs(t).toFixed(t % 1 ? 1 : 0)}`;
 
 export default function FullTime({ enabled }: { enabled: boolean }) {
   const card = useRef<HTMLDivElement | null>(null);
@@ -40,6 +39,16 @@ export default function FullTime({ enabled }: { enabled: boolean }) {
     if (coda.current) coda.current.style.opacity = String(span(p, 0.75, 1));
   }, []);
   useScrollScene(card, draw, { mode: "pass", from: 0.98, to: 0.18, enabled });
+  /* A STILL CARD IS A FINISHED CARD. Under reduced motion the first
+     (hydration) render is the moving one — `useReducedMotion` answers
+     the server's `false` until it has hydrated — so the scene's mount
+     frame has already written the folded state (clip-path at 100%, every
+     row and the coda at opacity 0) by the time `enabled` turns false,
+     and nothing else would ever unwrite it: the whole card, and the
+     why-this-match line under it, stayed invisible. Draw the end state
+     whenever the scene is not moving, as FieldStage and MatchClock do
+     with their fixed p. e2e/the-landing-holds-still.spec.ts. */
+  useEffect(() => { if (!enabled) draw(1); }, [enabled, draw]);
 
   const lock = DERBY.lock, mk = MARKET_AT_LOCK;
   return (
@@ -64,15 +73,14 @@ export default function FullTime({ enabled }: { enabled: boolean }) {
             <Triple v={lock.model} />
           </div>
           <div data-row className={s.reviewCol}>
-            <h3 className={s.colHead}>Market at T{MINUS}10</h3>
+            <h3 className={s.colHead}>Market at the lock</h3>
             <p className={s.colSub}>
-              {mk ? <>last quote before the lock, T{mins(mk.t)} · de-vigged</> : "no stored quote"}
+              {mk ? <>last quote, {Math.round(Math.abs(mk.t))} min before kick-off · de-vigged</> : "no stored quote"}
             </p>
             {mk ? <Triple v={mk.market} /> : <p className={s.colSub}>—</p>}
           </div>
           <div data-row className={s.reviewCol}>
             <h3 className={s.colHead}>What happened</h3>
-            <p className={s.colSub}>score tape</p>
             <ul className={s.events}>
               {DERBY.events.map((e, i) => (
                 <li key={i}>
@@ -95,8 +103,8 @@ export default function FullTime({ enabled }: { enabled: boolean }) {
           match is here: it is the one with the whole record stored —
           a model to 53′, both stand-downs, all four events. */}
       <p ref={coda} className={s.coda} data-testid="why-this-match">
-        Picked for its full stored record — not because the read was right.
-        One match can&rsquo;t tell a read from luck.
+        Picked for its full stored record, not its result. One match
+        can&rsquo;t tell a read from luck.
       </p>
     </section>
   );

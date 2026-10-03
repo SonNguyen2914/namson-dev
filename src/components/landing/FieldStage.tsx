@@ -17,10 +17,10 @@
 // THREE RENDERINGS, ONE DRAWING: `scroll` is the pinned scene; `hero` and
 // `match` are its two ends as still figures, which is what a reader who
 // asked for reduced motion gets — the same content, nothing withheld.
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { hueOf } from "../../lib/leagueHue";
-import { FIELD, FOCUS, GAP, MINUS } from "../../lib/landingData";
+import { FIELD, FOCUS, GAP } from "../../lib/landingData";
 import {
   easeInOut, easeOut, lerp, span, useScrollScene, useSize,
 } from "../../lib/useScrollScene";
@@ -29,6 +29,9 @@ import s from "./landing.module.css";
 const E0 = 1300, E1 = 2100;
 const TICKS = Array.from({ length: (E1 - E0) / 10 + 1 }, (_, i) => E0 + i * 10);
 const fmtElo = (v: number) => Math.round(v).toLocaleString("en-US");
+/** "2026-10-02" → "2 Oct": the day the baked field was read */
+const asOf = (iso: string) => new Date(`${iso}T12:00:00Z`)
+  .toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 
 type Dot = { x: number; y: number; column: string; club: string; focus: boolean };
 
@@ -90,6 +93,24 @@ export default function FieldStage({ mode, enabled }: {
   const note = useRef<HTMLParagraphElement | null>(null);
   const pitch = useRef<SVGSVGElement | null>(null);
 
+  /* THE TWO CLUB LABELS STAY INSIDE THE GUTTER (2026-10-03). At 390px
+     "REAL MADRID" ran to 2px from the screen's edge. Their widths are
+     measured (they change when Archivo arrives), and the scene clamps
+     each label's box inside the page gutter — the dot stays where the
+     rating puts it; only its caption slides in. */
+  const [labW, setLabW] = useState({ home: 0, away: 0 });
+  useEffect(() => {
+    const h = mk.current.homeLab, a = mk.current.awayLab;
+    if (!h || !a || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      const next = { home: h.offsetWidth, away: a.offsetWidth };
+      setLabW((v) => (v.home === next.home && v.away === next.away ? v : next));
+    });
+    ro.observe(h);
+    ro.observe(a);
+    return () => ro.disconnect();
+  }, []);
+
   /* EVERYTHING THE SCENE DRAWS, AS A FUNCTION OF p. The ranges are the
      ones in trivela-ops/landing/ARCHITECTURE.md §1+2. */
   const draw = useCallback((p: number) => {
@@ -146,8 +167,12 @@ export default function FieldStage({ mode, enabled }: {
     const hy = lerp(Y(L.home.y), lineY, rise), ay = lerp(Y(L.away.y), lineY, rise);
     set(mk.current.homeDot, `translate3d(${hx}px, ${hy}px, 0) scale(${grow})`);
     set(mk.current.awayDot, `translate3d(${ax}px, ${ay}px, 0) scale(${grow})`);
-    set(mk.current.homeLab, `translate3d(${hx}px, ${hy}px, 0)`, lab);
-    set(mk.current.awayLab, `translate3d(${ax}px, ${ay}px, 0)`, lab);
+    // the page gutter (landing.module.css .root), at the plane's width
+    const gut = size.w < 640 ? 16 : size.w < 1024 ? 32 : 56;
+    const hlx = Math.max(hx, gut + labW.home);          // right-aligned to hx
+    const alx = Math.min(ax, size.w - gut - labW.away); // left-aligned at ax
+    set(mk.current.homeLab, `translate3d(${hlx}px, ${hy}px, 0)`, lab);
+    set(mk.current.awayLab, `translate3d(${alx}px, ${ay}px, 0)`, lab);
 
     // step 1 — the rating gap, drawn left to right above the line
     const b1 = easeOut(span(p, 0.58, 0.70));
@@ -168,7 +193,7 @@ export default function FieldStage({ mode, enabled }: {
     set(mk.current.rest, `translate3d(${gx}px, ${lineY}px, 0) scaleX(${(Math.max(0, ax - gx) / 1000) * n})`, n > 0 ? 1 : 0);
     set(mk.current.restLab, `translate3d(${(gx + ax) / 2}px, ${lineY}px, 0)`, n);
     if (note.current) note.current.style.opacity = String(span(p, 0.6, 0.7));
-  }, [L, size.w, size.h]);
+  }, [L, size.w, size.h, labW]);
 
   const scroll = mode === "scroll";
   useScrollScene(section, draw, { mode: "pinned", stage, enabled: scroll && enabled });
@@ -176,7 +201,7 @@ export default function FieldStage({ mode, enabled }: {
   // by the same function at a fixed p — after layout, once per size.
   const fixedP = mode === "match" ? 1 : 0;
   const drawn = useRef("");
-  const key = `${mode}:${size.w}x${size.h}:${enabled}`;
+  const key = `${mode}:${size.w}x${size.h}:${enabled}:${labW.home}/${labW.away}`;
   const paint = useCallback((el: HTMLDivElement | null) => {
     stage.current = el;
     if (el && drawn.current !== key && !(scroll && enabled)) {
@@ -196,7 +221,9 @@ export default function FieldStage({ mode, enabled }: {
       <div ref={paint} className={`${s.stage} ${mode === "match" ? s.stageMatch : ""}`}>
         {showHero && (
           <div ref={hero} className={s.heroText}>
-            <p className={s.eyebrow}>11 competitions · one scale</p>
+            {/* the product's name, above the fold on every width: on a
+                phone the bar carries the mark alone */}
+            <p className={s.eyebrow}>TRIVELA · {FIELD.columns.length} leagues · one scale</p>
             <h1 id="landing-h1" className={`${s.display} ${s.h1}`}>
               Every match,<br />made readable.
             </h1>
@@ -211,8 +238,12 @@ export default function FieldStage({ mode, enabled }: {
           <div ref={match} className={s.matchText}
             style={mode === "scroll" ? { opacity: 0 } : undefined}>
             <p className={s.eyebrow}>La Liga · 20 Sep 2026</p>
+            {/* a club's name never breaks inside itself: the line breaks
+                before "v" or before the visitors, never in "REAL / MADRID" */}
             <h2 id="landing-match" className={`${s.display} ${s.h3}`}>
-              {FOCUS.home.name} <span className={s.vs}>v</span> {FOCUS.away.name}
+              <span className={s.team}>{FOCUS.home.name}</span>{" "}
+              <span className={s.vs}>v</span>{" "}
+              <span className={s.team}>{FOCUS.away.name}</span>
             </h2>
             <ol className={s.steps}>
               <li ref={(el) => { steps.current[0] = el; }}>
@@ -222,8 +253,8 @@ export default function FieldStage({ mode, enabled }: {
                 Atlético are at home: <b>+{GAP.venue}</b>.
               </li>
               <li ref={(el) => { steps.current[2] = el; }}>
-                Left: <b>+{GAP.net}</b>, too close to call — so the board
-                asks the market.
+                Net: <b>+{Math.abs(GAP.net)}</b> to {GAP.net >= 0 ? FOCUS.away.name : FOCUS.home.name}.
+                Too close to call, so the board asks the market.
               </li>
             </ol>
           </div>
@@ -326,12 +357,11 @@ export default function FieldStage({ mode, enabled }: {
         {showMatch && (
           <p ref={note} className={s.fieldNote}
             style={mode === "scroll" ? { opacity: 0 } : undefined}>
-            <span className={s.chip}>
-              +{GAP.net} {FOCUS.away.short} · +{GAP.raw} rating · {MINUS}{GAP.venue} away
-            </span>
+            {/* the diagram carries the numbers; this says only whose
+                numbers they are — and a rating keeps its pass count */}
             <span>
-              field page · {FIELD.passes} passes · current field, not the
-              pre-match read
+              Ratings as of {asOf(FIELD.fetched)}, at {FIELD.passes} passes — not
+              the pre-match read.
             </span>
           </p>
         )}

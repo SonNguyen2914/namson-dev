@@ -57,10 +57,12 @@ export const DERBY = derby as unknown as {
 };
 
 /** The two clubs as the FIELD names them (the field's spelling has no
- *  accent; the page prints the club's own). */
+ *  accent; the page prints the club's own). `short` labels the two
+ *  lights on a phone, where "REAL MADRID" ran to 2px from the screen's
+ *  edge: the heading above them says both names in full. */
 export const FOCUS = {
   home: { key: "Atletico Madrid", name: "Atlético Madrid", short: "Atlético" },
-  away: { key: "Real Madrid", name: "Real Madrid", short: "Real Madrid" },
+  away: { key: "Real Madrid", name: "Real Madrid", short: "Real" },
 } as const;
 
 function eloOf(key: string): number {
