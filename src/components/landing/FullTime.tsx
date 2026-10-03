@@ -69,13 +69,13 @@ export default function FullTime({ enabled }: { enabled: boolean }) {
         <div className={s.reviewCols}>
           <div data-row className={s.reviewCol}>
             <h3 className={s.colHead}>Model at T{MINUS}10</h3>
-            <p className={s.colSub}>locked {utc(lock.at)} UTC · shadow · not advice</p>
+            <p className={s.colSub}>locked {utc(lock.at)} UTC · shadow · not{"\u00a0"}advice</p>
             <Triple v={lock.model} />
           </div>
           <div data-row className={s.reviewCol}>
             <h3 className={s.colHead}>Market at the lock</h3>
             <p className={s.colSub}>
-              {mk ? <>last quote, {Math.round(Math.abs(mk.t))} min before kick-off · de-vigged</> : "no stored quote"}
+              {mk ? <>last quote, {Math.round(Math.abs(mk.t))}{"\u00a0"}min before <span className={s.keep}>kick-off · de-vigged</span></> : "no stored\u00a0quote"}
             </p>
             {mk ? <Triple v={mk.market} /> : <p className={s.colSub}>—</p>}
           </div>

@@ -802,6 +802,9 @@
 .reviewCol { min-width: 0; }
 .colHead { margin: 0; font-family: var(--font-geist-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--ink-hi); font-weight: 500; }
 .colSub { margin: 6px 0 0; font-size: 12px; line-height: 1.45; color: var(--ink-low); }
+/* a caption's tail is one unit: on any font's metrics its last word never
+   wraps alone (CI's Linux fonts left "de-vigged" alone at 320) */
+.keep { white-space: nowrap; }
 .triple { margin: 14px 0 0; display: grid; gap: 0; }
 .triple div { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 0; border-top: 1px solid var(--line); }
 .triple dt { font-size: 14px; color: var(--ink-mid); }
