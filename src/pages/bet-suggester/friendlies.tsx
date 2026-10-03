@@ -12,7 +12,7 @@ export default function FriendliesPage() {
       <Head><title>Club Friendlies · market viewer · namson.dev</title></Head>
       <RouteProgress />
       <TopBar back={{ href: "/bet-suggester", label: "board" }}
-        title="Club Friendlies · market viewer" />
+        title="Club friendlies" />
       <main className="mx-auto max-w-5xl px-5 pb-24 pt-10">
         <Eyebrow>club friendlies · viewer</Eyebrow>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-ink-hi">

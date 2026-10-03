@@ -1282,7 +1282,12 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
               ))}
             </span>
           </div>
-          <h1 className="mt-2 text-center text-2xl font-bold uppercase tracking-[0.02em] text-ink-hi [font-family:var(--font-archivo)] [font-stretch:115%] sm:text-3xl">
+          {/* ONE LINE ON A PHONE (2026-10-03). With Archivo really loading
+              (globals.css, --font-archivo) the 115% width wrapped this to
+              two ragged lines at 390px and pushed the board down 32px;
+              below sm it sets at the face's normal width, and if a very
+              narrow screen still wraps it, the two lines are balanced. */}
+          <h1 className="mt-2 text-balance text-center text-2xl font-bold uppercase tracking-[0.02em] text-ink-hi [font-family:var(--font-archivo)] [font-stretch:100%] sm:text-3xl sm:[font-stretch:115%]">
             Every fixture, ranked
           </h1>
           {/* THE ONE HONEST LINE OF FRAMING. Not "bet these".

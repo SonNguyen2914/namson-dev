@@ -1,0 +1,920 @@
+/* THE LANDING PAGE — "Floodlit". Every colour is a token from
+   globals.css :root; this file adds layout, type and motion only.
+   The system is written down in trivela-ops/landing/VISUAL-SYSTEM.md.
+
+   Two rules this file keeps everywhere:
+   - a pinned stage clips with `overflow: clip`, never `hidden`: clip is
+     not a scroll container (sticky keeps working) and it is the
+     intentional-clip spelling the layout audit already understands;
+   - anything that moves with scroll moves by transform, opacity or
+     clip-path, written from one rAF callback — never by top/left/width. */
+
+.root {
+  --gutter: 16px;
+  position: relative;
+  isolation: isolate;
+  min-height: 100svh;
+  background: var(--bs-bg);
+  color: var(--ink-mid);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  /* the board's display face — the site-wide token, valid everywhere
+     since 2026-10-03 (globals.css, --font-archivo) */
+  --display-face: var(--font-archivo);
+}
+@media (min-width: 640px) { .root { --gutter: 32px; } }
+@media (min-width: 1024px) { .root { --gutter: 56px; } }
+
+/* THE ONE LIGHT. An overhead floodlight, cool white, falling off toward
+   the stands. It is the only gradient on the page. */
+.light {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse 72% 58% at 50% -12%,
+    rgba(214, 226, 255, 0.11), rgba(214, 226, 255, 0.03) 46%, transparent 76%);
+}
+
+.wrap {
+  max-width: calc(1240px + 2 * var(--gutter));
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+/* ── type ───────────────────────────────────────────────────────────── */
+.display {
+  font-family: var(--display-face);
+  font-stretch: 72%;
+  font-weight: 800;
+  text-transform: uppercase;
+  line-height: 0.86;
+  letter-spacing: -0.005em;
+  color: var(--ink-hi);
+  margin: 0;
+}
+.h1 { font-size: clamp(58px, 9.6vw, 164px); }
+.h2 { font-size: clamp(40px, 6.2vw, 100px); margin-top: 14px; }
+.h3 { font-size: clamp(34px, 4.6vw, 72px); margin-top: 12px; line-height: 0.9; }
+.team { white-space: nowrap; }
+.vs { color: var(--ink-low); font-stretch: 100%; font-weight: 500; font-size: 0.6em; vertical-align: 0.18em; padding-inline: 0.1em; }
+.eyebrow {
+  margin: 0;
+  font-family: var(--font-geist-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--ink-low);
+}
+.body {
+  margin: 22px 0 0;
+  max-width: 34rem;
+  font-size: clamp(16px, 1.15vw, 19px);
+  line-height: 1.6;
+  color: var(--ink-mid);
+}
+/* NO WORD LEFT ALONE (round 12). Body copy and captions break `pretty`:
+   the browser re-flows the last lines so a paragraph never ends on one
+   short word ("on." under the 54′ caption at 320px, "tell." under the
+   record at 390px). An em dash is bound to the word before it in the copy
+   itself (a no-break space), so no line starts with one. */
+.body, .heroLine, .steps li, .caption, .note, .coda, .colSub, .smallprint,
+.fieldNote span, .timeline li > span:last-child, .findings p { text-wrap: pretty; }
+.chip {
+  display: inline-block;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-family: var(--font-geist-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-low);
+  white-space: nowrap;
+}
+.smallprint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ink-low);
+  max-width: 44rem;
+}
+
+/* still sections: generous, even rhythm */
+.still { padding-block: clamp(96px, 14vh, 176px) 0; }
+
+/* ── pinned scenes ──────────────────────────────────────────────────── */
+.sceneField { position: relative; height: calc(100svh + 260vh); }
+.sceneClock { position: relative; height: calc(100svh + 420vh); }
+.stillScene { position: relative; }
+.stage {
+  position: sticky;
+  top: var(--topbar-h);
+  height: calc(100svh - var(--topbar-h));
+  min-height: 560px;
+  overflow: clip;
+}
+.stillScene .stage {
+  position: relative;
+  top: auto;
+  height: min(calc(100svh - var(--topbar-h)), 900px);
+}
+.stillScene .stageMatch { height: min(78svh, 720px); }
+.stillScene .clockStage { height: auto; min-height: 0; padding-top: clamp(96px, 14vh, 176px); }
+@media (prefers-reduced-motion: reduce) {
+  .sceneField, .sceneClock { height: auto; }
+  .stage { position: relative; top: auto; }
+}
+
+/* ── 1+2 · the field ────────────────────────────────────────────────── */
+.heroText {
+  position: absolute;
+  left: var(--gutter);
+  right: var(--gutter);
+  top: clamp(28px, 7vh, 84px);
+  max-width: 1240px;
+  margin-inline: auto;
+  will-change: transform, opacity;
+}
+.heroText .h1 { margin-top: 18px; }
+.heroLine {
+  margin: clamp(18px, 3vh, 30px) 0 0;
+  max-width: 31rem;
+  font-size: clamp(17px, 1.45vw, 22px);
+  line-height: 1.45;
+  color: var(--ink-hi);
+}
+.matchText {
+  position: absolute;
+  left: var(--gutter);
+  right: var(--gutter);
+  top: clamp(28px, 6vh, 72px);
+  max-width: 1240px;
+  margin-inline: auto;
+  will-change: transform, opacity;
+}
+.steps {
+  list-style: none;
+  margin: clamp(16px, 2.6vh, 28px) 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  max-width: 40rem;
+  font-size: clamp(15px, 1.25vw, 19px);
+  line-height: 1.45;
+  color: var(--ink-hi);
+}
+.steps li { opacity: 0.26; }
+.stillScene .steps li { opacity: 1; }
+.steps b { font-family: var(--font-geist-mono); font-weight: 600; }
+
+.plane {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 54%;
+  bottom: 15%;
+}
+@media (max-width: 639px) { .plane { top: 49%; bottom: 21%; } }
+/* a tall tablet: the headline ends high, so the field comes up to meet it */
+@media (min-width: 640px) and (max-aspect-ratio: 4/5) { .plane { top: 44%; bottom: 24%; } }
+.planeMatch { top: 46%; bottom: 22%; }
+.planeInner {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.pitch {
+  position: absolute;
+  inset: 0;
+  color: rgba(214, 226, 255, 0.075);
+}
+.dots { position: absolute; inset: 0; }
+.dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  background: var(--dot);
+  box-shadow: 0 0 9px 1px color-mix(in srgb, var(--dot) 55%, transparent);
+}
+.overlay { position: absolute; inset: 0; pointer-events: none; }
+.axis {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -18px;
+  height: 1px;
+  background: var(--line);
+}
+.tick {
+  position: absolute;
+  left: 0;
+  bottom: -18px;
+  width: 0;
+  will-change: transform;
+}
+.tick i { position: absolute; left: 0; bottom: 0; width: 1px; background: var(--ink-faint); }
+.tickMajor { height: 7px; }
+.tickMinor { height: 4px; opacity: 0.7; }
+.tick span {
+  transition: opacity 200ms ease;
+  position: absolute;
+  top: 6px;
+  left: 0;
+  translate: -50% 0;
+  font-family: var(--font-geist-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--ink-low);
+  white-space: nowrap;
+}
+.focusDot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  background: var(--dot);
+  box-shadow: 0 0 0 1.5px var(--bs-bg), 0 0 14px 2px color-mix(in srgb, var(--dot) 70%, transparent);
+  will-change: transform;
+}
+.focusLab {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  gap: 2px;
+  padding-top: 18px;
+  white-space: nowrap;
+  will-change: transform, opacity;
+}
+.focusLabHome { translate: -100% 0; text-align: right; padding-right: 2px; }
+.focusLabAway { translate: 0 0; padding-left: 2px; }
+.focusName {
+  font-family: var(--display-face);
+  font-stretch: 90%;
+  font-weight: 700;
+  font-size: clamp(14px, 1.5vw, 20px);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--ink-hi);
+}
+.focusElo {
+  font-family: var(--font-geist-mono);
+  font-size: 12px;
+  color: var(--ink-mid);
+}
+.bracket, .venueSeg, .restSeg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1000px;
+  transform-origin: 0 50%;
+  will-change: transform, opacity;
+}
+.bracket {
+  height: 10px;
+  margin-top: -40px;
+  border: 1px solid var(--ink-low);
+  border-bottom: 0;
+}
+.venueSeg {
+  height: 0;
+  margin-top: 0;
+  border-top: 1.5px dashed var(--ink-mid);
+}
+.restSeg {
+  height: 3px;
+  margin-top: -1.5px;
+  background: var(--ink-hi);
+  box-shadow: 0 0 10px rgba(245, 245, 247, 0.35);
+}
+.ring {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  border: 1.5px solid var(--dot);
+  will-change: transform, opacity;
+}
+.segLab {
+  position: absolute;
+  left: 0;
+  top: 0;
+  translate: -50% 0;
+  font-family: var(--font-geist-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--ink-mid);
+  white-space: nowrap;
+  will-change: transform, opacity;
+}
+.segLabUp { margin-top: -64px; color: var(--ink-hi); }
+.segLabDown { margin-top: 44px; }
+.restLab { color: var(--ink-hi); font-weight: 600; }
+.nameShort { display: none; }
+@media (max-width: 639px) {
+  .nameFull { display: none; }
+  .nameShort { display: inline; }
+}
+
+.legend {
+  position: absolute;
+  left: var(--gutter);
+  right: var(--gutter);
+  max-width: 1240px;
+  margin-inline: auto;
+  bottom: clamp(18px, 3.4vh, 36px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 24px;
+  font-family: var(--font-geist-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-low);
+}
+.legendHead { color: var(--ink-mid); }
+.legendKeys { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.legendKey { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.legendKey i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dot);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--dot) 60%, transparent);
+}
+.cue {
+  position: absolute;
+  right: var(--gutter);
+  top: 50%;
+  display: none;
+}
+.fieldNote {
+  position: absolute;
+  left: var(--gutter);
+  right: var(--gutter);
+  max-width: 1240px;
+  margin-inline: auto;
+  bottom: clamp(18px, 3.4vh, 36px);
+  margin-block: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-low);
+}
+
+/* ── 3 · the board ──────────────────────────────────────────────────── */
+.boardGrid {
+  display: grid;
+  gap: 8px 48px;
+  align-items: end;
+}
+/* the intro and the frames under it span the page's one content column
+   (1240px), like every other section: the paragraph ends where the
+   pictures end, and at 1024–1920px the heading has 528–793px, enough
+   for "Every fixture," on one line and never for the whole of it.
+   The intro's track is measured in ITS OWN type size (21 × the body's
+   clamp, 336px at 1024 and 399px at 1920): a fixed 21rem held two lines
+   at 16px and three at 19px, leaving "picked." alone at 1920 (round 11).
+   `balance` evens the two lines wherever they break — at every width:
+   under the heading at 768px the 34rem measure left "picked." alone too. */
+.boardGrid .body { text-wrap: balance; }
+/* …and beside the heading it is SET RIGHT (round 12): balanced lines are
+   shorter than their track, so flush-left text stopped ~44px short of the
+   frames' right edge at 1024–1920. Flush right, both lines end on it. */
+@media (min-width: 1024px) {
+  .boardGrid { grid-template-columns: minmax(0, 1fr) minmax(0, calc(21 * clamp(16px, 1.15vw, 19px))); }
+  .boardGrid .body { margin-bottom: 6px; text-align: right; }
+}
+/* THE BOARD, BOTH HALVES (BoardShot.tsx). Wide: two frames side by side,
+   still, one whole board column each; each cell grows in its crop's
+   width from a base of its two insets, so both images draw at one scale
+   and one height. Narrow: one frame under the board's switch holding the
+   same two crops at one scale — the wider fills it, the narrower is
+   centred on the board's own ground — stacked in one grid cell, so a
+   switch moves no layout: opacity only. Below 1024px the figure is 460px
+   at most, centred, and its caption keeps to that width. Every frame
+   keeps an inset of the board's ground inside its hairline (--shot-inset)
+   so no capture's edge — the Nations League date rule runs to its crop's
+   edge — reaches the frame. */
+.shot { --shot-inset: 10px; margin: clamp(28px, 5vh, 48px) auto 0; max-width: 460px; }
+.shotPair { display: none; }
+.shotSolo { display: grid; justify-items: center; }
+@media (min-width: 1024px) {
+  .shot { --shot-inset: 14px; margin-inline: 0; max-width: none; }
+  .shotPair { display: flex; gap: 20px; }
+  .shotSolo { display: none; }
+}
+.pairCell { min-width: 0; flex: var(--grow) 1 calc(2 * var(--shot-inset)); }
+.pairLabel {
+  margin: 0 0 10px;
+  font-family: var(--font-geist-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-mid);
+}
+.pairLabel b { font-weight: 500; color: var(--ink-hi); }
+.modeSwitch {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bs-elev2);
+}
+.modeSwitch button {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  font-family: var(--font-geist-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  /* ink-mid, not ink-low: 11px on the switch's ground needs AA (4.5:1),
+     and the unpressed label is the only cue that a second board exists */
+  color: var(--ink-mid);
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+.modeSwitch button:hover { color: var(--ink-hi); }
+.modeSwitch button[aria-pressed="true"] { border-color: var(--accent); background: var(--bs-bg); color: var(--ink-hi); }
+.shotBox { position: relative; margin-top: 14px; justify-self: stretch; }
+.shotLine { position: absolute; left: 0; right: 0; top: 50%; height: 1px; pointer-events: none; }
+/* the hairline is drawn OVER the frame's edge, not around it: a real
+   border takes 2px off every frame, which is a larger share of the
+   narrower one, so the pair's two scales (and heights) came out ~0.1%
+   apart */
+.shotFrame {
+  position: relative;
+  display: grid;
+  padding: var(--shot-inset);
+  background: var(--bs-bg);
+  border-radius: 10px;
+  overflow: clip;
+}
+.shotFrame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: inherit;
+  pointer-events: none;
+}
+.shotLayer {
+  grid-area: 1 / 1;
+  position: relative;
+  align-self: start;
+  justify-self: center;
+  width: 100%;
+  transition: opacity 240ms ease;
+}
+.shotLayer[data-on="false"] { opacity: 0; pointer-events: none; }
+.shotImg { display: block; width: 100%; height: auto; }
+.pins { list-style: none; margin: 0; padding: 0; position: absolute; inset: 0; pointer-events: none; }
+.pins li, .pinKey b {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--ink-hi);
+  background: var(--bs-bg);
+  font-family: var(--font-geist-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-hi);
+}
+/* a pin starts 6px AFTER the thing it names, centred on its line
+   (BoardShot.tsx): the same clearance at every scale. A pin set UNDER a
+   thing ends on its right edge and starts a few px below its label. */
+.pins li { position: absolute; translate: 0 -50%; margin-left: 6px; }
+.pins li[data-at="under"] { translate: -100% 0; margin-left: 0; margin-top: 5px; }
+@media (max-width: 1023px) {
+  .pins li { width: 18px; height: 18px; font-size: 10px; }
+  .pins li[data-at="under"] { margin-top: 4px; }
+}
+/* a phone's capture is drawn at ~0.3 of its pixels: a pin a step smaller
+   keeps every pin inside its card down to 320px */
+@media (max-width: 479px) {
+  .pins li { width: 16px; height: 16px; font-size: 9px; margin-left: 4px; }
+}
+.shotCap {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px 24px;
+  font-family: var(--font-geist-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-low);
+}
+.pinKey { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 22px; color: var(--ink-mid); }
+.pinKey li { display: inline-flex; align-items: center; gap: 8px; }
+.pinKey b { width: 18px; height: 18px; font-size: 10px; }
+.shotMeta { text-transform: uppercase; letter-spacing: 0.12em; font-size: 10px; }
+
+/* ── 4 · the match clock ────────────────────────────────────────────── */
+.clockStage { display: flex; flex-direction: column; justify-content: center; }
+.clockGrid {
+  width: 100%;
+  display: grid;
+  gap: 18px;
+  align-content: center;
+}
+@media (min-width: 1024px) {
+  .clockGrid { grid-template-columns: minmax(0, 0.36fr) minmax(0, 0.64fr); gap: 56px; align-items: center; }
+}
+.clockText .h2 { font-size: clamp(34px, 5vw, 84px); }
+@media (max-width: 767px) {
+  .clockText .h2 { font-size: 34px; }
+  .clockNow { margin-top: 10px; }
+  .minute { font-size: 60px; }
+  .captionSlot { margin-top: 10px; }
+  .caption { font-size: 15px; }
+  .clockGrid { gap: 10px; }
+  .readout th, .readout td { padding: 3px 0; }
+}
+.clockNow { display: flex; align-items: flex-end; gap: 18px; margin-top: clamp(14px, 3vh, 36px); }
+.minute {
+  font-size: clamp(64px, 8.6vw, 148px);
+  font-variant-numeric: tabular-nums;
+  min-width: 2.15ch;
+  line-height: 0.8;
+}
+.scoreline {
+  display: grid;
+  /* the phase label spans every column; the trailing 1fr takes its extra
+     width, so "full time · recorded" never spreads the score apart */
+  grid-template-columns: auto auto auto 1fr;
+  align-items: baseline;
+  column-gap: 10px;
+  padding-bottom: 4px;
+  font-family: var(--font-geist-mono);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: var(--ink-mid);
+}
+.scoreline b { font-size: 22px; color: var(--ink-hi); font-weight: 600; font-variant-numeric: tabular-nums; }
+.scoreline em {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  font-style: normal;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--ink-low);
+}
+/* every caption in one grid cell (MatchClock.tsx): the slot is always
+   the tallest one's height, at every width, so a caption change never
+   moves the pinned stage */
+.captionSlot {
+  display: grid;
+  margin: clamp(14px, 3vh, 34px) 0 0;
+  max-width: 30rem;
+}
+.caption {
+  grid-area: 1 / 1;
+  margin: 0;
+  font-size: clamp(16px, 1.3vw, 20px);
+  line-height: 1.45;
+  color: var(--ink-hi);
+  visibility: hidden;
+}
+.caption[data-on="true"] {
+  visibility: visible;
+  animation: capIn 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.caption b, .timeline b { font-family: var(--font-geist-mono); font-weight: 600; font-size: 0.92em; }
+@keyframes capIn {
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  to { opacity: 1; transform: none; }
+}
+.capTag {
+  display: inline-block;
+  min-width: 3.2em;
+  margin-right: 10px;
+  font-family: var(--font-geist-mono);
+  font-size: 0.72em;
+  letter-spacing: 0.1em;
+  color: var(--ink-low);
+}
+.clockChart { min-width: 0; }
+.chartHead {
+  display: flex;
+  flex-wrap: wrap;           /* at 320px the label goes under the key, whole */
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px 12px;
+  margin-bottom: 8px;
+}
+.legendInline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-geist-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-low);
+}
+.keySolid, .keyDash { display: inline-block; width: 18px; height: 0; border-top: 2px solid var(--ink-mid); }
+.keyDash { border-top: 1.5px dashed var(--ink-mid); margin-left: 8px; }
+.chartBox {
+  position: relative;
+  height: clamp(220px, 40vh, 420px);
+}
+@media (max-width: 767px) {
+  .chartBox { height: clamp(170px, 27svh, 260px); }
+}
+.chartSvg { position: absolute; inset: 0; overflow: visible; }
+/* THE REVEAL WINDOW. Two composited layers moved in opposite directions
+   (MatchClock.tsx): the window's right edge is the clock, the ink inside
+   never moves, and nothing is repainted per frame. */
+.revealWin {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  will-change: transform;
+}
+.revealInner { position: absolute; inset: 0; will-change: transform; }
+.revealInner svg { position: absolute; inset: 0; overflow: visible; }
+.standLab {
+  position: absolute;
+  display: grid;
+  justify-items: start;
+  /* one line wherever it fits: it is measured at the widest free span of
+     the band (MatchClock.tsx) and wraps only past that */
+  white-space: normal;
+  padding: 7px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: rgba(5, 5, 7, 0.88);
+  gap: 2px;
+  font-family: var(--font-geist-mono);
+  font-size: 10px;
+  line-height: 1.35;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-mid);
+  pointer-events: none;
+}
+/* "model stands down" breaks evenly where it must ("model / stands
+   down", never "model stands / down"); "red card 54′" never breaks — where
+   it cannot fit, it steps aside (below) */
+.standLab span:first-child { color: var(--ink-hi); text-wrap: balance; }
+.standLab span:last-child { white-space: nowrap; }
+/* no spot in the band fits both lines, or the red card's line is wider
+   than the band's widest free span (≤375px): it steps aside — the event
+   rail marks the card right above the stop */
+.standLab[data-compact] span:last-child { display: none; }
+.cellQuiet { color: var(--ink-low) !important; font-size: 11px; letter-spacing: 0.04em; white-space: nowrap; }
+@media (max-width: 767px) {
+  .standLab { font-size: 9px; letter-spacing: 0.05em; line-height: 1.2; gap: 1px; padding: 4px 6px; }
+}
+.chartTxt { font-family: var(--font-geist-mono); font-size: 10.5px; fill: var(--ink-low); }
+.cursor {
+  position: absolute;
+  left: 0;
+  width: 0;
+  border-left: 1px dashed rgba(245, 245, 247, 0.7);
+  will-change: transform;
+}
+.dotModel, .dotMarket {
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  will-change: transform;
+}
+.dotModel { box-shadow: 0 0 0 1.5px var(--bs-bg); }
+.dotMarket { background: var(--bs-bg); border: 1.6px solid; }
+.readout {
+  width: 100%;
+  margin-top: 10px;
+  border-collapse: collapse;
+  font-family: var(--font-geist-mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.readout th, .readout td { padding: 5px 0; text-align: right; font-weight: 400; }
+.readout thead th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-low); padding-bottom: 4px; }
+.readout tbody tr { border-top: 1px solid var(--line); }
+.readout tbody th { text-align: left; color: var(--ink-mid); white-space: nowrap; }
+.readout tbody th i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 10px; }
+.readout td { color: var(--ink-hi); width: 22%; }
+.note {
+  margin: 8px 0 0;
+  min-height: 1.5em;   /* one line reserved: the longest note never moves the stage */
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-mid);
+}
+.provenance {
+  margin: 4px 0 0;
+  font-family: var(--font-geist-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  line-height: 1.6;
+  color: var(--ink-low);
+}
+/* A SHORT PHONE — an SE, or any phone with its browser toolbars showing.
+   The stacked caption slot is the tallest caption (three lines at 360px
+   and below), and the pinned stage clips: so on a screen this short the
+   clock sets everything a step smaller rather than lose its last lines.
+   And the stage is the screen, no taller (2026-10-03): the shared 560px
+   floor made it 49→609px in a 548px window, so the clock's last lines
+   were pinned below the fold for the whole scene. Here the key line and
+   the fine print step aside — the table already heads its column "gap",
+   and the "shadow · not advice" chip above the chart stays — which buys
+   the 46px the stage needs at 375×548 and 320×568. If a screen is
+   shorter still, `safe` centring keeps the eyebrow and the minute on
+   screen and lets the bottom go first. The still clock (reduced motion)
+   is not pinned, so it keeps both lines. */
+@media (max-width: 767px) and (max-height: 660px) {
+  .sceneClock .clockStage { min-height: 0; justify-content: safe center; }
+  .clockText .h2 { font-size: 28px; }
+  .clockNow { margin-top: 6px; }
+  .minute { font-size: 46px; }
+  .captionSlot { margin-top: 6px; }
+  .caption { font-size: 14px; }
+  .clockGrid { gap: 8px; }
+  .chartBox { height: clamp(130px, 24svh, 200px); }
+  .readout { margin-top: 6px; font-size: 12px; }
+  .readout th, .readout td { padding: 2px 0; }
+  .sceneClock .note, .sceneClock .provenance { display: none; }
+}
+.timeline {
+  list-style: none;
+  margin-top: 36px;
+  display: grid;
+  gap: 10px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink-mid);
+}
+.timeline li { display: grid; grid-template-columns: 3.6em 1fr; border-top: 1px solid var(--line); padding-top: 10px; }
+
+/* ── 5 · full time ──────────────────────────────────────────────────── */
+.review {
+  margin-top: clamp(28px, 5vh, 56px);
+  background: var(--bs-elev);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: clamp(20px, 3vw, 40px);
+  will-change: clip-path;
+}
+.reviewHead { display: grid; justify-items: center; text-align: center; gap: 14px; padding-bottom: clamp(18px, 3vh, 30px); border-bottom: 1px solid var(--line); }
+.final {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.4em;
+  font-size: clamp(26px, 4.4vw, 64px);
+  line-height: 0.95;
+}
+.final span:first-child { text-align: right; color: var(--ink-hi); }
+.final span:last-child { text-align: left; color: var(--ink-hi); }
+.final b {
+  padding: 0.12em 0.32em;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  color: var(--ink-hi);
+  font-stretch: 100%;
+  font-variant-numeric: tabular-nums;
+}
+.reviewCols { display: grid; gap: 28px; padding-top: clamp(18px, 3vh, 30px); }
+@media (min-width: 900px) { .reviewCols { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px; } }
+.reviewCol { min-width: 0; }
+.colHead { margin: 0; font-family: var(--font-geist-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--ink-hi); font-weight: 500; }
+.colSub { margin: 6px 0 0; font-size: 12px; line-height: 1.45; color: var(--ink-low); }
+/* a caption's tail is one unit: on any font's metrics its last word never
+   wraps alone (CI's Linux fonts left "de-vigged" alone at 320) */
+.keep { white-space: nowrap; }
+.triple { margin: 14px 0 0; display: grid; gap: 0; }
+.triple div { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 0; border-top: 1px solid var(--line); }
+.triple dt { font-size: 14px; color: var(--ink-mid); }
+.triple dd { margin: 0; font-family: var(--font-geist-mono); font-size: 18px; color: var(--ink-hi); font-variant-numeric: tabular-nums; }
+.triple small { font-size: 11px; color: var(--ink-low); margin-left: 2px; }
+.events { list-style: none; margin: 14px 0 0; padding: 0; }
+/* the events column has no sub-line, so on one row its list starts where
+   the other two columns' figures do */
+@media (min-width: 900px) { .colHead + .events { margin-top: calc(6px + 1.45 * 12px + 14px); } }
+.events li { display: grid; grid-template-columns: 3em 14px 1fr; align-items: center; gap: 6px; padding: 7px 0; border-top: 1px solid var(--line); font-size: 14px; color: var(--ink-mid); }
+.evMin { font-family: var(--font-geist-mono); font-size: 13px; color: var(--ink-hi); }
+.evGoal { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-hi); }
+.evRed { width: 6px; height: 10px; border-radius: 1px; background: var(--neg); margin-left: 1px; }
+.coda { margin: 22px 0 0; max-width: 48rem; font-size: clamp(15px, 1.15vw, 18px); line-height: 1.55; color: var(--ink-mid); }
+
+/* ── 6 · the record ─────────────────────────────────────────────────── */
+.figures {
+  margin: clamp(32px, 6vh, 64px) 0 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--line-strong);
+}
+@media (min-width: 1024px) { .figures { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* column-reverse puts the label under its number; flex-end (the TOP, in
+   a reversed column) keeps every number on one line when a label wraps */
+.figures div { padding: 18px 16px 22px 0; border-bottom: 1px solid var(--line); display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: 10px; }
+.figures dd { margin: 0; font-size: clamp(40px, 4.6vw, 76px); font-variant-numeric: tabular-nums; }
+.figures dt { font-family: var(--font-geist-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-low); }
+.findings {
+  list-style: none;
+  margin: clamp(40px, 7vh, 72px) 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+  max-width: 54rem;
+}
+.findings li { display: grid; gap: 6px 32px; padding: 20px 0; border-top: 1px solid var(--line); }
+/* the figures' own bottom rule is the line above the first finding */
+.findings li:first-child { border-top: 0; padding-top: 0; }
+@media (min-width: 768px) { .findings li { grid-template-columns: 15rem 1fr; } }
+.findings p { margin: 0; font-size: clamp(17px, 1.4vw, 21px); line-height: 1.5; color: var(--ink-hi); }
+.findings b { font-family: var(--font-geist-mono); font-weight: 600; font-size: 0.9em; white-space: nowrap; }
+/* the shadow chip under the last finding sits on its own line: inline,
+   `pretty` read it as a last line too short to stand alone and pulled
+   "price." down beside it, breaking a sentence that fits on one line */
+.findings p .chip { display: block; width: fit-content; margin-top: 10px; }
+.findTag { padding-top: 5px; font-family: var(--font-geist-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-low); }
+
+/* ── 7 · the door ───────────────────────────────────────────────────── */
+.end { padding-block: clamp(120px, 18vh, 220px) clamp(72px, 10vh, 120px); display: flex; flex-direction: column; align-items: flex-start; }
+.end > p:first-child { margin: 0 0 28px; }
+.cta {
+  margin-top: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 26px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #0a0a0c;
+  font-family: var(--font-geist-mono);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+.cta:hover { background: #ffd25a; transform: translateX(2px); }
+.cta span { transition: transform 160ms ease; }
+.cta:hover span { transform: translateX(3px); }
+/* ONE LABEL COLUMN (round 12): every value starts on one left edge — as
+   wrapped inline pairs, "github" is wider than "email" and the two
+   addresses started 8px apart at 390px. A row per contact, the rows a
+   subgrid of the list's two tracks. */
+.contact { list-style: none; margin: 36px 0 0; padding: 0; display: grid; grid-template-columns: max-content minmax(0, auto); gap: 12px 16px; }
+.contact li { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: baseline; }
+.contactKey { font-family: var(--font-geist-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--ink-low); }
+.contact a { font-size: 15px; color: var(--ink-hi); text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 4px; overflow-wrap: anywhere; }
+.contact a:hover { text-decoration-color: var(--ink-hi); }
+/* the rule is drawn in the CONTENT column, like every other rule on the
+   page (round 12: as a border on the padded wrap it ran 44–1396px at
+   1440, past the 100–1340 column) */
+.footer {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-block: 24px 40px;
+  font-family: var(--font-geist-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--ink-faint);
+}
+.footer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: var(--gutter);
+  right: var(--gutter);
+  height: 1px;
+  background: var(--line);
+}
+.footer span { display: inline-flex; align-items: center; gap: 8px; }
+
+/* ── reduced motion: nothing moves, nothing is withheld ─────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .caption, .caption[data-on="true"] { animation: none; }
+  .cta, .cta span { transition: none; }
+  .shotLayer, .modeSwitch button { transition: none; }
+}

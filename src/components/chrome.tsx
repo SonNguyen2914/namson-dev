@@ -5,7 +5,8 @@
 // section you're reading lights up.
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
+import { Wordmark } from "./Wordmark";
 
 /** THE FIELD, FROM THE TOP-LEFT OF EVERY PAGE THAT CARRIES THE NAV.
  *
@@ -54,68 +55,180 @@ function FieldLink() {
   );
 }
 
-export function TopBar({ back, left, title, children }: {
+/** THE LOGO, IN THE MIDDLE OF EVERY BAR, AND IT GOES HOME.
+ *
+ *  "put the Logo in the middle of the header bar to go back to landing
+ *   page"                                        (Son, 2026-10-03)
+ *
+ *  ONE PIECE OF CHROME, LIKE THE FIELD LINK: it is in TopBar itself, so
+ *  every page has it by construction and the page that ships next
+ *  cannot forget it.
+ *
+ *  TRULY CENTRED, AND IT CANNOT COLLIDE. The bar is a three-track grid,
+ *  `minmax(0,1fr) auto minmax(0,1fr)`: the two side tracks are always
+ *  equal, so the logo sits on the bar's own axis, and each side is a
+ *  `min-w-0` box its contents must live inside — the left cluster
+ *  truncates its title, the right chip rail scrolls within itself.
+ *
+ *  THE SEVEN LETTERS ONLY FROM `lg` (round 9). Between md and lg they
+ *  cost each side track ~35px, which cut every page title at 768px to a
+ *  fragment ("WC…", "ML…"); below lg the gold mark stands alone in a
+ *  44px box. From lg the box has a FIXED width, a little wider than the
+ *  word set in Archivo: the letters arrive with the font after first
+ *  paint (font-display: swap), and an auto-width middle track that grew
+ *  by 16px when they did made both sides — title and rail — jump on
+ *  every cold load. The gap between the three tracks is 4px below `sm`
+ *  (measured: at 390px the archive menu plus a back arrow overran a
+ *  145px left track by 2px at 8px). The gaps INSIDE the left cluster
+ *  stay 8px: at 6px the back arrow's 44px touch box reached the field
+ *  link's centre and answered its press
+ *  (e2e/the-floor-is-the-pointer-not-the-width.spec.ts). */
+function HomeLogo() {
+  const router = useRouter();
+  const here = router.pathname === "/";
+  return (
+    <Link href="/" data-testid="home-logo" aria-label="TRIVELA home"
+      aria-current={here ? "page" : undefined}
+      className="flex h-11 min-w-11 shrink-0 items-center justify-center rounded-md px-1.5 transition-opacity hover:opacity-80 lg:w-[120px]">
+      <Wordmark letters="hidden lg:inline" />
+    </Link>
+  );
+}
+
+/** THE CHIP RAIL, AND WHERE IT RUNS OUT.
+ *
+ *  The rail scrolls inside its own box, and a scrollbar is hidden
+ *  (`no-scrollbar`), so a rail cut at its edge read as a chip cut in
+ *  half ("PREDICTIO", "FRIENDLIE") with nothing saying there was more.
+ *  An edge that has more beyond it now FADES — the right edge while
+ *  there is more to the right, the left edge once the rail has been
+ *  scrolled — and an edge with nothing beyond it stays sharp. Measured,
+ *  not assumed: the chips change width when the fonts land and a live
+ *  chip can join the rail at any time, so the rail watches its own box,
+ *  each chip's box and its list of chips. */
+function Rail({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLElement | null>(null);
+  const [fade, setFade] = useState("");
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const read = () => {
+      const more = el.scrollWidth - el.clientWidth - el.scrollLeft;
+      const f = `${el.scrollLeft > 1 ? "l" : ""}${more > 1 ? "r" : ""}`;
+      setFade((v) => (v === f ? v : f));
+    };
+    read();
+    el.addEventListener("scroll", read, { passive: true });
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(read);
+    const watchChips = () => {
+      if (!ro) return;
+      ro.observe(el);
+      Array.from(el.children).forEach((c) => ro.observe(c));
+    };
+    watchChips();
+    const mo = new MutationObserver(() => { watchChips(); read(); });
+    mo.observe(el, { childList: true });
+    return () => {
+      el.removeEventListener("scroll", read);
+      ro?.disconnect();
+      mo.disconnect();
+    };
+  }, []);
+  return (
+    // min-w-0 (NOT shrink-0): the chip rail must compress and scroll
+    // within itself — a rigid rail forced the whole page wider than the
+    // viewport, horizontal-scrolling the entire app.
+    // py-2 -my-2: HEADROOM FOR A GLOW, at no cost to the layout.
+    // `overflow-x: auto` forces overflow-y to `auto` too, so this nav is
+    // a clipping box the exact height of a chip — a lit chip's outer
+    // bloom was being sliced off top and bottom with 0px to spare. The
+    // negative margin gives the padding back, so the rail sits precisely
+    // where it did.
+    <nav ref={ref} data-fade={fade || undefined}
+      className="topbar-rail no-scrollbar -my-2 flex min-w-0 items-center gap-1.5 overflow-x-auto py-2">
+      {children}
+    </nav>
+  );
+}
+
+export function TopBar({ back, left, title, children, inner, rail = "row" }: {
   back?: { href: string; label: string };
+  // The inner row's width and gutters. Every app page takes the default
+  // (the board's 5xl measure); the home page passes its own wider
+  // column so the bar's edges line up with the page under it.
+  inner?: string;
   // Far-left slot, ahead of the back link. The archive dropdown lives
   // here on the surfaces that have no "back" (the board is the root of
   // the app), so the top-left corner is either wayfinding OUT or
   // wayfinding DOWN — never both fighting over the same 40px.
   left?: ReactNode;
-  title: ReactNode;
+  // optional since 2026-10-03: the home page's bar is field · logo ·
+  // board, and a title beside the logo would only say the logo twice
+  title?: ReactNode;
   children?: ReactNode;               // right side: nav chips / status
+  /* WHERE THE CHIP RAIL GOES ON A PHONE (below `sm`), round 9.
+   *  "row" (the default): a full-width second row under the bar. With
+   *  the logo in the centre, the right track is half the bar — 149px at
+   *  390px — and a match hub showed two chips of five, the second cut
+   *  mid-word, where the rail had ~300px before the logo moved. Under
+   *  the bar it has the whole width again (350px), as the board's own
+   *  pills already do. The bar is then 89px tall, and `--topbar-h`
+   *  follows it in globals.css (declared, so the first paint is right).
+   *  "inline": the rail stays in the right track — for a rail of one
+   *  short chip (the home page's "open the board") that fits there. */
+  rail?: "row" | "inline";
 }) {
+  const row = children != null && rail === "row";
   return (
-    <header className="topbar">
-      <div className="mx-auto flex h-12 max-w-5xl items-center gap-2 px-5 sm:gap-4">
-        <FieldLink />
-        {left}
-        {back && (
-          <Link href={back.href} aria-label={back.label}
-            onClick={(e) => {
-              // "back" means where the user WAS. A hardcoded href resets
-              // the board to its default league tab (WC26), losing their
-              // place — reported after every Leagues Cup visit. Real
-              // history wins when it exists; the href stays as the
-              // fallback for direct/bookmarked loads.
-              // same-origin referrer required: history.length counts
-              // about:blank/new-tab entries, so on a DIRECT load back()
-              // would exit the site — e2e decision-safety.spec caught
-              // exactly that. Direct loads follow the href fallback.
-              if (typeof window !== "undefined"
-                  && window.history.length > 1
-                  && document.referrer.startsWith(window.location.origin)) {
-                e.preventDefault();
-                window.history.back();
-              }
-            }}
-            className="shrink-0 font-mono text-[11px] uppercase tracking-[0.16em] text-ink-low transition-colors hover:text-accent">
-            {/* arrow always; the label only where there's room (sm+),
-                so the nav chip rail gets the full width on phones */}
-            ←<span className="hidden sm:inline"> {back.label}</span>
-          </Link>
-        )}
-        {/* Title is hidden on phones: the match-info card directly below
-            already shows the matchup, so a truncated "RBNY …" here only
-            stole room from the nav rail (leaving chips cut off). Shows
-            again from sm+, where there's width for it. */}
-        <div className="hidden min-w-0 truncate font-mono text-[11px] uppercase tracking-[0.2em] text-ink-mid sm:block">
-          {title}
+    <header className="topbar" data-rail={children != null ? rail : undefined}>
+      <div className={`mx-auto grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] grid-rows-[3rem] items-center gap-x-1 sm:gap-x-4 ${
+        row ? "max-sm:grid-rows-[3rem_2.5rem]" : ""} ${inner ?? "max-w-5xl px-5"}`}>
+        <div data-testid="topbar-left" className="flex min-w-0 items-center gap-2 sm:gap-4">
+          <FieldLink />
+          {left}
+          {back && (
+            <Link href={back.href} aria-label={back.label}
+              onClick={(e) => {
+                // "back" means where the user WAS. A hardcoded href resets
+                // the board to its default league tab (WC26), losing their
+                // place — reported after every Leagues Cup visit. Real
+                // history wins when it exists; the href stays as the
+                // fallback for direct/bookmarked loads.
+                // same-origin referrer required: history.length counts
+                // about:blank/new-tab entries, so on a DIRECT load back()
+                // would exit the site — e2e decision-safety.spec caught
+                // exactly that. Direct loads follow the href fallback.
+                if (typeof window !== "undefined"
+                    && window.history.length > 1
+                    && document.referrer.startsWith(window.location.origin)) {
+                  e.preventDefault();
+                  window.history.back();
+                }
+              }}
+              className="shrink-0 font-mono text-[11px] uppercase tracking-[0.16em] text-ink-low transition-colors hover:text-accent">
+              {/* arrow always; the label only from lg (round 9): between
+                  sm and lg it took the room the page's own title needed,
+                  and the arrow carries the same way out */}
+              ←<span className="hidden lg:inline"> {back.label}</span>
+            </Link>
+          )}
+          {/* Title is hidden on phones: the match-info card directly below
+              already shows the matchup, so a truncated "RBNY …" here only
+              stole room from the nav rail (leaving chips cut off). Shows
+              again from sm+, where there's width for it — and where it
+              still truncates, the whole of it is the hover title. */}
+          {title != null && title !== "" && (
+            <div title={typeof title === "string" ? title : undefined}
+              className="hidden min-w-0 truncate font-mono text-[11px] uppercase tracking-[0.2em] text-ink-mid sm:block">
+              {title}
+            </div>
+          )}
         </div>
-        {children && (
-          // min-w-0 (NOT shrink-0): the chip rail must compress and scroll
-          // within itself on phones — a rigid rail forced the whole page
-          // wider than the viewport, horizontal-scrolling the entire app.
-          // On mobile the title is hidden, so the rail gets the full width.
-          // py-2 -my-2: HEADROOM FOR A GLOW, at no cost to the layout.
-          // `overflow-x: auto` forces overflow-y to `auto` too, so this
-          // nav is a clipping box the exact height of a chip — a lit
-          // chip's outer bloom was being sliced off top and bottom with
-          // 0px to spare. The negative margin gives the padding back, so
-          // the rail sits precisely where it did.
-          <nav className="no-scrollbar -my-2 ml-auto flex min-w-0 items-center gap-1.5 overflow-x-auto py-2">
-            {children}
-          </nav>
-        )}
+        <HomeLogo />
+        <div data-testid="topbar-right" className={`flex min-w-0 items-center justify-end ${
+          row ? "max-sm:col-span-3 max-sm:row-start-2 max-sm:justify-start" : ""}`}>
+          {children != null && <Rail>{children}</Rail>}
+        </div>
       </div>
     </header>
   );

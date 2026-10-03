@@ -212,7 +212,7 @@ const wcFont = Anton({ weight: "400", subsets: ["latin"] });
 // The competition's own palette, kept beside the view it drives (it used
 // to be entry 0 of the carousel's LEAGUES array).
 const WC26 = {
-  id: "wc26", name: "World Cup 26", top: "WC26 · Bet Suggester",
+  id: "wc26", name: "World Cup 26", top: "WC26",
   eyebrow: "live model · kalshi markets",
   accent: "#f5c542", dim: "rgba(245,197,66,0.35)", faint: "rgba(245,197,66,0.10)",
   ambient: "rgba(245,197,66,0.07)", modeMs: 3200,

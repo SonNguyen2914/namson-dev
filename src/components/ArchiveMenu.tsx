@@ -178,7 +178,12 @@ export function ArchiveMenu({ current }: { current?: string }) {
             : "border-line text-ink-low hover:border-line-strong hover:text-ink-hi"
         }`}
       >
-        Archive
+        {/* THE WORD GOES BELOW 360px, THE NAME STAYS (round 9). At 320px
+            (iPhone SE, or a mini with Display Zoom) field · ARCHIVE · ←
+            is 129px in a 114px track: it ran 11px into the centred logo,
+            and a press on the back arrow went home. The ▾ alone is the
+            button there; "Archive" stays its accessible name. */}
+        <span className="max-[360px]:sr-only">Archive</span>
         <span aria-hidden
           className={`text-[8px] leading-none transition-transform ${open ? "rotate-180" : ""}`}>
           ▾

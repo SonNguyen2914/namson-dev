@@ -1,0 +1,817 @@
+{
+"about": "Every current-season club of the eight board leagues on the overall axis of the league field, as GET /api/field/leagues served it (read-only, committed bytes; no board, no capture). Fetched once while authoring the landing page, 2026-10-02. Only club, column and the rating are kept.",
+"route": "GET /api/field/leagues",
+"fetched": "2026-10-02",
+"passes": 10,
+"corpus_sha256": "bf58f88facb0378a4e70fd294ba85c96b03521b81720f8b6cc93be349bac5695",
+"slices_sha256": "a5fcf62bb277fec3b92db1d681391d68de71da7f1607b2d055d1672f89edfc1b",
+"source": "research_archive/goal_axes_every_club_2026-09-25/league_field/slices.json",
+"columns": [
+{
+"key": "epl",
+"display": "Premier League"
+},
+{
+"key": "laliga",
+"display": "La Liga"
+},
+{
+"key": "mls",
+"display": "MLS"
+},
+{
+"key": "ligamx",
+"display": "Liga MX"
+},
+{
+"key": "bundesliga",
+"display": "Bundesliga"
+},
+{
+"key": "seriea",
+"display": "Serie A"
+},
+{
+"key": "ligue1",
+"display": "Ligue 1"
+},
+{
+"key": "eredivisie",
+"display": "Eredivisie"
+}
+],
+"home_term_elo": 65,
+"home_term_source": "backend src/models/home_advantage.CORPUS_HOME_ELO (+65, what the corpus model ships); the board's venue line reads the same constant (frontend lib/pickerApi.HOME_ELO)",
+"clubs": [
+{
+"club": "Bayern München",
+"column": "bundesliga",
+"elo": 2063.7
+},
+{
+"club": "Arsenal",
+"column": "epl",
+"elo": 2045.7
+},
+{
+"club": "Manchester City",
+"column": "epl",
+"elo": 2031.8
+},
+{
+"club": "Barcelona",
+"column": "laliga",
+"elo": 1998.3
+},
+{
+"club": "Paris Saint Germain",
+"column": "ligue1",
+"elo": 1986.6
+},
+{
+"club": "Aston Villa",
+"column": "epl",
+"elo": 1948.0
+},
+{
+"club": "Real Madrid",
+"column": "laliga",
+"elo": 1938.4
+},
+{
+"club": "Manchester United",
+"column": "epl",
+"elo": 1934.5
+},
+{
+"club": "Bournemouth",
+"column": "epl",
+"elo": 1911.1
+},
+{
+"club": "Liverpool",
+"column": "epl",
+"elo": 1901.5
+},
+{
+"club": "Inter",
+"column": "seriea",
+"elo": 1888.6
+},
+{
+"club": "Brighton",
+"column": "epl",
+"elo": 1881.9
+},
+{
+"club": "Brentford",
+"column": "epl",
+"elo": 1870.8
+},
+{
+"club": "Chelsea",
+"column": "epl",
+"elo": 1864.9
+},
+{
+"club": "Newcastle",
+"column": "epl",
+"elo": 1864.4
+},
+{
+"club": "Borussia Dortmund",
+"column": "bundesliga",
+"elo": 1856.6
+},
+{
+"club": "Atletico Madrid",
+"column": "laliga",
+"elo": 1851.2
+},
+{
+"club": "Lens",
+"column": "ligue1",
+"elo": 1845.1
+},
+{
+"club": "PSV Eindhoven",
+"column": "eredivisie",
+"elo": 1842.2
+},
+{
+"club": "Nottingham Forest",
+"column": "epl",
+"elo": 1840.2
+},
+{
+"club": "Bayer Leverkusen",
+"column": "bundesliga",
+"elo": 1840.2
+},
+{
+"club": "Leeds",
+"column": "epl",
+"elo": 1838.9
+},
+{
+"club": "Fulham",
+"column": "epl",
+"elo": 1830.9
+},
+{
+"club": "Everton",
+"column": "epl",
+"elo": 1823.4
+},
+{
+"club": "Crystal Palace",
+"column": "epl",
+"elo": 1822.4
+},
+{
+"club": "Tottenham",
+"column": "epl",
+"elo": 1799.7
+},
+{
+"club": "RB Leipzig",
+"column": "bundesliga",
+"elo": 1796.1
+},
+{
+"club": "Lyon",
+"column": "ligue1",
+"elo": 1794.6
+},
+{
+"club": "Sunderland",
+"column": "epl",
+"elo": 1794.5
+},
+{
+"club": "AS Roma",
+"column": "seriea",
+"elo": 1793.6
+},
+{
+"club": "Napoli",
+"column": "seriea",
+"elo": 1792.2
+},
+{
+"club": "Real Betis",
+"column": "laliga",
+"elo": 1791.5
+},
+{
+"club": "VfB Stuttgart",
+"column": "bundesliga",
+"elo": 1789.8
+},
+{
+"club": "Juventus",
+"column": "seriea",
+"elo": 1786.4
+},
+{
+"club": "Villarreal",
+"column": "laliga",
+"elo": 1782.0
+},
+{
+"club": "Marseille",
+"column": "ligue1",
+"elo": 1780.5
+},
+{
+"club": "Monaco",
+"column": "ligue1",
+"elo": 1778.6
+},
+{
+"club": "Lille",
+"column": "ligue1",
+"elo": 1775.5
+},
+{
+"club": "Como",
+"column": "seriea",
+"elo": 1769.7
+},
+{
+"club": "Inter Miami",
+"column": "mls",
+"elo": 1763.4
+},
+{
+"club": "SC Freiburg",
+"column": "bundesliga",
+"elo": 1762.0
+},
+{
+"club": "Rayo Vallecano",
+"column": "laliga",
+"elo": 1758.9
+},
+{
+"club": "Rennes",
+"column": "ligue1",
+"elo": 1758.8
+},
+{
+"club": "Cruz Azul",
+"column": "ligamx",
+"elo": 1754.8
+},
+{
+"club": "Strasbourg",
+"column": "ligue1",
+"elo": 1754.7
+},
+{
+"club": "AC Milan",
+"column": "seriea",
+"elo": 1754.0
+},
+{
+"club": "Celta Vigo",
+"column": "laliga",
+"elo": 1751.9
+},
+{
+"club": "Atalanta",
+"column": "seriea",
+"elo": 1747.2
+},
+{
+"club": "1899 Hoffenheim",
+"column": "bundesliga",
+"elo": 1743.1
+},
+{
+"club": "Valencia",
+"column": "laliga",
+"elo": 1742.3
+},
+{
+"club": "Paris FC",
+"column": "ligue1",
+"elo": 1734.1
+},
+{
+"club": "Real Sociedad",
+"column": "laliga",
+"elo": 1733.3
+},
+{
+"club": "Los Angeles FC",
+"column": "mls",
+"elo": 1728.9
+},
+{
+"club": "Lorient",
+"column": "ligue1",
+"elo": 1726.8
+},
+{
+"club": "FSV Mainz 05",
+"column": "bundesliga",
+"elo": 1724.8
+},
+{
+"club": "Coventry",
+"column": "epl",
+"elo": 1723.5
+},
+{
+"club": "Bologna",
+"column": "seriea",
+"elo": 1719.6
+},
+{
+"club": "Feyenoord",
+"column": "eredivisie",
+"elo": 1709.7
+},
+{
+"club": "Ipswich",
+"column": "epl",
+"elo": 1705.5
+},
+{
+"club": "Ajax",
+"column": "eredivisie",
+"elo": 1705.4
+},
+{
+"club": "Toulouse",
+"column": "ligue1",
+"elo": 1704.8
+},
+{
+"club": "Twente",
+"column": "eredivisie",
+"elo": 1704.7
+},
+{
+"club": "NEC Nijmegen",
+"column": "eredivisie",
+"elo": 1702.8
+},
+{
+"club": "AZ Alkmaar",
+"column": "eredivisie",
+"elo": 1698.7
+},
+{
+"club": "Eintracht Frankfurt",
+"column": "bundesliga",
+"elo": 1697.8
+},
+{
+"club": "Athletic Club",
+"column": "laliga",
+"elo": 1697.3
+},
+{
+"club": "Getafe",
+"column": "laliga",
+"elo": 1695.6
+},
+{
+"club": "Lazio",
+"column": "seriea",
+"elo": 1694.3
+},
+{
+"club": "Toluca",
+"column": "ligamx",
+"elo": 1693.1
+},
+{
+"club": "Fiorentina",
+"column": "seriea",
+"elo": 1691.2
+},
+{
+"club": "Alaves",
+"column": "laliga",
+"elo": 1690.4
+},
+{
+"club": "FC Augsburg",
+"column": "bundesliga",
+"elo": 1688.8
+},
+{
+"club": "Osasuna",
+"column": "laliga",
+"elo": 1683.5
+},
+{
+"club": "Elche",
+"column": "laliga",
+"elo": 1683.4
+},
+{
+"club": "Levante",
+"column": "laliga",
+"elo": 1679.5
+},
+{
+"club": "Nashville SC",
+"column": "mls",
+"elo": 1676.6
+},
+{
+"club": "Hamburger SV",
+"column": "bundesliga",
+"elo": 1674.0
+},
+{
+"club": "Vancouver Whitecaps",
+"column": "mls",
+"elo": 1668.3
+},
+{
+"club": "Stade Brestois 29",
+"column": "ligue1",
+"elo": 1667.7
+},
+{
+"club": "Tigres UANL",
+"column": "ligamx",
+"elo": 1667.6
+},
+{
+"club": "Utrecht",
+"column": "eredivisie",
+"elo": 1667.5
+},
+{
+"club": "Borussia Mönchengladbach",
+"column": "bundesliga",
+"elo": 1667.3
+},
+{
+"club": "Seattle Sounders",
+"column": "mls",
+"elo": 1664.0
+},
+{
+"club": "FC Cincinnati",
+"column": "mls",
+"elo": 1663.3
+},
+{
+"club": "Club America",
+"column": "ligamx",
+"elo": 1662.6
+},
+{
+"club": "Columbus Crew",
+"column": "mls",
+"elo": 1659.1
+},
+{
+"club": "Espanyol",
+"column": "laliga",
+"elo": 1658.4
+},
+{
+"club": "Union Berlin",
+"column": "bundesliga",
+"elo": 1658.2
+},
+{
+"club": "Sevilla",
+"column": "laliga",
+"elo": 1656.8
+},
+{
+"club": "New York City FC",
+"column": "mls",
+"elo": 1647.2
+},
+{
+"club": "Auxerre",
+"column": "ligue1",
+"elo": 1647.2
+},
+{
+"club": "Nice",
+"column": "ligue1",
+"elo": 1643.5
+},
+{
+"club": "Heerenveen",
+"column": "eredivisie",
+"elo": 1641.5
+},
+{
+"club": "FC Dallas",
+"column": "mls",
+"elo": 1641.1
+},
+{
+"club": "Guadalajara Chivas",
+"column": "ligamx",
+"elo": 1639.0
+},
+{
+"club": "Werder Bremen",
+"column": "bundesliga",
+"elo": 1637.6
+},
+{
+"club": "SC Paderborn 07",
+"column": "bundesliga",
+"elo": 1636.4
+},
+{
+"club": "Udinese",
+"column": "seriea",
+"elo": 1636.1
+},
+{
+"club": "Hull City",
+"column": "epl",
+"elo": 1630.8
+},
+{
+"club": "San Diego",
+"column": "mls",
+"elo": 1630.6
+},
+{
+"club": "Sassuolo",
+"column": "seriea",
+"elo": 1630.3
+},
+{
+"club": "Chicago Fire",
+"column": "mls",
+"elo": 1630.2
+},
+{
+"club": "Real Salt Lake",
+"column": "mls",
+"elo": 1627.3
+},
+{
+"club": "U.N.A.M. - Pumas",
+"column": "ligamx",
+"elo": 1625.3
+},
+{
+"club": "CF Pachuca",
+"column": "ligamx",
+"elo": 1625.0
+},
+{
+"club": "Torino",
+"column": "seriea",
+"elo": 1623.8
+},
+{
+"club": "Le Havre",
+"column": "ligue1",
+"elo": 1623.5
+},
+{
+"club": "Houston Dynamo",
+"column": "mls",
+"elo": 1622.5
+},
+{
+"club": "Angers",
+"column": "ligue1",
+"elo": 1622.3
+},
+{
+"club": "Minnesota United FC",
+"column": "mls",
+"elo": 1618.2
+},
+{
+"club": "Genoa",
+"column": "seriea",
+"elo": 1614.7
+},
+{
+"club": "1. FC Köln",
+"column": "bundesliga",
+"elo": 1611.2
+},
+{
+"club": "St. Louis City",
+"column": "mls",
+"elo": 1611.1
+},
+{
+"club": "Charlotte",
+"column": "mls",
+"elo": 1607.6
+},
+{
+"club": "Orlando City SC",
+"column": "mls",
+"elo": 1607.2
+},
+{
+"club": "Portland Timbers",
+"column": "mls",
+"elo": 1605.9
+},
+{
+"club": "Telstar",
+"column": "eredivisie",
+"elo": 1604.4
+},
+{
+"club": "San Jose Earthquakes",
+"column": "mls",
+"elo": 1603.3
+},
+{
+"club": "Parma",
+"column": "seriea",
+"elo": 1601.9
+},
+{
+"club": "Philadelphia Union",
+"column": "mls",
+"elo": 1592.9
+},
+{
+"club": "Cagliari",
+"column": "seriea",
+"elo": 1590.2
+},
+{
+"club": "Groningen",
+"column": "eredivisie",
+"elo": 1581.7
+},
+{
+"club": "New York Red Bulls",
+"column": "mls",
+"elo": 1580.4
+},
+{
+"club": "Monterrey",
+"column": "ligamx",
+"elo": 1580.2
+},
+{
+"club": "Los Angeles Galaxy",
+"column": "mls",
+"elo": 1579.9
+},
+{
+"club": "GO Ahead Eagles",
+"column": "eredivisie",
+"elo": 1575.9
+},
+{
+"club": "Club Tijuana",
+"column": "ligamx",
+"elo": 1572.5
+},
+{
+"club": "Excelsior",
+"column": "eredivisie",
+"elo": 1570.2
+},
+{
+"club": "SV Elversberg",
+"column": "bundesliga",
+"elo": 1569.8
+},
+{
+"club": "Colorado Rapids",
+"column": "mls",
+"elo": 1564.7
+},
+{
+"club": "Sparta Rotterdam",
+"column": "eredivisie",
+"elo": 1561.5
+},
+{
+"club": "FC Juarez",
+"column": "ligamx",
+"elo": 1559.9
+},
+{
+"club": "Austin",
+"column": "mls",
+"elo": 1559.7
+},
+{
+"club": "Lecce",
+"column": "seriea",
+"elo": 1556.4
+},
+{
+"club": "PEC Zwolle",
+"column": "eredivisie",
+"elo": 1546.9
+},
+{
+"club": "New England Revolution",
+"column": "mls",
+"elo": 1543.0
+},
+{
+"club": "Fortuna Sittard",
+"column": "eredivisie",
+"elo": 1540.3
+},
+{
+"club": "Atlas",
+"column": "ligamx",
+"elo": 1529.1
+},
+{
+"club": "Leon",
+"column": "ligamx",
+"elo": 1528.2
+},
+{
+"club": "DC United",
+"column": "mls",
+"elo": 1526.5
+},
+{
+"club": "Toronto FC",
+"column": "mls",
+"elo": 1522.6
+},
+{
+"club": "Venezia",
+"column": "seriea",
+"elo": 1516.1
+},
+{
+"club": "Necaxa",
+"column": "ligamx",
+"elo": 1498.4
+},
+{
+"club": "Club Queretaro",
+"column": "ligamx",
+"elo": 1498.3
+},
+{
+"club": "CF Montreal",
+"column": "mls",
+"elo": 1484.3
+},
+{
+"club": "Atlanta United FC",
+"column": "mls",
+"elo": 1483.3
+},
+{
+"club": "Atletico San Luis",
+"column": "ligamx",
+"elo": 1481.7
+},
+{
+"club": "Sporting Kansas City",
+"column": "mls",
+"elo": 1460.0
+},
+{
+"club": "Cambuur",
+"column": "eredivisie",
+"elo": 1422.8
+},
+{
+"club": "Willem II",
+"column": "eredivisie",
+"elo": 1393.6
+},
+{
+"club": "Puebla",
+"column": "ligamx",
+"elo": 1389.2
+},
+{
+"club": "Santos Laguna",
+"column": "ligamx",
+"elo": 1383.3
+},
+{
+"club": "Monza",
+"column": "seriea",
+"elo": 1367.4
+},
+{
+"club": "ADO Den Haag",
+"column": "eredivisie",
+"elo": 1322.5
+}
+]
+}
