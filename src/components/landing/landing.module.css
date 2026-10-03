@@ -371,14 +371,18 @@
   gap: 8px 48px;
   align-items: end;
 }
-/* the intro and the frames under it share ONE measure (1020px), so the
-   paragraph ends where the pictures end */
+/* the intro and the frames under it span the page's one content column
+   (1240px), like every other section: the paragraph ends where the
+   pictures end, and at 1024–1920px the heading has 528–856px, enough
+   for "Every fixture," on one line and never for the whole of it */
 @media (min-width: 1024px) {
-  .boardGrid { max-width: 1020px; grid-template-columns: minmax(0, 1fr) minmax(0, 21rem); }
+  .boardGrid { grid-template-columns: minmax(0, 1fr) minmax(0, 21rem); }
   .boardGrid .body { margin-bottom: 6px; }
 }
-/* THE BOARD, BOTH HALVES (BoardShot.tsx). Wide: two equal frames side by
-   side, still. Narrow: one frame under the board's switch; the two
+/* THE BOARD, BOTH HALVES (BoardShot.tsx). Wide: two frames side by side,
+   still, one whole board column each; the tracks are the crops' own
+   widths (--pair-cols, set from the crops), so both draw at one scale and
+   one height. Narrow: one frame under the board's switch; the two
    captures share a grid cell, so a switch moves no layout — opacity
    only. Below 1024px the figure is the card's own width (460px at most),
    centred, and its caption keeps to that width. */
@@ -386,8 +390,8 @@
 .shotPair { display: none; }
 .shotSolo { display: grid; justify-items: center; }
 @media (min-width: 1024px) {
-  .shot { margin-inline: 0; max-width: 1020px; }
-  .shotPair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  .shot { margin-inline: 0; max-width: none; }
+  .shotPair { display: grid; grid-template-columns: var(--pair-cols, repeat(2, minmax(0, 1fr))); gap: 20px; }
   .shotSolo { display: none; }
 }
 .pairCell { min-width: 0; }
@@ -428,12 +432,24 @@
 .modeSwitch button[aria-pressed="true"] { border-color: var(--accent); background: var(--bs-bg); color: var(--ink-hi); }
 .shotBox { position: relative; margin-top: 14px; justify-self: stretch; }
 .shotLine { position: absolute; left: 0; right: 0; top: 50%; height: 1px; pointer-events: none; }
+/* the hairline is drawn OVER the picture's edge, not around it: a real
+   border takes 2px off every frame, which is a larger share of the
+   narrower one, so the pair's two scales (and heights) came out ~0.1%
+   apart */
 .shotFrame {
+  position: relative;
   display: grid;
   background: var(--bs-bg);
-  border: 1px solid var(--line-strong);
   border-radius: 10px;
   overflow: clip;
+}
+.shotFrame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: inherit;
+  pointer-events: none;
 }
 .shotLayer {
   grid-area: 1 / 1;
@@ -444,12 +460,6 @@
   transition: opacity 240ms ease;
 }
 .shotLayer[data-on="false"] { opacity: 0; pointer-events: none; }
-/* the club crop shows the neighbouring columns' edges; they fade out, so
-   the frame reads as a window on a wider board rather than cut cards */
-.shotSides {
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
-  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
-}
 .shotFade {
   -webkit-mask-image: linear-gradient(to bottom, #000 86%, transparent);
   mask-image: linear-gradient(to bottom, #000 86%, transparent);
@@ -616,7 +626,7 @@
   position: absolute;
   display: grid;
   justify-items: start;
-  white-space: nowrap;
+  white-space: nowrap;      /* one line wherever it fits; see below */
   padding: 7px 10px;
   border: 1px solid var(--line-strong);
   border-radius: 6px;
@@ -633,7 +643,7 @@
 .standLab span:first-child { color: var(--ink-hi); }
 .cellQuiet { color: var(--ink-low) !important; font-size: 11px; letter-spacing: 0.04em; white-space: nowrap; }
 @media (max-width: 767px) {
-  .standLab { font-size: 9px; letter-spacing: 0.05em; padding: 5px 7px; }
+  .standLab { font-size: 9px; letter-spacing: 0.05em; padding: 5px 7px; white-space: normal; }
 }
 .chartTxt { font-family: var(--font-geist-mono); font-size: 10.5px; fill: var(--ink-low); }
 .cursor {
@@ -686,8 +696,18 @@
 /* A SHORT PHONE — an SE, or any phone with its browser toolbars showing.
    The stacked caption slot is the tallest caption (three lines at 360px
    and below), and the pinned stage clips: so on a screen this short the
-   clock sets everything a step smaller rather than lose its last lines. */
+   clock sets everything a step smaller rather than lose its last lines.
+   And the stage is the screen, no taller (2026-10-03): the shared 560px
+   floor made it 49→609px in a 548px window, so the clock's last lines
+   were pinned below the fold for the whole scene. Here the key line and
+   the fine print step aside — the table already heads its column "gap",
+   and the "shadow · not advice" chip above the chart stays — which buys
+   the 46px the stage needs at 375×548 and 320×568. If a screen is
+   shorter still, `safe` centring keeps the eyebrow and the minute on
+   screen and lets the bottom go first. The still clock (reduced motion)
+   is not pinned, so it keeps both lines. */
 @media (max-width: 767px) and (max-height: 660px) {
+  .sceneClock .clockStage { min-height: 0; justify-content: safe center; }
   .clockText .h2 { font-size: 28px; }
   .clockNow { margin-top: 6px; }
   .minute { font-size: 46px; }
@@ -697,6 +717,7 @@
   .chartBox { height: clamp(130px, 24svh, 200px); }
   .readout { margin-top: 6px; font-size: 12px; }
   .readout th, .readout td { padding: 2px 0; }
+  .sceneClock .note, .sceneClock .provenance { display: none; }
 }
 .timeline {
   list-style: none;

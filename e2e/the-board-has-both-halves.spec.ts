@@ -7,11 +7,17 @@ import { test, expect, type Page } from "@playwright/test";
 
    components/landing/BoardShot.tsx. What is asserted:
      - ON A WIDE SCREEN (1440) both halves are on screen at once, side
-       by side in two equal frames — clubs | national teams — at the same
-       height and top, both captures loaded, no switch, and scrolling
+       by side — clubs | national teams — one whole board column per
+       frame, at the same top, height and SCALE (each frame as wide as
+       its crop, so the type on both cards is one size), nothing faded
+       in at the edges, both captures loaded, no switch, and scrolling
        changes nothing (round 9: the single frame flipped, under the
        reader's eyes, to a one-column capture that left half of it
-       black);
+       black; round 10: the club frame was cut through its neighbours);
+     - AT 1024, 1440 AND 1920 the heading, the intro and the pair span
+       the same content column as the section below, and the heading
+       keeps to two lines (round 9 capped them at 1020px: a 220px empty
+       band at 1440, a three-line heading at 1920);
      - ON A PHONE (390) the board's own switch: a real button group, two
        buttons, `aria-pressed`, Leagues first and pressed, each at least
        44px tall; a press swaps which capture is shown and which is
@@ -70,12 +76,19 @@ async function pairState(page: Page) {
       const b = frame.getBoundingClientRect();
       const img = frame.querySelector("img")!;
       const layer = img.parentElement!;
+      const ls = getComputedStyle(layer);
       return {
         pair: c.dataset.pair, label: c.firstElementChild!.textContent,
         visible: frame.checkVisibility({ opacityProperty: true }),
-        opacity: Number(getComputedStyle(layer).opacity),
+        opacity: Number(ls.opacity),
         hidden: layer.getAttribute("aria-hidden"),
+        /* a faded edge is a mask; one whole column needs none */
+        mask: ls.maskImage || ls.getPropertyValue("-webkit-mask-image") || "none",
         top: Math.round(b.top), w: Math.round(b.width), h: Math.round(b.height),
+        /* drawn width per CROP pixel — the img's own width attribute is
+           the crop's; naturalWidth is whichever srcset size was served */
+        scale: b.width / Number(img.getAttribute("width")),
+        aspect: Number(img.getAttribute("width")) / Number(img.getAttribute("height")),
         loaded: img.complete && img.naturalWidth > 0,
       };
     });
@@ -98,11 +111,17 @@ test("on a wide screen both halves are shown at once, side by side, and nothing 
       expect(c.visible, `${c.pair} frame not on screen`).toBe(true);
       expect(c.opacity).toBe(1);
       expect(c.hidden, `${c.pair} hidden from assistive tech`).toBeNull();
+      expect(c.mask, `${c.pair} frame fades something in at its edges`).toBe("none");
     }
-    // two EQUAL frames, side by side: same top, same size
+    // side by side: same top, same height, and ONE scale — each frame is
+    // as wide as its crop, so the club column (narrower than a one-column
+    // championship board) is not blown up to match it
     expect(a[0].top).toBe(a[1].top);
-    expect(a[0].w).toBe(a[1].w);
-    expect(a[0].h).toBe(a[1].h);
+    expect(Math.abs(a[0].h - a[1].h), JSON.stringify(a)).toBeLessThanOrEqual(1);
+    expect(Math.abs(a[0].scale / a[1].scale - 1), JSON.stringify(a)).toBeLessThan(0.002);
+    // the club crop is one column: taller than wide, unlike the old
+    // three-column slice
+    expect(a[0].aspect).toBeLessThan(0.9);
     expect(a[0].w).toBeGreaterThan(400);
     // scrolling the frames through the whole screen changes nothing
     for (const share of [0.7, 0.3, 0.1, -0.5, 0.7]) {
@@ -117,6 +136,45 @@ test("on a wide screen both halves are shown at once, side by side, and nothing 
     await page.waitForLoadState("networkidle");
     expect(api, "the home page reached for the backend").toEqual([]);
   });
+
+for (const width of [1024, 1440, 1920]) {
+  test(`the board spans the page's one content column and its heading keeps to two lines — ${width}px`,
+    async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await openSection(page);
+      await page.evaluate(() => document.fonts.ready);
+      const m = await page.evaluate(() => {
+        const content = (sec: Element) => {
+          const b = sec.getBoundingClientRect(), cs = getComputedStyle(sec);
+          return [b.left + parseFloat(cs.paddingLeft), b.right - parseFloat(cs.paddingRight)]
+            .map(Math.round);
+        };
+        const edges = (el: Element) => {
+          const b = el.getBoundingClientRect();
+          return [Math.round(b.left), Math.round(b.right)];
+        };
+        const h2 = document.getElementById("landing-board")!;
+        const grid = h2.parentElement!.parentElement!;
+        const r = document.createRange();
+        r.selectNodeContents(h2);
+        return {
+          board: content(h2.closest("section")!),
+          below: content(document.getElementById("landing-record")!.closest("section")!),
+          grid: edges(grid),
+          intro: edges(grid.lastElementChild!),
+          pair: edges(document.querySelector('[data-testid="board-shot-pair"]')!),
+          lines: new Set([...r.getClientRects()].map((x) => Math.round(x.top))).size,
+        };
+      });
+      const said = JSON.stringify(m);
+      expect(m.board, said).toEqual(m.below);
+      expect(m.grid, said).toEqual(m.below);
+      expect(m.pair, said).toEqual(m.below);
+      // the intro ends where the pictures end
+      expect(m.intro[1], said).toBe(m.pair[1]);
+      expect(m.lines, said).toBe(2);
+    });
+}
 
 test("on a phone the switch shows clubs, then national teams, and fetches nothing — 390px",
   async ({ page }) => {

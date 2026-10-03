@@ -373,10 +373,15 @@ export default function MatchClock({ mode, enabled }: {
                   style={{ transform: `translate3d(${G.w - G.X(m) - 1}px,0,0)` }}>
                   <Ink G={G} />
                   {/* the label rides inside the window, so it is wiped in
-                      with the band it names — never shown ahead of it */}
+                      with the band it names — never shown ahead of it. It
+                      keeps inside the band, whose right edge (90′) is
+                      where the window stops: at 360px and below one line
+                      ran past it and lost its edge (at 320, the end of
+                      "down"), so there it wraps instead */}
                   {STOP && (
                     <div className={s.standLab} data-testid="clock-standdown-label"
-                      style={{ left: G.X(STOP.from) + 8, top: G.Y(64) }}>
+                      style={{ left: G.X(STOP.from) + 8, top: G.Y(64),
+                        maxWidth: G.X(LAST) - (G.X(STOP.from) + 8) }}>
                       <span>model stands down</span>
                       <span>red card {RED?.m ?? STOP.from}{PRIME}</span>
                     </div>
@@ -419,7 +424,9 @@ export default function MatchClock({ mode, enabled }: {
             </table>
             {/* ONE FIXED SLOT, one line, so the chart never moves when it
                 changes. After the red card it goes back to the key: the
-                band's label already names the stand-down. */}
+                band's label already names the stand-down. On a short
+                phone it and the fine print step aside, so the pinned
+                stage fits the screen (landing.module.css). */}
             <p className={s.note} data-testid="clock-note">
               {!standing && row.model == null && m > 0
                 ? (row.refused === "interval" ? "No model read at half-time." : "No model read this minute.")

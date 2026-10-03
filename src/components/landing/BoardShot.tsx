@@ -9,16 +9,20 @@
 // pre-kickoff cards only), cropped, never composed.
 //
 // ON A WIDE SCREEN (≥1024px) BOTH HALVES ARE SHOWN AT ONCE, side by side
-// in two equal frames — clubs | national teams — with no switch and
-// nothing that moves (2026-10-03). Round 8 put them behind the switch in
-// one frame, and the Nations League capture is a single column: it sat
-// in the middle of a 1020px frame with more than half of it black, and
-// it was what the frame flipped to while the reader was looking at it.
-// The two crops are cut to the same size at the same scale (1000×880
-// capture pixels each), so the type on both cards is the same size and
-// the frames are equal by construction. The club crop is centred on one
-// Eredivisie card with its neighbours' edges fading out either side —
-// the columns of a real board, not a card pasted on black.
+// — clubs | national teams — with no switch and nothing that moves
+// (2026-10-03). Each frame holds ONE whole column of its board, header
+// and card, at the SAME capture scale, so the type on both cards is the
+// same size: the Eredivisie column (746×880 capture pixels) and the
+// Nations League column (1000×880). A club column is narrower than a
+// one-column championship board, so the two frames are as wide as their
+// crops (grid tracks in the crops' own ratio) — equal height, equal
+// scale, nothing cut at either edge. Round 9 centred the club crop on
+// one card with its neighbours' halves fading out either side, which
+// read as a carousel cut by accident beside a clean single column. The
+// new crop has a new file name: the image optimizer and browsers cache by
+// URL, and a stale copy of the old crop is a different shape.
+// The pair spans the page's one 1240px content column, like every other
+// section (round 9 capped it at 1020px, left-aligned).
 //
 // ON A NARROWER SCREEN ONE CARD FILLS THE FRAME, so the switch stays,
 // mirroring the board's own part for part — the filled ground, the
@@ -40,6 +44,7 @@
 // Reduced motion: no automatic flip, and the swap is instant.
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { useReducedMotion } from "../../lib/useScrollScene";
 import s from "./landing.module.css";
 
@@ -56,11 +61,10 @@ type Pin = readonly [number, number];
 type Shot = { src: string; w: number; h: number; alt: string; pins: readonly Pin[] };
 
 const ALT = {
-  pair: "One club fixture card from the TRIVELA board in Leagues mode, "
-    + "captured 2 October 2026: PSV Eindhoven v Heerenveen in the "
-    + "Eredivisie column, a +1.62 goal-difference gap, a split tier read "
-    + "and the exchange's book, ask 81 cents, with the Ligue 1 and Liga MX "
-    + "columns either side.",
+  pair: "The Eredivisie column of the TRIVELA board in Leagues mode, "
+    + "captured 2 October 2026: its one fixture card, PSV Eindhoven v "
+    + "Heerenveen, a +1.62 goal-difference gap, a split tier read and the "
+    + "exchange's book, ask 81 cents.",
   card: "One club fixture card from the TRIVELA board, captured 2 October "
     + "2026: PSV Eindhoven v Heerenveen, a +1.62 goal-difference gap, a "
     + "split tier read and the exchange's book, ask 81 cents.",
@@ -71,14 +75,14 @@ const ALT = {
 };
 
 /* Pins: 1 the gap · 2 the tiers · 3 the book, measured off the
-   captures. `pair` is the wide screen's two equal frames; `card` is the
-   phone's one, at the card's own proportions, where the Nations League
-   capture's next fixture fades out below (`shotFade`) rather than
-   leaving the frame half empty. */
+   captures. `pair` is the wide screen's two frames, one whole column
+   each, at one scale; `card` is the phone's one, at the card's own
+   proportions, where the Nations League capture's next fixture fades out
+   below (`shotFade`) rather than leaving the frame half empty. */
 const SHOTS: Record<"pair" | "card", Record<BoardMode, Shot>> = {
   pair: {
-    leagues: { src: "/landing/board-leagues-pair.jpg", w: 1000, h: 880,
-      alt: ALT.pair, pins: [[88, 48.5], [61.4, 71], [81.2, 80.9]] },
+    leagues: { src: "/landing/board-leagues-column.jpg", w: 746, h: 880,
+      alt: ALT.pair, pins: [[86.3, 53.7], [65.2, 68.5], [91.7, 78.4]] },
     championships: { src: "/landing/board-championships.jpg", w: 1000, h: 880,
       alt: ALT.championships, pins: [[82, 53.9], [48, 77.3], [58, 86.6]] },
   },
@@ -88,6 +92,14 @@ const SHOTS: Record<"pair" | "card", Record<BoardMode, Shot>> = {
     championships: { src: "/landing/board-championships-card.jpg", w: 1000, h: 1050,
       alt: ALT.championships, pins: [[82, 45.1], [48, 64.8], [58, 72.6]] },
   },
+};
+
+/* the pair's rendered widths: (content − 20px gap) in the crops' ratio,
+   the content column being 1240px from a 1352px window, 100vw − 112px
+   below it */
+const PAIR_SIZES: Record<BoardMode, string> = {
+  leagues: "(min-width: 1352px) 520px, 39vw",
+  championships: "(min-width: 1352px) 700px, 52vw",
 };
 
 function Pins({ pins }: { pins: readonly Pin[] }) {
@@ -140,17 +152,20 @@ export default function BoardShot() {
 
   return (
     <figure ref={fig} className={s.shot} data-testid="board-shot" data-mode={mode}>
-      {/* WIDE: both halves, side by side, still */}
-      <div className={s.shotPair} data-testid="board-shot-pair">
+      {/* WIDE: both halves, side by side, still. The tracks are the
+          crops' own widths, so both frames draw at one scale and, since
+          both crops are 880 rows tall, at one height. */}
+      <div className={s.shotPair} data-testid="board-shot-pair"
+        style={{ "--pair-cols": MODES.map((m) => `minmax(0, ${SHOTS.pair[m].w}fr)`).join(" ") } as CSSProperties}>
         {MODES.map((m) => {
           const sh = SHOTS.pair[m];
           return (
             <div key={m} className={s.pairCell} data-pair={m}>
               <p className={s.pairLabel}><b>{LABEL[m]}</b> · {WHO[m]}</p>
               <div className={s.shotFrame}>
-                <div className={`${s.shotLayer} ${m === "leagues" ? s.shotSides : ""}`}>
+                <div className={s.shotLayer}>
                   <Image src={sh.src} width={sh.w} height={sh.h} alt={sh.alt}
-                    sizes="(min-width: 1360px) 500px, 46vw" className={s.shotImg} />
+                    sizes={PAIR_SIZES[m]} className={s.shotImg} />
                   <Pins pins={sh.pins} />
                 </div>
               </div>

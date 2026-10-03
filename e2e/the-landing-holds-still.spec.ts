@@ -17,7 +17,16 @@ import { test, expect, type Page } from "@playwright/test";
       so the sticky stage jumped 11–21px at the red card and back at
       60′. Stepped through the minutes where the caption, the note and
       the score change, the minute counter and the chart must not move
-      by a pixel. */
+      by a pixel.
+
+   3. THE PINNED CLOCK FITS A SHORT PHONE (round 10). The stage shared a
+      560px floor with the field scenes, so in a 548px window it ran
+      49→609px and its last lines sat below the fold for the whole
+      scene. At every phone size from an SE with its toolbars up to a
+      tall phone, at 0′, 54′ and 90′, everything the stage draws is on
+      screen — and the "shadow · not advice" chip with it, and at 90′
+      the "model stands down" label sits whole inside its band (at 360px
+      and below one line ran past the band's edge and was cut). */
 
 for (const width of [1440, 390]) {
   test(`under reduced motion the review card and its why-this-match line are drawn whole — ${width}px`,
@@ -106,5 +115,56 @@ for (const [w, h] of [[1024, 768], [1100, 800], [360, 740]] as const) {
       // the walk really reached the red card and full time
       expect(seen.some((s) => s.startsWith("54′")), seen.join("\n")).toBe(true);
       expect(seen.some((s) => s.startsWith("90′")), seen.join("\n")).toBe(true);
+    });
+}
+
+for (const [w, h] of [[375, 548], [320, 568], [360, 640], [390, 664], [390, 844]] as const) {
+  test(`the pinned clock fits the screen at 0′, 54′ and 90′, chip and band label whole — ${w}x${h}`,
+    async ({ page }) => {
+      test.setTimeout(90_000);
+      await page.setViewportSize({ width: w, height: h });
+      await page.goto("/");
+      await page.addStyleTag({ content: "html{scroll-behavior:auto!important}" });
+      await page.evaluate(() => document.fonts.ready);
+      for (const m of [0, 54, 90]) {
+        const got = await scrollToMinute(page, m);
+        expect(got).toBeGreaterThanOrEqual(m);
+        const at = await page.evaluate(() => {
+          const sec = document.querySelector('[data-testid="clock-scroll"]')!;
+          const stage = (sec.firstElementChild as HTMLElement).getBoundingClientRect();
+          // the stage's one grid: both columns, whatever is displayed
+          const ink = sec.firstElementChild!.firstElementChild!.getBoundingClientRect();
+          const chip = [...sec.querySelectorAll<HTMLElement>("span")]
+            .find((el) => el.textContent === "shadow · not advice");
+          const c = chip?.getBoundingClientRect();
+          // the stand-down label rides inside the reveal window; at 90′
+          // the window is the whole band, and the label must be within it
+          const lab = sec.querySelector('[data-testid="clock-standdown-label"]')!
+            .getBoundingClientRect();
+          const win = sec.querySelector('[data-testid="clock-standdown-label"]')!
+            .parentElement!.parentElement!.getBoundingClientRect();
+          return {
+            label: [Math.round(lab.left), Math.round(lab.right)],
+            window: [Math.round(win.left), Math.round(win.right)],
+            vh: innerHeight,
+            stage: [Math.round(stage.top), Math.round(stage.bottom)],
+            ink: [Math.round(ink.top), Math.round(ink.bottom)],
+            chip: c && chip!.checkVisibility({ opacityProperty: true, visibilityProperty: true })
+              ? [Math.round(c.top), Math.round(c.bottom)] : null,
+          };
+        });
+        const said = `${got}′ ${JSON.stringify(at)}`;
+        expect(at.stage[1], `stage runs below the fold: ${said}`).toBeLessThanOrEqual(at.vh);
+        expect(at.ink[0], said).toBeGreaterThanOrEqual(at.stage[0]);
+        expect(at.ink[1], `the clock's last line is below the fold: ${said}`)
+          .toBeLessThanOrEqual(at.vh);
+        expect(at.chip, `no shadow chip on screen: ${said}`).not.toBeNull();
+        expect(at.chip![0], said).toBeGreaterThanOrEqual(at.stage[0]);
+        expect(at.chip![1], said).toBeLessThanOrEqual(at.vh);
+        if (m === 90) {
+          expect(at.label[1], `the stand-down label is cut by the band's edge: ${said}`)
+            .toBeLessThanOrEqual(at.window[1]);
+        }
+      }
     });
 }
