@@ -23,6 +23,19 @@ import { test, expect, type Page } from "@playwright/test";
        44px tall; a press swaps which capture is shown and which is
        hidden from assistive tech, and the frame does not move by a
        pixel — both captures share one grid cell and load together;
+     - ON A PHONE AND A TABLET (390, 768) the two captures behind the
+       switch are the wide pair's own crops, drawn at ONE scale and one
+       height, unmasked, whole inside the frame with an inset all round
+       (round 10: the club crop drew 25% larger than the national one,
+       the national crop faded a cut-off second card in at its foot and
+       its date rule ran into the frame's edge);
+     - EVERYWHERE, pin 1 sits just after the gap number, on its line, at
+       the same offset in both frames, inside its frame and clear of the
+       label under the number (round 10: 2–3px from "GD/G GAP" at 1024,
+       and below the number in one frame, beside it in the other);
+     - and the intro under the heading is two even lines from 390 to
+       1920 (round 10: "picked." alone on a third line at 1920, on a
+       second at 768);
      - and none of it fetches anything: the home page makes no /api/
        request at all (the board routes WRITE a snapshot per read).
    And the one automatic flip, phones only: once the frame's middle has
@@ -86,13 +99,70 @@ async function pairState(page: Page) {
         mask: ls.maskImage || ls.getPropertyValue("-webkit-mask-image") || "none",
         top: Math.round(b.top), w: Math.round(b.width), h: Math.round(b.height),
         /* drawn width per CROP pixel — the img's own width attribute is
-           the crop's; naturalWidth is whichever srcset size was served */
-        scale: b.width / Number(img.getAttribute("width")),
+           the crop's; naturalWidth is whichever srcset size was served.
+           The image's own box, not the frame's: the frame adds an inset */
+        scale: img.getBoundingClientRect().width / Number(img.getAttribute("width")),
         aspect: Number(img.getAttribute("width")) / Number(img.getAttribute("height")),
         loaded: img.complete && img.naturalWidth > 0,
       };
     });
   });
+}
+
+/* WHAT PIN 1 POINTS AT, AND WHAT IT MUST KEEP CLEAR OF, in each crop's
+   own pixels — measured off the captures (public/landing/*.jpg): the gap
+   number, and the label(s) under it. */
+const GAP_NUMBER: Record<string, { num: number[]; under: number[][] }> = {
+  "board-leagues-column.jpg": { num: [577, 389, 692, 418], under: [[598, 436, 691, 449]] },
+  "board-championships.jpg": { num: [878, 459, 944, 487],
+    under: [[863, 506, 943, 517], [660, 525, 943, 541]] },
+};
+
+/** press the switch to one capture and wait out the crossfade, so it is
+ *  the only one drawn */
+async function shownAlone(page: Page, m: "leagues" | "championships") {
+  await page.getByTestId(`board-shot-${m}`).click();
+  const other = m === "leagues" ? "championships" : "leagues";
+  await expect.poll(async () => {
+    const st = await frameState(page);
+    return st[m] === 1 && st[other] === 0;
+  }).toBe(true);
+}
+
+/** every visible frame's image, its frame, and pin 1 against the gap number */
+async function framesAndPins(page: Page) {
+  return page.evaluate((GAP) => {
+    return [...document.querySelectorAll<HTMLImageElement>('[data-testid="board-shot"] img')]
+      .filter((img) => img.checkVisibility({ opacityProperty: true }))
+      .map((img) => {
+        const layer = img.parentElement!, frame = layer.parentElement!;
+        const i = img.getBoundingClientRect(), f = frame.getBoundingClientRect();
+        const file = img.getAttribute("src")!.match(/board-[a-z-]+\.jpg/)![0];
+        const k = i.width / Number(img.getAttribute("width"));
+        const toCss = ([x0, y0, x1, y1]: number[]) =>
+          [i.left + x0 * k, i.top + y0 * k, i.left + x1 * k, i.top + y1 * k];
+        const pin = layer.querySelector<HTMLElement>("ol > li")!.getBoundingClientRect();
+        // a crop this table does not know measures as NaN, and fails
+        const g = GAP[file] ?? { num: [NaN, NaN, NaN, NaN], under: [[NaN, NaN, NaN, NaN]] };
+        const num = toCss(g.num);
+        const gapTo = (b: number[]) => Math.hypot(Math.max(b[0] - pin.right, 0, pin.left - b[2]),
+          Math.max(b[1] - pin.bottom, 0, pin.top - b[3]));
+        const mask = getComputedStyle(layer).maskImage
+          || getComputedStyle(layer).getPropertyValue("-webkit-mask-image") || "none";
+        return {
+          file, scale: k, mask,
+          img: [i.left, i.top, i.right, i.bottom], frame: [f.left, f.top, f.right, f.bottom],
+          inset: [i.left - f.left, i.top - f.top, f.right - i.right, f.bottom - i.bottom],
+          // pin 1 against the gap number: its offset past the number's
+          // right edge, and its centre against the number's
+          after: pin.left - num[2],
+          drop: (pin.top + pin.bottom) / 2 - (num[1] + num[3]) / 2,
+          clear: Math.min(...g.under.map((u) => gapTo(toCss(u)))),
+          pinInFrame: pin.left >= f.left && pin.right <= f.right - 2
+            && pin.top >= f.top && pin.bottom <= f.bottom,
+        };
+      });
+  }, GAP_NUMBER);
 }
 
 test("on a wide screen both halves are shown at once, side by side, and nothing moves — 1440px",
@@ -122,6 +192,10 @@ test("on a wide screen both halves are shown at once, side by side, and nothing 
     // the club crop is one column: taller than wide, unlike the old
     // three-column slice
     expect(a[0].aspect).toBeLessThan(0.9);
+    // nothing in either capture reaches the frame's hairline
+    for (const f of await framesAndPins(page)) {
+      expect(Math.min(...f.inset), JSON.stringify(f)).toBeGreaterThanOrEqual(8);
+    }
     expect(a[0].w).toBeGreaterThan(400);
     // scrolling the frames through the whole screen changes nothing
     for (const share of [0.7, 0.3, 0.1, -0.5, 0.7]) {
@@ -174,6 +248,92 @@ for (const width of [1024, 1440, 1920]) {
       expect(m.intro[1], said).toBe(m.pair[1]);
       expect(m.lines, said).toBe(2);
     });
+}
+
+for (const [w, h] of [[390, 844], [768, 1024]] as const) {
+  test(`behind the switch both captures draw at one scale and one height, whole and inset — ${w}px`,
+    async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      await openSection(page);
+      await expect.poll(async () => (await frameState(page)).loaded).toBe(true);
+      // both layers are measurable whichever is shown: show each in turn
+      const seen: Awaited<ReturnType<typeof framesAndPins>> = [];
+      for (const m of ["championships", "leagues"] as const) {
+        await shownAlone(page, m);
+        seen.push((await framesAndPins(page))[0]);
+      }
+      const said = JSON.stringify(seen);
+      // the wide pair's own crops: one whole column each, one card
+      expect(seen.map((f) => f.file).sort(), said)
+        .toEqual(["board-championships.jpg", "board-leagues-column.jpg"]);
+      // one scale, so the type is one size in both; one height
+      expect(Math.abs(seen[0].scale / seen[1].scale - 1), said).toBeLessThan(0.002);
+      expect(Math.abs((seen[0].img[3] - seen[0].img[1]) - (seen[1].img[3] - seen[1].img[1])), said)
+        .toBeLessThanOrEqual(1);
+      for (const f of seen) {
+        expect(f.mask, `${f.file} fades something in: ${said}`).toBe("none");
+        // whole inside the frame, an inset all round: no date rule or
+        // card edge reaches the hairline, nothing is cut at the foot
+        expect(Math.min(...f.inset), `${f.file} touches its frame: ${said}`)
+          .toBeGreaterThanOrEqual(8);
+      }
+    });
+}
+
+for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1440, 900], [1920, 1080]] as const) {
+  test(`pin 1 sits after the gap number, the same in both frames, clear of its label — ${w}px`,
+    async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      await openSection(page);
+      await page.evaluate(() => document.fonts.ready);
+      const seen: Awaited<ReturnType<typeof framesAndPins>> = [];
+      if (w < 1024) {
+        for (const m of ["leagues", "championships"] as const) {
+          await shownAlone(page, m);
+          seen.push((await framesAndPins(page))[0]);
+        }
+      } else {
+        seen.push(...await framesAndPins(page));
+      }
+      const said = JSON.stringify(seen);
+      expect(seen.length, said).toBe(2);
+      for (const f of seen) {
+        // just after the number, on its line
+        expect(f.after, `${f.file}: ${said}`).toBeGreaterThanOrEqual(4);
+        expect(f.after, `${f.file}: ${said}`).toBeLessThanOrEqual(10);
+        expect(Math.abs(f.drop), `${f.file}: ${said}`).toBeLessThanOrEqual(2);
+        // clear of the label(s) under the number, and inside the frame
+        expect(f.clear, `${f.file} pin 1 crowds the label under the gap: ${said}`)
+          .toBeGreaterThanOrEqual(4);
+        expect(f.pinInFrame, `${f.file} pin 1 leaves its frame: ${said}`).toBe(true);
+      }
+      // and in the same place in both
+      expect(Math.abs(seen[0].after - seen[1].after), said).toBeLessThanOrEqual(1);
+      expect(Math.abs(seen[0].drop - seen[1].drop), said).toBeLessThanOrEqual(1);
+    });
+}
+
+for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1440, 900], [1920, 1080]] as const) {
+  test(`the intro is two even lines, no word left alone — ${w}px`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await openSection(page);
+    await page.evaluate(() => document.fonts.ready);
+    const lines = await page.evaluate(() => {
+      const body = document.getElementById("landing-board")!.parentElement!.parentElement!
+        .lastElementChild!;
+      const r = document.createRange();
+      r.selectNodeContents(body);
+      const by = new Map<number, number>();
+      for (const b of r.getClientRects()) {
+        const k = Math.round(b.top);
+        by.set(k, (by.get(k) ?? 0) + b.width);
+      }
+      return [...by.values()].map(Math.round);
+    });
+    expect(lines.length, JSON.stringify(lines)).toBe(2);
+    expect(Math.min(...lines) / Math.max(...lines), JSON.stringify(lines))
+      .toBeGreaterThanOrEqual(0.6);
+  });
 }
 
 test("on a phone the switch shows clubs, then national teams, and fetches nothing — 390px",

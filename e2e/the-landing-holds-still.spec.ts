@@ -26,7 +26,14 @@ import { test, expect, type Page } from "@playwright/test";
       tall phone, at 0′, 54′ and 90′, everything the stage draws is on
       screen — and the "shadow · not advice" chip with it, and at 90′
       the "model stands down" label sits whole inside its band (at 360px
-      and below one line ran past the band's edge and was cut). */
+      and below one line ran past the band's edge and was cut).
+
+   4. THE BAND'S LABEL SITS WHERE NOTHING IS DRAWN (round 11). At 320×568
+      and 375×548 it sat flush on the 90′ line with the Draw and Real
+      Madrid end dots on its corner. At 90′, at every phone size, the
+      label keeps clear of the stop line and the 90′ line, inside the
+      band, and no market line or end dot comes within a few pixels of
+      it — measured off the drawn paths, not the code's own sums. */
 
 for (const width of [1440, 390]) {
   test(`under reduced motion the review card and its why-this-match line are drawn whole — ${width}px`,
@@ -143,8 +150,30 @@ for (const [w, h] of [[375, 548], [320, 568], [360, 640], [390, 664], [390, 844]
             .getBoundingClientRect();
           const win = sec.querySelector('[data-testid="clock-standdown-label"]')!
             .parentElement!.parentElement!.getBoundingClientRect();
+          /* the band, and how near any market line or end dot comes to
+             the label's box: every half pixel of every drawn market path */
+          const band = sec.querySelector('[data-testid="clock-standdown"] rect')!
+            .getBoundingClientRect();
+          const gapTo = (x0: number, y0: number, x1: number, y1: number) => Math.hypot(
+            Math.max(lab.left - x1, 0, x0 - lab.right), Math.max(lab.top - y1, 0, y0 - lab.bottom));
+          let line = Infinity;
+          const paths = sec.querySelectorAll<SVGPathElement>('path[stroke-dasharray="4 3"]');
+          for (const p of paths) {
+            const ctm = p.getScreenCTM()!, n = p.getTotalLength();
+            for (let d = 0; d <= n; d += 0.5) {
+              const q = p.getPointAtLength(d).matrixTransform(ctm);
+              line = Math.min(line, gapTo(q.x, q.y, q.x, q.y));
+            }
+          }
+          // the six riding dots (model and market, one per outcome)
+          const dot = Math.min(...[...sec.querySelectorAll<HTMLElement>('[role="img"] i')]
+            .filter((d) => getComputedStyle(d).opacity !== "0")
+            .map((d) => { const b = d.getBoundingClientRect(); return gapTo(b.left, b.top, b.right, b.bottom); }));
           return {
             label: [Math.round(lab.left), Math.round(lab.right)],
+            box: [lab.left, lab.top, lab.right, lab.bottom].map(Math.round),
+            band: [band.left, band.top, band.right, band.bottom].map(Math.round),
+            paths: paths.length, line: Math.round(line * 10) / 10, dot: Math.round(dot * 10) / 10,
             window: [Math.round(win.left), Math.round(win.right)],
             vh: innerHeight,
             stage: [Math.round(stage.top), Math.round(stage.bottom)],
@@ -164,6 +193,16 @@ for (const [w, h] of [[375, 548], [320, 568], [360, 640], [390, 664], [390, 844]
         if (m === 90) {
           expect(at.label[1], `the stand-down label is cut by the band's edge: ${said}`)
             .toBeLessThanOrEqual(at.window[1]);
+          // inside the band, clear of the stop line and of the 90′ line
+          expect(at.box[0] - at.band[0], `label on the stop line: ${said}`).toBeGreaterThanOrEqual(6);
+          expect(at.band[2] - at.box[2], `label on the 90′ line: ${said}`).toBeGreaterThanOrEqual(10);
+          expect(at.box[1], said).toBeGreaterThanOrEqual(at.band[1]);
+          expect(at.box[3], said).toBeLessThanOrEqual(at.band[3]);
+          // and nothing drawn runs into it (the market's dashed lines, one
+          // run or more per outcome, sampled every half pixel)
+          expect(at.paths, said).toBeGreaterThanOrEqual(3);
+          expect(at.line, `a market line runs into the label: ${said}`).toBeGreaterThanOrEqual(4);
+          expect(at.dot, `an end dot sits on the label: ${said}`).toBeGreaterThanOrEqual(6);
         }
       }
     });

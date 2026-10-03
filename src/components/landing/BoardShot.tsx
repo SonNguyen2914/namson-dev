@@ -15,7 +15,7 @@
 // same size: the Eredivisie column (746×880 capture pixels) and the
 // Nations League column (1000×880). A club column is narrower than a
 // one-column championship board, so the two frames are as wide as their
-// crops (grid tracks in the crops' own ratio) — equal height, equal
+// crops (cells that grow in the crops' own ratio) — equal height, equal
 // scale, nothing cut at either edge. Round 9 centred the club crop on
 // one card with its neighbours' halves fading out either side, which
 // read as a carousel cut by accident beside a clean single column. The
@@ -24,12 +24,23 @@
 // The pair spans the page's one 1240px content column, like every other
 // section (round 9 capped it at 1020px, left-aligned).
 //
-// ON A NARROWER SCREEN ONE CARD FILLS THE FRAME, so the switch stays,
-// mirroring the board's own part for part — the filled ground, the
-// hairline, gold on the live choice. Default Leagues (clubs).
-//   - the two captures are stacked in one grid cell, so the frame is the
-//     taller one's height in BOTH modes — a switch moves no pixel of
-//     layout, and both images are loaded together;
+// ON A NARROWER SCREEN ONE FRAME, BEHIND THE BOARD'S OWN SWITCH, holding
+// the SAME two crops as the wide pair (2026-10-03, round 11). Round 10
+// gave the phone its own card crops — the club card 800px wide, the
+// Nations League one 1000px — so drawn to one frame width the club type
+// came out 25% larger than the national-team type, and the Nations
+// League crop carried a faded, cut-off second card (Iceland) and a date
+// rule that ran into the frame's edge. Now:
+//   - both captures draw at ONE scale (crop pixels per CSS pixel): the
+//     Nations League crop is the wider, so it fills the frame and the
+//     Eredivisie column sits centred at its own 746/1000 of that width,
+//     the rest the board's own ground — padded, never stretched;
+//   - both crops are 880 rows tall, so at one scale they are one height,
+//     stacked in one grid cell: a switch moves no pixel of layout, and
+//     both images are loaded together;
+//   - every frame (pair and switch) keeps an inset of the board's ground
+//     inside its hairline, so nothing in a capture — the date rule, a
+//     card's edge — touches the frame;
 //   - a switch is an opacity crossfade (240 ms), nothing else;
 //   - and once, as the frame scrolls up out of the reading zone, it
 //     flips to Championships by itself (and back, scrolling down), so a
@@ -56,50 +67,52 @@ const LABEL: Record<BoardMode, string> = {
 const WHO: Record<BoardMode, string> = {
   leagues: "clubs", championships: "national teams" };
 
-/** A pin, at a share of its image's own box: [left %, top %]. */
+/** A pin, set just AFTER the thing it names: [the thing's right edge,
+ *  its vertical centre], each a share (%) of its image's own box. The pin
+ *  starts a fixed 6px past that edge (landing.module.css `.pins li`), so
+ *  its clearance is the same at every scale — a pin centred on a share of
+ *  the image kept 2–3px from its neighbours at 1024px (round 10). */
 type Pin = readonly [number, number];
 type Shot = { src: string; w: number; h: number; alt: string; pins: readonly Pin[] };
 
-const ALT = {
-  pair: "The Eredivisie column of the TRIVELA board in Leagues mode, "
+const ALT: Record<BoardMode, string> = {
+  leagues: "The Eredivisie column of the TRIVELA board in Leagues mode, "
     + "captured 2 October 2026: its one fixture card, PSV Eindhoven v "
     + "Heerenveen, a +1.62 goal-difference gap, a split tier read and the "
     + "exchange's book, ask 81 cents.",
-  card: "One club fixture card from the TRIVELA board, captured 2 October "
-    + "2026: PSV Eindhoven v Heerenveen, a +1.62 goal-difference gap, a "
-    + "split tier read and the exchange's book, ask 81 cents.",
   championships: "The TRIVELA board in Championships mode, captured 2 "
     + "October 2026: a UEFA Nations League card, Finland v Albania, with "
     + "a +48 Elo gap split into rating and home terms, tier chips and the "
     + "exchange's book, ask 39 cents.",
 };
 
-/* Pins: 1 the gap · 2 the tiers · 3 the book, measured off the
-   captures. `pair` is the wide screen's two frames, one whole column
-   each, at one scale; `card` is the phone's one, at the card's own
-   proportions, where the Nations League capture's next fixture fades out
-   below (`shotFade`) rather than leaving the frame half empty. */
-const SHOTS: Record<"pair" | "card", Record<BoardMode, Shot>> = {
-  pair: {
-    leagues: { src: "/landing/board-leagues-column.jpg", w: 746, h: 880,
-      alt: ALT.pair, pins: [[86.3, 53.7], [65.2, 68.5], [91.7, 78.4]] },
-    championships: { src: "/landing/board-championships.jpg", w: 1000, h: 880,
-      alt: ALT.championships, pins: [[82, 53.9], [48, 77.3], [58, 86.6]] },
-  },
-  card: {
-    leagues: { src: "/landing/board-leagues-card.jpg", w: 800, h: 840,
-      alt: ALT.card, pins: [[97.25, 50.8], [64.25, 74.4], [89.1, 84.8]] },
-    championships: { src: "/landing/board-championships-card.jpg", w: 1000, h: 1050,
-      alt: ALT.championships, pins: [[82, 45.1], [48, 64.8], [58, 72.6]] },
-  },
+/* ONE CROP PER HALF, used by the wide pair and the phone switch alike:
+   one whole board column each, header, date row and ONE card, nothing
+   cut, both 880 capture rows tall at the capture's one scale. Pins: 1
+   the gap (after the gap number, on its line — the same place in both),
+   2 the tiers (after the # chip), 3 the book (after the last thing on
+   the book's line), measured off the captures' pixels. */
+const SHOTS: Record<BoardMode, Shot> = {
+  leagues: { src: "/landing/board-leagues-column.jpg", w: 746, h: 880,
+    alt: ALT.leagues, pins: [[92.76, 45.85], [60.59, 68.69], [87.13, 78.47]] },
+  championships: { src: "/landing/board-championships.jpg", w: 1000, h: 880,
+    alt: ALT.championships, pins: [[94.4, 53.75], [45.1, 77.39], [54.2, 86.59]] },
 };
+/** the wider crop sets the switch frame's scale; the other is centred at
+ *  its own share of that width */
+const SOLO_W = Math.max(...MODES.map((m) => SHOTS[m].w));
 
-/* the pair's rendered widths: (content − 20px gap) in the crops' ratio,
-   the content column being 1240px from a 1352px window, 100vw − 112px
-   below it */
+/* rendered widths, for the image optimizer. Pair: (content − 20px gap −
+   four 14px insets) in the crops' ratio, the content column being 1240px
+   from a 1352px window and 100vw − 112px below it. Switch: the frame is
+   460px at most, 100vw − 32px below that, less two 10px insets. */
 const PAIR_SIZES: Record<BoardMode, string> = {
-  leagues: "(min-width: 1352px) 520px, 39vw",
-  championships: "(min-width: 1352px) 700px, 52vw",
+  leagues: "(min-width: 1352px) 497px, calc(42.7vw - 80px)",
+  championships: "(min-width: 1352px) 667px, calc(57.3vw - 108px)",
+};
+const SOLO_SIZES: Record<BoardMode, string> = {
+  leagues: "(min-width: 492px) 329px, calc(74.6vw - 39px)",
+  championships: "(min-width: 492px) 440px, calc(100vw - 52px)",
 };
 
 function Pins({ pins }: { pins: readonly Pin[] }) {
@@ -152,15 +165,16 @@ export default function BoardShot() {
 
   return (
     <figure ref={fig} className={s.shot} data-testid="board-shot" data-mode={mode}>
-      {/* WIDE: both halves, side by side, still. The tracks are the
-          crops' own widths, so both frames draw at one scale and, since
-          both crops are 880 rows tall, at one height. */}
-      <div className={s.shotPair} data-testid="board-shot-pair"
-        style={{ "--pair-cols": MODES.map((m) => `minmax(0, ${SHOTS.pair[m].w}fr)`).join(" ") } as CSSProperties}>
+      {/* WIDE: both halves, side by side, still. Each cell grows in its
+          crop's width from a base of its two insets, so both images
+          draw at one scale and, both crops being 880 rows tall, at one
+          height. */}
+      <div className={s.shotPair} data-testid="board-shot-pair">
         {MODES.map((m) => {
-          const sh = SHOTS.pair[m];
+          const sh = SHOTS[m];
           return (
-            <div key={m} className={s.pairCell} data-pair={m}>
+            <div key={m} className={s.pairCell} data-pair={m}
+              style={{ "--grow": sh.w } as CSSProperties}>
               <p className={s.pairLabel}><b>{LABEL[m]}</b> · {WHO[m]}</p>
               <div className={s.shotFrame}>
                 <div className={s.shotLayer}>
@@ -189,14 +203,14 @@ export default function BoardShot() {
           <span ref={line} aria-hidden className={s.shotLine} />
           <div className={s.shotFrame}>
             {MODES.map((m) => {
-              const sh = SHOTS.card[m];
+              const sh = SHOTS[m];
               const on = mode === m;
               return (
                 <div key={m} data-layer={m} data-on={on}
-                  aria-hidden={on ? undefined : true}
-                  className={`${s.shotLayer} ${m === "championships" ? s.shotFade : ""}`}>
+                  aria-hidden={on ? undefined : true} className={s.shotLayer}
+                  style={{ width: `${(sh.w / SOLO_W) * 100}%` }}>
                   <Image src={sh.src} width={sh.w} height={sh.h} alt={sh.alt}
-                    sizes="(min-width: 500px) 460px, 100vw" className={s.shotImg} />
+                    sizes={SOLO_SIZES[m]} className={s.shotImg} />
                   <Pins pins={sh.pins} />
                 </div>
               );

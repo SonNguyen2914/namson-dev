@@ -38,7 +38,9 @@
 // The numbers in the rows are always one whole tape minute's reading;
 // the dots ride the drawn line between minutes, which is geometry, not
 // a reading.
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState,
+} from "react";
 import type { ReactNode } from "react";
 import {
   DERBY, MINUS, OUTCOMES, PRIME, fmt1, gapOf, signed1,
@@ -164,6 +166,70 @@ function geometry(w: number, h: number) {
 }
 type Geo = ReturnType<typeof geometry>;
 
+/* THE BAND'S LABEL GOES WHERE NOTHING IS DRAWN (round 11). It was set at
+   a fixed spot — 8px past the stop, at the 64% line, as wide as the band
+   — so on a short phone (320×568, 375×548) it wrapped to three lines,
+   sat flush on the 90′ line and took the Draw and Real Madrid end dots
+   (0–3%) on its corner. It is now placed from the series itself: the
+   leftmost spot inside the band, clear of the stop line, of the 90′ line
+   and its end dots, where the label fits between the market's lines with
+   LAB_CLEAR to spare above and below, centred in that gap. If no spot
+   fits, the second line (the red card's minute, which the event rail
+   marks right above the stop) steps aside and the label is placed again;
+   if that does not fit either, the roomier of the two is kept. */
+const LAB_LEFT = 8;     // px past the stop line
+const LAB_RIGHT = 14;   // px short of the 90′ line: its end dots are ~5px
+const LAB_CLEAR = 6;    // px between the label and any market line
+type LabSpot = { x: number; y: number; room: number };
+/** the market's value for one outcome at a fractional minute, as drawn */
+const marketAt = (o: Outcome, f: number) => {
+  const i = Math.max(0, Math.min(LAST, Math.floor(f))), j = Math.min(LAST, i + 1);
+  const a = at(i).market?.[o], z = at(j).market?.[o];
+  if (a == null) return z ?? null;
+  if (z == null) return a;
+  return a + (z - a) * (f - i);
+};
+function placeLabel(G: Geo, w: number, h: number): LabSpot | null {
+  if (!STOP) return null;
+  const x0 = G.X(STOP.from) + LAB_LEFT, x1 = G.X(LAST) - LAB_RIGHT;
+  const top = G.t + 2, bottom = G.h - G.b - 2;
+  const perMin = (G.w - G.l - G.r) / LAST;
+  /** the tallest run of plot height no market line enters over [xa, xb] */
+  const gap = (xa: number, xb: number): [number, number] => {
+    const fa = (xa - G.l) / perMin, fb = (xb - G.l) / perMin;
+    const used: [number, number][] = [];
+    for (const o of OUTCOMES) {
+      const vs = [marketAt(o, fa), marketAt(o, fb)];
+      for (let m = Math.ceil(fa); m <= Math.floor(fb); m++) vs.push(at(m).market?.[o] ?? null);
+      const got = vs.filter((v): v is number => v != null);
+      if (got.length) used.push([G.Y(Math.max(...got)) - 1, G.Y(Math.min(...got)) + 1]);
+    }
+    used.sort((p, q) => p[0] - q[0]);
+    let best: [number, number] = [top, top], cur = top;
+    for (const [a, b] of used) {
+      if (a - cur > best[1] - best[0]) best = [cur, a];
+      cur = Math.max(cur, b);
+    }
+    if (bottom - cur > best[1] - best[0]) best = [cur, bottom];
+    return best;
+  };
+  // the label's whole box, and LAB_CLEAR either side of it: a steep
+  // stretch of line just outside its edge still passes its corner
+  const last = Math.max(x0, x1 - w);
+  let pick: LabSpot | null = null;
+  for (let x = x0; ; x = Math.min(x + 2, last)) {
+    const [a, b] = gap(x - LAB_CLEAR, x + w + LAB_CLEAR);
+    const spot = { x, y: (a + b - h) / 2, room: (b - a - h) / 2 };
+    if (!pick || spot.room > pick.room) pick = spot;
+    if (spot.room >= LAB_CLEAR) return spot;
+    if (x >= last) return pick;
+  }
+}
+
+/** `useLayoutEffect` does nothing on the server, and says so; the label
+ *  is placed for the browser's next paint (components/LeagueTabs.tsx) */
+const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
 /** THE GROUND — grid and axis labels. Never changes with the minute. */
 const Ground = memo(function Ground({ G }: { G: Geo }) {
   return (
@@ -260,6 +326,60 @@ export default function MatchClock({ mode, enabled }: {
   const [done, setDone] = useState(still);
   const m = still ? LAST : minute;
   const fin = still || done;
+
+  /* the band label: measured as drawn (font, wrap), then placed */
+  const lab = useRef<HTMLDivElement | null>(null);
+  const [labAt, setLabAt] = useState<{ x: number; y: number; w: number; compact: boolean } | null>(null);
+  const [fonts, setFonts] = useState(false);
+  useEffect(() => {
+    let live = true;
+    document.fonts?.ready.then(() => { if (live) setFonts(true); });
+    return () => { live = false; };
+  }, []);
+  useIsoLayoutEffect(() => {
+    const el = lab.current;
+    if (!el) return;
+    /* a wrapped box keeps its max-width, however short its lines: so it
+       is measured at the max-width, then drawn as wide as its longest
+       line (and placed at that width). It is measured at the left edge:
+       where it last stood (or a first, pre-measure guess) may leave it
+       less room than its max-width, and then it wraps word by word. */
+    const measure = (compact: boolean) => {
+      el.toggleAttribute("data-compact", compact);
+      el.style.left = "0px";
+      el.style.width = "";
+      // a line's extent across all its text runs ("red card ", "54", "′")
+      const r = document.createRange();
+      const lines = new Map<number, [number, number]>();
+      for (const sp of el.children) {
+        if (getComputedStyle(sp).display === "none") continue;
+        r.selectNodeContents(sp);
+        for (const b of r.getClientRects()) {
+          const k = Math.round(b.top), e = lines.get(k);
+          lines.set(k, e ? [Math.min(e[0], b.left), Math.max(e[1], b.right)] : [b.left, b.right]);
+        }
+      }
+      let line = 0;
+      for (const [a, z] of lines.values()) line = Math.max(line, z - a);
+      const cs = getComputedStyle(el);
+      const w = Math.min(el.offsetWidth, Math.ceil(line + 1 + parseFloat(cs.paddingLeft)
+        + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth)));
+      el.style.width = `${w}px`;
+      const spot = placeLabel(G, w, el.offsetHeight);
+      return spot && { ...spot, w, compact };
+    };
+    let best = measure(false);
+    if (best && best.room < LAB_CLEAR) {
+      const c = measure(true);
+      if (c && c.room > best.room) best = c;
+    }
+    if (!best) return;
+    el.toggleAttribute("data-compact", best.compact);
+    el.style.width = `${best.w}px`;
+    el.style.left = `${best.x}px`;
+    el.style.top = `${best.y}px`;
+    setLabAt({ x: best.x, y: best.y, w: best.w, compact: best.compact });
+  }, [G, fonts]);
 
   const win = useRef<HTMLDivElement | null>(null);
   const winInner = useRef<HTMLDivElement | null>(null);
@@ -374,14 +494,15 @@ export default function MatchClock({ mode, enabled }: {
                   <Ink G={G} />
                   {/* the label rides inside the window, so it is wiped in
                       with the band it names — never shown ahead of it. It
-                      keeps inside the band, whose right edge (90′) is
-                      where the window stops: at 360px and below one line
-                      ran past it and lost its edge (at 320, the end of
-                      "down"), so there it wraps instead */}
+                      is placed where no market line runs (placeLabel),
+                      clear of the stop and of the 90′ line and its dots;
+                      it wraps rather than run past the band's edge */}
                   {STOP && (
-                    <div className={s.standLab} data-testid="clock-standdown-label"
-                      style={{ left: G.X(STOP.from) + 8, top: G.Y(64),
-                        maxWidth: G.X(LAST) - (G.X(STOP.from) + 8) }}>
+                    <div ref={lab} className={s.standLab} data-testid="clock-standdown-label"
+                      data-compact={labAt?.compact || undefined}
+                      style={{ left: labAt ? labAt.x : G.X(STOP.from) + LAB_LEFT,
+                        top: labAt ? labAt.y : G.Y(64), width: labAt?.w,
+                        maxWidth: G.X(LAST) - LAB_RIGHT - (G.X(STOP.from) + LAB_LEFT) }}>
                       <span>model stands down</span>
                       <span>red card {RED?.m ?? STOP.from}{PRIME}</span>
                     </div>

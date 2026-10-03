@@ -373,28 +373,38 @@
 }
 /* the intro and the frames under it span the page's one content column
    (1240px), like every other section: the paragraph ends where the
-   pictures end, and at 1024–1920px the heading has 528–856px, enough
-   for "Every fixture," on one line and never for the whole of it */
+   pictures end, and at 1024–1920px the heading has 528–793px, enough
+   for "Every fixture," on one line and never for the whole of it.
+   The intro's track is measured in ITS OWN type size (21 × the body's
+   clamp, 336px at 1024 and 399px at 1920): a fixed 21rem held two lines
+   at 16px and three at 19px, leaving "picked." alone at 1920 (round 11).
+   `balance` evens the two lines wherever they break — at every width:
+   under the heading at 768px the 34rem measure left "picked." alone too. */
+.boardGrid .body { text-wrap: balance; }
 @media (min-width: 1024px) {
-  .boardGrid { grid-template-columns: minmax(0, 1fr) minmax(0, 21rem); }
+  .boardGrid { grid-template-columns: minmax(0, 1fr) minmax(0, calc(21 * clamp(16px, 1.15vw, 19px))); }
   .boardGrid .body { margin-bottom: 6px; }
 }
 /* THE BOARD, BOTH HALVES (BoardShot.tsx). Wide: two frames side by side,
-   still, one whole board column each; the tracks are the crops' own
-   widths (--pair-cols, set from the crops), so both draw at one scale and
-   one height. Narrow: one frame under the board's switch; the two
-   captures share a grid cell, so a switch moves no layout — opacity
-   only. Below 1024px the figure is the card's own width (460px at most),
-   centred, and its caption keeps to that width. */
-.shot { margin: clamp(28px, 5vh, 48px) auto 0; max-width: 460px; }
+   still, one whole board column each; each cell grows in its crop's
+   width from a base of its two insets, so both images draw at one scale
+   and one height. Narrow: one frame under the board's switch holding the
+   same two crops at one scale — the wider fills it, the narrower is
+   centred on the board's own ground — stacked in one grid cell, so a
+   switch moves no layout: opacity only. Below 1024px the figure is 460px
+   at most, centred, and its caption keeps to that width. Every frame
+   keeps an inset of the board's ground inside its hairline (--shot-inset)
+   so no capture's edge — the Nations League date rule runs to its crop's
+   edge — reaches the frame. */
+.shot { --shot-inset: 10px; margin: clamp(28px, 5vh, 48px) auto 0; max-width: 460px; }
 .shotPair { display: none; }
 .shotSolo { display: grid; justify-items: center; }
 @media (min-width: 1024px) {
-  .shot { margin-inline: 0; max-width: none; }
-  .shotPair { display: grid; grid-template-columns: var(--pair-cols, repeat(2, minmax(0, 1fr))); gap: 20px; }
+  .shot { --shot-inset: 14px; margin-inline: 0; max-width: none; }
+  .shotPair { display: flex; gap: 20px; }
   .shotSolo { display: none; }
 }
-.pairCell { min-width: 0; }
+.pairCell { min-width: 0; flex: var(--grow) 1 calc(2 * var(--shot-inset)); }
 .pairLabel {
   margin: 0 0 10px;
   font-family: var(--font-geist-mono);
@@ -432,13 +442,14 @@
 .modeSwitch button[aria-pressed="true"] { border-color: var(--accent); background: var(--bs-bg); color: var(--ink-hi); }
 .shotBox { position: relative; margin-top: 14px; justify-self: stretch; }
 .shotLine { position: absolute; left: 0; right: 0; top: 50%; height: 1px; pointer-events: none; }
-/* the hairline is drawn OVER the picture's edge, not around it: a real
+/* the hairline is drawn OVER the frame's edge, not around it: a real
    border takes 2px off every frame, which is a larger share of the
    narrower one, so the pair's two scales (and heights) came out ~0.1%
    apart */
 .shotFrame {
   position: relative;
   display: grid;
+  padding: var(--shot-inset);
   background: var(--bs-bg);
   border-radius: 10px;
   overflow: clip;
@@ -460,10 +471,6 @@
   transition: opacity 240ms ease;
 }
 .shotLayer[data-on="false"] { opacity: 0; pointer-events: none; }
-.shotFade {
-  -webkit-mask-image: linear-gradient(to bottom, #000 86%, transparent);
-  mask-image: linear-gradient(to bottom, #000 86%, transparent);
-}
 .shotImg { display: block; width: 100%; height: auto; }
 .pins { list-style: none; margin: 0; padding: 0; position: absolute; inset: 0; pointer-events: none; }
 .pins li, .pinKey b {
@@ -479,7 +486,9 @@
   font-weight: 600;
   color: var(--ink-hi);
 }
-.pins li { position: absolute; translate: -50% -50%; }
+/* a pin starts 6px AFTER the thing it names, centred on its line
+   (BoardShot.tsx): the same clearance at every scale */
+.pins li { position: absolute; translate: 0 -50%; margin-left: 6px; }
 @media (max-width: 1023px) { .pins li { width: 18px; height: 18px; font-size: 10px; } }
 .shotCap {
   margin-top: 16px;
@@ -641,9 +650,12 @@
   pointer-events: none;
 }
 .standLab span:first-child { color: var(--ink-hi); }
+/* no spot in the band fits both lines (320×568, 375×548): the red card's
+   minute steps aside — the event rail marks it right above the stop */
+.standLab[data-compact] span:last-child { display: none; }
 .cellQuiet { color: var(--ink-low) !important; font-size: 11px; letter-spacing: 0.04em; white-space: nowrap; }
 @media (max-width: 767px) {
-  .standLab { font-size: 9px; letter-spacing: 0.05em; padding: 5px 7px; white-space: normal; }
+  .standLab { font-size: 9px; letter-spacing: 0.05em; line-height: 1.2; gap: 1px; padding: 4px 6px; white-space: normal; }
 }
 .chartTxt { font-family: var(--font-geist-mono); font-size: 10.5px; fill: var(--ink-low); }
 .cursor {
