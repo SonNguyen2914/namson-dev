@@ -1,4 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
+import { DERBY } from "../src/lib/landingData";
+
+/** the model's first IN-PLAY reading: the first tape row that carries one */
+const FIRST_READ = DERBY.minutes.find((r) => r.tape && r.model)!.m;
 
 /* THE LANDING PAGE HOLDS STILL WHERE IT PROMISES TO (round 9, 2026-10-03).
 
@@ -33,7 +37,17 @@ import { test, expect, type Page } from "@playwright/test";
       Madrid end dots on its corner. At 90′, at every phone size, the
       label keeps clear of the stop line and the 90′ line, inside the
       band, and no market line or end dot comes within a few pixels of
-      it — measured off the drawn paths, not the code's own sums. */
+      it — measured off the drawn paths, not the code's own sums.
+
+   5. NOTHING DRAWN DOWN THE BAND RUNS THROUGH IT EITHER, AND THE RAIL IS
+      WHOLE (round 12). The label sat on the 60′ goal's dashed guide at
+      360–1440px; the 90′ goal dot was cut in half by the reveal window
+      at every width; on a phone the 53′ goal dot hid half under the 54′
+      red card; and every model line began with a hook — a flat stub of
+      the T−10 lock and a drop at kick-off. At 90′: the label is clear of
+      every guide line, the stop line and the cursor; all four markers
+      are drawn, whole, on the rail, and no two overlap; and each model
+      line begins at the model's first in-play reading. */
 
 for (const width of [1440, 390]) {
   test(`under reduced motion the review card and its why-this-match line are drawn whole — ${width}px`,
@@ -169,7 +183,31 @@ for (const [w, h] of [[375, 548], [320, 568], [360, 640], [390, 664], [390, 844]
           const dot = Math.min(...[...sec.querySelectorAll<HTMLElement>('[role="img"] i')]
             .filter((d) => getComputedStyle(d).opacity !== "0")
             .map((d) => { const b = d.getBoundingClientRect(); return gapTo(b.left, b.top, b.right, b.bottom); }));
+          // every line drawn down the band: the goals' guides, the stop
+          // line and the cursor (at rest on the 90′ line)
+          const mid = (el: Element) => { const b = el.getBoundingClientRect(); return (b.left + b.right) / 2; };
+          const verticals = [...sec.querySelectorAll('[data-testid="clock-ev-guide"]'),
+            sec.querySelector('[data-testid="clock-standdown"] line')!,
+            sec.querySelector('[data-testid="clock-cursor"]')!].map(mid);
+          const guide = Math.min(...verticals.map((g) => Math.max(lab.left - g, g - lab.right)));
+          // the rail's markers, as drawn, against the rail and each other
+          const railLine = sec.querySelector('[data-testid="clock-rail-line"]')!.getBoundingClientRect();
+          const chart = sec.querySelector('[role="img"]')!.getBoundingClientRect();
+          const marks = [...sec.querySelectorAll('[data-testid="clock-rail"] [data-on="true"]')]
+            .map((e) => e.getBoundingClientRect()).sort((p, q) => p.left - q.left);
+          const railOut = Math.max(0, ...marks.map((b) => Math.max(railLine.left - b.left,
+            b.right - railLine.right, chart.left - b.left, b.right - chart.right)));
+          const railGap = Math.min(Infinity, ...marks.slice(1).map((b, i) => b.left - marks[i].right));
+          // where each model line begins, against the minute axis
+          const txt = (t: string) => mid([...sec.querySelectorAll("svg text")]
+            .find((e) => e.textContent === t)!);
+          const ko = txt("KO"), ft = txt("90′");
+          const starts = [...sec.querySelectorAll<SVGPathElement>('path[stroke-width="2.2"]')]
+            .map((p) => p.getPointAtLength(0).matrixTransform(p.getScreenCTM()!).x);
           return {
+            guide: Math.round(guide * 10) / 10, marks: marks.length,
+            railOut: Math.round(railOut * 10) / 10, railGap: Math.round(railGap * 10) / 10,
+            firstStart: Math.round((Math.min(...starts) - ko) / ((ft - ko) / 90) * 100) / 100,
             label: [Math.round(lab.left), Math.round(lab.right)],
             box: [lab.left, lab.top, lab.right, lab.bottom].map(Math.round),
             band: [band.left, band.top, band.right, band.bottom].map(Math.round),
@@ -203,6 +241,15 @@ for (const [w, h] of [[375, 548], [320, 568], [360, 640], [390, 664], [390, 844]
           expect(at.paths, said).toBeGreaterThanOrEqual(3);
           expect(at.line, `a market line runs into the label: ${said}`).toBeGreaterThanOrEqual(4);
           expect(at.dot, `an end dot sits on the label: ${said}`).toBeGreaterThanOrEqual(6);
+          // nor any line drawn down the band: guides, stop line, cursor
+          expect(at.guide, `a guide line runs through the label: ${said}`).toBeGreaterThanOrEqual(5);
+          // the rail: all four events, whole, on the rail, none on another
+          expect(at.marks, said).toBe(DERBY.events.length);
+          expect(at.railOut, `a rail marker is cut at the rail's end: ${said}`).toBeLessThanOrEqual(0);
+          expect(at.railGap, `two rail markers overlap: ${said}`).toBeGreaterThanOrEqual(1);
+          // the model's lines begin at its first in-play reading — no hook
+          expect(Math.abs(at.firstStart - FIRST_READ), `a model line starts before ${FIRST_READ}′: ${said}`)
+            .toBeLessThanOrEqual(0.3);
         }
       }
     });

@@ -72,6 +72,13 @@
   line-height: 1.6;
   color: var(--ink-mid);
 }
+/* NO WORD LEFT ALONE (round 12). Body copy and captions break `pretty`:
+   the browser re-flows the last lines so a paragraph never ends on one
+   short word ("on." under the 54′ caption at 320px, "tell." under the
+   record at 390px). An em dash is bound to the word before it in the copy
+   itself (a no-break space), so no line starts with one. */
+.body, .heroLine, .steps li, .caption, .note, .coda, .colSub, .smallprint,
+.fieldNote span, .timeline li > span:last-child, .findings p { text-wrap: pretty; }
 .chip {
   display: inline-block;
   border: 1px solid var(--line-strong);
@@ -381,9 +388,12 @@
    `balance` evens the two lines wherever they break — at every width:
    under the heading at 768px the 34rem measure left "picked." alone too. */
 .boardGrid .body { text-wrap: balance; }
+/* …and beside the heading it is SET RIGHT (round 12): balanced lines are
+   shorter than their track, so flush-left text stopped ~44px short of the
+   frames' right edge at 1024–1920. Flush right, both lines end on it. */
 @media (min-width: 1024px) {
   .boardGrid { grid-template-columns: minmax(0, 1fr) minmax(0, calc(21 * clamp(16px, 1.15vw, 19px))); }
-  .boardGrid .body { margin-bottom: 6px; }
+  .boardGrid .body { margin-bottom: 6px; text-align: right; }
 }
 /* THE BOARD, BOTH HALVES (BoardShot.tsx). Wide: two frames side by side,
    still, one whole board column each; each cell grows in its crop's
@@ -487,9 +497,19 @@
   color: var(--ink-hi);
 }
 /* a pin starts 6px AFTER the thing it names, centred on its line
-   (BoardShot.tsx): the same clearance at every scale */
+   (BoardShot.tsx): the same clearance at every scale. A pin set UNDER a
+   thing ends on its right edge and starts a few px below its label. */
 .pins li { position: absolute; translate: 0 -50%; margin-left: 6px; }
-@media (max-width: 1023px) { .pins li { width: 18px; height: 18px; font-size: 10px; } }
+.pins li[data-at="under"] { translate: -100% 0; margin-left: 0; margin-top: 5px; }
+@media (max-width: 1023px) {
+  .pins li { width: 18px; height: 18px; font-size: 10px; }
+  .pins li[data-at="under"] { margin-top: 4px; }
+}
+/* a phone's capture is drawn at ~0.3 of its pixels: a pin a step smaller
+   keeps every pin inside its card down to 320px */
+@media (max-width: 479px) {
+  .pins li { width: 16px; height: 16px; font-size: 9px; margin-left: 4px; }
+}
 .shotCap {
   margin-top: 16px;
   display: flex;
@@ -635,7 +655,9 @@
   position: absolute;
   display: grid;
   justify-items: start;
-  white-space: nowrap;      /* one line wherever it fits; see below */
+  /* one line wherever it fits: it is measured at the widest free span of
+     the band (MatchClock.tsx) and wraps only past that */
+  white-space: normal;
   padding: 7px 10px;
   border: 1px solid var(--line-strong);
   border-radius: 6px;
@@ -649,13 +671,18 @@
   color: var(--ink-mid);
   pointer-events: none;
 }
-.standLab span:first-child { color: var(--ink-hi); }
-/* no spot in the band fits both lines (320×568, 375×548): the red card's
-   minute steps aside — the event rail marks it right above the stop */
+/* "model stands down" breaks evenly where it must ("model / stands
+   down", never "model stands / down"); "red card 54′" never breaks — where
+   it cannot fit, it steps aside (below) */
+.standLab span:first-child { color: var(--ink-hi); text-wrap: balance; }
+.standLab span:last-child { white-space: nowrap; }
+/* no spot in the band fits both lines, or the red card's line is wider
+   than the band's widest free span (≤375px): it steps aside — the event
+   rail marks the card right above the stop */
 .standLab[data-compact] span:last-child { display: none; }
 .cellQuiet { color: var(--ink-low) !important; font-size: 11px; letter-spacing: 0.04em; white-space: nowrap; }
 @media (max-width: 767px) {
-  .standLab { font-size: 9px; letter-spacing: 0.05em; line-height: 1.2; gap: 1px; padding: 4px 6px; white-space: normal; }
+  .standLab { font-size: 9px; letter-spacing: 0.05em; line-height: 1.2; gap: 1px; padding: 4px 6px; }
 }
 .chartTxt { font-family: var(--font-geist-mono); font-size: 10.5px; fill: var(--ink-low); }
 .cursor {
@@ -817,6 +844,10 @@
 @media (min-width: 768px) { .findings li { grid-template-columns: 15rem 1fr; } }
 .findings p { margin: 0; font-size: clamp(17px, 1.4vw, 21px); line-height: 1.5; color: var(--ink-hi); }
 .findings b { font-family: var(--font-geist-mono); font-weight: 600; font-size: 0.9em; white-space: nowrap; }
+/* the shadow chip under the last finding sits on its own line: inline,
+   `pretty` read it as a last line too short to stand alone and pulled
+   "price." down beside it, breaking a sentence that fits on one line */
+.findings p .chip { display: block; width: fit-content; margin-top: 10px; }
 .findTag { padding-top: 5px; font-family: var(--font-geist-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-low); }
 
 /* ── 7 · the door ───────────────────────────────────────────────────── */
@@ -842,23 +873,39 @@
 .cta:hover { background: #ffd25a; transform: translateX(2px); }
 .cta span { transition: transform 160ms ease; }
 .cta:hover span { transform: translateX(3px); }
-.contact { list-style: none; margin: 36px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px 32px; }
-.contact li { display: inline-flex; align-items: baseline; gap: 10px; }
+/* ONE LABEL COLUMN (round 12): every value starts on one left edge — as
+   wrapped inline pairs, "github" is wider than "email" and the two
+   addresses started 8px apart at 390px. A row per contact, the rows a
+   subgrid of the list's two tracks. */
+.contact { list-style: none; margin: 36px 0 0; padding: 0; display: grid; grid-template-columns: max-content minmax(0, auto); gap: 12px 16px; }
+.contact li { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: baseline; }
 .contactKey { font-family: var(--font-geist-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--ink-low); }
 .contact a { font-size: 15px; color: var(--ink-hi); text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 4px; overflow-wrap: anywhere; }
 .contact a:hover { text-decoration-color: var(--ink-hi); }
+/* the rule is drawn in the CONTENT column, like every other rule on the
+   page (round 12: as a border on the padded wrap it ran 44–1396px at
+   1440, past the 100–1340 column) */
 .footer {
+  position: relative;
   display: flex;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 8px;
   padding-block: 24px 40px;
-  border-top: 1px solid var(--line);
   font-family: var(--font-geist-mono);
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.16em;
   color: var(--ink-faint);
+}
+.footer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: var(--gutter);
+  right: var(--gutter);
+  height: 1px;
+  background: var(--line);
 }
 .footer span { display: inline-flex; align-items: center; gap: 8px; }
 

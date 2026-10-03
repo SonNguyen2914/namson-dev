@@ -28,6 +28,12 @@ import s from "./landing.module.css";
 
 const E0 = 1300, E1 = 2100;
 const TICKS = Array.from({ length: (E1 - E0) / 10 + 1 }, (_, i) => E0 + i * 10);
+/** THE AXIS'S WORDS STAY ON THE PAGE (round 12): at the end of the zoom
+ *  on a wide screen "2,000" sat on the screen's edge, cut to "2". A tick
+ *  label whose box would come nearer the screen's edge than the page's
+ *  narrowest gutter is not shown — the tick stays, unlabelled; a label
+ *  slid in off its tick would name the wrong rating. */
+const TICK_EDGE = 16;
 const fmtElo = (v: number) => Math.round(v).toLocaleString("en-US");
 /** "2026-10-02" → "2 Oct": the day the baked field was read */
 const asOf = (iso: string) => new Date(`${iso}T12:00:00Z`)
@@ -99,6 +105,20 @@ export default function FieldStage({ mode, enabled }: {
      each label's box inside the page gutter — the dot stays where the
      rating puts it; only its caption slides in. */
   const [labW, setLabW] = useState({ home: 0, away: 0 });
+  /* every tick label is five mono characters ("1,300"–"2,100"), so one
+     measured width serves them all; it changes when the font arrives */
+  const [tickW, setTickW] = useState(34);
+  useEffect(() => {
+    const el = ticks.current.find((t) => t?.lastElementChild?.tagName === "SPAN")
+      ?.lastElementChild as HTMLElement | undefined;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      const w = Math.ceil(el.offsetWidth);
+      setTickW((v) => (v === w || w === 0 ? v : w));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   useEffect(() => {
     const h = mk.current.homeLab, a = mk.current.awayLab;
     if (!h || !a || typeof ResizeObserver === "undefined") return;
@@ -154,9 +174,11 @@ export default function FieldStage({ mode, enabled }: {
       const e = TICKS[i];
       const named = e % step === 0;
       const show = named || e % 100 === 0 ? 1 : 10 * px >= 7 ? 0.6 * zoom : 0;
-      set(el, `translate3d(${X(L.X(e))}px, 0, 0)`, show);
+      const at = X(L.X(e));
+      set(el, `translate3d(${at}px, 0, 0)`, show);
       const lab = el.lastElementChild as HTMLElement | null;
-      if (lab && lab.tagName === "SPAN") lab.style.opacity = named ? "1" : "0";
+      const onPage = at - tickW / 2 >= TICK_EDGE && at + tickW / 2 <= size.w - TICK_EDGE;
+      if (lab && lab.tagName === "SPAN") lab.style.opacity = named && onPage ? "1" : "0";
     });
 
     // the two clubs leave the swarm for one line
@@ -193,7 +215,7 @@ export default function FieldStage({ mode, enabled }: {
     set(mk.current.rest, `translate3d(${gx}px, ${lineY}px, 0) scaleX(${(Math.max(0, ax - gx) / 1000) * n})`, n > 0 ? 1 : 0);
     set(mk.current.restLab, `translate3d(${(gx + ax) / 2}px, ${lineY}px, 0)`, n);
     if (note.current) note.current.style.opacity = String(span(p, 0.6, 0.7));
-  }, [L, size.w, size.h, labW]);
+  }, [L, size.w, size.h, labW, tickW]);
 
   const scroll = mode === "scroll";
   useScrollScene(section, draw, { mode: "pinned", stage, enabled: scroll && enabled });
@@ -201,7 +223,7 @@ export default function FieldStage({ mode, enabled }: {
   // by the same function at a fixed p — after layout, once per size.
   const fixedP = mode === "match" ? 1 : 0;
   const drawn = useRef("");
-  const key = `${mode}:${size.w}x${size.h}:${enabled}:${labW.home}/${labW.away}`;
+  const key = `${mode}:${size.w}x${size.h}:${enabled}:${labW.home}/${labW.away}:${tickW}`;
   const paint = useCallback((el: HTMLDivElement | null) => {
     stage.current = el;
     if (el && drawn.current !== key && !(scroll && enabled)) {
@@ -228,7 +250,7 @@ export default function FieldStage({ mode, enabled }: {
               Every match,<br />made readable.
             </h1>
             <p className={s.heroLine}>
-              Each one read against the real market — before kickoff, in
+              Each one read against the real market&nbsp;— before kickoff, in
               play, after the whistle.
             </p>
           </div>
@@ -360,8 +382,8 @@ export default function FieldStage({ mode, enabled }: {
             {/* the diagram carries the numbers; this says only whose
                 numbers they are — and a rating keeps its pass count */}
             <span>
-              Ratings as of {asOf(FIELD.fetched)}, at {FIELD.passes} passes — not
-              the pre-match read.
+              Ratings as of {asOf(FIELD.fetched)}, at {FIELD.passes} passes{"\u00a0"}— not
+              the pre-match{"\u00a0"}read.
             </span>
           </p>
         )}

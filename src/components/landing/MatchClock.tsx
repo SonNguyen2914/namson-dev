@@ -71,6 +71,14 @@ const STOP = (() => {
 })();
 const RED = DERBY.events.find((e) => e.type === "red");
 
+/* WHERE THE MODEL'S LINE BEGINS (round 12): at its first IN-PLAY reading,
+   the first tape row that carries one. The rows before it (0′ and 1′)
+   hold the T−10 lock carried forward, and drawn as a line they made a
+   flat stub and a near-vertical drop at kick-off — a "hook" — in every
+   view. The rows are untouched: the readout still says what they hold,
+   and the KO caption says the read was locked before. */
+const FIRST_READ = M.find((r) => r.tape && r.model)?.m ?? 0;
+
 /* scroll → minute: continuous, lingering gently where the read changed */
 const MARKS = [51, 53, 54, 60];
 const WEIGHT = Array.from({ length: LAST }, (_, i) => {
@@ -102,7 +110,7 @@ const CAPS: Cap[] = (() => {
     { id: "h2", from: 46, to: 50, tag: `46${PRIME}`, text: <>Still 0–0. Both lines lean toward the draw.</> },
     { id: "first", from: 51, to: 52, tag: `51${PRIME}`, text: <>The market moves first: Atlético <b>{pct(m50.market?.home)}</b> → <b>{pct(m51.market?.home)}</b>. The tape hasn&rsquo;t caught up.</> },
     { id: "goal1", from: 53, to: 53, tag: `53${PRIME}`, text: <>Goal, Atlético. {sc(53)}. Model <b>{pct(g.model?.home)}</b>, market <b>{pct(g.market?.home)}</b>.</> },
-    { id: "red", from: 54, to: 59, tag: `54${PRIME}`, text: <>Red card, Real Madrid. The model stands down — it reads 11 v 11 only. The market reads on.</> },
+    { id: "red", from: 54, to: 59, tag: `54${PRIME}`, text: <>Red card, Real Madrid. The model stands down&nbsp;— it reads 11&nbsp;v&nbsp;11 only. The market reads on.</> },
     { id: "goal2", from: 60, to: 67, tag: `60${PRIME}`, text: <>{sc(60)} Atlético. Market: <b>{pct(m60.market?.home)}</b>.</> },
     { id: "flat", from: 68, to: 89, tag: `68${PRIME}`, text: <>The model stays out. The market runs to full time.</> },
     { id: "ft", from: 90, to: 90, tag: `90${PRIME}`, text: <>Real Madrid pull one back. {sc(90)}, full time.</> },
@@ -117,6 +125,11 @@ function phase(m: number, done: boolean) {
   return m < 45 ? "first half" : "second half";
 }
 
+/* the event rail: a goal's dot radius, a red card's half-width, the
+   least gap between two markers, the rail's height, and how far it runs
+   past full time so the 90′ marker sits on it whole */
+const EV_R = 3.6, EV_HALF_W = 2.5, EV_GAP = 1.5, RAIL_Y = 12, RAIL_PAD = 6;
+
 /** the chart's fixed drawing — rebuilt only when its box changes size */
 function geometry(w: number, h: number) {
   const l = 34, r = 12, t = 30, b = 24;
@@ -127,6 +140,7 @@ function geometry(w: number, h: number) {
   const series = (o: Outcome, k: "model" | "market") => {
     const runs: { m: number; v: number }[][] = []; let cur: { m: number; v: number }[] = [];
     for (const row of M) {
+      if (k === "model" && row.m < FIRST_READ) continue;
       const v = row[k]?.[o];
       if (v == null) { if (cur.length) runs.push(cur); cur = []; continue; }
       cur.push({ m: row.m, v });
@@ -151,7 +165,10 @@ function geometry(w: number, h: number) {
       }
       cur = [];
     };
-    for (const row of M) { if (row.model && row.market) cur.push(row); else flush(); }
+    for (const row of M) {
+      if (row.m < FIRST_READ) continue;
+      if (row.model && row.market) cur.push(row); else flush();
+    }
     flush();
     return out;
   };
@@ -159,8 +176,24 @@ function geometry(w: number, h: number) {
     const v = at(STOP.last).model?.[o];
     return v == null ? null : { o, x: X(STOP.last), y: Y(v) };
   }).filter(Boolean) as { o: Outcome; x: number; y: number }[] : [];
+  /* THE EVENT RAIL, SPACED (round 12). On a phone a minute is ~3px, so
+     the 53′ goal dot sat half under the 54′ red card. Markers closer than
+     their own half-widths and EV_GAP are pushed apart, symmetrically, as
+     far as it takes for both to be whole; the guide lines and the stop
+     line stay on the true minutes. */
+  const rail = [...DERBY.events].sort((p, q) => p.m - q.m)
+    .map((e) => ({ m: e.m, type: e.type, x: X(e.m), half: e.type === "goal" ? EV_R : EV_HALF_W }));
+  for (let pass = 0; pass < 8; pass++) {
+    let moved = false;
+    for (let i = 1; i < rail.length; i++) {
+      const a = rail[i - 1], z = rail[i];
+      const short = a.half + z.half + EV_GAP - (z.x - a.x);
+      if (short > 0.01) { a.x -= short / 2; z.x += short / 2; moved = true; }
+    }
+    if (!moved) break;
+  }
   return {
-    l, r, t, b, X, Y, w, h, caps,
+    l, r, t, b, X, Y, w, h, caps, rail,
     paths: OUTCOMES.map((o) => ({ o, model: series(o, "model"), market: series(o, "market"), fill: fills(o) })),
   };
 }
@@ -178,8 +211,34 @@ type Geo = ReturnType<typeof geometry>;
    marks right above the stop) steps aside and the label is placed again;
    if that does not fit either, the roomier of the two is kept. */
 const LAB_LEFT = 8;     // px past the stop line
-const LAB_RIGHT = 14;   // px short of the 90′ line: its end dots are ~5px
+const LAB_RIGHT = 12;   // px short of the 90′ line: its end dots are 4px either side
 const LAB_CLEAR = 6;    // px between the label and any market line
+const LAB_GUIDE = 6;    // px between the label and any line drawn down the band
+
+/* AND NO LINE DRAWN DOWN THE BAND RUNS THROUGH IT (round 12). The 60′
+   goal's dashed guide crosses the band, and the label — placed clear of
+   the market's lines only — sat on it at 360–1440px. Every vertical line
+   the chart draws is now kept LAB_GUIDE clear: each event's guide (the
+   red card's is the stop line, the band's own left edge), and the
+   cursor, which rests on the 90′ line at full time. What is left of the
+   band is a run of free spans between those lines; the label is measured
+   to the widest and placed in the first that holds it. */
+function labelRuns(G: Geo): [number, number][] {
+  if (!STOP) return [];
+  const x0 = G.X(STOP.from) + LAB_LEFT, x1 = G.X(LAST) - LAB_RIGHT;
+  const cuts = [...DERBY.events.map((e) => G.X(e.m)), G.X(LAST)]
+    .filter((g) => g > x0 - LAB_GUIDE && g < x1 + LAB_GUIDE).sort((p, q) => p - q);
+  const runs: [number, number][] = [];
+  let a = x0;
+  for (const g of cuts) {
+    if (g - LAB_GUIDE > a) runs.push([a, g - LAB_GUIDE]);
+    a = Math.max(a, g + LAB_GUIDE);
+  }
+  if (x1 > a) runs.push([a, x1]);
+  return runs;
+}
+/** the widest free span: the label's measuring width */
+const labelMax = (G: Geo) => Math.max(0, ...labelRuns(G).map(([a, b]) => b - a));
 type LabSpot = { x: number; y: number; room: number };
 /** the market's value for one outcome at a fractional minute, as drawn */
 const marketAt = (o: Outcome, f: number) => {
@@ -191,7 +250,6 @@ const marketAt = (o: Outcome, f: number) => {
 };
 function placeLabel(G: Geo, w: number, h: number): LabSpot | null {
   if (!STOP) return null;
-  const x0 = G.X(STOP.from) + LAB_LEFT, x1 = G.X(LAST) - LAB_RIGHT;
   const top = G.t + 2, bottom = G.h - G.b - 2;
   const perMin = (G.w - G.l - G.r) / LAST;
   /** the tallest run of plot height no market line enters over [xa, xb] */
@@ -213,17 +271,31 @@ function placeLabel(G: Geo, w: number, h: number): LabSpot | null {
     if (bottom - cur > best[1] - best[0]) best = [cur, bottom];
     return best;
   };
-  // the label's whole box, and LAB_CLEAR either side of it: a steep
-  // stretch of line just outside its edge still passes its corner
-  const last = Math.max(x0, x1 - w);
+  /* the leftmost spot in [from, to] (the label's left edge) with
+     LAB_CLEAR to spare; else the roomiest. The label's whole box, and
+     LAB_CLEAR either side of it: a steep stretch of line just outside its
+     edge still passes its corner. */
+  const scan = (from: number, to: number) => {
+    let pick: LabSpot | null = null;
+    for (let x = from; ; x = Math.min(x + 2, to)) {
+      const [a, b] = gap(x - LAB_CLEAR, x + w + LAB_CLEAR);
+      const spot = { x, y: (a + b - h) / 2, room: (b - a - h) / 2 };
+      if (!pick || spot.room > pick.room) pick = spot;
+      if (spot.room >= LAB_CLEAR || x >= to) return { spot, pick };
+    }
+  };
+  // every free span wide enough, left to right; the first clear spot wins
   let pick: LabSpot | null = null;
-  for (let x = x0; ; x = Math.min(x + 2, last)) {
-    const [a, b] = gap(x - LAB_CLEAR, x + w + LAB_CLEAR);
-    const spot = { x, y: (a + b - h) / 2, room: (b - a - h) / 2 };
-    if (!pick || spot.room > pick.room) pick = spot;
-    if (spot.room >= LAB_CLEAR) return spot;
-    if (x >= last) return pick;
+  for (const [a, b] of labelRuns(G)) {
+    if (b - a < w - 0.5) continue;
+    const r = scan(a, Math.max(a, b - w));
+    if (r.spot.room >= LAB_CLEAR) return r.spot;
+    if (r.pick && (!pick || r.pick.room > pick.room)) pick = r.pick;
   }
+  if (pick) return pick;
+  // no span holds it (never measured so): the old rule, the whole band
+  const x0 = G.X(STOP.from) + LAB_LEFT, x1 = G.X(LAST) - LAB_RIGHT;
+  return scan(x0, Math.max(x0, x1 - w)).pick;
 }
 
 /** `useLayoutEffect` does nothing on the server, and says so; the label
@@ -248,15 +320,17 @@ const Ground = memo(function Ground({ G }: { G: Geo }) {
           {t === 0 ? "KO" : t === 45 ? "HT" : `${t}${PRIME}`}
         </text>
       ))}
-      <line x1={G.l} x2={G.w - G.r} y1={12} y2={12} stroke="var(--ink-faint)" strokeOpacity="0.6" />
+      <line x1={G.l} x2={G.w - G.r + RAIL_PAD} y1={RAIL_Y} y2={RAIL_Y}
+        stroke="var(--ink-faint)" strokeOpacity="0.6" data-testid="clock-rail-line" />
     </svg>
   );
 });
 
-/** THE INK — everything that is revealed as the clock runs: the event
- *  rail, the stand-down band, the fills, the six lines, their bridges and
- *  the model's end caps. Built once per size; the reveal moves a window
- *  over it and never touches it. */
+/** THE INK — everything that is revealed as the clock runs: the goals'
+ *  guide lines, the stand-down band, the fills, the six lines, their
+ *  bridges and the model's end caps (the rail's markers are drawn whole,
+ *  outside the window: Rail). Built once per size; the reveal moves a
+ *  window over it and never touches it. */
 const Ink = memo(function Ink({ G }: { G: Geo }) {
   const x0 = STOP ? G.X(STOP.from) : 0;
   return (
@@ -277,15 +351,9 @@ const Ink = memo(function Ink({ G }: { G: Geo }) {
             strokeDasharray="3 3" />
         </g>
       )}
-      {DERBY.events.map((e, i) => (
-        e.type === "goal"
-          ? <circle key={i} cx={G.X(e.m)} cy={12} r="3.6" fill="var(--ink-hi)" data-testid="clock-ev-goal" />
-          : <rect key={i} x={G.X(e.m) - 2.5} y={6.5} width="5" height="11" rx="1" fill="var(--neg)"
-              data-testid={`clock-ev-${e.type}`} />
-      ))}
       {DERBY.events.filter((e) => e.type === "goal").map((e, i) => (
         <line key={`g${i}`} x1={G.X(e.m)} x2={G.X(e.m)} y1={G.t} y2={G.h - G.b}
-          stroke="var(--ink-faint)" strokeDasharray="2 3" />
+          stroke="var(--ink-faint)" strokeDasharray="2 3" data-testid="clock-ev-guide" />
       ))}
       {G.paths.map((pp) => (
         <g key={pp.o}>
@@ -314,6 +382,27 @@ const Ink = memo(function Ink({ G }: { G: Geo }) {
     </svg>
   );
 });
+
+/** THE EVENT RAIL'S MARKERS, OUTSIDE THE REVEAL WINDOW (round 12). Inside
+ *  it, the window's edge — the clock — cut each marker in half on the
+ *  minute it was reached, and cut the 90′ goal for good at full time. Out
+ *  here a marker is drawn whole from its minute on, at its spaced place
+ *  on the rail (geometry). */
+function Rail({ G, upTo }: { G: Geo; upTo: number }) {
+  return (
+    <svg aria-hidden className={s.chartSvg} width={G.w} height={G.h} data-testid="clock-rail">
+      {G.rail.map((e, i) => {
+        const on = upTo >= e.m;
+        return e.type === "goal"
+          ? <circle key={i} cx={e.x} cy={RAIL_Y} r={EV_R} fill="var(--ink-hi)"
+              opacity={on ? 1 : 0} data-on={on} data-testid="clock-ev-goal" />
+          : <rect key={i} x={e.x - EV_HALF_W} y={RAIL_Y - 5.5} width={2 * EV_HALF_W} height="11"
+              rx="1" fill="var(--neg)" opacity={on ? 1 : 0} data-on={on}
+              data-testid={`clock-ev-${e.type}`} />;
+      })}
+    </svg>
+  );
+}
 
 export default function MatchClock({ mode, enabled }: {
   mode: "scroll" | "still"; enabled: boolean }) {
@@ -362,16 +451,24 @@ export default function MatchClock({ mode, enabled }: {
       let line = 0;
       for (const [a, z] of lines.values()) line = Math.max(line, z - a);
       const cs = getComputedStyle(el);
-      const w = Math.min(el.offsetWidth, Math.ceil(line + 1 + parseFloat(cs.paddingLeft)
-        + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth)));
+      const chrome = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight)
+        + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
+      /* the box as laid out, unrounded: `offsetWidth` rounds 144.4 down
+         to 144, and a box set to that wrapped its own one line (round 12,
+         "model stands / down" at 1440) */
+      const box = el.getBoundingClientRect().width;
+      // the red card's line does not break: wider than the widest free
+      // span, it would run out of the box, so it steps aside instead
+      if (line + chrome > box + 0.5) return null;
+      const w = Math.min(Math.ceil(box), Math.ceil(line + 1 + chrome));
       el.style.width = `${w}px`;
       const spot = placeLabel(G, w, el.offsetHeight);
       return spot && { ...spot, w, compact };
     };
     let best = measure(false);
-    if (best && best.room < LAB_CLEAR) {
+    if (!best || best.room < LAB_CLEAR) {
       const c = measure(true);
-      if (c && c.room > best.room) best = c;
+      if (c && (!best || c.room > best.room)) best = c;
     }
     if (!best) return;
     el.toggleAttribute("data-compact", best.compact);
@@ -400,7 +497,8 @@ export default function MatchClock({ mode, enabled }: {
         const el = dots.current[`${k}-${o}`];
         if (!el) continue;
         const v0 = a[k]?.[o];
-        if (v0 == null) { el.style.opacity = "0"; continue; }
+        // a dot rides the drawn line: none before the model's line begins
+        if (v0 == null || (k === "model" && f < FIRST_READ)) { el.style.opacity = "0"; continue; }
         const v1 = z[k]?.[o];
         const y = v1 == null ? G.Y(v0) : G.Y(v0) + (G.Y(v1) - G.Y(v0)) * fr;
         el.style.opacity = "1";
@@ -495,21 +593,23 @@ export default function MatchClock({ mode, enabled }: {
                   {/* the label rides inside the window, so it is wiped in
                       with the band it names — never shown ahead of it. It
                       is placed where no market line runs (placeLabel),
-                      clear of the stop and of the 90′ line and its dots;
-                      it wraps rather than run past the band's edge */}
+                      clear of the stop, of every guide line, of the 90′
+                      line and its dots; it wraps rather than run past
+                      the free span it sits in */}
                   {STOP && (
                     <div ref={lab} className={s.standLab} data-testid="clock-standdown-label"
                       data-compact={labAt?.compact || undefined}
                       style={{ left: labAt ? labAt.x : G.X(STOP.from) + LAB_LEFT,
                         top: labAt ? labAt.y : G.Y(64), width: labAt?.w,
-                        maxWidth: G.X(LAST) - LAB_RIGHT - (G.X(STOP.from) + LAB_LEFT) }}>
+                        maxWidth: labelMax(G) }}>
                       <span>model stands down</span>
                       <span>red card {RED?.m ?? STOP.from}{PRIME}</span>
                     </div>
                   )}
                 </div>
               </div>
-              <div ref={cursor} aria-hidden className={s.cursor}
+              <Rail G={G} upTo={m} />
+              <div ref={cursor} aria-hidden className={s.cursor} data-testid="clock-cursor"
                 style={{ transform: `translate3d(${G.X(m)}px,0,0)`, top: G.t - 6, height: G.h - G.t - G.b + 6 }} />
               {OUTCOMES.map((o) => (
                 <span key={o} aria-hidden>

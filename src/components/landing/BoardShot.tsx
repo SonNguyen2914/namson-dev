@@ -12,8 +12,8 @@
 // — clubs | national teams — with no switch and nothing that moves
 // (2026-10-03). Each frame holds ONE whole column of its board, header
 // and card, at the SAME capture scale, so the type on both cards is the
-// same size: the Eredivisie column (746×880 capture pixels) and the
-// Nations League column (1000×880). A club column is narrower than a
+// same size: the Eredivisie column (712×880 capture pixels) and the
+// Nations League column (966×880). A club column is narrower than a
 // one-column championship board, so the two frames are as wide as their
 // crops (cells that grow in the crops' own ratio) — equal height, equal
 // scale, nothing cut at either edge. Round 9 centred the club crop on
@@ -33,7 +33,7 @@
 // rule that ran into the frame's edge. Now:
 //   - both captures draw at ONE scale (crop pixels per CSS pixel): the
 //     Nations League crop is the wider, so it fills the frame and the
-//     Eredivisie column sits centred at its own 746/1000 of that width,
+//     Eredivisie column sits centred at its own 712/966 of that width,
 //     the rest the board's own ground — padded, never stretched;
 //   - both crops are 880 rows tall, so at one scale they are one height,
 //     stacked in one grid cell: a switch moves no pixel of layout, and
@@ -71,8 +71,15 @@ const WHO: Record<BoardMode, string> = {
  *  its vertical centre], each a share (%) of its image's own box. The pin
  *  starts a fixed 6px past that edge (landing.module.css `.pins li`), so
  *  its clearance is the same at every scale — a pin centred on a share of
- *  the image kept 2–3px from its neighbours at 1024px (round 10). */
-type Pin = readonly [number, number];
+ *  the image kept 2–3px from its neighbours at 1024px (round 10).
+ *
+ *  Or set just UNDER it ("under"): [the thing's right edge, the bottom of
+ *  the lowest label under it]; the pin's right edge is the thing's right
+ *  edge and its top a fixed few px below that label. Pin 1 is set so
+ *  (round 12): the gap number is the last thing on its line, 33 capture
+ *  pixels from the card's border — 11.5px at 390, 23px at 1440 — and a
+ *  16–20px pin set after it sat on the gold border in every frame. */
+type Pin = readonly [number, number] | readonly [number, number, "under"];
 type Shot = { src: string; w: number; h: number; alt: string; pins: readonly Pin[] };
 
 const ALT: Record<BoardMode, string> = {
@@ -87,16 +94,22 @@ const ALT: Record<BoardMode, string> = {
 };
 
 /* ONE CROP PER HALF, used by the wide pair and the phone switch alike:
-   one whole board column each, header, date row and ONE card, nothing
-   cut, both 880 capture rows tall at the capture's one scale. Pins: 1
-   the gap (after the gap number, on its line — the same place in both),
-   2 the tiers (after the # chip), 3 the book (after the last thing on
-   the book's line), measured off the captures' pixels. */
+   one whole board column each, header, date row and ONE card, both 880
+   capture rows tall at the capture's one scale, and each exactly as wide
+   as its card — border to border (round 12). The Nations League capture
+   ends at the board's own right edge and its date rule runs to it, past
+   the card: cropped at the card's border, the rule now ends where the
+   card does, and the club crop is cut the same way so both frames hold
+   their card at one inset. New file names: the optimizer and browsers
+   cache by URL. Pins: 1 the gap (under the gap number, right-aligned to
+   it, below its label — the same place in both), 2 the tiers (after the
+   # chip), 3 the book (after the last thing on the book's line),
+   measured off the captures' pixels. */
 const SHOTS: Record<BoardMode, Shot> = {
-  leagues: { src: "/landing/board-leagues-column.jpg", w: 746, h: 880,
-    alt: ALT.leagues, pins: [[92.76, 45.85], [60.59, 68.69], [87.13, 78.47]] },
-  championships: { src: "/landing/board-championships.jpg", w: 1000, h: 880,
-    alt: ALT.championships, pins: [[94.4, 53.75], [45.1, 77.39], [54.2, 86.59]] },
+  leagues: { src: "/landing/board-leagues-eredivisie.jpg", w: 712, h: 880,
+    alt: ALT.leagues, pins: [[95.08, 51.14, "under"], [61.24, 68.98], [89.04, 78.52]] },
+  championships: { src: "/landing/board-championships-unl.jpg", w: 966, h: 880,
+    alt: ALT.championships, pins: [[96.27, 61.70, "under"], [45.13, 77.39], [54.66, 86.65]] },
 };
 /** the wider crop sets the switch frame's scale; the other is centred at
  *  its own share of that width */
@@ -107,19 +120,19 @@ const SOLO_W = Math.max(...MODES.map((m) => SHOTS[m].w));
    from a 1352px window and 100vw − 112px below it. Switch: the frame is
    460px at most, 100vw − 32px below that, less two 10px insets. */
 const PAIR_SIZES: Record<BoardMode, string> = {
-  leagues: "(min-width: 1352px) 497px, calc(42.7vw - 80px)",
-  championships: "(min-width: 1352px) 667px, calc(57.3vw - 108px)",
+  leagues: "(min-width: 1352px) 494px, calc(42.4vw - 80px)",
+  championships: "(min-width: 1352px) 670px, calc(57.6vw - 108px)",
 };
 const SOLO_SIZES: Record<BoardMode, string> = {
-  leagues: "(min-width: 492px) 329px, calc(74.6vw - 39px)",
+  leagues: "(min-width: 492px) 325px, calc(73.7vw - 38px)",
   championships: "(min-width: 492px) 440px, calc(100vw - 52px)",
 };
 
 function Pins({ pins }: { pins: readonly Pin[] }) {
   return (
     <ol aria-hidden className={s.pins}>
-      {pins.map(([x, y], i) => (
-        <li key={i} style={{ left: `${x}%`, top: `${y}%` }}>{i + 1}</li>
+      {pins.map(([x, y, at], i) => (
+        <li key={i} data-at={at} style={{ left: `${x}%`, top: `${y}%` }}>{i + 1}</li>
       ))}
     </ol>
   );

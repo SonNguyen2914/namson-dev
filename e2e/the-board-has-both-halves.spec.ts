@@ -29,13 +29,21 @@ import { test, expect, type Page } from "@playwright/test";
        (round 10: the club crop drew 25% larger than the national one,
        the national crop faded a cut-off second card in at its foot and
        its date rule ran into the frame's edge);
-     - EVERYWHERE, pin 1 sits just after the gap number, on its line, at
-       the same offset in both frames, inside its frame and clear of the
-       label under the number (round 10: 2–3px from "GD/G GAP" at 1024,
-       and below the number in one frame, beside it in the other);
+     - EVERYWHERE, pin 1 sits just under the gap number's label(s),
+       right-aligned to the number, the same in both frames, clear of
+       every label and of the row below it — and EVERY pin is inside its
+       CARD, not merely its frame (round 10: 2–3px from "GD/G GAP" at
+       1024; round 11: set after the number, pin 1 sat on the card's gold
+       border in every frame — the number is the last thing on its line,
+       33 capture px from the border, 11–23px drawn, and a pin is 16–20);
+     - each crop is one card wide, border to border, so the Nations
+       League date rule ends where the card does (round 11: it ran ~6px
+       past the card's right edge — the capture's own edge);
      - and the intro under the heading is two even lines from 390 to
        1920 (round 10: "picked." alone on a third line at 1920, on a
-       second at 768);
+       second at 768), and beside the heading (1024–1920) both lines END
+       on the frames' right edge (round 11: flush left, it stopped ~44px
+       short of it);
      - and none of it fetches anything: the home page makes no /api/
        request at all (the board routes WRITE a snapshot per read).
    And the one automatic flip, phones only: once the frame's middle has
@@ -111,11 +119,14 @@ async function pairState(page: Page) {
 
 /* WHAT PIN 1 POINTS AT, AND WHAT IT MUST KEEP CLEAR OF, in each crop's
    own pixels — measured off the captures (public/landing/*.jpg): the gap
-   number, and the label(s) under it. */
-const GAP_NUMBER: Record<string, { num: number[]; under: number[][] }> = {
-  "board-leagues-column.jpg": { num: [577, 389, 692, 418], under: [[598, 436, 691, 449]] },
-  "board-championships.jpg": { num: [878, 459, 944, 487],
-    under: [[863, 506, 943, 517], [660, 525, 943, 541]] },
+   number, the label(s) under it, the next row below that on the number's
+   side, and the card's own border box (each crop is one card wide). */
+const GAP_NUMBER: Record<string, {
+  num: number[]; under: number[][]; below: number[][]; card: number[] }> = {
+  "board-leagues-eredivisie.jpg": { num: [560, 389, 677, 419], under: [[580, 435, 675, 450]],
+    below: [[529, 532, 640, 549]], card: [0, 298, 712, 800] },
+  "board-championships-unl.jpg": { num: [861, 459, 930, 489], under: [[620, 506, 928, 543]],
+    below: [[34, 600, 418, 630]], card: [0, 362, 966, 868] },
 };
 
 /** press the switch to one capture and wait out the crossfade, so it is
@@ -141,25 +152,34 @@ async function framesAndPins(page: Page) {
         const k = i.width / Number(img.getAttribute("width"));
         const toCss = ([x0, y0, x1, y1]: number[]) =>
           [i.left + x0 * k, i.top + y0 * k, i.left + x1 * k, i.top + y1 * k];
-        const pin = layer.querySelector<HTMLElement>("ol > li")!.getBoundingClientRect();
+        const pins = [...layer.querySelectorAll<HTMLElement>("ol > li")]
+          .map((li) => li.getBoundingClientRect());
+        const pin = pins[0];
         // a crop this table does not know measures as NaN, and fails
-        const g = GAP[file] ?? { num: [NaN, NaN, NaN, NaN], under: [[NaN, NaN, NaN, NaN]] };
+        const NAN = [NaN, NaN, NaN, NaN];
+        const g = GAP[file] ?? { num: NAN, under: [NAN], below: [NAN], card: NAN };
         const num = toCss(g.num);
         const gapTo = (b: number[]) => Math.hypot(Math.max(b[0] - pin.right, 0, pin.left - b[2]),
           Math.max(b[1] - pin.bottom, 0, pin.top - b[3]));
+        // the card's INNER edge: its border is 2 capture px
+        const c = toCss(g.card), bw = 2 * k;
+        const inCard = pins.map((p) => Math.min(p.left - (c[0] + bw), p.top - (c[1] + bw),
+          (c[2] - bw) - p.right, (c[3] - bw) - p.bottom));
         const mask = getComputedStyle(layer).maskImage
           || getComputedStyle(layer).getPropertyValue("-webkit-mask-image") || "none";
         return {
           file, scale: k, mask,
           img: [i.left, i.top, i.right, i.bottom], frame: [f.left, f.top, f.right, f.bottom],
           inset: [i.left - f.left, i.top - f.top, f.right - i.right, f.bottom - i.bottom],
-          // pin 1 against the gap number: its offset past the number's
-          // right edge, and its centre against the number's
-          after: pin.left - num[2],
-          drop: (pin.top + pin.bottom) / 2 - (num[1] + num[3]) / 2,
+          // pin 1 against the gap number: its right edge against the
+          // number's, and its top against the lowest label under it
+          rightOff: pin.right - num[2],
+          below: pin.top - Math.max(...g.under.map((u) => toCss(u)[3])),
           clear: Math.min(...g.under.map((u) => gapTo(toCss(u)))),
-          pinInFrame: pin.left >= f.left && pin.right <= f.right - 2
-            && pin.top >= f.top && pin.bottom <= f.bottom,
+          clearBelow: Math.min(...g.below.map((u) => gapTo(toCss(u)))),
+          // every pin's least distance inside its card's border
+          inCard: Math.min(...inCard),
+          pins: pins.length,
         };
       });
   }, GAP_NUMBER);
@@ -231,6 +251,14 @@ for (const width of [1024, 1440, 1920]) {
         const grid = h2.parentElement!.parentElement!;
         const r = document.createRange();
         r.selectNodeContents(h2);
+        // where each line of the intro ENDS (its last text run's right)
+        const ir = document.createRange();
+        ir.selectNodeContents(grid.lastElementChild!);
+        const ends = new Map<number, number>();
+        for (const b of ir.getClientRects()) {
+          const k = Math.round(b.top);
+          ends.set(k, Math.max(ends.get(k) ?? -Infinity, b.right));
+        }
         return {
           board: content(h2.closest("section")!),
           below: content(document.getElementById("landing-record")!.closest("section")!),
@@ -238,14 +266,18 @@ for (const width of [1024, 1440, 1920]) {
           intro: edges(grid.lastElementChild!),
           pair: edges(document.querySelector('[data-testid="board-shot-pair"]')!),
           lines: new Set([...r.getClientRects()].map((x) => Math.round(x.top))).size,
+          introEnds: [...ends.values()],
         };
       });
       const said = JSON.stringify(m);
       expect(m.board, said).toEqual(m.below);
       expect(m.grid, said).toEqual(m.below);
       expect(m.pair, said).toEqual(m.below);
-      // the intro ends where the pictures end
+      // the intro ends where the pictures end — its box, and every line
+      // of its text (set right: balanced lines are shorter than the box)
       expect(m.intro[1], said).toBe(m.pair[1]);
+      expect(m.introEnds.length, said).toBe(2);
+      for (const e of m.introEnds) expect(Math.abs(e - m.pair[1]), said).toBeLessThanOrEqual(1);
       expect(m.lines, said).toBe(2);
     });
 }
@@ -265,7 +297,7 @@ for (const [w, h] of [[390, 844], [768, 1024]] as const) {
       const said = JSON.stringify(seen);
       // the wide pair's own crops: one whole column each, one card
       expect(seen.map((f) => f.file).sort(), said)
-        .toEqual(["board-championships.jpg", "board-leagues-column.jpg"]);
+        .toEqual(["board-championships-unl.jpg", "board-leagues-eredivisie.jpg"]);
       // one scale, so the type is one size in both; one height
       expect(Math.abs(seen[0].scale / seen[1].scale - 1), said).toBeLessThan(0.002);
       expect(Math.abs((seen[0].img[3] - seen[0].img[1]) - (seen[1].img[3] - seen[1].img[1])), said)
@@ -277,11 +309,31 @@ for (const [w, h] of [[390, 844], [768, 1024]] as const) {
         expect(Math.min(...f.inset), `${f.file} touches its frame: ${said}`)
           .toBeGreaterThanOrEqual(8);
       }
+      /* EACH CROP IS ONE CARD WIDE, BORDER TO BORDER (round 12), read off
+         the asset's own pixels: halfway down the card, the first and last
+         columns are its border and the columns just inside are its
+         ground. The Nations League date rule runs to the capture's edge,
+         so cut anywhere but the card's border it ran past the card. */
+      const edges = await page.evaluate(async (files) => Promise.all(files.map(async (f) => {
+        const bmp = await createImageBitmap(await (await fetch(`/landing/${f}`)).blob());
+        const cv = document.createElement("canvas");
+        cv.width = bmp.width; cv.height = bmp.height;
+        const cx = cv.getContext("2d")!;
+        cx.drawImage(bmp, 0, 0);
+        const y = Math.round(bmp.height * 0.7);
+        const lum = (x: number) => Math.max(...cx.getImageData(x, y, 1, 1).data.slice(0, 3));
+        return { f, w: bmp.width, edge: [lum(0), lum(bmp.width - 1)], inside: [lum(6), lum(bmp.width - 7)] };
+      })), seen.map((f) => f.file));
+      for (const e of edges) {
+        expect(Math.min(...e.edge), JSON.stringify(e)).toBeGreaterThanOrEqual(60);
+        expect(Math.max(...e.inside), JSON.stringify(e)).toBeLessThan(40);
+        expect(e.w, JSON.stringify(e)).toBe(GAP_NUMBER[e.f].card[2]);
+      }
     });
 }
 
 for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1440, 900], [1920, 1080]] as const) {
-  test(`pin 1 sits after the gap number, the same in both frames, clear of its label — ${w}px`,
+  test(`pin 1 sits under the gap number, the same in both frames, and every pin is inside its card — ${w}px`,
     async ({ page }) => {
       await page.setViewportSize({ width: w, height: h });
       await openSection(page);
@@ -298,18 +350,23 @@ for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1440, 900], [1920, 
       const said = JSON.stringify(seen);
       expect(seen.length, said).toBe(2);
       for (const f of seen) {
-        // just after the number, on its line
-        expect(f.after, `${f.file}: ${said}`).toBeGreaterThanOrEqual(4);
-        expect(f.after, `${f.file}: ${said}`).toBeLessThanOrEqual(10);
-        expect(Math.abs(f.drop), `${f.file}: ${said}`).toBeLessThanOrEqual(2);
-        // clear of the label(s) under the number, and inside the frame
+        // right-aligned to the number, a few px under its label
+        expect(Math.abs(f.rightOff), `${f.file}: ${said}`).toBeLessThanOrEqual(1);
+        expect(f.below, `${f.file}: ${said}`).toBeGreaterThanOrEqual(3);
+        expect(f.below, `${f.file}: ${said}`).toBeLessThanOrEqual(8);
+        // clear of the label(s) under the number and of the row below
         expect(f.clear, `${f.file} pin 1 crowds the label under the gap: ${said}`)
+          .toBeGreaterThanOrEqual(3);
+        expect(f.clearBelow, `${f.file} pin 1 crowds the row below: ${said}`)
           .toBeGreaterThanOrEqual(4);
-        expect(f.pinInFrame, `${f.file} pin 1 leaves its frame: ${said}`).toBe(true);
+        // all three pins inside the card — none on or past its border
+        expect(f.pins, said).toBe(3);
+        expect(f.inCard, `${f.file} a pin sits on or past its card's border: ${said}`)
+          .toBeGreaterThanOrEqual(2);
       }
       // and in the same place in both
-      expect(Math.abs(seen[0].after - seen[1].after), said).toBeLessThanOrEqual(1);
-      expect(Math.abs(seen[0].drop - seen[1].drop), said).toBeLessThanOrEqual(1);
+      expect(Math.abs(seen[0].rightOff - seen[1].rightOff), said).toBeLessThanOrEqual(1);
+      expect(Math.abs(seen[0].below - seen[1].below), said).toBeLessThanOrEqual(1);
     });
 }
 

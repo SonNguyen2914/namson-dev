@@ -105,7 +105,7 @@ export default function Home() {
             </div>
             <p className={s.body}>
               Clubs and national teams, ranked by the gap between the
-              sides — never picked.
+              sides&nbsp;— never picked.
             </p>
           </div>
           <BoardShot />
@@ -131,7 +131,7 @@ export default function Home() {
             <li>
               <span className={s.findTag}>better than the old method</span>
               <p>A learned model cuts log-loss by <b>0.018–0.030</b> per
-                match in walk-forward tests.</p>
+                match in walk-forward{"\u00a0"}tests.</p>
             </li>
             <li>
               <span className={s.findTag}>not yet confirmed</span>
