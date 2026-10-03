@@ -250,7 +250,10 @@ export function TradingBook({ token }: { token: string }) {
       headers: { "x-admin-token": token }, cache: "no-store", signal,
     });
     let body: unknown = null;
-    try { body = await r.json(); } catch { /* named by its status below */ }
+    try { body = await r.json(); } catch {
+      /* SWALLOWED(tradingbook:book-body-parse) — registered in
+         e2e/missing-is-not-zero.spec.ts with its closes_when. */
+    }
     if (r.status === 404 || (isObj(body) && body.available === false)) {
       // a definite answer: keep asking at the usual cadence, so the
       // section fills in once the backend has the route
@@ -303,9 +306,14 @@ export function TradingBook({ token }: { token: string }) {
                                side: e.side, contracts: n }),
       });
       let body: unknown = null;
-      try { body = await r.json(); } catch { /* described by its status */ }
+      try { body = await r.json(); } catch {
+        /* SWALLOWED(tradingbook:post-body-parse) — registered in
+           e2e/missing-is-not-zero.spec.ts with its closes_when. */
+      }
       o = describe(e, n, title, r.status, body);
     } catch {
+      /* SWALLOWED(tradingbook:post-no-answer) — registered in
+         e2e/missing-is-not-zero.spec.ts with its closes_when. */
       o = { ok: false, text: `${e.action === "handover" ? "Hand-over" : "Take-back"} `
         + "failed: no answer came back — the book below is read again to "
         + "show whether it went through." };
