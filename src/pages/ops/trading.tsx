@@ -1,10 +1,16 @@
 // /ops/trading — THE OPERATOR'S TRADING CONSOLE (basic, typed token).
 //
 // Son, 2026-10-03: "I need to track what the trader doing." This page
-// reads ONE route, /api/ops/trading-status, which relays the backend's
+// reads /api/ops/trading-status, which relays the backend's
 // operator-gated `GET /api/admin/trading/status` — aggregates only:
-// counts, dollar sums, flags and clocks. No ticker, fixture or order id
-// is on the payload, so none can be on this page.
+// counts, dollar sums, flags and clocks.
+//
+// THE BOOK (2026-10-03, later). Once the status has been read, the
+// "Positions & orders" section (components/TradingBook.tsx) reads
+// /api/ops/trading-book — every open position and resting order, each
+// flagged by whose it is — and is the page's ONE write: handing a
+// position the operator holds to the trader, or taking it back, through
+// /api/ops/trading-handover. It places, cancels and stops nothing.
 //
 // THE TOKEN (option A). Typed into a password field and held in React
 // state ONLY — never localStorage, sessionStorage, a cookie, an env var
@@ -38,6 +44,7 @@ import Head from "next/head";
 import { useEffect, useState, type ReactNode } from "react";
 import { NavChip, RouteProgress, TopBar } from "../../components/chrome";
 import { useOperatorToken } from "../../components/OperatorToken";
+import { TradingBook } from "../../components/TradingBook";
 import { Eyebrow } from "../../components/ui";
 import { usePoll, type PollOutcome } from "../../lib/usePoll";
 
@@ -480,7 +487,8 @@ function HowToStop() {
         <li>Or delete the agent&apos;s Kalshi API key in Kalshi&apos;s settings.</li>
       </ul>
       <p className="mt-2 text-xs text-ink-faint">
-        This page is read-only: it cannot place, cancel or stop anything.
+        This page cannot place, cancel or stop anything. The one thing it
+        changes is which of your positions the trader may manage.
       </p>
     </section>
   );
@@ -594,9 +602,9 @@ export default function TradingConsole() {
           Trading console
         </h1>
         <p className="mt-1 max-w-2xl text-sm leading-relaxed text-ink-low">
-          What the trading agent is doing, from its own journal: aggregates
-          only, read-only, refreshed every 15 seconds while a token is held.
-          Not advice; no edge is claimed.
+          What the trading agent is doing, from its own journal, and every
+          open position and order on the account — refreshed every 15
+          seconds while a token is held. Not advice; no edge is claimed.
         </p>
 
         <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -641,6 +649,9 @@ export default function TradingConsole() {
           <div data-testid="ops-console" data-stale={stale || undefined}
             className={`mt-6 space-y-4 transition-opacity ${stale ? "opacity-50" : ""}`}>
             <TopStrip d={d} now={now} />
+            {/* read only once the status answered: a refused or not-ready
+                plane is not asked for its book */}
+            <TradingBook token={armed} />
             <Money d={d} now={now} />
             <Activity d={d} />
             <InPlay d={d} now={now} />

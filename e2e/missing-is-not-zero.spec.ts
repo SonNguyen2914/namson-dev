@@ -447,6 +447,37 @@ type Swallow = { finding: string; closes_when: string };
  *  each with why it is judged safe and what would close it. Keyed by
  *  the marker written into the source at the site. */
 export const REGISTERED_SWALLOWS: Record<string, Swallow> = {
+  "tradingbook:book-body-parse": {
+    finding:
+      "TradingBook's poll folds a book response whose body is not JSON to "
+      + "null, then names the read by its HTTP status: 404 shows 'Book not "
+      + "available yet', 403 shows the refusal, any other non-2xx shows "
+      + "'HTTP <status>', and a 2xx with no object is not drawn as a book. "
+      + "Nothing renders an unparsed body as an empty book.",
+    closes_when:
+      "a 2xx with an unparseable body is ever drawn as an empty book "
+      + "rather than as an error state.",
+  },
+  "tradingbook:post-body-parse": {
+    finding:
+      "A hand-over or take-back answer whose body is not JSON is folded "
+      + "to null and described by describe() from its HTTP status, so the "
+      + "operator always reads a sentence that names the failure "
+      + "(token rejected, not available, no answer in time, HTTP <n>).",
+    closes_when:
+      "a non-2xx answer is ever reported as a success, or the outcome "
+      + "sentence stops naming the status.",
+  },
+  "tradingbook:post-no-answer": {
+    finding:
+      "A hand-over or take-back POST that throws (network, abort) is "
+      + "NAMED in the outcome line ('failed: no answer came back') and the "
+      + "book is read again at once to show whether it went through; "
+      + "nothing claims success.",
+    closes_when:
+      "the outcome line stops printing the failure, or the book re-read "
+      + "after a failed POST is removed.",
+  },
   "livepanel:saved-read-parse": {
     finding:
       "LivePanel.loadSaved() folds a corrupt or unreadable localStorage "

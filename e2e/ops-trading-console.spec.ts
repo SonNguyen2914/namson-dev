@@ -7,9 +7,12 @@ import { STANDIN_URL } from "./backend";
 //
 //   - with no token it shows the field and asks NOTHING — not the status
 //     route, not any /api/ route;
-//   - a typed token makes exactly ONE call, through /api/ops/trading-status,
-//     carrying the token as `x-admin-token` (debounced: a token typed key
-//     by key is sent once, whole);
+//   - a typed token makes exactly ONE status call, through
+//     /api/ops/trading-status, carrying the token as `x-admin-token`
+//     (debounced: a token typed key by key is sent once, whole) — and,
+//     once that read succeeds, ONE book read (/api/ops/trading-book, the
+//     "Positions & orders" section; its own behaviour is
+//     e2e/ops-trading-book.spec.ts);
 //   - the token is held in React state only: not in localStorage,
 //     sessionStorage or a cookie, and a reload forgets it;
 //   - a 200 renders every section the payload carries, and a payload
@@ -117,6 +120,13 @@ async function serve(page: Page, status: number, body: unknown) {
   await page.route(ROUTE, (route) => route.fulfill({
     status, contentType: "application/json", body: JSON.stringify(body),
   }));
+  // the book section is read once the status answers; served empty here
+  await page.route("**/api/ops/trading-book", (route) => route.fulfill({
+    status: 200, contentType: "application/json",
+    body: JSON.stringify({ version: "trading-book-v1", positions: [],
+      orders: [], totals: { positions: 0, orders: 0, managed_contracts: 0,
+        manual_contracts: 0 } }),
+  }));
 }
 
 test.describe("the operator trading console", () => {
@@ -136,8 +146,8 @@ test.describe("the operator trading console", () => {
       await expect(page.getByTestId("ops-console")).toHaveCount(0);
     });
 
-  test("a typed token makes exactly one status call, with the header, and "
-    + "every section renders", async ({ page }) => {
+  test("a typed token makes exactly one status call and one book read, "
+    + "with the header, and every section renders", async ({ page }) => {
       await serve(page, 200, PAYLOAD);
       const calls = apiCalls(page);
       await page.goto("/ops/trading");
@@ -146,12 +156,14 @@ test.describe("the operator trading console", () => {
       await expect(page.getByTestId("ops-console")).toBeVisible();
       await page.waitForTimeout(1000);
       expect(calls.map((r) => new URL(r.url()).pathname))
-        .toEqual(["/api/ops/trading-status"]);
-      expect(calls[0].method()).toBe("GET");
-      expect(calls[0].headers()["x-admin-token"]).toBe(TOKEN);
+        .toEqual(["/api/ops/trading-status", "/api/ops/trading-book"]);
+      for (const c of calls) {
+        expect(c.method()).toBe("GET");
+        expect(c.headers()["x-admin-token"]).toBe(TOKEN);
+      }
 
-      for (const id of ["strip", "money", "activity", "inplay", "learning",
-                        "catalogue", "stop"]) {
+      for (const id of ["strip", "book", "money", "activity", "inplay",
+                        "learning", "catalogue", "stop"]) {
         await expect(page.getByTestId(`ops-${id}`), id).toBeVisible();
       }
       const strip = page.getByTestId("ops-strip");
@@ -215,16 +227,23 @@ test.describe("the operator trading console", () => {
     async ({ page, request }) => {
       // NOT MOCKED: the app's own route relays the stand-in's 503
       const started = new Date().toISOString();
+      const calls = apiCalls(page);
       await page.goto("/ops/trading");
       await page.locator("#watch-token").fill(TOKEN);
       await expect(page.getByTestId("ops-not-ready"))
         .toContainText("trading plane not ready");
       const log = await (await request.get(`${STANDIN_URL}/__standin/log`))
         .json() as { requests: { at: string; method: string; url: string }[] };
+      // only the STATUS path is counted off the shared stand-in: other
+      // workers' pages read /api/admin/trading/book through it in parallel
       const hits = log.requests.filter((e) => e.at >= started
-        && e.url.startsWith("/api/admin/trading/"));
+        && e.url.startsWith("/api/admin/trading/status"));
       expect(hits.map((e) => `${e.method} ${e.url}`))
         .toEqual(["GET /api/admin/trading/status"]);
+      // a plane that is not ready is not asked for its book — read off
+      // this page's own requests, which no other worker shares
+      expect(calls.map((r) => new URL(r.url()).pathname))
+        .not.toContain("/api/ops/trading-book");
     });
 
   test("the route is a read: other verbs are 405, and nothing is cached",
