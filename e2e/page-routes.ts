@@ -70,4 +70,4 @@ export function pageRoutes(): PageRoute[] {
  *  this, and the count is what makes a walk that silently shrinks — a
  *  directory renamed, a filter too eager — fail instead of covering
  *  less. A page added or removed moves this number on purpose. */
-export const PAGE_COUNT = 26;
+export const PAGE_COUNT = 27;

@@ -33,7 +33,7 @@ import {
 const STATIC_ROUTES = [
   "/", "/bet-suggester", "/bet-suggester/leagues", "/bet-suggester/bots",
   "/bet-suggester/hunter", "/bet-suggester/friendlies",
-  "/bet-suggester/ratings",
+  "/bet-suggester/ratings", "/ops/trading",
 ];
 
 const ROUTES = [...STATIC_ROUTES, ...COMPETITION_PAGES];
