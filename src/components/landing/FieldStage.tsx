@@ -196,13 +196,13 @@ export default function FieldStage({ mode, enabled }: {
       <div ref={paint} className={`${s.stage} ${mode === "match" ? s.stageMatch : ""}`}>
         {showHero && (
           <div ref={hero} className={s.heroText}>
-            <p className={s.eyebrow}>Trivela · 11 competitions · one scale</p>
+            <p className={s.eyebrow}>11 competitions · one scale</p>
             <h1 id="landing-h1" className={`${s.display} ${s.h1}`}>
               Every match,<br />made readable.
             </h1>
             <p className={s.heroLine}>
-              TRIVELA reads every match in eleven competitions against the
-              real market — before kickoff, in play, and after the whistle.
+              Each one read against the real market — before kickoff, in
+              play, after the whistle.
             </p>
           </div>
         )}
@@ -210,20 +210,20 @@ export default function FieldStage({ mode, enabled }: {
         {showMatch && (
           <div ref={match} className={s.matchText}
             style={mode === "scroll" ? { opacity: 0 } : undefined}>
-            <p className={s.eyebrow}>One match · La Liga · Sun 20 Sep 2026</p>
+            <p className={s.eyebrow}>La Liga · 20 Sep 2026</p>
             <h2 id="landing-match" className={`${s.display} ${s.h3}`}>
               {FOCUS.home.name} <span className={s.vs}>v</span> {FOCUS.away.name}
             </h2>
             <ol className={s.steps}>
               <li ref={(el) => { steps.current[0] = el; }}>
-                On one scale, Real Madrid sit <b>{GAP.raw} points</b> higher.
+                Real Madrid rate <b>{GAP.raw}</b> points higher.
               </li>
               <li ref={(el) => { steps.current[1] = el; }}>
                 Atlético are at home: <b>+{GAP.venue}</b>.
               </li>
               <li ref={(el) => { steps.current[2] = el; }}>
-                What is left is <b>+{GAP.net}</b> — too close for the rating
-                alone to separate them. So the board asks the market.
+                Left: <b>+{GAP.net}</b>, too close to call — so the board
+                asks the market.
               </li>
             </ol>
           </div>
@@ -309,7 +309,7 @@ export default function FieldStage({ mode, enabled }: {
         {showHero && (
           <div ref={legend} className={s.legend}>
             <span className={s.legendHead}>
-              {FIELD.clubs.length} clubs · 8 leagues · one rating scale
+              {FIELD.clubs.length} clubs · 8 leagues
             </span>
             <span className={s.legendKeys}>
               {FIELD.columns.map((c) => (
@@ -330,9 +330,8 @@ export default function FieldStage({ mode, enabled }: {
               +{GAP.net} {FOCUS.away.short} · +{GAP.raw} rating · {MINUS}{GAP.venue} away
             </span>
             <span>
-              Ratings as published on the field page — {FIELD.passes} passes,
-              corpus {FIELD.corpus_sha256.slice(0, 8)}. The current field, not
-              the pre-match read.
+              field page · {FIELD.passes} passes · current field, not the
+              pre-match read
             </span>
           </p>
         )}

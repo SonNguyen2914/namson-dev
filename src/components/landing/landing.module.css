@@ -17,14 +17,9 @@
   background: var(--bs-bg);
   color: var(--ink-mid);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  /* THE DISPLAY FACE, RESOLVED HERE AND NOT AT :root. globals.css
-     declares --font-archivo on :root as "Archivo Variable",
-     var(--font-geist-sans), … — but --font-geist-sans is only defined on
-     the app shell's wrapper, BELOW :root, so at :root the whole value is
-     invalid and every `var(--display-face)` falls back to the inherited
-     Geist (measured 2026-10-02: Archivo's faces stay "unloaded" on every
-     page). Declared on this page's root, the Geist reference resolves. */
-  --display-face: "Archivo Variable", var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  /* the board's display face — the site-wide token, valid everywhere
+     since 2026-10-03 (globals.css, --font-archivo) */
+  --display-face: var(--font-archivo);
 }
 @media (min-width: 640px) { .root { --gutter: 32px; } }
 @media (min-width: 1024px) { .root { --gutter: 56px; } }
@@ -380,20 +375,70 @@
   .boardGrid { grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); }
   .boardGrid .body { margin-bottom: 6px; }
 }
-.shot { margin: clamp(36px, 6vh, 64px) 0 0; }
-.shotFrame { position: relative; max-width: 1020px; }
-.shotNarrow { display: none; }
-@media (max-width: 767px) {
-  .shotWide { display: none; }
-  .shotNarrow { display: block; }
+/* THE BOARD, BOTH HALVES (BoardShot.tsx). A switch above one frame; the
+   two captures share a grid cell, so the frame is always the taller one's
+   height and a switch moves no layout — opacity only. */
+.shot { margin: clamp(28px, 5vh, 48px) 0 0; max-width: 1020px; }
+.modeSwitch {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bs-elev2);
 }
-.shotImg {
-  display: block;
-  width: 100%;
-  height: auto;
+.modeSwitch button {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  font-family: var(--font-geist-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-low);
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+.modeSwitch button:hover { color: var(--ink-hi); }
+.modeSwitch button[aria-pressed="true"] { border-color: var(--accent); background: var(--bs-bg); color: var(--ink-hi); }
+.shotBox { position: relative; margin-top: 14px; }
+.shotLine { position: absolute; left: 0; right: 0; top: 50%; height: 1px; pointer-events: none; }
+.shotFrame {
+  display: grid;
+  background: var(--bs-bg);
   border: 1px solid var(--line-strong);
   border-radius: 10px;
+  overflow: clip;
 }
+.shotNarrow { display: none; }
+@media (max-width: 1023px) {
+  .shotWide { display: none; }
+  .shotNarrow { display: grid; max-width: 460px; }
+}
+.shotLayer {
+  grid-area: 1 / 1;
+  position: relative;
+  align-self: start;
+  justify-self: center;
+  width: 100%;
+  transition: opacity 240ms ease;
+}
+.shotLayer[data-on="false"] { opacity: 0; pointer-events: none; }
+/* the Nations League capture is one column at the same scale as the
+   three club columns, centred; its last pixels fade into the frame so
+   the column's own ground has no hard edge */
+.shotColumn {
+  width: 43.86%;
+  -webkit-mask-image: linear-gradient(to right, #000 97.5%, transparent);
+  mask-image: linear-gradient(to right, #000 97.5%, transparent);
+}
+.shotFade {
+  -webkit-mask-image: linear-gradient(to bottom, #000 86%, transparent);
+  mask-image: linear-gradient(to bottom, #000 86%, transparent);
+}
+.shotImg { display: block; width: 100%; height: auto; }
 .pins { list-style: none; margin: 0; padding: 0; position: absolute; inset: 0; pointer-events: none; }
 .pins li, .pinKey b {
   display: inline-grid;
@@ -409,6 +454,7 @@
   color: var(--ink-hi);
 }
 .pins li { position: absolute; translate: -50% -50%; }
+@media (max-width: 1023px) { .pins li { width: 18px; height: 18px; font-size: 10px; } }
 .shotCap {
   margin-top: 16px;
   display: flex;
@@ -443,7 +489,7 @@
   .clockText .h2 { font-size: 34px; }
   .clockNow { margin-top: 10px; }
   .minute { font-size: 60px; }
-  .caption { margin-top: 10px; font-size: 15px; min-height: 5.9em; }
+  .caption { margin-top: 10px; font-size: 15px; min-height: 2.9em; }
   .clockGrid { gap: 10px; }
   .readout th, .readout td { padding: 3px 0; }
 }
@@ -478,9 +524,9 @@
 .caption {
   margin: clamp(14px, 3vh, 34px) 0 0;
   max-width: 30rem;
-  /* the longest caption's height, reserved, so a caption change never
-     moves the chart beside it */
-  min-height: 5.9em;
+  /* the longest caption's height (two lines), reserved, so a caption
+     change never moves the chart beside it */
+  min-height: 2.9em;
   font-size: clamp(16px, 1.3vw, 20px);
   line-height: 1.45;
   color: var(--ink-hi);
@@ -596,7 +642,7 @@
 .readout td { color: var(--ink-hi); width: 22%; }
 .note {
   margin: 8px 0 0;
-  min-height: 3em;   /* two lines reserved: the longest note never moves the stage */
+  min-height: 1.5em;   /* one line reserved: the longest note never moves the stage */
   font-size: 12px;
   line-height: 1.5;
   color: var(--ink-mid);
@@ -737,4 +783,5 @@
 @media (prefers-reduced-motion: reduce) {
   .caption { animation: none; }
   .cta, .cta span { transition: none; }
+  .shotLayer, .modeSwitch button { transition: none; }
 }

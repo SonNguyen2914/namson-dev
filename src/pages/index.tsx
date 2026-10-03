@@ -11,7 +11,8 @@
 // "Every match, made readable."
 //   1  the field — every club of the eight board leagues on one scale
 //   2  ↳ scroll moment 1: the camera moves in on one real match
-//   3  three hours before — the board (a real screenshot; still)
+//   3  three hours before — the board (real screenshots, Leagues |
+//      Championships behind one switch; still — BoardShot.tsx)
 //   4  scroll moment 2: the match clock, model vs market, 0′→90′
 //   5  scroll moment 3: full time, the review card unfolds
 //   6  the record — scale, and the honest results in plain words
@@ -30,13 +31,13 @@
 // buy, sell or bet. The results section says the standing result plainly:
 // no model has shown information beyond the exchange price.
 import Head from "next/head";
-import Image from "next/image";
 import Link from "next/link";
 import { NavChip, TopBar } from "../components/chrome";
+import { Mark, Wordmark } from "../components/Wordmark";
+import BoardShot from "../components/landing/BoardShot";
 import FieldStage from "../components/landing/FieldStage";
 import FullTime from "../components/landing/FullTime";
 import MatchClock from "../components/landing/MatchClock";
-import { Mark, Wordmark } from "../components/landing/Wordmark";
 import s from "../components/landing/landing.module.css";
 import { useReducedMotion } from "../lib/useScrollScene";
 
@@ -51,8 +52,8 @@ export const CONTACT = {
 const filled = (v: string) => v.trim() !== "" && v !== "TODO";
 
 const FIGURES = [
-  { n: "45,500", k: "matches in the research corpus" },
-  { n: "11", k: "competitions, one board" },
+  { n: "45,500", k: "matches in the corpus" },
+  { n: "11", k: "competitions" },
   { n: "~134,000", k: "Kalshi markets tracked" },
   { n: "10,000+", k: "backend tests" },
 ];
@@ -74,8 +75,10 @@ export default function Home() {
         <meta name="theme-color" content="#050507" />
       </Head>
       <div aria-hidden className={s.light} />
-      <TopBar left={<Wordmark />} title="namson.dev"
-        inner="max-w-[calc(1240px+7rem)] px-4 sm:px-8 lg:px-14">
+      {/* field · logo · board: the logo is the shared bar's own centre
+          (components/chrome.tsx), so this page passes no wordmark and no
+          title of its own */}
+      <TopBar inner="max-w-[calc(1240px+7rem)] px-4 sm:px-8 lg:px-14">
         <NavChip href="/bet-suggester">open the board</NavChip>
       </TopBar>
 
@@ -95,47 +98,11 @@ export default function Home() {
               <h2 id="landing-board" className={`${s.display} ${s.h2}`}>Every fixture, ranked.</h2>
             </div>
             <p className={s.body}>
-              Hours before kickoff, every fixture in the eleven competitions
-              lands on one board — ranked by the gap between the two sides,
-              with the tiers underneath it and the exchange&rsquo;s own price
-              beside it. It ranks. It never picks.
+              Clubs and national teams, ranked by the gap between the sides.
+              It ranks — it never picks.
             </p>
           </div>
-          {/* THE REAL BOARD, at a size it can be read. Wide screens get
-              both columns; a phone gets one card, cropped from the same
-              capture, rather than the whole board shrunk to a smudge. */}
-          <figure className={s.shot}>
-            <div className={`${s.shotFrame} ${s.shotWide}`}>
-              <Image src="/landing/board-championships.jpg" width={1020} height={518}
-                alt="The TRIVELA board on 2 October 2026: two Nations League columns, each fixture card ranked, with an Elo gap split into rating and home terms, tier chips and the exchange's ask price."
-                sizes="(min-width: 1100px) 1020px, 100vw" className={s.shotImg} />
-              <ol aria-hidden className={s.pins}>
-                <li style={{ left: "49.6%", top: "59.5%" }}>1</li>
-                <li style={{ left: "49.6%", top: "65.6%" }}>2</li>
-                <li style={{ left: "29.4%", top: "87.4%" }}>3</li>
-              </ol>
-            </div>
-            <div className={`${s.shotFrame} ${s.shotNarrow}`}>
-              <Image src="/landing/board-card.jpg" width={505} height={428}
-                alt="One fixture card from the TRIVELA board, 2 October 2026: Hungary v Georgia, ranked first, +148 Elo gap split into +83 rating and +65 home, tier chips and the exchange's ask of 40 cents."
-                sizes="100vw" className={s.shotImg} />
-              <ol aria-hidden className={s.pins}>
-                <li style={{ left: "79.4%", top: "50.9%" }}>1</li>
-                <li style={{ left: "66%", top: "57.9%" }}>2</li>
-                <li style={{ left: "57.8%", top: "84.6%" }}>3</li>
-              </ol>
-            </div>
-            <figcaption className={s.shotCap}>
-              <ol className={s.pinKey}>
-                <li><b>1</b>the gap between the sides, in Elo</li>
-                <li><b>2</b>that gap split: rating + home</li>
-                <li><b>3</b>the exchange&rsquo;s own ask</li>
-              </ol>
-              <span className={s.shotMeta}>
-                the Championships board · 2 Oct 2026 · <span className={s.chip}>shadow · not advice</span>
-              </span>
-            </figcaption>
-          </figure>
+          <BoardShot />
         </section>
 
         <MatchClock mode={moving ? "scroll" : "still"} enabled={moving} />
@@ -157,18 +124,17 @@ export default function Home() {
           <ol className={s.findings}>
             <li>
               <span className={s.findTag}>better than the old method</span>
-              <p>In long walk-forward tests, a learned model beats the old
-                method by <b>+0.018 to +0.030</b> log-loss per match.</p>
+              <p>A learned model beats it by <b>+0.018 to +0.030</b> log-loss
+                per match in walk-forward tests.</p>
             </li>
             <li>
               <span className={s.findTag}>not yet confirmed</span>
-              <p>The first sealed hold-outs were too small to confirm it.</p>
+              <p>The first sealed hold-outs were too small to tell.</p>
             </li>
             <li>
               <span className={s.findTag}>not better than the market</span>
-              <p>No model here has shown information beyond the exchange
-                price. Until one does, every model number on TRIVELA is
-                labelled <b>shadow · not advice</b>.</p>
+              <p>No model has shown information beyond the exchange price.{" "}
+                <span className={s.chip}>shadow · not advice</span></p>
             </li>
           </ol>
         </section>
@@ -177,9 +143,7 @@ export default function Home() {
         <section aria-labelledby="landing-end" className={`${s.wrap} ${s.end}`}>
           <Wordmark size="lg" as="p" />
           <h2 id="landing-end" className={`${s.display} ${s.h2}`}>Every match, made readable.</h2>
-          <p className={s.body}>
-            A place to look, not a thing to do. Nothing on TRIVELA is advice.
-          </p>
+          <p className={s.body}>A place to look, not a thing to do.</p>
           <Link href="/bet-suggester" className={s.cta} data-testid="landing-cta">
             Open the board <span aria-hidden>→</span>
           </Link>

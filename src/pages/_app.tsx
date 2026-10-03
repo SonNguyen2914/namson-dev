@@ -23,7 +23,9 @@ import { GeistMono } from "geist/font/mono";
 // e2e/the-floor-is-the-pointer-not-the-width.spec.ts.
 export default function App({ Component, pageProps }: AppProps) {
   return (
-    <div data-tap-floor className={`${GeistSans.variable} ${GeistMono.variable}`}>
+    // `app-shell`: where --font-archivo gets its Geist fallback, because
+    // this element is where --font-geist-sans is defined (globals.css).
+    <div data-tap-floor className={`app-shell ${GeistSans.variable} ${GeistMono.variable}`}>
       <Component {...pageProps} />
     </div>
   );

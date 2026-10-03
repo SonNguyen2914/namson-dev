@@ -49,7 +49,7 @@ export default function FullTime({ enabled }: { enabled: boolean }) {
 
       <div ref={card} className={s.review} data-testid="review-card">
         <div data-row className={s.reviewHead}>
-          <span className={s.eyebrow}>La Liga · {DERBY.venue} · 20 Sep 2026</span>
+          <span className={s.eyebrow}>La Liga · 20 Sep 2026</span>
           <p className={`${s.display} ${s.final}`}>
             <span>{DERBY.home.name}</span>
             <b>{FINAL ? `${FINAL.home}–${FINAL.away}` : "—"}</b>
@@ -66,13 +66,13 @@ export default function FullTime({ enabled }: { enabled: boolean }) {
           <div data-row className={s.reviewCol}>
             <h3 className={s.colHead}>Market at T{MINUS}10</h3>
             <p className={s.colSub}>
-              {mk ? <>newest stored quote before the lock (T{mins(mk.t)}) · de-vigged</> : "no stored quote"}
+              {mk ? <>last quote before the lock, T{mins(mk.t)} · de-vigged</> : "no stored quote"}
             </p>
             {mk ? <Triple v={mk.market} /> : <p className={s.colSub}>—</p>}
           </div>
           <div data-row className={s.reviewCol}>
             <h3 className={s.colHead}>What happened</h3>
-            <p className={s.colSub}>from the score tape</p>
+            <p className={s.colSub}>score tape</p>
             <ul className={s.events}>
               {DERBY.events.map((e, i) => (
                 <li key={i}>
@@ -90,9 +90,13 @@ export default function FullTime({ enabled }: { enabled: boolean }) {
         </div>
       </div>
 
-      <p ref={coda} className={s.coda}>
-        No hit count, no streak. One match cannot tell a read from luck — so
-        the review puts what was said beside what happened, and stops there.
+      {/* WHY THIS MATCH (Son, 2026-10-03). The T−10 read happened to
+          favour the winner, so the page says plainly that is not why the
+          match is here: it is the one with the whole record stored —
+          a model to 53′, both stand-downs, all four events. */}
+      <p ref={coda} className={s.coda} data-testid="why-this-match">
+        Picked for its full stored record — not because the read was right.
+        One match can&rsquo;t tell a read from luck.
       </p>
     </section>
   );

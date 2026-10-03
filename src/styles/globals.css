@@ -36,6 +36,12 @@
   --accent: #f5c542;
   --accent-dim: rgba(245, 197, 66, 0.35);
   --accent-faint: rgba(245, 197, 66, 0.10);
+  /* THE BRAND'S OWN GOLD, which no page re-themes. Nine surfaces set
+     --accent to their league's colour on their page root (laliga,
+     leagues, comp/[key], …), and the TRIVELA mark in the shared bar sits
+     inside those roots — on --accent it turned La Liga red. The mark
+     reads this instead (components/Wordmark.tsx). */
+  --brand: #f5c542;
 
   /* league identity — WAYFINDING ONLY (2026-09-01 board redesign).
      One hue per league column: rails, favourite pips, dumbbell spans,
@@ -219,9 +225,17 @@
      far from gold as the band allows. */
   --lg-uel:      #2eac1e;   /* green      — UEFA Europa League      */
 
-  /* the board's display voice (bundled via @fontsource-variable) */
-  --font-archivo: "Archivo Variable", var(--font-geist-sans), ui-sans-serif,
-    system-ui, sans-serif;
+  /* the board's display voice (bundled via @fontsource-variable).
+     VALID HERE, ON ITS OWN (2026-10-03). It used to read
+     `"Archivo Variable", var(--font-geist-sans), …` — but
+     --font-geist-sans is set by the geist package's class on the app
+     shell, BELOW :root, so at :root the reference was missing, the whole
+     token was invalid at computed-value time, and every
+     `var(--font-archivo)` on the site silently fell back to the inherited
+     Geist (measured: Archivo's faces "unloaded" on the board, the field
+     page and the hubs). The Geist fallback is restored one level down,
+     on `.app-shell`, where the variable it names actually exists. */
+  --font-archivo: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
 
   /* semantic data-ink */
   --up: #34d399;           /* ahead / favours the favourite (2026-09-01:
@@ -472,6 +486,17 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Arial, sans-serif;
+}
+
+/* THE DISPLAY FACE, WITH ITS GEIST FALLBACK, WHERE GEIST IS DEFINED.
+   `.app-shell` is the wrapper in _app.tsx that carries the geist
+   package's `--font-geist-sans`, so the reference resolves here (it
+   cannot at :root — see the token's own note). While Archivo is still
+   swapping in, display text falls back to the site's own Geist rather
+   than to the system face. */
+.app-shell {
+  --font-archivo: "Archivo Variable", var(--font-geist-sans), ui-sans-serif,
+    system-ui, sans-serif;
 }
 
 /* One overflowing element must never horizontal-scroll the whole app on a

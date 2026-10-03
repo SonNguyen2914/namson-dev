@@ -94,16 +94,16 @@ const pct = (v: number | undefined | null) => (v == null ? "—" : `${fmt1(v)}%`
 const CAPS: Cap[] = (() => {
   const k = at(0), m50 = at(50), m51 = at(51), g = at(53), m60 = at(60);
   return [
-    { id: "ko", from: 0, to: 1, tag: `0${PRIME}`, text: <>Kick-off. The model&rsquo;s T{MINUS}10 lock had Atlético at <b>{pct(k.model?.home)}</b>; the market had them at <b>{pct(k.market?.home)}</b>.</> },
-    { id: "play", from: 2, to: 44, tag: `2${PRIME}`, text: <>In play, the model reads the minute and the score. The market already knows both — the two start within a point.</> },
-    { id: "ht", from: 45, to: 45, tag: "HT", text: <>Half-time. The ball stops, and so does the model: it gives no read while nothing moves.</> },
-    { id: "h2", from: 46, to: 50, tag: `46${PRIME}`, text: <>Second half, still 0–0. Both lines have leaned toward the draw.</> },
-    { id: "first", from: 51, to: 52, tag: `51${PRIME}`, text: <>The market moves first — Atlético from <b>{pct(m50.market?.home)}</b> to <b>{pct(m51.market?.home)}</b>. The score tape has not caught up yet.</> },
-    { id: "goal1", from: 53, to: 53, tag: `53${PRIME}`, text: <>Goal, Atlético. {sc(53)}. Both lines bend: model <b>{pct(g.model?.home)}</b>, market <b>{pct(g.market?.home)}</b>.</> },
-    { id: "red", from: 54, to: 59, tag: `54${PRIME}`, text: <>Red card, Real Madrid. The model stands down — it was built for eleven against eleven, and says so instead of guessing. The market keeps reading.</> },
-    { id: "goal2", from: 60, to: 67, tag: `60${PRIME}`, text: <>Atlético again, {sc(60)}. The market puts them at <b>{pct(m60.market?.home)}</b>.</> },
-    { id: "flat", from: 68, to: 89, tag: `68${PRIME}`, text: <>Ten against eleven, two goals down. The market drifts toward certainty; the model&rsquo;s lines stay ended at 53{PRIME} — no read is drawn where none was made.</> },
-    { id: "ft", from: 90, to: 90, tag: `90${PRIME}`, text: <>Real Madrid pull one back. {sc(90)} at the whistle.</> },
+    { id: "ko", from: 0, to: 1, tag: `0${PRIME}`, text: <>Kick-off. Model (T{MINUS}10 lock): Atlético <b>{pct(k.model?.home)}</b>. Market: <b>{pct(k.market?.home)}</b>.</> },
+    { id: "play", from: 2, to: 44, tag: `2${PRIME}`, text: <>In play, model and market start within a point.</> },
+    { id: "ht", from: 45, to: 45, tag: "HT", text: <>Half-time. No play, no read.</> },
+    { id: "h2", from: 46, to: 50, tag: `46${PRIME}`, text: <>Still 0–0. Both lines lean toward the draw.</> },
+    { id: "first", from: 51, to: 52, tag: `51${PRIME}`, text: <>The market moves first: Atlético <b>{pct(m50.market?.home)}</b> → <b>{pct(m51.market?.home)}</b>. The tape hasn&rsquo;t caught up.</> },
+    { id: "goal1", from: 53, to: 53, tag: `53${PRIME}`, text: <>Goal, Atlético. {sc(53)}. Model <b>{pct(g.model?.home)}</b>, market <b>{pct(g.market?.home)}</b>.</> },
+    { id: "red", from: 54, to: 59, tag: `54${PRIME}`, text: <>Red card, Real Madrid. The model stands down — it reads 11 v 11 only. The market reads on.</> },
+    { id: "goal2", from: 60, to: 67, tag: `60${PRIME}`, text: <>{sc(60)} Atlético. Market: <b>{pct(m60.market?.home)}</b>.</> },
+    { id: "flat", from: 68, to: 89, tag: `68${PRIME}`, text: <>The market drifts toward certainty. The model&rsquo;s lines stay ended at 53{PRIME}.</> },
+    { id: "ft", from: 90, to: 90, tag: `90${PRIME}`, text: <>Real Madrid pull one back. {sc(90)}, full time.</> },
   ];
 })();
 const capAt = (m: number) => CAPS.find((c) => m >= c.from && m <= c.to) ?? CAPS[0];
@@ -362,7 +362,6 @@ export default function MatchClock({ mode, enabled }: {
                       style={{ left: G.X(STOP.from) + 8, top: G.Y(64) }}>
                       <span>model stands down</span>
                       <span>red card {RED?.m ?? STOP.from}{PRIME}</span>
-                      <span>built for 11 v 11</span>
                     </div>
                   )}
                 </div>
@@ -401,18 +400,19 @@ export default function MatchClock({ mode, enabled }: {
                 })}
               </tbody>
             </table>
-            {/* ONE FIXED SLOT for the model's absence, so the chart never
-                moves when it appears; the provenance line below is constant. */}
+            {/* ONE FIXED SLOT, one line, for the model's absence, so the
+                chart never moves when it appears; the provenance line below
+                is constant. */}
             <p className={s.note} data-testid="clock-note">
               {standing
-                ? `Model stood down at the ${RED?.m ?? STOP?.from}${PRIME} red card — its lines end at ${STOP?.last}${PRIME}. The in-play engine reads 11 v 11 only.`
+                ? `Model stood down at the ${RED?.m ?? STOP?.from}${PRIME} red card.`
                 : row.model == null && m > 0
-                  ? (row.refused === "interval" ? "Model: no read at half-time — the dotted link only joins the two halves." : "Model: no read this minute.")
+                  ? (row.refused === "interval" ? "No model read at half-time." : "No model read this minute.")
                   : `Gap = model ${MINUS} market, in points.`}
             </p>
             <p className={s.provenance}>
-              a read, not a signal · the stored series for this match, not an
-              illustration · market = the de-vigged three-way book
+              a read, not a signal · stored series, not an illustration ·
+              market de-vigged
             </p>
           </div>
         </div>

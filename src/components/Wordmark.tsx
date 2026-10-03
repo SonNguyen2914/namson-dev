@@ -2,14 +2,18 @@
 //
 // A trivela is a ball struck with the outside of the foot, so it swerves
 // AWAY from where it was aimed. The mark is that path: a low line that
-// bends late, and the ball at the end of it. It is the only gold on the
-// page outside the call to action, because gold is the brand and never a
-// verdict (globals.css, the accent token).
+// bends late, and the ball at the end of it. Gold is the brand and never
+// a verdict — `--brand`, not `--accent`, because nine pages re-theme the
+// accent to their league and the mark is in every page's bar.
 //
 // The letters are Archivo at the top of its width axis — the board's own
 // display face, opened right out — so the name reads as a broadcast
 // caption rather than a logo lock-up. The favicon (public/icon.svg) is
 // this mark alone.
+//
+// SHARED since 2026-10-03: the centre of every page's TopBar
+// (components/chrome.tsx) is this mark, linking home; the home page
+// also signs off with the large size.
 
 export function Mark({ size = 18, className = "" }: {
   size?: number; className?: string }) {
@@ -17,14 +21,16 @@ export function Mark({ size = 18, className = "" }: {
     <svg aria-hidden viewBox="0 0 24 24" width={size} height={size}
       className={className} style={{ overflow: "visible" }}>
       <path d="M2.5 19.5 C 9 19.5, 15.5 17, 18.2 8.6" fill="none"
-        stroke="var(--accent)" strokeWidth="2.6" strokeLinecap="round" />
-      <circle cx="19.2" cy="5.2" r="3.1" fill="var(--accent)" />
+        stroke="var(--brand)" strokeWidth="2.6" strokeLinecap="round" />
+      <circle cx="19.2" cy="5.2" r="3.1" fill="var(--brand)" />
     </svg>
   );
 }
 
-export function Wordmark({ size = "sm", as = "span" }: {
-  size?: "sm" | "lg"; as?: "span" | "p" }) {
+/** `letters` is a class for the seven letters alone, so a narrow bar
+ *  can hide them and keep the mark (`"hidden md:inline"`). */
+export function Wordmark({ size = "sm", as = "span", letters = "" }: {
+  size?: "sm" | "lg"; as?: "span" | "p"; letters?: string }) {
   const Tag = as;
   const lg = size === "lg";
   return (
@@ -32,12 +38,12 @@ export function Wordmark({ size = "sm", as = "span" }: {
       className="inline-flex items-center whitespace-nowrap text-ink-hi"
       style={{ gap: lg ? "0.5em" : "0.45em" }}>
       <Mark size={lg ? 34 : 14} />
-      <span
+      <span className={letters}
         style={{
-          // not var(--font-archivo): that token is invalid at :root (it
-          // references a Geist variable defined lower down), so it
-          // silently falls back to Geist. Named here, it resolves.
-          fontFamily: '"Archivo Variable", var(--font-geist-sans), sans-serif',
+          // the site-wide token: valid at :root since 2026-10-03 (it
+          // used to reference a Geist variable defined below :root, so
+          // it fell back to Geist everywhere — globals.css)
+          fontFamily: "var(--font-archivo)",
           fontStretch: "125%",
           fontWeight: 700,
           letterSpacing: lg ? "0.16em" : "0.2em",
