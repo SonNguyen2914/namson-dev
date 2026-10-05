@@ -170,6 +170,11 @@ export interface ShotState {
   full_time: Checkpoint | null;
   first_goal_minute: number | null;
   error: string | null;
+  /** A REASON CODE for a shot state that is absent BY DESIGN rather than
+   *  by failure (parity W1.5) — read by lib/hubParity `shotGap`. Optional:
+   *  today's backend sends only `error`, whose national no-tape sentence
+   *  `shotGap` also recognises. */
+  unavailable_reason?: string | null;
 }
 
 /** TWO verdicts, never one tick. Either can be null, which means NOT

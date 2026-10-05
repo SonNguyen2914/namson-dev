@@ -461,6 +461,15 @@ export const LEAGUE_PROXY_ALLOWED: Record<string, readonly string[]> = {
   // `/api/live-performance` list route is not under this prefix and a
   // non-optional catch-all could not forward it anyway.
   "live-performance": [],
+  // TEAM NEWS ON EVERY MATCH HUB (2026-10-05, parity W1.6): the hub reads
+  // `/api/news/fixture/{fixture_ref}` for its ESPN event id — absences in
+  // the provider's words and the XI release minute. GET-only and
+  // read-only on the backend (TRIVELA api/main.py: "a route never starts a
+  // fetch"; tests/test_team_news_isolation.py keeps it off every model
+  // path). No literal route is forwarded — the one read is the id route
+  // below — and `coverage` is withheld, with its reason, in
+  // LEAGUE_PROXY_WITHHELD.
+  news: [],
 };
 
 /** The comp proxy's resource set, as a pattern rather than a list.
@@ -523,6 +532,8 @@ export const LEAGUE_PROXY_ID_ROUTES: Record<string, readonly RegExp[]> = {
   championships: [],
   minutes: [new RegExp(`^${COMP_KEY}/\\d{1,12}$`)],
   "live-performance": [/^\d{1,12}$/],
+  // the backend accepts a provider reference of up to 20 digits
+  news: [/^fixture\/\d{1,20}$/],
   comp: [
     new RegExp(`^${COMP_KEY}/(${COMP_RESOURCES.join("|")})$`),
     // the per-match live read — see COMP_RESOURCES for why this was the
@@ -629,6 +640,13 @@ export const LEAGUE_PROXY_WITHHELD: Record<string, Record<string, string>> = {
       + "live session, and no browser surface reads it.",
     "stats-coverage": "how many completed matches hold team, provider-xG "
       + "and player stats. An ingest verification read.",
+  },
+  news: {
+    coverage: "per-source, per-competition capture counts and the shared "
+      + "API-Football budget ledger (own cap, account usage) — an operator "
+      + "read about the capture job, not about a match. No surface in src/ "
+      + "reads it (checked 2026-10-05); the hub reads only "
+      + "fixture/{fixture_ref}.",
   },
   // Keyed by the route's OPENAPI SPELLING, `{key}` included — that is
   // the string `proxyAllowlistDrift` compares against, so a record

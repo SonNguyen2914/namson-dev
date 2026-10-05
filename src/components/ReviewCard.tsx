@@ -62,6 +62,7 @@ import {
 } from "./PickerRead";
 import ErrorBoundary from "./ErrorBoundary";
 import { Eyebrow } from "./ui";
+import { SHOT_GAP_WORDS, shotGap } from "../lib/hubParity";
 
 // ---------------------------------------------------------------- bits
 
@@ -700,6 +701,13 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
      feed's exception as the backend caught it; the card names the
      absence and not the exception. */
   const shotFailure = readFailure(row.shot_state.error);
+  /* A SHOT STATE ABSENT BY DESIGN IS NOT A FAILED READ (parity W1.5). A
+     national row's archive keeps no shot tape, and ESPN publishes no
+     play-by-play for AFCON qualifiers at all; both arrive in `error`, and
+     drawing them in the failure's warn ink told the reader a provider
+     had broken. They are named as what they are instead. A real failure
+     still reaches `shotFailure` below, unchanged. */
+  const gap = shotGap(row);
   const fit = row.fit;
 
   /* A CAPTURE MADE BY A RULE THAT HAS SINCE BEEN CORRECTED
@@ -976,9 +984,16 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
         <Eyebrow className="mb-1.5">what happened</Eyebrow>
         <p data-testid="tape-sentence"
           className="text-xs leading-relaxed text-ink-mid">
-          {tapeSentence(row)}
+          {gap ? "No shot state is read for this match — the reason is below."
+            : tapeSentence(row)}
         </p>
-        {shotFailure ? (
+        {gap ? (
+          <p data-testid="shot-gap" data-gap={gap}
+            className="mt-2 rounded-md border border-dashed border-line px-2 py-1.5 font-mono text-[10px] leading-relaxed text-ink-low">
+            {SHOT_GAP_WORDS[gap]}. The score above is the scoreboard&apos;s,
+            and it stands on its own.
+          </p>
+        ) : shotFailure ? (
           <p data-testid="shot-error"
             className="mt-2 font-mono text-[11px] leading-relaxed text-warn">
             shot state unavailable — {failureSentence(shotFailure)}. The score
