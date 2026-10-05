@@ -12,7 +12,9 @@ import { STANDIN_URL } from "./backend";
 //     (debounced: a token typed key by key is sent once, whole) — and,
 //     once that read succeeds, ONE book read (/api/ops/trading-book, the
 //     "Positions & orders" section; its own behaviour is
-//     e2e/ops-trading-book.spec.ts);
+//     e2e/ops-trading-book.spec.ts) and ONE candidates read
+//     (/api/ops/trading-candidates, 2026-10-05; its own behaviour is
+//     e2e/ops-trading-candidates.spec.ts);
 //   - the token is held in React state only: not in localStorage,
 //     sessionStorage or a cookie, and a reload forgets it;
 //   - a 200 renders every section the payload carries, and a payload
@@ -120,6 +122,11 @@ async function serve(page: Page, status: number, body: unknown) {
   await page.route(ROUTE, (route) => route.fulfill({
     status, contentType: "application/json", body: JSON.stringify(body),
   }));
+  // the candidates are read once the status answers; served empty here
+  await page.route("**/api/ops/trading-candidates", (route) => route.fulfill({
+    status: 200, contentType: "application/json",
+    body: JSON.stringify({ version: "trading-candidates-v1", rows: [] }),
+  }));
   // the book section is read once the status answers; served empty here
   await page.route("**/api/ops/trading-book", (route) => route.fulfill({
     status: 200, contentType: "application/json",
@@ -146,8 +153,9 @@ test.describe("the operator trading console", () => {
       await expect(page.getByTestId("ops-console")).toHaveCount(0);
     });
 
-  test("a typed token makes exactly one status call and one book read, "
-    + "with the header, and every section renders", async ({ page }) => {
+  test("a typed token makes exactly one status call, one book read and one "
+    + "candidates read, with the header, and every section renders",
+  async ({ page }) => {
       await serve(page, 200, PAYLOAD);
       const calls = apiCalls(page);
       await page.goto("/ops/trading");
@@ -155,15 +163,20 @@ test.describe("the operator trading console", () => {
       await page.locator("#watch-token").pressSequentially(TOKEN, { delay: 20 });
       await expect(page.getByTestId("ops-console")).toBeVisible();
       await page.waitForTimeout(1000);
-      expect(calls.map((r) => new URL(r.url()).pathname))
-        .toEqual(["/api/ops/trading-status", "/api/ops/trading-book"]);
+      // the status first; the book and the candidates are siblings read
+      // once it answers, so their order between themselves is not a claim
+      const paths = calls.map((r) => new URL(r.url()).pathname);
+      expect(paths[0]).toBe("/api/ops/trading-status");
+      expect(paths.slice(1).sort())
+        .toEqual(["/api/ops/trading-book", "/api/ops/trading-candidates"]);
       for (const c of calls) {
         expect(c.method()).toBe("GET");
         expect(c.headers()["x-admin-token"]).toBe(TOKEN);
       }
 
-      for (const id of ["strip", "book", "money", "activity", "inplay",
-                        "learning", "catalogue", "stop"]) {
+      for (const id of ["strip", "book", "candidates", "money", "activity",
+                        "inplay", "handover", "learning", "settlements",
+                        "catalogue", "stop"]) {
         await expect(page.getByTestId(`ops-${id}`), id).toBeVisible();
       }
       const strip = page.getByTestId("ops-strip");
@@ -180,7 +193,8 @@ test.describe("the operator trading console", () => {
       await expect(page.getByTestId("by-reason").locator("tbody tr").nth(1))
         .toContainText("skipped · below_threshold");
       await expect(page.getByTestId("shocks")).toContainText("goal");
-      await expect(page.getByTestId("learning-comps")).toContainText("epl");
+      // competitions are named (2026-10-05), not printed as their keys
+      await expect(page.getByTestId("learning-comps")).toContainText("Premier League");
       await expect(page.getByTestId("learning-comps")).toContainText("+0.81¢");
       await expect(page.getByTestId("refusals").locator("tbody tr").first())
         .toContainText("no_fair_price");
@@ -240,10 +254,13 @@ test.describe("the operator trading console", () => {
         && e.url.startsWith("/api/admin/trading/status"));
       expect(hits.map((e) => `${e.method} ${e.url}`))
         .toEqual(["GET /api/admin/trading/status"]);
-      // a plane that is not ready is not asked for its book — read off
-      // this page's own requests, which no other worker shares
+      // a plane that is not ready is not asked for its book or its
+      // candidates — read off this page's own requests, which no other
+      // worker shares
       expect(calls.map((r) => new URL(r.url()).pathname))
         .not.toContain("/api/ops/trading-book");
+      expect(calls.map((r) => new URL(r.url()).pathname))
+        .not.toContain("/api/ops/trading-candidates");
     });
 
   test("the route is a read: other verbs are 405, and nothing is cached",
