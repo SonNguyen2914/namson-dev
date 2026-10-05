@@ -28,9 +28,14 @@
 //                   own fixture id; until the backend joins it to the
 //                   hub's ESPN id the page cannot find them)
 //     not_sent      the payload carried no absence block at all
-//   Each empty state adds the competition's own named gap from
-//   lib/hubParity ABSENCE_GAPS when it has one (Liga MX's provider wall,
-//   the nations' unmeasured coverage, the four leagues not yet swept).
+//   Each empty state adds the BACKEND'S OWN named gap for the
+//   competition — `absences.provider_gap` (team_news ABSENCE_GAPS: today
+//   Liga MX's provider wall), verbatim — and says how far the join from
+//   ESPN's event to API-Football's fixture got (`absences.resolved_by`:
+//   own / archive_bridge / live_plane / none). No competition-specific
+//   sentence is typed here: the first cut hard-coded "not swept yet" and
+//   "coverage never measured", and the backend's W1.6 sweep made both
+//   false on the day they shipped (parity review, 2026-10-05).
 //
 // SIDES ARE ATTRIBUTED ONLY ON A CLEAR NAME MATCH. API-Football names
 // clubs its own way; a group whose provider name does not plainly match
@@ -40,7 +45,10 @@ import { useState } from "react";
 import { failureOf, NEVER_ANSWERED } from "../lib/httpFailure";
 import { usePoll } from "../lib/usePoll";
 import { TZ } from "../lib/matchday";
-import { ABSENCE_GAPS, TEAM_NEWS_LABEL, type HubSlug } from "../lib/hubParity";
+import {
+  LINEUP_STATE_UNKNOWN, LINEUP_STATE_WORDS, NEVER_CAPTURED_WORDS,
+  RESOLVED_BY_WORDS, TEAM_NEWS_LABEL, gapWords, resolvedByOf,
+} from "../lib/hubParity";
 import { Collapse } from "./chrome";
 import { Reveal } from "./ui";
 
@@ -51,7 +59,14 @@ export type AbsenceRecord = { player_name?: string | null;
   provider_reason?: string | null; still_reported?: boolean | null;
   last_seen_at?: string | null; side?: "home" | "away" | null };
 type AbsenceBlock = { provider?: string | null; records?: AbsenceRecord[];
-  freshness?: Freshness | null; note?: string | null };
+  freshness?: Freshness | null; note?: string | null;
+  /** the ref the absences are stored under, and how the backend got
+   *  there from this hub's ESPN id (team_news `absence_ref_for`) */
+  subject_ref?: string | null; resolved_by?: string | null;
+  competition?: string | null;
+  /** the backend's own words for a competition whose provider does not
+   *  publish absences (team_news ABSENCE_GAPS), or null */
+  provider_gap?: string | null };
 type LineupSide = { team_name?: string | null; lineup_state?: string | null;
   released?: boolean | null; released_minutes_before_kickoff?: number | null;
   first_released_at?: string | null };
@@ -150,11 +165,10 @@ export default function HubTeamNews({ eventId, slug, home, away, post }: {
     return post ? "stop" : "ok";
   }, 300_000, [eventId, post]);
 
-  const gaps = ABSENCE_GAPS[slug as HubSlug] ?? {};
   return (
     <Reveal>
       <Collapse eyebrow="team news" title="Absences" className="mt-8 mb-0">
-        <section data-testid="team-news" data-state={st.kind}
+        <section data-testid="team-news" data-state={st.kind} data-hub={slug}
           className="min-w-0">
           <p data-testid="team-news-label"
             className="mb-3 font-mono text-[9px] uppercase leading-relaxed tracking-[0.14em] text-ink-faint">
@@ -179,8 +193,7 @@ export default function HubTeamNews({ eventId, slug, home, away, post }: {
           )}
           {st.kind === "read" && (
             <>
-              <Absences block={st.d.absences} home={home} away={away}
-                gaps={gaps} />
+              <Absences block={st.d.absences} home={home} away={away} />
               <Releases lineup={st.d.lineup} />
             </>
           )}
@@ -190,9 +203,8 @@ export default function HubTeamNews({ eventId, slug, home, away, post }: {
   );
 }
 
-function Absences({ block, home, away, gaps }: {
+function Absences({ block, home, away }: {
   block: AbsenceBlock | null | undefined; home: string; away: string;
-  gaps: { never?: string; empty?: string };
 }) {
   const box = "rounded-xl border border-dashed border-line px-3 py-3 "
     + "font-mono text-[10px] leading-relaxed text-ink-low";
@@ -204,7 +216,6 @@ function Absences({ block, home, away, gaps }: {
           match, so whether the provider lists anyone is not known here.{" "}
           {NOT_NOBODY}
         </p>
-        <Gap text={gaps.never} />
       </div>
     );
   }
@@ -214,41 +225,46 @@ function Absences({ block, home, away, gaps }: {
     ? block.records.filter((r) => r && typeof r === "object") : [];
   const held = state === "stale";
   const who = providerName(block.provider);
+  // the backend's own gap sentence for this competition, verbatim
+  const gap = typeof block.provider_gap === "string"
+    && block.provider_gap.trim() ? gapWords(block.provider_gap) : undefined;
+  const joined = resolvedByOf(block.resolved_by);
 
   if (state === "never_captured" || (recs.length === 0
       && !["empty", "unavailable", "ok", "stale"].includes(state))) {
     return (
-      <div data-testid="absences" data-state="never_captured" data-held="false">
+      <div data-testid="absences" data-state="never_captured" data-held="false"
+        data-resolved-by={joined}>
         <p data-testid="absences-never" className={box}>
-          no absence read is recorded for this match. {who} absences are
-          stored under {who}&apos;s own fixture id, and this page reads by
-          ESPN&apos;s; until the two are joined for this match there is
-          nothing here to show. {NOT_NOBODY}
+          {NEVER_CAPTURED_WORDS[joined](who)}. {NOT_NOBODY}
         </p>
-        <Gap text={gaps.never} />
+        <Gap text={gap} />
       </div>
     );
   }
   if (state === "unavailable" && recs.length === 0) {
     return (
-      <div data-testid="absences" data-state="unavailable" data-held="false">
+      <div data-testid="absences" data-state="unavailable" data-held="false"
+        data-resolved-by={joined}>
         <p data-testid="absences-unavailable" className={box}>
           the last absence read from {who} did not succeed
           ({fmtClock(f.captured_at)}), so who is missing is UNKNOWN — not
           empty. {NOT_NOBODY}
         </p>
+        <Gap text={gap} />
       </div>
     );
   }
   if (recs.length === 0) {
     return (
       <div data-testid="absences" data-state={state} data-held={String(held)}
+        data-resolved-by={joined}
         className={held ? "opacity-50" : undefined}>
         <p data-testid="absences-empty" className={box}>
           the provider lists none — {who} answered with an empty list
           ({fmtClock(f.captured_at)}). {NOT_NOBODY}
         </p>
-        <Gap text={gaps.empty} />
+        <Gap text={gap} />
       </div>
     );
   }
@@ -270,6 +286,7 @@ function Absences({ block, home, away, gaps }: {
 
   return (
     <div data-testid="absences" data-state={state} data-held={String(held)}
+      data-resolved-by={joined}
       className={held ? "opacity-50" : undefined}>
       {held ? (
         <p data-testid="absences-held"
@@ -327,6 +344,10 @@ function Absences({ block, home, away, gaps }: {
       <p className="mt-2 font-mono text-[9px] leading-relaxed text-ink-faint">
         type and reason are {who}&apos;s own words, shown verbatim — its
         claim, not ours. A player not listed here is not thereby fit.
+        {joined === "archive_bridge" || joined === "live_plane"
+          ? <span data-testid="absences-joined">
+              {" "}This match&apos;s list was {RESOLVED_BY_WORDS[joined]}.
+            </span> : null}
       </p>
     </div>
   );
@@ -337,7 +358,7 @@ function Gap({ text }: { text?: string }) {
   return (
     <p data-testid="absences-gap"
       className="mt-2 font-mono text-[10px] leading-relaxed text-ink-low">
-      {text}.
+      {text.replace(/[.\s]+$/, "")}.
     </p>
   );
 }
@@ -372,18 +393,23 @@ function Releases({ lineup }: { lineup: FixtureNews["lineup"] }) {
         {rows.map(({ prov, side, s }) => (
           <li key={`${prov}-${side}`} data-testid="xi-release"
             data-side={side} data-provider={prov}
+            data-state={s!.released === true ? "released"
+              : s!.lineup_state && s!.lineup_state !== "released"
+                  && LINEUP_STATE_WORDS[s!.lineup_state]
+                ? s!.lineup_state : "unknown"}
             className="min-w-0 font-mono text-[10px] leading-relaxed text-ink-low">
             <span className="text-ink-mid">
               {s!.team_name || (side === "home" ? "listed home" : "listed away")}
             </span>
             {" · "}{providerName(prov)}{" · "}
-            {s!.released
+            {s!.released === true
               ? (s!.released_minutes_before_kickoff != null
                   ? `released, first seen ${Math.round(s!.released_minutes_before_kickoff)} min before kickoff`
                   : `released, first seen ${fmtClock(s!.first_released_at)}`)
-              : s!.lineup_state === "no_coverage"
-                ? "this provider carries no roster for this match"
-                : "not released yet — not a claim that anyone is out"}
+              : s!.lineup_state && s!.lineup_state !== "released"
+                  && LINEUP_STATE_WORDS[s!.lineup_state]
+                ? LINEUP_STATE_WORDS[s!.lineup_state]
+                : LINEUP_STATE_UNKNOWN}
           </li>
         ))}
       </ul>

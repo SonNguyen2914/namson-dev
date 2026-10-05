@@ -170,11 +170,16 @@ export interface ShotState {
   full_time: Checkpoint | null;
   first_goal_minute: number | null;
   error: string | null;
-  /** A REASON CODE for a shot state that is absent BY DESIGN rather than
-   *  by failure (parity W1.5) — read by lib/hubParity `shotGap`. Optional:
-   *  today's backend sends only `error`, whose national no-tape sentence
-   *  `shotGap` also recognises. */
-  unavailable_reason?: string | null;
+  /** WHY A NATIONAL SHOT STATE IS NOT KNOWN, by code (parity W1.5;
+   *  TRIVELA src/match_archive/tail.py SHOTS_NOT_KNOWN): not_requested,
+   *  no_play_by_play_published, empty_play_by_play, team_ids_missing.
+   *  Null on a read tape and on a FAILED feed (whose failure is in
+   *  `error`). Absent on the league review, which sends no code. Read by
+   *  lib/hubParity `shotGap`. */
+  not_known_reason?: string | null;
+  /** where a read tape came from ("espn_play_by_play" on a national
+   *  row); null when nothing was read. Absent on the league review. */
+  source?: string | null;
 }
 
 /** TWO verdicts, never one tick. Either can be null, which means NOT

@@ -19,11 +19,13 @@
 // PARITY ACROSS THE ELEVEN (2026-10-05, Son's "every feature, every
 // match"). Four sections are drawn on every hub and name their own gaps
 // (registers in lib/hubParity): the venue line (W1.12 — who hosts, only
-// from a derived venue class), provider absences and the XI release
-// minute (W1.6, components/HubTeamNews), every Kalshi family present or
-// named as not on this page (W1.11), and on a nation hub the match
-// archive's frozen pre-kickoff read, or the words saying it is not
-// served here yet (W1.4).
+// from the derived venue class the frozen pre-kickoff read carries),
+// provider absences and the XI release minute (W1.6,
+// components/HubTeamNews), every Kalshi family present or named with the
+// backend's own per-family status (W1.11, `book_meta.families`), and on
+// a generic hub the frozen pre-kickoff read — the board's snapshot or
+// the match archive's T-60/T-10 rung — or the backend's reason there is
+// none (W1.4).
 import { TZ } from "../lib/matchday";
 import Head from "next/head";
 import { useRouter } from "next/router";
@@ -41,9 +43,11 @@ import RatingsBlock from "./RatingsBlock";
 import ErrorBoundary from "./ErrorBoundary";
 import HubTeamNews from "./HubTeamNews";
 import {
-  FAMILY_GAP_WORDS, KALSHI_FAMILIES, VENUE_BASIS_WORDS, VENUE_CLASSES,
-  VENUE_UNRESOLVED_WORDS, familyGap, isNationHub, type VenueClass,
-  type VenueRead,
+  ARCHIVE_READ_UNKNOWN, ARCHIVE_READ_WORDS, FAMILY_REASON_ORDER,
+  FAMILY_REASON_WORDS, VENUE_BASIS_WORDS, VENUE_CLASSES, VENUE_GAP_WORDS,
+  VENUE_SOURCE_WORDS, isNationHub, unservedFamilies, venueFrom,
+  venueUnresolvedWords, type FamilyReason, type VenueClass,
+  type VenueRead, type VenueSource,
 } from "../lib/hubParity";
 
 type Side = { name?: string; abbrev?: string; logo?: string; score?: string;
@@ -68,8 +72,7 @@ type Match = { id: string; date?: string; state?: string; detail?: string;
   /** ESPN's own flag (comp_match.enrich). NOT a measurement — false on
    *  every recorded national summary, neutral grounds included — so it
    *  is never read as "home" (see VenueLine). */
-  neutral_site?: boolean | null;
-  venue_class?: VenueRead | null };
+  neutral_site?: boolean | null };
 type XiPlayer = { name?: string; position?: string; jersey?: string;
   xg90?: number | null; apps?: number | null; is_goalkeeper?: boolean };
 type Absence = { name?: string; xg90?: number; apps?: number;
@@ -118,18 +121,33 @@ export type BoardRead = { origin?: string | null; origin_label?: string | null;
   origin_note?: string | null; captured_at?: string | null;
   captured_lead_band_means?: string | null; corrections?: number | null;
   /** the match archive's rung ("t60" / "t10") when the read was frozen
-   *  by the archive rather than the board (parity W1.4, nations) */
+   *  by the archive rather than the board (parity W1.4) */
   archive_rung?: string | null;
   captured_seconds_before_kickoff?: number | null;
   unavailable_reason?: string | null;
+  /** which store served it: "board_snapshot" | "match_archive" */
+  source?: string | null;
+  /** a league's `not_frozen`: the match archive's own code beside it */
+  archive_read?: string | null;
   /** the frozen board row. Only its two NAMES are drawn here (who the
-   *  board named the favourite, over whom); its numbers stay on the
-   *  review card. */
-  state?: { favourite?: unknown; opponent?: unknown } | null };
+   *  board named the favourite, over whom), plus its derived
+   *  `venue_class` on the venue line; its numbers stay on the review
+   *  card. A refused read is `{refused: true, ...}` with no favourite. */
+  state?: { favourite?: unknown; opponent?: unknown; refused?: unknown;
+    venue_class?: unknown } | null };
 /** Why the hub's Kalshi book is what it is, in the backend's words
  *  (src/match_hubs.py `book_meta`). "unavailable" is NOT "no book
- *  exists" — its `means` says which. The four league planes send none. */
-type BookMeta = { status?: string | null; means?: string | null };
+ *  exists" — its `means` says which. `families` is every non-winner
+ *  family's status on the generic route (W1.11) — `{}` when the winner
+ *  did not bridge. The four league planes send none. */
+type BookMeta = { status?: string | null; means?: string | null;
+  families?: unknown; families_read?: number | null;
+  winner_means?: string | null;
+  /** why every family is unread: the winner did not bridge */
+  families_not_read_because?: string | null;
+  /** the competition's listed series that are NOT a market on one match
+   *  (season and stage outrights), named in the backend's words */
+  other_series?: unknown };
 /** The backend's prose names a payload key in backticks; the reader gets
  *  words, never the key. */
 const plainWords = (t: string) =>
@@ -212,14 +230,18 @@ function leadWords(seconds?: number | null): string | null {
   return seconds < 0 ? `${span} AFTER kickoff` : `${span} before kickoff`;
 }
 
-/** THE VENUE, LABELLED (parity W1.12). Who hosts is said only from the
- *  backend's DERIVED venue class (TRIVELA src/championships/espn.py
- *  `venue_class`): ESPN's own `neutralSite` flag was false on every one
- *  of 341 recorded national summaries, neutral grounds included, so it is
- *  never read as "home" — and on neutral ground the listed home side is
- *  only ESPN's listing order. With no class sent, the line says so. */
-function VenueLine({ v, m, slug }: {
-  v: VenueRead | null; m: Match; slug: string;
+/** THE VENUE, LABELLED (parity W1.12). Who hosts is said only from a
+ *  DERIVED venue class: the route's own `venue_class`, which every hub
+ *  route serves (match_hubs.venue_class_of — the board column's rule for
+ *  the competition), else the class the frozen pre-kickoff read was
+ *  computed with (`board_read.state.venue_class`). ESPN's own
+ *  `neutralSite` flag was false on every one of 341 recorded national
+ *  summaries, neutral grounds included, so it is never read as "home" —
+ *  and on neutral ground the listed home side is only ESPN's listing
+ *  order. With no class on the page, the line says WHY there is none
+ *  (lib/hubParity VenueSource), never just that it is missing. */
+function VenueLine({ v, source, m, slug }: {
+  v: VenueRead | null; source: VenueSource; m: Match; slug: string;
 }) {
   const nation = isNationHub(slug);
   const home = m.home.name || "the listed home side";
@@ -230,8 +252,12 @@ function VenueLine({ v, m, slug }: {
       ? raw as VenueClass : "unrecognised";
   const basis = v?.basis && cls !== "UNKNOWN"
     ? VENUE_BASIS_WORDS[v.basis] : undefined;
-  const why = v?.unresolved_why ? VENUE_UNRESOLVED_WORDS[v.unresolved_why]
+  const why = v?.unresolved_why ? venueUnresolvedWords(v.unresolved_why)
     : undefined;
+  // where the ground is, when the backend placed it (words, not a code)
+  const place = [v?.venue?.name, v?.venue?.country ?? v?.country]
+    .filter((x): x is string => typeof x === "string" && !!x.trim())
+    .join(", ");
   let text: string;
   switch (cls) {
     case "NEUTRAL":
@@ -242,11 +268,20 @@ function VenueLine({ v, m, slug }: {
     case "TRUE_HOME":
       text = nation
         ? `${home} hosts — the venue is in the listed home side's country`
-        : `${home} hosts — the listed home side's own ground`;
+        : `${home} hosts — the venue is in the country where the listed `
+          + "home side's league plays, and the away side's league does not";
       break;
     case "OPPONENT_COUNTRY":
-      text = `${away} hosts — the venue is in the listed away side's `
-        + `country; ESPN lists ${home} first, which is only its listing order`;
+      text = (nation
+        ? `${away} hosts — the venue is in the listed away side's country`
+        : `${away} hosts — the venue is in the country where the listed `
+          + "away side's league plays")
+        + `; ESPN lists ${home} first, which is only its listing order`;
+      break;
+    case "DOMESTIC":
+      text = `${home} hosts — both clubs' league plays in the venue's `
+        + "country, so the listed home side is taken as host (the board's "
+        + "rule; the ground itself is not placed)";
       break;
     case "UNKNOWN":
       text = "venue not placed — the venue could not be resolved to a "
@@ -261,22 +296,30 @@ function VenueLine({ v, m, slug }: {
       text = (m.neutral_site === true
         ? "ESPN flags this ground as a neutral site — the provider's flag, "
           + "not a derived class. " : "")
+        + "venue class not on this page — "
+        + (source === "hub_route"
+          ? "this hub's match route sent a venue class with no class in it"
+          : source === "frozen_read" ? VENUE_GAP_WORDS.read_without_class
+            : VENUE_GAP_WORDS[source])
         + (nation
-        ? "venue class not on this page yet — ESPN's own neutral-site "
-          + "flag is not read as a measurement (it was false on every "
-          + "recorded national summary, neutral grounds included), so "
-          + "“home” here is only ESPN's listing order"
-          + (slug === "afcon"
-            ? "; at the AFCON finals, two non-host nations meet on "
-              + "neutral ground" : "")
-        : "venue class not on this page — “home” is ESPN's listing, and "
-          + "this page does not classify the ground");
+          ? ". ESPN's own neutral-site flag is not read as a measurement "
+            + "(it was false on every recorded national summary, neutral "
+            + "grounds included), so “home” here is only ESPN's listing "
+            + "order"
+            + (slug === "afcon"
+              ? "; at the AFCON finals, two non-host nations meet on "
+                + "neutral ground" : "")
+          : ", so “home” is ESPN's listing and this page does not "
+            + "classify the ground");
   }
   return (
-    <p data-testid="venue-class" data-class={cls}
+    <p data-testid="venue-class" data-class={cls} data-source={source}
       className="mb-3 min-w-0 font-mono text-[10px] leading-relaxed text-ink-faint">
       <span className="uppercase tracking-[0.14em] text-ink-low">venue · </span>
       {text}{basis ? ` · ${basis}` : ""}
+      {cls !== "absent" && place ? ` · ${place}` : ""}
+      {cls !== "absent" && (source === "hub_route" || source === "frozen_read")
+        ? ` · ${VENUE_SOURCE_WORDS[source]}` : ""}
     </p>
   );
 }
@@ -376,7 +419,8 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
   const [refusal, setRefusal] = useState<ModelRefusal | null>(null);
   const [boardRead, setBoardRead] = useState<BoardRead | null>(null);
   const [bookMeta, setBookMeta] = useState<BookMeta | null>(null);
-  const [venue, setVenue] = useState<VenueRead | null>(null);
+  // the route's own derived venue class, as received (W1.12)
+  const [routeVenue, setRouteVenue] = useState<unknown>(null);
   const [lineups, setLineups] = useState<Lineups | null>(null);
   // THE FAILURE IS NAMED, NOT A BOOLEAN (2026-09-25). This was `err: true`
   // off `Promise.reject(r.status)` then `.catch(() => setErr(true))`, so
@@ -415,9 +459,7 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
     setRefusal(d.model ? null : (d.model_refusal ?? null));
     setBoardRead(d.board_read && typeof d.board_read === "object" ? d.board_read : null);
     setBookMeta(d.book_meta && typeof d.book_meta === "object" ? d.book_meta : null);
-    // the derived venue class (parity W1.12), top-level or on the match
-    const vc = d.venue_class ?? d.match?.venue_class;
-    setVenue(vc && typeof vc === "object" ? vc : null);
+    setRouteVenue(d.venue_class ?? null);
     setErr(null);
     setFetchedAt(Date.now());
     return d.match?.state === "post" ? "stop" : "ok";
@@ -428,6 +470,8 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
   // the canonical T-10 lock is the fixture's model once it exists —
   // a later scheduled run must never silently supersede it (V8 eval F9)
   const run = model?.primary ?? model?.latest;
+  // the derived venue class rides on the frozen pre-kickoff read (W1.12)
+  const venue = venueFrom(cfg.boardQuery, routeVenue, boardRead);
   const activeSection = useScrollSpy([
     ...(cfg.suggestion ? ["card"] : []),
     "prediction", "strategy", "markets", "stats"]);
@@ -504,7 +548,8 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                     {m.venue}
                   </span>
                 </div>
-                <VenueLine v={venue} m={m} slug={cfg.boardQuery} />
+                <VenueLine v={venue.v} source={venue.source} m={m}
+                  slug={cfg.boardQuery} />
                 <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
                   <TeamBlock s={m.home} form={formOf(m, m.home.abbrev)} />
                   <div className={`text-center font-mono text-3xl tabular-nums ${
@@ -539,6 +584,8 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                       </p>
                     )}
                     <p data-testid="board-read" data-origin={boardRead?.origin ?? "absent"}
+                      data-source={boardRead?.source ?? ""}
+                      data-reason={boardRead?.unavailable_reason ?? ""}
                       className="mt-2 font-mono text-[10px] leading-relaxed text-ink-faint">
                       {boardRead?.origin === "captured"
                         ? <>board read · {boardRead.origin_label ?? "captured"}
@@ -557,6 +604,29 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                         : <>no board read on record · {boardRead?.origin_note
                             ?? "the payload carried no board read, so whether one was frozen is not known here"}</>}
                     </p>
+                    {/* A LEAGUE'S `not_frozen` CARRIES THE ARCHIVE'S OWN
+                        ANSWER beside it: no snapshot, and what the match
+                        archive said — said, not folded into "none". */}
+                    {boardRead?.origin !== "captured" && boardRead?.archive_read && (
+                      <p data-testid="board-read-archive"
+                        data-archive={boardRead.archive_read}
+                        className="mt-1 font-mono text-[10px] leading-relaxed text-ink-faint">
+                        and {ARCHIVE_READ_WORDS[boardRead.archive_read]
+                          ?? ARCHIVE_READ_UNKNOWN}
+                      </p>
+                    )}
+                    {/* A FROZEN REFUSAL IS A READ, NOT A MISSING ONE: the
+                        board declined to name a favourite before kickoff,
+                        and that is what it said. */}
+                    {boardRead?.origin === "captured"
+                      && boardRead.state?.refused === true && (
+                      <p data-testid="board-read-refused"
+                        className="mt-1 font-mono text-[10px] leading-relaxed text-ink-low">
+                        frozen before kickoff, the board refused this
+                        pairing and named no favourite — what it said, not
+                        a pick
+                      </p>
+                    )}
                     {boardRead?.origin === "captured" && (() => {
                       const fav = boardRead.state?.favourite;
                       const opp = boardRead.state?.opponent;
@@ -572,23 +642,6 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                         </p>
                       );
                     })()}
-                    {/* PARITY W1.4, NAMED WHILE IT IS OPEN. The match
-                        archive already freezes a nation fixture's read at
-                        T-60 and T-10; until this route serves it, the
-                        Championships board's "freezes nothing" is the
-                        only reason the page can give — so the page says
-                        the archive's read exists and is not here yet. */}
-                    {isNationHub(cfg.boardQuery)
-                      && boardRead?.unavailable_reason
-                        === "championships_board_freezes_nothing" && (
-                      <p data-testid="board-read-pending"
-                        className="mt-1 font-mono text-[10px] leading-relaxed text-ink-faint">
-                        the match archive freezes this fixture&apos;s read
-                        at T-60 and T-10 before kickoff; that frozen read
-                        is not served on this page yet, and it appears here
-                        when it is
-                      </p>
-                    )}
                   </div>
                 )}
               </section>
@@ -707,14 +760,29 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                       why — {plainWords(bookMeta.means)}
                     </p>
                   )}
+                  {/* HOW THE OTHER FAMILIES WERE JOINED, in the backend's
+                      words, when it read them (generic hubs, W1.11). */}
+                  {book && bookMeta?.status === "ok"
+                    && typeof bookMeta.families === "object"
+                    && bookMeta.families !== null && !!bookMeta.means && (
+                    <p data-testid="families-means"
+                      className="mt-2 font-mono text-[10px] leading-relaxed text-ink-low">
+                      {plainWords(bookMeta.means)}
+                    </p>
+                  )}
                   {!book && books.length === 0 && (
                     <p data-testid="families-none"
                       className="mt-1 font-mono text-[10px] leading-relaxed text-ink-faint">
-                      no Kalshi family is on this page for this match —
-                      every other family is read off the winner book, which
-                      is not here, so no price is implied for any of them
+                      {bookMeta?.families_not_read_because
+                        ? <>no Kalshi family is on this page for this match
+                            — {plainWords(bookMeta.families_not_read_because)}</>
+                        : <>no Kalshi family is on this page for this match —
+                            every other family is read off the winner book,
+                            which is not here, so no price is implied for any
+                            of them</>}
                     </p>
                   )}
+                  <OtherSeries list={bookMeta?.other_series} />
                   <div className="mt-5 border-t border-line pt-4">
                     <Eyebrow className="mb-1">model outcome probabilities</Eyebrow>
                     <TripleBar m={m} probs={modelProbs(run)} hex={cfg.accentHex}
@@ -767,7 +835,8 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
 
             {/* ===== every market, right under the pure-model view ===== */}
             <Guard name="every market" k={fetchedAt}>
-            <MarketsTable m={m} run={run} book={book} families={books} cfg={cfg} />
+            <MarketsTable m={m} run={run} book={book} families={books} cfg={cfg}
+              familyReport={bookMeta ? bookMeta.families : undefined} />
             </Guard>
 
             {/* ===== scenario engine ===== */}
@@ -1179,6 +1248,38 @@ function HowTheyPlay({ m, run, note }: {
   );
 }
 
+/** THE COMPETITION'S OTHER LISTED SERIES, NAMED (parity review,
+ *  2026-10-05). Kalshi lists season and stage outrights under the same
+ *  prefix; they are not markets on this match and are never asked for,
+ *  but every listed series is either on this page or named here in the
+ *  backend's words (`book_meta.other_series`), so none is silently left
+ *  out. Folded: it is about the competition, not the match. */
+function OtherSeries({ list }: { list: unknown }) {
+  const rows = Array.isArray(list)
+    ? list.filter((r): r is { series?: string; means?: string } =>
+        !!r && typeof r === "object" && typeof r.means === "string"
+        && !!r.means.trim())
+    : [];
+  if (rows.length === 0) return null;
+  return (
+    <details data-testid="other-series" className="mt-2 min-w-0">
+      <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
+        {rows.length} other kalshi series for this competition — not
+        markets on this match
+      </summary>
+      <ul className="mt-1.5 space-y-0.5">
+        {rows.map((r, i) => (
+          <li key={r.series ?? i} data-testid="other-series-row"
+            title={r.series}
+            className="min-w-0 font-mono text-[10px] leading-relaxed text-ink-low">
+            {plainWords(r.means!)}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 /* ---------- the every-market table ---------- */
 
 // families whose long tails read better folded away until asked for —
@@ -1187,9 +1288,11 @@ const UNSERVED = "__unserved";
 const COLLAPSED_FAMILIES = new Set(
   ["score", "mov", "h1", "h1_total", "h1_spread", "h1_btts", UNSERVED]);
 
-function MarketsTable({ m, run, book, families, cfg }: {
+function MarketsTable({ m, run, book, families, cfg, familyReport }: {
   m: Match; run?: ModelRun; book: Book | null; families: Family[];
   cfg: HubCfg;
+  /** `book_meta.families` exactly as received (undefined: not sent) */
+  familyReport: unknown;
 }) {
   // THE NET EDGE COLUMN AND THE CARD ONE SECTION UP DISAGREE ON A
   // STARTED MATCH, AND THE PAGE SAID SO NOWHERE.
@@ -1235,9 +1338,17 @@ function MarketsTable({ m, run, book, families, cfg }: {
                 event_ticker: book.event_ticker,
                 markets: book.markets }] : [];
   if (fams.length === 0) return null;
-  const served = new Set(fams.map((f) => f.key));
-  const unserved = KALSHI_FAMILIES.filter((f) => !served.has(f.key));
-  const gap = familyGap(cfg.api.startsWith("/api/comp/"));
+  // EVERY FAMILY NOT IN THE TABLE, WITH THE BACKEND'S OWN REASON per
+  // family on a generic hub (book_meta.families), grouped so each reason
+  // is said once — the unknowns (a failed read, a status with no words)
+  // first, because they are the ones a reader must not take for "none".
+  const unserved = unservedFamilies({
+    generic: cfg.api.startsWith("/api/comp/"),
+    served: new Set(fams.map((f) => f.key)), families: familyReport });
+  const byReason = FAMILY_REASON_ORDER
+    .map((reason) => ({ reason,
+      fams: unserved.filter((f) => f.reason === reason) }))
+    .filter((g) => g.fams.length > 0);
   const nMarkets = fams.reduce((n, f) => n + f.markets.length, 0);
 
   const toggle = (key: string) => setClosed((c) => {
@@ -1380,22 +1491,28 @@ function MarketsTable({ m, run, book, families, cfg }: {
               </span>
             </button>
             {!closed.has(UNSERVED) && (
-              <div className="border-t border-line px-4 py-3">
-                {/* one reason, said once: on a hub every missing family
-                    is missing for the same reason */}
-                <p data-testid="families-unserved-why"
-                  className="font-mono text-[10px] leading-relaxed text-ink-faint">
-                  {FAMILY_GAP_WORDS[gap](cfg.tag)}
-                </p>
-                <ul className="mt-2.5 flex flex-wrap gap-1.5">
-                  {unserved.map((f) => (
-                    <li key={f.key} data-testid="family-unserved"
-                      data-family={f.key} data-reason={gap}
-                      className="rounded-md border border-dashed border-line px-2 py-0.5 text-[12px] text-ink-low">
-                      {f.label}
-                    </li>
-                  ))}
-                </ul>
+              <div className="space-y-3 border-t border-line px-4 py-3">
+                {/* each reason said once, over the families it covers */}
+                {byReason.map((g) => (
+                  <div key={g.reason} data-testid="families-unserved-group"
+                    data-reason={g.reason} className="min-w-0">
+                    <p data-testid="families-unserved-why"
+                      className={`font-mono text-[10px] leading-relaxed ${
+                        g.reason === "unavailable" ? "text-ink-low"
+                          : "text-ink-faint"}`}>
+                      {FAMILY_REASON_WORDS[g.reason as FamilyReason]}
+                    </p>
+                    <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                      {g.fams.map((f) => (
+                        <li key={f.key} data-testid="family-unserved"
+                          data-family={f.key} data-reason={f.reason}
+                          className="rounded-md border border-dashed border-line px-2 py-0.5 text-[12px] text-ink-low">
+                          {f.label}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
               </div>
             )}
           </div>
