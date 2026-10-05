@@ -1,8 +1,9 @@
-// THE OPERATOR RELAY — what the trading book and hand-over routes share
-// (2026-10-03).
+// THE OPERATOR RELAY — what the trading book, candidates and hand-over
+// routes share (2026-10-03; candidates 2026-10-05).
 //
-// pages/api/ops/trading-book.ts and trading-handover.ts are the same shape
-// as trading-status.ts beside them, and for the same reasons:
+// pages/api/ops/trading-book.ts, trading-candidates.ts and
+// trading-handover.ts are the same shape as trading-status.ts beside
+// them, and for the same reasons:
 //
 //   * FIXED BACKEND PATHS. Each route names its backend path(s) as
 //     literals; nothing from the request is interpolated into a URL.
