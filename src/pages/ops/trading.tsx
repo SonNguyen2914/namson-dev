@@ -447,9 +447,13 @@ function InPlayV2({ v, now }: { v: Obj | null; now: number }) {
           sub={nOf(v.inplay_clv_rewards, "reward")} />
         <Stat k="mean exit reward" v={cents(v.mean_exit_reward_c)}
           sub={`${nOf(v.exit_rewards, "reward")} · P&L rewards ${count(v.pnl_rewards)}`} />
+        {"anchor_rewards" in v && (
+          <Stat k="mean anchor reward" v={cents(v.mean_anchor_reward_c)}
+            sub={`${nOf(v.anchor_rewards, "reward")} · w on our forecast, learned`} />
+        )}
       </Grid>
       <ArmsInUse v={v.arms_in_use} testid="inplay-v2-arms"
-        title="in-play arms in use on the newest tick" />
+        title="in-play arms in use on the newest tick (entry, exit, anchor)" />
     </div>
   );
 }
@@ -706,6 +710,9 @@ function Learning({ l, now }: { l: Obj; now: number }) {
     return o === null ? ABSENT : c in o ? count(o[c]) : "0";
   };
   const dflt = obj(l.default_arm);
+  // the ratings model's share of the model-priced markets (backend
+  // learning.ratings_model, 2026-10-05): UNVALIDATED, said so
+  const rm = obj(l.ratings_model);
   return (
     <Section id="learning" title="Learning"
       note={`${text(l.label) === ABSENT ? "" : `${text(l.label)} · `}CLV is cents per contract after fees against the last stored mid before kickoff — a learning signal, not a result.`}>
@@ -720,6 +727,11 @@ function Learning({ l, now }: { l: Obj; now: number }) {
         <Stat k="model-priced markets" v={count(l.model_priced_markets)}
           sub={`fixtures ${count(l.model_priced_fixtures)} · model-only ${count(l.model_only_markets)}`} />
         <Stat k="candidates" v={count(l.candidates)} sub={`as of ${clock(l.at, now)}`} />
+        {rm && (
+          <Stat k="ratings model · unvalidated"
+            v={`${count(rm.priced_markets)} markets`}
+            sub={`fixtures ${count(rm.priced_fixtures)} · ${text(rm.version)} · ${text(rm.label)}`} />
+        )}
         <Stat k="default arm"
           v={dflt ? `w ${text(dflt.w)} · t ${text(dflt.threshold)}` : ABSENT}
           sub="where every context starts" />

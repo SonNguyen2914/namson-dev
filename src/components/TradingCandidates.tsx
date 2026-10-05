@@ -37,9 +37,10 @@
 // evidence of an edge. This section reads; it places nothing.
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  ABSENT, ACTION_LABEL, ACTION_ORDER, type Candidate, type Candidates,
-  type Pair, cents, compLabel, coverage, decisionWords, emptyWhy, isObj,
-  parseCandidates, pct, scopeSource, signedCents,
+  ABSENT, ACTION_LABEL, ACTION_ORDER, BOUND_REASONS, type Candidate,
+  type Candidates, type Pair, anchorWords, cents, compLabel, coverage,
+  decisionWords, emptyWhy, isObj, parseCandidates, pct, scopeSource,
+  signedCents,
 } from "../lib/tradingConsole";
 import { usePoll, type PollOutcome } from "../lib/usePoll";
 
@@ -147,6 +148,13 @@ function InPlayCell({ c }: { c: Candidate }) {
       {(ip.p_engine !== null || ip.p_informed !== null) && (
         <span className="text-ink-low">
           engine {pct(ip.p_engine)} · live-stat {pct(ip.p_informed)}
+        </span>
+      )}
+      {ip.anchor && (
+        <span data-testid="cand-anchor" className="text-ink-low"
+          title="what the in-play engine number started from: w on our pre-match forecast, the rest the market's T-10 price (experimental, unvalidated)">
+          {anchorWords(ip.anchor)}
+          {ip.anchor.why ? ` (${ip.anchor.why})` : ""}
         </span>
       )}
     </span>
@@ -301,7 +309,14 @@ export function TradingCandidates({ token }: { token: string }) {
 
   const tickAt = c?.tick_at ?? null;
   const tickMs = tickAt ? Date.parse(tickAt) : NaN;
-  const omittedN = c ? Object.values(c.omitted).reduce((s, n) => s + n, 0) : 0;
+  // the markets left out BY DESIGN (far-off kickoffs, not trading, out of
+  // scope…), said in neutral ink; only a cut to the bound is a warning
+  const bound = new Set<string>(BOUND_REASONS);
+  const byDesign = c ? Object.entries(c.omitted).filter(([k]) => !bound.has(k))
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])) : [];
+  const byDesignN = byDesign.reduce((s, [, n]) => s + n, 0);
+  const cutReasons = c ? Object.entries(c.omitted).filter(([k]) => bound.has(k))
+    : [];
   const src = c ? scopeSource(c) : "focus";
   const empty = c && c.rows.length === 0 ? emptyWhy(c) : null;
 
@@ -329,9 +344,16 @@ export function TradingCandidates({ token }: { token: string }) {
           {c.truncated && (
             <span data-testid="cand-truncated" className="text-warn">
               {" "}· snapshot cut to its bound
-              {omittedN > 0 ? ` — ${omittedN} left out (${Object.entries(c.omitted)
-                .sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(", ")})`
+              {c.cut > 0 ? ` — ${c.cut} left out (${cutReasons
+                .map(([k, n]) => `${k} ${n}`).join(", ")})`
                 : c.considered !== null ? ` — ${c.rows.length} of ${c.considered} shown` : ""}
+            </span>
+          )}
+          {byDesignN > 0 && (
+            <span data-testid="cand-not-shown">
+              {" "}· {byDesignN.toLocaleString("en-US")} not shown by design ({byDesign
+                .slice(0, 4).map(([k, n]) => `${k} ${n}`).join(", ")}
+              {byDesign.length > 4 ? ", …" : ""})
             </span>
           )}
           {(c.not_served ?? 0) > 0 && (
@@ -527,8 +549,8 @@ export function TradingCandidates({ token }: { token: string }) {
                     className="w-full min-w-[600px] border-collapse font-mono text-[11px] tabular-nums">
                     <thead>
                       <tr>
-                        {["competition", "in scope", "eligible", "in play", "decided",
-                          "model-priced", "placed", "in this snapshot"].map((h, i) => (
+                        {["competition", "in scope", "assessed", "eligible", "in play",
+                          "decided", "model-priced", "placed", "in this snapshot"].map((h, i) => (
                           <th key={h} scope="col"
                             className={`${TH} ${i === 0 ? "text-left" : "text-right"}`}>{h}</th>
                         ))}
@@ -539,7 +561,12 @@ export function TradingCandidates({ token }: { token: string }) {
                         <tr key={k.competition || "none"} data-testid="cand-by-comp-row"
                           data-comp={k.competition} className="border-b border-line/50">
                           <td className="py-1 pr-3 text-ink-mid">{k.label}</td>
-                          {[k.counts?.in_scope, k.counts?.eligible,
+                          <td data-testid="cand-by-comp-in-scope"
+                            className="py-1 pr-3 text-right text-ink-hi">
+                            {k.counts?.in_scope === true ? "yes"
+                              : k.counts?.in_scope === false ? "no" : ABSENT}
+                          </td>
+                          {[k.counts?.assessed, k.counts?.eligible,
                             k.counts?.in_play_markets, k.counts?.decided,
                             k.counts?.model_priced, k.counts?.placed].map((n, i) => (
                             <td key={i} className="py-1 pr-3 text-right text-ink-hi">

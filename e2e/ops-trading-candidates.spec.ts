@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
+import { hydrated } from "./operator-console";
 import { LIVE, STANDIN_URL } from "./backend";
 
 // THE TRADER'S CANDIDATES ON THE OPERATOR CONSOLE (2026-10-05).
@@ -133,9 +134,14 @@ const ROWS = [
     minutes_to_kickoff: 150 },
 ];
 
-const COMP_ROW = (inScope: number, eligible: number, decided: number,
+/** a competition's counts as the route sends them: `in_scope` is a
+ *  BOOLEAN (is it in the trader's scope — every focus competition is by
+ *  default), `assessed` the count of its markets the tick assessed
+ *  (aligned at integration, 2026-10-05, against the recorded payloads in
+ *  e2e/trading-console-recorded.ts) */
+const COMP_ROW = (assessed: number, eligible: number, decided: number,
                   modelPriced: number, placed: number) => ({
-  in_scope: inScope, assessed: inScope, eligible, in_window_held_back: 0,
+  in_scope: true, assessed, eligible, in_window_held_back: 0,
   in_play_markets: 0, decided, model_priced: modelPriced, placed,
 });
 
@@ -188,6 +194,7 @@ async function openConsole(page: Page, answers: Answer[],
       : r.fulfill(json(a.status, a.body));
   });
   await page.goto("/ops/trading");
+  await hydrated(page, fakeClock);
   await page.locator("#watch-token").fill(TOKEN);
   // UNDER AN INSTALLED CLOCK the token's 600 ms debounce waits for it —
   // and React may schedule the effect that arms that timer only after a
@@ -369,10 +376,11 @@ test.describe("the trader's candidates on the console", () => {
           .toContainText(name);
       }
       await expect(table.locator('[data-comp="epl"]'))
-        .toHaveText(/Premier League\s*30\s*12\s*0\s*10\s*0\s*1\s*1/);
-      // a competition with nothing in scope is a row of real zeros, sent
+        .toHaveText(/Premier League\s*yes\s*30\s*12\s*0\s*10\s*0\s*1\s*1/);
+      // a competition in scope with nothing assessed is a row of real
+      // zeros, sent
       await expect(table.locator('[data-comp="ligamx"]'))
-        .toHaveText(/Liga MX\s*0\s*0\s*0\s*0\s*0\s*0\s*0/);
+        .toHaveText(/Liga MX\s*yes\s*0\s*0\s*0\s*0\s*0\s*0\s*0/);
       await expect(chip(page, "epl")).toHaveText("Premier League · 1, 1 placed");
       await expect(chip(page, "mls")).toHaveText("MLS · 2, 1 placed");
       await expect(chip(page, "unl")).toHaveText("UEFA Nations League · 1");
@@ -410,12 +418,15 @@ test.describe("the trader's candidates on the console", () => {
       await expect(chip(page, "ligamx")).toHaveCount(0);
     });
 
-  test("rows left out of the bounded snapshot are counted by reason",
+  test("rows left out of the bounded snapshot are counted by reason; the "
+    + "markets left out by design are said apart, not as a cut",
     async ({ page }) => {
       await openConsole(page, [{ status: 200, body: {
         ...CANDIDATES_PAYLOAD, omitted: { size_bound: 3, outside_window: 9 } } }]);
       await expect(page.getByTestId("cand-truncated")).toContainText(
-        "snapshot cut to its bound — 12 left out (outside_window 9, size_bound 3)");
+        "snapshot cut to its bound — 3 left out (size_bound 3)");
+      await expect(page.getByTestId("cand-not-shown")).toContainText(
+        "9 not shown by design (outside_window 9)");
     });
 
   test("the brief's spelling of the contract reads the same, and a payload "

@@ -34,6 +34,18 @@
 //     `by_competition` {comp: {in_scope, eligible, decided, placed, …}},
 //     `arms_in_use`, `actions` {action: words}.
 //
+// ALIGNED AT INTEGRATION (mon-integration, 2026-10-05), against payloads
+// recorded from the integrated backend (e2e/trading-console-recorded.ts):
+//   - `by_competition[c].in_scope` is a BOOLEAN (is the competition in
+//     the trader's scope), not a count; `assessed` is the count of its
+//     markets the tick assessed, `in_window_held_back` those held back.
+//   - `omitted` counts EVERY market not in the snapshot by its reason —
+//     mostly by design (`outside_window`, `market_not_trading`, …). Only
+//     `row_bound` / `size_bound` mean the snapshot was CUT to its bound.
+//   - an in-play row's `inplay.anchor` = {w, source, why}: the weight on
+//     OUR pre-match forecast the in-play engine number started from (0 =
+//     the market's T-10 price alone) and the forecast's source.
+//
 // UNITS. The payload's `units` block says what it sent (the route sends
 // cents for prices, edges and the threshold, and 0..1 for probabilities).
 // A payload that says nothing is read as cents. `units` saying "dollars"
@@ -141,6 +153,9 @@ export interface InPlayExtras {
   danger: number | null; danger_yes: number | null; danger_no: number | null;
   hot: boolean | null; hot_yes: boolean | null; hot_no: boolean | null;
   p_engine: number | null; p_informed: number | null;
+  /** the in-play anchor: w on OUR forecast (0..1), its source, and why
+   *  nothing was re-run; null when the decision carried none */
+  anchor: { w: number | null; source: string | null; why: string | null } | null;
 }
 
 /** What the trader did with a market, in the route's vocabulary. */
@@ -178,7 +193,11 @@ export interface Candidate {
 }
 
 export interface CompCounts {
-  in_scope: number | null; eligible: number | null;
+  /** is the competition in the trader's scope (the route sends a
+   *  boolean; a number from the brief's spelling reads as > 0) */
+  in_scope: boolean | null;
+  assessed: number | null; eligible: number | null;
+  in_window_held_back: number | null;
   in_play_markets: number | null; decided: number | null;
   model_priced: number | null; placed: number | null;
 }
@@ -195,11 +214,16 @@ export interface Candidates {
   by_competition: Record<string, CompCounts> | null;
   /** how many markets the tick considered in all, when the backend says */
   considered: number | null;
-  /** rows left out of the bounded snapshot, by reason */
+  /** markets left out of the snapshot, by reason (mostly by design) */
   omitted: Record<string, number>;
+  /** of those, the ones CUT by the snapshot's bound (row_bound,
+   *  size_bound) */
+  cut: number;
   /** rows of the snapshot withheld because their market stopped trading */
   not_served: number | null;
-  /** true when rows were cut to the snapshot's bound */
+  /** true when rows were cut to the snapshot's bound — `truncated`
+   *  sent, or a `row_bound` / `size_bound` omission; never the
+   *  by-design omissions */
   truncated: boolean;
   /** the route's words for each action, when sent */
   actions: Record<string, string>;
@@ -235,6 +259,10 @@ function parseInPlay(v: unknown): InPlayExtras | null {
     danger_yes: prob(v.danger_yes), danger_no: prob(v.danger_no),
     hot: bool(v.hot), hot_yes: bool(v.hot_yes), hot_no: bool(v.hot_no),
     p_engine: prob(v.p_engine), p_informed: prob(v.p_informed),
+    anchor: isObj(v.anchor)
+      ? { w: prob(v.anchor.w), source: str(v.anchor.source),
+          why: str(v.anchor.why) }
+      : null,
   };
 }
 
@@ -253,11 +281,39 @@ function byCompetition(v: unknown): Record<string, CompCounts> | null {
   const out: Record<string, CompCounts> = {};
   for (const [k, o] of Object.entries(v)) {
     const c = isObj(o) ? o : {};
-    out[k] = { in_scope: num(c.in_scope), eligible: num(c.eligible),
+    const sc = num(c.in_scope);
+    out[k] = {
+      in_scope: typeof c.in_scope === "boolean" ? c.in_scope
+        : sc === null ? null : sc > 0,
+      assessed: num(c.assessed), eligible: num(c.eligible),
+      in_window_held_back: num(c.in_window_held_back),
       in_play_markets: num(c.in_play_markets), decided: num(c.decided),
       model_priced: num(c.model_priced), placed: num(c.placed) };
   }
   return Object.keys(out).length ? out : null;
+}
+
+/** The `omitted` reasons that mean the snapshot was CUT to its bound
+ *  (backend src/trading/console.py: MAX_ROWS rows, MAX_BYTES bytes).
+ *  Every other reason is a market left out by design. */
+export const BOUND_REASONS = ["row_bound", "size_bound"] as const;
+
+/** THE ANCHOR'S SOURCE, in short words (backend
+ *  src/trading/inplay_anchor.py SOURCES). A code not listed here is drawn
+ *  as itself. */
+export const ANCHOR_SOURCE_WORDS: Record<string, string> = {
+  served: "our served model",
+  served_unapproved: "our model (not approved on its plane)",
+  ratings_club: "ratings model, club (unvalidated)",
+  ratings_national: "ratings model, nations (unvalidated)",
+  market_only: "the market alone",
+};
+
+export function anchorWords(a: InPlayExtras["anchor"]): string | null {
+  if (!a) return null;
+  const src = a.source === null ? "source not stated"
+    : ANCHOR_SOURCE_WORDS[a.source] ?? a.source;
+  return a.w === null ? `anchor ${src}` : `anchor w ${a.w.toFixed(2)} · ${src}`;
 }
 
 export function parseCandidates(b: Obj): Candidates {
@@ -294,7 +350,7 @@ export function parseCandidates(b: Obj): Candidates {
     : null;
   const considered = num(b.considered);
   const omitted = countsOf(b.omitted);
-  const omittedN = Object.values(omitted).reduce((s, n) => s + n, 0);
+  const cut = BOUND_REASONS.reduce((s, k) => s + (omitted[k] ?? 0), 0);
   const actions: Record<string, string> = {};
   if (isObj(b.actions)) {
     for (const [k, w] of Object.entries(b.actions)) {
@@ -306,8 +362,8 @@ export function parseCandidates(b: Obj): Candidates {
     tick_at: str(b.tick_at), stale: bool(b.stale), age_s: num(b.age_s),
     scope, by_competition: byCompetition(b.by_competition),
     considered: considered === null ? null : Math.trunc(considered),
-    omitted, not_served: num(b.not_served),
-    truncated: b.truncated === true || omittedN > 0,
+    omitted, cut, not_served: num(b.not_served),
+    truncated: b.truncated === true || cut > 0,
     actions, rows, unreadable,
   };
 }

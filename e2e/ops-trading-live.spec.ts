@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
+import { hydrated } from "./operator-console";
 
 // LIVE VALUE AND THE REST OF THE STATUS ON THE CONSOLE (2026-10-05).
 //
@@ -144,6 +145,7 @@ async function open(page: Page, status: unknown, books: unknown[],
     return r.fulfill(json(200, books[Math.min(bookReads.length - 1, books.length - 1)]));
   });
   await page.goto("/ops/trading");
+  await hydrated(page, fakeClock);
   await page.locator("#watch-token").fill(TOKEN);
   // UNDER AN INSTALLED CLOCK the token's 600 ms debounce waits for it —
   // and React may schedule the effect that arms that timer only after a
