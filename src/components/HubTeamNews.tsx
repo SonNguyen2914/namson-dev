@@ -66,7 +66,11 @@ type AbsenceBlock = { provider?: string | null; records?: AbsenceRecord[];
   competition?: string | null;
   /** the backend's own words for a competition whose provider does not
    *  publish absences (team_news ABSENCE_GAPS), or null */
-  provider_gap?: string | null };
+  provider_gap?: string | null;
+  /** whether the match archive's absence sweep — the one that makes the
+   *  archive_bridge joins — is on at the backend (absent on an older
+   *  payload). With it off, `none` is a join never attempted. */
+  archive_sweep?: boolean | null };
 type LineupSide = { team_name?: string | null; lineup_state?: string | null;
   released?: boolean | null; released_minutes_before_kickoff?: number | null;
   first_released_at?: string | null };
@@ -229,14 +233,19 @@ function Absences({ block, home, away }: {
   const gap = typeof block.provider_gap === "string"
     && block.provider_gap.trim() ? gapWords(block.provider_gap) : undefined;
   const joined = resolvedByOf(block.resolved_by);
+  // `none` with the archive sweep switched off is a join NEVER ATTEMPTED,
+  // not one that failed (review, 2026-10-05): its own words
+  const never = joined === "none" && block.archive_sweep === false
+    ? "sweep_off" : joined;
 
   if (state === "never_captured" || (recs.length === 0
       && !["empty", "unavailable", "ok", "stale"].includes(state))) {
     return (
       <div data-testid="absences" data-state="never_captured" data-held="false"
-        data-resolved-by={joined}>
+        data-resolved-by={joined} data-archive-sweep={
+          block.archive_sweep == null ? "not_sent" : String(block.archive_sweep)}>
         <p data-testid="absences-never" className={box}>
-          {NEVER_CAPTURED_WORDS[joined](who)}. {NOT_NOBODY}
+          {NEVER_CAPTURED_WORDS[never](who)}. {NOT_NOBODY}
         </p>
         <Gap text={gap} />
       </div>

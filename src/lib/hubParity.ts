@@ -293,9 +293,13 @@ export const RESOLVED_BY_WORDS: Record<AbsenceResolvedBy, string> = {
   none: "not joined to any API-Football fixture",
 };
 
-/** Why no absence read is recorded, by how far the join got. */
+/** Why no absence read is recorded, by how far the join got —
+ *  `sweep_off`: no join was ATTEMPTED, because the backend's match-archive
+ *  absence sweep (the one that makes the archive_bridge joins, and the
+ *  only one that reaches the competitions with no live plane) is switched
+ *  off there (`absences.archive_sweep === false`). */
 export const NEVER_CAPTURED_WORDS: Record<AbsenceResolvedBy | "not_sent"
-  | "unrecognised", (who: string) => string> = {
+  | "unrecognised" | "sweep_off", (who: string) => string> = {
   own: (who) => `no absence read from ${who} is recorded for this match`,
   archive_bridge: (who) => `this match is joined to ${who}'s fixture (by the `
     + `match archive's bridge), but no absence read is recorded under it yet`,
@@ -305,6 +309,11 @@ export const NEVER_CAPTURED_WORDS: Record<AbsenceResolvedBy | "not_sent"
     + `bridge row and no live-plane row names it — so there is no absence `
     + `read to find. Joins are made only when both clubs and the kickoff `
     + `match exactly, never guessed`,
+  sweep_off: (who) => `this match is not joined to any ${who} fixture, and `
+    + `no join was attempted: the absence sweep that makes these joins is `
+    + `switched off on this deployment (an operator setting that spends `
+    + `metered ${who} requests), and no live-plane row names it. So there `
+    + `is no absence read to find`,
   not_sent: (who) => `no absence read is recorded for this match. ${who} `
     + `absences are stored under ${who}'s own fixture id, and this page `
     + `reads by ESPN's; the payload did not say whether the two are joined`,

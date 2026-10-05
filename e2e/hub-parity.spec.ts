@@ -355,6 +355,7 @@ const CODES = new RegExp([
   "plane_sends_none", "no_frozen_read", "refused_read", "read_without_class",
   "frozen_read", ...SHOT_NOT_KNOWN_CODES, "not_known_reason",
   "espn_play_by_play", "archive_bridge", "live_plane", "resolved_by",
+  "archive_sweep", "sweep_off",
   "provider_gap", "board_snapshot", "match_archive", "research_archive",
   "\\.json", "caf\\.nations_qual", "archive_not_reached", "archive_failed",
   "not_archived", "archive_not_configured", "listing_incomplete",
@@ -504,6 +505,31 @@ for (const slug of HUBS) {
 }
 
 // ── W1.6: every state of the read, in words ─────────────────────────
+
+test("a join never attempted (the backend's archive sweep is off) is said so, not blamed on a failed join", async ({ page }) => {
+  // RED FIRST (review, 2026-10-05): `none` read "not joined ... yet ...
+  // Joins are made only when both clubs and the kickoff match exactly",
+  // when the sweep that makes the join was switched off and never ran
+  await open(page, "bundesliga", { hub: hub("bundesliga"), news: { status: 200,
+    body: news({ ...NEVER, competition: "bundesliga", archive_sweep: false }) } });
+  const ab = page.getByTestId("absences");
+  await expect(ab).toHaveAttribute("data-resolved-by", "none");
+  await expect(ab).toHaveAttribute("data-archive-sweep", "false");
+  const never = page.getByTestId("absences-never");
+  await expect(never).toContainText("no join was attempted");
+  await expect(never).toContainText("switched off on this deployment");
+  await expect(never).not.toContainText("Joins are made only when");
+  await expect(never).toContainText("NOT a statement that nobody is missing");
+  expect(await bodyText(page)).not.toMatch(CODES);
+});
+
+test("with the archive sweep on, an unjoined match keeps the join words", async ({ page }) => {
+  await open(page, "bundesliga", { hub: hub("bundesliga"), news: { status: 200,
+    body: news({ ...NEVER, competition: "bundesliga", archive_sweep: true }) } });
+  await expect(page.getByTestId("absences")).toHaveAttribute("data-archive-sweep", "true");
+  await expect(page.getByTestId("absences-never")).toContainText(
+    "Joins are made only when both clubs and the kickoff match exactly");
+});
 
 test("an empty provider list says the provider lists none, with the backend's own Liga MX wall", async ({ page }) => {
   await open(page, "ligamx", { hub: hub("ligamx"), news: { status: 200,
