@@ -26,7 +26,21 @@
 //
 // OPEN STATE ONLY: no settled result and no per-match P&L is on the
 // payload, so none can be here. Experimental, unproven.
+//
+// LIVE VALUE (2026-10-05). Son, 2026-10-04: the console should show the
+// ACTUAL fluctuating value of in-play positions, not the fixed cost. Each
+// position now draws the backend's live mark (the running in-play feed's
+// book for a held in-play market, the catalogue's bid otherwise), what
+// the position is worth at it, its unrealised P&L against cost, and how
+// the mark was taken — refreshed with the book every 15 s. DISPLAY ONLY:
+// the halts keep his "in play at cost until it settles" rule, and this
+// page says so beside the numbers. A position with no live mark draws
+// "—" and "no live price", and the totals name how many were left out; a
+// missing value is never summed as $0.
 import { useEffect, useState, type ReactNode } from "react";
+import {
+  compLabel, type LiveValue, liveTotals, markSourceWords, parseLiveValue,
+} from "../lib/tradingConsole";
 import { usePoll, type PollOutcome } from "../lib/usePoll";
 
 const POLL_MS = 15_000;
@@ -43,6 +57,8 @@ interface Position {
   contracts: number; own: number; handed_over: number; managed: number;
   manual: number; avg_cost_cents: number | null; mark_cents: number | null;
   at_risk_dollars: number | null;
+  /** the live mark, value, unrealised P&L and mark source — display only */
+  live: LiveValue;
 }
 
 interface Order {
@@ -55,6 +71,8 @@ interface Book {
   version: string | null; generated_at: string | null;
   account_read_at: string | null; positions: Position[]; orders: Order[];
   totals: { positions: number; orders: number; managed: number; manual: number };
+  /** the backend's own sentence for each live mark source, when sent */
+  markSources: Record<string, string>;
 }
 
 type BookRead =
@@ -99,6 +117,7 @@ function parseBook(b: Obj): Book {
       managed: whole(p.managed), manual: whole(p.manual),
       avg_cost_cents: num(p.avg_cost_cents), mark_cents: num(p.mark_cents),
       at_risk_dollars: num(p.at_risk_dollars),
+      live: parseLiveValue(p),
     });
   }
   const orders: Order[] = [];
@@ -117,7 +136,14 @@ function parseBook(b: Obj): Book {
     });
   }
   const t = isObj(b.totals) ? b.totals : {};
+  const markSources: Record<string, string> = {};
+  if (isObj(b.mark_sources)) {
+    for (const [k, w] of Object.entries(b.mark_sources)) {
+      if (typeof w === "string") markSources[k] = w;
+    }
+  }
   return {
+    markSources,
     version: str(b.version), generated_at: str(b.generated_at),
     account_read_at: str(b.account_read_at), positions, orders,
     totals: {
@@ -137,6 +163,11 @@ const ABSENT = "—";
 const cents = (n: number | null) =>
   n === null ? ABSENT : `${Number.isInteger(n) ? n : n.toFixed(1)}¢`;
 const dollars = (n: number | null) => (n === null ? ABSENT : `$${n.toFixed(2)}`);
+/** a gain or a loss: "+$1.20", "−$0.40" */
+const pl = (n: number | null) => (n === null ? ABSENT
+  : `${n > 0 ? "+" : n < 0 ? "−" : ""}$${Math.abs(n).toFixed(2)}`);
+const plTone = (n: number | null) => (n === null || n === 0 ? "text-ink-mid"
+  : n > 0 ? "text-up" : "text-neg");
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 
 function when(iso: string | null): string {
@@ -233,6 +264,16 @@ function Market({ title, ticker }: { title: string; ticker: string }) {
 
 const keyOf = (p: { ticker: string; side: Side }) => `${p.ticker}|${p.side}`;
 
+/** The positions table's columns. "live value" stacks what the position
+ *  would fetch now over the live mark and how it was taken (display only —
+ *  the halts count in-play positions at cost until they settle); it sits
+ *  next to the market, so at phone width the live numbers are on screen
+ *  before anything is scrolled to. "cost · mark" stacks the average cost
+ *  over the catalogue mark the book always carried. */
+const POSITION_HEAD = ["market", "side", "live value", "unrealised",
+  "contracts", "owner", "cost · mark", "at risk", "league · time", ""];
+const RIGHT = new Set([2, 3, 4, 6, 7]);
+
 // --------------------------------------------------------------- body
 
 export function TradingBook({ token }: { token: string }) {
@@ -287,6 +328,7 @@ export function TradingBook({ token }: { token: string }) {
 
   const book = last?.book ?? null;
   const stale = last !== null && (read.kind !== "ok" || now - last.at > STALE_MS);
+  const live = book ? liveTotals(book.positions.map((p) => p.live)) : null;
 
   const open = (p: Position, action: Action) => {
     const max = action === "handover" ? p.manual : p.handed_over;
@@ -342,6 +384,27 @@ export function TradingBook({ token }: { token: string }) {
           {stale && ` · stale, ${ago(now - last!.at)} old`}
         </p>
       )}
+      {book && live && book.positions.length > 0 && (
+        <p data-testid="book-live-totals" className="mt-0.5 font-mono text-[11px] text-ink-faint">
+          live value <span className="text-ink-hi">{dollars(live.value)}</span>
+          {" "}· unrealised{" "}
+          <span data-testid="book-live-unrealised" className={plTone(live.unrealised)}>
+            {pl(live.unrealised)}
+          </span>
+          {" "}· {live.marked} of {book.positions.length} with a live mark
+          {live.unmarked > 0 && (
+            <span data-testid="book-live-unmarked" className="text-warn">
+              {" "}· {live.unmarked} without one, not counted
+            </span>
+          )}
+          {live.unrealisedMissing > 0 && (
+            <span className="text-warn">
+              {" "}· {live.unrealisedMissing} with a value but no unrealised P&amp;L, not counted in it
+            </span>
+          )}
+          {" "}· refreshed every 15 s · experimental, unproven
+        </p>
+      )}
 
       <div className="mt-3">
         {read.kind === "unavailable" && (
@@ -386,13 +449,12 @@ export function TradingBook({ token }: { token: string }) {
             ) : (
               <div className="overflow-x-auto">
                 <table data-testid="book-positions"
-                  className="w-full min-w-[760px] border-collapse font-mono text-xs tabular-nums">
+                  className="w-full min-w-[820px] border-collapse font-mono text-xs tabular-nums">
                   <thead>
                     <tr>
-                      {["market", "competition", "kickoff", "side", "contracts",
-                        "owner", "avg cost", "mark", "at risk", ""].map((h, i) => (
+                      {POSITION_HEAD.map((h, i) => (
                         <th key={`${h}-${i}`} scope="col"
-                          className={`${TH} ${i >= 4 && i <= 8 && i !== 5 ? "text-right" : "text-left"}`}>
+                          className={`${TH} ${RIGHT.has(i) ? "text-right" : "text-left"}`}>
                           {h}
                         </th>
                       ))}
@@ -410,16 +472,30 @@ export function TradingBook({ token }: { token: string }) {
                       return [
                         <tr key={k} data-testid="book-position" data-ticker={p.ticker}
                           data-side={p.side} className="border-b border-line/50">
-                          <td className={`${TD} min-w-[180px]`}>
+                          <td className={`${TD} min-w-[150px]`}>
                             <Market title={p.title} ticker={p.ticker} />
                           </td>
-                          <td className={`${TD} text-ink-mid`}>{p.competition ?? ABSENT}</td>
-                          <td className={`${TD} whitespace-nowrap`}>
-                            {p.in_play
-                              ? <span className="text-live">in play</span>
-                              : <span className="text-ink-mid">{when(p.kickoff_utc)}</span>}
-                          </td>
                           <td className={`${TD} uppercase text-ink-hi`}>{p.side}</td>
+                          <td className={`${TD} text-right`}>
+                            <span data-testid="book-live-value"
+                              className="block whitespace-nowrap text-ink-hi">
+                              {dollars(p.live.live_value_dollars)}
+                            </span>
+                            {/* the sub line WRAPS, so the column stays narrow
+                                enough to sit on a phone's first screen */}
+                            <span className="block min-w-[84px] text-[10px] leading-tight text-ink-faint">
+                              at <span data-testid="book-live-mark">{cents(p.live.live_mark_cents)}</span>
+                              {" "}·{" "}
+                              <span data-testid="book-mark-source"
+                                data-source={p.live.mark_source ?? "none"}>
+                                {markSourceWords(p.live.mark_source)}
+                              </span>
+                            </span>
+                          </td>
+                          <td data-testid="book-unrealised"
+                            className={`${TD} whitespace-nowrap text-right ${plTone(p.live.unrealised_pl_dollars)}`}>
+                            {pl(p.live.unrealised_pl_dollars)}
+                          </td>
                           <td className={`${TD} text-right text-ink-hi`}>{p.contracts}</td>
                           <td className={TD}>
                             <span className="flex flex-wrap gap-1">
@@ -430,9 +506,23 @@ export function TradingBook({ token }: { token: string }) {
                               {p.manual > 0 && <Chip tone="yours">Yours {p.manual}</Chip>}
                             </span>
                           </td>
-                          <td className={`${TD} text-right text-ink-mid`}>{cents(p.avg_cost_cents)}</td>
-                          <td className={`${TD} text-right text-ink-mid`}>{cents(p.mark_cents)}</td>
+                          <td className={`${TD} whitespace-nowrap text-right text-ink-mid`}>
+                            <span className="block">{cents(p.avg_cost_cents)}</span>
+                            <span className="block text-[10px] text-ink-faint">
+                              mark {cents(p.mark_cents)}
+                            </span>
+                          </td>
                           <td className={`${TD} text-right text-ink-hi`}>{dollars(p.at_risk_dollars)}</td>
+                          <td className={TD}>
+                            <span className="block text-ink-mid">
+                              {p.competition ? compLabel(p.competition) : ABSENT}
+                            </span>
+                            <span className="block whitespace-nowrap text-[10px]">
+                              {p.in_play
+                                ? <span className="text-live">in play</span>
+                                : <span className="text-ink-faint">{when(p.kickoff_utc)}</span>}
+                            </span>
+                          </td>
                           <td className={`${TD} text-right`}>
                             <span className="flex justify-end gap-1">
                               {p.manual > 0 && (
@@ -455,7 +545,7 @@ export function TradingBook({ token }: { token: string }) {
                         editing && max > 0 && (
                           <tr key={`${k}-edit`} data-testid="book-edit"
                             className="border-b border-line/50 bg-bs">
-                            <td colSpan={10} className="px-2 py-2">
+                            <td colSpan={POSITION_HEAD.length} className="px-2 py-2">
                               <form className="flex flex-wrap items-center gap-2"
                                 onSubmit={(ev) => {
                                   ev.preventDefault();
@@ -501,6 +591,22 @@ export function TradingBook({ token }: { token: string }) {
                 </table>
               </div>
             )}
+
+            {book.positions.length > 0 && (() => {
+              // THE LEGEND: each mark source the positions use, in the
+              // backend's own sentence when it sent one
+              const used = [...new Set(book.positions.map((p) => p.live.mark_source ?? "none"))];
+              return (
+                <ul data-testid="book-mark-legend" className="mt-1.5 space-y-0.5 text-[11px] text-ink-faint">
+                  {used.map((k) => (
+                    <li key={k}>
+                      <span className="font-mono text-ink-low">{markSourceWords(k === "none" ? null : k)}</span>
+                      {" "}— {book.markSources[k] ?? "the backend sent no description of this source"}
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
 
             <h3 className="mb-1.5 mt-4 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
               resting orders
@@ -556,6 +662,12 @@ export function TradingBook({ token }: { token: string }) {
         The trader never touches positions marked Yours. Handed-over positions
         are fully managed: it may add or close within its limits; a close that
         lowers risk always goes through. Experimental, unproven.
+      </p>
+      <p data-testid="book-live-note" className="mt-1 text-xs leading-relaxed text-ink-faint">
+        Live value is what a position would fetch at its live mark now — the
+        running in-play feed&apos;s book when the market is in play, the
+        catalogue&apos;s bid otherwise. It is for watching only: the loss
+        halts still count an in-play position at its cost until it settles.
       </p>
     </section>
   );

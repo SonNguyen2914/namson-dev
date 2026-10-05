@@ -37,6 +37,15 @@
 // OUT is every page's: the logo goes home, the back arrow and the chips
 // go to the board, the leagues and the field.
 //
+// CANDIDATES, LIVE VALUE, AND THE REST OF THE STATUS (2026-10-05). Once
+// the status has been read, the "Candidates" section
+// (components/TradingCandidates.tsx) reads /api/ops/trading-candidates —
+// every market the newest tick considered and what it decided — and the
+// book's positions carry their live value. The status route's in-play v2
+// block, the learner's arms, the hand-over aggregates and the settlement
+// reads are drawn here too; a block the backend does not send says "not
+// on this backend", never a row of zeros.
+//
 // EXPERIMENTAL, UNPROVEN. The agent's numbers are its own bookkeeping
 // of a small, capped experiment. Nothing on this page is advice and
 // nothing here is evidence of an edge.
@@ -45,7 +54,9 @@ import { useEffect, useState, type ReactNode } from "react";
 import { NavChip, RouteProgress, TopBar } from "../../components/chrome";
 import { useOperatorToken } from "../../components/OperatorToken";
 import { TradingBook } from "../../components/TradingBook";
+import { TradingCandidates } from "../../components/TradingCandidates";
 import { Eyebrow } from "../../components/ui";
+import { compLabel } from "../../lib/tradingConsole";
 import { usePoll, type PollOutcome } from "../../lib/usePoll";
 
 const TOKEN_DEBOUNCE_MS = 600;
@@ -114,6 +125,22 @@ function clock(v: unknown, now: number): string {
   });
   return `${when} (${ago(now - t)} ago)`;
 }
+/** Cents a contract, signed: a reward or a CLV. */
+function cents(v: unknown): string {
+  const n = num(v);
+  return n === null ? ABSENT : `${n >= 0 ? "+" : "−"}${Math.abs(n).toFixed(2)}¢`;
+}
+function fixed(v: unknown, d = 2): string {
+  const n = num(v);
+  return n === null ? ABSENT : n.toFixed(d);
+}
+/** "1 reward", "2 rewards", "— rewards" */
+function nOf(v: unknown, one: string): string {
+  return `${count(v)} ${one}${num(v) === 1 ? "" : "s"}`;
+}
+/** Which of `keys` a block carries at all. */
+const carries = (o: Obj, keys: string[]) => keys.some((k) => k in o);
+
 /** A {key: n} block as rows, largest first. */
 function rowsOf(v: unknown): [string, number][] {
   const o = obj(v);
@@ -197,8 +224,10 @@ function Meter({ label, used, limit, testid }: {
   );
 }
 
-function Table({ head, rows, empty, testid }: {
+function Table({ head, rows, empty, testid, words = false }: {
   head: string[]; rows: (string | number)[][]; empty: string; testid?: string;
+  /** the first column is prose: wrap it at words, not mid-word */
+  words?: boolean;
 }) {
   if (rows.length === 0) {
     return <p data-testid={testid} className="font-mono text-[11px] text-ink-faint">{empty}</p>;
@@ -222,7 +251,8 @@ function Table({ head, rows, empty, testid }: {
             <tr key={ri} className="border-b border-line/50">
               {r.map((c, i) => (
                 <td key={i} className={`py-1 ${i === 0
-                  ? "break-all pr-2 text-left text-ink-mid" : "pl-2 text-right text-ink-hi"}`}>
+                  ? `${words ? "break-words font-sans" : "break-all"} pr-2 text-left text-ink-mid`
+                  : "pl-2 text-right text-ink-hi"}`}>
                   {c}
                 </td>
               ))}
@@ -378,6 +408,280 @@ function InPlay({ d, now }: { d: Obj; now: number }) {
       <Sub>shocks today, by kind</Sub>
       <Table testid="shocks" head={["kind", "count"]}
         rows={shocks.map(([k, n]) => [k, n])} empty="no shocks today" />
+      <Sub>in-play v2 · live stats, pressure entries, protective exits</Sub>
+      <InPlayV2 v={obj(t.v2)} now={now} />
+    </Section>
+  );
+}
+
+/** IN-PLAY V2 (status `in_play_trading.v2`): aggregates only. */
+function InPlayV2({ v, now }: { v: Obj | null; now: number }) {
+  if (!v) {
+    return (
+      <p data-testid="inplay-v2-absent" className="font-mono text-[11px] text-ink-faint">
+        in-play v2 is not on this backend
+      </p>
+    );
+  }
+  return (
+    <div data-testid="inplay-v2">
+      {typeof v.error === "string" && (
+        <p className="mb-2 font-mono text-[11px] text-warn">
+          the in-play v2 summary failed on the backend: {v.error}
+        </p>
+      )}
+      <Grid>
+        <Stat k="v2 enabled" v={flag(v.enabled)} sub={`strategy ${text(v.strategy)}`} />
+        <Stat k="v2 active" v={flag(v.active)} sub={`as of ${clock(v.at, now)}`} />
+        <Stat k="legs with a live-stat read" v={count(v.informed_available_legs)}
+          sub={`mean w ${fixed(v.w_mean)}`} />
+        <Stat k="pressure entries today"
+          v={`${count(v.entries_placed_today)} placed`}
+          sub={`${count(v.entries_cancelled_today)} cancelled`} />
+        <Stat k="exits placed today" v={count(v.exits_placed_today)} />
+        <Stat k="protective exits today"
+          v={`${count(v.protective_exits_placed_today)} placed`}
+          sub={`${count(v.protective_exits_refused_today)} refused · ${count(v.protective_exits_cancelled_today)} cancelled`} />
+        <Stat k="+5-min marks today" v={count(v.marks_today)} sub="journal only" />
+        <Stat k="mean in-play CLV" v={cents(v.mean_inplay_clv_c)}
+          sub={nOf(v.inplay_clv_rewards, "reward")} />
+        <Stat k="mean exit reward" v={cents(v.mean_exit_reward_c)}
+          sub={`${nOf(v.exit_rewards, "reward")} · P&L rewards ${count(v.pnl_rewards)}`} />
+      </Grid>
+      <ArmsInUse v={v.arms_in_use} testid="inplay-v2-arms"
+        title="in-play arms in use on the newest tick" />
+    </div>
+  );
+}
+
+/** THE LEARNER'S ARMS IN USE, if the backend sends them. Read in the
+ *  route's shape — `{at, <phase>: {competition: {"w/threshold": markets}}}`
+ *  (phases pre_match, entry, exit) — and in two simpler ones: a list of
+ *  `{context, arm | w + threshold, count}` and a `{name: {w, threshold,
+ *  count}}` block. Drawn as sent; absent, nothing is claimed. */
+function ArmsInUse({ v, testid, title }: {
+  v: unknown; testid: string; title: string;
+}) {
+  if (v === undefined || v === null) return null;
+  let rows: (string | number)[][] = [];
+  let error: string | null = null;
+  const o = obj(v);
+  const phased = o !== null && Object.entries(o).some(([k, x]) =>
+    k !== "at" && k !== "error" && obj(x) !== null
+    && Object.values(obj(x)!).every((y) => obj(y) !== null));
+  if (o && typeof o.error === "string") error = o.error;
+  if (Array.isArray(v)) {
+    rows = v.map((a) => {
+      const r = obj(a) ?? {};
+      const arm = Array.isArray(r.arm) ? r.arm : null;
+      const ctx = Array.isArray(r.context) ? r.context.map(text).join(" · ")
+        : text(r.context ?? r.competition);
+      return [ctx,
+        `w ${text(r.w ?? arm?.[0])} · t ${text(r.threshold ?? arm?.[1])}`,
+        count(r.count ?? r.ticks ?? r.n)];
+    });
+  } else if (o && phased) {
+    for (const [phase, byComp] of Object.entries(o)) {
+      const bc = obj(byComp);
+      if (phase === "at" || phase === "error" || !bc) continue;
+      for (const [comp, arms] of Object.entries(bc)) {
+        for (const [label, n] of Object.entries(obj(arms) ?? {})) {
+          rows.push([`${phase.replace(/_/g, "-")} · ${compLabel(comp)}`,
+            label, count(n)]);
+        }
+      }
+    }
+  } else if (o) {
+    rows = Object.entries(o).filter(([k, a]) => k !== "at" && k !== "error"
+      && a !== null && a !== undefined)
+      .map(([k, a]) => {
+        const r = obj(a);
+        return [k, r ? `w ${text(r.w)} · t ${text(r.threshold)}` : text(a),
+          r ? count(r.count ?? r.ticks ?? r.n) : ABSENT];
+      });
+  }
+  return (
+    <>
+      <Sub>{title}</Sub>
+      {error && (
+        <p className="mb-1 font-mono text-[11px] text-warn">
+          the arms read failed on the backend: {error}
+        </p>
+      )}
+      <Table testid={testid} head={["phase · competition", "arm (w/threshold)", "markets"]}
+        rows={rows} empty="no arm was drawn on the newest tick" />
+    </>
+  );
+}
+
+/** HAND-OVER AGGREGATES: the status route's `handover` block (handed
+ *  over, managed and manual contracts, markets, clips, today's
+ *  risk-lowering closes), or — on a backend before it — the top-level
+ *  handed_over_contracts / managed_markets / risk_lowering_closes_today /
+ *  managed_at. Counts only. */
+function Handover({ d, now }: { d: Obj; now: number }) {
+  const keys = ["handed_over_contracts", "managed_markets",
+    "risk_lowering_closes_today", "managed_at"];
+  const h: Obj | null = obj(d.handover)
+    ?? (carries(d, keys) ? { ...d, at: d.managed_at } : null);
+  return (
+    <Section id="handover" title="Hand-over"
+      note="Contracts you handed to the trader, what it manages, what stays yours, and the closes that went over a cap because they lowered risk. Experimental, unproven.">
+      {!h ? (
+        <p data-testid="handover-absent" className="font-mono text-[11px] text-ink-faint">
+          hand-over numbers are not on this backend
+        </p>
+      ) : (
+        <>
+          {typeof h.closes_error === "string" && (
+            <p className="mb-2 font-mono text-[11px] text-warn">
+              today&apos;s risk-lowering closes could not be counted: {h.closes_error}
+            </p>
+          )}
+          <Grid>
+            <Stat k="handed-over contracts" v={count(h.handed_over_contracts)}
+              sub={"handed_markets" in h ? `in ${count(h.handed_markets)} markets` : undefined} />
+            <Stat k="managed contracts" v={count(h.managed_contracts)}
+              sub={`in ${count(h.managed_markets)} markets`} />
+            <Stat k="yours (manual) contracts" v={count(h.manual_contracts)} />
+            <Stat k="risk-lowering closes today" v={count(h.risk_lowering_closes_today)} />
+            <Stat k="clips" v={count(h.clips)}
+              sub={`pending ${count(h.clips_pending)} · sold outside the trader`} />
+            <Stat k="as of" v={clock(h.at, now)}
+              sub={typeof h.outcome === "string" ? `reconcile ${h.outcome}` : undefined} />
+          </Grid>
+        </>
+      )}
+    </Section>
+  );
+}
+
+/** WHAT EACH SETTLEMENT-READ OUTCOME MEANS (src/trading/agent.py
+ *  journal_settlements). An unsettled market is valued at 0 by the
+ *  halts: a win is never assumed. */
+const SETTLEMENT_WORDS: [string, string][] = [
+  ["settled", "settled — the account's settlement data gave one yes/no result"],
+  ["not_listed", "not listed yet — Kalshi has no settlement row for it; asked again later"],
+  ["unknown_result", "unclear result — not one clean yes/no; left unsettled"],
+  ["refused", "read refused — asked again later"],
+];
+/** keys of a settlement block that are not outcome counts */
+const SETTLEMENT_META = new Set(["outcome", "at", "due", "asked", "today",
+  "label", "basis", "version", "window_ticks", "window_since", "passes",
+  "latest", "settled_rows_today", "error"]);
+const PASS_WORDS: Record<string, string> = {
+  read: "asked Kalshi", nothing_held: "nothing held awaits a result",
+  error: "the read raised",
+};
+
+/** SETTLEMENT READS AND FILL READS (ops T5 on the status route). Read in
+ *  the route's shape — `settlement_reads: {window_ticks, window_since, due,
+ *  asked, settled, not_listed, unknown_result, refused (summed over the
+ *  window), passes, latest: {outcome, due, asked, …, at},
+ *  settled_rows_today}` and `fill_reads: {total, today, unreadable,
+ *  unreadable_today, by_terms_basis, by_direction_basis,
+ *  legacy_words_disagreed}` — and in a flat one (the newest pass's counts
+ *  at the top, `today` beside them; `unreadable_fills` a number or
+ *  `{today, total}`). Counts only: no market is named. A block the backend
+ *  does not send says so; a block that failed on the backend says that. */
+function Settlements({ d, now }: { d: Obj; now: number }) {
+  const s = obj(d.settlement_reads);
+  const latest = s ? obj(s.latest) : null;
+  const today = s ? obj(s.today) : null;
+  // the newest pass: the route's `latest`, or the flat block itself
+  const pass: Obj | null = latest ?? (s && !("window_ticks" in s) ? s : null);
+  const windowed = s !== null && "window_ticks" in s;
+  const known = new Set(SETTLEMENT_WORDS.map(([k]) => k));
+  const extra = s ? Object.keys(s).filter((k) => !known.has(k)
+    && !SETTLEMENT_META.has(k) && num(s[k]) !== null).sort() : [];
+  const head = ["outcome", "last read",
+    ...(windowed ? [`last ${count(s!.window_ticks)} ticks`] : []),
+    ...(today ? ["today"] : [])];
+  const cells = (k: string) => [count(pass?.[k]),
+    ...(windowed ? [count(s![k])] : []), ...(today ? [count(today[k])] : [])];
+  const passes = s ? obj(s.passes) : null;
+  const fr = obj(d.fill_reads);
+  const uf = d.unreadable_fills;
+  const ufo = obj(uf);
+  return (
+    <Section id="settlements" title="Settlement reads"
+      note="Held markets that stopped trading are asked for their result from the account's settlement data. Until one clean yes/no comes back the halts value them at 0 — a win is never assumed. Experimental, unproven.">
+      {!s ? (
+        <p data-testid="settlements-absent" className="font-mono text-[11px] text-ink-faint">
+          settlement-read outcomes are not on this backend
+        </p>
+      ) : (
+        <>
+          {typeof s.error === "string" && (
+            <p data-testid="settlements-error" className="mb-2 font-mono text-[11px] text-warn">
+              the settlement-read summary failed on the backend: {s.error}
+            </p>
+          )}
+          <Grid>
+            <Stat k="last read"
+              v={pass ? PASS_WORDS[text(pass.outcome)] ?? text(pass.outcome) : ABSENT}
+              sub={`as of ${clock(pass?.at ?? s.at, now)}`} />
+            <Stat k="due a read" v={count(pass?.due)}
+              sub={windowed ? `${count(s.due)} over the window` : undefined} />
+            <Stat k="asked on the last read" v={count(pass?.asked)}
+              sub={windowed ? `${count(s.asked)} over the window` : undefined} />
+            {"settled_rows_today" in s && (
+              <Stat k="settled rows today" v={count(s.settled_rows_today)} />
+            )}
+          </Grid>
+          {windowed && (
+            <p className="mt-2 font-mono text-[10px] text-ink-faint">
+              window: the last {count(s.window_ticks)} ticks, since {clock(s.window_since, now)}
+              {passes ? ` · passes ${Object.entries(passes)
+                .map(([k, n]) => `${PASS_WORDS[k] ?? k} ${count(n)}`).join(" · ")}` : ""}
+            </p>
+          )}
+          <Sub>outcomes</Sub>
+          <Table testid="settlement-outcomes" words head={head}
+            rows={[
+              ...SETTLEMENT_WORDS.map(([k, words]) => [words, ...cells(k)]),
+              ...extra.map((k) => [k, ...cells(k)]),
+            ]}
+            empty="no outcomes recorded" />
+        </>
+      )}
+      <Sub>fill reads</Sub>
+      <div data-testid="unreadable-fills" className="font-mono text-xs text-ink-hi">
+        {fr ? (
+          typeof fr.error === "string" ? (
+            <p className="text-warn">the fill-read summary failed on the backend: {fr.error}</p>
+          ) : (
+            <>
+              <p>
+                unreadable: {count(fr.unreadable_today)} today · {count(fr.unreadable)} in all
+                <span className="text-ink-faint">
+                  {" "}(of {count(fr.today)} fills today · {count(fr.total)} in all)
+                </span>
+              </p>
+              {num(fr.legacy_words_disagreed) !== null && num(fr.legacy_words_disagreed)! > 0 && (
+                <p className="text-warn">
+                  {count(fr.legacy_words_disagreed)} fill rows carried legacy words that disagreed with the canonical fields
+                </p>
+              )}
+              <Table testid="fill-terms" head={["how the terms were decided", "fills"]}
+                rows={rowsOf(fr.by_terms_basis).map(([k, n]) => [k, n.toLocaleString("en-US")])}
+                empty="no fills recorded" />
+            </>
+          )
+        ) : uf === undefined ? (
+          <p className="text-ink-faint">not on this backend</p>
+        ) : (
+          <p>
+            unreadable: {ufo
+              ? `${count(ufo.today)} today · ${count(ufo.total)} in all`
+              : count(uf)}
+          </p>
+        )}
+        <p className="mt-1 text-[10px] text-ink-faint">
+          a fill whose venue fields could not be read takes its own order&apos;s
+          side and price, and is counted here
+        </p>
+      </div>
     </Section>
   );
 }
@@ -387,12 +691,21 @@ function Learning({ l, now }: { l: Obj; now: number }) {
   const fills = obj(l.fills_rewarded_by_competition) ?? {};
   const clv = obj(l.mean_clv_c_by_competition) ?? {};
   const best = obj(l.best_arm_by_competition) ?? {};
-  const comps = [...new Set([...Object.keys(trades), ...Object.keys(fills),
-    ...Object.keys(clv), ...Object.keys(best)])].sort();
-  const cents = (v: unknown) => {
-    const n = num(v);
-    return n === null ? ABSENT : `${n >= 0 ? "+" : "−"}${Math.abs(n).toFixed(2)}¢`;
+  // EVERY FOCUS COMPETITION IS A ROW: the backend's `competitions` list
+  // (in its order) first, then any other the counts name
+  const listed = Array.isArray(l.competitions)
+    ? l.competitions.filter((c): c is string => typeof c === "string") : [];
+  const comps = [...new Set([...listed, ...[...new Set([
+    ...Object.keys(trades), ...Object.keys(fills), ...Object.keys(clv),
+    ...Object.keys(best)])].sort()])];
+  /** a per-competition count: 0 when the backend sent the count map and it
+   *  has no entry (it counts rows; none were counted), "—" when it sent no
+   *  map at all */
+  const tally = (m: unknown, c: string) => {
+    const o = obj(m);
+    return o === null ? ABSENT : c in o ? count(o[c]) : "0";
   };
+  const dflt = obj(l.default_arm);
   return (
     <Section id="learning" title="Learning"
       note={`${text(l.label) === ABSENT ? "" : `${text(l.label)} · `}CLV is cents per contract after fees against the last stored mid before kickoff — a learning signal, not a result.`}>
@@ -407,15 +720,26 @@ function Learning({ l, now }: { l: Obj; now: number }) {
         <Stat k="model-priced markets" v={count(l.model_priced_markets)}
           sub={`fixtures ${count(l.model_priced_fixtures)} · model-only ${count(l.model_only_markets)}`} />
         <Stat k="candidates" v={count(l.candidates)} sub={`as of ${clock(l.at, now)}`} />
+        <Stat k="default arm"
+          v={dflt ? `w ${text(dflt.w)} · t ${text(dflt.threshold)}` : ABSENT}
+          sub="where every context starts" />
       </Grid>
+      {typeof l.reward_basis === "string" && (
+        <p data-testid="learning-basis" className="mt-2 font-mono text-[10px] text-ink-faint">
+          reward: {l.reward_basis}
+        </p>
+      )}
+      <ArmsInUse v={l.arms_in_use} testid="learning-arms"
+        title="arms in use on the newest tick (pre-match)" />
       <Sub>by competition</Sub>
       <Table testid="learning-comps"
         head={["competition", "trades", "fills", "mean CLV", "best arm"]}
         rows={comps.map((c) => {
           const b = obj(best[c]);
-          return [c, count(trades[c]), count(fills[c]), cents(clv[c]),
+          return [compLabel(c), tally(l.trades_by_competition, c),
+            tally(l.fills_rewarded_by_competition, c), cents(clv[c]),
             b ? `w ${text(b.w)} · t ${text(b.threshold)} · ${cents(b.posterior_mean_c)}`
-              : ABSENT];
+              : "prior only"];
         })}
         empty="no trades or fills recorded by competition yet" />
     </Section>
@@ -652,10 +976,13 @@ export default function TradingConsole() {
             {/* read only once the status answered: a refused or not-ready
                 plane is not asked for its book */}
             <TradingBook token={armed} />
+            <TradingCandidates token={armed} />
             <Money d={d} now={now} />
             <Activity d={d} />
             <InPlay d={d} now={now} />
+            <Handover d={d} now={now} />
             {learning && <Learning l={learning} now={now} />}
+            <Settlements d={d} now={now} />
             <Catalogue d={d} now={now} />
             <p className="font-mono text-[10px] text-ink-faint">
               {text(d.version)} · generated {clock(d.generated_at, now)}
