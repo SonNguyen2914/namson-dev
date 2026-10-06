@@ -518,8 +518,9 @@ function Reasons({ block, testid, empty }: {
 
 /** IN PLAY, EVERY COMPETITION (status `in_play_trading.by_competition`):
  *  the eleven focus competitions in the registry's order, then any other
- *  the backend names. What the backend did not send reads "not served
- *  yet", never 0. */
+ *  the backend names — its in-play legs, and its skipped, refused and
+ *  placed counts. What the backend did not send reads "not served yet",
+ *  never 0. Short headers, so the five columns fit a phone unscrolled. */
 function InPlayByComp({ v }: { v: unknown }) {
   const b = inPlayByCompetition(v);
   return (
@@ -534,10 +535,10 @@ function InPlayByComp({ v }: { v: unknown }) {
           className="w-full border-collapse font-mono text-xs tabular-nums">
           <thead>
             <tr>
-              {["competition", "legs in play", "skipped", "refused", "placed"].map((h, i) => (
+              {["competition", "legs", "skipped", "refused", "placed"].map((h, i) => (
                 <th key={h} scope="col"
                   className={`border-b border-line pb-1 font-normal uppercase tracking-[0.12em] text-[10px] text-ink-faint ${
-                    i === 0 ? "text-left" : "text-right"}`}>
+                    i === 0 ? "text-left" : "pl-2 text-right"}`}>
                   {h}
                 </th>
               ))}
