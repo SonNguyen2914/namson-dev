@@ -422,6 +422,9 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
   // the route's own derived venue class, as received (W1.12)
   const [routeVenue, setRouteVenue] = useState<unknown>(null);
   const [lineups, setLineups] = useState<Lineups | null>(null);
+  // the trader's model line (Son, 2026-10-06): what the trading agent
+  // prices this match from, as the backend's `traders_model` sends it
+  const [trader, setTrader] = useState<TradersModel | null>(null);
   // THE FAILURE IS NAMED, NOT A BOOLEAN (2026-09-25). This was `err: true`
   // off `Promise.reject(r.status)` then `.catch(() => setErr(true))`, so
   // the status and the backend's own sentence were thrown away and the
@@ -460,6 +463,8 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
     setBoardRead(d.board_read && typeof d.board_read === "object" ? d.board_read : null);
     setBookMeta(d.book_meta && typeof d.book_meta === "object" ? d.book_meta : null);
     setRouteVenue(d.venue_class ?? null);
+    setTrader(d.traders_model && typeof d.traders_model === "object"
+      ? d.traders_model : null);
     setErr(null);
     setFetchedAt(Date.now());
     return d.match?.state === "post" ? "stop" : "ok";
@@ -568,6 +573,8 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                     </span>
                   )}
                 </div>
+                <TradersModelLine t={trader} home={m.home.abbrev}
+                  away={m.away.abbrev} />
                 {/* THE MODEL'S ABSENCE, NAMED. A competition with no fitted
                     model sends `model: null` with the backend's reason;
                     drawing only an empty bar would leave a reader to guess
@@ -2053,5 +2060,55 @@ function Empty({ children }: { children: React.ReactNode }) {
     <p className="rounded-2xl border border-dashed border-line px-4 py-6 text-center font-mono text-[10px] uppercase tracking-[0.15em] text-ink-faint">
       {children}
     </p>
+  );
+}
+
+
+/** THE TRADER'S MODEL LINE (Son, 2026-10-06). The backend's
+ *  `traders_model` (src/trading/hub_line.py) is the trading agent's own
+ *  pre-match read of this match, through the same interface it trades
+ *  from — so this line and the trader cannot disagree. "tested" means
+ *  only that the model passed a pre-registered replay of pre-seal history
+ *  against the model it replaced; it is never a claim of an edge. Its
+ *  absence is NAMED, never drawn as an empty bar. */
+type TradersModel = {
+  title?: string; tested?: boolean; available?: boolean; label?: string;
+  means?: string; why?: string | null; detail?: string | null;
+  model?: string | null; source?: string | null; verdict?: string | null;
+  p_home?: number; p_draw?: number; p_away?: number;
+};
+
+function tmPct(p: unknown): string {
+  return typeof p === "number" && Number.isFinite(p)
+    ? `${(p * 100).toFixed(1)}%` : "–";
+}
+
+function TradersModelLine({ t, home, away }: {
+  t: TradersModel | null; home?: string; away?: string }) {
+  if (!t) return null;
+  const title = t.title ?? "trader's model (untested)";
+  return (
+    <div data-testid="traders-model" data-tested={t.tested ? "yes" : "no"}
+      data-available={t.available ? "yes" : "no"}
+      className="mt-3 rounded-xl border border-line px-4 py-3">
+      <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
+        {title} · {t.label ?? "experimental, unproven"}
+      </p>
+      {t.available ? (
+        <p data-testid="traders-model-1x2"
+          className="mt-1 font-mono text-[12px] tabular-nums text-ink-hi">
+          {home ?? "home"} {tmPct(t.p_home)} · draw {tmPct(t.p_draw)} · {away ?? "away"} {tmPct(t.p_away)}
+          <span className="ml-2 text-ink-faint">
+            {t.model ?? ""}{t.verdict ? ` · ${t.verdict.toLowerCase().replace("_", " ")} vs the model it replaced` : ""}
+          </span>
+        </p>
+      ) : (
+        <p data-testid="traders-model-absent"
+          className="mt-1 text-[12px] leading-relaxed text-ink-faint">
+          the trader has no pre-match read of this match
+          {t.why ? ` (${t.why})` : ""}
+        </p>
+      )}
+    </div>
   );
 }

@@ -152,6 +152,30 @@ test("a hub whose payload is missing sections draws what it has and names what i
   expect(errors, "a section's throw escaped its boundary").toEqual([]);
 });
 
+test("the trader's model line draws its 1X2 and says tested or untested (2026-10-06)", async ({ page }) => {
+  const tm = { title: "trader's model (tested)", tested: true, available: true,
+    label: "experimental, unproven", model: "unified-nb-v1", source: "unified_model",
+    verdict: "NOT_WORSE", p_home: 0.452, p_draw: 0.271, p_away: 0.277 };
+  const errors = await openHub(page, "cnl",
+    payload("cnl", "pre", { traders_model: tm }), WHEN.pre.clock);
+  const line = page.getByTestId("traders-model");
+  await expect(line).toHaveAttribute("data-tested", "yes");
+  await expect(line).toContainText("trader's model (tested)");
+  await expect(line).toContainText("experimental, unproven");
+  await expect(page.getByTestId("traders-model-1x2")).toContainText("NTH 45.2% · draw 27.1% · STH 27.7%");
+  expect(errors).toEqual([]);
+});
+
+test("an absent trader's read is named, never an empty bar", async ({ page }) => {
+  const tm = { title: "trader's model (untested)", tested: false, available: false,
+    label: "experimental, unproven", why: "fixture_not_keyed" };
+  const errors = await openHub(page, "seriea",
+    payload("seriea", "pre", { traders_model: tm }), WHEN.pre.clock);
+  await expect(page.getByTestId("traders-model")).toHaveAttribute("data-tested", "no");
+  await expect(page.getByTestId("traders-model-absent")).toContainText("fixture_not_keyed");
+  expect(errors).toEqual([]);
+});
+
 test("a payload with no match block is a named failure, not a crash", async ({ page }) => {
   const errors = await openHub(page, "afcon", { model: null, model_refusal: REFUSAL }, WHEN.pre.clock);
   await expect(page.locator("body")).toContainText("no match block");
