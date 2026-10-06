@@ -46,6 +46,16 @@
 // reads are drawn here too; a block the backend does not send says "not
 // on this backend", never a row of zeros.
 //
+// WHY IT SKIPS IN PLAY (2026-10-06). The trader had never placed an
+// in-play order and the console could not say why. Son chose "Show why
+// it skips": the "In play" section draws the day's in-play skips and
+// refusals per reason, in the backend's plain words (largest first, the
+// code beside them), every focus competition as an in-play row (legs,
+// skipped, refused, placed), and the in-play strategy that RAN — a
+// backend that still labels it v1 while its v2 block says v2 ran is
+// drawn as v2, and the lag is said. A field the backend does not send
+// reads "not served yet", never 0. Readers: lib/tradingConsole.ts.
+//
 // EXPERIMENTAL, UNPROVEN. The agent's numbers are its own bookkeeping
 // of a small, capped experiment. Nothing on this page is advice and
 // nothing here is evidence of an edge.
@@ -56,7 +66,10 @@ import { useOperatorToken } from "../../components/OperatorToken";
 import { TradingBook } from "../../components/TradingBook";
 import { TradingCandidates } from "../../components/TradingCandidates";
 import { Eyebrow } from "../../components/ui";
-import { compLabel } from "../../lib/tradingConsole";
+import {
+  NOT_SERVED, type ReasonsBlock, compLabel, inPlayByCompetition, inPlayReasons,
+  inPlayStrategy,
+} from "../../lib/tradingConsole";
 import { usePoll, type PollOutcome } from "../../lib/usePoll";
 
 const TOKEN_DEBOUNCE_MS = 600;
@@ -377,9 +390,10 @@ function InPlay({ d, now }: { d: Obj; now: number }) {
   const t = obj(d.in_play_trading) ?? {};
   const tp = obj(t.pnl) ?? {};
   const shocks = rowsOf(t.shocks_today);
+  const strat = inPlayStrategy(t);
   return (
     <Section id="inplay" title="In play"
-      note="Positions in fixtures that have kicked off and not settled. The halts count them at cost until they settle.">
+      note="Positions in fixtures that have kicked off and not settled — the halts count them at cost until they settle — and, when in-play trading is on, the resting maker orders it places in play and why it skipped or was refused.">
       <Grid>
         <Stat k="positions" v={count(p.positions)}
           sub={`marked ${count(p.marked)} · unmarked ${count(p.unmarked)}`} />
@@ -387,7 +401,21 @@ function InPlay({ d, now }: { d: Obj; now: number }) {
         <Stat k="live mark total" v={money(p.live_mark_total)} />
         <Stat k="last live update" v={clock(p.last_live_update_at, now)} />
       </Grid>
-      <Sub>in-play trading · {text(t.strategy)}</Sub>
+      <Sub>in-play trading</Sub>
+      <p className="mb-2 font-mono text-[11px] text-ink-faint">
+        strategy{" "}
+        <span data-testid="inplay-strategy" className="text-ink-hi">
+          {strat.label ?? NOT_SERVED}
+        </span>
+      </p>
+      {strat.lag && (
+        <p data-testid="inplay-strategy-note"
+          className="-mt-1 mb-2 font-mono text-[10px] text-warn">
+          this backend&apos;s status labels in-play trading
+          &ldquo;{strat.sent ?? "nothing"}&rdquo;, but its in-play v2 block
+          says the newest in-play tick ran {strat.label}
+        </p>
+      )}
       <Grid>
         <Stat k="enabled" v={flag(t.enabled)} />
         <Stat k="active" v={flag(t.active)} sub={`outcome ${text(t.outcome)}`} />
@@ -405,12 +433,140 @@ function InPlay({ d, now }: { d: Obj; now: number }) {
           tone={pnlTone(tp.settled)}
           sub={`cost ${money(tp.cost)} · share ${text(tp.share_of_agent_pnl)}`} />
       </Grid>
+      <div className="mt-2 grid gap-x-6 sm:grid-cols-2">
+        <div>
+          <Sub>why in-play legs were skipped today (UTC day)</Sub>
+          <Reasons testid="inplay-skips"
+            block={inPlayReasons(t.v2, "skipped_by_reason_today", "skips")}
+            empty="no in-play skips recorded today" />
+        </div>
+        <div>
+          <Sub>refused by the risk engine in play today</Sub>
+          <Reasons testid="inplay-refusals"
+            block={inPlayReasons(t.v2, "refused_by_reason_today", "refusals")}
+            empty="no in-play refusals recorded today" />
+        </div>
+      </div>
+      <Sub>in play, every competition</Sub>
+      <InPlayByComp v={t.by_competition} />
       <Sub>shocks today, by kind</Sub>
       <Table testid="shocks" head={["kind", "count"]}
         rows={shocks.map(([k, n]) => [k, n])} empty="no shocks today" />
       <Sub>in-play v2 · live stats, pressure entries, protective exits</Sub>
       <InPlayV2 v={obj(t.v2)} now={now} />
     </Section>
+  );
+}
+
+/** A DAY'S IN-PLAY REASONS (status `in_play_trading.v2.*_by_reason_today`):
+ *  the backend's plain words, the code beneath them, the count beside —
+ *  largest first. Not served is said as not served; served and empty is
+ *  "none today". */
+function Reasons({ block, testid, empty }: {
+  block: ReasonsBlock; testid: string; empty: string;
+}) {
+  if ("notServed" in block) {
+    return (
+      <p data-testid={testid} data-served="false"
+        className="font-mono text-[11px] text-ink-faint">
+        {block.notServed}
+      </p>
+    );
+  }
+  if (block.rows.length === 0) {
+    return (
+      <p data-testid={testid} className="font-mono text-[11px] text-ink-faint">
+        {empty}
+      </p>
+    );
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table data-testid={testid} className="w-full border-collapse text-xs">
+        <thead>
+          <tr>
+            {["reason", "count"].map((h, i) => (
+              <th key={h} scope="col"
+                className={`border-b border-line pb-1 font-mono font-normal uppercase tracking-[0.12em] text-[10px] text-ink-faint ${
+                  i === 0 ? "text-left" : "text-right"}`}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {block.rows.map((r) => (
+            <tr key={r.code} data-testid="inplay-reason-row" data-code={r.code}
+              data-words={r.from} className="border-b border-line/50">
+              <td className="py-1 pr-2 text-left align-top">
+                <span className="block break-words text-ink-mid">{r.words}</span>
+                <span className="block break-all font-mono text-[10px] text-ink-faint">
+                  {r.code}
+                </span>
+              </td>
+              <td data-testid="inplay-reason-count"
+                className="py-1 pl-2 text-right align-top font-mono tabular-nums text-ink-hi">
+                {count(r.n)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** IN PLAY, EVERY COMPETITION (status `in_play_trading.by_competition`):
+ *  the eleven focus competitions in the registry's order, then any other
+ *  the backend names. What the backend did not send reads "not served
+ *  yet", never 0. */
+function InPlayByComp({ v }: { v: unknown }) {
+  const b = inPlayByCompetition(v);
+  return (
+    <>
+      {b.failed && (
+        <p className="mb-1 font-mono text-[11px] text-warn">
+          the per-competition in-play counts failed on the backend: {b.failed}
+        </p>
+      )}
+      <div className="overflow-x-auto">
+        <table data-testid="inplay-by-comp" data-served={b.served}
+          className="w-full border-collapse font-mono text-xs tabular-nums">
+          <thead>
+            <tr>
+              {["competition", "legs in play", "skipped", "refused", "placed"].map((h, i) => (
+                <th key={h} scope="col"
+                  className={`border-b border-line pb-1 font-normal uppercase tracking-[0.12em] text-[10px] text-ink-faint ${
+                    i === 0 ? "text-left" : "text-right"}`}>
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {b.rows.map((r) => (
+              <tr key={r.competition} data-testid="inplay-comp-row"
+                data-comp={r.competition} className="border-b border-line/50">
+                <td className="py-1 pr-2 text-left font-sans text-ink-mid">{r.label}</td>
+                {r.counts === null ? (
+                  <td colSpan={4} className="py-1 pl-2 text-right text-ink-faint">
+                    {NOT_SERVED}
+                  </td>
+                ) : (
+                  [r.counts.legs, r.counts.skipped, r.counts.refused,
+                    r.counts.placed].map((n, i) => (
+                    <td key={i} className={`py-1 pl-2 text-right ${
+                      n === null ? "text-ink-faint" : "text-ink-hi"}`}>
+                      {n === null ? NOT_SERVED : n.toLocaleString("en-US")}
+                    </td>
+                  ))
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 
