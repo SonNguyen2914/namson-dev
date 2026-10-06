@@ -229,6 +229,26 @@ test.describe("the operator trading console", () => {
         .toContainText("not on this backend");
     });
 
+  test("the halt meters fill on a loss and stay empty on a gain",
+    async ({ page }) => {
+      // the backend's day_loss / drawdown are NEGATIVE after a settled win
+      // (risk.py halt_loss): a gain spends none of the limit
+      await serve(page, 200, { ...PAYLOAD,
+        daily_loss: { used: "-6.00", limit: "10" },
+        drawdown: { used: "12.00", limit: "15" } });
+      await page.goto("/ops/trading");
+      await page.locator("#watch-token").fill(TOKEN);
+      const daily = page.getByTestId("meter-daily");
+      await expect(daily).toContainText("+$6.00 up");
+      await expect(daily).toContainText("0%");
+      await expect(daily.locator("div.h-full")).toHaveAttribute(
+        "style", /width: 0%/);
+      const dd = page.getByTestId("meter-drawdown");
+      await expect(dd).toContainText("$12.00");
+      await expect(dd).toContainText("80%");
+      await expect(dd.locator("div.h-full")).toHaveClass(/bg-neg/);
+    });
+
   test("a 403 reads as a rejected token", async ({ page }) => {
     await serve(page, 403, { detail: "operator credentials required" });
     await page.goto("/ops/trading");
