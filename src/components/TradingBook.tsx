@@ -40,6 +40,12 @@
 // page says so beside the numbers. A position with no live mark draws
 // "—" and "no live price", and the totals name how many were left out; a
 // missing value is never summed as $0.
+//
+// QUEUED HAND-OVERS (2026-10-06). A hand-over may now be queued until the
+// market's next live price: the POST answers 202 {queued: true}, said as
+// "Queued — hands over at the next live price", and the book's
+// `pending_handovers` are drawn under the positions with a status chip in
+// plain words. A book without the field draws nothing.
 import { useEffect, useState, type ReactNode } from "react";
 import {
   compLabel, type LiveValue, liveTotals, markSourceWords, parseLiveValue,
@@ -70,7 +76,16 @@ interface Order {
   owner: "trader" | "manual"; expires_utc: string | null;
 }
 
+/** A hand-over the backend queued until the market's next live price. */
+interface Pending {
+  ticker: string; side: Side | null; count: number | null;
+  requested_at: string | null; status: string; reason: string | null;
+  price_cents: number | null;
+}
+
 interface Book {
+  /** the backend's queued hand-overs; null when it does not send them */
+  pending: Pending[] | null;
   version: string | null; generated_at: string | null;
   account_read_at: string | null; positions: Position[]; orders: Order[];
   totals: { positions: number; orders: number; managed: number; manual: number;
@@ -140,6 +155,23 @@ function parseBook(b: Obj): Book {
       expires_utc: str(o.expires_utc),
     });
   }
+  // MISSING IS NOT EMPTY: a backend that does not send the field draws
+  // nothing; only an array is read
+  let pending: Pending[] | null = null;
+  if (Array.isArray(b.pending_handovers)) {
+    pending = [];
+    for (const q of b.pending_handovers) {
+      if (!isObj(q)) continue;
+      const ticker = str(q.ticker);
+      if (!ticker) continue;
+      pending.push({
+        ticker, side: sideOf(q.side), count: num(q.count),
+        requested_at: str(q.requested_at), status: str(q.status) ?? "",
+        reason: str(q.reason),
+        price_cents: num(q.price_cents) ?? num(q.completed_price_cents),
+      });
+    }
+  }
   const t = isObj(b.totals) ? b.totals : {};
   const markSources: Record<string, string> = {};
   if (isObj(b.mark_sources)) {
@@ -148,7 +180,7 @@ function parseBook(b: Obj): Book {
     }
   }
   return {
-    markSources,
+    pending, markSources,
     version: str(b.version), generated_at: str(b.generated_at),
     account_read_at: str(b.account_read_at), positions, orders,
     totals: {
@@ -209,6 +241,12 @@ function describe(e: Edit, n: number, title: string, status: number,
                   body: unknown): Outcome {
   const b = isObj(body) ? body : {};
   const SIDE = e.side.toUpperCase();
+  if (status === 202 && b.queued === true) {
+    // the backend queued it until the market's next live price
+    return { ok: true, text: e.action === "handover"
+      ? `Queued — hands over at the next live price (${plural(n, `${SIDE} contract`)} on ${title}).`
+      : `Queued — takes back at the next live price (${plural(n, `${SIDE} contract`)} on ${title}).` };
+  }
   if (status >= 200 && status < 300 && b.ok === true) {
     const managed = whole(b.managed);
     const manual = whole(b.manual);
@@ -245,6 +283,28 @@ function describe(e: Edit, n: number, title: string, status: number,
   }
   return { ok: false, text: `${verb} failed: ${why}.` };
 }
+
+/** A queued hand-over's status, in plain words. An unrecognised status
+ *  is said as exactly that — never folded into one of the four. */
+export function pendingWords(q: {
+  status: string; reason: string | null; price_cents: number | null;
+}): string {
+  switch (q.status) {
+    case "queued": return "queued — will hand over at the next live price";
+    case "completed":
+      return q.price_cents === null ? "completed" : `completed at ${cents(q.price_cents)}`;
+    case "expired": return `expired: ${q.reason ?? "no reason given"}`;
+    case "cancelled": return q.reason ? `cancelled — ${q.reason}` : "cancelled";
+    default: return `status not recognised (${q.status || "none sent"})`;
+  }
+}
+
+const PENDING_TONE: Record<string, string> = {
+  queued: "border-accent/50 text-accent",
+  completed: "border-line-strong text-ink-hi",
+  expired: "border-warn/50 text-warn",
+  cancelled: "border-line text-ink-low",
+};
 
 // ------------------------------------------------------------- pieces
 
@@ -641,6 +701,36 @@ export function TradingBook({ token }: { token: string }) {
                 </ul>
               );
             })()}
+
+            {book.pending && book.pending.length > 0 && (
+              <div data-testid="book-pending-list">
+                <h3 className="mb-1.5 mt-4 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
+                  queued hand-overs
+                </h3>
+                <ul className="space-y-1">
+                  {book.pending.map((q, i) => {
+                    const title = book.positions.find((p) => p.ticker === q.ticker)?.title
+                      ?? q.ticker;
+                    return (
+                      <li key={`${q.ticker}-${q.side}-${q.requested_at}-${i}`}
+                        data-testid="book-pending" data-status={q.status || "none"}
+                        className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-line/50 py-1 font-mono text-[11px]">
+                        <span className="min-w-0 break-all font-sans text-[12px] text-ink-hi">{title}</span>
+                        <span className="uppercase text-ink-mid">{q.side ?? ABSENT}</span>
+                        <span className="text-ink-mid">
+                          {q.count === null ? ABSENT : plural(q.count, "contract")}
+                        </span>
+                        <span className="text-ink-faint">asked {when(q.requested_at)}</span>
+                        <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] ${
+                          PENDING_TONE[q.status] ?? "border-warn/50 text-warn"}`}>
+                          {pendingWords(q)}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
 
             <h3 className="mb-1.5 mt-4 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
               resting orders

@@ -3,7 +3,7 @@
 // 2026-10-06).
 //
 // pages/api/ops/trading-book.ts, trading-candidates.ts,
-// trading-ledger.ts and trading-handover.ts are the same shape as
+// trading-ledger.ts, trading-handover.ts and trading-kill-lift.ts are the same shape as
 // trading-status.ts beside them, and for the same reasons:
 //
 //   * FIXED BACKEND PATHS. Each route names its backend path(s) as

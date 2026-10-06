@@ -478,6 +478,26 @@ export const REGISTERED_SWALLOWS: Record<string, Swallow> = {
       "the outcome line stops printing the failure, or the book re-read "
       + "after a failed POST is removed.",
   },
+  "killlift:post-body-parse": {
+    finding:
+      "A kill-lift answer whose body is not JSON is folded to null and "
+      + "described by describeLift() from its HTTP status, so the operator "
+      + "always reads a sentence naming the failure (token rejected, not "
+      + "available, no answer in time, HTTP <n>); a 2xx without a boolean "
+      + "`lifted` is never reported as lifted.",
+    closes_when:
+      "a non-2xx or unparseable answer is ever reported as a lift, or the "
+      + "result line stops naming the status.",
+  },
+  "killlift:post-no-answer": {
+    finding:
+      "A kill-lift POST that throws (network, abort) is NAMED in the result "
+      + "line ('Lift failed: no answer came back') and the status is read "
+      + "again at once; nothing claims the kill was lifted.",
+    closes_when:
+      "the result line stops printing the failure, or the status re-read "
+      + "after a failed POST is removed.",
+  },
   "livepanel:saved-read-parse": {
     finding:
       "LivePanel.loadSaved() folds a corrupt or unreadable localStorage "

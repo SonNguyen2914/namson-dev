@@ -66,6 +66,13 @@
 // own P&L — with P&L by UTC day against the daily loss limit, filters,
 // row expansion and a CSV export of the loaded rows.
 //
+// LIFT KILL AND QUEUED HAND-OVERS (2026-10-06). Beside the kill switch,
+// "Lift kill" (components/TradingKillLift.tsx) ends an operator kill
+// through /api/ops/trading-kill-lift after an in-page Confirm; it cannot
+// lift TRADING_KILL on Railway, and says so. The book draws the backend's
+// queued hand-overs (`pending_handovers`) when it sends them, and a
+// hand-over answered 202 {queued: true} reads as queued, not failed.
+//
 // EXPERIMENTAL, UNPROVEN. The agent's numbers are its own bookkeeping
 // of a small, capped experiment. Nothing on this page is advice and
 // nothing here is evidence of an edge.
@@ -77,6 +84,7 @@ import { TradingBook } from "../../components/TradingBook";
 import { TradingCandidates } from "../../components/TradingCandidates";
 import { TradingLedger } from "../../components/TradingLedger";
 import { TradingCareful } from "../../components/TradingCareful";
+import { TradingKillLift } from "../../components/TradingKillLift";
 import { Eyebrow } from "../../components/ui";
 import {
   NOT_SERVED, type ReasonsBlock, compLabel, inPlayByCompetition, inPlayReasons,
@@ -305,7 +313,9 @@ function Sub({ children }: { children: ReactNode }) {
 
 // ----------------------------------------------------------- sections
 
-function TopStrip({ d, now }: { d: Obj; now: number }) {
+function TopStrip({ d, now, token, onLifted }: {
+  d: Obj; now: number; token: string; onLifted: () => void;
+}) {
   const halt = obj(d.halt) ?? {};
   const ip = obj(d.in_play_trading) ?? {};
   const learning = obj(d.learning);
@@ -322,7 +332,9 @@ function TopStrip({ d, now }: { d: Obj; now: number }) {
           v={learning ? flag(learning.enabled) : "not on this backend"} />
         <Stat k="universe enabled" v={flag(d.universe_enabled)} />
         <Stat k="kill switch" v={d.kill === true ? "KILLED" : flag(d.kill)}
-          tone={d.kill === true ? "neg" : "hi"} />
+          tone={d.kill === true ? "neg" : "hi"}
+          sub={typeof d.kill_until === "string" && d.kill_until !== ""
+            ? `until ${clock(d.kill_until, now)}` : undefined} />
         <Stat k="halt" v={halted ? `HALTED · ${text(halt.reason)}` : flag(halt.active)}
           tone={halted ? "neg" : "hi"}
           sub={halted
@@ -333,6 +345,9 @@ function TopStrip({ d, now }: { d: Obj; now: number }) {
           sub={last ? `${clock(last.at, now)}${num(last.elapsed_s) !== null
             ? ` · took ${num(last.elapsed_s)!.toFixed(1)}s` : ""}` : undefined} />
       </Grid>
+      {/* LIFT KILL (2026-10-06), beside the kill switch: lifts an
+          operator kill only — never TRADING_KILL on Railway */}
+      <TradingKillLift token={token} onDone={onLifted} />
     </Section>
   );
 }
@@ -998,10 +1013,12 @@ function HowToStop() {
         <li>Or delete the agent&apos;s Kalshi API key in Kalshi&apos;s settings.</li>
       </ul>
       <p className="mt-2 text-xs text-ink-faint">
-        This page cannot place or stop anything. The one thing it changes is
+        This page cannot place or stop anything. It changes two things:
         which of your positions the trader may manage — and a take-back also
         cancels the trader&apos;s own resting orders on that market, on its
-        next tick.
+        next tick — and &ldquo;Lift kill&rdquo;, which ends an operator kill
+        set through the backend&apos;s kill route. It cannot lift
+        TRADING_KILL on Railway.
       </p>
     </section>
   );
@@ -1021,6 +1038,8 @@ export default function TradingConsole() {
   const [read, setRead] = useState<Read>({ kind: "idle" });
   const [last, setLast] = useState<{ data: Obj; at: number } | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  // bumped after a kill lift so the status is read again at once
+  const [statusBump, setStatusBump] = useState(0);
 
   // A REAL DEBOUNCE: every keystroke restarts the clock, so a half-typed
   // token is never sent. Clearing the field disarms at once and drops
@@ -1077,7 +1096,7 @@ export default function TradingConsole() {
     }
     setRead({ kind: "error", status: r.status, detail });
     return "failed";
-  }, POLL_MS, [armed], armed !== "");
+  }, POLL_MS, [armed, statusBump], armed !== "");
 
   // the age of what is on screen, ticking only while something is
   useEffect(() => {
@@ -1161,7 +1180,8 @@ export default function TradingConsole() {
         {d && (
           <div data-testid="ops-console" data-stale={stale || undefined}
             className={`mt-6 space-y-4 transition-opacity ${stale ? "opacity-50" : ""}`}>
-            <TopStrip d={d} now={now} />
+            <TopStrip d={d} now={now} token={armed}
+              onLifted={() => setStatusBump((b) => b + 1)} />
             {/* THE CAREFUL STRATEGY (2026-10-06): the budget, the
                 kickoff-hour caps, Son's competition switch and the paper
                 learner's evidence */}
