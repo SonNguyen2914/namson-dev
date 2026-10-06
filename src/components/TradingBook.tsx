@@ -4,7 +4,10 @@
 // and then I can choose in the console whenever I want the trader to take
 // care of it, if not then it cant touch it?" — so this section shows every
 // open position and resting order on the account, each flagged by whose
-// it is, and lets him hand a position to the trader or take it back.
+// it is, and lets him hand a position to the trader or take it back. Those
+// on markets the trader's catalogue does not list (combos, markets newer
+// than its last refresh) are not drawn; the backend COUNTS them
+// (totals.not_listed_*) and this section says how many.
 //
 // WHAT THE CHIPS MEAN, per position (from GET /api/ops/trading-book,
 // trading-book-v1):
@@ -70,7 +73,9 @@ interface Order {
 interface Book {
   version: string | null; generated_at: string | null;
   account_read_at: string | null; positions: Position[]; orders: Order[];
-  totals: { positions: number; orders: number; managed: number; manual: number };
+  totals: { positions: number; orders: number; managed: number; manual: number;
+            /** on markets the catalogue does not list: counted, not drawn */
+            notListedPositions: number; notListedOrders: number };
   /** the backend's own sentence for each live mark source, when sent */
   markSources: Record<string, string>;
 }
@@ -153,6 +158,8 @@ function parseBook(b: Obj): Book {
         ?? positions.reduce((s, p) => s + p.managed, 0),
       manual: num(t.manual_contracts)
         ?? positions.reduce((s, p) => s + p.manual, 0),
+      notListedPositions: whole(t.not_listed_positions),
+      notListedOrders: whole(t.not_listed_orders),
     },
   };
 }
@@ -205,6 +212,12 @@ function describe(e: Edit, n: number, title: string, status: number,
   if (status >= 200 && status < 300 && b.ok === true) {
     const managed = whole(b.managed);
     const manual = whole(b.manual);
+    if (b.repeat === true) {
+      // the backend's repeat guard: the same request a moment ago
+      return { ok: true, text: `Already done a moment ago — nothing new was `
+        + `sent. The trader manages ${managed} here; ${manual} `
+        + `${manual === 1 ? "is" : "are"} yours.` };
+    }
     return e.action === "handover"
       ? { ok: true, text: `Handed ${plural(n, `${SIDE} contract`)} on ${title} `
           + `to the trader. It now manages ${managed} here; ${manual} `
@@ -217,7 +230,10 @@ function describe(e: Edit, n: number, title: string, status: number,
   const code = str(b.error);
   const detail = str(b.detail);
   let why: string;
-  if (code && ERROR_WORDS[code]) why = ERROR_WORDS[code];
+  if (code === "more_than_yours" && detail) {
+    // the backend names what is committed to his resting closing orders
+    why = `${ERROR_WORDS[code]} (${detail})`;
+  } else if (code && ERROR_WORDS[code]) why = ERROR_WORDS[code];
   else if (status === 403) why = "token rejected";
   else if (status === 404 || b.available === false) {
     why = "hand-over is not available on this backend yet";
@@ -332,9 +348,17 @@ export function TradingBook({ token }: { token: string }) {
 
   const open = (p: Position, action: Action) => {
     const max = action === "handover" ? p.manual : p.handed_over;
+    // a hand-over defaults to what is FREE: his contracts less those his
+    // own resting orders would close (a buy of the other side), which the
+    // backend refuses to hand over (more_than_yours)
+    const committed = action !== "handover" || !book ? 0
+      : book.orders.filter((o) => o.ticker === p.ticker
+        && o.owner === "manual" && o.side !== p.side)
+        .reduce((s, o) => s + o.remaining, 0);
+    const free = Math.max(0, max - committed);
     setOutcome(null);
     setEdit({ key: keyOf(p), action, ticker: p.ticker, side: p.side,
-              value: String(max) });
+              value: String(free >= 1 ? free : max) });
   };
 
   const submit = async (e: Edit, n: number, title: string) => {
@@ -382,6 +406,14 @@ export function TradingBook({ token }: { token: string }) {
               ? ` (${ago(now - Date.parse(book.account_read_at))} ago)` : ""}`
             : "— not yet"}
           {stale && ` · stale, ${ago(now - last!.at)} old`}
+        </p>
+      )}
+      {book && (book.totals.notListedPositions > 0
+        || book.totals.notListedOrders > 0) && (
+        <p data-testid="book-not-listed" className="mt-0.5 font-mono text-[11px] text-warn">
+          {plural(book.totals.notListedPositions, "more position")} and{" "}
+          {plural(book.totals.notListedOrders, "more resting order")} on markets
+          the trader does not track are not shown.
         </p>
       )}
       {book && live && book.positions.length > 0 && (
@@ -444,7 +476,9 @@ export function TradingBook({ token }: { token: string }) {
             </h3>
             {book.positions.length === 0 ? (
               <p data-testid="book-positions-empty" className="font-mono text-[11px] text-ink-faint">
-                No open positions on the account.
+                {book.totals.notListedPositions > 0
+                  ? "No open positions on markets the trader tracks."
+                  : "No open positions on the account."}
               </p>
             ) : (
               <div className="overflow-x-auto">
@@ -580,7 +614,7 @@ export function TradingBook({ token }: { token: string }) {
                               <p className="mt-1 text-[11px] text-ink-faint">
                                 {editing.action === "handover"
                                   ? "The trader will fully manage these: it may add to them or close them within its limits."
-                                  : "These become yours again; the trader stops managing them and never touches them."}
+                                  : "These become yours again; the trader stops managing them. A close it already had resting is cancelled on its next tick (up to ~15 s) and could fill before then."}
                               </p>
                             </td>
                           </tr>
@@ -616,7 +650,9 @@ export function TradingBook({ token }: { token: string }) {
             </p>
             {book.orders.length === 0 ? (
               <p data-testid="book-orders-empty" className="font-mono text-[11px] text-ink-faint">
-                No resting orders on the account.
+                {book.totals.notListedOrders > 0
+                  ? "No resting orders on markets the trader tracks."
+                  : "No resting orders on the account."}
               </p>
             ) : (
               <div className="overflow-x-auto">
@@ -661,7 +697,8 @@ export function TradingBook({ token }: { token: string }) {
       <p data-testid="book-note" className="mt-4 text-xs leading-relaxed text-ink-faint">
         The trader never touches positions marked Yours. Handed-over positions
         are fully managed: it may add or close within its limits; a close that
-        lowers risk always goes through. Experimental, unproven.
+        lowers risk may go over a cap, but the halts and the kill switch
+        still stop it. Experimental, unproven.
       </p>
       <p data-testid="book-live-note" className="mt-1 text-xs leading-relaxed text-ink-faint">
         Live value is what a position would fetch at its live mark now — the

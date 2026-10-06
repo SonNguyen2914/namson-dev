@@ -218,15 +218,19 @@ const pnlTone = (v: unknown): Tone => {
   return n === null || n === 0 ? "hi" : n > 0 ? "up" : "neg";
 };
 
-/** USED AGAINST A LIMIT, as a bar. The share is |used| / limit, so a
- *  loss measured as a negative number fills the bar the same way. */
+/** USED AGAINST A LIMIT, as a bar. The backend's daily loss and drawdown
+ *  are POSITIVE for a loss and NEGATIVE after a settled gain (risk.py
+ *  halt_loss counts a settled market both ways), so a negative `used` is a
+ *  gain: it spends none of the limit and draws an empty bar, said as
+ *  "+$X up" (audit 2026-10-06: the bar used to fill on a gain). */
 function Meter({ label, used, limit, testid }: {
   label: string; used: unknown; limit: unknown; testid: string;
 }) {
   const u = num(used);
   const l = num(limit);
   const share = u !== null && l !== null && l > 0
-    ? Math.min(1, Math.abs(u) / l) : null;
+    ? (u <= 0 ? 0 : Math.min(1, u / l)) : null;
+  const gain = u !== null && u < 0;
   const tone = share === null ? "bg-line-strong"
     : share >= 0.8 ? "bg-neg" : share >= 0.5 ? "bg-warn" : "bg-up";
   return (
@@ -234,7 +238,9 @@ function Meter({ label, used, limit, testid }: {
       <div className="flex items-baseline justify-between gap-2">
         <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">{label}</span>
         <span className="font-mono text-xs tabular-nums text-ink-hi">
-          {money(used)} <span className="text-ink-faint">of</span> {money(limit)}
+          {gain
+            ? <span className="text-up">+{money(-(u as number))} up</span>
+            : money(used)} <span className="text-ink-faint">of</span> {money(limit)}
           {share !== null && (
             <span className="text-ink-low"> · {Math.round(share * 100)}%</span>
           )}
@@ -991,8 +997,10 @@ function HowToStop() {
         <li>Or delete the agent&apos;s Kalshi API key in Kalshi&apos;s settings.</li>
       </ul>
       <p className="mt-2 text-xs text-ink-faint">
-        This page cannot place, cancel or stop anything. The one thing it
-        changes is which of your positions the trader may manage.
+        This page cannot place or stop anything. The one thing it changes is
+        which of your positions the trader may manage — and a take-back also
+        cancels the trader&apos;s own resting orders on that market, on its
+        next tick.
       </p>
     </section>
   );
