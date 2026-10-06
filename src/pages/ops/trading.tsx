@@ -56,6 +56,16 @@
 // drawn as v2, and the lag is said. A field the backend does not send
 // reads "not served yet", never 0. Readers: lib/tradingConsole.ts.
 //
+// TRADES & GROUNDS (2026-10-06). Son: "I need you to work with me on
+// the trader strategy, tell me about all of its trade and its ground". The
+// "Trades & grounds" section (components/TradingLedger.tsx) reads
+// /api/ops/trading-ledger — every order the trader placed and every
+// contract handed over to it, the grounds it recorded at placement, the
+// order's fills and cancels, and (Son's seal decision of 2026-10-06,
+// "Everything, for my bets only") the journaled result and that order's
+// own P&L — with P&L by UTC day against the daily loss limit, filters,
+// row expansion and a CSV export of the loaded rows.
+//
 // EXPERIMENTAL, UNPROVEN. The agent's numbers are its own bookkeeping
 // of a small, capped experiment. Nothing on this page is advice and
 // nothing here is evidence of an edge.
@@ -65,6 +75,7 @@ import { NavChip, RouteProgress, TopBar } from "../../components/chrome";
 import { useOperatorToken } from "../../components/OperatorToken";
 import { TradingBook } from "../../components/TradingBook";
 import { TradingCandidates } from "../../components/TradingCandidates";
+import { TradingLedger } from "../../components/TradingLedger";
 import { Eyebrow } from "../../components/ui";
 import {
   NOT_SERVED, type ReasonsBlock, compLabel, inPlayByCompetition, inPlayReasons,
@@ -1146,6 +1157,13 @@ export default function TradingConsole() {
                 plane is not asked for its book */}
             <TradingBook token={armed} />
             <TradingCandidates token={armed} />
+            {/* TRADES & GROUNDS (2026-10-06): every order the trader
+                placed and every contract handed over to it, with its
+                grounds, lifecycle and — its own bets only — result and
+                P&L. The status route's daily loss limit is handed down for
+                the by-day line, used only when the ledger states none. */}
+            <TradingLedger token={armed}
+              statusDailyLimit={num(obj(d.daily_loss)?.limit)} />
             <Money d={d} now={now} />
             <Activity d={d} />
             <InPlay d={d} now={now} />

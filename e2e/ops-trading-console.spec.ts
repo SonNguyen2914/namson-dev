@@ -14,7 +14,9 @@ import { STANDIN_URL } from "./backend";
 //     "Positions & orders" section; its own behaviour is
 //     e2e/ops-trading-book.spec.ts) and ONE candidates read
 //     (/api/ops/trading-candidates, 2026-10-05; its own behaviour is
-//     e2e/ops-trading-candidates.spec.ts);
+//     e2e/ops-trading-candidates.spec.ts) and ONE ledger read
+//     (/api/ops/trading-ledger, "Trades & grounds", 2026-10-06; its own
+//     behaviour is e2e/ops-trading-ledger.spec.ts);
 //   - the token is held in React state only: not in localStorage,
 //     sessionStorage or a cookie, and a reload forgets it;
 //   - a 200 renders every section the payload carries, and a payload
@@ -127,6 +129,13 @@ async function serve(page: Page, status: number, body: unknown) {
     status: 200, contentType: "application/json",
     body: JSON.stringify({ version: "trading-candidates-v1", rows: [] }),
   }));
+  // the ledger ("Trades & grounds") is read once the status answers;
+  // served empty here
+  await page.route("**/api/ops/trading-ledger**", (route) => route.fulfill({
+    status: 200, contentType: "application/json",
+    body: JSON.stringify({ version: "trading-ledger-v1", rows: [],
+      summary: null, page: { offset: 0, returned: 0, has_more: false } }),
+  }));
   // the book section is read once the status answers; served empty here
   await page.route("**/api/ops/trading-book", (route) => route.fulfill({
     status: 200, contentType: "application/json",
@@ -153,8 +162,9 @@ test.describe("the operator trading console", () => {
       await expect(page.getByTestId("ops-console")).toHaveCount(0);
     });
 
-  test("a typed token makes exactly one status call, one book read and one "
-    + "candidates read, with the header, and every section renders",
+  test("a typed token makes exactly one status call, one book read, one "
+    + "candidates read and one ledger read, with the header, and every "
+    + "section renders",
   async ({ page }) => {
       await serve(page, 200, PAYLOAD);
       const calls = apiCalls(page);
@@ -163,18 +173,20 @@ test.describe("the operator trading console", () => {
       await page.locator("#watch-token").pressSequentially(TOKEN, { delay: 20 });
       await expect(page.getByTestId("ops-console")).toBeVisible();
       await page.waitForTimeout(1000);
-      // the status first; the book and the candidates are siblings read
-      // once it answers, so their order between themselves is not a claim
+      // the status first; the book, the candidates and the ledger are
+      // siblings read once it answers, so their order between themselves
+      // is not a claim
       const paths = calls.map((r) => new URL(r.url()).pathname);
       expect(paths[0]).toBe("/api/ops/trading-status");
       expect(paths.slice(1).sort())
-        .toEqual(["/api/ops/trading-book", "/api/ops/trading-candidates"]);
+        .toEqual(["/api/ops/trading-book", "/api/ops/trading-candidates",
+          "/api/ops/trading-ledger"]);
       for (const c of calls) {
         expect(c.method()).toBe("GET");
         expect(c.headers()["x-admin-token"]).toBe(TOKEN);
       }
 
-      for (const id of ["strip", "book", "candidates", "money", "activity",
+      for (const id of ["strip", "book", "candidates", "ledger", "money", "activity",
                         "inplay", "handover", "learning", "settlements",
                         "catalogue", "stop"]) {
         await expect(page.getByTestId(`ops-${id}`), id).toBeVisible();
@@ -261,6 +273,8 @@ test.describe("the operator trading console", () => {
         .not.toContain("/api/ops/trading-book");
       expect(calls.map((r) => new URL(r.url()).pathname))
         .not.toContain("/api/ops/trading-candidates");
+      expect(calls.map((r) => new URL(r.url()).pathname))
+        .not.toContain("/api/ops/trading-ledger");
     });
 
   test("the route is a read: other verbs are 405, and nothing is cached",
