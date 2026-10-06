@@ -42,7 +42,7 @@ import {
 } from "react";
 import {
   type Bucket, type DayBucket, LEDGER_PHASES, type Ledger, type LedgerRow,
-  NOT_RECORDED, ROW_TYPE_WORDS, type Summary, blendWords, cents, compLabel,
+  NOT_RECORDED, ROW_TYPE_WORDS, type Summary, blendWords, carefulWords, cents, compLabel,
   consensusWords, dollars, edgeBucketWords, edgeGroundWords, edgeNote, edgeWords,
   fairWords, familyWords, feeWords, fillWords, guardLines, handoverWords,
   inPlayLines, ledgerCsv, lifecycleLines, makerWords, modelWords, outcomeLines,
@@ -360,6 +360,7 @@ function Grounds({ r }: { r: LedgerRow }) {
             <G field="consensus" k="bookmaker consensus">{consensusWords(g.consensus)}</G>
             <G field="model" k="our model (unvalidated)">{modelWords(g.model)}</G>
             <G field="blend" k="blend & learner">{blendWords(g.blend)}</G>
+            {g.careful && <G field="careful" k="careful strategy">{carefulWords(g.careful)}</G>}
             <G field="maker" k="maker price">{makerWords(g)}</G>
             <G field="fee" k="fee">{feeWords(g)}</G>
             <G field="edge" k="edge after fee (its own estimate)">{edgeGroundWords(r)}</G>

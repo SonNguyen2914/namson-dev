@@ -239,6 +239,9 @@ export interface Grounds {
   consensus: Consensus | null;
   model: ModelGround | null;
   blend: Blend | null;
+  /** THE CAREFUL STRATEGY (2026-10-06): its score, size and ground, as
+   *  placed; null for an order another strategy placed */
+  careful: CarefulGround | null;
   in_play: InPlay | null;
   maker: { price_cents: number | null; maker_yes_cents: number | null;
            maker_no_cents: number | null; ceiling_cents: number | null } | null;
@@ -426,6 +429,7 @@ function parseGrounds(v: unknown): Grounds {
     consensus: parseConsensus(g.consensus),
     model: parseModel(g.model),
     blend: parseBlend(g.blend),
+    careful: parseCareful(g.careful),
     in_play: parseInPlay(g.in_play),
     maker: maker ? { price_cents: num(maker.price_cents),
       maker_yes_cents: num(maker.maker_yes_cents), maker_no_cents: num(maker.maker_no_cents),
@@ -846,6 +850,25 @@ export function modelWords(m: ModelGround | null): string {
     `${sourceWords(m.source)}${run ? ` (${run})` : ""}`,
     m.age_s === null ? "run age not recorded" : `${age(m.age_s)} old`,
     "unvalidated"].join(" · ");
+}
+
+export interface CarefulGround {
+  score: number | null; size_dollars: number | null;
+  worst_dollars: number | null; ground: string | null;
+}
+
+function parseCareful(v: unknown): CarefulGround | null {
+  const c = obj(v);
+  if (!c) return null;
+  return { score: num(c.score), size_dollars: num(c.size_dollars),
+    worst_dollars: num(c.worst_dollars), ground: str(c.ground) };
+}
+
+/** The careful strategy's grounds, in words; "" for another strategy. */
+export function carefulWords(c: CarefulGround | null): string {
+  if (!c) return "";
+  return `confidence ${c.score ?? "?"}/5 · size $${c.size_dollars ?? "?"}`
+    + ` (worst case ${dollars(c.worst_dollars)}) · ${c.ground ?? "ground not recorded"}`;
 }
 
 export function blendWords(b: Blend | null): string {

@@ -5,6 +5,7 @@ import {
 } from "./trading-console-recorded";
 import { FOCUS_COMPETITIONS } from "../src/lib/tradingConsole";
 import { parseCarefulBody } from "../src/pages/api/ops/trading-careful";
+import { carefulWords } from "../src/lib/tradingLedger";
 
 // THE CAREFUL STRATEGY ON THE CONSOLE (2026-10-06, Son's decisions;
 // backend src/trading/careful.py, docs/TRADING-AGENT.md §38).
@@ -141,5 +142,12 @@ test.describe("the careful strategy on the console", () => {
       .toBe(false);
     expect(parseCarefulBody({ op: "competition_on", competition: "EPL; drop" }).ok)
       .toBe(false);
+  });
+
+  test("the ledger says a careful order's score, size and ground", () => {
+    expect(carefulWords({ score: 4, size_dollars: 2, worst_dollars: 1.76,
+      ground: "family:GAME" })).toBe(
+      "confidence 4/5 · size $2 (worst case $1.76) · family:GAME");
+    expect(carefulWords(null)).toBe("");
   });
 });
