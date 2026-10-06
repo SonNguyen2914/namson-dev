@@ -18,8 +18,10 @@
 //
 //   THE FILTERS CROSS, AND NOTHING ELSE DOES. The ledger is paginated
 //   and filtered on the backend, so six named query parameters — since,
-//   until, competition, phase, cursor, limit (lib/tradingLedger.ts
-//   LEDGER_PARAMS) — are read here BY NAME, each checked against its own
+//   until, competition, phase, offset, limit (lib/tradingLedger.ts
+//   LEDGER_PARAMS, each held to the BACKEND's own rule: limit 1..200,
+//   offset 0..5000, its phase keys, its competition pattern) — are read
+//   here BY NAME, each checked against its own
 //   pattern, and the backend is sent a query REBUILT from the checked
 //   values alone. Any other key is dropped. A value that is not what its
 //   filter is answers `400 {"reason":"invalid_parameter","parameter":…}`
@@ -48,8 +50,8 @@ export default async function handler(
         + "this route has",
     });
   }
-  const { since, until, competition, phase, cursor, limit } = req.query;
-  const q = ledgerQuery({ since, until, competition, phase, cursor, limit });
+  const { since, until, competition, phase, offset, limit } = req.query;
+  const q = ledgerQuery({ since, until, competition, phase, offset, limit });
   if (!q.ok) {
     return res.status(400).json({
       error: "invalid_parameter", reason: "invalid_parameter",

@@ -1,73 +1,64 @@
 import { expect, test } from "@playwright/test";
 import {
-  LEDGER_CSV_COLUMNS, LEDGER_LIMIT_MAX, LEDGER_PARAMS, composeWhy, ledgerCsv,
-  ledgerQuery, parseLedger,
+  LEDGER_CSV_COLUMNS, LEDGER_LIMIT_MAX, LEDGER_OFFSET_MAX, LEDGER_PARAMS,
+  LEDGER_PHASES, edgeWords, fillWords, ledgerCsv, ledgerQuery, parseLedger,
+  pnlWords, resultWords,
 } from "../src/lib/tradingLedger";
+import {
+  LEDGER_PAGE_1, LEDGER_PAGE_2, LEDGER_RECORDED,
+} from "./trading-ledger-recorded";
 
 // THE LEDGER'S READERS, WITHOUT A BROWSER (2026-10-06).
 //
 // src/lib/tradingLedger.ts is the one place the "Trades & grounds"
 // payload is read, its query is checked and its CSV is written. These are
-// its rules, held to account directly (the page's behaviour is
-// e2e/ops-trading-ledger.spec.ts):
+// its rules, held to account directly against payloads RECORDED from the
+// backend's own route (e2e/trading-ledger-recorded.ts) — the page's
+// behaviour is e2e/ops-trading-ledger.spec.ts and
+// e2e/ops-trading-ledger-contract.spec.ts:
 //
 //   - the proxy's query is REBUILT from the named filters only, in a fixed
-//     order; a bad value is refused naming its parameter;
-//   - units: a stated `units` block wins; a price is read by magnitude
-//     (below 1 is dollars); an edge, fee and threshold take the unit of
-//     the block's own prices; money is dollars;
-//   - missing stays null — never 0 — and a row with no ticker is counted
-//     as unreadable, not dropped silently;
-//   - the composed why reads like the brief's example, from recorded
-//     values only;
+//     order, each held to the backend's own rule (limit 1..200, offset
+//     0..5000, its phase keys, its competition pattern); a bad value is
+//     refused naming its parameter;
+//   - every recorded row reads, with its nested market, money, edge,
+//     lifecycle and outcome; nothing is converted (cents stay cents);
+//   - missing stays null — never 0 — and a thing that is not a ledger row
+//     is counted, not dropped silently;
+//   - the next page is the next OFFSET while page.has_more;
 //   - the CSV writes null as an EMPTY cell, quotes what needs quoting, and
 //     defuses a text cell a spreadsheet would run as a formula.
 //
 // EXPERIMENTAL, UNPROVEN.
 
-const now = Date.now();
-const iso = (minutes: number) => new Date(now + minutes * 60_000).toISOString();
-
-const BRIEF_ROW = {
-  placed_at: iso(-60), competition: "epl",
-  fixture: { home: "Arsenal", away: "West Ham", kickoff_utc: iso(60) },
-  ticker: "KXEPLGAME-SYNTH01ARSWHU-ARS", family: "GAME", outcome_key: "ARS",
-  contract: "Arsenal to win", side: "yes", price: 44, count: 4, cost: 1.79,
-  phase: "pre_match", strategy_version: "consensus-v2",
-  grounds: { fair: 0.472, consensus: { prob: 0.46, age_s: 10800, books: 3 },
-    model: { prob: 0.49, source: "served", run_age_s: 2400 }, w: 0.25,
-    threshold: 2, maker_price: 44, fee: 0.4, edge: 2.8,
-    guards: { news: "clear" }, risk: { passed: ["per_order_cap"] },
-    inplay: null },
-  why: null, fills: { count: 4, avg_price: 44, fees: 0.03, last_at: iso(-50) },
-  status: "filled", cancel_reason: null, result: "yes", pnl: 2.21,
-};
+type Obj = Record<string, unknown>;
+const RAW = LEDGER_RECORDED as unknown as Obj;
+const L = parseLedger(RAW);
+const row = (oid: string) => L.rows.find((r) => r.order_id === oid)!;
 
 test.describe("the ledger's query", () => {
   test("is rebuilt from the named filters only, in a fixed order", () => {
-    const q = ledgerQuery({ limit: "50", cursor: "c2.page-2",
-      phase: "pre_match", competition: "epl",
-      since: "2026-01-02T00:00:00Z", until: "2026-01-03" });
+    const q = ledgerQuery({ limit: "50", offset: "100", phase: "handover",
+      competition: "ligue_1", since: "2026-01-02T00:00:00Z", until: "2026-01-03" });
     expect(q).toEqual({ ok: true, search: "since=2026-01-02T00%3A00%3A00Z"
-      + "&until=2026-01-03&competition=epl&phase=pre_match&cursor=c2.page-2"
+      + "&until=2026-01-03&competition=ligue_1&phase=handover&offset=100"
       + "&limit=50" });
     expect(LEDGER_PARAMS).toEqual(["since", "until", "competition", "phase",
-      "cursor", "limit"]);
-    // nothing, or empty values, is no filter at all
+      "offset", "limit"]);
     expect(ledgerQuery({})).toEqual({ ok: true, search: "" });
     expect(ledgerQuery({ competition: "", phase: undefined }))
       .toEqual({ ok: true, search: "" });
   });
 
-  test("refuses a bad value, naming its parameter", () => {
+  test("holds each value to the backend's own rule, naming the parameter", () => {
     const cases: [string, unknown][] = [
       ["since", "yesterday"], ["since", "2026-13-45"], ["until", "../x"],
       ["competition", "../mls/risk"], ["competition", "EPL"],
-      ["competition", ["epl", "mls"]], ["phase", "pre match"],
-      ["phase", "_x"], ["cursor", "../../admin"], ["cursor", "a/b"],
-      ["cursor", "x#y"], ["cursor", "x".repeat(257)], ["limit", "0"],
-      ["limit", String(LEDGER_LIMIT_MAX + 1)], ["limit", "1.5"],
-      ["limit", "-3"], ["limit", 5],
+      ["competition", "a".repeat(17)], ["competition", ["epl", "mls"]],
+      ["phase", "handed_over"], ["phase", "pre match"], ["phase", "entry"],
+      ["offset", "-1"], ["offset", String(LEDGER_OFFSET_MAX + 1)], ["offset", "1.5"],
+      ["limit", "0"], ["limit", String(LEDGER_LIMIT_MAX + 1)], ["limit", "1.5"],
+      ["limit", 5],
     ];
     for (const [k, v] of cases) {
       const q = ledgerQuery({ [k]: v });
@@ -77,160 +68,164 @@ test.describe("the ledger's query", () => {
         expect(q.detail).toContain("no backend was contacted");
       }
     }
-    // the bounds themselves are admitted
-    expect(ledgerQuery({ limit: "1" }).ok).toBe(true);
-    expect(ledgerQuery({ limit: String(LEDGER_LIMIT_MAX) }).ok).toBe(true);
-    expect(ledgerQuery({ cursor: "2026-10-06T12:00:00+00:00|8812" }).ok).toBe(true);
+    // the bounds themselves, and every backend phase, are admitted
+    for (const ok of [{ limit: "1" }, { limit: "200" }, { offset: "0" },
+      { offset: "5000" }, { competition: "a".repeat(16) }, { competition: "a_b-c" },
+      ...LEDGER_PHASES.map((phase) => ({ phase }))]) {
+      expect(ledgerQuery(ok).ok, JSON.stringify(ok)).toBe(true);
+    }
+    expect(LEDGER_PHASES).toEqual(expect.arrayContaining(
+      Object.keys(LEDGER_RECORDED.vocab.phases)));
+    expect(LEDGER_PHASES).toHaveLength(Object.keys(LEDGER_RECORDED.vocab.phases).length);
   });
 });
 
-test.describe("the ledger's payload", () => {
-  test("cents, as the console's other routes send them", () => {
-    const l = parseLedger({ rows: [BRIEF_ROW], next_cursor: "c2" });
-    const r = l.rows[0];
-    expect(r.price).toBe(44);
-    expect(r.grounds!.maker_price).toBe(44);
-    expect(r.grounds!.edge).toBe(2.8);
-    expect(r.grounds!.fee).toBe(0.4);
-    expect(r.grounds!.threshold).toBe(2);
-    expect(r.cost).toBe(1.79);
-    expect(r.fills!.avg_price).toBe(44);
-    expect(r.result).toBe("yes");
-    expect(r.kind).toBe("order");
-    expect(l.next_cursor).toBe("c2");
+test.describe("the recorded payload", () => {
+  test("every row reads, in the order sent, none unreadable", () => {
+    expect(L.version).toBe("trading-ledger-v1");
+    expect(L.unreadable).toBe(0);
+    expect(L.rows.map((r) => r.id)).toEqual(LEDGER_RECORDED.rows.map((r) => r.id));
+    for (const r of L.rows) expect(r.market.ticker, String(r.id)).toBeTruthy();
   });
 
-  test("the journal's decimal dollars read the same", () => {
-    const r = parseLedger({ rows: [{ ...BRIEF_ROW, price: "0.44",
-      grounds: { ...BRIEF_ROW.grounds, maker_price: "0.44", edge: "0.028",
-        fee: "0.004", threshold: "0.02" },
-      fills: { ...BRIEF_ROW.fills, avg_price: "0.44" } }] }).rows[0];
-    expect(r.price).toBe(44);
-    expect(r.grounds!.maker_price).toBe(44);
-    expect(r.grounds!.edge).toBe(2.8);
-    expect(r.grounds!.fee).toBe(0.4);
-    expect(r.grounds!.threshold).toBe(2);
-    expect(r.fills!.avg_price).toBe(44);
+  test("the won order's numbers are the backend's, in its units", () => {
+    const r = row("ord-1");
+    expect(r.row_type).toBe("order");
+    expect(r.market.contract).toBe("Synthetic Home to win");
+    expect(r.market.family).toBe("GAME");
+    expect(r.price_cents).toBe(41);
+    expect(r.yes_book_price_cents).toBe(41);
+    expect(r.cost_dollars).toBe(4.98);
+    expect(r.fee_dollars).toBe(0.06);
+    expect(r.lifecycle.filled_count).toBe(12);
+    expect(r.outcome.status).toBe("won");
+    expect(r.outcome.pnl_dollars).toBe(7.02);
+    expect(r.edge.threshold_cents).toBe(3);
+    expect(resultWords(r)).toBe("YES · won");
+    expect(pnlWords(r)).toBe("+$7.02");
+    expect(edgeWords(r)).toBe("+6.9¢ vs 3¢");
+    expect(fillWords(r)).toBe("filled 12/12 @ 41¢");
   });
 
-  test("with no price on the row, a threshold under half a cent says dollars", () => {
-    const r = parseLedger({ rows: [{ ...BRIEF_ROW, price: null,
-      grounds: { ...BRIEF_ROW.grounds, maker_price: null, edge: "0.03",
-        threshold: "0.02", fee: null } }] }).rows[0];
-    expect(r.grounds!.threshold).toBe(2);
-    expect(r.grounds!.edge).toBe(3);
+  test("unsettled, not filled, a handover, an old row: each says so", () => {
+    const v2 = row("v2-1");
+    expect(v2.outcome.pnl_dollars).toBeNull();
+    expect(pnlWords(v2)).toBe("unsettled");
+    expect(v2.grounds.blend!.arm).toEqual(["0.25", "0.02"]);
+    expect(v2.grounds.consensus!.books).toEqual(["Pinnacle", "Bet365", "Unibet"]);
+
+    const c = row("tie-1");
+    expect(resultWords(c)).toBe("not filled");
+    expect(pnlWords(c)).toBe("$0.00 · not filled");
+    expect(c.lifecycle.cancels.map((x) => x.reason)).toEqual(["edge_gone"]);
+
+    const h = L.rows.find((r) => r.row_type === "handover")!;
+    expect(edgeWords(h)).toBe("not applicable");
+    expect(h.grounds.handover!.mark_cents).toBe(40);
+    expect(pnlWords(h)).toBe("+$3.71");
+
+    const old = row("old-2");
+    expect(old.grounds.fair!.side).toBeNull();
+    expect(old.edge.cents).toBeNull();
+    expect(edgeWords(old)).toBe("not recorded");
+    expect(old.not_recorded).toContain("grounds.fair");
   });
 
-  test("a stated units block wins over magnitude", () => {
-    const r = parseLedger({ units: { prices: "cents", edges: "cents",
-      money: "cents" }, rows: [{ ...BRIEF_ROW, cost: 179, pnl: -80,
-      grounds: { ...BRIEF_ROW.grounds, edge: 0.5, threshold: 0.4 } }] }).rows[0];
-    expect(r.grounds!.edge).toBe(0.5);
-    expect(r.grounds!.threshold).toBe(0.4);
-    expect(r.cost).toBe(1.79);
-    expect(r.pnl).toBe(-0.8);
+  test("the summary reads its money and the backend's day flag", () => {
+    const s = L.summary!;
+    expect(s.totals!.settled_pnl_dollars).toBe(LEDGER_RECORDED.summary.totals.settled_pnl_dollars);
+    expect(s.totals!.open_cost_dollars).toBe(LEDGER_RECORDED.summary.totals.open_cost_dollars);
+    expect(s.daily_loss_limit_dollars).toBe(10);
+    expect(s.complete).toBe(true);
+    expect(s.by_day!.map((d) => d.key)).toEqual(LEDGER_RECORDED.summary.by_day.map((d) => d.key));
+    expect(s.by_day!.filter((d) => d.over_daily_limit).map((d) => d.settled_pnl_dollars))
+      .toEqual([-11.1]);
+    expect(s.by_phase!.map((b) => b.key)).toContain("handover");
   });
 
-  test("missing stays null, never 0; a row with no ticker is counted", () => {
+  test("a row whose P&L is unknown makes the totals incomplete", () => {
+    const sum = { ...LEDGER_RECORDED.summary,
+      totals: { ...LEDGER_RECORDED.summary.totals, unknown: 1 } };
+    expect(parseLedger({ ...RAW, summary: sum }).summary!.complete).toBe(false);
+    const said = { ...LEDGER_RECORDED.summary,
+      totals: { ...LEDGER_RECORDED.summary.totals, complete: false } };
+    expect(parseLedger({ ...RAW, summary: said }).summary!.complete).toBe(false);
+  });
+
+  test("the next page is the next offset, while the backend has more", () => {
+    expect(L.next_offset).toBeNull();
+    expect(parseLedger(LEDGER_PAGE_1 as unknown as Obj).next_offset).toBe(3);
+    expect(parseLedger(LEDGER_PAGE_2 as unknown as Obj).next_offset).toBe(6);
+  });
+
+  test("missing stays null, never 0; what is not a ledger row is counted", () => {
     const l = parseLedger({ rows: [
-      { ticker: "KXOLD-1", placed_at: iso(-999) },
-      { placed_at: iso(-1) }, "nonsense", null,
+      { id: 1, row_type: "order" }, { row_type: "order" },
+      { id: 2, row_type: "something_else" }, "nonsense", null,
     ] });
-    expect(l.unreadable).toBe(3);
+    expect(l.unreadable).toBe(4);
     const r = l.rows[0];
-    for (const k of ["price", "count", "cost", "pnl", "grounds", "fills",
-      "why", "phase", "result", "contract", "strategy_version"] as const) {
-      expect(r[k], k).toBeNull();
+    for (const v of [r.price_cents, r.count, r.cost_dollars, r.outcome.pnl_dollars,
+      r.edge.cents, r.lifecycle.filled_count, r.why, r.phase, r.market.ticker]) {
+      expect(v).toBeNull();
     }
+    expect(edgeWords(r)).toBe("not recorded");
+    expect(pnlWords(r)).toBe("not recorded");
     expect(l.summary).toBeNull();
-    expect(l.next_cursor).toBeNull();
-  });
-
-  test("a handed-over contract is its own kind, however the backend says it", () => {
-    for (const extra of [{ kind: "handover" }, { row_type: "handed_over" },
-      { phase: "handed_over" }, { status: "handed_over" }]) {
-      const r = parseLedger({ rows: [{ ...BRIEF_ROW, ...extra }] }).rows[0];
-      expect(r.kind, JSON.stringify(extra)).toBe("handover");
-    }
-  });
-
-  test("rows come out newest first, and two identical rows stay two", () => {
-    const l = parseLedger({ rows: [
-      { ...BRIEF_ROW, placed_at: iso(-300), ticker: "B" },
-      { ...BRIEF_ROW, placed_at: iso(-10), ticker: "A" },
-      { ...BRIEF_ROW, placed_at: iso(-300), ticker: "B" },
-      { ...BRIEF_ROW, placed_at: null, ticker: "Z" },
-    ] });
-    expect(l.rows.map((r) => r.ticker)).toEqual(["A", "B", "B", "Z"]);
-    expect(new Set(l.rows.map((r) => r.key)).size).toBe(4);
-  });
-
-  test("the summary reads breakdowns as objects or lists, and the limit as a "
-    + "number or a block", () => {
-      const s = parseLedger({ rows: [], summary: {
-        by_day: [{ day: "2026-01-01", pnl: 1 }, { day: "2026-01-03", pnl: -2 }],
-        by_competition: { epl: { placed: 2, pnl: "1.5" } },
-        by_family: [{ family: "GAME", orders: 3, pnl: null }],
-        daily_limit: { dollars: "10.00" },
-      } }).summary!;
-      expect(s.by_day!.map((d) => d.day)).toEqual(["2026-01-03", "2026-01-01"]);
-      expect(s.by_competition).toEqual([{ key: "epl", placed: 2, filled: null,
-        wins: null, losses: null, unsettled: null, cost: null, pnl: 1.5 }]);
-      expect(s.by_family![0].key).toBe("GAME");
-      expect(s.by_family![0].placed).toBe(3);
-      expect(s.by_family![0].pnl).toBeNull();
-      expect(s.daily_limit).toBe(10);
-      expect(s.by_phase).toBeNull();
-      expect(s.totals).toBeNull();
-    });
-});
-
-test.describe("the composed why", () => {
-  test("reads like the brief's example, from the recorded values", () => {
-    const r = parseLedger({ rows: [BRIEF_ROW] }).rows[0];
-    expect(composeWhy(r)).toBe("Fair 47.2% (books 46.0% 3h old, model 49.0% "
-      + "w=0.25) vs our YES bid 44¢ + 0.4¢ fee = edge 2.8¢ ≥ threshold 2¢");
-  });
-
-  test("says below the bar when it was, and leaves out what was not recorded", () => {
-    const r = parseLedger({ rows: [{ ...BRIEF_ROW, side: "no",
-      grounds: { fair: 0.4, w: null, threshold: 3, maker_price: 31,
-        fee: null, edge: 1.2 } }] }).rows[0];
-    expect(composeWhy(r)).toBe("Fair 40.0% vs our NO bid 31¢ = edge 1.2¢ < "
-      + "threshold 3¢");
-  });
-
-  test("is null when nothing was recorded", () => {
-    const r = parseLedger({ rows: [{ ticker: "KXOLD-1" }] }).rows[0];
-    expect(composeWhy(r)).toBeNull();
-    const bare = parseLedger({ rows: [{ ticker: "KXOLD-2", grounds: {} }] }).rows[0];
-    expect(composeWhy(bare)).toBeNull();
+    expect(l.next_offset).toBeNull();
   });
 });
 
 test.describe("the CSV", () => {
   test("a null is an empty cell; quoting and formula cells are handled", () => {
-    const rows = parseLedger({ rows: [
-      { ...BRIEF_ROW, contract: "=HYPERLINK(\"x\")",
-        why: "fair, \"books\"\nand model", pnl: -0.8 },
-      { ticker: "KXOLD-1", placed_at: iso(-500), result: "no" },
+    const first = LEDGER_RECORDED.rows[0];
+    const rows = parseLedger({ ...RAW, rows: [
+      { ...first, market: { ...first.market, contract: "=HYPERLINK(\"x\")" },
+        why: "fair, \"books\"\nand model" },
+      ...LEDGER_RECORDED.rows.slice(1),
     ] }).rows;
     const csv = ledgerCsv(rows);
     const lines = csv.split("\r\n");
     expect(lines[0]).toBe(LEDGER_CSV_COLUMNS.join(","));
-    const col = (name: string) => LEDGER_CSV_COLUMNS.indexOf(name as never);
-    // the first row: a formula-looking text cell is defused, a field with a
-    // comma, quote or newline is quoted, a negative NUMBER stays a number
     expect(csv).toContain("\"'=HYPERLINK(\"\"x\"\")\"");
     expect(csv).toContain("\"fair, \"\"books\"\"\nand model\"");
-    expect(csv).toContain(",-0.8");
+    const col = (name: string) => LEDGER_CSV_COLUMNS.indexOf(name as never);
+    const table = parseCsv(csv);
+    expect(table).toHaveLength(LEDGER_RECORDED.rows.length + 1);
+    const cells = (oid: string) => {
+      const id = String(LEDGER_RECORDED.rows.find((r) => r.order_id === oid)!.id);
+      return table.find((r) => r[0] === id)!;
+    };
     // the old row: every value it did not record is EMPTY — not 0
-    const old = csv.split("\r\n").find((l) => l.includes("KXOLD-1"))!.split(",");
-    for (const c of ["price_yes_cents", "count", "cost_dollars", "fair",
-      "edge_cents", "fills_count", "pnl_dollars", "why", "why_source"]) {
+    const old = cells("old-2");
+    for (const c of ["fair_side", "edge_cents", "threshold_cents", "consensus_age_s",
+      "news_guard", "risk_checks", "cancel_reasons"]) {
       expect(old[col(c)], c).toBe("");
     }
-    expect(old[col("result")]).toBe("no");
-    expect(old[col("kind")]).toBe("order");
+    // the unsettled order: its P&L is EMPTY, not 0
+    expect(cells("v2-1")[col("pnl_dollars")]).toBe("");
+    expect(cells("v2-1")[col("outcome")]).toBe("unsettled");
+    expect(cells("mls-1")[col("pnl_dollars")]).toBe("-11.1");
   });
 });
+
+/** A small RFC 4180 reader: quoted fields, doubled quotes, newlines. */
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let out: string[] = [], field = "", q = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i];
+    if (q) {
+      if (c === '"' && text[i + 1] === '"') { field += '"'; i += 1; }
+      else if (c === '"') q = false;
+      else field += c;
+    } else if (c === '"') q = true;
+    else if (c === ",") { out.push(field); field = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i += 1;
+      out.push(field); rows.push(out); out = []; field = "";
+    } else field += c;
+  }
+  if (field !== "" || out.length) { out.push(field); rows.push(out); }
+  return rows;
+}

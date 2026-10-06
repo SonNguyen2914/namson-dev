@@ -2,33 +2,37 @@
 //
 // Son, 2026-10-06: "I need you to work with me on the trader strategy,
 // tell me about all of its trade and its ground". So this section lists
-// every order the trader placed and every contract he handed over to it —
-// newest first — with the grounds it recorded when it placed (fair price
-// and its parts, the blend weight and the learner's bar, the maker price,
-// the fee, the edge after fee, the guards and the risk checks, the in-play
-// reads), what became of the order (fills, cancels, still resting), and,
-// once its market settled in the trader's journal, the result and that
-// order's own P&L. Above the table: the summary — P&L by UTC day against
-// the daily loss limit, and by competition, market type, phase, price
-// bucket and edge bucket.
+// every order the trader placed and every row of contracts he handed over
+// to it (handover, takeback, managed clip) — newest first, as the backend
+// sends them — with the grounds it recorded when it placed (fair price and
+// its parts, the blend weight and the learner's arm and bar, the maker
+// price, the fee, the edge after fee against the bar, the guards and the
+// risk checks, the in-play reads), what became of the order (fills,
+// cancels, resting, expired), and, once its market settled in the
+// trader's journal, the result and that row's own P&L. Above the table:
+// the summary — totals, P&L by UTC day against the daily loss line the
+// backend states, and by competition, market type, phase, price bucket and
+// edge bucket.
 //
 // THE SEAL (Son's decision, 2026-10-06, "Everything, for my bets only"):
 // results and P&L are shown for the trader's OWN orders and handed-over
 // contracts only — the backend serves nothing else on this route — and
 // this page is the operator's, token-gated, never linked for a visitor.
+// The CSV is the operator's own download, never research data.
 //
 // WHAT IT READS: GET /api/ops/trading-ledger (the relay of the backend's
-// operator-gated GET /api/admin/trading/ledger), every 60 s while a
-// token is held, through lib/usePoll, with the filters as named query
-// parameters; "Load older" follows the backend's `next_cursor`.
-// lib/tradingLedger.ts reads the payload and is the one place to align if
-// the backend's contract moves.
+// operator-gated GET /api/admin/trading/ledger, trading-ledger-v1), every
+// 60 s while a token is held, through lib/usePoll, with the filters as
+// named query parameters; "Load older" asks for the next OFFSET while the
+// backend says `page.has_more`. lib/tradingLedger.ts reads the payload and
+// is the one place to align if the backend's contract moves; the recorded
+// contract test is e2e/ops-trading-ledger-contract.spec.ts.
 //
 // MISSING IS NOT ZERO, A FAILED READ IS NOT AN EMPTY ONE. A value a row
-// did not record reads "not recorded" (a P&L with no journaled result
-// reads "unsettled"); the CSV writes it as an empty cell. A missing route
-// reads "not available yet"; a refusal, an error, an answer that is not
-// JSON, not an object, or carries no rows list is named.
+// did not record reads "not recorded"; a P&L whose market has no journaled
+// result reads "unsettled"; the CSV writes a missing value as an empty
+// cell. A missing route reads "not available yet"; a refusal, an error, an
+// answer that is not JSON, not an object, or carries no rows list is named.
 //
 // EXPERIMENTAL, UNPROVEN. "Edge" is the trader's own estimate at the time
 // it placed — not a measured edge, not advice. This section reads; it
@@ -37,12 +41,13 @@ import {
   useCallback, useEffect, useMemo, useRef, useState, type ReactNode,
 } from "react";
 import {
-  type DayRow, DEFAULT_PHASES, type Group, type Ledger, type LedgerRow,
-  NOT_RECORDED, type Summary, age, bucketStart, cents, clears, compLabel,
-  composeWhy, dollars, edgeWords, familyWords, fillWords, flat, lines,
-  newestFirst, outcomeOf, parseLedger, pct, phaseWords, pnlWords,
-  priceBucketWords, resultWords, signedCents, signedDollars, sourceWords,
-  statusWords, ledgerCsv,
+  type Bucket, type DayBucket, LEDGER_PHASES, type Ledger, type LedgerRow,
+  NOT_RECORDED, ROW_TYPE_WORDS, type Summary, blendWords, cents, compLabel,
+  consensusWords, dollars, edgeBucketWords, edgeGroundWords, edgeNote, edgeWords,
+  fairWords, familyWords, feeWords, fillWords, guardLines, handoverWords,
+  inPlayLines, ledgerCsv, lifecycleLines, makerWords, modelWords, outcomeLines,
+  parseLedger, phaseWords, pnlWords, priceBucketWords, resultWords, riskLines,
+  signedDollars,
 } from "../lib/tradingLedger";
 import { FOCUS_COMPETITIONS } from "../lib/tradingConsole";
 import { usePoll, type PollOutcome } from "../lib/usePoll";
@@ -65,20 +70,16 @@ type Read =
 interface Filters { competition: string; phase: string; since: string; until: string }
 const NO_FILTERS: Filters = { competition: "", phase: "", since: "", until: "" };
 
-/** the next UTC day's midnight: an `until` day is read to its end */
-function endOfDay(d: string): string {
-  const t = Date.parse(`${d}T00:00:00Z`);
-  return `${new Date(t + 86_400_000).toISOString().slice(0, 10)}T00:00:00Z`;
-}
-
-/** the query the page asks with — the named filters only */
-function queryOf(f: Filters, cursor?: string): string {
+/** the query the page asks with — the named filters only. A day is sent
+ *  as the bare date: the backend reads `since` from that day's start and
+ *  `until` to that day's END. */
+function queryOf(f: Filters, offset?: number): string {
   const q = new URLSearchParams();
-  if (f.since && Number.isFinite(Date.parse(f.since))) q.set("since", `${f.since}T00:00:00Z`);
-  if (f.until && Number.isFinite(Date.parse(f.until))) q.set("until", endOfDay(f.until));
+  if (f.since && /^\d{4}-\d{2}-\d{2}$/.test(f.since)) q.set("since", f.since);
+  if (f.until && /^\d{4}-\d{2}-\d{2}$/.test(f.until)) q.set("until", f.until);
   if (f.competition) q.set("competition", f.competition);
   if (f.phase) q.set("phase", f.phase);
-  if (cursor) q.set("cursor", cursor);
+  if (offset) q.set("offset", String(offset));
   const s = q.toString();
   return s ? `?${s}` : "";
 }
@@ -102,25 +103,12 @@ function ago(ms: number): string {
 const count = (n: number | null) => (n === null ? NOT_RECORDED : n.toLocaleString("en-US"));
 const plTone = (n: number | null) => (n === null || n === 0 ? "text-ink-mid"
   : n > 0 ? "text-up" : "text-neg");
-/** wins–losses–unsettled; a count not sent is "?" (never 0) */
-function wlu(w: number | null, l: number | null, u: number | null): string {
-  if (w === null && l === null && u === null) return NOT_RECORDED;
+/** won–lost–unsettled; a count not sent is "?" (never 0) */
+function wlu(b: Bucket): string {
+  if (b.won === null && b.lost === null && b.unsettled === null) return NOT_RECORDED;
   const c = (n: number | null) => (n === null ? "?" : String(n));
-  return `${c(w)}–${c(l)}–${c(u)}`;
+  return `${c(b.won)}–${c(b.lost)}–${c(b.unsettled)}`;
 }
-
-/** WHY AN ORDER WAS WITHDRAWN, in short words, when the code is known.
- *  The code itself is always printed beside them. */
-const CANCEL_WORDS: Record<string, string> = {
-  kickoff_window: "the pre-match window closed",
-  outside_window: "outside the trading window",
-  repriced: "re-priced",
-  edge_gone: "the edge was gone",
-  stale_book: "the book went stale",
-  shock: "a shock (goal, card)",
-  kill_switch: "the kill switch",
-  expired: "the venue's expiry",
-};
 
 const TH = "border-b border-line pb-1 pr-3 font-normal uppercase tracking-[0.12em] text-[10px] text-ink-faint whitespace-nowrap";
 const TD = "py-1.5 pr-3 align-top";
@@ -141,8 +129,8 @@ function Tile({ id, k, v, tone = "text-ink-hi" }: {
   );
 }
 
-/** ONE DAY'S P&L AS A BAR, zero in the middle, the daily loss limit as a
- *  dashed line on the loss side — at the same place on every day. */
+/** ONE DAY'S SETTLED P&L AS A BAR, zero in the middle, the daily loss
+ *  limit as a dashed line on the loss side — at the same place every day. */
 function DayBar({ pnl, limit, scale }: {
   pnl: number | null; limit: number | null; scale: number;
 }) {
@@ -166,18 +154,19 @@ function DayBar({ pnl, limit, scale }: {
 }
 
 function Days({ days, limit, limitFrom }: {
-  days: DayRow[] | null; limit: number | null;
+  days: DayBucket[] | null; limit: number | null;
   limitFrom: "summary" | "status" | null;
 }) {
-  const scale = Math.max(limit ?? 0, ...(days ?? []).map((d) => Math.abs(d.pnl ?? 0)), 0.01);
+  const scale = Math.max(limit ?? 0,
+    ...(days ?? []).map((d) => Math.abs(d.settled_pnl_dollars ?? 0)), 0.01);
   return (
     <>
-      <h3 className={SUB}>P&amp;L by UTC day</h3>
+      <h3 className={SUB}>settled P&amp;L by UTC day</h3>
       <p data-testid="ledger-day-limit" className="mb-1.5 font-mono text-[11px] text-ink-faint">
         {limit === null ? "daily loss limit not stated, so no line is drawn"
           : `daily loss limit ${dollars(limit)}${limitFrom === "status"
             ? " (from the status route)" : ""} — the dashed line`}
-        {" "}· as the backend summed it
+        {" "}· the day an order was placed · as the backend summed it
       </p>
       {days === null ? (
         <p className="font-mono text-[11px] text-ink-faint">by-day totals not sent</p>
@@ -185,29 +174,36 @@ function Days({ days, limit, limitFrom }: {
         <p className="font-mono text-[11px] text-ink-faint">no day in this window</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[420px] border-collapse font-mono text-[11px] tabular-nums">
+          <table className="w-full min-w-[460px] border-collapse font-mono text-[11px] tabular-nums">
             <thead>
               <tr>
-                {["UTC day", "placed", "W–L–U", "P&L", ""].map((h, i) => (
+                {["UTC day", "rows", "W–L–U", "settled P&L", "open", ""].map((h, i) => (
                   <th key={h || i} scope="col"
-                    className={`${TH} ${i === 0 || i === 4 ? "text-left" : "text-right"}`}>{h}</th>
+                    className={`${TH} ${i === 0 || i === 5 ? "text-left" : "text-right"}`}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {days.map((d) => {
-                const hit = d.pnl !== null && limit !== null && d.pnl <= -limit;
+                // THE BACKEND'S FLAG; with none, the line it states
+                const hit = d.over_daily_limit ?? (d.settled_pnl_dollars !== null
+                  && limit !== null && d.settled_pnl_dollars <= -limit);
                 return (
-                  <tr key={d.day} data-testid="ledger-day" data-day={d.day}
+                  <tr key={d.key} data-testid="ledger-day" data-day={d.key}
                     data-limit-hit={hit || undefined} className="border-b border-line/50">
-                    <td className="whitespace-nowrap py-1 pr-3 text-ink-mid">{d.day}</td>
-                    <td className="py-1 pr-3 text-right text-ink-hi">{count(d.placed)}</td>
-                    <td className="py-1 pr-3 text-right text-ink-mid">{wlu(d.wins, d.losses, d.unsettled)}</td>
-                    <td className={`whitespace-nowrap py-1 pr-3 text-right ${plTone(d.pnl)}`}>
-                      {signedDollars(d.pnl)}
+                    <td className="whitespace-nowrap py-1 pr-3 text-ink-mid">{d.key}</td>
+                    <td className="py-1 pr-3 text-right text-ink-hi">{count(d.rows)}</td>
+                    <td className="py-1 pr-3 text-right text-ink-mid">{wlu(d)}</td>
+                    <td className={`whitespace-nowrap py-1 pr-3 text-right ${plTone(d.settled_pnl_dollars)}`}>
+                      {signedDollars(d.settled_pnl_dollars)}
                       {hit && <span className="ml-1 text-[10px] text-warn">limit reached</span>}
                     </td>
-                    <td className="w-1/2 py-1"><DayBar pnl={d.pnl} limit={limit} scale={scale} /></td>
+                    <td className="whitespace-nowrap py-1 pr-3 text-right text-ink-low">
+                      {dollars(d.open_cost_dollars)}
+                    </td>
+                    <td className="w-1/2 py-1">
+                      <DayBar pnl={d.settled_pnl_dollars} limit={limit} scale={scale} />
+                    </td>
                   </tr>
                 );
               })}
@@ -222,8 +218,8 @@ function Days({ days, limit, limitFrom }: {
 const COMP_ORDER = new Map(FOCUS_COMPETITIONS.map((c, i) => [c, i]));
 
 function GroupTable({ id, title, groups, label, order }: {
-  id: string; title: string; groups: Group[] | null;
-  label: (k: string) => string; order?: (a: Group, b: Group) => number;
+  id: string; title: string; groups: Bucket[] | null;
+  label: (k: string) => string; order?: (a: Bucket, b: Bucket) => number;
 }) {
   const rows = groups ? (order ? [...groups].sort(order) : groups) : null;
   return (
@@ -236,10 +232,10 @@ function GroupTable({ id, title, groups, label, order }: {
       ) : (
         <div className="overflow-x-auto">
           <table data-testid={`ledger-by-${id}`}
-            className="w-full min-w-[360px] border-collapse font-mono text-[11px] tabular-nums">
+            className="w-full min-w-[400px] border-collapse font-mono text-[11px] tabular-nums">
             <thead>
               <tr>
-                {["", "placed", "W–L–U", "cost", "P&L"].map((h, i) => (
+                {["", "rows", "W–L–U", "cost", "settled P&L", "open"].map((h, i) => (
                   <th key={h || i} scope="col"
                     className={`${TH} ${i === 0 ? "text-left" : "text-right"}`}>{h}</th>
                 ))}
@@ -250,12 +246,13 @@ function GroupTable({ id, title, groups, label, order }: {
                 <tr key={g.key} data-testid="ledger-group-row" data-key={g.key}
                   className="border-b border-line/50">
                   <td className="min-w-[88px] py-1 pr-3 font-sans text-[12px] text-ink-mid">{label(g.key)}</td>
-                  <td className="py-1 pr-3 text-right text-ink-hi">{count(g.placed)}</td>
-                  <td className="whitespace-nowrap py-1 pr-3 text-right text-ink-mid">
-                    {wlu(g.wins, g.losses, g.unsettled)}
+                  <td className="py-1 pr-3 text-right text-ink-hi">{count(g.rows)}</td>
+                  <td className="whitespace-nowrap py-1 pr-3 text-right text-ink-mid">{wlu(g)}</td>
+                  <td className="whitespace-nowrap py-1 pr-3 text-right text-ink-mid">{dollars(g.cost_dollars)}</td>
+                  <td className={`whitespace-nowrap py-1 pr-3 text-right ${plTone(g.settled_pnl_dollars)}`}>
+                    {signedDollars(g.settled_pnl_dollars)}
                   </td>
-                  <td className="whitespace-nowrap py-1 pr-3 text-right text-ink-mid">{dollars(g.cost)}</td>
-                  <td className={`whitespace-nowrap py-1 text-right ${plTone(g.pnl)}`}>{signedDollars(g.pnl)}</td>
+                  <td className="whitespace-nowrap py-1 text-right text-ink-low">{dollars(g.open_cost_dollars)}</td>
                 </tr>
               ))}
             </tbody>
@@ -266,11 +263,6 @@ function GroupTable({ id, title, groups, label, order }: {
   );
 }
 
-const byStart = (a: Group, b: Group) => {
-  const x = bucketStart(a.key), y = bucketStart(b.key);
-  return Number.isNaN(x) || Number.isNaN(y) ? 0 : x - y;
-};
-
 function SummaryBlock({ s, statusLimit }: { s: Summary | null; statusLimit: number | null }) {
   if (!s) {
     return (
@@ -280,39 +272,52 @@ function SummaryBlock({ s, statusLimit }: { s: Summary | null; statusLimit: numb
     );
   }
   const t = s.totals;
-  const limit = s.daily_limit ?? statusLimit;
-  const limitFrom = s.daily_limit !== null ? "summary"
+  const limit = s.daily_loss_limit_dollars ?? statusLimit;
+  const limitFrom = s.daily_loss_limit_dollars !== null ? "summary"
     : statusLimit !== null ? "status" : null;
   return (
     <div data-testid="ledger-summary">
       {t ? (
-        <div data-testid="ledger-totals" className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-5">
-          <Tile id="placed" k="orders placed" v={count(t.placed)} />
-          <Tile id="handed_over" k="handed over" v={count(t.handed_over)} />
+        <div data-testid="ledger-totals" className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+          <Tile id="rows" k="rows" v={count(t.rows)} />
+          <Tile id="orders" k="orders placed" v={count(t.orders)} />
           <Tile id="filled" k="filled" v={count(t.filled)} />
-          <Tile id="wins" k="won" v={count(t.wins)} />
-          <Tile id="losses" k="lost" v={count(t.losses)} />
+          <Tile id="won" k="won" v={count(t.won)} />
+          <Tile id="lost" k="lost" v={count(t.lost)} />
           <Tile id="unsettled" k="unsettled" v={count(t.unsettled)} />
-          <Tile id="cost" k="cost (fees in)" v={dollars(t.cost)} />
-          <Tile id="fees" k="fees" v={dollars(t.fees)} />
-          <Tile id="pnl" k="P&L, settled" v={signedDollars(t.pnl)} tone={plTone(t.pnl)} />
+          <Tile id="not_filled" k="not filled" v={count(t.not_filled)} />
+          <Tile id="cost" k="filled cost (fees in)" v={dollars(t.cost_dollars)} />
+          <Tile id="fees" k="fees" v={dollars(t.fees_dollars)} />
+          <Tile id="pnl" k="settled P&L" v={signedDollars(t.settled_pnl_dollars)}
+            tone={plTone(t.settled_pnl_dollars)} />
+          <Tile id="open" k="open (unsettled cost)" v={dollars(t.open_cost_dollars)} />
+          {t.unknown !== null && t.unknown > 0 && (
+            <Tile id="unknown" k="P&L unknown" v={count(t.unknown)} tone="text-warn" />
+          )}
         </div>
       ) : (
         <p className="font-mono text-[11px] text-ink-faint">totals not sent</p>
       )}
+      {!s.complete && (
+        <p data-testid="ledger-incomplete" role="note" className="mt-1.5 font-mono text-[11px] text-warn">
+          {`incomplete: ${t?.unknown ?? "some"} row${t?.unknown === 1 ? "" : "s"} had a fill `
+            + "that could not be read, so their cost and P&L are not in these sums"}
+        </p>
+      )}
       <Days days={s.by_day} limit={limit} limitFrom={limitFrom} />
       <div className="grid gap-x-6 sm:grid-cols-2">
         <GroupTable id="competition" title="by competition" groups={s.by_competition}
-          label={compLabel}
+          label={(k) => (k === "unknown" ? "competition not stated" : compLabel(k))}
           order={(a, b) => (COMP_ORDER.get(a.key) ?? 99) - (COMP_ORDER.get(b.key) ?? 99)
             || a.key.localeCompare(b.key)} />
         <GroupTable id="family" title="by market type" groups={s.by_family}
-          label={(k) => (familyWords(k) === k ? k : `${familyWords(k)} (${k})`)} />
+          label={(k) => (k === "unknown" ? "type not stated"
+            : familyWords(k) === k ? k : `${familyWords(k)} (${k})`)} />
         <GroupTable id="phase" title="by phase" groups={s.by_phase} label={phaseWords} />
-        <GroupTable id="price" title="by price (YES book)" groups={s.by_price_bucket}
-          label={priceBucketWords} order={byStart} />
+        <GroupTable id="price" title="by price (the side bought)" groups={s.by_price_bucket}
+          label={priceBucketWords} />
         <GroupTable id="edge" title="by edge at placement (its own estimate)"
-          groups={s.by_edge_bucket} label={(k) => k} order={byStart} />
+          groups={s.by_edge_bucket} label={edgeBucketWords} />
       </div>
     </div>
   );
@@ -329,115 +334,58 @@ function G({ field, k, children }: { field: string; k: string; children: ReactNo
   );
 }
 
-function Lines({ v }: { v: unknown }) {
-  const ls = lines(v);
-  if (!ls) return <>{NOT_RECORDED}</>;
+function Lines({ ls }: { ls: string[] }) {
   return <>{ls.map((l, i) => <span key={i} className="block">{l}</span>)}</>;
-}
-
-/** the in-play keys drawn by name; any other is drawn as sent */
-const INPLAY_NAMED = new Set(["minute", "p_engine", "engine_prob", "engine",
-  "anchor_w", "anchor_weight", "anchor", "anchor_source", "signals",
-  "live_signals", "hot", "danger"]);
-
-function InPlayGround({ r }: { r: LedgerRow }) {
-  const g = r.grounds;
-  if (!g) return <>{NOT_RECORDED}</>;
-  const ip = g.inplay;
-  if (!ip) {
-    return <>{r.phase === "pre_match" ? "pre-match order — no in-play reads"
-      : "no in-play reads recorded"}</>;
-  }
-  const out: string[] = [];
-  out.push(`minute ${ip.minute === null ? NOT_RECORDED : `${ip.minute}′`}`);
-  out.push(`engine ${pct(ip.p_engine)}`);
-  out.push(ip.anchor_w === null && ip.anchor_source === null ? "anchor not recorded"
-    : `anchor ${ip.anchor_w === null ? "w not recorded" : `w ${ip.anchor_w.toFixed(2)}`} · ${sourceWords(ip.anchor_source)}`);
-  if (ip.signals !== null && ip.signals !== undefined) {
-    out.push(`signals ${isObj(ip.signals)
-      ? Object.entries(ip.signals).map(([k, v]) => `${k}: ${flat(v)}`).join(" · ")
-      : flat(ip.signals)}`);
-  } else {
-    out.push("signals not recorded");
-  }
-  out.push(`HOT ${ip.hot === null ? NOT_RECORDED : ip.hot ? "yes" : "no"}`);
-  out.push(`danger ${pct(ip.danger)}`);
-  for (const [k, v] of Object.entries(ip.raw)) {
-    if (!INPLAY_NAMED.has(k)) out.push(`${k}: ${flat(v)}`);
-  }
-  return <>{out.map((l) => <span key={l} className="block">{l}</span>)}</>;
-}
-
-function booksWords(c: NonNullable<LedgerRow["grounds"]>["consensus"]): string {
-  if (!c) return NOT_RECORDED;
-  const n = c.books_n;
-  const books = c.books ? `${c.books.length} books (${c.books.join(", ")})`
-    : n !== null ? `${n} book${n === 1 ? "" : "s"}` : "books not recorded";
-  return `${pct(c.prob)} · ${c.age_s === null ? "age not recorded" : `${age(c.age_s)} old`} · ${books}`;
 }
 
 function Grounds({ r }: { r: LedgerRow }) {
   const g = r.grounds;
-  const why = r.why ?? composeWhy(r);
+  const order = r.row_type === "order";
   return (
     <div className="space-y-3">
       <p className="font-sans text-[12px] leading-snug text-ink-mid">
         <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">why · </span>
-        {why ?? NOT_RECORDED}
-        {r.why === null && why !== null && (
-          <span className="text-ink-faint"> (composed here from the recorded grounds)</span>
-        )}
+        {r.why ?? NOT_RECORDED}
       </p>
-      {!g && (
+      {order && g.status !== "recorded" && (
         <p className="font-mono text-[11px] text-warn">
-          no grounds were recorded on this row — every ground below is named as such
+          grounds {g.status === "truncated" ? "truncated — the inputs were too large to keep"
+            : "not recorded on this row"} — every ground below is named as such
         </p>
       )}
       <dl className="grid grid-cols-1 gap-x-5 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
-        <G field="fair" k="fair probability (its own)">{pct(g?.fair ?? null)}</G>
-        <G field="consensus" k="bookmaker consensus">{booksWords(g?.consensus ?? null)}</G>
-        <G field="model" k="our model (unvalidated)">
-          {g?.model ? `${pct(g.model.prob)} · ${sourceWords(g.model.source)} · ${g.model.run_age_s === null
-            ? "run age not recorded" : `run ${age(g.model.run_age_s)} old`}` : NOT_RECORDED}
+        {order ? (
+          <>
+            <G field="fair" k="fair probability (its own)">{fairWords(g, r.side)}</G>
+            <G field="consensus" k="bookmaker consensus">{consensusWords(g.consensus)}</G>
+            <G field="model" k="our model (unvalidated)">{modelWords(g.model)}</G>
+            <G field="blend" k="blend & learner">{blendWords(g.blend)}</G>
+            <G field="maker" k="maker price">{makerWords(g)}</G>
+            <G field="fee" k="fee">{feeWords(g)}</G>
+            <G field="edge" k="edge after fee (its own estimate)">{edgeGroundWords(r)}</G>
+            <G field="guards" k="guards at placement"><Lines ls={guardLines(g.guards)} /></G>
+            <G field="risk" k="risk checks"><Lines ls={riskLines(g.risk)} /></G>
+            <G field="in_play" k="in play"><Lines ls={inPlayLines(g.in_play)} /></G>
+          </>
+        ) : (
+          <G field="handover" k={ROW_TYPE_WORDS[r.row_type]}>{handoverWords(g.handover)}</G>
+        )}
+        <G field="lifecycle" k="lifecycle"><Lines ls={lifecycleLines(r)} /></G>
+        <G field="outcome" k="result (from the journal)"><Lines ls={outcomeLines(r)} /></G>
+        <G field="cost" k="cost (fee in)">
+          {dollars(r.cost_dollars)}{r.fee_dollars !== null ? ` · fee ${dollars(r.fee_dollars)}` : ""}
         </G>
-        <G field="w" k="blend weight w (on the model)">
-          {g?.w === null || g?.w === undefined ? NOT_RECORDED : g.w.toFixed(2)}
-          {g?.arm ? ` · learner arm ${g.arm}` : ""}
-        </G>
-        <G field="threshold" k="bar (min edge)">{cents(g?.threshold ?? null)}</G>
-        <G field="maker_price" k="maker price (its side)">{cents(g?.maker_price ?? null)}</G>
-        <G field="fee" k="fee (a contract)">{cents(g?.fee ?? null)}</G>
-        <G field="edge" k="edge after fee (its own estimate)">
-          {signedCents(g?.edge ?? null)}
-          {g && g.edge !== null && g.threshold !== null
-            ? (clears(g) ? " — clears the bar" : " — under the bar") : ""}
-        </G>
-        <G field="guards" k="guards at placement (news, anomaly)"><Lines v={g?.guards} /></G>
-        <G field="risk" k="risk checks"><Lines v={g?.risk} /></G>
-        <G field="inplay" k="in play"><InPlayGround r={r} /></G>
-        <G field="fills" k="fills">
-          {r.fills === null ? NOT_RECORDED
-            : `${count(r.fills.count)} filled${r.fills.avg_price === null ? ""
-              : ` @ ${cents(r.fills.avg_price)}`} · fees ${dollars(r.fills.fees)}${r.fills.last_at
-              ? ` · last ${when(r.fills.last_at)}` : ""}`}
-        </G>
-        <G field="status" k="status">
-          {statusWords(r.status)}
-          {r.cancel_reason ? ` — ${r.cancel_reason}${CANCEL_WORDS[r.cancel_reason]
-            ? ` (${CANCEL_WORDS[r.cancel_reason]})` : ""}` : ""}
-        </G>
-        <G field="result" k="result (from the journal)">
-          {r.result === null
-            ? (r.result_other === null ? "unsettled — no journaled result"
-              : `${r.result_other} (as sent)`)
-            : `settled ${r.result.toUpperCase()}${["won", "lost"].includes(outcomeOf(r))
-              ? ` · ${outcomeOf(r)}` : ""}`}
-        </G>
-        <G field="pnl" k="this order's P&L">{pnlWords(r)}</G>
-        <G field="cost" k="cost (fee in)">{dollars(r.cost)}</G>
         <G field="strategy_version" k="strategy">{r.strategy_version ?? NOT_RECORDED}</G>
-        <G field="ticker" k="market">{r.ticker}</G>
-        <G field="placed_at" k="placed (UTC)">{r.placed_at ?? NOT_RECORDED}</G>
+        <G field="ticker" k="market">
+          {r.market.ticker ?? NOT_RECORDED}
+          {r.market.outcome_key_source ? ` · key from ${r.market.outcome_key_source}` : ""}
+        </G>
+        <G field="placed_at" k="placed (UTC)">
+          {r.placed_at ?? NOT_RECORDED}{r.order_id ? ` · order ${r.order_id}` : ""}
+        </G>
+        <G field="not_recorded" k="not recorded on this row">
+          {r.not_recorded.length ? r.not_recorded.join(", ") : "nothing missing"}
+        </G>
       </dl>
     </div>
   );
@@ -445,27 +393,29 @@ function Grounds({ r }: { r: LedgerRow }) {
 
 // ------------------------------------------------------------- the table
 
-const HEAD = ["", "time", "match", "contract", "side", "price (YES book)",
+const HEAD = ["", "time", "match", "contract", "side", "price",
   "size", "cost", "phase", "edge vs bar", "fill", "result", "P&L", "why"];
 const RIGHT = new Set([5, 6, 7, 9, 12]);
 
-function Row({ r, open, onToggle, boxW, idx }: {
-  r: LedgerRow; open: boolean; onToggle: () => void; boxW: number | null; idx: number;
+function Row({ r, open, onToggle, boxW }: {
+  r: LedgerRow; open: boolean; onToggle: () => void; boxW: number | null;
 }) {
-  const g = r.grounds;
-  const composed = r.why === null ? composeWhy(r) : null;
-  const o = outcomeOf(r);
-  const minute = g?.inplay?.minute ?? null;
-  const id = `ledger-g-${idx}`;
+  const o = r.outcome.status;
+  const minute = r.grounds.in_play?.status === "recorded" ? r.grounds.in_play.minute : null;
+  const id = `ledger-g-${r.id}`;
+  const fx = r.fixture;
+  const note = edgeNote(r);
+  const cleared = r.row_type === "order" && r.edge.cleared === true;
   return (
     <>
-      <tr data-testid="ledger-row" data-ticker={r.ticker} data-kind={r.kind}
-        data-result={o} data-placed-at={r.placed_at ?? undefined}
+      <tr data-testid="ledger-row" data-row-id={r.id} data-ticker={r.market.ticker ?? ""}
+        data-kind={r.row_type} data-result={o ?? "not_recorded"}
+        data-placed-at={r.placed_at ?? undefined}
         data-phase={r.phase ?? ""} className="border-b border-line/50">
         <td className={`${TD} pl-1`}>
           <button type="button" data-testid="ledger-expand" aria-expanded={open}
             aria-controls={id} onClick={onToggle}
-            aria-label={`${open ? "hide" : "show"} the grounds for ${r.contract ?? r.ticker}`}
+            aria-label={`${open ? "hide" : "show"} the grounds for ${r.market.contract ?? r.market.ticker ?? "this row"}`}
             className="rounded-md border border-line px-1.5 py-0.5 text-[11px] text-ink-mid transition-colors hover:border-line-strong">
             {open ? "▾" : "▸"}
           </button>
@@ -475,53 +425,63 @@ function Row({ r, open, onToggle, boxW, idx }: {
         </td>
         <td data-testid="ledger-match" className={`${TD} min-w-[150px]`}>
           <span className="block font-sans text-[12px] text-ink-hi">
-            {r.home === null && r.away === null ? "match not recorded"
-              : `${r.home ?? "home not recorded"} v ${r.away ?? "away not recorded"}`}
+            {fx.label ?? (fx.home === null && fx.away === null ? "match not recorded"
+              : `${fx.home ?? "home not recorded"} v ${fx.away ?? "away not recorded"}`)}
           </span>
           <span className="block text-[10px] text-ink-faint">
-            {compLabel(r.competition)} · kickoff {when(r.kickoff_utc)}
+            {compLabel(r.competition)} · kickoff {when(fx.kickoff_utc)}
           </span>
+          {fx.key_source === "same_event" && (
+            <span data-testid="ledger-fixture-borrowed" className="block text-[10px] text-ink-faint">
+              fixture from an order on the same Kalshi event (not recorded on this row)
+            </span>
+          )}
         </td>
         <td data-testid="ledger-contract" className={`${TD} min-w-[160px]`}>
           <span className="block font-sans text-[12px] text-ink-hi">
-            {r.contract ?? `contract ${NOT_RECORDED}`}
-            {r.kind === "handover" && (
+            {r.market.contract ?? `contract ${NOT_RECORDED}`}
+            {r.row_type !== "order" && (
               <span data-testid="ledger-handed-chip"
                 className="ml-1.5 whitespace-nowrap rounded-full border border-accent/50 px-1.5 text-[10px] text-accent">
-                handed over
+                {ROW_TYPE_WORDS[r.row_type]}
               </span>
             )}
           </span>
-          <span className="block break-all text-[10px] text-ink-faint">{r.ticker}</span>
+          <span className="block break-all text-[10px] text-ink-faint">{r.market.ticker ?? `ticker ${NOT_RECORDED}`}</span>
           <span className="block text-[10px] text-ink-faint">
-            {r.family === null && r.outcome_key === null ? `market type ${NOT_RECORDED}`
-              : `${familyWords(r.family)} · ${r.outcome_key ?? NOT_RECORDED}`}
+            {`${familyWords(r.market.family)} · ${r.market.outcome_key ?? NOT_RECORDED}`}
           </span>
         </td>
         <td data-testid="ledger-side" className={`${TD} text-ink-hi`}>
           {r.side ? r.side.toUpperCase() : NOT_RECORDED}
         </td>
         <td data-testid="ledger-price" className={`${TD} whitespace-nowrap text-right text-ink-hi`}>
-          {cents(r.price)}
-          {r.side === "no" && r.price !== null && (
-            <span className="block text-[10px] text-ink-faint">NO at {cents(100 - r.price)}</span>
-          )}
+          {cents(r.price_cents)}
+          <span className="block text-[10px] text-ink-faint">
+            YES book {cents(r.yes_book_price_cents)}
+          </span>
         </td>
         <td data-testid="ledger-size" className={`${TD} text-right text-ink-hi`}>{count(r.count)}</td>
-        <td data-testid="ledger-cost" className={`${TD} whitespace-nowrap text-right text-ink-hi`}>{dollars(r.cost)}</td>
+        <td data-testid="ledger-cost" className={`${TD} whitespace-nowrap text-right text-ink-hi`}>
+          {dollars(r.cost_dollars)}
+          {r.fee_dollars !== null && (
+            <span className="block text-[10px] text-ink-faint">fee {dollars(r.fee_dollars)}</span>
+          )}
+        </td>
         <td data-testid="ledger-phase" className={`${TD} whitespace-nowrap text-ink-mid`}>
           {phaseWords(r.phase)}
           {minute !== null && <span className="text-live"> · {minute}′</span>}
         </td>
-        <td data-testid="ledger-edge" data-clears={clears(g) || undefined}
-          className={`${TD} whitespace-nowrap text-right ${clears(g) ? "font-semibold text-ink-hi" : "text-ink-low"}`}>
-          {edgeWords(g)}
+        <td data-testid="ledger-edge" data-clears={cleared || undefined}
+          className={`${TD} whitespace-nowrap text-right ${cleared ? "font-semibold text-ink-hi" : "text-ink-low"}`}>
+          {edgeWords(r)}
+          {note && <span className="block text-[10px] font-normal text-ink-faint">{note}</span>}
         </td>
         <td data-testid="ledger-fill" className={`${TD} whitespace-nowrap text-ink-mid`}>
           {fillWords(r)}
-          {r.cancel_reason && (
+          {r.lifecycle.cancels.length > 0 && (
             <span className="block text-[10px] text-ink-faint">
-              {r.cancel_reason}{CANCEL_WORDS[r.cancel_reason] ? ` · ${CANCEL_WORDS[r.cancel_reason]}` : ""}
+              {r.lifecycle.cancels.map((c) => c.reason ?? NOT_RECORDED).join(", ")}
             </span>
           )}
         </td>
@@ -529,19 +489,18 @@ function Row({ r, open, onToggle, boxW, idx }: {
           className={`${TD} whitespace-nowrap ${o === "won" ? "text-up" : o === "lost" ? "text-neg" : "text-ink-mid"}`}>
           {resultWords(r)}
         </td>
-        <td data-testid="ledger-pnl" className={`${TD} whitespace-nowrap text-right ${plTone(r.pnl)}`}>
+        <td data-testid="ledger-pnl"
+          className={`${TD} whitespace-nowrap text-right ${o === "won" || o === "lost"
+            ? plTone(r.outcome.pnl_dollars) : "text-ink-mid"}`}>
           {pnlWords(r)}
         </td>
         <td data-testid="ledger-why" className={`${TD} min-w-[260px] max-w-[340px] font-sans text-[12px] leading-snug text-ink-mid`}>
-          <span className="line-clamp-3">{r.why ?? composed ?? NOT_RECORDED}</span>
-          {composed !== null && (
-            <span className="block text-[10px] text-ink-faint">composed here from the recorded grounds</span>
-          )}
+          <span className="line-clamp-3">{r.why ?? NOT_RECORDED}</span>
         </td>
       </tr>
       {open && (
-        <tr id={id} data-testid="ledger-grounds" data-ticker={r.ticker}
-          className="border-b border-line bg-bs/60">
+        <tr id={id} data-testid="ledger-grounds" data-row-id={r.id}
+          data-ticker={r.market.ticker ?? ""} className="border-b border-line bg-bs/60">
           <td colSpan={HEAD.length} className="p-0">
             {/* STICKY AT THE BOX'S LEFT EDGE AND THE BOX'S WIDTH, so at
                 phone width the grounds are read in view, not off to the
@@ -572,16 +531,16 @@ export function TradingLedger({ token, statusDailyLimit }: {
   const [read, setRead] = useState<Read>({ kind: "idle" });
   const [last, setLast] = useState<{ l: Ledger; at: number } | null>(null);
   const [older, setOlder] = useState<LedgerRow[]>([]);
-  /** the cursor after the older pages; undefined until one is loaded */
-  const [olderCursor, setOlderCursor] = useState<string | null | undefined>(undefined);
+  /** the offset after the older pages; undefined until one is loaded */
+  const [olderNext, setOlderNext] = useState<number | null | undefined>(undefined);
   const [more, setMore] = useState<{ busy: boolean; error: string | null }>(
     { busy: false, error: null });
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
-  const [open, setOpen] = useState<Set<string>>(() => new Set());
+  const [open, setOpen] = useState<Set<number>>(() => new Set());
   const [now, setNow] = useState(() => Date.now());
   const [boxW, setBoxW] = useState<number | null>(null);
   const [known, setKnown] = useState<{ comps: string[]; phases: string[] }>(
-    { comps: [...FOCUS_COMPETITIONS], phases: [...DEFAULT_PHASES] });
+    { comps: [...FOCUS_COMPETITIONS], phases: [...LEDGER_PHASES] });
   const gen = useRef(0);
   const observer = useRef<ResizeObserver | null>(null);
   const q = queryOf(filters);
@@ -625,12 +584,14 @@ export function TradingLedger({ token, statusDailyLimit }: {
       setRead({ kind: "ok" });
       setLast({ l, at });
       setNow(at);
-      // every competition and phase ever named stays a filter option
+      // the backend's own phase keys are the filter's options; every
+      // competition ever named stays one
+      const vocab = Object.keys(l.vocab.phases);
       setKnown((k) => ({
-        comps: [...new Set([...k.comps, ...(l.summary?.by_competition ?? []).map((g) => g.key),
+        comps: [...new Set([...k.comps,
+          ...(l.summary?.by_competition ?? []).map((g) => g.key).filter((c) => c !== "unknown"),
           ...l.rows.map((x) => x.competition).filter((c): c is string => !!c)])],
-        phases: [...new Set([...k.phases, ...(l.summary?.by_phase ?? []).map((g) => g.key),
-          ...l.rows.map((x) => x.phase).filter((p): p is string => !!p)])],
+        phases: vocab.length ? vocab : k.phases,
       }));
       return "ok";
     }
@@ -666,53 +627,53 @@ export function TradingLedger({ token, statusDailyLimit }: {
     observer.current = o;
   }, []);
 
-  const setFilter = (k: keyof Filters, v: string) => {
+  const reset = () => {
     gen.current += 1;
-    setFilters((f) => ({ ...f, [k]: v }));
     setOlder([]);
-    setOlderCursor(undefined);
+    setOlderNext(undefined);
     setMore({ busy: false, error: null });
     setLast(null);
     setRead({ kind: "idle" });
   };
+  const setFilter = (k: keyof Filters, v: string) => {
+    setFilters((f) => ({ ...f, [k]: v }));
+    reset();
+  };
   const clearFilters = () => {
-    gen.current += 1;
     setFilters(NO_FILTERS);
-    setOlder([]);
-    setOlderCursor(undefined);
-    setMore({ busy: false, error: null });
-    setLast(null);
-    setRead({ kind: "idle" });
+    reset();
   };
 
   const l = last?.l ?? null;
+  // AS SENT, newest first; an older page is appended after it. A row
+  // already drawn (the window moved between reads) is not drawn twice.
   const rows = useMemo(() => {
     if (!l) return [];
-    const seen = new Set<string>();
+    const seen = new Set<number>();
     const out: LedgerRow[] = [];
     for (const r of [...l.rows, ...older]) {
-      if (seen.has(r.key)) continue;
-      seen.add(r.key);
+      if (seen.has(r.id)) continue;
+      seen.add(r.id);
       out.push(r);
     }
-    return newestFirst(out);
+    return out;
   }, [l, older]);
-  const cursor = olderCursor === undefined ? l?.next_cursor ?? null : olderCursor;
+  const nextOffset = olderNext === undefined ? l?.next_offset ?? null : olderNext;
   const stale = last !== null && (read.kind !== "ok" || now - last.at > STALE_MS);
   const filtered = filters.competition !== "" || filters.phase !== ""
     || filters.since !== "" || filters.until !== "";
 
-  // AN OLDER PAGE, by the backend's cursor. Every failure is put on the
-  // page by name (the read that failed, and why); a page that arrives
-  // after the filters changed is dropped, not appended to another window.
+  // AN OLDER PAGE, by the backend's offset. Every failure is put on the
+  // page by name; a page that arrives after the filters changed is
+  // dropped, not appended to another window.
   const loadOlder = async () => {
-    if (!cursor) return;
+    if (nextOffset === null) return;
     const mine = gen.current;
     const current = () => gen.current === mine;
     setMore({ busy: true, error: null });
     let r: Response;
     try {
-      r = await fetch(`/api/ops/trading-ledger${queryOf(filters, cursor)}`, {
+      r = await fetch(`/api/ops/trading-ledger${queryOf(filters, nextOffset)}`, {
         headers: { "x-admin-token": token }, cache: "no-store",
       });
     } catch (err) {
@@ -733,7 +694,7 @@ export function TradingLedger({ token, statusDailyLimit }: {
     if (r.ok && isObj(body) && Array.isArray(body.rows)) {
       const page = parseLedger(body);
       setOlder((o) => [...o, ...page.rows]);
-      setOlderCursor(page.next_cursor);
+      setOlderNext(page.next_offset);
       setMore({ busy: false, error: null });
       return;
     }
@@ -754,11 +715,13 @@ export function TradingLedger({ token, statusDailyLimit }: {
     setTimeout(() => URL.revokeObjectURL(url), 2_000);
   };
 
-  const toggle = (k: string) => setOpen((s) => {
+  const toggle = (k: number) => setOpen((s) => {
     const n = new Set(s);
     if (n.has(k)) n.delete(k); else n.add(k);
     return n;
   });
+
+  const page = l?.page ?? null;
 
   return (
     <section data-testid="ops-ledger" aria-labelledby="ops-ledger-h"
@@ -776,7 +739,8 @@ export function TradingLedger({ token, statusDailyLimit }: {
         the trader&apos;s own estimate at the time, not evidence of an edge,
         and our model&apos;s number is unvalidated. Only the trader&apos;s
         orders and handed-over contracts: your own manual bets are not here.
-        Prices in cents on the YES book; money in dollars.
+        Prices in cents of the side bought (the YES book beside it); money
+        in dollars.
       </p>
 
       <div data-testid="ledger-filters" role="group" aria-label="filter the ledger"
@@ -816,8 +780,8 @@ export function TradingLedger({ token, statusDailyLimit }: {
             <button type="button" data-testid="ledger-export" onClick={exportCsv}
               className={`${CTRL} border-accent/60`}>Export CSV</button>
             <span className="font-mono text-[10px] text-ink-faint">
-              the {rows.length} loaded rows · blank cell = not recorded · for
-              your review only, never research data
+              the {rows.length} loaded rows · blank cell = not recorded · your
+              own download, never research data
             </span>
           </span>
         )}
@@ -847,15 +811,24 @@ export function TradingLedger({ token, statusDailyLimit }: {
         {l && (
           <div data-testid="ledger-body" data-stale={stale || undefined}
             className={`transition-opacity ${stale ? "opacity-50" : ""}`}>
+            {page?.scan_complete === false && (
+              <p data-testid="ledger-scan-partial" role="note"
+                className="mb-2 font-mono text-[11px] text-warn">
+                only the newest {page.scan_max ?? "?"} journal rows were read — the
+                summary and these rows cover those; narrow the dates to see older ones
+              </p>
+            )}
             <SummaryBlock s={l.summary} statusLimit={statusDailyLimit} />
 
             <h3 className={SUB}>every order, newest first</h3>
             <p data-testid="ledger-count" className="mb-1.5 font-mono text-[11px] text-ink-faint">
-              {rows.length} row{rows.length === 1 ? "" : "s"} · newest first · {cursor
-                ? "more on the backend" : "all loaded"}
+              {rows.length} row{rows.length === 1 ? "" : "s"}
+              {page?.matching !== null && page?.matching !== undefined
+                && page.matching !== rows.length ? ` of ${page.matching}` : ""}
+              {" "}· newest first · {nextOffset !== null ? "more on the backend" : "all loaded"}
               {l.unreadable > 0 && (
                 <span className="text-warn">
-                  {" "}· {l.unreadable} row{l.unreadable === 1 ? "" : "s"} unreadable (no ticker), not drawn
+                  {" "}· {l.unreadable} row{l.unreadable === 1 ? "" : "s"} unreadable (not a ledger row), not drawn
                 </span>
               )}
               {` · read ${when(new Date(last!.at).toISOString())}`}
@@ -878,15 +851,15 @@ export function TradingLedger({ token, statusDailyLimit }: {
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((r, i) => (
-                      <Row key={r.key} r={r} idx={i} open={open.has(r.key)}
-                        onToggle={() => toggle(r.key)} boxW={boxW} />
+                    {rows.map((r) => (
+                      <Row key={r.id} r={r} open={open.has(r.id)}
+                        onToggle={() => toggle(r.id)} boxW={boxW} />
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
-            {cursor && (
+            {nextOffset !== null && (
               <button type="button" data-testid="ledger-more" onClick={loadOlder}
                 disabled={more.busy} className={`${CTRL} mt-2 text-ink-mid disabled:opacity-40`}>
                 {more.busy ? "loading older…" : "Load older"}
@@ -898,9 +871,14 @@ export function TradingLedger({ token, statusDailyLimit }: {
               </p>
             )}
             <p className="mt-3 font-mono text-[10px] text-ink-faint">
-              {l.version ?? "version not stated"} · generated {when(l.generated_at)}
+              {l.version ?? "version not stated"}{l.env ? ` · ${l.env}` : ""} · generated {when(l.generated_at)}
               {" "}· read every 60 s while a token is held
             </p>
+            {l.seal && (
+              <p data-testid="ledger-seal" className="mt-1 font-mono text-[10px] text-ink-faint">
+                {l.seal}
+              </p>
+            )}
           </div>
         )}
       </div>

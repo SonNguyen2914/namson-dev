@@ -134,7 +134,7 @@ async function serve(page: Page, status: number, body: unknown) {
   await page.route("**/api/ops/trading-ledger**", (route) => route.fulfill({
     status: 200, contentType: "application/json",
     body: JSON.stringify({ version: "trading-ledger-v1", rows: [],
-      summary: null, next_cursor: null }),
+      summary: null, page: { offset: 0, returned: 0, has_more: false } }),
   }));
   // the book section is read once the status answers; served empty here
   await page.route("**/api/ops/trading-book", (route) => route.fulfill({
