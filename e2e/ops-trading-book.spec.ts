@@ -161,7 +161,8 @@ test.describe("the trader's book on the console", () => {
       await expect(page.getByTestId("book-note")).toContainText(
         "The trader never touches positions marked Yours.");
       await expect(page.getByTestId("book-note")).toContainText(
-        "a close that lowers risk always goes through. Experimental, unproven.");
+        "a close that lowers risk may go over a cap, but the halts and the "
+        + "kill switch still stop it. Experimental, unproven.");
       await expect(page.getByTestId("book-totals")).toContainText("3 positions");
     });
 
@@ -258,6 +259,53 @@ test.describe("the trader's book on the console", () => {
       await expect(page.getByTestId("book-positions")).toHaveCount(0);
       await expect(page.getByTestId("ops-strip")).toBeVisible();
       await expect(page.getByTestId("ops-money")).toContainText("$48.12");
+    });
+
+  test("what the book does not list is counted, never hidden",
+    async ({ page }) => {
+      await openConsole(page, { status: 200, body: {
+        ...BOOK_PAYLOAD, positions: [], orders: [],
+        totals: { positions: 0, orders: 0, managed_contracts: 0,
+          manual_contracts: 0, not_listed_positions: 2, not_listed_orders: 1 },
+      } });
+      await expect(page.getByTestId("book-not-listed")).toHaveText(
+        "2 more positions and 1 more resting order on markets the trader "
+        + "does not track are not shown.");
+      await expect(page.getByTestId("book-positions-empty"))
+        .toHaveText("No open positions on markets the trader tracks.");
+      await expect(page.getByTestId("book-orders-empty"))
+        .toHaveText("No resting orders on markets the trader tracks.");
+    });
+
+  test("a repeat says nothing new was sent; more_than_yours names its "
+    + "detail; the default count leaves out his closing orders",
+  async ({ page }) => {
+      const detail = "4 > 1 of yours free on yes (3 contracts are committed "
+        + "to your resting orders that would close them: cancel those first)";
+      await serveHandover(page, [
+        { status: 200, body: { ok: true, handed_over: 4, managed: 4,
+          manual: 0, repeat: true } },
+        { status: 409, body: { ok: false, error: "more_than_yours", detail } },
+      ]);
+      await openConsole(page, { status: 200, body: { ...BOOK_PAYLOAD,
+        orders: [...BOOK_PAYLOAD.orders, { order_id: "ord-manual-close",
+          ticker: MANUAL, title: "Arsenal vs West Ham — Arsenal",
+          competition: "epl", side: "no", price_cents: 47, remaining: 3,
+          owner: "manual", expires_utc: null,
+          created_utc: "2026-10-03T16:00:00+00:00" }] } });
+      await row(page, MANUAL).getByTestId("hand-over").click();
+      await expect(page.getByTestId("book-count")).toHaveValue("1");
+      await expect(page.getByTestId("book-count")).toHaveAttribute("max", "4");
+      await page.getByTestId("book-confirm").click();
+      const outcome = page.getByTestId("book-outcome");
+      await expect(outcome).toHaveAttribute("data-ok", "true");
+      await expect(outcome).toContainText(
+        "Already done a moment ago — nothing new was sent.");
+      await row(page, MANUAL).getByTestId("hand-over").click();
+      await page.getByTestId("book-count").fill("4");
+      await page.getByTestId("book-confirm").click();
+      await expect(outcome).toHaveAttribute("data-ok", "false");
+      await expect(outcome).toContainText(detail);
     });
 
   test("empty lists say so", async ({ page }) => {

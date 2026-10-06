@@ -1,12 +1,17 @@
-// THE OPERATOR RELAY — what the trading book, candidates and hand-over
-// routes share (2026-10-03; candidates 2026-10-05).
+// THE OPERATOR RELAY — what the trading book, candidates, ledger and
+// hand-over routes share (2026-10-03; candidates 2026-10-05; ledger
+// 2026-10-06).
 //
-// pages/api/ops/trading-book.ts, trading-candidates.ts and
-// trading-handover.ts are the same shape as trading-status.ts beside
-// them, and for the same reasons:
+// pages/api/ops/trading-book.ts, trading-candidates.ts,
+// trading-ledger.ts, trading-handover.ts and trading-kill-lift.ts are the same shape as
+// trading-status.ts beside them, and for the same reasons:
 //
 //   * FIXED BACKEND PATHS. Each route names its backend path(s) as
-//     literals; nothing from the request is interpolated into a URL.
+//     literals; nothing from the request is interpolated into a URL —
+//     save the ledger's six NAMED filters (lib/tradingLedger.ts
+//     LEDGER_PARAMS), each checked against its own pattern and rebuilt
+//     into the query by URLSearchParams; any other key is dropped, and a
+//     bad value is a 400 before any backend is asked.
 //   * ONE HEADER CROSSES, `x-admin-token`, byte for byte as the caller
 //     sent it. This layer holds no credential and logs nothing — not the
 //     token, not the body. (The hand-over route also sets its own

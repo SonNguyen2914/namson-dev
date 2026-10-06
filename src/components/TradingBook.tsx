@@ -4,7 +4,10 @@
 // and then I can choose in the console whenever I want the trader to take
 // care of it, if not then it cant touch it?" — so this section shows every
 // open position and resting order on the account, each flagged by whose
-// it is, and lets him hand a position to the trader or take it back.
+// it is, and lets him hand a position to the trader or take it back. Those
+// on markets the trader's catalogue does not list (combos, markets newer
+// than its last refresh) are not drawn; the backend COUNTS them
+// (totals.not_listed_*) and this section says how many.
 //
 // WHAT THE CHIPS MEAN, per position (from GET /api/ops/trading-book,
 // trading-book-v1):
@@ -37,6 +40,12 @@
 // page says so beside the numbers. A position with no live mark draws
 // "—" and "no live price", and the totals name how many were left out; a
 // missing value is never summed as $0.
+//
+// QUEUED HAND-OVERS (2026-10-06). A hand-over may now be queued until the
+// market's next live price: the POST answers 202 {queued: true}, said as
+// "Queued — hands over at the next live price", and the book's
+// `pending_handovers` are drawn under the positions with a status chip in
+// plain words. A book without the field draws nothing.
 import { useEffect, useState, type ReactNode } from "react";
 import {
   compLabel, type LiveValue, liveTotals, markSourceWords, parseLiveValue,
@@ -67,10 +76,21 @@ interface Order {
   owner: "trader" | "manual"; expires_utc: string | null;
 }
 
+/** A hand-over the backend queued until the market's next live price. */
+interface Pending {
+  ticker: string; side: Side | null; count: number | null;
+  requested_at: string | null; status: string; reason: string | null;
+  price_cents: number | null;
+}
+
 interface Book {
+  /** the backend's queued hand-overs; null when it does not send them */
+  pending: Pending[] | null;
   version: string | null; generated_at: string | null;
   account_read_at: string | null; positions: Position[]; orders: Order[];
-  totals: { positions: number; orders: number; managed: number; manual: number };
+  totals: { positions: number; orders: number; managed: number; manual: number;
+            /** on markets the catalogue does not list: counted, not drawn */
+            notListedPositions: number; notListedOrders: number };
   /** the backend's own sentence for each live mark source, when sent */
   markSources: Record<string, string>;
 }
@@ -135,6 +155,23 @@ function parseBook(b: Obj): Book {
       expires_utc: str(o.expires_utc),
     });
   }
+  // MISSING IS NOT EMPTY: a backend that does not send the field draws
+  // nothing; only an array is read
+  let pending: Pending[] | null = null;
+  if (Array.isArray(b.pending_handovers)) {
+    pending = [];
+    for (const q of b.pending_handovers) {
+      if (!isObj(q)) continue;
+      const ticker = str(q.ticker);
+      if (!ticker) continue;
+      pending.push({
+        ticker, side: sideOf(q.side), count: num(q.count),
+        requested_at: str(q.requested_at), status: str(q.status) ?? "",
+        reason: str(q.reason),
+        price_cents: num(q.price_cents) ?? num(q.completed_price_cents),
+      });
+    }
+  }
   const t = isObj(b.totals) ? b.totals : {};
   const markSources: Record<string, string> = {};
   if (isObj(b.mark_sources)) {
@@ -143,7 +180,7 @@ function parseBook(b: Obj): Book {
     }
   }
   return {
-    markSources,
+    pending, markSources,
     version: str(b.version), generated_at: str(b.generated_at),
     account_read_at: str(b.account_read_at), positions, orders,
     totals: {
@@ -153,6 +190,8 @@ function parseBook(b: Obj): Book {
         ?? positions.reduce((s, p) => s + p.managed, 0),
       manual: num(t.manual_contracts)
         ?? positions.reduce((s, p) => s + p.manual, 0),
+      notListedPositions: whole(t.not_listed_positions),
+      notListedOrders: whole(t.not_listed_orders),
     },
   };
 }
@@ -202,9 +241,21 @@ function describe(e: Edit, n: number, title: string, status: number,
                   body: unknown): Outcome {
   const b = isObj(body) ? body : {};
   const SIDE = e.side.toUpperCase();
+  if (status === 202 && b.queued === true) {
+    // the backend queued it until the market's next live price
+    return { ok: true, text: e.action === "handover"
+      ? `Queued — hands over at the next live price (${plural(n, `${SIDE} contract`)} on ${title}).`
+      : `Queued — takes back at the next live price (${plural(n, `${SIDE} contract`)} on ${title}).` };
+  }
   if (status >= 200 && status < 300 && b.ok === true) {
     const managed = whole(b.managed);
     const manual = whole(b.manual);
+    if (b.repeat === true) {
+      // the backend's repeat guard: the same request a moment ago
+      return { ok: true, text: `Already done a moment ago — nothing new was `
+        + `sent. The trader manages ${managed} here; ${manual} `
+        + `${manual === 1 ? "is" : "are"} yours.` };
+    }
     return e.action === "handover"
       ? { ok: true, text: `Handed ${plural(n, `${SIDE} contract`)} on ${title} `
           + `to the trader. It now manages ${managed} here; ${manual} `
@@ -217,7 +268,10 @@ function describe(e: Edit, n: number, title: string, status: number,
   const code = str(b.error);
   const detail = str(b.detail);
   let why: string;
-  if (code && ERROR_WORDS[code]) why = ERROR_WORDS[code];
+  if (code === "more_than_yours" && detail) {
+    // the backend names what is committed to his resting closing orders
+    why = `${ERROR_WORDS[code]} (${detail})`;
+  } else if (code && ERROR_WORDS[code]) why = ERROR_WORDS[code];
   else if (status === 403) why = "token rejected";
   else if (status === 404 || b.available === false) {
     why = "hand-over is not available on this backend yet";
@@ -229,6 +283,28 @@ function describe(e: Edit, n: number, title: string, status: number,
   }
   return { ok: false, text: `${verb} failed: ${why}.` };
 }
+
+/** A queued hand-over's status, in plain words. An unrecognised status
+ *  is said as exactly that — never folded into one of the four. */
+export function pendingWords(q: {
+  status: string; reason: string | null; price_cents: number | null;
+}): string {
+  switch (q.status) {
+    case "queued": return "queued — will hand over at the next live price";
+    case "completed":
+      return q.price_cents === null ? "completed" : `completed at ${cents(q.price_cents)}`;
+    case "expired": return `expired: ${q.reason ?? "no reason given"}`;
+    case "cancelled": return q.reason ? `cancelled — ${q.reason}` : "cancelled";
+    default: return `status not recognised (${q.status || "none sent"})`;
+  }
+}
+
+const PENDING_TONE: Record<string, string> = {
+  queued: "border-accent/50 text-accent",
+  completed: "border-line-strong text-ink-hi",
+  expired: "border-warn/50 text-warn",
+  cancelled: "border-line text-ink-low",
+};
 
 // ------------------------------------------------------------- pieces
 
@@ -332,9 +408,17 @@ export function TradingBook({ token }: { token: string }) {
 
   const open = (p: Position, action: Action) => {
     const max = action === "handover" ? p.manual : p.handed_over;
+    // a hand-over defaults to what is FREE: his contracts less those his
+    // own resting orders would close (a buy of the other side), which the
+    // backend refuses to hand over (more_than_yours)
+    const committed = action !== "handover" || !book ? 0
+      : book.orders.filter((o) => o.ticker === p.ticker
+        && o.owner === "manual" && o.side !== p.side)
+        .reduce((s, o) => s + o.remaining, 0);
+    const free = Math.max(0, max - committed);
     setOutcome(null);
     setEdit({ key: keyOf(p), action, ticker: p.ticker, side: p.side,
-              value: String(max) });
+              value: String(free >= 1 ? free : max) });
   };
 
   const submit = async (e: Edit, n: number, title: string) => {
@@ -382,6 +466,14 @@ export function TradingBook({ token }: { token: string }) {
               ? ` (${ago(now - Date.parse(book.account_read_at))} ago)` : ""}`
             : "— not yet"}
           {stale && ` · stale, ${ago(now - last!.at)} old`}
+        </p>
+      )}
+      {book && (book.totals.notListedPositions > 0
+        || book.totals.notListedOrders > 0) && (
+        <p data-testid="book-not-listed" className="mt-0.5 font-mono text-[11px] text-warn">
+          {plural(book.totals.notListedPositions, "more position")} and{" "}
+          {plural(book.totals.notListedOrders, "more resting order")} on markets
+          the trader does not track are not shown.
         </p>
       )}
       {book && live && book.positions.length > 0 && (
@@ -444,7 +536,9 @@ export function TradingBook({ token }: { token: string }) {
             </h3>
             {book.positions.length === 0 ? (
               <p data-testid="book-positions-empty" className="font-mono text-[11px] text-ink-faint">
-                No open positions on the account.
+                {book.totals.notListedPositions > 0
+                  ? "No open positions on markets the trader tracks."
+                  : "No open positions on the account."}
               </p>
             ) : (
               <div className="overflow-x-auto">
@@ -580,7 +674,7 @@ export function TradingBook({ token }: { token: string }) {
                               <p className="mt-1 text-[11px] text-ink-faint">
                                 {editing.action === "handover"
                                   ? "The trader will fully manage these: it may add to them or close them within its limits."
-                                  : "These become yours again; the trader stops managing them and never touches them."}
+                                  : "These become yours again; the trader stops managing them. A close it already had resting is cancelled on its next tick (up to ~15 s) and could fill before then."}
                               </p>
                             </td>
                           </tr>
@@ -608,6 +702,36 @@ export function TradingBook({ token }: { token: string }) {
               );
             })()}
 
+            {book.pending && book.pending.length > 0 && (
+              <div data-testid="book-pending-list">
+                <h3 className="mb-1.5 mt-4 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
+                  queued hand-overs
+                </h3>
+                <ul className="space-y-1">
+                  {book.pending.map((q, i) => {
+                    const title = book.positions.find((p) => p.ticker === q.ticker)?.title
+                      ?? q.ticker;
+                    return (
+                      <li key={`${q.ticker}-${q.side}-${q.requested_at}-${i}`}
+                        data-testid="book-pending" data-status={q.status || "none"}
+                        className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-line/50 py-1 font-mono text-[11px]">
+                        <span className="min-w-0 break-all font-sans text-[12px] text-ink-hi">{title}</span>
+                        <span className="uppercase text-ink-mid">{q.side ?? ABSENT}</span>
+                        <span className="text-ink-mid">
+                          {q.count === null ? ABSENT : plural(q.count, "contract")}
+                        </span>
+                        <span className="text-ink-faint">asked {when(q.requested_at)}</span>
+                        <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] ${
+                          PENDING_TONE[q.status] ?? "border-warn/50 text-warn"}`}>
+                          {pendingWords(q)}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+
             <h3 className="mb-1.5 mt-4 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
               resting orders
             </h3>
@@ -616,7 +740,9 @@ export function TradingBook({ token }: { token: string }) {
             </p>
             {book.orders.length === 0 ? (
               <p data-testid="book-orders-empty" className="font-mono text-[11px] text-ink-faint">
-                No resting orders on the account.
+                {book.totals.notListedOrders > 0
+                  ? "No resting orders on markets the trader tracks."
+                  : "No resting orders on the account."}
               </p>
             ) : (
               <div className="overflow-x-auto">
@@ -661,7 +787,8 @@ export function TradingBook({ token }: { token: string }) {
       <p data-testid="book-note" className="mt-4 text-xs leading-relaxed text-ink-faint">
         The trader never touches positions marked Yours. Handed-over positions
         are fully managed: it may add or close within its limits; a close that
-        lowers risk always goes through. Experimental, unproven.
+        lowers risk may go over a cap, but the halts and the kill switch
+        still stop it. Experimental, unproven.
       </p>
       <p data-testid="book-live-note" className="mt-1 text-xs leading-relaxed text-ink-faint">
         Live value is what a position would fetch at its live mark now — the
