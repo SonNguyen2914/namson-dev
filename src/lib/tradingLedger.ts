@@ -253,6 +253,9 @@ export interface Grounds {
 export interface Fill {
   at: string | null; count: number | null; price_cents: number | null;
   fee_dollars: number | null; side: Side | null; taker: boolean | null;
+  /** THE FILL CORRECTION (backend, 2026-10-06): the count came from the
+   *  venue's order record because the fill row's own was unreadable */
+  corrected: boolean;
 }
 
 export interface Cancel { at: string | null; reason: string | null; words: string | null }
@@ -443,7 +446,8 @@ function parseLifecycle(v: unknown): Lifecycle {
   const l = obj(v) ?? {};
   const fills: Fill[] = (Array.isArray(l.fills) ? l.fills : []).filter(isObj)
     .map((f) => ({ at: str(f.at), count: num(f.count), price_cents: num(f.price_cents),
-      fee_dollars: num(f.fee_dollars), side: sideOf(f.side), taker: bool(f.taker) }));
+      fee_dollars: num(f.fee_dollars), side: sideOf(f.side), taker: bool(f.taker),
+      corrected: f.corrected === true }));
   const cancels: Cancel[] = (Array.isArray(l.cancels) ? l.cancels : []).filter(isObj)
     .map((c) => ({ at: str(c.at), reason: str(c.reason), words: str(c.words) }));
   return { state: str(l.state), words: str(l.words),
@@ -971,7 +975,8 @@ export function lifecycleLines(r: LedgerRow): string[] {
   for (const f of l.fills) {
     out.push(`fill ${f.at ?? "time not recorded"}: ${f.count === null ? "?" : whole(f.count)}`
       + ` ${f.side ? f.side.toUpperCase() : ""} @ ${cents2(f.price_cents)}`
-      + ` · fee ${dollars(f.fee_dollars)}${f.taker === true ? " · taker" : ""}`);
+      + ` · fee ${dollars(f.fee_dollars)}${f.taker === true ? " · taker" : ""}`
+      + (f.corrected ? " · count corrected from the venue's order record" : ""));
   }
   if (l.fills_total !== null && l.fills_total > l.fills.length) {
     out.push(`… ${l.fills_total - l.fills.length} more fills`);

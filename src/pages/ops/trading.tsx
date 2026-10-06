@@ -76,6 +76,7 @@ import { useOperatorToken } from "../../components/OperatorToken";
 import { TradingBook } from "../../components/TradingBook";
 import { TradingCandidates } from "../../components/TradingCandidates";
 import { TradingLedger } from "../../components/TradingLedger";
+import { TradingCareful } from "../../components/TradingCareful";
 import { Eyebrow } from "../../components/ui";
 import {
   NOT_SERVED, type ReasonsBlock, compLabel, inPlayByCompetition, inPlayReasons,
@@ -1161,6 +1162,10 @@ export default function TradingConsole() {
           <div data-testid="ops-console" data-stale={stale || undefined}
             className={`mt-6 space-y-4 transition-opacity ${stale ? "opacity-50" : ""}`}>
             <TopStrip d={d} now={now} />
+            {/* THE CAREFUL STRATEGY (2026-10-06): the budget, the
+                kickoff-hour caps, Son's competition switch and the paper
+                learner's evidence */}
+            <TradingCareful d={d} token={armed} />
             {/* read only once the status answered: a refused or not-ready
                 plane is not asked for its book */}
             <TradingBook token={armed} />

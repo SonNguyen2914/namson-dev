@@ -196,6 +196,23 @@ export interface Candidate {
   threshold: number | null;
   inplay: InPlayExtras | null;
   decision: Decision;
+  /** THE CAREFUL STRATEGY (backend, 2026-10-06): its confidence score
+   *  (0-5), its size (worst-case dollars; 0 = paper), the ground, and
+   *  whether a ground's edge was above the 8c ceiling. Null on a row the
+   *  careful strategy did not judge, or a backend that does not send it */
+  careful: CarefulCell | null;
+}
+
+export interface CarefulCell {
+  score: number | null; size: number | null; ground: string | null;
+  data_error: boolean;
+}
+
+export function carefulCell(v: unknown): CarefulCell | null {
+  if (!isObj(v)) return null;
+  const o = v;
+  return { score: num(o.score), size: num(o.size), ground: str(o.ground),
+    data_error: o.data_error === true };
 }
 
 export interface CompCounts {
@@ -348,7 +365,7 @@ export function parseCandidates(b: Obj): Candidates {
       edge_yes: inCents(r.edge_yes, u.edges), edge_no: inCents(r.edge_no, u.edges),
       edge_basis: str(r.edge_basis),
       threshold: inCents(r.threshold, u.threshold),
-      inplay, decision,
+      inplay, decision, careful: carefulCell(r.careful),
     });
   }
   const scope = Array.isArray(b.scope)

@@ -38,6 +38,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ABSENT, ACTION_LABEL, ACTION_ORDER, BOUND_REASONS, type Candidate,
+  type CarefulCell,
   type Candidates, type Pair, anchorWords, cents, compLabel, coverage,
   decisionWords, emptyWhy, isObj, parseCandidates, pct, scopeSource,
   signedCents,
@@ -106,6 +107,24 @@ function BookCell({ bid, ask, maker }: {
 
 /** An edge, drawn brighter when it clears the bar. Clearing the bar is
  *  the trader's rule, not a verdict, so it is ink weight, not a colour. */
+/** THE CAREFUL STRATEGY's cell: score of 5, the worst-case size (paper
+ *  when 0), the ground, and a probable data error said in words. */
+function CarefulCellView({ c }: { c: CarefulCell | null }) {
+  if (!c) return <span className="text-ink-faint">—</span>;
+  return (
+    <span className="whitespace-nowrap">
+      {c.score !== null && <span className="text-ink-hi">{c.score}/5</span>}
+      {c.size !== null && (
+        <span className={c.size > 0 ? "text-ink-mid" : "text-ink-faint"}>
+          {" · "}{c.size > 0 ? `$${c.size}` : "paper"}
+        </span>)}
+      {c.ground && <span className="block text-[10px] text-ink-faint">{c.ground}</span>}
+      {c.data_error && (
+        <span className="block text-[10px] text-warn">edge above 8c: probable data error</span>)}
+    </span>
+  );
+}
+
 function EdgeCell({ edge, threshold, side, basis }: {
   edge: number | null; threshold: number | null; side: "yes" | "no";
   basis: string | null;
@@ -462,7 +481,7 @@ export function TradingCandidates({ token }: { token: string }) {
                         {["market", "decision", "competition", "kickoff / minute",
                           "model", "consensus", "w", "fair (yes)", "yes bid / ask",
                           "no bid / ask", "edge yes", "edge no", "min edge",
-                          "in play"].map((h, i) => (
+                          "in play", "score / size"].map((h, i) => (
                           <th key={h} scope="col"
                             className={`${TH} ${i >= 4 && i <= 12 ? "text-right" : "text-left"}`}>
                             {h}
@@ -515,6 +534,9 @@ export function TradingCandidates({ token }: { token: string }) {
                             </td>
                             <td className={`${TD} text-right text-ink-mid`}>{cents(r.threshold)}</td>
                             <td className={TD}><InPlayCell c={r} /></td>
+                            <td className={TD} data-testid="cand-careful">
+                              <CarefulCellView c={r.careful} />
+                            </td>
                           </tr>
                         );
                       })}
