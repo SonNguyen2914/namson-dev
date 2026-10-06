@@ -203,11 +203,14 @@ for (const [prefix, resource] of FOREIGN) {
  *  list has its whole surface in the id table, so it probes the first
  *  id-shaped candidate its own patterns admit: `comp`'s
  *  `{key}/{resource}` (the first COMP_RESOURCES entry under a real
- *  competition key), `minutes`' `{key}/{event_id}`, and a bare numeric
- *  id (`live-performance/{event_id}`). A prefix admitting none probes ""
+ *  competition key), `minutes`' `{key}/{event_id}`, a bare numeric
+ *  id (`live-performance/{event_id}`) and `news`' `fixture/{fixture_ref}`.
+ *  A prefix admitting none probes ""
  *  and fails the census below. */
 const ID_PROBES = [`${OPENAPI_PROBE_VALUES.key}/${COMP_RESOURCES[0]}`,
-                   `${OPENAPI_PROBE_VALUES.key}/1`, "1"];
+                   `${OPENAPI_PROBE_VALUES.key}/1`, "1",
+                   // `news`' one read, `fixture/{fixture_ref}`
+                   "fixture/1"];
 const PROBE: Array<[string, string]> = PREFIXES.map((prefix) => {
   const list = LEAGUE_PROXY_ALLOWED[prefix];
   if (list.length) return [prefix, list[0]];

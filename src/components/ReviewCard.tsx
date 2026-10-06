@@ -62,6 +62,7 @@ import {
 } from "./PickerRead";
 import ErrorBoundary from "./ErrorBoundary";
 import { Eyebrow } from "./ui";
+import { SHOT_GAP_WORDS, SHOT_SOURCE_WORDS, shotGap } from "../lib/hubParity";
 
 // ---------------------------------------------------------------- bits
 
@@ -485,6 +486,13 @@ const REASON_WORDS: Record<string, string> = {
     "nothing had happened by then — an empty tape is not a failure to confirm",
 };
 
+/** The fit's `no_shot_state` on a row whose shot state is NOT KNOWN by
+ *  the backend's own code: "the tape could not be read" would call a
+ *  stated gap a failure, one section below the words saying it is not. */
+const NOT_KNOWN_SHOT_REASON =
+  "no shot state for this match — not known, for the reason named above; "
+  + "not a failed read";
+
 const reasonWords = (r: string | null) =>
   r == null ? null : (REASON_WORDS[r] ?? r);
 
@@ -700,6 +708,17 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
      feed's exception as the backend caught it; the card names the
      absence and not the exception. */
   const shotFailure = readFailure(row.shot_state.error);
+  /* A SHOT STATE THAT IS NOT KNOWN IS NOT A FAILED READ (parity W1.5).
+     A national row says WHY by code — `shot_state.not_known_reason`
+     (not requested, no play-by-play published, an empty feed, team ids
+     missing) — with the backend's sentence in `error` beside it; drawing
+     those in the failure's warn ink told the reader a provider had
+     broken. They are named as what they are instead. A real failure
+     arrives with NO code and still reaches `shotFailure` below,
+     unchanged. */
+  const gap = shotGap(row);
+  const shotSource = row.shot_state.source
+    ? SHOT_SOURCE_WORDS[row.shot_state.source] ?? null : null;
   const fit = row.fit;
 
   /* A CAPTURE MADE BY A RULE THAT HAS SINCE BEEN CORRECTED
@@ -976,9 +995,16 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
         <Eyebrow className="mb-1.5">what happened</Eyebrow>
         <p data-testid="tape-sentence"
           className="text-xs leading-relaxed text-ink-mid">
-          {tapeSentence(row)}
+          {gap ? "No shot state is read for this match — the reason is below."
+            : tapeSentence(row)}
         </p>
-        {shotFailure ? (
+        {gap ? (
+          <p data-testid="shot-gap" data-gap={gap}
+            className="mt-2 rounded-md border border-dashed border-line px-2 py-1.5 font-mono text-[10px] leading-relaxed text-ink-low">
+            {SHOT_GAP_WORDS[gap]}. The score above is the scoreboard&apos;s,
+            and it stands on its own.
+          </p>
+        ) : shotFailure ? (
           <p data-testid="shot-error"
             className="mt-2 font-mono text-[11px] leading-relaxed text-warn">
             shot state unavailable — {failureSentence(shotFailure)}. The score
@@ -990,6 +1016,14 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
             <CheckpointRow cp={row.shot_state.before_first_goal}
               slot="before_first_goal" />
             <CheckpointRow cp={row.shot_state.full_time} slot="full_time" />
+            {/* where a national tape came from, in words — the league
+                review sends no source, and draws none */}
+            {shotSource && (
+              <p data-testid="shot-source"
+                className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-faint">
+                {shotSource}
+              </p>
+            )}
           </div>
         )}
       </section>
@@ -1004,7 +1038,8 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
           <Verdict testid="fit-read"
             label={`in-play read at ${fit.checkpoint_minute}'`}
             value={fit.confirmed_at_20} yes="confirmed" no="did not confirm"
-            reason={fit.confirm_reason} />
+            reason={gap && fit.confirm_reason === "no_shot_state"
+              ? NOT_KNOWN_SHOT_REASON : fit.confirm_reason} />
         </div>
         {/* THE METHOD PARAGRAPH USED TO STAND HERE (moved 2026-09-09).
             It said "Two answers, never one…" on EVERY finished row. That
