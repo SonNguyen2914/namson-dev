@@ -356,7 +356,15 @@ export function useBoardLoop({ trackRef, stripRef, railRef, slugs, view,
     let touching = false;
 
     // ── geometry ───────────────────────────────────────────────────────
-    const colW = () => (track.clientWidth - GAP * (view - 1)) / view;
+    /** The track's inline padding — the gutter that keeps the end
+     *  columns' borders inside the clip (see the track's note in
+     *  pages/bet-suggester/index.tsx). `clientWidth` includes it, so it
+     *  comes off before the columns share what is left. */
+    const padX = () => {
+      const cs = getComputedStyle(track);
+      return (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+    };
+    const colW = () => (track.clientWidth - padX() - GAP * (view - 1)) / view;
     const oneW = () => colW() + GAP;
     /** Is the track genuinely a horizontal scroller? Below `xl` the
      *  columns stack and it is not — the rail is then a jump nav, and
@@ -403,7 +411,9 @@ export function useBoardLoop({ trackRef, stripRef, railRef, slugs, view,
       track.style.setProperty("--colw", `${colW()}px`);
       /* what the matchday rail sticks to, so a date stays legible over
          whichever four columns you have scrolled to */
-      track.style.setProperty("--vieww", `${track.clientWidth}px`);
+      /* less the end gutters: the band spans the CONTENT width, so its
+         sort control sits over the last column, not in the gutter */
+      track.style.setProperty("--vieww", `${track.clientWidth - padX()}px`);
       const rail = railRef?.current ?? null;
       if (rail) {
         rail.style.setProperty("--cols", String(N));

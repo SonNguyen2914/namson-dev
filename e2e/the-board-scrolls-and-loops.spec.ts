@@ -25,18 +25,27 @@ const VIEW = 4;
 const trackState = (page: Page) => page.evaluate(() => {
   const t = document.querySelector<HTMLElement>('[data-testid="board-track"]')!;
   const box = t.getBoundingClientRect();
+  /* MEASURED FROM THE SCROLLPORT'S CONTENT EDGE: since 2026-10-07 the
+     track carries a 4px gutter each end (board-right-edge.spec), so a
+     seated column sits 4px inside the border box, exactly at the padding
+     edge. */
+  const cs = getComputedStyle(t);
+  const padL = parseFloat(cs.paddingLeft) || 0;
+  const inner = box.width - padL - (parseFloat(cs.paddingRight) || 0);
   const cols = [...t.querySelectorAll<HTMLElement>('[data-testid="league-col"]')]
     .map((c) => ({ slug: c.dataset.league!,
-                   x: c.getBoundingClientRect().left - box.left }));
+                   x: c.getBoundingClientRect().left - box.left - padL }));
   const lead = cols.slice().sort((a, b) => Math.abs(a.x) - Math.abs(b.x))[0];
   const onScreen = cols
-    .filter((c) => c.x > -4 && c.x < box.width - 4)
+    .filter((c) => c.x > -4 && c.x < inner - 4)
     .sort((a, b) => a.x - b.x).map((c) => c.slug);
   const strip = document.querySelector<HTMLElement>('[data-testid="league-ribbon"]')!;
   return {
     scrollLeft: t.scrollLeft,
     max: t.scrollWidth - t.clientWidth,
     clientWidth: t.clientWidth,
+    // the two 4px end gutters `clientWidth` includes (2026-10-07)
+    padX: padL + (parseFloat(cs.paddingRight) || 0),
     columns: cols.length,
     lead: lead.slug,
     leadOffset: lead.x,
@@ -166,7 +175,7 @@ test.describe("the board is a looped scroller", () => {
       expect(Number.isInteger(Math.round(s0.pos * 1000) / 1000),
         "a settled board is a whole number of columns along").toBe(true);
 
-      const half = (s0.clientWidth + 24) / VIEW / 2;   // half a column + gap
+      const half = (s0.clientWidth - s0.padX + 24) / VIEW / 2;   // half a column + gap
       await page.evaluate((d) => {
         const t = document.querySelector<HTMLElement>(
           '[data-testid="board-track"]')!;
@@ -286,15 +295,19 @@ async function traceKey(page: Page, key: string, ms: number): Promise<Sample[]> 
     w.__tr = [];
     const take = () => {
       const box = t.getBoundingClientRect();
+      // from the content edge, past the track's 4px gutter (see above)
+      const cs = getComputedStyle(t);
+      const padL = parseFloat(cs.paddingLeft) || 0;
+      const inner = box.width - padL - (parseFloat(cs.paddingRight) || 0);
       const cols = [...t.querySelectorAll<HTMLElement>(
         '[data-testid="league-col"]')]
         .map((c) => ({ slug: c.dataset.league!,
-                       x: c.getBoundingClientRect().left - box.left }));
+                       x: c.getBoundingClientRect().left - box.left - padL }));
       const lead = cols.slice().sort((a, b) => Math.abs(a.x) - Math.abs(b.x))[0];
       w.__tr.push({
         t: performance.now() - t0, pos: Number(strip.dataset.pos),
         lead: lead.slug, leadX: lead.x,
-        on: cols.filter((c) => c.x > -4 && c.x < box.width - 4).length,
+        on: cols.filter((c) => c.x > -4 && c.x < inner - 4).length,
       });
       w.__trRaf = requestAnimationFrame(take);
     };
@@ -433,7 +446,7 @@ test.describe("one keypress is one movement", () => {
   test("a step arrives ONCE and lands on a whole column — from a settled "
     + "board and from one left mid-column", async ({ page }) => {
       const s0 = await openBoard(page);
-      const oneW = (s0.clientWidth + 24) / VIEW;
+      const oneW = (s0.clientWidth - s0.padX + 24) / VIEW;
 
       pinStep(await traceKey(page, "ArrowRight", 2600), 1, oneW,
         "from a settled board");
@@ -459,7 +472,7 @@ test.describe("one keypress is one movement", () => {
 
   test("a free scroll comes to REST on a whole column", async ({ page }) => {
     const s0 = await openBoard(page);
-    const oneW = (s0.clientWidth + 24) / VIEW;
+    const oneW = (s0.clientWidth - s0.padX + 24) / VIEW;
     const box = (await page.getByTestId("board-track").boundingBox())!;
     /* Fractions chosen so momentum cannot land on an edge by luck: each
        leaves the board well inside a column, which is exactly where it
@@ -491,7 +504,7 @@ test.describe("one keypress is one movement", () => {
          must arrive rather than travel. */
       await page.emulateMedia({ reducedMotion: "reduce" });
       const s0 = await openBoard(page);
-      const oneW = (s0.clientWidth + 24) / VIEW;
+      const oneW = (s0.clientWidth - s0.padX + 24) / VIEW;
       const box = (await page.getByTestId("board-track").boundingBox())!;
       await page.mouse.move(box.x + box.width / 2, box.y + 120);
       await page.mouse.wheel(Math.round(0.45 * oneW), 0);

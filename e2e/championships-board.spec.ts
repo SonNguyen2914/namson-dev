@@ -168,8 +168,12 @@ test.describe("the Championships board", () => {
         refusals: [...CHAMP_BOARD.refusals, SAMPLE_REFUSAL] });
       const refused = page.locator('[data-testid="picker-refusal"]');
       await expect(refused).toHaveCount(1);
-      await expect(refused.locator('[data-testid="refusal-reason"]'))
-        .toHaveText("no_national_rating");
+      // the reason in a reader's words, the backend's code on the hover
+      // (Son, 2026-10-07: no machine text on the card's face)
+      const reason = refused.locator('[data-testid="refusal-reason"]');
+      await expect(reason).toHaveText(/no rating yet/i);
+      await expect(reason).toHaveAttribute("data-reason", "no_national_rating");
+      expect(await reason.getAttribute("title")).toContain("no_national_rating");
       // a refused card's price has no favourite to belong to, so it is
       // named — by the book's own code for the side
       await expect(refused.locator('[data-testid="price-side"]')).toHaveText("GEO");

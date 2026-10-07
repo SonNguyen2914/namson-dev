@@ -332,6 +332,62 @@ export function sortRows(rows: BoardRow[], sort: ColumnSort): BoardRow[] {
   return orderBy(rows, mode.value, sort.dir, defaultOrder);
 }
 
+/** ONE DAY'S CARDS IN DRAWING ORDER, the refused ones placed (Son,
+ *  2026-10-07).
+ *
+ *  KICKOFF SORT INTERLEAVES THEM. A refused fixture has no gap, but it
+ *  has a kickoff like any other, so in kickoff order it sits between the
+ *  cards whose kickoffs bracket it — it used to drop to the foot of the
+ *  day, which put a 13:30 match under a 20:45 one. Ties go to the ranked
+ *  card; a refusal with no readable kickoff goes last.
+ *
+ *  EVERY OTHER SORT KEEPS THEM AFTER THE RANKED CARDS, and that is right
+ *  rather than inherited: every other key is a gap or a book figure the
+ *  refusal does not have (refusing the comparison is what it IS), and a
+ *  missing value sorts last here in both directions (NULL POLICY above).
+ *
+ *  NUMBERING follows the same rule. In kickoff sort a card's number is
+ *  its place in kickoff order, so a refused card takes one like any
+ *  other; in every other sort the numbers are the ranked ladder and a
+ *  refused card is not on it, so it carries none (`rank` undefined). */
+export type DayItem<F> =
+  | { kind: "row"; row: BoardRow; rank: number }
+  | { kind: "refused"; r: F; rank?: number };
+
+export function placeRefused<F extends { kickoff?: string | null }>(
+  rows: BoardRow[], refused: F[], sort: ColumnSort): DayItem<F>[] {
+  const mode = modeById(sort.mode) ?? modeById(DEFAULT_SORT.mode)!;
+  if (mode.id !== "kickoff") {
+    return [
+      ...rows.map((row, i) => ({ kind: "row" as const, row, rank: i + 1 })),
+      ...refused.map((r) => ({ kind: "refused" as const, r })),
+    ];
+  }
+  const t = (k?: string | null) => {
+    const v = k ? Date.parse(k) : NaN;
+    return Number.isNaN(v) ? null : v;
+  };
+  const asc = sort.dir === "asc";
+  const refs = refused
+    .map((r, i) => ({ r, i, at: t(r.kickoff) }))
+    .sort((a, b) => (a.at == null ? 1 : 0) - (b.at == null ? 1 : 0)
+      || (a.at != null && b.at != null ? (asc ? a.at - b.at : b.at - a.at) : 0)
+      || a.i - b.i);
+  const out: Array<{ kind: "row"; row: BoardRow } | { kind: "refused"; r: F }> = [];
+  let j = 0;
+  for (const row of rows) {
+    const at = t(row.kickoff);
+    while (j < refs.length && refs[j].at != null && at != null
+           && (asc ? refs[j].at! < at : refs[j].at! > at)) {
+      out.push({ kind: "refused", r: refs[j].r });
+      j += 1;
+    }
+    out.push({ kind: "row", row });
+  }
+  for (; j < refs.length; j++) out.push({ kind: "refused", r: refs[j].r });
+  return out.map((it, i) => ({ ...it, rank: i + 1 }));
+}
+
 /** The note to print under this column's sort control, or null. */
 export function nullNoteFor(mode: SortMode, rows: BoardRow[]): string | null {
   if (!mode.nullNote) return null;

@@ -1340,10 +1340,16 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
               : soleOwnSort
               ? `Ranked by ${soleOwnSort.mode} — nearly every tie here pairs two different domestic tables, and the gap between them is withheld.`
               : "Ranked by how far apart the two clubs sit in their own league's table."}
-            {" "}No model runs on this page, no number below
-            is a probability or an edge of ours, and nothing here is a
-            recommendation — the ranking says where to look, and you are the
-            one who picks.
+            {/* CHANGED 2026-10-07 with the cards' model and market lines:
+                "no number below is a probability" stopped being true the
+                day each card printed the trader's model in percent. What
+                stays true, and is said instead: no model RANKS the page,
+                the lines are display only, the model is a shadow read and
+                not advice, and the reader is still the one who picks. */}
+            {" "}No model ranks this page. Each card&apos;s model and market
+            lines are display only, a shadow read and not advice; neither line
+            moves a card. Nothing here is a recommendation: you are the one
+            who picks.
           </p>
           </details>
           {/* THE SWITCH, where the field page puts its own: under the
@@ -1893,7 +1899,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   drawn and never decides that it should be. */}
               {railOn && (
                 <div data-testid="board-head-rail"
-                  className="sticky top-[var(--topbar-h)] z-30 hidden overflow-x-clip bg-bs md:block">
+                  className="sticky top-[var(--topbar-h)] z-30 -mx-1 hidden overflow-x-clip bg-bs px-1 md:block">
                   <div ref={railRef} data-testid="board-head-track"
                     className="grid w-max items-start gap-x-6 [grid-template-columns:repeat(var(--cols),var(--colw,minmax(0,1fr)))] will-change-transform">
                     {drawnSlugs.map((slug) => (
@@ -1921,6 +1927,18 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   </div>
                 </div>
               )}
+              {/* ── A GUTTER AT BOTH ENDS OF THE SCROLLPORT (2026-10-07).
+                  The track clips at its padding box, and its columns used
+                  to run edge to edge across it — so the last column's
+                  right border sat ON the clip line and a sub-pixel
+                  remainder cut it off ("the rightmost cards lose their
+                  right border", Son). `-mx-1 px-1` widens the scrollport
+                  by 4px each side and pads it back: every column stays
+                  exactly where it was, and both end columns now have 4px
+                  of room inside the clip. `useBoardLoop` subtracts the
+                  padding from its column width, and the header rail above
+                  takes the same pair so it stays on the same grid.
+                  e2e/board-right-edge.spec.ts. */}
               {/* ── THE TRACK, AND THE TWO WIDTHS IT IS A SCROLLER AT
                   (2026-09-16) ────────────────────────────────────────
 
@@ -1952,7 +1970,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                 style={{ ["--cols" as string]: String(drawnSlugs.length) }}
                 className={`grid grid-cols-1 gap-6 ${
                   windowed
-                    ? "md:gap-y-2 md:overflow-x-auto md:overscroll-x-contain md:[grid-template-columns:repeat(var(--cols),var(--colw,minmax(0,1fr)))]"
+                    ? "md:-mx-1 md:gap-y-2 md:overflow-x-auto md:overscroll-x-contain md:px-1 md:[grid-template-columns:repeat(var(--cols),var(--colw,minmax(0,1fr)))]"
                     : `xl:gap-y-2 xl:[grid-template-columns:repeat(var(--cols),var(--colw,minmax(0,1fr)))] ${
                         soleColumn ? "" : "md:grid-cols-2"}`}`}>
                 {drawnSlugs.map((slug, ci) => (
