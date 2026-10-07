@@ -86,6 +86,11 @@ export function noModelHubCfg(slug: NoModelHub): HubCfg {
       footnote: () =>
         "xi from espn · context only — no model reads lineups here",
     },
+    // Form/H2H was measured non-predictive on the CLUB corpus only; a
+    // national hub says so rather than borrowing the club finding.
+    ...(board === "championships"
+      ? { scoutingNote: "display only — never measured for national teams" }
+      : {}),
     footer:
       "live data + real exchange prices · no shadow model · trader's " +
       "model where served · a read, not a signal · shadow · not advice",

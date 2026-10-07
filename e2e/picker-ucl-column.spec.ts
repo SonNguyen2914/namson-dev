@@ -1135,9 +1135,9 @@ test("the framing names the sort this board actually runs, and keeps every "
     await expect(intro).not.toContainText(/how far apart the two clubs sit/i);
     // the three decision-safety sentences are carried verbatim, exactly
     // as on the default board
-    await expect(intro).toContainText(/no model runs on this page/i);
+    await expect(intro).toContainText(/neither line moves a card/i);
     await expect(intro)
-      .toContainText(/no number below is a probability or an edge of ours/i);
+      .toContainText(/No model ranks this page\. Each card's model and market lines are display only, a shadow read and not advice/i);
     await expect(intro).toContainText(/nothing here is a recommendation/i);
     await expect(intro).toContainText(/you are the one who picks/i);
   });

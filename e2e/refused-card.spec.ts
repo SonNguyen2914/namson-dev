@@ -454,7 +454,9 @@ test("it carries the ranked card's blocks, in the ranked card's order",
   async ({ page }) => {
     await open(page);
     const c = refused(page);
-    const chips = ["refused-rank", "refused-tag", "refused-kickoff"];
+    /* `refused-tag` (#refused) retired 2026-10-07: the reason, in plain
+       words, is the card's one status chip now (see the next test). */
+    const chips = ["refused-rank", "refused-kickoff"];
     /* THE READ BELOW THE CHIP ROW, top to bottom: matchup + anchor slot,
        dumbbell slot, Stage 1, Stage 2, and the admission chip.
 
@@ -497,7 +499,7 @@ test("it carries the ranked card's blocks, in the ranked card's order",
         .toBeLessThan(card.height * 0.25);
     }
     const kick = await box("refused-kickoff");
-    for (const id of ["refused-rank", "refused-tag"]) {
+    for (const id of ["refused-rank"]) {
       const b = await box(id);
       expect(kick.y, `the kickoff is at or above ${id}`)
         .toBeLessThanOrEqual(b.y + 1);
@@ -521,82 +523,80 @@ test("it carries the ranked card's blocks, in the ranked card's order",
 
 // ────────────────────────────────────── 2. and it is unmistakable ────
 
-test("the tag says #refused in words, and the border is a highlight rather "
-  + "than damage", async ({ page }) => {
-    await open(page);
+test("the status is said in plain words, and the border is a ranked card's "
+  + "own — no raised or glow style", async ({ page }) => {
+    /* SON, 2026-10-07, reversing the 2026-09-11 highlight: the lit white
+       edge and outer bloom made refused cards read as RAISED and come out
+       visibly bigger than the cards around them, and the top-left showed
+       raw machine text (`no_prior_row`, `#refused`). So: the reason in
+       words, in the card's own chip style, the code in the hover — and
+       the card's frame is exactly a ranked card's. Every check below is
+       on COMPUTED style, never on a class name. */
+    await open(page, [{ ...FULL, reason: "no_prior_row" }]);
     const c = refused(page);
-    await expect(c.getByTestId("refused-tag")).toHaveText("#refused");
+    const tag = c.getByTestId("refusal-reason");
+    await expect(tag).toHaveText(/new to the league/i);
+    expect(await tag.getAttribute("title")).toContain("no_prior_row");
+    await expect(c.getByTestId("refused-tag")).toHaveCount(0);
+    expect(await c.innerText()).not.toMatch(/no_prior_row|#refused/);
 
-    const style = await c.evaluate((el) => {
-      const s = getComputedStyle(el);
+    const frame = (el: import("@playwright/test").Locator) => el.evaluate((e) => {
+      const s = getComputedStyle(e);
       return { style: s.borderTopStyle, width: s.borderTopWidth,
-               color: s.borderTopColor, shadow: s.boxShadow };
+               color: s.borderTopColor, radius: s.borderTopLeftRadius,
+               shadow: s.boxShadow, pad: s.paddingTop + " " + s.paddingRight,
+               w: e.getBoundingClientRect().width };
     });
-    /* ONE FINDINGS LIST, so a border that broke two of these rules at
-       once reports both rather than hiding the second behind the first.
-       Every check below is on the COMPUTED INK, never on a class name,
-       so a restyle cannot quietly re-borrow a colour it is not allowed. */
-    const findings: string[] = [];
-    // SOLID, not dashed. A dashed border is this system's vocabulary for
-    // a placeholder (the rest-day cell IS one) and this card is full of
-    // measured numbers. The operator's word was "highlighted", and the
-    // treatment it replaced — dashed, amber — read as damage.
-    if (style.style !== "solid")
-      findings.push(`border is ${style.style}, not solid`);
-    // and it is genuinely lit rather than merely bordered
-    if (style.shadow === "none") findings.push("border carries no highlight");
-    // NEITHER GOLD NOR THE TRAFFIC LIGHT. Gold (#f5c542) is the brand and
-    // rank 01; --warn (#fbbf24), --up (#34d399) and --neg (#f87171) are
-    // verdicts about a fixture, and a refusal is a statement about the
-    // BOARD'S COVERAGE, not a judgement on the match.
-    const ink = `${style.color} ${style.shadow}`.toLowerCase();
-    for (const banned of [
-      ["gold/brand", [245, 197, 66]], ["warn", [251, 191, 36]],
-      ["up", [52, 211, 153]], ["neg", [248, 113, 113]],
-    ] as const) {
-      const [name, [r, g, b]] = banned;
-      if (ink.includes(`${r}, ${g}, ${b}`))
-        findings.push(`the highlight borrows ${name}: ${ink}`);
-    }
-    expect(findings).toEqual([]);
+    const r = await frame(ranked(page).first());
+    const f = await frame(c);
+    expect(f.shadow, "a refused card carries no glow").toBe("none");
+    expect(f.style).toBe(r.style);
+    expect(f.width).toBe(r.width);
+    expect(f.radius).toBe(r.radius);
+    expect(f.pad).toBe(r.pad);
+    expect(Math.abs(f.w - r.w)).toBeLessThanOrEqual(1);
+    // the neutral line colour every non-01 ranked card wears (01 wears
+    // the brand's gold edge, which is a rank, not a frame)
+    const line = await page.evaluate(() => {
+      const probe = document.createElement("div");
+      probe.className = "border border-line";
+      document.body.appendChild(probe);
+      const c = getComputedStyle(probe).borderTopColor;
+      probe.remove();
+      return c;
+    });
+    expect(f.color).toBe(line);
   });
 
-test("there is NO rank number — a refused row is not in the ladder",
-  async ({ page }) => {
+test("numbered by kickoff in KICKOFF sort, unnumbered after the ranked "
+  + "cards in a gap sort", async ({ page }) => {
+    /* SON, 2026-10-07: in kickoff sort a refused card sits in kickoff
+       order like any other card, and the column's numbers ARE kickoff
+       positions — so it takes its number. In a gap sort it has no gap, so
+       it sits after every ranked card and is not on the ladder: no
+       number. FULL kicks off at +11h, the ranked card at +9h. */
     await open(page);
-    // the ranked card has one; the refused card's slot says so instead
-    await expect(ranked(page).first().getByTestId("row-rank"))
-      .toHaveText("01");
-    await expect(refused(page).getByTestId("row-rank")).toHaveCount(0);
     const slot = refused(page).getByTestId("refused-rank");
-    /* WHAT STANDS IN THE LADDER'S PLACE, and why it is no longer the
-       words "rank refused". Those two words were a THIRD copy of a fact
-       the `#refused` tag beside them and the axes row below them both
-       carry. The REASON stands there now — the one thing neither of them
-       says — and the slot's own hover keeps the ladder sentence, so the
-       claim "this row is not in the ladder" is still made in the ladder's
-       own place, by the slot, the tag and the title together. */
-    await expect(slot.getByTestId("refusal-reason"))
-      .toHaveText(FULL.reason);
-    // `toHaveAttribute` retries for 15s and can wait out a transient;
-    // this title is fixed at render, so read it once and assert on it.
+    await expect(ranked(page).first().getByTestId("row-rank")).toHaveText("01");
+    await expect(refused(page).getByTestId("refused-number")).toHaveText("02");
+    await expect(refused(page).getByTestId("row-rank")).toHaveCount(0);
+    await expect(slot.getByTestId("refusal-reason")).toHaveText(FULL.reason);
     const says = (await slot.getAttribute("title")) ?? "";
     expect(says).toContain("no position in the day's ladder");
     expect(says).toContain("A number here would be a placement nobody "
       + "measured");
-    // and the status is still said in WORDS, beside it, for a reader who
-    // never hovers
-    await expect(refused(page).getByTestId("refused-tag"))
-      .toHaveText("#refused");
-    /* AND NO LADDER POSITION HIDING ANYWHERE IN THAT SLOT. The fixture's
-       reason carries no digit of its own, which is what makes the sweep
-       below mean "no number" rather than "no number that isn't already
-       in the reason" — stated here so the check cannot quietly become
-       unfalsifiable behind a reason string that grows one. */
-    expect(FULL.reason, "this fixture's reason carries a digit, so the "
-      + "sweep below no longer proves the slot prints no rank")
-      .not.toMatch(/\d/);
+    // the reason itself never carries a ladder position
+    expect(FULL.reason).not.toMatch(/\d/);
     expect(await slot.innerText()).not.toMatch(/\d/);
+
+    // a GAP sort: the refused card drops after the ranked ones, unnumbered
+    await page.getByTestId("band-sort").first().selectOption("gdg");
+    await expect(refused(page).getByTestId("refused-number")).toHaveCount(0);
+    const order = await page.locator(
+      '[data-testid="picker-row"], [data-testid="picker-refusal"]')
+      .evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
+    expect(order.lastIndexOf("picker-row"))
+      .toBeLessThan(order.indexOf("picker-refusal"));
   });
 
 test("every comparison cell is refused BY NAME, in the cell where the "

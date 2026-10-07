@@ -145,11 +145,16 @@ test("each column numbers its own ladder, and the folded row is in "
          come back is a POSITION: a refused row is not in the ladder. */
       const slot = col(page, slug).getByTestId("refused-rank");
       await expect(slot.getByTestId("refusal-reason")).toHaveCount(1);
-      await expect(slot).toHaveText(ROW.reason);
+      // the reason in a reader's words since 2026-10-07; the code rides
+      // the hover and `data-reason`
+      await expect(slot).toHaveText(/no shared ladder/i);
+      await expect(slot.getByTestId("refusal-reason"))
+        .toHaveAttribute("data-reason", ROW.reason);
       expect(await slot.getAttribute("title"))
         .toContain("no position in the day's ladder");
-      await expect(col(page, slug).getByTestId("refused-tag"))
-        .toHaveText("#refused");
+      // `#refused` retired 2026-10-07 — the plain-words reason above is
+      // the card's one status chip
+      await expect(col(page, slug).getByTestId("refused-tag")).toHaveCount(0);
       // and the ranked card in this column keeps `01` — the folded row
       // consumed no number and renumbered nothing
       await expect(col(page, slug).getByTestId("row-rank")).toHaveCount(1);
@@ -294,9 +299,11 @@ test("the reason line keeps its subject when no club was refused",
        " — no_shared_scale", a reason with no subject at all. */
     const line = cardIn(page, COLS[0]).getByTestId("refusal-reason");
     await expect(line).toHaveAttribute("data-subject", "pairing");
-    await expect(line).toHaveText(ROW.reason);
+    // the reason in a reader's words (2026-10-07); the subject and the
+    // backend's code ride the title
+    await expect(line).toHaveText(/no shared ladder/i);
     expect(await line.getAttribute("title"))
-      .toBe(`${ROW.home} v ${ROW.away} — ${ROW.reason}`);
+      .toBe(`${ROW.home} v ${ROW.away} — not ranked (${ROW.reason})`);
     expect((await line.textContent() ?? "").trim())
       .not.toMatch(/^[\s—-]/);
     expect((await line.getAttribute("title") ?? "").trim())

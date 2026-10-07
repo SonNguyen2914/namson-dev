@@ -184,7 +184,10 @@ function Rail({ children }: { children: ReactNode }) {
 }
 
 export function TopBar({ back, left, title, children, inner, rail = "row" }: {
-  back?: { href: string; label: string };
+  /** `direct`: ALWAYS the href, never history.back() — for a page whose
+   *  own history is not the way back (the trading console, 2026-10-07:
+   *  "← board" walked back through every console view first) */
+  back?: { href: string; label: string; direct?: boolean };
   // The inner row's width and gutters. Every app page takes the default
   // (the board's 5xl measure); the home page passes its own wider
   // column so the bar's edges line up with the page under it.
@@ -237,7 +240,7 @@ export function TopBar({ back, left, title, children, inner, rail = "row" }: {
                 // about:blank/new-tab entries, so on a DIRECT load back()
                 // would exit the site — e2e decision-safety.spec caught
                 // exactly that. Direct loads follow the href fallback.
-                if (typeof window !== "undefined"
+                if (!back.direct && typeof window !== "undefined"
                     && window.history.length > 1
                     && document.referrer.startsWith(window.location.origin)) {
                   e.preventDefault();

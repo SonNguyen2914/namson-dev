@@ -45,7 +45,7 @@ import {
   LeagueMeta,
   HeadToHead, NationalBlock, NationalColumn, RatePair, RowField,
   RowFieldPartial, SEASON_BLEND_K,
-  columnsOf, fieldRanksBlock, homeBadge, leagueLabel, licensedRead, rowHref, rowIsInPlay, rowNoHrefWhy,
+  columnsOf, fieldRanksBlock, homeBadge, leagueLabel, licensedRead, rowHasKickedOff, rowHref, rowIsInPlay, rowNoHrefWhy,
   seasonDisagreement,
   seasonSpan, seasonSpanLabel, venueDisagreement,
 } from "../lib/pickerApi";
@@ -54,7 +54,7 @@ import {
 } from "../lib/pickerReview";
 import {
   COLUMN_DEFAULT_SORT, ColumnSort, DEFAULT_SORT, SortModeId, columnSort,
-  isDefaultSort, modeById, sortRows,
+  isDefaultSort, modeById, placeRefused, sortRows,
 } from "../lib/pickerSort";
 import {
   GapNote, KalshiCell, KickoffCell, RegTimeNote, TierGaps, WITHHELD,
@@ -62,6 +62,7 @@ import {
 } from "./PickerRead";
 import { ReviewTail } from "./ReviewCard";
 import { WatchToggle } from "./WatchDeclaration";
+import { ModelMarketLines, VerdictBox, mmOf } from "./ModelMarket";
 import { Eyebrow } from "./ui";
 
 // ---------------------------------------------------------------------
@@ -1073,12 +1074,22 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
       {/* Stage 1 — the ranking inputs, favourite-signed. The metric the
           anchor already shows is not repeated down here; the ranks pair
           names what the dumbbell draws. */}
-      {/* ALREADY flex-wrap, and that is what makes it survive: the five
-          items reflow onto two or three lines in a narrow track rather
-          than running off the edge. Only the gap tightens, so more of
-          them fit per line. */}
-      <div className={`mt-2.5 flex flex-wrap items-baseline gap-y-1 font-mono text-[10.5px] tabular-nums ${
-        dense ? "gap-x-4 md:gap-x-2.5" : "gap-x-4"}`}>
+      {/* ONE LINE (Son, 2026-10-07). "#27 v #29 · ppg +0.17 · rank +2 ·
+          gp 27/27 · h2h 3-2-0" is ~42 characters at 10.5px, and with four
+          16px gaps it overran a ~320px card and dropped h2h onto a line
+          of its own. So the five items SHARE the line — `justify-between`
+          spreads whatever room is left over the gaps.
+
+          MEASURED, NOT ASSUMED: Geist Mono at 10.5px is 6.3px a
+          character, so "… h2h 10-5-3" (44 characters) is 277px of ink —
+          past a 298px card with any gap at all. At 10px (6.0px) and a 6px
+          minimum gap it is 288px, which fits the board's column at 1440
+          and the ~320px card Son measured. `flex-wrap` stays only as the
+          last resort — a genuinely long fallback ("gp 12 home · away not
+          counted"), or a column narrower than ~290px (1280px windows) —
+          so nothing is ever clipped. e2e/card-stats-one-line.spec.ts. */}
+      <div data-testid="stats-row"
+        className="mt-2.5 flex flex-wrap items-baseline justify-between gap-x-1.5 gap-y-1 font-mono text-[10px] tabular-nums">
         {/* THE RANKS PAIR, ON WHICHEVER LADDER IS REAL (operator,
             2026-09-09). "#7 v #33 = rank of 36." On a league column
             these are the two clubs' places in that league, which is one
@@ -1341,7 +1352,13 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
         floorNote={floorNote} />
 
       <div className="mt-3 border-t border-line pt-3">
-        <KalshiCell quote={row.kalshi} side={priceSide(row)} />
+        {/* THE MODEL AND MARKET LINES (Son, 2026-10-07) — the ask line's
+            successor; see ModelMarket.tsx. A board built before the block
+            draws the old price line rather than nothing. */}
+        {mmOf(row)
+          ? <ModelMarketLines mm={mmOf(row)!} home={row.home} away={row.away}
+              quote={row.kalshi} kickedOff={rowHasKickedOff(row)} />
+          : <KalshiCell quote={row.kalshi} side={priceSide(row)} />}
         {/* WHAT THAT PRICE ACTUALLY SETTLES ON — the settlement rule of
             a whole competition, so on a cup column it is identical on
             every card and the header carries it instead (columnNotes).
@@ -1363,7 +1380,10 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
             never a silent no-op. Off the board it renders nothing at
             all: there is no provider, so there is no control. */}
         <WatchToggle eventId={row.event_id}
-          label={`${row.favourite} v ${row.opponent}`} />
+          label={`${row.favourite} v ${row.opponent}`}
+          beside={mmOf(row)
+            ? <VerdictBox mm={mmOf(row)!} kickedOff={rowHasKickedOff(row)} />
+            : undefined} />
       </div>
     </article>
   );
@@ -1504,8 +1524,34 @@ function formText(f: string | string[] | null | undefined): string | null {
  *  not there at all, and a distinction between a Kalshi key that is null
  *  (no event matched) and one that was never sent (the board said
  *  nothing about the market either way). */
-function RefusalCard({ r, col, dated = true, dense = false }: {
+/** THE REFUSAL'S REASON, WRITTEN FOR A READER (Son, 2026-10-07). The
+ *  backend's code (`no_prior_row`, `no_shared_scale`, …) stays in the
+ *  hover; the card prints these words, in its own chip style. A code this
+ *  table has never seen reads "NOT RANKED" — never the raw token
+ *  (e2e/no-machine-text-reaches-the-reader.spec.ts). */
+export const REFUSAL_WORDS: Record<string, string> = {
+  no_prior_row: "new to the league",
+  no_shared_scale: "no shared ladder",
+  no_national_rating: "no rating yet",
+  unresolved: "club not matched",
+  ambiguous: "club not matched",
+};
+export const refusalWords = (reason: string | null | undefined) => {
+  if (!reason) return "not ranked";
+  if (REFUSAL_WORDS[reason]) return REFUSAL_WORDS[reason];
+  // a reason the backend already wrote as a sentence is a reader's text;
+  // a bare token (`snake_case`, no space) is a code, and never printed
+  return /\s/.test(reason.trim()) ? reason : "not ranked";
+};
+
+function RefusalCard({ r, col, dated = true, dense = false, rank }: {
   r: BoardRefusal;
+  /** ITS NUMBER, WHEN THE COLUMN NUMBERS IT — in KICKOFF sort the column's
+   *  numbers are positions in kickoff order, and a refused fixture has a
+   *  kickoff like any other, so it takes its place and its number. In a
+   *  gap sort it has no gap, sits after the ranked cards and carries no
+   *  number (undefined here). */
+  rank?: number;
   /** THE COLUMN THIS CARD IS BEING DRAWN IN, passed by the column that
    *  draws it. NOT `r.column`: since backend #136 a row can name two
    *  columns and `r.column` is only the first of them, so a card in the
@@ -1519,6 +1565,10 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
   dense?: boolean;
 }) {
   const adm = r.admission;
+  /* A PLAIN LEAGUE REFUSAL'S CHIP ROW: number, reason, kickoff — nothing
+     else drawn in it (no cup badge, no national group or XI chip), so it
+     can be held to one line. See the chip row below. */
+  const plainChips = r.league === col && !r.national;
   const own = r.this_season;
   const opp = r.opponent_row;
 
@@ -1645,7 +1695,11 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
          ranked card carries: those belong to a card you can open, and
          this one is not a link. A hover response with nothing behind it
          is an affordance that lies. */
-      className={`card-refused rounded-xl border bg-gradient-to-b from-elev2/60 to-elev/40 ${
+      /* THE SAME CARD AS A RANKED ONE (Son, 2026-10-07): same border
+         weight and colour, radius, padding and no shadow. The glow it
+         carried until then made it read as raised and look bigger than
+         the cards around it; what it IS, the tag in its chip row says. */
+      className={`rounded-xl border border-line bg-gradient-to-b from-elev2/60 to-elev/40 ${
         dense ? "p-4 md:p-3" : "p-4"}`}
     >
       {/* ── THE CHIP ROW, FULL WIDTH, ABOVE THE READ — RowCard's own row,
@@ -1663,9 +1717,21 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
           `flex-none`, at the card's content edge — the date's placement
           is then independent of how many chips precede it, at every
           width, and only the chips wrap. */}
-      <div className="flex items-baseline gap-3">
-        <span className={`flex min-w-0 flex-1 flex-wrap items-baseline gap-y-1 ${
-          dense ? "gap-x-3 md:gap-x-2" : "gap-x-3"}`}>
+      {/* ONE LINE, AS A RANKED CARD'S CHIP ROW IS (2026-10-07). "02 · NEW TO
+          THE LEAGUE · Sun, Sep 20, 6:00 AM" measured 296.4px in a 298px
+          card on macOS, and Linux's font metrics tipped it onto a second
+          line in CI: the refused card came out 317px against a ranked
+          card's 294 — exactly the "bigger than the cards around it" Son
+          asked to be rid of. So the gaps are 8px rather than 12, the tag's
+          tracking is 0.1em rather than 0.14 (about 16px of room at 1440),
+          and on a plain league refusal the row does NOT wrap: if a track
+          is narrower still, the tag truncates and its words stay on the
+          hover. A row carrying more chips (a cup badge, a national group)
+          keeps wrapping, as a ranked card's own chip row does. */}
+      <div className="flex items-baseline gap-2">
+        <span className={`flex min-w-0 flex-1 items-baseline gap-x-2 gap-y-1 ${
+          plainChips ? "flex-nowrap" : "flex-wrap"}`}
+          data-chips={plainChips ? "plain" : "extra"}>
           {/* WHERE `01` GOES. A rank is a POSITION in this day's ladder
               and a refused fixture is not in the ladder — so the slot
               says that, in the ladder's own place, rather than going
@@ -1682,6 +1748,21 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
               both clubs have rows, in two tables that were never
               measured against each other. A missing value needs a
               different sentence, not a shorter one. */}
+          {/* THE NUMBER, ONLY WHERE THE COLUMN'S NUMBERS ARE KICKOFF
+              POSITIONS (see `rank` above) — the same badge a ranked card
+              carries, in the same place. */}
+          {rank != null && (
+            <span data-testid="refused-number"
+              title="this card's place in the day's kickoff order"
+              className={`font-mono text-[11px] tabular-nums ${
+                rank === 1 ? "text-accent" : "text-ink-faint"}`}>
+              {String(rank).padStart(2, "0")}
+            </span>
+          )}
+          {/* WHY IT IS NOT RANKED, IN WORDS (Son, 2026-10-07: the raw
+              `no_prior_row` and `#refused` were machine text on a reader's
+              card). One small tag in the card's own chip style; the
+              backend's code and the full sentence ride on the hover. */}
           <span data-testid="refused-rank"
             title={(r.club
               ? `${r.club} has no row in the table this column ranks on, `
@@ -1689,30 +1770,18 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
                 + "rated, on two different leagues' tables, and no "
                 + "measured field puts those tables on one scale, ")
               + "so this fixture has no position in the day's ladder. A "
-              + "number here would be a placement nobody measured."}
-            className="font-mono text-[11px] tabular-nums text-ink-low">
-            {/* THE REASON STANDS WHERE THE RANK WOULD BE. "rank refused"
-                here was a third copy of a fact the #refused tag beside it
-                and the axes row below it both carry; the REASON is the
-                one thing neither of them says, and the rank slot is
-                exactly where a reader's eye already goes. */}
+              + `number here would be a placement nobody measured. (${r.reason})`}
+            className="flex min-w-0 font-mono text-[11px] tabular-nums text-ink-low">
             <span data-testid="refusal-reason"
               data-subject={r.club ? "club" : "pairing"}
-              title={`${r.club ?? pairing} — ${r.reason}`}>
-              {r.reason}
+              data-reason={r.reason}
+              title={`${r.club ?? pairing} — not ranked (${r.reason})`}
+              className={REFUSAL_WORDS[r.reason]
+                || !/\s/.test((r.reason ?? "").trim())
+                ? "min-w-0 truncate rounded border border-line px-1.5 py-[2px] text-[9px] uppercase leading-none tracking-[0.1em] text-ink-low"
+                : "min-w-0 truncate"}>
+              {refusalWords(r.reason)}
             </span>
-          </span>
-          {/* THE TAG, IN THE OPERATOR'S OWN CHARACTERS. Lower case and
-              with its `#`, because that is what he wrote and it is what
-              makes it read as a tag rather than as one more uppercase
-              badge in a row of them. It carries the card's whole status
-              in words, which is what a border can never do for a reader
-              who cannot see one. */}
-          <span data-testid="refused-tag"
-            title={"this fixture is listed but not ranked — the board refused "
-              + "to place these two clubs on one scale"}
-            className="rounded border border-line-strong bg-ink-hi/[0.06] px-1.5 py-0.5 font-mono text-[9.5px] tracking-[0.12em] text-ink-hi">
-            #refused
           </span>
           <GroupChip national={r.national} />
           <XiChip national={r.national} />
@@ -1864,8 +1933,8 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
           card's vertical rhythm identical to a ranked one's. */}
       <span data-testid="refused-dumbbell" data-refused="dumbbell"
         title={withheld}
-        className="mt-2 flex h-[9px] items-center font-mono text-[8px] uppercase leading-none tracking-[0.12em] text-ink-faint">
-        no shared ladder · refused
+        className="mt-2 flex h-[9px] items-center overflow-hidden whitespace-nowrap font-mono text-[8px] uppercase leading-none tracking-[0.12em] text-ink-faint">
+        <span className="min-w-0 truncate">no shared ladder · refused</span>
       </span>
 
       {/* ── STAGE 1, in RowRead's own row and order: the ranks pair, the
@@ -1878,8 +1947,19 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
           absence, never a dash — so the space between them gives way
           instead. The RANKED card's identical row is untouched: its
           cells are short and it already fits on one line. */}
-      <div className={`mt-2.5 flex flex-wrap items-baseline gap-y-0.5 font-mono text-[10.5px] tabular-nums ${
-        dense ? "gap-x-2.5 md:gap-x-2" : "gap-x-2.5"}`}>
+      {/* THE SAME ROW AS THE RANKED CARD'S, standing in for it (Son,
+          2026-10-07: the refused rows take the normal rows' place, they
+          are not extra rows) — so the same type size, spacing and
+          justification, and the same `stats-row` handle the one-line
+          guard reads. */}
+      {/* ONE LINE, NOT A LAST-RESORT WRAP (2026-10-07): this row stands
+          in for the ranked card's stats row, and a refused card that grows
+          a line on another machine's font is the size difference Son asked
+          to be rid of. Each cell truncates rather than wraps on a track too
+          narrow for it, and every cell carries its whole sentence on its
+          hover, so nothing is cut without its words. */}
+      <div data-testid="stats-row"
+        className="mt-2.5 flex flex-nowrap items-baseline justify-between gap-x-1.5 font-mono text-[10px] tabular-nums [&>*]:min-w-0 [&>*]:truncate">
         {/* `#N v #N`, AND WHY IT IS NOT HALF A PAIR. One of these clubs
             HAS a rank — it has a row in the table, and printing its
             position is no more a comparison than printing its name. The
@@ -1985,7 +2065,11 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
           keeps its tiers and its circled i, so the two cards have the
           same skeleton and the same height. The axes are still NAMED:
           a reader must know which figures are gone. */}
-      <div className="relative mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+      {/* ONE LINE, the ranked tiers row's height (2026-10-07): the cells
+          truncate rather than wrap, each with its hover, and the "i" sits
+          in a flex box so its inline wrapper adds no 24px line box. */}
+      <div data-testid="refused-tiers-row"
+        className="relative mt-3 flex flex-nowrap items-center gap-x-2 [&>*]:min-w-0">
         {/* FOUR NAMED ABSENCES, ONE WORD. The trio said `refused` under
             its three labels and the shape chip said it again beside them;
             the header said it a third time. Every axis is still NAMED —
@@ -1995,7 +2079,7 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
         <span data-testid="refused-tiers" data-refused="tiers"
           data-shape-refused="1"
           title={withheld}
-          className="inline-flex items-baseline gap-1 font-mono text-[10px] leading-none">
+          className="inline-flex items-baseline gap-1 overflow-hidden whitespace-nowrap font-mono text-[10px] leading-none">
           <span className="text-[7.5px] uppercase tracking-[0.12em] text-ink-faint">
             {AXIS_ORDER.join(" ")} shape
           </span>
@@ -2006,7 +2090,7 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
             data-k={adm.k} data-gp={adm.gp ?? undefined}
             data-to-go={adm.games_until_rated ?? undefined}
             title={`${adm.gate} — rated at ${adm.k} games, played ${adm.gp ?? "not stated"}`}
-            className="rounded border border-warn/35 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.08em] text-warn">
+            className="truncate rounded border border-warn/35 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.08em] text-warn">
             {adm.games_until_rated == null
               ? <>rated at {adm.k}</>
               : <>{adm.games_until_rated} to go</>}
@@ -2026,7 +2110,7 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
             centre answered the SECTION behind it. The room grows, the ink
             does not, which is the whole principle of the floor. Coarse
             pointers only; the desktop card is unchanged. */}
-        <span className="ml-auto tap-floor-room">
+        <span className="ml-auto flex flex-none items-center tap-floor-room">
           <NotesPanel
             idPrefix={`refusal-${r.event_id ?? `${r.home}-${r.away}`}`}
             testidOpen="refusal-why-open" testidPanel="refusal-notes"
@@ -2109,7 +2193,10 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
             about the market at all, and printing "no kalshi event" over
             that would be this card making a claim on the backend's
             behalf. */}
-        {"kalshi" in r
+        {mmOf(r)
+          ? <ModelMarketLines mm={mmOf(r)!} home={r.home} away={r.away}
+              quote={r.kalshi} kickedOff={rowHasKickedOff(r)} />
+          : "kalshi" in r
           ? <KalshiCell quote={r.kalshi} side={priceSide(r)} />
           : (
             <span data-testid="refused-no-market"
@@ -2120,7 +2207,10 @@ function RefusalCard({ r, col, dated = true, dense = false }: {
           )}
         {r.event_id
           ? <WatchToggle eventId={r.event_id}
-              label={`${r.home} v ${r.away}`} />
+              label={`${r.home} v ${r.away}`}
+              beside={mmOf(r)
+                ? <VerdictBox mm={mmOf(r)!} kickedOff={rowHasKickedOff(r)} />
+                : undefined} />
           : (
             <p data-testid="refused-no-watch"
               className="mt-2 font-mono text-[10px] leading-relaxed text-ink-faint">
@@ -2845,11 +2935,13 @@ export function LeagueColumn({
       sort,
       modeId: (modeById(sort.mode) ?? modeById(DEFAULT_SORT.mode)!).id,
       rows: sortRows(rows.filter((r) => localDay(r.kickoff) === k), sort),
-      // the day's refused fixtures, drawn after its ranked ones: they
-      // carry no rank, so they cannot be interleaved with numbers
+      // the day's refused fixtures. WHERE they sit and whether they carry
+      // a number is `placeRefused`'s (pickerSort): between the cards
+      // their kickoff falls between in KICKOFF sort, after the ranked
+      // cards in every gap or book sort (they have no gap to sort on)
       refused: refusals.filter((r) => r.kickoff && localDay(r.kickoff) === k),
     };
-  });
+  }).map((d) => ({ ...d, items: placeRefused(d.rows, d.refused, d.sort) }));
   /* WHAT COULD NOT BE PLACED, AND WHY — never silently dropped. A
      refusal with no kickoff, or with one outside the board's window, has
      no band to sit in. It keeps a named block rather than disappearing,
@@ -3346,7 +3438,7 @@ export function LeagueColumn({
           its own compact divider so a stacked layout still says the
           date. A day this league does not play leaves its track to the
           columns that do. */}
-      {byDay.map(({ key, rows: dayRows, modeId, refused }, di) => {
+      {byDay.map(({ key, rows: dayRows, modeId, refused, items }, di) => {
         if (dayRows.length === 0 && refused.length === 0) {
           // A REST DAY IS SAID, NOT LEFT BLANK (draft C, shipped): the
           // empty track gets a quiet cell naming the league's next
@@ -3380,16 +3472,16 @@ export function LeagueColumn({
         // and grid flow being row-major keeps it top-left.
         const cards = (
           <>
-            {dayRows.map((r, i) => (
-              <RowCard key={`${r.league}-${r.event_id}`} row={r} rank={i + 1}
-                modeId={modeId} clubCount={meta?.clubs ?? 0}
-                colSrc={meta?.src} dense={dense} hoisted={notes}
-                field={field} boardFloorNote={boardFloorNote} />
-            ))}
-            {refused.map((r, i) => (
-              <RefusalCard key={`ref-${r.event_id ?? r.club}-${i}`} r={r}
-                col={slug} dense={dense} />
-            ))}
+            {items.map((it, i) => it.kind === "row"
+              ? (
+                <RowCard key={`${it.row.league}-${it.row.event_id}`}
+                  row={it.row} rank={it.rank}
+                  modeId={modeId} clubCount={meta?.clubs ?? 0}
+                  colSrc={meta?.src} dense={dense} hoisted={notes}
+                  field={field} boardFloorNote={boardFloorNote} />)
+              : (
+                <RefusalCard key={`ref-${it.r.event_id ?? it.r.club}-${i}`}
+                  r={it.r} col={slug} dense={dense} rank={it.rank} />))}
           </>
         );
         return (

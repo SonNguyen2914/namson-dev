@@ -129,6 +129,32 @@ for (const key of SEVEN) {
   }
 }
 
+// THE SCOUTING LABEL DOES NOT STRETCH A CLUB FINDING ONTO NATIONS
+// (2026-10-07). ESPN form + H2H was measured non-predictive on the CLUB
+// corpus, and the panel's header says so on a club hub. A national hub
+// carries the same panel and says the finding was never measured there,
+// rather than borrowing it. Synthetic H2H row, dated before 2026-09-27.
+for (const key of ["bundesliga", "unl"] as const) {
+  test(`${key} hub: the scouting header names what was measured`, async ({ page }) => {
+    const h2h = [{ perspective: "NTH", result: "W", home_score: "2",
+      away_score: "0", at_vs: "vs", opponent: "STH",
+      date: "2026-03-01T18:00Z" }];
+    const body = payload(key, "pre");
+    const errors = await openHub(page, key,
+      { ...body, match: { ...body.match,
+        scouting: { last_five: [], head_to_head: h2h } } },
+      WHEN.pre.clock);
+    const label = page.getByTestId("scouting-display-only");
+    await expect(label).toBeVisible();
+    await expect(label).toHaveText(CHAMPS.has(key)
+      ? "display only — never measured for national teams"
+      : "display only — measured non-predictive");
+    await expect(page.getByRole("button", { name: /ESPN form \+ H2H/i }))
+      .toHaveAttribute("aria-expanded", "false");
+    expect(errors, "the page threw").toEqual([]);
+  });
+}
+
 test("a captured board read is drawn with its label and clock, never its numbers", async ({ page }) => {
   const errors = await openHub(page, "bundesliga",
     payload("bundesliga", "post", { board_read: CAPTURED_READ }), WHEN.post.clock);
