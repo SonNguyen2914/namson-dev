@@ -189,6 +189,14 @@ export interface LiveStateFetch {
   status_short?: string;
   is_live?: boolean;
   is_finished?: boolean;
+  /** which provider answered ("espn" | "api-football"); `budget` beside
+   *  it is API-Football's counter and says nothing about an ESPN read */
+  source?: string | null;
+  /** TRUE WHEN THE PROVIDER SENT NO CLOCK. `minutes_elapsed` is then the
+   *  backend's fold (0.0 run through sim_minutes into a period floor),
+   *  not an observed minute — read it as absent */
+  minute_unread?: boolean;
+  /** the refusal's sentence, naming which provider ran (available: false) */
   reason?: string;
   budget: {
     calls_today: number; daily_cap: number;
