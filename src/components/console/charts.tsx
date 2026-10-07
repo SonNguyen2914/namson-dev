@@ -43,7 +43,7 @@ export function DailyPnlChart({ days, limit, height = 180, testid }: {
               : s.settled_pnl_dollars > 0 ? "text-up" : s.settled_pnl_dollars < 0 ? "text-neg" : "text-ink-hi"}`}>
               {s.settled_pnl_dollars === null ? "settled P&L not sent" : usd(s.settled_pnl_dollars, true)}
             </span>
-            <span className="tc-num text-ink-low">{s.rows ?? "?"} rows · W–L–U {wlu(s)}</span>
+            <span className="tc-num text-ink-low">{s.rows ?? "?"} rows · {wlu(s)}</span>
             <span className="tc-num text-ink-low">open {usd(s.open_cost_dollars)}</span>
             {s.over_daily_limit === true && <span className="text-warn">◆ daily loss limit reached</span>}
           </>
@@ -98,8 +98,7 @@ export function DailyPnlChart({ days, limit, height = 180, testid }: {
       <div className="mt-1 flex flex-wrap gap-x-4 text-[11px] text-ink-low">
         <span><span className="mr-1 inline-block h-2 w-2 rounded-[1px] bg-up/80 align-middle" />gain</span>
         <span><span className="mr-1 inline-block h-2 w-2 rounded-[1px] bg-neg/80 align-middle" />loss</span>
-        {limit !== null && <span><span className="mr-1 inline-block w-3 border-t border-dashed border-warn align-middle" />daily loss limit {usd(limit)}</span>}
-        <span>settled P&amp;L by the day the order was placed, as the backend summed it</span>
+        {limit !== null && <span title="daily loss limit"><span className="mr-1 inline-block w-3 border-t border-dashed border-warn align-middle" />limit {usd(limit)}</span>}
       </div>
     </div>
   );

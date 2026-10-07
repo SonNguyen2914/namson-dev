@@ -16,7 +16,7 @@ import { auditFloor } from "./the-touch-floor";
  *   - typing the token on the board draws the chip;
  *   - pressing it lands on the console ALREADY AUTHENTICATED: one status
  *     read, carrying the token, with no typing and no debounce wait — the
- *     page never once says "held in this tab only" (which is what it
+ *     page never once says "this tab only" (which is what it
  *     says while no token is armed);
  *   - the token is in no storage, and a reload forgets it and the chip;
  *   - the console has a way back to everything: the logo goes home, the
@@ -135,7 +135,7 @@ test("a token typed on the board draws the chip, and pressing it opens the "
       w.__unarmed = 0;
       new MutationObserver(() => {
         const s = document.querySelector('[data-testid="ops-state"]');
-        if (s?.textContent?.includes("held in this tab only")) w.__unarmed += 1;
+        if (s?.textContent?.includes("this tab only")) w.__unarmed += 1;
       }).observe(document.body,
         { childList: true, subtree: true, characterData: true });
     });
@@ -167,7 +167,7 @@ test("a token typed on the board draws the chip, and pressing it opens the "
     await page.reload();
     await expect(page.locator("#watch-token")).toHaveValue("");
     await expect(page.getByTestId("ops-state"))
-      .toContainText("held in this tab only");
+      .toContainText("this tab only");
     await page.waitForTimeout(1_200);
     await expect(chip).toHaveCount(0);
     await expect(page.locator('a[href="/ops/trading"]')).toHaveCount(0);

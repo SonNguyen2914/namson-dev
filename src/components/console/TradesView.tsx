@@ -25,7 +25,7 @@ import {
   pnlWords, resultWords, riskLines, signedDollars,
 } from "../../lib/tradingLedger";
 import {
-  CTRL, ErrorNote, Freshness, InfoNote, Metric, Panel, TH, Tech, ago, count, usd,
+  CTRL, ErrorNote, Freshness, Info, InfoNote, Metric, Panel, TH, Tech, ago, count, usd, whenShort,
 } from "./primitives";
 import type { LedgerSource } from "./useConsoleData";
 
@@ -124,9 +124,12 @@ function Grounds({ r }: { r: LedgerRow }) {
 
 // ------------------------------------------------------------- the row
 
-const HEAD = ["", "time", "match", "market", "side", "price", "size", "edge vs bar", "status", "p&l", "why"];
+// WHY is not a default column (the brief's default: time, match, market,
+// side, price, size, status, P&L): the trader's sentence is the first line
+// of the grounds, one click away, and the row's tooltip.
+const HEAD = ["", "time", "match", "market", "side", "price", "size", "edge vs bar", "status", "p&l"];
 const RIGHT = new Set([5, 6, 7, 9]);
-const TD = "border-b border-tc-line px-3 py-2 align-top";
+const TD = "border-b border-tc-line px-2.5 py-1 align-top whitespace-nowrap";
 
 function Row({ r, open, onToggle, boxW }: { r: LedgerRow; open: boolean; onToggle: () => void; boxW: number | null }) {
   const o = r.outcome.status;
@@ -139,7 +142,7 @@ function Row({ r, open, onToggle, boxW }: { r: LedgerRow; open: boolean; onToggl
     <>
       <tr data-testid="ledger-row" data-row-id={r.id} data-ticker={r.market.ticker ?? ""}
         data-kind={r.row_type} data-result={o ?? "not_recorded"}
-        data-placed-at={r.placed_at ?? undefined} data-phase={r.phase ?? ""}
+        data-placed-at={r.placed_at ?? undefined} data-phase={r.phase ?? ""} title={r.why ?? undefined}
         className={`transition-colors hover:bg-tc-hover ${open ? "bg-tc-raised" : ""}`}>
         <td className={`${TD} pl-4 pr-1`}>
           <button type="button" data-testid="ledger-expand" aria-expanded={open} aria-controls={id} onClick={onToggle}
@@ -149,25 +152,26 @@ function Row({ r, open, onToggle, boxW }: { r: LedgerRow; open: boolean; onToggl
           </button>
         </td>
         <td className={`${TD} whitespace-nowrap`}>
-          <span data-testid="ledger-time" className="tc-num block text-[12.5px] text-ink-hi">{when(r.placed_at)}</span>
+          <span data-testid="ledger-time" className="tc-num block text-[12.5px] text-ink-hi" title={when(r.placed_at)}>{r.placed_at ? whenShort(r.placed_at) : NOT_RECORDED}</span>
           <span data-testid="ledger-phase" className="block text-[11px] text-ink-low">
             {phaseWords(r.phase)}{minute !== null && <span className="text-live"> · {minute}′</span>}
           </span>
         </td>
-        <td data-testid="ledger-match" className={`${TD} min-w-[160px] max-w-[260px]`}>
-          <span className="block text-[12.5px] leading-snug text-ink-hi">
+        <td data-testid="ledger-match" className={`${TD} max-w-[230px]`}>
+          <span className="block truncate text-[12.5px] leading-snug text-ink-hi" title={fx.label ?? undefined}>
             {fx.label ?? (fx.home === null && fx.away === null ? "match not recorded"
               : `${fx.home ?? "home not recorded"} v ${fx.away ?? "away not recorded"}`)}
           </span>
-          <span className="block text-[11px] text-ink-low">{compLabel(r.competition)} · kickoff {when(fx.kickoff_utc)}</span>
-          {fx.key_source === "same_event" && (
-            <span data-testid="ledger-fixture-borrowed" className="block text-[11px] text-ink-low">
-              fixture from an order on the same Kalshi event (not recorded on this row)
-            </span>
-          )}
+          <span className="block truncate text-[11px] text-ink-low" title={`${compLabel(r.competition)} · kickoff ${when(fx.kickoff_utc)}`}>
+            {compLabel(r.competition)} · {fx.kickoff_utc ? whenShort(fx.kickoff_utc) : NOT_RECORDED}
+            {fx.key_source === "same_event" && (
+              <span data-testid="ledger-fixture-borrowed" title="fixture from an order on the same Kalshi event (not recorded on this row)"> · borrowed</span>
+            )}
+          </span>
         </td>
-        <td data-testid="ledger-contract" className={`${TD} min-w-[170px] max-w-[280px]`}>
-          <span className="block text-[12.5px] leading-snug text-ink-hi">
+        <td data-testid="ledger-contract" className={`${TD} max-w-[250px]`}>
+          <span className="block truncate text-[12.5px] leading-snug text-ink-hi"
+            title={`${r.market.contract ?? ""} · ${familyWords(r.market.family)} · ${r.market.outcome_key ?? NOT_RECORDED}`}>
             {r.market.contract ?? `contract ${NOT_RECORDED}`}
             {r.row_type !== "order" && (
               <span data-testid="ledger-handed-chip"
@@ -177,12 +181,11 @@ function Row({ r, open, onToggle, boxW }: { r: LedgerRow; open: boolean; onToggl
             )}
           </span>
           <Tech className="block truncate" title={r.market.ticker ?? undefined}>{r.market.ticker ?? `ticker ${NOT_RECORDED}`}</Tech>
-          <span className="block text-[11px] text-ink-low">{`${familyWords(r.market.family)} · ${r.market.outcome_key ?? NOT_RECORDED}`}</span>
         </td>
         <td data-testid="ledger-side" className={`${TD} font-medium text-ink-hi`}>{r.side ? r.side.toUpperCase() : NOT_RECORDED}</td>
         <td data-testid="ledger-price" className={`${TD} tc-num whitespace-nowrap text-right text-ink-hi`}>
           {cents(r.price_cents)}
-          <span className="block text-[11px] text-ink-low">YES book {cents(r.yes_book_price_cents)}</span>
+          <span className="block text-[11px] text-ink-low" title="the YES book price">YES book {cents(r.yes_book_price_cents)}</span>
         </td>
         <td className={`${TD} tc-num whitespace-nowrap text-right`}>
           <span data-testid="ledger-size" className="block text-ink-hi">{count(r.count)}</span>
@@ -192,14 +195,14 @@ function Row({ r, open, onToggle, boxW }: { r: LedgerRow; open: boolean; onToggl
         </td>
         <td data-testid="ledger-edge" data-clears={cleared || undefined}
           className={`${TD} tc-num whitespace-nowrap text-right ${cleared ? "font-semibold text-ink-hi" : "text-ink-low"}`}>
-          {edgeWords(r)}
-          {note && <span className="block text-[11px] font-normal text-ink-low">{note}</span>}
+          <span title={note ?? undefined}>{edgeWords(r)}{note ? <span className="font-normal text-ink-faint"> *</span> : null}</span>
         </td>
         <td className={`${TD} whitespace-nowrap`}>
-          <span data-testid="ledger-fill" className="block text-[12px] text-ink-mid">
+          <span data-testid="ledger-fill" className="block max-w-[200px] truncate text-[12px] text-ink-mid"
+            title={`${fillWords(r)}${r.lifecycle.cancels.length > 0 ? ` · ${r.lifecycle.cancels.map((c) => c.reason ?? NOT_RECORDED).join(", ")}` : ""}`}>
             {fillWords(r)}
             {r.lifecycle.cancels.length > 0 && (
-              <span className="block text-[11px] text-ink-low">{r.lifecycle.cancels.map((c) => c.reason ?? NOT_RECORDED).join(", ")}</span>
+              <span className="text-[11px] text-ink-low"> · {r.lifecycle.cancels.map((c) => c.reason ?? NOT_RECORDED).join(", ")}</span>
             )}
           </span>
           <span data-testid="ledger-result"
@@ -208,11 +211,8 @@ function Row({ r, open, onToggle, boxW }: { r: LedgerRow; open: boolean; onToggl
           </span>
         </td>
         <td data-testid="ledger-pnl"
-          className={`${TD} tc-num whitespace-nowrap text-right font-medium ${o === "won" || o === "lost" ? plTone(r.outcome.pnl_dollars) : "text-ink-low"}`}>
+          className={`${TD} tc-num whitespace-nowrap pr-4 text-right font-medium ${o === "won" || o === "lost" ? plTone(r.outcome.pnl_dollars) : "text-ink-low"}`}>
           {pnlWords(r)}
-        </td>
-        <td data-testid="ledger-why" className={`${TD} min-w-[200px] max-w-[300px] pr-4 text-[12px] leading-snug text-ink-mid`}>
-          <span className="line-clamp-2" title={r.why ?? undefined}>{r.why ?? NOT_RECORDED}</span>
         </td>
       </tr>
       {open && (
@@ -312,29 +312,26 @@ export function TradesView({ now, source, client, setClient, open, setOpen, stat
   const setC = (k: keyof LedgerClientFilters, v: string) => setClient((c) => ({ ...c, [k]: v }));
 
   return (
-    <div className="space-y-4">
-      <Panel testid="ops-ledger" title="Trades & grounds"
-        meta={l ? <Freshness at={at} now={now} cadenceMs={source.cadenceMs} failed={read.kind === "error"} label="ledger" /> : undefined}
+    <div className="space-y-3">
+      <Panel testid="ops-ledger" title="Trades"
+        info={<>Every order the trader placed and every contract you handed over to it: the grounds it recorded when
+          it placed, what became of the order, and — once its market settled in the trader&apos;s journal — the result
+          and that order&apos;s own P&amp;L. &ldquo;Edge&rdquo; is the trader&apos;s own estimate at the time, not
+          evidence of an edge, and our model&apos;s number is unvalidated. Only the trader&apos;s orders and handed-over contracts: your own manual
+          bets are not here. Prices in cents of the side bought (the YES book beside it); money in dollars.</>}
+        meta={l ? <Freshness at={at} now={now} cadenceMs={source.cadenceMs} failed={read.kind === "error"} /> : undefined}
         bodyClass="py-0">
-        <p className="border-b border-tc-line px-4 py-2 text-[12px] leading-relaxed text-ink-low">
-          <span className="text-warn">experimental · unproven</span> — every order the trader placed and every contract you
-          handed over to it: the grounds it recorded when it placed, what became of the order, and — once its market
-          settled in the trader&apos;s journal — the result and that order&apos;s own P&amp;L. &ldquo;Edge&rdquo; is
-          the trader&apos;s own estimate at the time, not evidence of an edge, and our model&apos;s number is
-          unvalidated. Only the trader&apos;s orders and handed-over contracts: your own manual bets are not here.
-          Prices in cents of the side bought (the YES book beside it); money in dollars.
-        </p>
 
         {/* ---- filters ---- */}
         <div data-testid="ledger-filters" role="group" aria-label="filter the ledger"
-          className="flex flex-wrap items-end gap-2 border-b border-tc-line px-4 py-3">
+          className="flex flex-wrap items-end gap-2 border-b border-tc-line px-4 py-2">
           <label className="flex flex-col gap-1">
-            <span className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low">from (UTC day)</span>
+            <span className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low" title="UTC day">from</span>
             <input type="date" data-testid="ledger-filter-since" value={filters.since}
               onChange={(e) => setFilter("since", e.target.value)} className={CTRL} />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low">to (UTC day)</span>
+            <span className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low" title="UTC day">to</span>
             <input type="date" data-testid="ledger-filter-until" value={filters.until}
               onChange={(e) => setFilter("until", e.target.value)} className={CTRL} />
           </label>
@@ -378,80 +375,81 @@ export function TradesView({ now, source, client, setClient, open, setOpen, stat
           </label>
           <label className="flex min-w-[200px] flex-1 flex-col gap-1 sm:max-w-[280px]">
             <span className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low">search</span>
-            <input type="search" data-testid="ledger-filter-search" value={client.q} placeholder="match, market, ticker, order id…"
+            <input type="search" data-testid="ledger-filter-search" value={client.q} placeholder="match, ticker, order id"
               onChange={(e) => setC("q", e.target.value)} className={`${CTRL} w-full`} />
           </label>
           {(serverFiltered || clientFiltered) && (
             <button type="button" data-testid="ledger-filter-clear"
               onClick={() => { if (serverFiltered) clearFilters(); setClient(NO_LEDGER_CLIENT); }}
-              className={`${CTRL} self-end text-ink-mid`}>Clear filters</button>
+              className={`${CTRL} self-end text-ink-mid`}>Clear</button>
           )}
           {rows.length > 0 && (
-            <span className="ml-auto flex flex-col items-end gap-0.5 self-end">
+            <span className="ml-auto flex items-center gap-1.5 self-end">
               <button type="button" data-testid="ledger-export" onClick={exportCsv}
                 className={`${CTRL} border-tc-line-strong font-medium`}>Export CSV</button>
-              <span className="text-[10.5px] text-ink-low">
-                the {rows.length} loaded rows · blank cell = not recorded · your own download, never research data
-              </span>
+              <Info label="the CSV export">
+                The {rows.length} loaded rows · blank cell = not recorded · your own download, never research data.
+              </Info>
             </span>
           )}
         </div>
 
-        <div className="px-4 py-3">
+        <div className="px-4 py-2">
           {read.kind === "unavailable" && (
             <p data-testid="ledger-unavailable" className="text-[12.5px] text-ink-low">
-              Trades &amp; grounds not available yet — this backend does not serve the trader&apos;s ledger. The rest of the console is unaffected.
+              Trades &amp; grounds not available yet
             </p>
           )}
           {read.kind === "refused" && <ErrorNote testid="ledger-error">token rejected — the backend refused it ({read.detail})</ErrorNote>}
           {read.kind === "error" && <ErrorNote testid="ledger-error" tone="warn">the ledger read failed (HTTP {read.status}) — {read.detail}</ErrorNote>}
-          {read.kind === "idle" && !l && <InfoNote>reading the ledger…</InfoNote>}
+          {read.kind === "idle" && !l && <InfoNote>reading…</InfoNote>}
 
           {l && (
             <div data-testid="ledger-body" data-stale={stale || undefined}>
               {page?.scan_complete === false && (
-                <p data-testid="ledger-scan-partial" role="note" className="mb-2 text-[12px] text-warn">
-                  ◆ only the newest {page.scan_max ?? "?"} journal rows were read — the summary and these rows cover those;
-                  narrow the dates to see older ones
+                <p data-testid="ledger-scan-partial" role="note" className="mb-1.5 text-[12px] text-warn"
+                  title="the summary and these rows cover those; narrow the dates to see older ones">
+                  ◆ only the newest {page.scan_max ?? "?"} journal rows were read
                 </p>
               )}
               {!l.summary ? (
-                <p data-testid="ledger-summary-absent" className="text-[12px] text-ink-low">
-                  summary not sent by this backend — the rows below are all there is
+                <p data-testid="ledger-summary-absent" className="text-[12px] text-ink-low" title="the rows below are all there is">
+                  summary not sent by this backend
                 </p>
               ) : t ? (
-                <div data-testid="ledger-totals" className="grid grid-cols-3 gap-x-6 gap-y-3 sm:grid-cols-6 xl:grid-cols-12">
+                <div data-testid="ledger-totals" className="grid grid-cols-3 gap-x-5 gap-y-2 sm:grid-cols-6 xl:grid-cols-12">
                   {([
                     ["rows", "rows", count(t.rows)], ["orders", "placed", count(t.orders)],
                     ["filled", "filled", count(t.filled)], ["not_filled", "not filled", count(t.not_filled)],
                     ["won", "won", count(t.won)], ["lost", "lost", count(t.lost)],
-                    ["unsettled", "unsettled", count(t.unsettled)], ["cost", "filled cost (fees in)", usd(t.cost_dollars)],
+                    ["unsettled", "unsettled", count(t.unsettled)], ["cost", "cost", usd(t.cost_dollars)],
                     ["fees", "fees", usd(t.fees_dollars)],
                     ["pnl", "settled P&L", signedDollars(t.settled_pnl_dollars)],
-                    ["open", "open (unsettled cost)", usd(t.open_cost_dollars)],
+                    ["open", "open", usd(t.open_cost_dollars)],
                     ...(t.unknown !== null && t.unknown > 0 ? [["unknown", "P&L unknown", count(t.unknown)]] : []),
                   ] as [string, string, string][]).map(([id, k, v]) => (
                     <Metric key={id} testid={`ledger-total-${id}`} size="sm" label={k} value={v}
+                      sub={id === "cost" ? "Filled cost (fees in)" : id === "open" ? "Open (unsettled cost)" : undefined}
                       tone={id === "pnl" ? (t.settled_pnl_dollars === null || t.settled_pnl_dollars === 0 ? "text-ink-hi" : t.settled_pnl_dollars > 0 ? "text-up" : "text-neg")
                         : id === "unknown" ? "text-warn" : "text-ink-hi"} />
                   ))}
                 </div>
               ) : <p className="text-[12px] text-ink-low">totals not sent</p>}
               {l.summary && !l.summary.complete && (
-                <p data-testid="ledger-incomplete" role="note" className="mt-2 text-[12px] text-warn">
+                <p data-testid="ledger-incomplete" role="note" className="mt-1.5 text-[12px] text-warn">
                   ◆ {`incomplete: ${t?.unknown ?? "some"} row${t?.unknown === 1 ? "" : "s"} had a fill `
                     + "that could not be read, so their cost and P&L are not in these sums"}
                 </p>
               )}
-              <p data-testid="ledger-count" className="tc-num mt-3 text-[12px] text-ink-low">
+              <p data-testid="ledger-count" className="tc-num mt-2 text-[12px] text-ink-low">
                 {rows.length} row{rows.length === 1 ? "" : "s"}
                 {page?.matching !== null && page?.matching !== undefined && page.matching !== rows.length ? ` of ${page.matching}` : ""}
-                {" "}· newest first · {source.nextOffset !== null ? "more on the backend" : "all loaded"}
+                {" "}· {source.nextOffset !== null ? "more on the backend" : "all loaded"}
                 {clientFiltered ? ` · ${shown.length} match the page's filters` : ""}
                 {l.unreadable > 0 && (
                   <span className="text-warn"> · {l.unreadable} row{l.unreadable === 1 ? "" : "s"} unreadable (not a ledger row), not drawn</span>
                 )}
-                {` · read ${when(new Date(at!).toISOString())}`}
+
                 {stale && <span className="text-warn"> · stale, {ago(now - at!)} old</span>}
               </p>
             </div>
@@ -466,7 +464,7 @@ export function TradesView({ now, source, client, setClient, open, setOpen, stat
           </div>
         ) : (
           <div ref={box} className="tc-scroll max-h-[75vh] overflow-auto border-t border-tc-line">
-            <table data-testid="ledger-table" className="tc-table w-full min-w-[1180px] border-collapse text-[12.5px]">
+            <table data-testid="ledger-table" className="tc-table w-full min-w-[980px] border-collapse text-[12.5px]">
               <thead>
                 <tr>
                   {HEAD.map((h, i) => (
@@ -485,7 +483,7 @@ export function TradesView({ now, source, client, setClient, open, setOpen, stat
           </div>
         ))}
         {l && (
-          <div className="border-t border-tc-line px-4 py-3">
+          <div className="border-t border-tc-line px-4 py-2">
             {source.nextOffset !== null && (
               <button type="button" data-testid="ledger-more" onClick={() => void source.loadOlder()}
                 disabled={source.more.busy} className={`${CTRL} text-ink-mid disabled:opacity-40`}>
@@ -497,10 +495,10 @@ export function TradesView({ now, source, client, setClient, open, setOpen, stat
                 the older page could not be read — {source.more.error}
               </p>
             )}
-            <p className="mt-2 font-mono text-[10.5px] text-ink-faint">
-              {l.version ?? "version not stated"}{l.env ? ` · ${l.env}` : ""} · generated {when(l.generated_at)} · read every 60 s while a token is held
+            <p className="mt-1.5 font-mono text-[10.5px] text-ink-faint" title={`generated ${when(l.generated_at)} · read every 60 s while a token is held`}>
+              {l.version ?? "version not stated"}{l.env ? ` · ${l.env}` : ""}
             </p>
-            {l.seal && <p data-testid="ledger-seal" className="mt-1 font-mono text-[10.5px] text-ink-faint">{l.seal}</p>}
+            {l.seal && <p className="mt-0.5 flex items-center gap-1.5 font-mono text-[10.5px] text-ink-faint">seal <Info label="the seal" testid="ledger-seal">{l.seal}</Info></p>}
           </div>
         )}
       </Panel>

@@ -14,8 +14,8 @@ import { TradingKillLift } from "../TradingKillLift";
 import { OwnerChip, bookDollars, bookPl, plTone } from "../TradingBook";
 import { DailyPnlChart } from "./charts";
 import {
-  DASH, DecisionBadge, Disclosure, Dot, EmptyNote, ErrorNote, Freshness, InfoNote, Label, Metric,
-  Panel, RiskBar, SubHead, Tech, agoIso, clockTime, count, numOf, pnlTone, usd, when,
+  DASH, DecisionBadge, Disclosure, Dot, EmptyNote, ErrorNote, Freshness, Info, InfoNote, Label, Metric,
+  Panel, RiskBar, SubHead, Tech, agoIso, clockTime, count, numOf, pnlTone, usd, when, whenShort,
 } from "./primitives";
 import { hrefOf } from "./route";
 import type { SectionReads } from "./useConsoleData";
@@ -31,23 +31,58 @@ const SEV: Record<Severity, { dot: "bad" | "warn" | "info"; word: string; cls: s
 
 // ------------------------------------------------------------- safety
 
-function SafetyCell({ label, value, state, sub, testid }: {
-  label: string; value: ReactNode; state: "ok" | "warn" | "bad" | "off" | "info"; sub?: ReactNode; testid?: string;
+function SafetyCell({ label, value, state, sub, inline, testid }: {
+  label: string; value: ReactNode; state: "ok" | "warn" | "bad" | "off" | "info";
+  /** the gloss — behind the ⓘ */
+  sub?: ReactNode;
+  /** a state the operator must see (the kill's end, the halt's re-arm) */
+  inline?: ReactNode; testid?: string;
 }) {
   return (
     <div data-testid={testid} data-state={state} className="min-w-0">
-      <Label>{label}</Label>
-      <div className={`mt-1 flex items-center gap-2 text-[15px] font-semibold ${
+      <span className="flex items-center gap-1.5">
+        <Label>{label}</Label>
+        {sub && <Info label={label}>{sub}</Info>}
+      </span>
+      <div className={`mt-0.5 flex items-center gap-2 text-[14px] font-semibold ${
         state === "bad" ? "text-neg" : state === "warn" ? "text-warn" : "text-ink-hi"}`}>
         <Dot state={state} />{value}
       </div>
-      {sub && <div className="mt-0.5 text-[11.5px] leading-snug text-ink-low">{sub}</div>}
+      {inline && <div className="mt-0.5 text-[11.5px] leading-snug text-ink-low">{inline}</div>}
     </div>
   );
 }
 
-export function SafetyPanel({ d, now, token, bumpStatus }: {
-  d: Obj; now: number; token: string; bumpStatus: () => void;
+/** HOW TO STOP IT and WHAT THIS CONSOLE CAN CHANGE — the words that used
+ *  to sit open on the Safety panel, now one ⓘ away wherever the lift
+ *  control is (the unfolded panel, or the rail's Controls menu). */
+export function StopHowTo() {
+  return (
+    <span data-testid="ops-stop" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-low">
+      How to stop
+      <Info label="how to stop it" testid="ops-stop-info">
+        <span className="block">
+          Set <code className="font-mono text-ink-hi">TRADING_KILL=true</code> on the Railway backend service (the
+          next tick places nothing), or delete the agent&apos;s Kalshi API key.
+        </span>
+        <span className="mt-1.5 block text-ink-low">
+          This console cannot place or stop anything. It changes three things: which of your positions the trader
+          may manage (a take-back also cancels the trader&apos;s own resting orders on that market, on its next
+          tick), the careful strategy&apos;s per-competition switch (off = paper only), and &ldquo;Lift operator
+          kill&rdquo;, which ends an operator kill set through the backend&apos;s kill route. It cannot lift
+          TRADING_KILL on Railway.
+        </span>
+      </Info>
+    </span>
+  );
+}
+
+/** SAFETY & CONTROL, UNFOLDED: drawn only while something is not normal
+ *  (consoleModel.safetyTriggers) — otherwise its states are the rail's
+ *  pills and its controls the rail's Controls menu. `triggers` says why
+ *  it is open, in a word or two each. */
+export function SafetyPanel({ d, token, bumpStatus, triggers }: {
+  d: Obj; now: number; token: string; bumpStatus: () => void; triggers: string[];
 }) {
   const halt = obj(d.halt);
   const killed = d.kill === true;
@@ -57,14 +92,14 @@ export function SafetyPanel({ d, now, token, bumpStatus }: {
   const loud = killed || halted;
   return (
     <section data-testid="ops-safety" data-focus="safety" aria-labelledby="safety-h"
-      className={`rounded-lg border ${loud ? "border-neg/50 bg-neg/[0.04]" : "border-tc-line-strong bg-tc-panel"}`}>
-      <header className="flex flex-wrap items-baseline justify-between gap-2 border-b border-tc-line px-4 py-2.5">
+      className={`rounded-lg border ${loud ? "border-neg/50 bg-neg/[0.04]" : "border-warn/40 bg-tc-panel"}`}>
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-tc-line px-4 py-2">
         <h2 id="safety-h" className="text-[13px] font-semibold text-ink-hi">Safety &amp; control</h2>
-        <span className="text-[11.5px] text-ink-low">
-          {loud ? "Nothing is placed while this holds." : "Read from the status route; the console cannot place or stop orders."}
+        <span data-testid="safety-why" className={`text-[11.5px] ${loud ? "text-neg" : "text-warn"}`}>
+          {loud ? "■" : "◆"} {triggers.join(" · ")}
         </span>
       </header>
-      <div className="grid grid-cols-2 gap-x-6 gap-y-4 px-4 py-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-x-6 gap-y-3 px-4 py-2.5 lg:grid-cols-6">
         <SafetyCell testid="safety-trading" label="Real trading"
           value={loud ? "Blocked" : d.enabled === true ? (d.paper_only === true ? "Paper only" : "Enabled")
             : d.enabled === false ? "Disabled" : "Not stated"}
@@ -75,42 +110,27 @@ export function SafetyPanel({ d, now, token, bumpStatus }: {
         <SafetyCell testid="safety-kill" label="Kill switch"
           value={killed ? "ACTIVE" : d.kill === false ? "Off" : "Not stated"}
           state={killed ? "bad" : d.kill === false ? "info" : "warn"}
-          sub={killed ? <>
-            {typeof d.kill_until === "string" && d.kill_until !== ""
-              ? <>until {when(d.kill_until, true)} · </> : null}
-            source not stated by the status route — TRADING_KILL or an operator kill
-          </> : "TRADING_KILL or an operator kill"} />
+          inline={killed && typeof d.kill_until === "string" && d.kill_until !== "" ? <>until {when(d.kill_until, true)}</> : undefined}
+          sub={killed ? "Source not stated by the status route — TRADING_KILL or an operator kill."
+            : "TRADING_KILL or an operator kill"} />
         <SafetyCell testid="safety-halt" label="Loss halt"
           value={halted ? (str(halt?.reason) ?? "ACTIVE").replace(/_/g, " ") : halt?.active === false ? "None" : "Not stated"}
           state={halted ? "bad" : halt?.active === false ? "info" : "warn"}
-          sub={halted ? <>since {when(halt?.since)} · re-arm: {str(halt?.rearm) ?? "not sent"}</> : "daily loss or drawdown"} />
+          inline={halted ? <>since {when(halt?.since)}</> : undefined}
+          sub={halted ? <>re-arm: {str(halt?.rearm) ?? "not sent"}</> : "daily loss or drawdown"} />
         <SafetyCell testid="safety-env" label="Environment" value={(str(d.env) ?? "not stated").toUpperCase()}
           state="info" sub={<>strategy <Tech>{str(d.strategy) ?? DASH}</Tech></>} />
-        <SafetyCell testid="safety-inplay" label="In-play trading"
-          value={ip?.enabled === true ? "Enabled" : ip?.enabled === false ? "Off" : DASH}
+        <SafetyCell testid="safety-inplay" label="In-play"
+          value={ip?.enabled === true ? (ip.active === true ? "Active" : "Enabled") : ip?.enabled === false ? "Off" : DASH}
           state={ip?.enabled === true ? "info" : "off"}
           sub={ip ? <><Tech>{str(ip.strategy) ?? "strategy not sent"}</Tech>{ip.active === true ? " · active" : ""}</> : undefined} />
         <SafetyCell testid="safety-day" label="Trading day" value={str(day?.day) ?? DASH} state="info"
           sub={day ? <>{str(day.tz) ?? "zone not sent"}{day.valid === false ? " (zone unreadable: UTC)" : ""} · ends {when(day.ends_at)}</> : undefined} />
       </div>
-      <div className="grid gap-x-8 gap-y-3 border-t border-tc-line px-4 py-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-2 border-t border-tc-line px-4 py-2">
         <TradingKillLift token={token} onDone={bumpStatus} active={killed} />
-        <div data-testid="ops-stop" className="text-[12px] leading-relaxed text-ink-mid">
-          <span className="mr-2 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-low">How to stop it</span>
-          set <code className="font-mono text-ink-hi">TRADING_KILL=true</code>{" "}on the Railway backend service (the next
-          tick places nothing), or delete the agent&apos;s Kalshi API key.
-          <Disclosure summary="What this console can and cannot change">
-            <p className="text-[11.5px] leading-relaxed text-ink-low">
-              It cannot place or stop anything. It changes three things: which of your positions the trader may
-              manage (a take-back also cancels the trader&apos;s own resting orders on that market, on its next
-              tick), the careful strategy&apos;s per-competition switch (off = paper only), and &ldquo;Lift operator
-              kill&rdquo;, which ends an operator kill set through the backend&apos;s kill route. It cannot lift
-              TRADING_KILL on Railway.
-            </p>
-          </Disclosure>
-        </div>
+        <StopHowTo />
       </div>
-      <span className="sr-only">checked {agoIso(d.generated_at, now) ?? DASH} ago</span>
     </section>
   );
 }
@@ -123,7 +143,7 @@ function DailyBudget({ d }: { d: Obj }) {
     return (
       <div data-testid="careful-budget-absent">
         <Label>Daily budget</Label>
-        <p className="mt-1 text-[12px] text-ink-low">not served yet — this backend sends no daily budget</p>
+        <p className="mt-1 text-[12px] text-ink-low" title="this backend sends no daily budget">not served yet</p>
       </div>
     );
   }
@@ -138,11 +158,13 @@ function DailyBudget({ d }: { d: Obj }) {
   return (
     <div data-testid="careful-budget">
       <RiskBar label="Daily budget" cls="agent" used={b.used} limit={b.limit} gainAware={false}
+        flag={numOf(b.remaining) !== null && numOf(b.remaining)! <= 0
+          ? <span className="tc-num text-warn">◆ spent · remaining {usd(b.remaining)}</span> : undefined}
         sub={<>
-          <span className="tc-num">remaining <span className={numOf(b.remaining) !== null && numOf(b.remaining)! <= 0 ? "text-warn" : "text-ink-hi"}>{usd(b.remaining)}</span></span>
-          {" · "}realised (net) {usd(b.realised)} · open {usd(b.open_positions)} · resting {usd(b.resting_orders)}
-          <span className="block text-ink-faint">
-            every new order must fit with its own worst case · day {str(b.trading_day) ?? DASH} {str(b.trading_day_tz) ?? ""}
+          <span className="tc-num block">remaining <span className="text-ink-hi">{usd(b.remaining)}</span>
+          {" · "}realised (net) {usd(b.realised)} · open {usd(b.open_positions)} · resting {usd(b.resting_orders)}</span>
+          <span className="block">
+            Every new order must fit with its own worst case · day {str(b.trading_day) ?? DASH} {str(b.trading_day_tz) ?? ""}
             {(numOf(b.refused_today) ?? 0) > 0 ? ` · ${count(b.refused_today)} refused today` : ""}
           </span>
         </>} />
@@ -163,14 +185,14 @@ function KickoffHours({ d }: { d: Obj }) {
   return (
     <div>
       <RiskBar label="Busiest kickoff hour" cls="agent" used={worst ? worst[1] : 0} limit={usage.hour_max} gainAware={false}
-        sub={worst ? `kickoff ${when(worst[0])} · per-hour cap (CAREFUL_HOUR_MAX)` : "nothing at risk in any kickoff hour"} />
+        sub={worst ? `Kickoff ${when(worst[0])} · per-hour cap (CAREFUL_HOUR_MAX) ${usd(usage.hour_max)} per kickoff hour.` : "Nothing at risk in any kickoff hour."} />
       {hours.length > 0 && (
-        <ul data-testid="careful-hours" className="mt-1.5 grid gap-x-4 text-[11.5px] sm:grid-cols-2">
+        <ul data-testid="careful-hours" className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-[11.5px]">
           {hours.map(([h, v]) => (
-            <li key={h} className="flex justify-between gap-2 border-b border-tc-line py-0.5">
-              <span className="text-ink-low">{when(h)}</span>
+            <li key={h} className="flex gap-1.5 whitespace-nowrap" title={`${usd(v)} of ${usd(usage.hour_max)} at kickoff ${when(h)}`}>
+              <span className="text-ink-low">{whenShort(h)}</span>
               <span className={`tc-num ${cap !== null && (numOf(v) ?? 0) >= cap * 0.8 ? "text-warn" : "text-ink-hi"}`}>
-                {usd(v)} / {usd(usage.hour_max)}
+                {cap !== null && (numOf(v) ?? 0) >= cap * 0.8 ? "◆ " : ""}{usd(v)}
               </span>
             </li>
           ))}
@@ -188,35 +210,35 @@ export function CapitalPanel({ d, now, stale, statusAt }: { d: Obj; now: number;
   const dayUsed = numOf(daily.used);
   return (
     <Panel testid="ops-money" title="Capital & risk"
-      meta={<>account read {agoIso(d.account_read_at, now) ? `${agoIso(d.account_read_at, now)} ago` : DASH}{stale ? <span className="text-warn"> · status stale, {Math.round((now - statusAt) / 1000)} s old</span> : null}</>}>
-      <div className="grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-4">
+      meta={<>account {agoIso(d.account_read_at, now) ? `${agoIso(d.account_read_at, now)} ago` : DASH}{stale ? <span className="text-warn"> · ◆ status stale, {Math.round((now - statusAt) / 1000)} s old</span> : null}</>}>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
         <Metric size="lg" label="Cash" cls="account" value={usd(d.balance)}
-          sub={`read ${when(d.account_read_at)}`} />
-        <Metric size="lg" label="Marked equity" cls="account" value={usd(d.marked_equity)}
-          sub={`bankroll cap ${usd(d.bankroll_cap)}`} />
+          sub={`Read ${when(d.account_read_at)}`} />
+        <Metric size="lg" label="Equity" cls="account" value={usd(d.marked_equity)}
+          sub={`Marked equity · bankroll cap ${usd(d.bankroll_cap)}`} />
         <Metric size="lg" label="Agent P&L" cls="agent" value={usd(pnl.agent_total, true)}
-          tone={pnlTone(pnl.agent_total)} sub={<>since start <span className={`tc-num ${pnlTone(pnl.agent_since_start)}`}>{usd(pnl.agent_since_start, true)}</span></>} />
-        <Metric size="lg" label="Today (halt measure)" cls="agent"
+          tone={pnlTone(pnl.agent_total)} sub={<>Since start <span className={`tc-num ${pnlTone(pnl.agent_since_start)}`}>{usd(pnl.agent_since_start, true)}</span></>} />
+        <Metric size="lg" label="Today" cls="agent" testid="cap-today"
           value={dayUsed === null ? DASH : usd(-dayUsed, true)} tone={dayUsed === null ? "text-ink-hi" : pnlTone(-dayUsed)}
-          sub="the day's loss as the daily halt measures it, signed as a result" />
+          sub="The day's loss as the daily halt measures it (halt measure), signed as a result." />
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-tc-line pt-3 md:grid-cols-4">
-        <Metric size="sm" label="Realized, open markets" cls="account" value={usd(pnl.realized_total, true)}
-          sub="Kalshi's figure, manual trades included" />
-        <Metric size="sm" label="In play (at cost)" cls="agent" value={usd(play.cost)}
-          sub={`${count(play.positions)} positions · live ${usd(play.live_mark_total)}`} />
+      <div className="mt-2.5 grid grid-cols-2 gap-x-6 gap-y-2.5 border-t border-tc-line pt-2.5 md:grid-cols-4">
+        <Metric size="sm" label="Realized" cls="account" value={usd(pnl.realized_total, true)}
+          sub="Realized on open markets — Kalshi's figure, manual trades included." />
+        <Metric size="sm" label="In play" cls="agent" value={usd(play.cost)}
+          sub={`At cost · ${count(play.positions)} positions · live ${usd(play.live_mark_total)}`} />
         <Metric size="sm" label="Open orders" value={`${count(d.open_agent_orders)} agent · ${count(d.open_other_orders)} manual`}
           sub={`${count(d.placed_today)} placed · ${count(d.fills_today)} fills today`} />
-        <Metric size="sm" label="Risk read" value={when(d.risk_at ?? d.account_at, true)} sub="the tick that measured the limits" />
+        <Metric size="sm" label="Risk read" value={when(d.risk_at ?? d.account_at, true)} sub="The tick that measured the limits." />
       </div>
-      <div className="mt-4 grid gap-x-8 gap-y-4 border-t border-tc-line pt-3 md:grid-cols-2">
+      <div className="mt-3 grid gap-x-8 gap-y-3 border-t border-tc-line pt-2.5 md:grid-cols-2">
         <RiskBar testid="meter-risk" label="Total at risk" cls="agent" used={d.total_at_risk} limit={d.total_limit}
-          gainAware={false} sub="worst-case exposure of the agent's positions and orders" />
+          gainAware={false} sub="Worst-case exposure of the agent's positions and orders." />
         <DailyBudget d={d} />
-        <RiskBar testid="meter-daily" label="Daily loss (halt)" cls="agent" used={daily.used} limit={daily.limit}
-          sub="halts trading for the day at the limit" />
+        <RiskBar testid="meter-daily" label="Daily loss" cls="agent" used={daily.used} limit={daily.limit}
+          sub="The daily loss halt: halts trading for the day at the limit." />
         <RiskBar testid="meter-drawdown" label="Drawdown" cls="agent" used={dd.used} limit={dd.limit}
-          sub="halts until TRADING_REARM_TOKEN changes" />
+          sub="Halts until TRADING_REARM_TOKEN changes." />
         <KickoffHours d={d} />
       </div>
     </Panel>
@@ -236,7 +258,7 @@ function AttentionList({ items, go, compact = false }: {
         const body = (
           <>
             <span className="mt-[5px]"><Dot state={s.dot} /></span>
-            <span className="min-w-0 flex-1">
+            <span className="min-w-0 flex-1 overflow-hidden">
               <span className="flex items-baseline justify-between gap-2">
                 <span className={`text-[12.5px] leading-snug ${a.severity === "info" ? "text-ink-hi" : s.cls} ${a.severity === "critical" ? "font-semibold" : ""}`}>
                   <span className="sr-only">{s.word}: </span>{a.title}
@@ -246,8 +268,9 @@ function AttentionList({ items, go, compact = false }: {
                 )}
               </span>
               {!compact || a.detail ? (
-                <span className="block text-[11px] leading-snug text-ink-low">
-                  {a.subsystem}{a.detail ? ` · ${a.detail}` : ""}{a.at ? ` · ${when(a.at)}` : ""}
+                <span className="block truncate text-[11px] leading-snug text-ink-low"
+                  title={`${a.subsystem}${a.detail ? ` · ${a.detail}` : ""}${a.at ? ` · ${when(a.at)}` : ""}`}>
+                  {a.subsystem}{a.at ? ` · ${whenShort(a.at)}` : ""}{a.detail ? ` · ${a.detail}` : ""}
                 </span>
               ) : null}
             </span>
@@ -282,19 +305,22 @@ export function AttentionPanel({ items, go }: {
       bodyClass="px-1 py-1">
       <div data-focus="attention" />
       {items.length === 0 ? (
-        <p data-testid="attention-none" className="px-3 py-3 text-[12.5px] text-ink-low">
-          Nothing needs attention. Checked: kill, halt, trading switch, ticks, feed, cool-downs, catalogue,
-          settlement and fill reads, hand-over, careful data errors, and every read this console makes.
+        <p data-testid="attention-none" className="flex items-center gap-1.5 px-3 py-2.5 text-[12.5px] text-ink-low">
+          All clear
+          <Info label="what was checked">
+            Checked: kill, halt, trading switch, ticks, feed, cool-downs, catalogue, settlement and fill reads,
+            hand-over, careful data errors, and every read this console makes.
+          </Info>
         </p>
       ) : (
         <div className="tc-scroll max-h-[560px] overflow-y-auto">
           {crit + warn === 0 && (
-            <p className="px-3 pb-1 pt-2.5 text-[12.5px] text-ink-mid">Nothing critical and no warnings. Routine counts:</p>
+            <p className="px-3 pb-0.5 pt-2 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-low">Routine</p>
           )}
           <AttentionList items={items.filter((i) => i.severity !== "info")} go={go} />
           {info > 0 && (crit + warn > 0 ? (
             <div className="border-t border-tc-line px-3 pb-2">
-              <Disclosure testid="attention-routine" summary={`Routine counts (${info})`}>
+              <Disclosure testid="attention-routine" summary={`Routine (${info})`}>
                 <AttentionList items={items.filter((i) => i.severity === "info")} go={go} compact />
               </Disclosure>
             </div>
@@ -333,12 +359,12 @@ export function LatestTick({ d, reads, now, go }: {
   const r = reads.candidates.read;
   return (
     <Panel testid="ops-tick" title="Newest tick"
-      meta={<span className="tc-num">{t.at ? <>{clockTime(t.at)} · {agoIso(t.at, now)} ago</> : "no tick on record"}{t.elapsed_s !== null ? ` · took ${t.elapsed_s.toFixed(1)} s` : ""}{t.outcome ? <> · outcome <Tech>{t.outcome}</Tech></> : null}</span>}
+      meta={<span className="tc-num">{t.at ? <>{clockTime(t.at)} · {agoIso(t.at, now)} ago</> : "no tick on record"}{t.elapsed_s !== null ? ` · ${t.elapsed_s.toFixed(1)} s` : ""}{t.outcome ? <> · <Tech>{t.outcome}</Tech></> : null}</span>}
       actions={<a href={hrefOf("trading")} onClick={(e) => { e.preventDefault(); go("trading"); }}
         className="text-[12px] text-ink-mid outline-none hover:text-ink-hi focus-visible:ring-2 focus-visible:ring-accent">Candidates →</a>}>
-      <div className="space-y-4">
+      <div className="space-y-3">
         <div>
-          <SubHead right="the catalogue, as the tick read it">Coverage</SubHead>
+          <SubHead info="The catalogue, as the tick read it.">Coverage</SubHead>
           {u ? (
             <Funnel steps={[
               { label: "known", n: num(u.known) }, { label: "in scope", n: num(u.in_scope) },
@@ -346,17 +372,17 @@ export function LatestTick({ d, reads, now, go }: {
           ) : <InfoNote>no coverage block on record</InfoNote>}
         </div>
         <div>
-          <SubHead right={c ? <Freshness at={reads.candidates.last!.at} now={now} cadenceMs={reads.candidates.cadenceMs} /> : undefined}>Decisions this tick</SubHead>
-          {r.kind === "unavailable" ? <InfoNote>Candidates not available on this backend.</InfoNote>
-            : r.kind === "error" || r.kind === "refused" ? <InfoNote tone="warn">◆ the candidates read failed — see Attention</InfoNote>
-              : !c ? <InfoNote>reading the candidates…</InfoNote> : (
+          <SubHead right={c ? <Freshness at={reads.candidates.last!.at} now={now} cadenceMs={reads.candidates.cadenceMs} /> : undefined}>Decisions</SubHead>
+          {r.kind === "unavailable" ? <InfoNote>Candidates not on this backend</InfoNote>
+            : r.kind === "error" || r.kind === "refused" ? <InfoNote tone="warn">◆ candidates read failed</InfoNote>
+              : !c ? <InfoNote>reading…</InfoNote> : (
                 <>
                   <Funnel steps={[
                     { label: "considered", n: t.considered, title: "markets the tick considered" },
                     { label: "decided", n: c.decided, title: "markets a strategy decided on" },
                     { label: "in snapshot", n: t.shown, title: "rows in the bounded snapshot" },
                     { label: "placed", n: t.placed }]} />
-                  <div className="mt-2 flex flex-wrap gap-1.5">
+                  <div className="mt-1.5 flex flex-wrap gap-1">
                     {Object.entries(t.byBadge).sort((a, b) => b[1] - a[1]).map(([k, n]) => (
                       <button key={k} type="button" onClick={() => go("trading", { decision: k })}
                         className="flex items-center gap-1.5 rounded-md px-1 py-0.5 outline-none hover:bg-tc-hover focus-visible:ring-2 focus-visible:ring-accent">
@@ -371,14 +397,18 @@ export function LatestTick({ d, reads, now, go }: {
         </div>
         {ct && (
           <div>
-            <SubHead right="the careful strategy's gate">Careful gate</SubHead>
+            <SubHead info="The careful strategy's gate on the newest tick.">Careful gate</SubHead>
             <Funnel steps={[
               { label: "candidates", n: num(ct.candidates) }, { label: "qualifying", n: num(ct.qualifying) },
               { label: "funded", n: num(ct.funded) }, { label: "paper rows", n: num(ct.paper_rows) }]} />
-            <p className="mt-1 text-[11.5px] text-ink-low">
-              swaps {count(ct.swaps)} · edges above the ceiling{" "}
-              <span className={(num(ct.data_errors) ?? 0) > 0 ? "text-warn" : "text-ink-hi"}>{count(ct.data_errors)}</span>{" "}
-              (probable data errors, never bet){d.paper_only === true ? " · PAPER ONLY: nothing real is sent" : ""}
+            <p className="mt-1 flex items-center gap-1.5 text-[11.5px] text-ink-low">
+              <span>swaps {count(ct.swaps)} · data errors{" "}
+              <span className={(num(ct.data_errors) ?? 0) > 0 ? "text-warn" : "text-ink-hi"}>{(num(ct.data_errors) ?? 0) > 0 ? "◆ " : ""}{count(ct.data_errors)}</span>
+              {d.paper_only === true ? <span className="text-warn"> · PAPER ONLY</span> : ""}</span>
+              <Info label="data errors">
+                Edges above the ceiling: probable data errors, never bet.
+                {d.paper_only === true ? " Paper only: nothing real is sent." : ""}
+              </Info>
             </p>
           </div>
         )}
@@ -401,63 +431,64 @@ export function BookSnapshot({ reads, now, go }: {
       meta={book ? <Freshness at={src.last!.at} now={now} cadenceMs={src.cadenceMs} failed={src.read.kind === "error"} /> : undefined}
       actions={<a href={hrefOf("portfolio")} onClick={(e) => { e.preventDefault(); go("portfolio"); }}
         className="text-[12px] text-ink-mid outline-none hover:text-ink-hi focus-visible:ring-2 focus-visible:ring-accent">Portfolio →</a>}>
-      {src.read.kind === "unavailable" ? <InfoNote>Book not available on this backend.</InfoNote>
+      {src.read.kind === "unavailable" ? <InfoNote>Book not on this backend</InfoNote>
         : src.read.kind === "error" && !book ? <ErrorNote tone="warn">Could not read account positions (HTTP {src.read.status}) — {src.read.detail}</ErrorNote>
           : src.read.kind === "refused" ? <ErrorNote>token rejected — the backend refused the book read</ErrorNote>
             : !book ? <InfoNote>reading the book…</InfoNote> : (
               <>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
                   <Metric size="md" label="Positions" value={count(book.totals.positions)}
-                    sub={`agent manages ${book.totals.managed} · manual ${book.totals.manual} contracts`} />
+                    sub={`Agent manages ${book.totals.managed} · manual ${book.totals.manual} contracts`} />
                   <Metric size="md" label="Resting orders" value={count(book.totals.orders)}
                     sub={`${agentOrders} agent · ${book.orders.length - agentOrders} manual`} />
                   <Metric size="md" label="Live value" value={live?.value === null || !live ? DASH : bookDollars(live.value)}
                     sub={live ? `${live.marked} of ${book.positions.length} with a live mark` : undefined} />
                   <Metric size="md" label="Unrealised" value={live ? bookPl(live.unrealised) : DASH}
                     tone={live ? plTone(live.unrealised).replace("text-ink-mid", "text-ink-hi") : "text-ink-hi"}
-                    sub="display only — halts count in-play at cost" />
+                    sub="Display only — the halts count in-play at cost." />
                 </div>
                 {book.positions.length === 0 ? (
-                  <div className="mt-3"><EmptyNote>No open positions{book.totals.notListedPositions > 0 ? " on markets the trader tracks" : ""}.</EmptyNote></div>
+                  <div className="mt-2.5"><EmptyNote>No open positions{book.totals.notListedPositions > 0 ? " on tracked markets" : ""}</EmptyNote></div>
                 ) : (
-                  <div className="tc-scroll mt-3 overflow-x-auto">
+                  <div className="tc-scroll mt-2.5 overflow-x-auto">
                     <table className="w-full min-w-[520px] border-collapse text-[12.5px]">
                       <thead>
                         <tr className="text-left">
                           {["market", "side", "owner", "live value", "unrealised"].map((h, i) => (
-                            <th key={h} scope="col" className={`border-b border-tc-line px-2 py-1.5 text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low first:pl-0 ${i >= 3 ? "text-right" : ""}`}>{h}</th>
+                            <th key={h} scope="col" className={`whitespace-nowrap border-b border-tc-line px-2 py-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low first:pl-0 ${i >= 3 ? "text-right" : ""}`}>{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {book.positions.slice(0, 6).map((p) => (
                           <tr key={`${p.ticker}|${p.side}`} data-testid="ov-position">
-                            <td className="max-w-[280px] border-b border-tc-line py-1.5 pr-2">
-                              <span className="block truncate text-ink-hi" title={p.title}>{p.title}</span>
-                              <span className="block text-[11px] text-ink-low">{p.competition ? compLabel(p.competition) : DASH}{p.in_play ? <span className="text-live"> · in play</span> : null}</span>
+                            <td className="max-w-[300px] border-b border-tc-line py-1 pr-2">
+                              <span className="block truncate text-ink-hi" title={`${p.title} · ${p.competition ? compLabel(p.competition) : "competition not stated"}`}>{p.title}</span>
+                              {p.in_play && <span className="block text-[11px] text-live">in play</span>}
                             </td>
-                            <td className="border-b border-tc-line px-2 py-1.5 font-medium uppercase text-ink-hi">{p.side}</td>
-                            <td className="border-b border-tc-line px-2 py-1.5">
-                              <span className="flex flex-wrap gap-1">
+                            <td className="border-b border-tc-line px-2 py-1 font-medium uppercase text-ink-hi">{p.side}</td>
+                            <td className="border-b border-tc-line px-2 py-1">
+                              <span className="flex flex-nowrap gap-1">
                                 {p.own > 0 && <OwnerChip tone="trader" n={p.own} />}
                                 {p.handed_over > 0 && <OwnerChip tone="handed" n={p.handed_over} />}
                                 {p.manual > 0 && <OwnerChip tone="yours" n={p.manual} />}
                               </span>
                             </td>
-                            <td className="tc-num border-b border-tc-line px-2 py-1.5 text-right text-ink-hi">{bookDollars(p.live.live_value_dollars)}</td>
-                            <td className={`tc-num border-b border-tc-line py-1.5 pl-2 text-right ${plTone(p.live.unrealised_pl_dollars)}`}>{bookPl(p.live.unrealised_pl_dollars)}</td>
+                            <td className="tc-num whitespace-nowrap border-b border-tc-line px-2 py-1 text-right text-ink-hi">{bookDollars(p.live.live_value_dollars)}</td>
+                            <td className={`tc-num whitespace-nowrap border-b border-tc-line py-1 pl-2 text-right ${plTone(p.live.unrealised_pl_dollars)}`}>{bookPl(p.live.unrealised_pl_dollars)}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                     {book.positions.length > 6 && (
-                      <p className="mt-1.5 text-[11.5px] text-ink-low">and {book.positions.length - 6} more — Portfolio has them all</p>
+                      <p className="mt-1 text-[11.5px] text-ink-low">+{book.positions.length - 6} more</p>
                     )}
                   </div>
                 )}
                 {book.pending && book.pending.filter((q) => q.status === "queued").length > 0 && (
-                  <p className="mt-2 text-[12px] text-ink-mid">
-                    {book.pending.filter((q) => q.status === "queued").length} hand-over(s) queued for the next live price
+                  <p className="mt-1.5 flex items-center gap-1.5 text-[12px] text-ink-mid">
+                    {book.pending.filter((q) => q.status === "queued").length} hand-over(s) queued
+                    <Info label="queued hand-overs">They hand over at the next live price.</Info>
                   </p>
                 )}
               </>
@@ -478,23 +509,24 @@ export function PerformanceSnapshot({ reads, now, go, limit }: {
   const filtered = Object.values(src.filters).some((v) => v !== "");
   const wlu = t ? `${t.won ?? "?"}–${t.lost ?? "?"}–${t.unsettled ?? "?"}` : DASH;
   return (
-    <Panel testid="ops-perf-snapshot" title="Performance snapshot"
-      meta={<>{l ? <Freshness at={src.last!.at} now={now} cadenceMs={src.cadenceMs} /> : null}{filtered ? <span className="text-warn"> · ledger filters active</span> : null}</>}
+    <Panel testid="ops-perf-snapshot" title="Performance"
+      info="The trader's own orders and handed-over contracts only. A small sample: no figure here is evidence of an edge."
+      meta={<>{l ? <Freshness at={src.last!.at} now={now} cadenceMs={src.cadenceMs} /> : null}{filtered ? <span className="text-warn"> · ◆ filtered</span> : null}</>}
       actions={<a href={hrefOf("performance")} onClick={(e) => { e.preventDefault(); go("performance"); }}
         className="text-[12px] text-ink-mid outline-none hover:text-ink-hi focus-visible:ring-2 focus-visible:ring-accent">Performance →</a>}>
-      {src.read.kind === "unavailable" ? <InfoNote>Trades &amp; grounds not available on this backend.</InfoNote>
+      {src.read.kind === "unavailable" ? <InfoNote>Ledger not on this backend</InfoNote>
         : !l ? (src.read.kind === "error" ? <ErrorNote tone="warn">Could not read the ledger (HTTP {src.read.status}) — {src.read.detail}</ErrorNote>
           : <InfoNote>reading the ledger…</InfoNote>)
           : !t ? <InfoNote>the ledger summary was not sent</InfoNote> : (
             <div className="grid gap-x-8 gap-y-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
               <div className="grid grid-cols-3 gap-x-4 gap-y-3 self-start">
                 <Metric size="md" label="Settled P&L" cls="agent" value={usd(t.settled_pnl_dollars, true)} tone={pnlTone(t.settled_pnl_dollars)}
-                  sub={`over ${t.won !== null && t.lost !== null ? t.won + t.lost : "?"} settled`} />
-                <Metric size="md" label="W–L–U" value={wlu} sub="won · lost · unsettled" />
-                <Metric size="md" label="Fees" value={usd(t.fees_dollars)} sub={`filled cost ${usd(t.cost_dollars)}`} />
+                  sub={`Over ${t.won !== null && t.lost !== null ? t.won + t.lost : "?"} settled`} />
+                <Metric size="md" label="W–L–U" value={wlu} sub="Won · lost · unsettled" />
+                <Metric size="md" label="Fees" value={usd(t.fees_dollars)} sub={`Filled cost ${usd(t.cost_dollars)}`} />
                 <Metric size="sm" label="Orders" value={count(t.orders)} sub={`${count(t.filled)} filled · ${count(t.not_filled)} not`} />
-                <Metric size="sm" label="Open cost" value={usd(t.open_cost_dollars)} sub="filled, unsettled" />
-                <Metric size="sm" label="Rows" value={count(t.rows)} sub="orders and hand-overs" />
+                <Metric size="sm" label="Open cost" value={usd(t.open_cost_dollars)} sub="Filled, unsettled" />
+                <Metric size="sm" label="Rows" value={count(t.rows)} sub="Orders and hand-overs" />
               </div>
               <div>
                 {days.length ? <DailyPnlChart days={days} limit={l.summary?.daily_loss_limit_dollars ?? limit} height={120} />
@@ -502,24 +534,25 @@ export function PerformanceSnapshot({ reads, now, go, limit }: {
               </div>
             </div>
           )}
-      <p className="mt-2 text-[11px] text-ink-faint">
-        The trader&apos;s own orders and handed-over contracts only. A small sample: no figure here is evidence of an edge.
-      </p>
     </Panel>
   );
 }
 
 // -------------------------------------------------------------- view
 
-export function Overview({ d, now, token, reads, attention, bumpStatus, go, statusStale, statusAt }: {
+export function Overview({ d, now, token, reads, attention, bumpStatus, go, statusStale, statusAt, safety }: {
   d: Obj; now: number; token: string; reads: SectionReads; attention: AttentionItem[];
   bumpStatus: () => void; go: (v: string, p?: Record<string, string>) => void;
   statusStale: boolean; statusAt: number;
+  /** why Safety & control is unfolded — empty while everything is normal */
+  safety: string[];
 }) {
   const limit = numOf(obj(d.daily_loss)?.limit);
   return (
-    <div className="grid grid-cols-12 gap-4">
-      <div className="col-span-12"><SafetyPanel d={d} now={now} token={token} bumpStatus={bumpStatus} /></div>
+    <div className="grid grid-cols-12 gap-3">
+      {safety.length > 0 && (
+        <div className="col-span-12"><SafetyPanel d={d} now={now} token={token} bumpStatus={bumpStatus} triggers={safety} /></div>
+      )}
       <div className="col-span-12 xl:col-span-8"><CapitalPanel d={d} now={now} stale={statusStale} statusAt={statusAt} /></div>
       <div className="col-span-12 xl:col-span-4"><AttentionPanel items={attention} go={go} /></div>
       <div className="col-span-12 xl:col-span-5"><LatestTick d={d} reads={reads} now={now} go={go} /></div>

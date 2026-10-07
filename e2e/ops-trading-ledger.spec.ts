@@ -295,7 +295,9 @@ test.describe("trades & grounds on the console", () => {
     + "estimate; your own bets are not here", async ({ page }) => {
       await openConsole(page, serveOk());
       const s = page.getByTestId("ops-ledger");
-      await expect(s).toContainText("experimental · unproven");
+      // ONE DISCLAIMER (quiet pass): the header says it; the panel's words
+      // are behind its ⓘ
+      await expect(page.getByTestId("ops-disclosure")).toContainText("experimental · unproven");
       await expect(s).toContainText("the trader's own estimate at the time");
       await expect(s).toContainText("not evidence of an edge");
       await expect(s).toContainText("your own manual bets are not here");

@@ -15,8 +15,8 @@
 // below) until "Re-sort" is pressed, so rows never jump under the cursor.
 import { type KeyboardEvent, memo, useMemo, useRef, useState } from "react";
 import {
-  BADGES, BADGE_MEANING, BADGE_ORDER, GROUP_LABEL, type ReasonBar, type ReasonGroup,
-  decisionBadge, rankReasons, reasonsOfKinds, rowReasonWords, rowReasons,
+  BADGES, BADGE_MEANING, BADGE_ORDER, type ReasonBar,
+  decisionBadge, rankReasons, reasonsOfKinds, rowReasonWords, rowReasons, rowTag,
 } from "../../lib/consoleModel";
 import {
   BOUND_REASONS, type Candidate, type Candidates, type Pair,
@@ -26,8 +26,8 @@ import {
 import { familyWords } from "../../lib/tradingLedger";
 import { InPlayPanel } from "./InPlayPanel";
 import {
-  BarList, CTRL, DASH, DecisionBadge, Drawer, DrawerSection, EmptyNote, ErrorNote,
-  FilterButton, Freshness, InfoNote, KV, Panel, TH, Tech, ago, when,
+  CTRL, DASH, DecisionBadge, Drawer, DrawerSection, EmptyNote, ErrorNote,
+  FilterButton, Freshness, Info, InfoNote, KV, Panel, TH, Tech, ago, when, whenShort,
 } from "./primitives";
 import type { Source } from "./useConsoleData";
 
@@ -139,6 +139,9 @@ function sortRows(rows: Candidate[], k: string, dir: "asc" | "desc", now: number
 
 // ------------------------------------------------------------ cells
 
+/** one dense grid cell: never wraps, top-aligned */
+const CELL = "whitespace-nowrap border-b border-tc-line px-2.5 py-1 align-top";
+
 const fixed = (n: number | null, d = 2) => (n === null ? DASH : n.toFixed(d));
 const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toFixed(2)}`;
 function pair(p: Pair): string {
@@ -149,7 +152,7 @@ function pair(p: Pair): string {
 function Kickoff({ r }: { r: Candidate }) {
   if (r.minute !== null) return <span className="text-live">in play {r.minute}&prime;</span>;
   if (isInPlay(r)) return <span className="text-live">in play</span>;
-  return <span className="text-ink-mid">{when(r.kickoff_utc)}</span>;
+  return <span className="text-ink-mid" title={when(r.kickoff_utc)}>{whenShort(r.kickoff_utc)}</span>;
 }
 
 const CandRow = memo(function CandRow({ r, selected, onOpen, onKey }: {
@@ -169,42 +172,42 @@ const CandRow = memo(function CandRow({ r, selected, onOpen, onKey }: {
       onClick={() => onOpen(r.ticker)} onKeyDown={(e) => onKey(e, r.ticker)}
       className={`cursor-pointer outline-none transition-colors hover:bg-tc-hover focus-visible:bg-tc-hover focus-visible:shadow-[inset_2px_0_0_var(--accent)] ${
         selected ? "bg-tc-raised shadow-[inset_2px_0_0_var(--accent)]" : ""}`}>
-      <td className="border-b border-tc-line py-2 pl-4 pr-3 align-top">
-        <span className="block max-w-[170px] text-[13px] leading-snug text-ink-hi sm:max-w-[340px]">{r.title}</span>
-        <Tech className="mt-0.5 block max-w-[170px] truncate sm:max-w-[300px]" title={r.ticker}>{r.ticker}</Tech>
-        <span className="block text-[11px] text-ink-low">{r.family ? familyWords(r.family) : "type not stated"}</span>
+      <td className={`${CELL} max-w-[340px] pl-4`}>
+        <span className="block truncate text-[12.5px] leading-snug text-ink-hi" title={`${r.title} · ${r.family ? familyWords(r.family) : "type not stated"}`}>{r.title}</span>
+        <Tech className="block truncate" title={r.ticker}>{r.ticker}</Tech>
       </td>
-      <td className="border-b border-tc-line px-3 py-2 align-top">
-        <span className="flex flex-col items-start gap-1">
+      <td className={CELL}>
+        <span className="flex flex-col items-start gap-0.5">
           <DecisionBadge badge={b} side={SIDE} />
           {d.action === "placed" && (
-            <span data-testid="cand-placed-chip" className="tc-num whitespace-nowrap text-[11.5px] text-ink-hi">
+            <span data-testid="cand-placed-chip" className="tc-num whitespace-nowrap text-[11px] text-ink-hi">
               {SIDE ?? "side not stated"} · {d.count === null ? DASH : d.count} @ {cents(d.price_cents)}
             </span>
           )}
         </span>
       </td>
-      <td className="border-b border-tc-line px-3 py-2 align-top">
-        <span data-testid="cand-words" className="line-clamp-2 block min-w-[200px] max-w-[360px] text-[12px] leading-snug text-ink-mid">
-          {d.action === "placed" ? (d.words ?? "placed") : w.text}
+      <td className={`${CELL} max-w-[200px]`}>
+        <span data-testid="cand-reason-tag" data-code={d.reason ?? ""}
+          title={`${d.action === "placed" ? (d.words ?? "placed") : w.text}${d.reason ? ` (${d.reason})` : ""}`}
+          className="block truncate text-[12px] text-ink-mid">
+          {d.action === "placed" ? DASH : rowTag(d)}
         </span>
-        {d.reason && <Tech className="mt-0.5 block">{d.reason}</Tech>}
       </td>
-      <td className="whitespace-nowrap border-b border-tc-line px-3 py-2 align-top text-[12.5px] text-ink-mid">{compLabel(r.competition)}</td>
-      <td className="tc-num whitespace-nowrap border-b border-tc-line px-3 py-2 align-top text-[12.5px]"><Kickoff r={r} /></td>
-      <td className="tc-num border-b border-tc-line px-3 py-2 text-right align-top text-[12.5px] text-ink-mid">{pct(r.p_model)}</td>
-      <td className="tc-num border-b border-tc-line px-3 py-2 text-right align-top text-[12.5px] text-ink-mid">{pct(r.p_consensus)}</td>
-      <td className="tc-num border-b border-tc-line px-3 py-2 text-right align-top text-[12.5px] text-ink-hi">{pct(r.fair)}</td>
-      <td className="tc-num whitespace-nowrap border-b border-tc-line px-3 py-2 text-right align-top text-[12.5px] text-ink-mid">
+      <td className={`${CELL} max-w-[150px] truncate text-[12.5px] text-ink-mid`} title={compLabel(r.competition)}>{compLabel(r.competition)}</td>
+      <td className={`${CELL} tc-num text-[12.5px]`}><Kickoff r={r} /></td>
+      <td className={`${CELL} tc-num text-right text-[12.5px] text-ink-mid`}>{pct(r.p_model)}</td>
+      <td className={`${CELL} tc-num text-right text-[12.5px] text-ink-mid`}>{pct(r.p_consensus)}</td>
+      <td className={`${CELL} tc-num text-right text-[12.5px] text-ink-hi`}>{pct(r.fair)}</td>
+      <td className={`${CELL} tc-num text-right text-[12.5px] text-ink-mid`}>
         {cents(r.yes_bid)}<span className="text-ink-faint"> / </span>{cents(r.yes_ask)}
       </td>
-      <td className="tc-num whitespace-nowrap border-b border-tc-line py-2 pl-3 pr-4 text-right align-top text-[12.5px]">
+      <td className={`${CELL} tc-num pr-4 text-right text-[12.5px]`}>
         <span data-testid="cand-best-edge" data-clears={clears || undefined}
           className={clears ? "font-semibold text-ink-hi" : "text-ink-low"}>
           {signedCents(be.edge)}
         </span>
-        <span className="block text-[11px] text-ink-low">
-          {be.side ? be.side.toUpperCase() : DASH} · bar {cents(r.threshold)}
+        <span className="block text-[11px] text-ink-low" title="the side considered (else the larger) · the minimum edge (bar)">
+          {be.side ? be.side.toUpperCase() : DASH} · ≥{cents(r.threshold)}
         </span>
       </td>
     </tr>
@@ -241,7 +244,7 @@ function InPlayDetail({ r }: { r: Candidate }) {
       )}
       {ip.anchor && (
         <KV k="anchor"><span data-testid="cand-anchor">{anchorWords(ip.anchor)}{ip.anchor.why ? ` (${ip.anchor.why})` : ""}</span>
-          <span className="block text-[11px] text-ink-low">what the in-play engine number started from: w on our pre-match forecast, the rest the market&apos;s T-10 price (experimental, unvalidated)</span></KV>
+          {" "}<Info label="the anchor">What the in-play engine number started from: w on our pre-match forecast, the rest the market&apos;s T-10 price (unvalidated).</Info></KV>
       )}
     </>
   );
@@ -269,7 +272,7 @@ function CandidateInspector({ r, c, gone, actionsMeaning }: {
       <DrawerSection title="Decision">
         <KV k="decision">{b.label}{d.side ? ` · ${d.side.toUpperCase()}` : ""}</KV>
         {d.action === "placed" && <KV k="order">{(r.side_considered ?? d.side ?? "side not stated").toUpperCase()} · {d.count ?? DASH} @ {cents(d.price_cents)}</KV>}
-        <KV k="reason">{w.text}{!w.sentWords && d.reason ? <span className="block text-[11px] text-ink-low">words from the console&apos;s mirror of the backend registry</span> : null}</KV>
+        <KV k="reason" testid="insp-reason">{w.text}{d.reason ? <Tech className="block" tone="text-ink-mid">{d.reason}</Tech> : null}{!w.sentWords && d.reason ? <span className="block text-[11px] text-ink-low">words from the console&apos;s mirror of the backend registry</span> : null}</KV>
         {d.detail && <KV k="detail">{d.detail}</KV>}
         <KV k="what the action means">{actionsMeaning[d.action] ?? BADGE_MEANING[b.key] ?? DASH}</KV>
       </DrawerSection>
@@ -282,7 +285,7 @@ function CandidateInspector({ r, c, gone, actionsMeaning }: {
         <KV k="side considered">{r.side_considered ? r.side_considered.toUpperCase() : "not stated"}</KV>
       </DrawerSection>
       <DrawerSection title="Probabilities (YES side)">
-        <KV k="our model">{pct(r.p_model)} <span className="text-[11px] text-ink-low">unvalidated</span></KV>
+        <KV k="our model (unvalidated)">{pct(r.p_model)}</KV>
         <KV k="bookmaker consensus">{pct(r.p_consensus)}</KV>
         <KV k="blend weight w">{fixed(r.w)} <span className="text-[11px] text-ink-low">on our model</span></KV>
         <KV k="fair">{pct(r.fair)}{r.fair_method ? ` · ${r.fair_method}` : ""}</KV>
@@ -291,12 +294,11 @@ function CandidateInspector({ r, c, gone, actionsMeaning }: {
         <KV k="YES bid / ask">{cents(r.yes_bid)} / {cents(r.yes_ask)} <span className="text-ink-low">· maker {cents(r.maker_yes)}</span></KV>
         <KV k="NO bid / ask">{cents(r.no_bid)} / {cents(r.no_ask)} <span className="text-ink-low">· maker {cents(r.maker_no)}</span></KV>
       </DrawerSection>
-      <DrawerSection title="Edge after the maker fee (its own estimate)">
+      <DrawerSection title="Edge after maker fee (estimate)">
         <KV k="edge YES"><span data-testid="cand-edge-yes" data-clears={clearsYes || undefined} className={clearsYes ? "font-semibold" : ""}>{signedCents(r.edge_yes)}</span>{r.edge_basis === "ask" && r.edge_yes !== null ? " at the ask" : ""}</KV>
         <KV k="edge NO"><span data-testid="cand-edge-no" data-clears={clearsNo || undefined} className={clearsNo ? "font-semibold" : ""}>{signedCents(r.edge_no)}</span>{r.edge_basis === "ask" && r.edge_no !== null ? " at the ask" : ""}</KV>
         <KV k="minimum edge (bar)">{cents(r.threshold)}</KV>
         <KV k="clears the bar">{clearsYes || clearsNo ? `yes — ${[clearsYes ? "YES" : null, clearsNo ? "NO" : null].filter(Boolean).join(" and ")}` : r.threshold === null ? "bar not sent" : "no"}</KV>
-        <p className="mt-1 text-[11px] text-ink-low">An estimated edge is not proof: clearing the bar is the trader&apos;s rule, not a verdict.</p>
       </DrawerSection>
       <DrawerSection title="In play">
         <InPlayDetail r={r} />
@@ -332,40 +334,49 @@ function WhyNotPlaced({ rows, today, compLabelText, onReason, activeReason }: {
   const [src, setSrc] = useState<"tick" | "today">("tick");
   const bars: ReasonBar[] = src === "tick" ? rankReasons([rowReasons(rows)], rowReasonWords(rows))
     : rankReasons([today]);
-  const groups = new Map<ReasonGroup, ReasonBar[]>();
-  for (const b of bars) groups.set(b.group, [...(groups.get(b.group) ?? []), b]);
-  const ordered = [...groups.entries()].sort((a, b) =>
-    b[1].reduce((s, x) => s + x.n, 0) - a[1].reduce((s, x) => s + x.n, 0));
   const total = bars.reduce((s, b) => s + b.n, 0);
+  const max = Math.max(1, bars[0]?.n ?? 1);
   return (
     <Panel testid="ops-why" title="Why not placed"
-      meta={src === "tick" ? `this tick${compLabelText ? ` · ${compLabelText}` : ""} · ${total} markets` : `today, journal skips and refusals · ${total.toLocaleString("en-US")} rows`}
+      info={<>
+        {src === "tick" ? "The newest tick's not-placed markets, ranked by reason. Click a reason to filter the candidates to it."
+          : "Today's journaled skips and refusals, ranked by reason."}
+        {bars.map((b) => (
+          <span key={b.code} className="mt-1 block"><span className="text-ink-hi">{b.tag}</span> — {b.words} <span className="font-mono text-[10.5px]">{b.code}</span> · {Math.round(b.share * 100)}%</span>
+        ))}
+      </>}
+      meta={<span className="tc-num">{src === "tick" ? `${total} markets${compLabelText ? ` · ${compLabelText}` : ""}` : `${total.toLocaleString("en-US")} rows today`}</span>}
       actions={
         <div className="flex gap-1" role="group" aria-label="reason source">
-          <FilterButton pressed={src === "tick"} onClick={() => setSrc("tick")}>This tick</FilterButton>
+          <FilterButton pressed={src === "tick"} onClick={() => setSrc("tick")}>Tick</FilterButton>
           <FilterButton pressed={src === "today"} onClick={() => setSrc("today")}>Today</FilterButton>
         </div>}>
       {bars.length === 0 ? (
-        <InfoNote>{src === "tick" ? "Every market in this view was placed, or there are none." : today === null ? "Today's reasons are not served." : "No skips or refusals journaled today."}</InfoNote>
+        <InfoNote>{src === "tick" ? "Nothing unplaced" : today === null ? "Not served" : "None today"}</InfoNote>
       ) : (
-        <div data-testid="cand-why" className="space-y-2">
-          {ordered.map(([g, list]) => (
-            <div key={g}>
-              <div className="flex items-baseline justify-between px-2 text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low">
-                <span>{GROUP_LABEL[g]}</span>
-                <span className="tc-num normal-case tracking-normal">{list.reduce((s, x) => s + x.n, 0).toLocaleString("en-US")} · {Math.round(list.reduce((s, x) => s + x.share, 0) * 100)}%</span>
-              </div>
-              <BarList dense scaleMax={bars[0]?.n} items={list.map((b) => ({
-                key: b.code, value: b.n, testid: "why-bar", data: { "data-code": b.code },
-                label: <span className={activeReason === b.code ? "text-accent" : ""}>{b.words}</span>,
-                sub: <span className="font-mono">{b.code}</span>,
-                display: <>{b.n.toLocaleString("en-US")} <span className="text-ink-low">· {Math.round(b.share * 100)}%</span></>,
-                onClick: src === "tick" ? () => onReason(b.code) : undefined,
-              }))} />
-            </div>
-          ))}
-          {src === "tick" && <p className="text-[11px] text-ink-faint">Click a reason to filter the candidates to it.</p>}
-        </div>
+        <ol data-testid="cand-why" className="-mx-1">
+          {bars.map((b) => {
+            const inner = (
+              <>
+                <span className={`min-w-0 truncate text-left text-[12.5px] ${activeReason === b.code ? "text-accent" : "text-ink-hi"}`}>{b.tag}</span>
+                <span aria-hidden className="relative h-1.5 rounded-full bg-tc-raised">
+                  <span className="absolute inset-y-0 left-0 rounded-full bg-ink-mid/60" style={{ width: `${(b.n / max) * 100}%` }} />
+                </span>
+                <span className="tc-num text-right text-[12.5px] text-ink-hi">{b.n.toLocaleString("en-US")}</span>
+              </>
+            );
+            const cls = "grid w-full grid-cols-[minmax(0,11rem)_minmax(0,1fr)_2.5rem] items-center gap-3 rounded-md px-1 py-[3px]";
+            const title = `${b.words} (${b.code}) · ${Math.round(b.share * 100)}%`;
+            return (
+              <li key={b.code} data-testid="why-bar" data-code={b.code} title={title}>
+                {src === "tick" ? (
+                  <button type="button" onClick={() => onReason(b.code)} aria-label={`${b.tag}: ${b.n} — filter the candidates to it`}
+                    className={`${cls} outline-none transition-colors hover:bg-tc-hover focus-visible:ring-2 focus-visible:ring-accent`}>{inner}</button>
+                ) : <div className={cls}>{inner}</div>}
+              </li>
+            );
+          })}
+        </ol>
       )}
     </Panel>
   );
@@ -482,17 +493,18 @@ function CandidatesSection({ d, now, source, filters: f, setFilters, selected, s
   };
 
   return (
-    <div className="grid grid-cols-12 gap-4">
+    <div className="grid grid-cols-12 gap-3">
       <div className="col-span-12">
         <Panel testid="ops-candidates" title="Candidates"
-          meta={<>
-            {c ? <Freshness at={at} now={now} cadenceMs={source.cadenceMs} failed={read.kind === "error"} label="read" /> : null}
-            <span className="ml-2 text-ink-faint">Experimental, unproven: our model&apos;s probability is unvalidated; a placement is the trader&apos;s rule at work — not advice, not evidence of an edge. Prices in cents; edges after the maker fee.</span>
-          </>}
+          info={<>Prices in cents; edges after the maker fee; our model&apos;s probability is unvalidated; a placement
+            is the trader&apos;s rule at work. Row order is the backend&apos;s priority order until a column is sorted.
+            Click a row or press Enter for the inspector; ↑ ↓ move between rows. Edge: the side considered (else the
+            larger), after the maker fee, against the bar (≥).</>}
+          meta={c ? <Freshness at={at} now={now} cadenceMs={source.cadenceMs} failed={read.kind === "error"} /> : null}
           bodyClass="py-0">
           {read.kind === "unavailable" && (
             <div className="px-4 py-3"><p data-testid="cand-unavailable" className="text-[12.5px] text-ink-low">
-              Candidates not available yet — this backend does not serve what the trader considered. The rest of the console is unaffected.
+              Candidates not available yet
             </p></div>
           )}
           {read.kind === "refused" && (
@@ -501,16 +513,15 @@ function CandidatesSection({ d, now, source, filters: f, setFilters, selected, s
           {read.kind === "error" && (
             <div className="px-4 py-3"><ErrorNote testid="cand-error" tone="warn">the candidates read failed (HTTP {read.status}) — {read.detail}</ErrorNote></div>
           )}
-          {read.kind === "idle" && !c && <div className="px-4 py-3"><InfoNote>reading the candidates…</InfoNote></div>}
+          {read.kind === "idle" && !c && <div className="px-4 py-3"><InfoNote>reading…</InfoNote></div>}
 
           {c && (
             <div data-testid="cand-body" data-stale={stale || undefined}>
-              <p data-testid="cand-summary" className="tc-num border-b border-tc-line px-4 py-2 text-[12px] text-ink-low">
+              <p data-testid="cand-summary" className="tc-num flex flex-wrap items-center gap-x-1 border-b border-tc-line px-4 py-1.5 text-[12px] text-ink-low">
                 <span className="text-ink-hi">{c.rows.length} shown · {placedN} placed ·{" "}
                   {c.rows.length - placedN} not placed
                   {c.considered !== null ? ` · ${c.considered.toLocaleString("en-US")} considered` : ""}</span>
-                {" "}· tick {when(c.tick_at)}
-                {Number.isFinite(tickMs) ? ` (${ago(now - tickMs)} ago)` : ""}
+                {" "}· tick {Number.isFinite(tickMs) ? `${ago(now - tickMs)} ago` : when(c.tick_at)}
                 {c.truncated && (
                   <span data-testid="cand-truncated" className="text-warn">
                     {" "}· snapshot cut to its bound
@@ -519,16 +530,18 @@ function CandidatesSection({ d, now, source, filters: f, setFilters, selected, s
                   </span>
                 )}
                 {byDesignN > 0 && (
-                  <span data-testid="cand-not-shown">
-                    {" "}· {byDesignN.toLocaleString("en-US")} not shown by design ({byDesign
-                      .slice(0, 4).map(([k, n]) => `${k} ${n}`).join(", ")}
-                    {byDesign.length > 4 ? ", …" : ""})
+                  <span data-testid="cand-not-shown" className="inline-flex items-center gap-1">
+                    {" "}· {byDesignN.toLocaleString("en-US")} hidden
+                    <Info label="markets not shown by design">
+                      {byDesignN.toLocaleString("en-US")} not shown by design ({byDesign
+                        .map(([k, n]) => `${k} ${n}`).join(", ")}). Tick {when(c.tick_at)}.
+                    </Info>
                   </span>
                 )}
                 {(c.not_served ?? 0) > 0 && (
-                  <span data-testid="cand-not-served">
-                    {" "}· {c.not_served} withheld ({c.stale === true
-                      ? "the snapshot is too old to serve" : "market no longer trading"})
+                  <span data-testid="cand-not-served" title={c.stale === true
+                    ? "the snapshot is too old to serve" : "market no longer trading"}>
+                    {" "}· {c.not_served} withheld ({c.stale === true ? "too old" : "not trading"})
                   </span>
                 )}
                 {c.unreadable > 0 && (
@@ -540,11 +553,11 @@ function CandidatesSection({ d, now, source, filters: f, setFilters, selected, s
               </p>
 
               {/* ---- the toolbar ---- */}
-              <div className="space-y-2 border-b border-tc-line px-4 py-3">
+              <div className="space-y-1.5 border-b border-tc-line px-4 py-2">
                 <div className="flex flex-wrap items-end gap-2">
                   <label className="flex min-w-[220px] flex-1 flex-col gap-1 sm:max-w-[320px]">
                     <span className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low">search</span>
-                    <input type="search" data-testid="cand-search" value={f.q} placeholder="market, ticker, reason code…"
+                    <input type="search" data-testid="cand-search" value={f.q} placeholder="market, ticker, code"
                       onChange={(e) => set("q", e.target.value)} className={`${CTRL} w-full`} />
                   </label>
                   <label className="flex flex-col gap-1">
@@ -581,19 +594,26 @@ function CandidatesSection({ d, now, source, filters: f, setFilters, selected, s
                       </button>
                     )}
                     <span data-testid="cand-filter-count" className="tc-num text-[12px] text-ink-low">
-                      {active === 0 ? "no filters" : `${active} filter${active === 1 ? "" : "s"} · ${filtered.length} of ${c.rows.length} rows`}
+                      {active === 0 ? "" : `${active} filter${active === 1 ? "" : "s"} · ${filtered.length} of ${c.rows.length}`}
                     </span>
                     {active > 0 && (
                       <button type="button" data-testid="cand-clear"
                         onClick={() => setFilters((x) => ({ ...NO_CAND_FILTERS, sort: x.sort, dir: x.dir }))}
                         className="h-7 rounded-md border border-tc-line-strong px-2 text-[12px] text-ink-mid outline-none hover:text-ink-hi focus-visible:ring-2 focus-visible:ring-accent">
-                        Clear filters
+                        Clear
                       </button>
                     )}
                   </div>
                 </div>
                 <div data-testid="cand-decisions" role="group" aria-label="filter by decision" className="flex flex-wrap items-center gap-1.5">
-                  <span className="mr-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low">decision</span>
+                  <span className="mr-1 inline-flex items-center gap-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low">
+                    decision
+                    {f.decision && (
+                      <Info label="this decision" testid="cand-action-means">
+                        {f.decision === "placed" && c.actions.placed ? c.actions.placed : BADGE_MEANING[f.decision]}
+                      </Info>
+                    )}
+                  </span>
                   <FilterButton testid="cand-decision" data={{ "data-decision": "all" }}
                     pressed={f.decision === ""} onClick={() => set("decision", "")}>
                     All · {forDecisionCounts.length}
@@ -605,14 +625,10 @@ function CandidatesSection({ d, now, source, filters: f, setFilters, selected, s
                     </FilterButton>
                   ))}
                 </div>
-                {f.decision && (
-                  <p data-testid="cand-action-means" className="text-[11.5px] text-ink-low">
-                    {f.decision === "placed" && c.actions.placed ? c.actions.placed : BADGE_MEANING[f.decision]}
-                  </p>
-                )}
                 <div data-testid="cand-comps" role="group" aria-label="filter by competition" className="flex flex-wrap items-center gap-1.5">
-                  <span className="mr-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low">
-                    {src === "focus" ? "the eleven focus competitions" : "the trader's scope"}
+                  <span data-testid="cand-scope-label" className="mr-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low"
+                    title={src === "focus" ? "the eleven focus competitions" : "the trader's scope"}>
+                    {src === "focus" ? "focus" : "scope"}
                   </span>
                   <FilterButton testid="cand-comp" data={{ "data-comp": "__all__" }}
                     pressed={f.comp === ""} onClick={() => set("comp", "")}>
@@ -621,9 +637,10 @@ function CandidatesSection({ d, now, source, filters: f, setFilters, selected, s
                   {cov.map((k) => (
                     <FilterButton key={k.competition || "none"} testid="cand-comp"
                       data={{ "data-comp": k.competition, "data-considered": String(k.considered) }}
+                      title={`${k.label}: ${k.considered === 0 ? "none in this snapshot"
+                        : `${k.considered} in this snapshot${k.placed ? `, ${k.placed} placed` : ""}`}${!k.declared && k.considered > 0 ? " (not in scope list)" : ""}`}
                       pressed={f.comp === k.competition} onClick={() => set("comp", k.competition)}>
-                      {k.label} · {k.considered === 0 ? "none in this snapshot"
-                        : `${k.considered}${k.placed ? `, ${k.placed} placed` : ""}`}
+                      {k.label} · {k.considered === 0 ? "none" : `${k.considered}${k.placed ? `, ${k.placed} placed` : ""}`}
                       {!k.declared && k.considered > 0 ? " (not in scope list)" : ""}
                     </FilterButton>
                   ))}
@@ -649,14 +666,15 @@ function CandidatesSection({ d, now, source, filters: f, setFilters, selected, s
               ) : (
                 <>
                   {drift && (
-                    <div className="flex items-center justify-between gap-3 border-b border-tc-line bg-tc-raised px-4 py-1.5 text-[12px] text-ink-mid">
-                      <span>Order held since you sorted — newer values would reorder the rows.</span>
+                    <div className="flex items-center justify-between gap-3 border-b border-tc-line bg-tc-raised px-4 py-1 text-[12px] text-ink-mid">
+                      <span className="inline-flex items-center gap-1.5">Order held
+                        <Info label="the held order">Held since you sorted — newer values would reorder the rows.</Info></span>
                       <button type="button" data-testid="cand-resort" onClick={() => setHeld(liveSorted.map((r) => r.ticker))}
                         className="rounded-md border border-tc-line-strong px-2 py-0.5 text-[12px] text-ink-hi outline-none hover:bg-tc-hover focus-visible:ring-2 focus-visible:ring-accent">Re-sort</button>
                     </div>
                   )}
                   <div className="tc-scroll max-h-[70vh] overflow-auto">
-                    <table data-testid="cand-table" className="tc-table w-full min-w-[1180px] border-collapse">
+                    <table data-testid="cand-table" className="tc-table w-full min-w-[1100px] border-collapse">
                       <thead>
                         <tr>
                           <th scope="col" className={`${TH} pl-4 text-left`}>
@@ -683,13 +701,10 @@ function CandidatesSection({ d, now, source, filters: f, setFilters, selected, s
                       </tbody>
                     </table>
                   </div>
-                  <p className="border-t border-tc-line px-4 py-2 text-[11px] text-ink-faint">
-                    Row order is the backend&apos;s priority order until a column is sorted. Click a row or press Enter for the inspector; ↑ ↓ move between rows. Edge: the side considered (else the larger), after the maker fee, against the bar.
-                  </p>
                 </>
               )}
-              <p className="border-t border-tc-line px-4 py-2 font-mono text-[10.5px] text-ink-faint">
-                {c.version ?? "version not stated"} · generated {when(c.generated_at)}
+              <p className="border-t border-tc-line px-4 py-1.5 font-mono text-[10.5px] text-ink-faint" title={`generated ${when(c.generated_at)}`}>
+                {c.version ?? "version not stated"}
               </p>
             </div>
           )}
@@ -705,7 +720,7 @@ function CandidatesSection({ d, now, source, filters: f, setFilters, selected, s
               activeReason={f.reason} />
           </div>
           <div className="col-span-12 xl:col-span-7">
-            <Panel title="Every competition, this tick" meta={src === "focus" ? "the eleven focus competitions" : "the trader's scope"}>
+            <Panel title="By competition" info={`Every competition, this tick — ${src === "focus" ? "the eleven focus competitions" : "the trader's scope"}.`}>
               {c.by_competition ? (
                 <div className="tc-scroll overflow-x-auto">
                   <table data-testid="cand-by-comp" className="w-full min-w-[600px] border-collapse text-[12.5px]">
@@ -721,23 +736,23 @@ function CandidatesSection({ d, now, source, filters: f, setFilters, selected, s
                       {cov.map((k) => (
                         <tr key={k.competition || "none"} data-testid="cand-by-comp-row" data-comp={k.competition}
                           className="hover:bg-tc-hover">
-                          <td className="border-b border-tc-line py-1.5 pr-3 text-ink-hi">{k.label}</td>
-                          <td data-testid="cand-by-comp-in-scope" className="tc-num border-b border-tc-line px-3 py-1.5 text-right text-ink-mid">
+                          <td className="whitespace-nowrap border-b border-tc-line py-1 pr-3 text-ink-hi">{k.label}</td>
+                          <td data-testid="cand-by-comp-in-scope" className="tc-num border-b border-tc-line px-2.5 py-1 text-right text-ink-mid">
                             {k.counts?.in_scope === true ? "yes" : k.counts?.in_scope === false ? "no" : DASH}
                           </td>
                           {[k.counts?.assessed, k.counts?.eligible, k.counts?.in_play_markets,
                             k.counts?.decided, k.counts?.model_priced, k.counts?.placed].map((n, i) => (
-                            <td key={i} className={`tc-num border-b border-tc-line px-3 py-1.5 text-right ${n ? "text-ink-hi" : "text-ink-low"}`}>
+                            <td key={i} className={`tc-num border-b border-tc-line px-2.5 py-1 text-right ${n ? "text-ink-hi" : "text-ink-low"}`}>
                               {n === null || n === undefined ? DASH : n.toLocaleString("en-US")}
                             </td>
                           ))}
-                          <td className="tc-num border-b border-tc-line py-1.5 pl-3 text-right text-ink-mid">{k.considered}</td>
+                          <td className="tc-num border-b border-tc-line py-1 pl-2.5 text-right text-ink-mid">{k.considered}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              ) : <InfoNote>Per-competition counts are not sent by this backend; the chips above list the eleven focus competitions.</InfoNote>}
+              ) : <InfoNote>Not sent by this backend</InfoNote>}
             </Panel>
           </div>
         </>

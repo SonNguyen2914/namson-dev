@@ -13,7 +13,7 @@ import {
   bookCents, bookDollars, bookPl, bookWhen, keyOf, plTone, plural,
 } from "../TradingBook";
 import {
-  DASH, Drawer, DrawerSection, ErrorNote, Freshness, InfoNote, KV, Metric, Panel,
+  DASH, Drawer, DrawerSection, ErrorNote, Freshness, Info, InfoNote, KV, Metric, Panel,
   SubHead, Tech, ago, count, when,
 } from "./primitives";
 import type { Source } from "./useConsoleData";
@@ -27,30 +27,30 @@ function HandoverAggregates({ d, now }: { d: Obj; now: number }) {
   const h: Obj | null = obj(d.handover)
     ?? (keys.some((k) => k in d) ? { ...d, at: d.managed_at } : null);
   return (
-    <Panel testid="ops-handover" title="Hand-over, as the newest tick counted it"
-      meta="contracts you handed to the trader, what it manages, what stays yours · experimental, unproven">
+    <Panel testid="ops-handover" title="Hand-over"
+      info="As the newest tick counted it: contracts you handed to the trader, what it manages, what stays yours.">
       {!h ? (
         <p data-testid="handover-absent" className="text-[12px] text-ink-low">hand-over numbers are not on this backend</p>
       ) : (
         <>
           {typeof h.closes_error === "string" && (
-            <p className="mb-2 text-[12px] text-warn">◆ today&apos;s risk-lowering closes could not be counted: {h.closes_error}</p>
+            <p className="mb-2 text-[12px] text-warn" title={`today's risk-lowering closes could not be counted: ${h.closes_error}`}>◆ closes not counted: {h.closes_error}</p>
           )}
-          <div className="grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-3 xl:grid-cols-6">
-            <Metric size="md" label="handed-over contracts" value={count(h.handed_over_contracts)}
-              sub={"handed_markets" in h ? `in ${count(h.handed_markets)} markets` : undefined} />
-            <Metric size="md" label="managed contracts" value={count(h.managed_contracts)} sub={`in ${count(h.managed_markets)} markets`} />
-            <Metric size="md" label="yours (manual) contracts" value={count(h.manual_contracts)} />
-            <Metric size="md" label="risk-lowering closes today" value={count(h.risk_lowering_closes_today)}
-              sub="closes that went over a cap because they lowered risk" />
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-3 xl:grid-cols-6">
+            <Metric size="md" label="handed over" value={count(h.handed_over_contracts)}
+              sub={`handed-over contracts${"handed_markets" in h ? ` in ${count(h.handed_markets)} markets` : ""}`} />
+            <Metric size="md" label="managed" value={count(h.managed_contracts)} sub={`managed contracts in ${count(h.managed_markets)} markets`} />
+            <Metric size="md" label="manual" value={count(h.manual_contracts)} sub="yours (manual) contracts" />
+            <Metric size="md" label="risk closes" value={count(h.risk_lowering_closes_today)}
+              sub="risk-lowering closes today: closes that went over a cap because they lowered risk." />
             <Metric size="md" label="clips" value={count(h.clips)} sub={`pending ${count(h.clips_pending)} · sold outside the trader`} />
             <Metric size="md" label="as of" value={when(h.at, true)}
               sub={typeof h.outcome === "string" ? <>reconcile <Tech>{h.outcome}</Tech></> : undefined} />
           </div>
           {("settlement_pending" in h || "vanished_ambiguous" in h) && (
-            <p className="mt-3 text-[12px] text-ink-low">
-              settlement pending {count(h.settlement_pending)} · vanished ambiguously{" "}
-              <span className={(Number(h.vanished_ambiguous) || 0) > 0 ? "text-warn" : ""}>{count(h.vanished_ambiguous)}</span>
+            <p className="mt-2 text-[12px] text-ink-low">
+              settlement pending {count(h.settlement_pending)} · vanished{" "}
+              <span className={(Number(h.vanished_ambiguous) || 0) > 0 ? "text-warn" : ""} title="vanished ambiguously">{(Number(h.vanished_ambiguous) || 0) > 0 ? "◆ " : ""}{count(h.vanished_ambiguous)}</span>
             </p>
           )}
         </>
@@ -90,7 +90,7 @@ function PositionInspector({ book, k }: { book: Book; k: string }) {
         <KV k="live value">{bookDollars(p.live.live_value_dollars)}</KV>
         <KV k="unrealised"><span className={plTone(p.live.unrealised_pl_dollars)}>{bookPl(p.live.unrealised_pl_dollars)}</span></KV>
         <KV k="how the mark was taken">{book.markSources[p.live.mark_source ?? "none"] ?? "the backend sent no description of this source"}</KV>
-        <p className="mt-1 text-[11px] text-ink-low">The loss halts still count an in-play position at its cost until it settles.</p>
+        <p className="mt-1 text-[11px] text-ink-low">Halts count in-play at cost until it settles.</p>
       </DrawerSection>
       <DrawerSection title={`Resting orders on this market (${orders.length})`}>
         {orders.length === 0 ? <KV k="orders">none</KV> : orders.map((o) => (
@@ -128,104 +128,108 @@ export function PortfolioView({ d, now, token, source, onPosted, selected, setSe
   const queued = book?.pending ? book.pending.filter((q) => q.status === "queued").length : null;
   const sel = selected && book ? book.positions.find((p) => keyOf(p) === selected) ?? null : null;
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <Panel testid="ops-book" title="Positions & orders"
         meta={book ? <Freshness at={at} now={now} cadenceMs={source.cadenceMs} failed={read.kind === "error"} label="book" /> : undefined}>
         {read.kind === "unavailable" && (
           <p data-testid="book-unavailable" className="text-[12.5px] text-ink-low">
-            Book not available yet — this backend does not serve the trader&apos;s positions and orders. The rest of the console is unaffected.
+            Book not available yet
           </p>
         )}
         {read.kind === "refused" && <ErrorNote testid="book-error">token rejected — the backend refused it ({read.detail})</ErrorNote>}
-        {read.kind === "error" && <ErrorNote testid="book-error" tone="warn">Could not read account positions — the book read failed (HTTP {read.status}) — {read.detail}</ErrorNote>}
-        {read.kind === "idle" && !book && <InfoNote>reading the book…</InfoNote>}
+        {read.kind === "error" && <ErrorNote testid="book-error" tone="warn">Could not read account positions (HTTP {read.status}) — {read.detail}</ErrorNote>}
+        {read.kind === "idle" && !book && <InfoNote>reading…</InfoNote>}
 
         {book && (
           <div data-stale={stale || undefined}>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-4 border-b border-tc-line pb-3 md:grid-cols-4 xl:grid-cols-8">
-              <Metric size="md" label="Positions" value={count(book.totals.positions)} />
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3 border-b border-tc-line pb-2.5 md:grid-cols-4 xl:grid-cols-8">
+              <Metric size="md" label="Positions" value={count(book.totals.positions)}
+                sub={`${plural(book.totals.positions, "position")} · trader manages ${book.totals.managed} · yours ${book.totals.manual}`} />
               <Metric size="md" label="Resting orders" value={count(book.totals.orders)}
                 sub={`${book.orders.filter((o) => o.owner === "trader").length} agent · ${book.orders.filter((o) => o.owner !== "trader").length} yours`} />
-              <Metric size="md" label="Agent-opened" value={`${sum((p) => p.own)}`} sub="contracts (AGENT)" />
-              <Metric size="md" label="Handed over" value={`${sum((p) => p.handed_over)}`} sub="contracts (HANDOVER)" />
-              <Metric size="md" label="Yours" value={`${book.totals.manual}`} sub="contracts (MANUAL) — never touched" />
+              <Metric size="md" label="Agent" value={`${sum((p) => p.own)}`} sub="Agent-opened contracts (AGENT)" />
+              <Metric size="md" label="Handed over" value={`${sum((p) => p.handed_over)}`} sub="Contracts (HANDOVER)" />
+              <Metric size="md" label="Yours" value={`${book.totals.manual}`} sub="Contracts (MANUAL) — never touched" />
               <Metric size="md" label="At risk" value={atRisk.length ? bookDollars(atRisk.reduce((s, p) => s + (p.at_risk_dollars ?? 0), 0)) : DASH}
-                sub={atRisk.length < book.positions.length ? `${book.positions.length - atRisk.length} without a figure, not summed` : "sum of the positions' worst cases"} />
+                inline={atRisk.length < book.positions.length ? <span className="text-warn">◆ {book.positions.length - atRisk.length} not summed</span> : undefined}
+                sub={atRisk.length < book.positions.length ? `${book.positions.length - atRisk.length} without a figure, not summed` : "Sum of the positions' worst cases"} />
               <Metric size="md" label="Live value" value={live?.value === null || !live ? DASH : bookDollars(live.value)}
                 sub={live ? `${live.marked} of ${book.positions.length} marked` : undefined} />
               <Metric size="md" label="Unrealised" value={live ? bookPl(live.unrealised) : DASH}
                 tone={live ? (plTone(live.unrealised) === "text-ink-mid" ? "text-ink-hi" : plTone(live.unrealised)) : "text-ink-hi"}
-                sub={queued !== null ? `${queued} hand-over${queued === 1 ? "" : "s"} queued` : "display only"} />
+                sub={queued !== null ? `Display only · ${queued} hand-over${queued === 1 ? "" : "s"} queued` : "Display only"} />
             </div>
-            <p data-testid="book-totals" className="tc-num mt-2 text-[12px] text-ink-low">
-              {plural(book.totals.positions, "position")} · {plural(book.totals.orders, "resting order")}
-              {" "}· trader manages {book.totals.managed} · yours {book.totals.manual}
-              {" "}· account read {book.account_read_at
+            <p data-testid="book-totals" className="tc-num mt-1.5 text-[12px] text-ink-low"
+              title={`${plural(book.totals.positions, "position")} · ${plural(book.totals.orders, "resting order")} · trader manages ${book.totals.managed} · yours ${book.totals.manual}`}>
+              account {book.account_read_at
                 ? `${when(book.account_read_at)}${Number.isFinite(Date.parse(book.account_read_at))
                   ? ` (${ago(now - Date.parse(book.account_read_at))} ago)` : ""}`
-                : "— not yet"}
-              {stale && <span className="text-warn"> · stale, {ago(now - at!)} old</span>}
+                : "not read yet"}
+              {stale && <span className="text-warn"> · ◆ stale, {ago(now - at!)} old</span>}
             </p>
             {(book.totals.notListedPositions > 0 || book.totals.notListedOrders > 0) && (
-              <p data-testid="book-not-listed" className="mt-0.5 text-[12px] text-warn">
+              <p data-testid="book-not-listed" className="mt-0.5 text-[12px] text-warn">◆{" "}
                 {plural(book.totals.notListedPositions, "more position")} and{" "}
                 {plural(book.totals.notListedOrders, "more resting order")} on markets
                 the trader does not track are not shown.
               </p>
             )}
             {live && book.positions.length > 0 && (
-              <p data-testid="book-live-totals" className="tc-num mt-0.5 text-[12px] text-ink-low">
-                live value <span className="text-ink-hi">{bookDollars(live.value)}</span>
-                {" "}· unrealised{" "}
+              <p data-testid="book-live-totals" className="tc-num mt-0.5 text-[12px] text-ink-low"
+                title="live value · unrealised · refreshed every 15 s">
+                live <span className="text-ink-hi">{bookDollars(live.value)}</span>
+                {" "}·{" "}
                 <span data-testid="book-live-unrealised" className={plTone(live.unrealised)}>{bookPl(live.unrealised)}</span>
-                {" "}· {live.marked} of {book.positions.length} with a live mark
+                {" "}· {live.marked} of {book.positions.length} marked
                 {live.unmarked > 0 && (
-                  <span data-testid="book-live-unmarked" className="text-warn"> · {live.unmarked} without one, not counted</span>
+                  <span data-testid="book-live-unmarked" className="text-warn"> · ◆ {live.unmarked} without one, not counted</span>
                 )}
                 {live.unrealisedMissing > 0 && (
-                  <span className="text-warn"> · {live.unrealisedMissing} with a value but no unrealised P&amp;L, not counted in it</span>
+                  <span className="text-warn" title="with a value but no unrealised P&L, not counted in it"> · ◆ {live.unrealisedMissing} no unrealised, not counted</span>
                 )}
-                {" "}· refreshed every 15 s · experimental, unproven
               </p>
             )}
 
-            <div className="mt-4">
-              <SubHead right="click a market for its inspector">Positions</SubHead>
+            <div className="mt-3">
+              <SubHead info={<>Click a market for its inspector. The trader never touches positions marked Yours (MANUAL).
+                Handed-over positions are fully managed: it may add or close within its limits; a close that lowers risk
+                may go over a cap, but the halts and the kill switch still stop it.</>}>Positions</SubHead>
               <PositionsTable book={book} token={token} onPosted={onPosted}
                 onInspect={(k) => setSelected(k)} selected={selected} />
               <MarkLegend book={book} />
             </div>
 
             {book.pending && book.pending.length > 0 && (
-              <div className="mt-5">
+              <div className="mt-4">
                 <SubHead>Queued hand-overs</SubHead>
                 <PendingList book={book} />
               </div>
             )}
 
-            <div className="mt-5">
-              <SubHead>Resting orders</SubHead>
-              <p data-testid="book-orders-line" className="mb-1.5 text-[12px] text-ink-low">
-                Resting orders can&apos;t be handed over yet — positions only.
-              </p>
+            <div className="mt-4">
+              <SubHead info={<span data-testid="book-orders-line">Resting orders can&apos;t be handed over yet — positions only.</span>}>Resting orders</SubHead>
               <OrdersTable book={book} />
             </div>
           </div>
         )}
-        <div className="mt-4 space-y-1 border-t border-tc-line pt-3">
-          <p data-testid="book-note" className="text-[12px] leading-relaxed text-ink-low">
-            The trader never touches positions marked Yours (MANUAL).
-            Handed-over positions
-            are fully managed: it may add or close within its limits; a close that
-            lowers risk may go over a cap, but the halts and the kill switch
-            still stop it. Experimental, unproven.
-          </p>
-          <p data-testid="book-live-note" className="text-[12px] leading-relaxed text-ink-low">
-            Live value is what a position would fetch at its live mark now — the
-            running in-play feed&apos;s book when the market is in play, the
-            catalogue&apos;s bid otherwise. It is for watching only: the loss
-            halts still count an in-play position at its cost until it settles.
-          </p>
+        <div className="mt-3 flex flex-wrap gap-x-4 border-t border-tc-line pt-2 text-[11.5px] text-ink-low">
+          <span className="inline-flex items-center gap-1.5">Ownership
+            <Info label="ownership" testid="book-note">
+              The trader never touches positions marked Yours (MANUAL).
+              Handed-over positions
+              are fully managed: it may add or close within its limits; a close that
+              lowers risk may go over a cap, but the halts and the kill switch
+              still stop it.
+            </Info>
+          </span>
+          <span className="inline-flex items-center gap-1.5">Live value
+            <Info label="live value" testid="book-live-note">
+              Live value is what a position would fetch at its live mark now — the
+              running in-play feed&apos;s book when the market is in play, the
+              catalogue&apos;s bid otherwise. It is for watching only: the loss
+              halts still count an in-play position at its cost until it settles.
+            </Info>
+          </span>
         </div>
       </Panel>
 

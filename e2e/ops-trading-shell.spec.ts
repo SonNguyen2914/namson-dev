@@ -56,7 +56,13 @@ test.describe("the console's shell", () => {
       await expect(strip.getByTestId("rail-trading")).toContainText("LIVE");
       await expect(strip.getByTestId("rail-kill")).toContainText("OFF");
       expect(new URL(page.url()).hash).toBe("");
-      await expect(page.getByTestId("ops-safety")).toBeVisible();
+      // SAFETY FOLDS INTO THE RAIL while everything is normal (quiet pass):
+      // no panel, and the lift control is in the rail's Controls menu
+      await expect(page.getByTestId("ops-safety")).toHaveCount(0);
+      await expect(strip.getByTestId("rail-controls")).toBeVisible();
+      await expect(strip.getByTestId("kill-lift")).toBeHidden();
+      await strip.getByTestId("rail-controls").locator("summary").click();
+      await expect(strip.getByRole("button", { name: "Lift operator kill" })).toBeVisible();
       await expect(page.getByTestId("nav-overview")).toHaveAttribute("aria-current", "page");
       await expect.poll(() => reads.ledger.length).toBe(1);
       const before = { book: reads.book.length, cand: reads.cand.length, ledger: reads.ledger.length };
@@ -138,7 +144,8 @@ test.describe("the console's shell", () => {
     await page.locator('[data-testid="why-bar"][data-code="no_edge"] button').click();
     await expect(page.getByTestId("cand-reason-chip")).toContainText("no_edge");
     for (const r of await page.getByTestId("cand-row").all()) {
-      await expect(r.getByTestId("cand-words")).toContainText("Neither side clears the bar");
+      await expect(r.getByTestId("cand-reason-tag")).toHaveText("no edge");
+      await expect(r.getByTestId("cand-reason-tag")).toHaveAttribute("title", /Neither side clears the bar/);
     }
     await page.getByTestId("cand-reason-chip").click();
     await expect(page.getByTestId("cand-reason-chip")).toHaveCount(0);

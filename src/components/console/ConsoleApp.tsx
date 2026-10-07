@@ -8,13 +8,14 @@
 // book, the candidates and the ledger are read from here
 // (useSectionReads), never for a plane that refused or is not ready.
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { attention, type ReadState } from "../../lib/consoleModel";
+import { attention, type ReadState, safetyTriggers } from "../../lib/consoleModel";
+import { TradingKillLift } from "../TradingKillLift";
 import { liveTotals } from "../../lib/tradingConsole";
 import { Freshness } from "./primitives";
 import { OperatorStatusBar, ViewNav } from "./shell";
 import { useHashRoute } from "./route";
 import { type Read, useSectionReads } from "./useConsoleData";
-import { Overview } from "./Overview";
+import { Overview, StopHowTo } from "./Overview";
 import { TradingView, type CandFilters, NO_CAND_FILTERS, candFiltersFrom, candParams } from "./TradingView";
 import { PortfolioView } from "./PortfolioView";
 import { TradesView, type LedgerClientFilters, NO_LEDGER_CLIENT } from "./TradesView";
@@ -97,6 +98,28 @@ export function ConsoleApp({ d, statusAt, statusRead, statusStale, now, token, b
   }), [d, statusRead, statusStale, candidates, reads.candidates.read, book, reads.book.read,
     ledger, reads.ledger.read, nowBucket]);
 
+  // SAFETY & CONTROL UNFOLDS only while something is not normal
+  const readsFailed = ([["candidates", reads.candidates.read], ["book", reads.book.read], ["ledger", reads.ledger.read]] as const)
+    .filter(([, r]) => r.kind === "error" || r.kind === "refused" || r.kind === "not_ready").map(([n]) => n);
+  const safety = safetyTriggers(d, {
+    now, statusFailed: statusRead.kind === "error" || statusRead.kind === "not_ready" || statusRead.kind === "refused",
+    statusStale, readsFailed: [...readsFailed],
+  });
+  const panelOnScreen = view === "overview" && safety.length > 0;
+  const day = (d.trading_day && typeof d.trading_day === "object" ? d.trading_day : {}) as Obj;
+  const controls = panelOnScreen ? null : (
+    <>
+      <TradingKillLift token={token} onDone={bumpStatus} active={d.kill === true} />
+      <div className="flex items-center justify-between gap-3">
+        <StopHowTo />
+        <span data-testid="controls-day" className="tc-num text-[11.5px] text-ink-low"
+          title={`trading day · ${typeof day.tz === "string" ? day.tz : "zone not sent"}${day.valid === false ? " (zone unreadable: UTC)" : ""} · ends ${typeof day.ends_at === "string" ? day.ends_at : "not sent"}`}>
+          day {typeof day.day === "string" ? day.day : "—"}
+        </span>
+      </div>
+    </>
+  );
+
   const counts = {
     trading: candidates ? String(candidates.rows.length) : undefined,
     portfolio: book ? String(book.positions.length + book.orders.length) : undefined,
@@ -111,7 +134,7 @@ export function ConsoleApp({ d, statusAt, statusRead, statusStale, now, token, b
   return (
     <div data-testid="ops-console" data-stale={statusStale || undefined}>
       <div className="sticky top-[var(--topbar-h,48px)] z-40">
-        <OperatorStatusBar d={d} now={now} attention={items} freshness={statusFresh} />
+        <OperatorStatusBar d={d} now={now} attention={items} freshness={statusFresh} controls={controls} />
       </div>
       <div className="border-b border-tc-line bg-tc-app">
         <div className="mx-auto flex max-w-[1760px] flex-wrap items-end justify-between gap-x-6 gap-y-2 px-4 pt-3 sm:px-6">
@@ -130,23 +153,23 @@ export function ConsoleApp({ d, statusAt, statusRead, statusStale, now, token, b
         </div>
       </div>
 
-      <main className="mx-auto max-w-[1760px] px-4 pb-24 pt-5 sm:px-6">
+      <main className="mx-auto max-w-[1760px] px-4 pb-24 pt-4 sm:px-6">
         {statusRead.kind === "not_ready" && (
           <p data-testid="ops-not-ready" role="alert"
             className="mb-4 rounded-md border border-warn/40 px-3 py-2 text-[12.5px] text-warn">
-            trading plane not ready — {statusRead.detail}. The figures below are from the last good read, {Math.round((now - statusAt) / 1000)} s old.
+            ◆ trading plane not ready — {statusRead.detail} · showing the last good read, {Math.round((now - statusAt) / 1000)} s old
           </p>
         )}
         {statusRead.kind === "error" && (
           <p data-testid="ops-error" role="alert"
             className="mb-4 rounded-md border border-warn/40 px-3 py-2 text-[12.5px] text-warn">
-            the status read failed (HTTP {statusRead.status}) — {statusRead.detail}. The figures below are from the last good read, {Math.round((now - statusAt) / 1000)} s old.
+            ◆ status read failed (HTTP {statusRead.status}) — {statusRead.detail} · showing the last good read, {Math.round((now - statusAt) / 1000)} s old
           </p>
         )}
 
         {view === "overview" && (
           <Overview d={d} now={now} token={token} reads={reads} attention={items}
-            bumpStatus={bumpStatus} go={go} statusStale={statusStale} statusAt={statusAt} />
+            bumpStatus={bumpStatus} go={go} statusStale={statusStale} statusAt={statusAt} safety={safety} />
         )}
         {view === "trading" && (
           <TradingView d={d} now={now} source={reads.candidates} filters={cand} setFilters={setCand}

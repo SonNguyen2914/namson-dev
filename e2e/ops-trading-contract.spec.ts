@@ -84,8 +84,10 @@ test.describe("the console reads the integrated backend's payloads", () => {
       const summary = page.getByTestId("cand-summary");
       await expect(page.getByTestId("cand-truncated")).toHaveCount(0);
       await expect(summary).not.toContainText("cut to its bound");
-      await expect(page.getByTestId("cand-not-shown")).toHaveText(
-        "· 160 not shown by design (outside_window 120, market_not_trading 40)");
+      // said short ("160 hidden"), the breakdown one ⓘ away (quiet pass)
+      await expect(page.getByTestId("cand-not-shown")).toContainText("160 hidden");
+      await expect(page.getByTestId("cand-not-shown")).toContainText(
+        "160 not shown by design (outside_window 120, market_not_trading 40)");
     });
 
   test("a cut to the snapshot's bound is still a warning", async ({ page }) => {

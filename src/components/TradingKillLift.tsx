@@ -13,6 +13,7 @@
 // answer is said in plain words; `onDone` asks the page to read the
 // status again at once.
 import { useState } from "react";
+import { Info } from "./console/primitives";
 
 type Obj = Record<string, unknown>;
 interface Outcome { ok: boolean; text: string }
@@ -109,7 +110,14 @@ export function TradingKillLift({ token, onDone, active = false }: {
   return (
     <div data-testid="kill-lift" className="text-[12.5px] text-ink-mid">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-1 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-low">Operator kill</span>
+        <span className="mr-1 inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-low">
+          Operator kill
+          <Info label="the operator kill" testid="kill-lift-info">
+            Re-enables trading only if backend TRADING_KILL is not active: it
+            ends a kill set through the backend&apos;s kill route and cannot lift
+            TRADING_KILL on the Railway service.
+          </Info>
+        </span>
         {!asking ? (
           <button type="button" disabled={busy}
             onClick={() => { setOutcome(null); setAsking(true); }}
@@ -120,7 +128,7 @@ export function TradingKillLift({ token, onDone, active = false }: {
           <>
             <span className="text-[12.5px] text-ink-hi">
               Lift the operator kill? If TRADING_KILL is not set and no halt
-              holds, the trader may place again on its next tick.
+              holds, the trader may place on its next tick.
             </span>
             <button type="button" data-testid="kill-lift-confirm" disabled={busy}
               onClick={() => void lift()}
@@ -143,11 +151,6 @@ export function TradingKillLift({ token, onDone, active = false }: {
           {outcome.text}
         </p>
       )}
-      <p className="mt-1.5 text-[11.5px] leading-snug text-ink-low">
-        Re-enables trading only if backend TRADING_KILL is not active: it
-        ends a kill set through the backend&apos;s kill route and cannot lift
-        TRADING_KILL on the Railway service.
-      </p>
     </div>
   );
 }

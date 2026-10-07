@@ -20,6 +20,7 @@
 // never 0.
 import { useState } from "react";
 import { compLabel } from "../lib/tradingConsole";
+import { Info } from "./console/primitives";
 
 type Obj = Record<string, unknown>;
 const obj = (v: unknown): Obj | null =>
@@ -38,16 +39,17 @@ const NOT_SERVED = "not served yet";
 function Cell({ k, v, sub, tone }: { k: string; v: string; sub?: string; tone?: string }) {
   return (
     <div className="min-w-0">
-      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-ink-low">{k}</p>
+      <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-low">
+        {k}{sub && <Info label={k}>{sub}</Info>}
+      </div>
       <p className={`tc-num mt-0.5 text-[16px] font-medium ${tone ?? "text-ink-hi"}`}>{v}</p>
-      {sub && <p className="mt-0.5 text-[11.5px] text-ink-low">{sub}</p>}
     </div>
   );
 }
 
-const H3 = "mb-2 mt-5 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-low";
-const TH = "border-b border-tc-line px-2 py-1.5 text-left text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low first:pl-0";
-const TD = "border-b border-tc-line px-2 py-1.5 first:pl-0";
+const H3 = "mb-1.5 mt-4 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-low";
+const TH = "whitespace-nowrap border-b border-tc-line px-2 py-1.5 text-left text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low first:pl-0";
+const TD = "whitespace-nowrap border-b border-tc-line px-2 py-1 first:pl-0";
 
 export function TradingCareful({ d, token }: { d: Obj; token: string }) {
   const c = obj(d.careful);
@@ -89,14 +91,14 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
   return (
     <section data-testid="ops-careful" aria-labelledby="ops-careful-h"
       className="rounded-lg border border-tc-line bg-tc-panel">
-      <header className="flex flex-wrap items-baseline justify-between gap-2 border-b border-tc-line px-4 py-2.5">
+      <header className="flex flex-wrap items-center gap-2 border-b border-tc-line px-4 py-2">
         <h2 id="ops-careful-h" className="text-[13px] font-semibold text-ink-hi">Careful strategy</h2>
-        <span className="text-[11.5px] text-ink-low">
-          Experimental, unproven. Real money only on match winner, directly priced totals and
+        <Info label="the careful strategy">
+          Real money only on match winner, directly priced totals and
           both-teams-to-score; everything else is paper. A bet needs the bookmakers AND our model to clear the bar.
-        </span>
+        </Info>
       </header>
-      <div className="px-4 py-3">
+      <div className="px-4 py-2.5">
         {!c ? (
           <p data-testid="careful-absent" className="text-[12px] text-ink-low">careful strategy: {NOT_SERVED}</p>
         ) : typeof c.error === "string" ? (
@@ -109,12 +111,12 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
                 v={tick ? `${num(tick.funded) ?? "—"} / ${num(tick.qualifying) ?? "—"}` : NOT_SERVED}
                 sub={tick ? `of ${num(tick.candidates) ?? "—"} candidates · ${num(tick.paper_rows) ?? "—"} paper rows` : undefined} />
               <Cell k="swaps" v={tick ? String(num(tick.swaps) ?? "—") : NOT_SERVED} />
-              <Cell k="edges above the ceiling" v={tick ? String(num(tick.data_errors) ?? "—") : NOT_SERVED}
+              <Cell k="data errors" v={tick ? `${(num(tick.data_errors) ?? 0) > 0 ? "◆ " : ""}${num(tick.data_errors) ?? "—"}` : NOT_SERVED}
                 tone={(num(tick?.data_errors) ?? 0) > 0 ? "text-warn" : "text-ink-hi"}
-                sub="probable data errors, never bet" />
+                sub="Edges above the ceiling: probable data errors, never bet." />
             </div>
 
-            <h3 className={H3}>competitions (off = paper only)</h3>
+            <h3 className={H3}>competitions <Info label="the competition switches">Off = paper only.</Info></h3>
             <div data-testid="careful-competitions" className="flex flex-wrap gap-1.5">
               {Object.entries(comps).map(([k, v]) => {
                 const on = local[k] ?? (obj(v)?.on !== false);
@@ -133,7 +135,7 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
             </div>
             {said && <p data-testid="careful-said" role="status" className="mt-2 text-[12px] text-ink-mid">{said}</p>}
 
-            <h3 className={H3}>paper vs real, per situation</h3>
+            <h3 className={H3}>paper vs real</h3>
             {Object.keys(sits).length === 0 ? (
               <p className="text-[12px] text-ink-low">no bet scored yet</p>
             ) : (
@@ -154,7 +156,7 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
                           <td className={`${TD} tc-num`}>{num(s.real_n) ?? "—"}</td>
                           <td className={`${TD} tc-num`}>{c2(s.real_x_c)}</td>
                           <td className={`${TD} tc-num`}>{c2(s.real_pnl_c)}</td>
-                          <td className={`${TD} text-warn`}>{s.disagreement === true ? "◆ CLV and money disagree" : ""}</td>
+                          <td className={`${TD} text-warn`} title={s.disagreement === true ? "CLV and money disagree" : undefined}>{s.disagreement === true ? "◆ disagree" : ""}</td>
                         </tr>);
                     })}
                   </tbody>
@@ -162,7 +164,7 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
               </div>
             )}
 
-            <h3 className={H3}>grounds — evidence so far</h3>
+            <h3 className={H3}>grounds <Info label="the grounds">Evidence so far. Mean CLV after the fee, with its match-clustered 95% range; a range that spans zero is not evidence either way.</Info></h3>
             <p className="text-[12px] text-ink-low">
               promoted: {Array.isArray(c.promoted) && c.promoted.length ? (c.promoted as string[]).join(", ") : "none"}
               {" · "}probation: {Array.isArray(c.probation) && c.probation.length ? (c.probation as string[]).join(", ") : "none"}
@@ -172,7 +174,7 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
                 ...Object.entries(gr).map(([g, v]) => [g, v, "real"] as const)].map(([g, v, kind]) => {
                 const s = obj(v) ?? {};
                 return (
-                  <li key={`${kind}:${g}`} className="flex flex-wrap justify-between gap-2 py-1">
+                  <li key={`${kind}:${g}`} className="flex flex-wrap justify-between gap-2 py-0.5">
                     <span className="text-ink-hi"><span className="font-mono text-[11.5px]">{g}</span> <span className="text-ink-low">({kind})</span></span>
                     <span className="tc-num text-ink-mid">
                       n {num(s.n) ?? "—"} · {num(s.matches) ?? "—"} matches · {c2(s.mean)}
@@ -181,23 +183,22 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
                   </li>);
               })}
             </ul>
-            <p className="mt-1 text-[11px] text-ink-faint">Mean CLV after the fee, with its match-clustered 95% range; a range that spans zero is not evidence either way.</p>
             {events.length > 0 && (
               <>
-                <h3 className={H3}>checks and proposals (section 4)</h3>
+                <h3 className={H3}>checks · proposals</h3>
                 <ul data-testid="careful-events" className="space-y-1 text-[12px] text-ink-mid">
                   {events.slice(-8).map((e, i) => {
                     const o = obj(e) ?? {};
                     return (<li key={i}><span className="font-mono text-[11px] text-ink-low">{str(o.at)?.slice(0, 16) ?? ""}</span> · {str(o.reason)}
                       {o.ground ? ` · ${String(o.ground)}` : ""}{o.milestone ? ` @ ${String(o.milestone)}` : ""}
-                      {o.proposed === true ? <span className="text-ink-hi"> · PROPOSED (Son decides)</span> : ""}</li>);
+                      {o.proposed === true ? <span className="text-ink-hi" title="Son decides"> · PROPOSED</span> : ""}</li>);
                   })}
                 </ul>
               </>
             )}
             {knobs && (
               <details className="mt-4">
-                <summary className="cursor-pointer text-[11.5px] text-ink-low outline-none hover:text-ink-mid focus-visible:text-ink-hi">Knobs in force ({Object.keys(knobs).length})</summary>
+                <summary className="cursor-pointer text-[11.5px] text-ink-low outline-none hover:text-ink-mid focus-visible:text-ink-hi">Knobs ({Object.keys(knobs).length})</summary>
                 <dl className="mt-2 grid gap-x-6 sm:grid-cols-2 xl:grid-cols-3">
                   {Object.entries(knobs).map(([k, v]) => (
                     <div key={k} className="flex justify-between gap-3 border-b border-tc-line py-1 text-[11.5px]">

@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
@@ -34,8 +34,25 @@ async function open(page: Page, o: {
   await expect(page.getByTestId("ops-console")).toBeVisible();
   await page.waitForTimeout(900);
 }
-const shot = (page: Page, name: string, full = true) =>
-  page.screenshot({ path: join(DIR, `${name}.png`), fullPage: full });
+// THE WORD COUNT (quiet pass, 2026-10-07): every shot also records the
+// visible words of `main` (innerText split on whitespace), one TSV line
+// per screen, so a copy pass is measured, not eyeballed.
+async function shot(page: Page, name: string, full = true) {
+  await page.screenshot({ path: join(DIR, `${name}.png`), fullPage: full });
+  const text = await page.evaluate(() => {
+    const m = document.querySelector("main");
+    return m ? (m as HTMLElement).innerText : "";
+  });
+  const count = (t: string) => t.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+  const words = count(text);
+  // innerText also carries every <select>'s closed option list (never on
+  // screen); said beside the count, so the two can be read apart
+  const options = count(await page.evaluate(() => [...document.querySelectorAll("main option")]
+    .map((o) => (o as HTMLElement).textContent ?? "").join(" ")));
+  appendFileSync(join(DIR, "words.tsv"), `${name}\t${words}\t${options}\n`);
+  // CONSOLE_TEXT=1 also keeps the text itself, to see what the words are
+  if (process.env.CONSOLE_TEXT === "1") writeFileSync(join(DIR, `${name}.txt`), text);
+}
 
 test("overview 1440", async ({ page }) => { await open(page); await shot(page, "01-overview-1440"); });
 test("overview 1920", async ({ page }) => { await open(page, { width: 1920, height: 1080 }); await shot(page, "02-overview-1920"); });

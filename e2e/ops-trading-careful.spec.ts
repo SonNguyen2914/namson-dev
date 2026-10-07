@@ -85,7 +85,10 @@ test.describe("the careful strategy on the console", () => {
   test("per kickoff hour against $12, and edges above 8c counted",
     async ({ page }) => {
       await openConsole(page, SERVED, "");
-      await expect(page.getByTestId("careful-hours")).toContainText("$7.46 / $12.00");
+      // each hour's figure against the cap is one hover away (quiet pass)
+      await expect(page.getByTestId("careful-hours")).toContainText("$7.46");
+      await expect(page.getByTestId("careful-hours").locator("li").first())
+        .toHaveAttribute("title", /\$7\.46 of \$12\.00/);
       await view(page, "#model");
       const t = page.getByTestId("careful-tick");
       await expect(t).toContainText("2 / 5");
@@ -118,8 +121,9 @@ test.describe("the careful strategy on the console", () => {
       await openConsole(page, SERVED);
       const row = page.getByTestId("careful-situation");
       await expect(row).toHaveAttribute("data-flag", "true");
-      await expect(row).toContainText("CLV and money disagree");
-      await expect(page.getByTestId("careful-events")).toContainText("PROPOSED (Son decides)");
+      await expect(row).toContainText("◆ disagree");
+      await expect(row.locator("td").last()).toHaveAttribute("title", "CLV and money disagree");
+      await expect(page.getByTestId("careful-events")).toContainText("PROPOSED");
       await expect(page.getByTestId("careful-grounds")).toContainText("family:SPREAD");
     });
 

@@ -163,8 +163,9 @@ test.describe("the trader's book on the console", () => {
         "The trader never touches positions marked Yours (MANUAL).");
       await expect(page.getByTestId("book-note")).toContainText(
         "a close that lowers risk may go over a cap, but the halts and the "
-        + "kill switch still stop it. Experimental, unproven.");
-      await expect(page.getByTestId("book-totals")).toContainText("3 positions");
+        + "kill switch still stop it.");
+      // the totals sentence moved behind the line's hover (quiet pass)
+      expect(await page.getByTestId("book-totals").getAttribute("title")).toContain("3 positions");
     });
 
   test("hand to trader: inline count, Confirm posts the exact body, says "
@@ -271,7 +272,7 @@ test.describe("the trader's book on the console", () => {
           manual_contracts: 0, not_listed_positions: 2, not_listed_orders: 1 },
       } });
       await expect(page.getByTestId("book-not-listed")).toHaveText(
-        "2 more positions and 1 more resting order on markets the trader "
+        "◆ 2 more positions and 1 more resting order on markets the trader "
         + "does not track are not shown.");
       await expect(page.getByTestId("book-positions-empty"))
         .toHaveText("No open positions on markets the trader tracks.");
@@ -319,7 +320,8 @@ test.describe("the trader's book on the console", () => {
       .toHaveText("No open positions on the account.");
     await expect(page.getByTestId("book-orders-empty"))
       .toHaveText("No resting orders on the account.");
-    await expect(page.locator('[data-testid="ops-book"] button')).toHaveCount(0);
+    // no hand-over control (the ⓘ disclosures are not controls on a position)
+    await expect(page.locator('[data-testid="ops-book"] button:not([data-info])')).toHaveCount(0);
   });
 
   test("at 400 px the tables scroll inside their boxes and the page does "

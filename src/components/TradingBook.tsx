@@ -38,6 +38,7 @@ import { Fragment, useState, type ReactNode } from "react";
 import {
   compLabel, type LiveValue, markSourceWords, parseLiveValue,
 } from "../lib/tradingConsole";
+import { Info } from "./console/primitives";
 
 type Obj = Record<string, unknown>;
 type Side = "yes" | "no";
@@ -297,15 +298,15 @@ export function OwnerChip({ tone, n }: { tone: keyof typeof OWNER; n?: number })
   );
 }
 
-const TH = "border-b border-tc-line px-3 py-2 text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low whitespace-nowrap";
-const TD = "border-b border-tc-line px-3 py-2 align-top";
+const TH = "border-b border-tc-line px-2.5 py-1.5 text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low whitespace-nowrap";
+const TD = "border-b border-tc-line px-2.5 py-1 align-top whitespace-nowrap";
 const BTN = "whitespace-nowrap rounded-md border px-2 py-1 text-[12px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-40";
 
 function Market({ title, ticker }: { title: string; ticker: string }) {
   return (
     <>
-      <span className="block text-[13px] leading-snug text-ink-hi">{title}</span>
-      <span title={ticker} className="block break-all font-mono text-[10.5px] text-ink-low">{ticker}</span>
+      <span title={title} className="block truncate text-[12.5px] leading-snug text-ink-hi">{title}</span>
+      <span title={ticker} className="block truncate font-mono text-[10.5px] text-ink-low">{ticker}</span>
     </>
   );
 }
@@ -424,7 +425,7 @@ export function PositionsTable({ book, token, onPosted, onInspect, selected }: {
                         aria-label={onInspect ? `inspect ${p.title}` : undefined}
                         onClick={onInspect ? () => onInspect(k) : undefined}
                         onKeyDown={onInspect ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onInspect(k); } } : undefined}
-                        className={`${TD} min-w-[170px] max-w-[300px] ${onInspect ? "cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent" : ""}`}>
+                        className={`${TD} max-w-[150px] sm:max-w-[300px] ${onInspect ? "cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent" : ""}`}>
                         <Market title={p.title} ticker={p.ticker} />
                       </td>
                       <td className={`${TD} font-medium uppercase text-ink-hi`}>{p.side}</td>
@@ -435,7 +436,7 @@ export function PositionsTable({ book, token, onPosted, onInspect, selected }: {
                         </span>
                         {/* the sub line WRAPS, so the column stays narrow
                             enough to sit on a phone's first screen */}
-                        <span className="block min-w-[84px] text-[10.5px] leading-tight text-ink-low">
+                        <span className="block min-w-[84px] whitespace-normal text-[10.5px] leading-tight text-ink-low">
                           at <span data-testid="book-live-mark" className="tc-num">{bookCents(p.live.live_mark_cents)}</span>
                           {" "}·{" "}
                           <span data-testid="book-mark-source"
@@ -463,8 +464,8 @@ export function PositionsTable({ book, token, onPosted, onInspect, selected }: {
                         </span>
                       </td>
                       <td className={`${TD} tc-num text-right text-ink-hi`}>{bookDollars(p.at_risk_dollars)}</td>
-                      <td className={TD}>
-                        <span className="block text-ink-mid">
+                      <td className={`${TD} max-w-[160px]`}>
+                        <span className="block truncate text-ink-mid">
                           {p.competition ? compLabel(p.competition) : ABSENT}
                         </span>
                         <span className="block whitespace-nowrap text-[10.5px]">
@@ -551,14 +552,19 @@ export function MarkLegend({ book }: { book: Book }) {
   if (book.positions.length === 0) return null;
   const used = [...new Set(book.positions.map((p) => p.live.mark_source ?? "none"))];
   return (
-    <ul data-testid="book-mark-legend" className="mt-2 space-y-0.5 text-[11.5px] text-ink-low">
-      {used.map((k) => (
-        <li key={k}>
-          <span className="text-ink-mid">{markSourceWords(k === "none" ? null : k)}</span>
-          {" "}— {book.markSources[k] ?? "the backend sent no description of this source"}
-        </li>
-      ))}
-    </ul>
+    <div className="mt-1.5 flex items-center gap-1.5 text-[11.5px] text-ink-low">
+      Marks
+      <Info label="the live marks">
+        <span data-testid="book-mark-legend" className="block space-y-0.5">
+          {used.map((k) => (
+            <span key={k} data-testid="book-mark-legend-item" className="block">
+              <span className="text-ink-hi">{markSourceWords(k === "none" ? null : k)}</span>
+              {" "}— {book.markSources[k] ?? "the backend sent no description of this source"}
+            </span>
+          ))}
+        </span>
+      </Info>
+    </div>
   );
 }
 
@@ -571,7 +577,7 @@ export function PendingList({ book }: { book: Book }) {
         return (
           <li key={`${q.ticker}-${q.side}-${q.requested_at}-${i}`}
             data-testid="book-pending" data-status={q.status || "none"}
-            className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2 text-[12.5px]">
+            className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-1 text-[12.5px]">
             <span className="min-w-0 break-words text-ink-hi">{title}</span>
             <span className="font-medium uppercase text-ink-mid">{q.side ?? ABSENT}</span>
             <span className="tc-num text-ink-mid">
@@ -618,7 +624,7 @@ export function OrdersTable({ book }: { book: Book }): ReactNode {
           {book.orders.map((o) => (
             <tr key={o.order_id} data-testid="book-order" data-ticker={o.ticker}
               className="hover:bg-tc-hover">
-              <td className={`${TD} min-w-[180px]`}>
+              <td className={`${TD} min-w-[180px] max-w-[320px]`}>
                 <Market title={o.title} ticker={o.ticker} />
               </td>
               <td className={`${TD} font-medium uppercase text-ink-hi`}>{o.side}</td>

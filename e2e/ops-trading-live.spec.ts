@@ -191,18 +191,18 @@ test.describe("live value on the book", () => {
 
       // the legend: each source in use, in the backend's own sentence
       const legend = page.getByTestId("book-mark-legend");
-      await expect(legend.locator("li")).toHaveCount(3);
+      await expect(page.getByTestId("book-mark-legend-item")).toHaveCount(3);
       await expect(legend).toContainText("catalogue book bid — before kickoff: the catalogue's order book bid");
       await expect(legend).toContainText("live feed — in play: the running in-play WebSocket feed's best bid");
       await expect(legend).toContainText("no live price — no live price: in play with no vouched feed book");
 
       const totals = page.getByTestId("book-live-totals");
-      await expect(totals).toContainText("live value $4.92");
-      await expect(totals).toContainText("unrealised +$0.35");
-      await expect(totals).toContainText("2 of 3 with a live mark");
+      await expect(totals).toContainText("live $4.92");
+      await expect(totals).toContainText("+$0.35");
+      await expect(totals).toContainText("2 of 3 marked");
+      await expect(totals).toHaveAttribute("title", /live value · unrealised/);
       await expect(page.getByTestId("book-live-unmarked"))
         .toContainText("1 without one, not counted");
-      await expect(totals).toContainText("experimental, unproven");
       await expect(page.getByTestId("book-live-note"))
         .toContainText("the loss halts still count an in-play position at its cost");
     });
@@ -315,8 +315,9 @@ test.describe("in-play v2, learning, hand-over and settlement reads", () => {
     const out = page.getByTestId("settlement-outcomes");
     await expect(out.locator("thead")).toContainText("last 240 ticks");
     await expect(out.locator("tbody tr")).toHaveCount(4);
-    await expect(out.locator("tbody tr").nth(0)).toHaveText(
-      /settled — the account's settlement data gave one yes\/no result\s*1\s*2/);
+    await expect(out.locator("tbody tr").nth(0)).toHaveText(/settled\s*1\s*2/);
+    await expect(out.locator("tbody tr").nth(0).locator("td span").first()).toHaveAttribute("title",
+      "settled — the account's settlement data gave one yes/no result");
     await expect(out.locator("tbody tr").nth(1)).toHaveText(/not listed yet.*\s*1\s*9/);
     await expect(out.locator("tbody tr").nth(1)).toContainText("not listed yet");
     await expect(out.locator("tbody tr").nth(2)).toContainText("unclear result");

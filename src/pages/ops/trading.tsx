@@ -86,8 +86,9 @@ export default function TradingConsole() {
           className="h-7 w-44 max-w-full rounded-md border border-tc-line-strong bg-tc-raised px-2 font-mono text-[12px] text-ink-hi outline-none transition-colors hover:border-ink-faint focus-visible:ring-2 focus-visible:ring-accent" />
       </label>
       <span data-testid="ops-state" data-stale={stale || undefined}
+        title={armed === "" ? "held in this tab only — a reload forgets it" : undefined}
         className={`tc-num text-[11.5px] ${stale ? "text-warn" : "text-ink-low"}`}>
-        {armed === "" ? "held in this tab only — a reload forgets it"
+        {armed === "" ? "this tab only"
           : read.kind === "idle" && !last ? "reading…"
           : last ? `last updated ${new Date(last.at).toLocaleTimeString()}`
             + (stale ? ` · stale, ${ago(age)} old` : "")
@@ -122,10 +123,12 @@ export default function TradingConsole() {
         <main className="mx-auto max-w-[1760px] px-4 pb-24 pt-8 sm:px-6">
           <div className="max-w-xl">
             <h1 className="text-[18px] font-semibold tracking-[-0.01em] text-ink-hi">Trading console</h1>
-            <p className="mt-1 text-[13px] leading-relaxed text-ink-low">
-              What the trading agent is doing, from its own journal, and every
-              open position and order on the account. Operator only.{" "}
-              <span className="text-ink-mid">Experimental, unproven — not advice; no edge is claimed.</span>
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-ink-low">
+              Operator only
+              <span title="What the trading agent is doing, from its own journal, and every open position and order on the account. No edge is claimed."
+                className="rounded-[4px] border border-warn/30 px-1.5 py-[1px] text-[10.5px] font-medium uppercase tracking-[0.08em] text-warn/90">
+                experimental · unproven · not advice
+              </span>
             </p>
             <div className="mt-5 rounded-lg border border-tc-line bg-tc-panel px-4 py-4">
               {tokenField}

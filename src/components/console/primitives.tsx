@@ -14,7 +14,7 @@
 // with a word or a shape beside it; gold only for the active view, the
 // selected row and focus.
 import {
-  type ReactNode, useEffect, useId, useRef,
+  type CSSProperties, type ReactNode, useCallback, useEffect, useId, useRef, useState,
 } from "react";
 import type { Badge } from "../../lib/consoleModel";
 
@@ -70,6 +70,18 @@ export function when(iso: unknown, seconds = false): string {
     ...(seconds ? { second: "2-digit" } : {}),
   });
 }
+/** COMPACT, for grid cells: "14:05" on the viewer's today, else
+ *  "Oct 7 14:05" (24 h, local). The full `when()` goes in the cell's
+ *  title. */
+export function whenShort(iso: unknown, now: number = Date.now()): string {
+  if (typeof iso !== "string" || iso === "") return DASH;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return iso;
+  const d = new Date(t);
+  const hm = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  return d.toDateString() === new Date(now).toDateString() ? hm
+    : `${d.toLocaleDateString([], { month: "short", day: "numeric" })} ${hm}`;
+}
 /** "14:05:09" local */
 export function clockTime(iso: unknown): string {
   if (typeof iso !== "string" || iso === "") return DASH;
@@ -83,11 +95,72 @@ export const pnlTone = (v: unknown): string => {
   return n === null || n === 0 ? "text-ink-hi" : n > 0 ? "text-up" : "text-neg";
 };
 
+// ------------------------------------------------------------ the ⓘ
+
+/** THE QUIET PASS'S ONE DISCLOSURE FOR WORDS (2026-10-07): a label stays
+ *  1–3 words and the sentence that explains it lives here — a real button
+ *  (focusable, works on tap) whose `aria-describedby` names the tooltip, so
+ *  a screen reader hears the sentence with the button. Shown on hover,
+ *  focus or tap; Esc or a second tap hides it. The text is always in the
+ *  DOM (hidden), so nothing is lost — it is one hover or tap away.
+ *  Positioned `fixed` from the button, so a table's scroller never clips
+ *  it. */
+export function Info({ children, label = "details", testid, className = "" }: {
+  children: ReactNode; label?: string; testid?: string; className?: string;
+}) {
+  const id = useId();
+  const btn = useRef<HTMLButtonElement | null>(null);
+  const [pinned, setPinned] = useState(false);
+  const [hover, setHover] = useState(false);
+  // keyboard focus shows it; a tap's focus does not (the tap pins it)
+  const [kbd, setKbd] = useState(false);
+  const [pos, setPos] = useState<CSSProperties>({});
+  const show = pinned || hover || kbd;
+  const place = useCallback(() => {
+    const b = btn.current?.getBoundingClientRect();
+    if (!b) return;
+    const w = Math.min(300, window.innerWidth - 16);
+    const left = Math.max(8, Math.min(b.left - 8, window.innerWidth - w - 8));
+    const below = b.bottom + 6;
+    setPos(below + 120 > window.innerHeight && b.top > 160
+      ? { left, bottom: window.innerHeight - b.top + 6, width: w }
+      : { left, top: below, width: w });
+  }, []);
+  useEffect(() => {
+    if (!show) return;
+    place();
+    const on = () => place();
+    window.addEventListener("scroll", on, true);
+    window.addEventListener("resize", on);
+    return () => { window.removeEventListener("scroll", on, true); window.removeEventListener("resize", on); };
+  }, [show, place]);
+  return (
+    <span className={`inline-flex align-middle ${className}`}
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+      <button ref={btn} type="button" aria-describedby={id} aria-expanded={show}
+        aria-label={`About ${label}`} data-testid={testid ? `${testid}-btn` : "info-btn"} data-info=""
+        onClick={(e) => { e.stopPropagation(); setKbd(false); setPinned((x) => !x); }}
+        onFocus={(e) => setKbd(e.currentTarget.matches(":focus-visible"))}
+        onBlur={() => { setPinned(false); setKbd(false); }}
+        onKeyDown={(e) => { if (e.key === "Escape") { setPinned(false); setHover(false); setKbd(false); } }}
+        className="inline-flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full font-sans text-[11px] font-normal normal-case leading-none tracking-normal text-ink-faint outline-none transition-colors hover:text-ink-mid focus-visible:text-ink-hi focus-visible:ring-1 focus-visible:ring-accent">
+        <span aria-hidden>ⓘ</span>
+      </button>
+      <span id={id} role="tooltip" data-testid={testid} style={{ position: "fixed", ...pos }}
+        className={`${show ? "block" : "hidden"} tc-scroll z-[80] max-h-[60vh] overflow-y-auto whitespace-normal rounded-md border border-tc-line-strong bg-tc-raised px-2.5 py-1.5 text-left font-sans text-[11.5px] font-normal normal-case leading-snug tracking-normal text-ink-mid shadow-xl`}>
+        {children}
+      </span>
+    </span>
+  );
+}
+
 // ------------------------------------------------------------- regions
 
 export function Panel({ title, meta, actions, children, testid, id, className = "",
-  bodyClass = "", tone }: {
+  bodyClass = "", tone, info }: {
   title?: ReactNode; meta?: ReactNode; actions?: ReactNode; children: ReactNode;
+  /** what the panel is, in a sentence — behind an ⓘ beside the title */
+  info?: ReactNode;
   testid?: string; id?: string; className?: string; bodyClass?: string;
   /** a control area is drawn apart from data panels */
   tone?: "control";
@@ -98,25 +171,28 @@ export function Panel({ title, meta, actions, children, testid, id, className = 
       className={`min-w-0 rounded-lg border bg-tc-panel ${tone === "control"
         ? "border-tc-line-strong" : "border-tc-line"} ${className}`}>
       {(title || actions || meta) && (
-        <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-tc-line px-4 py-2.5">
-          <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
+        <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-tc-line px-4 py-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
             {title && (
               <h2 id={hid} className="text-[13px] font-semibold tracking-[-0.005em] text-ink-hi">{title}</h2>
             )}
+            {info && <Info label={typeof title === "string" ? title : "this panel"}>{info}</Info>}
             {meta && <div className="text-[11.5px] text-ink-low">{meta}</div>}
           </div>
           {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </header>
       )}
-      <div className={bodyClass || "px-4 py-3"}>{children}</div>
+      <div className={bodyClass || "px-4 py-2.5"}>{children}</div>
     </section>
   );
 }
 
-export function SubHead({ children, right }: { children: ReactNode; right?: ReactNode }) {
+export function SubHead({ children, right, info }: { children: ReactNode; right?: ReactNode; info?: ReactNode }) {
   return (
-    <div className="mb-2 mt-1 flex items-baseline justify-between gap-3">
-      <h3 className="text-[11px] font-medium uppercase tracking-[0.08em] text-ink-low">{children}</h3>
+    <div className="mb-1.5 mt-1 flex items-center justify-between gap-3">
+      <h3 className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-low">
+        {children}{info && <Info label={typeof children === "string" ? children : "this section"}>{info}</Info>}
+      </h3>
       {right && <div className="text-[11px] text-ink-faint">{right}</div>}
     </div>
   );
@@ -130,23 +206,30 @@ export function Label({ children, className = "" }: { children: ReactNode; class
   );
 }
 
-/** A metric: label over value, a unit or source line under it. */
-export function Metric({ label, value, sub, tone = "text-ink-hi", size = "md", testid, cls }: {
+/** A metric: a 1–3 word label over the value. Its unit or source line
+ *  (`sub`) sits behind an ⓘ beside the label (quiet pass) — one hover or
+ *  tap away — unless `inline` keeps it under the value, which is only for
+ *  a line that carries a state the operator must SEE (an amber or red
+ *  word). */
+export function Metric({ label, value, sub, tone = "text-ink-hi", size = "md", testid, cls, inline }: {
   label: ReactNode; value: ReactNode; sub?: ReactNode; tone?: string;
   size?: "lg" | "md" | "sm"; testid?: string;
   /** the value's class (account / agent / learning), said under the label */
   cls?: "account" | "agent" | "learning" | "config";
+  /** a line drawn under the value, always visible (a state, not a gloss) */
+  inline?: ReactNode;
 }) {
   const sz = size === "lg" ? "text-[22px] leading-7" : size === "md"
     ? "text-[16px] leading-6" : "text-[13px] leading-5";
   return (
     <div data-testid={testid} className="min-w-0">
-      <div className="flex items-center gap-1.5">
-        <Label>{label}</Label>
+      <div className="flex min-w-0 items-center gap-1.5">
+        <span className="min-w-0 truncate" title={typeof label === "string" ? label : undefined}><Label>{label}</Label></span>
         {cls && <ClassTag cls={cls} />}
+        {sub && <Info label={typeof label === "string" ? label : "this figure"}>{sub}</Info>}
       </div>
       <div className={`tc-num mt-0.5 font-medium ${sz} ${tone}`}>{value}</div>
-      {sub && <div className="mt-0.5 text-[11.5px] leading-snug text-ink-low">{sub}</div>}
+      {inline && <div className="mt-0.5 truncate text-[11.5px] leading-snug">{inline}</div>}
     </div>
   );
 }
@@ -159,9 +242,10 @@ const CLASS_WORDS: Record<string, [string, string]> = {
 };
 export function ClassTag({ cls }: { cls: keyof typeof CLASS_WORDS }) {
   const [w, t] = CLASS_WORDS[cls];
+  const id = useId();
   return (
-    <span title={t} className="rounded-[3px] border border-tc-line-strong px-1 font-mono text-[9px] leading-[14px] tracking-[0.06em] text-ink-low">
-      {w}<span className="sr-only"> — {t}</span>
+    <span title={t} aria-describedby={id} className="rounded-[3px] border border-tc-line-strong px-1 font-mono text-[9px] leading-[14px] tracking-[0.06em] text-ink-low">
+      {w}<span id={id} hidden>{t}</span>
     </span>
   );
 }
@@ -173,9 +257,13 @@ export function ClassTag({ cls }: { cls: keyof typeof CLASS_WORDS }) {
  *  halt_loss), so a negative `used` is a gain: it spends none of the
  *  limit, draws an empty bar and is said as "+$X up". Below 50 % the bar is
  *  ink; 50–80 % amber; 80 %+ red — with the percentage in words beside it. */
-export function RiskBar({ label, used, limit, testid, sub, gainAware = true, cls }: {
-  label: ReactNode; used: unknown; limit: unknown; testid?: string; sub?: ReactNode;
+export function RiskBar({ label, used, limit, testid, sub, gainAware = true, cls, flag }: {
+  label: ReactNode; used: unknown; limit: unknown; testid?: string;
+  /** what the limit is, in words — behind the ⓘ */
+  sub?: ReactNode;
   gainAware?: boolean; cls?: "account" | "agent" | "learning" | "config";
+  /** a state the operator must see (amber/red), drawn under the bar */
+  flag?: ReactNode;
 }) {
   const u = n2(used);
   const l = n2(limit);
@@ -186,10 +274,11 @@ export function RiskBar({ label, used, limit, testid, sub, gainAware = true, cls
   const word = share === null ? null : share >= 1 ? "at limit" : share >= 0.8 ? "near limit" : null;
   return (
     <div data-testid={testid} className="min-w-0">
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="flex items-center gap-1.5">
-          <Label>{label}</Label>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <Label className="truncate">{label}</Label>
           {cls && <ClassTag cls={cls} />}
+          {sub && <Info label={typeof label === "string" ? label : "this limit"}>{sub}</Info>}
         </span>
         <span className="tc-num whitespace-nowrap text-[13px] text-ink-hi">
           {gain ? <span className="text-up">+{usd(-(u as number))} up</span> : usd(used)}
@@ -201,15 +290,16 @@ export function RiskBar({ label, used, limit, testid, sub, gainAware = true, cls
           )}
         </span>
       </div>
-      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-tc-raised" role="meter"
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-tc-raised" role="meter"
         aria-valuemin={0} aria-valuemax={100} aria-valuenow={share === null ? undefined : Math.round(share * 100)}
         aria-label={typeof label === "string" ? label : undefined}>
         <div className={`h-full ${fill}`} style={{ width: `${share === null ? 0 : share * 100}%` }} />
       </div>
-      {(sub || word) && (
-        <div className="mt-1 text-[11.5px] leading-snug text-ink-low">
-          {word && <span className="text-neg">■ {word}{sub ? " · " : ""}</span>}
-          {sub}
+      {(word || flag) && (
+        <div className="mt-1 text-[11.5px] leading-snug">
+          {word && <span className="text-neg">■ {word}</span>}
+          {word && flag ? <span className="text-ink-faint"> · </span> : null}
+          {flag}
         </div>
       )}
     </div>
@@ -297,8 +387,8 @@ export function Freshness({ at, now, cadenceMs, failed, testid, label }: {
       title={`read ${new Date(at).toLocaleTimeString()} · refreshed every ${cadenceMs / 1000} s`}>
       <Dot state={state} />
       {label ? `${label} · ` : ""}
-      {failed ? `last read failed · data ${ago(age)} old`
-        : stale ? `stale · ${ago(age)}` : `live · ${ago(age)} ago`}
+      {failed ? `read failed · ${ago(age)} old`
+        : stale ? `stale · ${ago(age)}` : `${ago(age)} ago`}
     </span>
   );
 }
@@ -371,7 +461,7 @@ export function KV({ k, children, testid, field }: {
 }) {
   return (
     <div data-testid={testid} data-field={field}
-      className="grid grid-cols-[minmax(110px,38%)_1fr] gap-x-3 border-b border-tc-line py-1.5 last:border-b-0">
+      className="grid grid-cols-[minmax(110px,38%)_1fr] gap-x-3 border-b border-tc-line py-1 last:border-b-0">
       <dt className="text-[11.5px] text-ink-low">{k}</dt>
       <dd className="tc-num min-w-0 break-words text-[12.5px] text-ink-hi">{children}</dd>
     </div>
@@ -520,8 +610,8 @@ export function BarList({ items, testid, signed = false, scaleMax, dense = false
 
 // ------------------------------------------------------------- the table
 
-export const TH = "border-b border-tc-line px-3 py-2 text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low whitespace-nowrap";
-export const TD = "border-b border-tc-line px-3 py-2 align-top";
+export const TH = "border-b border-tc-line px-2.5 py-1.5 text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low whitespace-nowrap";
+export const TD = "border-b border-tc-line px-2.5 py-1 align-top whitespace-nowrap";
 
 /** A plain dense table for small read-only blocks. */
 export function SimpleTable({ head, rows, empty, testid, right = [], minWidth }: {
@@ -548,7 +638,8 @@ export function SimpleTable({ head, rows, empty, testid, right = [], minWidth }:
           {rows.map((r, ri) => (
             <tr key={ri}>
               {r.map((c, i) => (
-                <td key={i} className={`${TD} first:pl-0 last:pr-0 ${R.has(i) ? "tc-num text-right text-ink-hi" : "text-ink-mid"}`}>{c}</td>
+                <td key={i} className={`${TD} max-w-[360px] truncate first:pl-0 last:pr-0 ${R.has(i) ? "tc-num text-right text-ink-hi" : "text-ink-mid"}`}
+                  title={typeof c === "string" ? c : undefined}>{c}</td>
               ))}
             </tr>
           ))}

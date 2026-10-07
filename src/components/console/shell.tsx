@@ -6,7 +6,7 @@
 // only an abnormal one takes amber or red, and always with a word and a
 // distinct dot shape (degraded ◆, broken ■, off ○). Each item is a link to
 // where it is looked into.
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import type { AttentionItem } from "../../lib/consoleModel";
 import { isObj, num, str } from "../../lib/tradingConsole";
 import { Dot, StatusPill, type State, agoIso } from "./primitives";
@@ -79,8 +79,37 @@ export function railItems(d: Obj, now: number): RailItem[] {
   return items;
 }
 
-export function OperatorStatusBar({ d, now, attention, freshness }: {
+/** THE RAIL'S CONTROLS MENU (quiet pass): while Safety & control is folded
+ *  into the rail, its lift control and its how-to-stop words live here — a
+ *  small disclosure, apart from the filters and the nav. Never drawn while
+ *  the unfolded panel is on screen (one lift control on the page). */
+function ControlsMenu({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDetailsElement | null>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && ref.current?.open) ref.current.open = false; };
+    const onDown = (e: MouseEvent) => {
+      if (ref.current?.open && !ref.current.contains(e.target as Node)) ref.current.open = false;
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("mousedown", onDown);
+    return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("mousedown", onDown); };
+  }, []);
+  return (
+    <details ref={ref} data-testid="rail-controls" className="relative shrink-0">
+      <summary className="flex cursor-pointer list-none items-center gap-1 whitespace-nowrap rounded-md border border-tc-line-strong px-2 py-1 text-[11.5px] text-ink-mid outline-none hover:bg-tc-hover hover:text-ink-hi focus-visible:ring-2 focus-visible:ring-accent [&::-webkit-details-marker]:hidden">
+        Controls <span aria-hidden className="text-[9px] text-ink-faint">▾</span>
+      </summary>
+      <div className="absolute right-0 top-full z-50 mt-1 w-[min(380px,calc(100vw-32px))] space-y-2.5 rounded-lg border border-tc-line-strong bg-tc-panel p-3 shadow-2xl">
+        {children}
+      </div>
+    </details>
+  );
+}
+
+export function OperatorStatusBar({ d, now, attention, freshness, controls }: {
   d: Obj; now: number; attention: AttentionItem[]; freshness: ReactNode;
+  /** the folded safety controls; null while the Safety panel is unfolded on screen */
+  controls?: ReactNode;
 }) {
   const items = railItems(d, now);
   const crit = attention.filter((a) => a.severity === "critical").length;
@@ -96,6 +125,7 @@ export function OperatorStatusBar({ d, now, attention, freshness }: {
             </span>
           ))}
         </div>
+        {controls && <ControlsMenu>{controls}</ControlsMenu>}
         <div className="hidden shrink-0 items-center gap-2 lg:flex">
           <a href={hrefOf("overview", { focus: "attention" })} data-testid="rail-attention"
             className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-[12px] outline-none hover:bg-tc-hover focus-visible:ring-2 focus-visible:ring-accent ${

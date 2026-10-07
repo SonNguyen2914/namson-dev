@@ -6,7 +6,7 @@
 // retention, every block's own clock, and the versions. Human description
 // first; the raw code is always beside it.
 import type { ReactNode } from "react";
-import { GROUP_LABEL, codeWords, reasonGroup } from "../../lib/consoleModel";
+import { GROUP_LABEL, codeWords, reasonGroup, reasonTag } from "../../lib/consoleModel";
 import { type Candidates, isObj, num, str } from "../../lib/tradingConsole";
 import {
   BarList, DASH, InfoNote, KV, Metric, Panel, SimpleTable, SubHead, Tech, agoIso, count, when,
@@ -25,9 +25,10 @@ function rowsOf(v: unknown): [string, number][] {
 }
 
 const Code = ({ c }: { c: string }) => <Tech tone="text-ink-mid">{c}</Tech>;
-const Words = ({ c }: { c: string }) => {
+/** a code with the backend's plain words one hover away (title) */
+const CodeW = ({ c, prefix = "" }: { c: string; prefix?: string }) => {
   const w = codeWords(c);
-  return w ? <span className="block text-[11.5px] leading-snug text-ink-low">{w}</span> : null;
+  return <Tech tone="text-ink-hi" title={w ? `${w} (${c})` : c}>{prefix}{c}</Tech>;
 };
 
 // ------------------------------------------------------------- activity
@@ -42,15 +43,16 @@ function Activity({ d }: { d: Obj }) {
   byReason.sort((a, b) => b[2] - a[2] || a[0].localeCompare(b[0]) || a[1].localeCompare(b[1]));
   const day = obj(d.trading_day);
   return (
-    <Panel testid="ops-activity" title="Journal activity today"
-      meta={`the trading day ${str(day?.day) ?? "(UTC)"}${str(day?.tz) ? ` · ${str(day?.tz)}` : ""}`}>
+    <Panel testid="ops-activity" title="Journal today"
+      meta={`${str(day?.day) ?? "(UTC)"}${str(day?.tz) ? ` · ${str(day?.tz)}` : ""}`}
+      info="Journal activity on the trading day. Hover a reason code for the backend's plain words.">
       <div className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
-        <Metric size="md" label="open agent orders" value={count(d.open_agent_orders)} />
-        <Metric size="md" label="other (manual) orders" value={count(d.open_other_orders)} />
-        <Metric size="md" label="orders placed today" value={count(d.placed_today)} />
-        <Metric size="md" label="fills today" value={count(d.fills_today)} />
+        <Metric size="md" label="agent orders" value={count(d.open_agent_orders)} sub="Open agent orders" />
+        <Metric size="md" label="manual orders" value={count(d.open_other_orders)} sub="Other (manual) open orders" />
+        <Metric size="md" label="placed" value={count(d.placed_today)} sub="Orders placed today" />
+        <Metric size="md" label="fills" value={count(d.fills_today)} sub="Fills today" />
       </div>
-      <div className="mt-4 grid gap-x-8 gap-y-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+      <div className="mt-3 grid gap-x-8 gap-y-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <div>
           <SubHead>Rows by kind</SubHead>
           <SimpleTable testid="by-kind" head={["kind", "rows"]} right={[1]}
@@ -58,10 +60,10 @@ function Activity({ d }: { d: Obj }) {
             empty="no journal rows today" />
         </div>
         <div>
-          <SubHead right="raw code · the backend's plain words · group">By reason — why it acted or skipped</SubHead>
+          <SubHead info="Why it acted or skipped: kind · raw code · group. Hover a code for the backend's plain words.">By reason</SubHead>
           <SimpleTable testid="by-reason" head={["kind · reason", "group", "rows"]} right={[2]}
             rows={byReason.map(([k, r, n]) => [
-              <span key="r"><Tech tone="text-ink-hi">{`${k} · ${r}`}</Tech><Words c={r} /></span>,
+              <CodeW key="r" c={r} prefix={`${k} · `} />,
               <span key="g" className="text-[11.5px] text-ink-low">{k === "tick" ? "tick outcome" : GROUP_LABEL[reasonGroup(r)]}</span>,
               n.toLocaleString("en-US")])}
             empty="no reasons recorded today" />
@@ -106,41 +108,41 @@ function Settlements({ d, now }: { d: Obj; now: number }) {
   const ufo = obj(uf);
   return (
     <Panel testid="ops-settlements" title="Settlement & fill reads"
-      meta="held markets that stopped trading are asked for their result; until one clean yes/no comes back the halts value them at 0 — a win is never assumed">
+      info="Held markets that stopped trading are asked for their result; until one clean yes/no comes back the halts value them at 0 — a win is never assumed.">
       {!s ? (
         <p data-testid="settlements-absent" className="text-[12px] text-ink-low">settlement-read outcomes are not on this backend</p>
       ) : (
         <>
           {typeof s.error === "string" && (
-            <p data-testid="settlements-error" className="mb-2 text-[12px] text-warn">◆ the settlement-read summary failed on the backend: {s.error}</p>
+            <p data-testid="settlements-error" className="mb-2 text-[12px] text-warn">◆ settlement summary failed: {s.error}</p>
           )}
           <div className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
             <Metric size="md" label="last read" value={pass ? PASS_WORDS[text(pass.outcome)] ?? text(pass.outcome) : DASH}
-              sub={`as of ${when(pass?.at ?? s.at, true)}`} />
-            <Metric size="md" label="due a read" value={count(pass?.due)} sub={windowed ? `${count(s.due)} over the window` : undefined} />
-            <Metric size="md" label="asked on the last read" value={count(pass?.asked)} sub={windowed ? `${count(s.asked)} over the window` : undefined} />
-            {"settled_rows_today" in s && <Metric size="md" label="settled rows today" value={count(s.settled_rows_today)} />}
+              sub={`As of ${when(pass?.at ?? s.at, true)}`} />
+            <Metric size="md" label="due" value={count(pass?.due)} sub={`due a read${windowed ? ` · ${count(s.due)} over the window` : ""}`} />
+            <Metric size="md" label="asked" value={count(pass?.asked)} sub={`asked on the last read${windowed ? ` · ${count(s.asked)} over the window` : ""}`} />
+            {"settled_rows_today" in s && <Metric size="md" label="settled today" value={count(s.settled_rows_today)} sub="settled rows today" />}
           </div>
           {windowed && (
-            <p className="mt-2 text-[11.5px] text-ink-low">
+            <p className="mt-1.5 text-[11.5px] text-ink-low">
               window: the last {count(s.window_ticks)} ticks, since {when(s.window_since, true)}
               {passes ? ` · passes ${Object.entries(passes).map(([k, n]) => `${PASS_WORDS[k] ?? k} ${count(n)}`).join(" · ")}` : ""}
             </p>
           )}
-          <div className="mt-3">
-            <SubHead>Outcomes</SubHead>
+          <div className="mt-2.5">
+            <SubHead info={<>{SETTLEMENT_WORDS.map(([k, w]) => <span key={k} className="block">{w}</span>)}</>}>Outcomes</SubHead>
             <SimpleTable testid="settlement-outcomes" head={head} right={head.map((_, i) => i).slice(1)}
-              rows={[...SETTLEMENT_WORDS.map(([k, w]) => [w, ...cells(k)]), ...extra.map((k) => [k, ...cells(k)])]}
+              rows={[...SETTLEMENT_WORDS.map(([k, w]) => [<span key="w" title={w}>{w.split(" — ")[0]}</span>, ...cells(k)]), ...extra.map((k) => [k, ...cells(k)])]}
               empty="no outcomes recorded" />
           </div>
         </>
       )}
-      <div className="mt-4">
-        <SubHead>Fill reads</SubHead>
+      <div className="mt-3">
+        <SubHead info="A fill whose venue fields could not be read takes its own order's side and price, and is counted here.">Fill reads</SubHead>
         <div data-testid="unreadable-fills" className="text-[12.5px] text-ink-hi">
           {fr ? (
             typeof fr.error === "string" ? (
-              <p className="text-warn">◆ the fill-read summary failed on the backend: {fr.error}</p>
+              <p className="text-warn">◆ fill summary failed: {fr.error}</p>
             ) : (
               <>
                 <p className="tc-num">
@@ -151,11 +153,11 @@ function Settlements({ d, now }: { d: Obj; now: number }) {
                   <p className="text-warn">◆ {count(fr.legacy_words_disagreed)} fill rows carried legacy words that disagreed with the canonical fields</p>
                 )}
                 <div className="mt-2 grid gap-x-8 md:grid-cols-2">
-                  <SimpleTable testid="fill-terms" head={["how the terms were decided", "fills"]} right={[1]}
+                  <SimpleTable testid="fill-terms" head={["terms basis", "fills"]} right={[1]}
                     rows={rowsOf(fr.by_terms_basis).map(([k, n]) => [<Code key="k" c={k} />, n.toLocaleString("en-US")])}
                     empty="no fills recorded" />
                   {obj(fr.by_direction_basis) && (
-                    <SimpleTable head={["how the direction was decided", "fills"]} right={[1]}
+                    <SimpleTable head={["direction basis", "fills"]} right={[1]}
                       rows={rowsOf(fr.by_direction_basis).map(([k, n]) => [<Code key="k" c={k} />, n.toLocaleString("en-US")])}
                       empty="no fills recorded" />
                   )}
@@ -167,7 +169,6 @@ function Settlements({ d, now }: { d: Obj; now: number }) {
           ) : (
             <p className="tc-num">unreadable: {ufo ? `${count(ufo.today)} today · ${count(ufo.total)} in all` : count(uf)}</p>
           )}
-          <p className="mt-1 text-[11px] text-ink-low">a fill whose venue fields could not be read takes its own order&apos;s side and price, and is counted here</p>
         </div>
       </div>
     </Panel>
@@ -186,11 +187,11 @@ function Catalogue({ d }: { d: Obj }) {
   const top = num(u.known);
   return (
     <Panel testid="ops-catalogue" title="Catalogue coverage" meta={`as of ${when(d.universe_at, true)} · ${text(u.version)}`}>
-      {typeof u.error === "string" && <p className="mb-2 text-[12px] text-warn">◆ the coverage read failed on the tick: {u.error}</p>}
+      {typeof u.error === "string" && <p className="mb-2 text-[12px] text-warn">◆ coverage read failed: {u.error}</p>}
       <div className="grid gap-x-8 gap-y-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <div>
-          <SubHead right="the backend's four stages">Funnel</SubHead>
-          <ol className="space-y-2">
+          <SubHead info="The backend's four stages.">Funnel</SubHead>
+          <ol className="space-y-1.5">
             {stages.map(([k, v]) => {
               const n = num(v);
               return (
@@ -207,19 +208,19 @@ function Catalogue({ d }: { d: Obj }) {
               );
             })}
           </ol>
-          <p className="mt-3 text-[12px] text-ink-low">
-            catalogue rows <span className="tc-num text-ink-hi">{count(cat.rows)}</span> of {count(cat.max_rows)} · full refresh {when(cat.last_full_refresh_at)}
+          <p className="mt-2 text-[12px] text-ink-low">
+            rows <span className="tc-num text-ink-hi">{count(cat.rows)}</span> of {count(cat.max_rows)} · refreshed {when(cat.last_full_refresh_at)}
           </p>
         </div>
         <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">
           <div>
             <SubHead>Refusals by reason</SubHead>
             <SimpleTable testid="refusals" head={["reason", "markets"]} right={[1]}
-              rows={rowsOf(u.refusals_by_reason).map(([k, n]) => [<span key="k"><Code c={k} /><Words c={k} /></span>, n.toLocaleString("en-US")])}
+              rows={rowsOf(u.refusals_by_reason).map(([k, n]) => [<CodeW key="k" c={k} />, n.toLocaleString("en-US")])}
               empty="no refusals recorded" />
           </div>
           <div>
-            <SubHead>Unmapped fixtures / no fair price</SubHead>
+            <SubHead>Unmapped / unpriced</SubHead>
             <SimpleTable testid="unmapped" head={["why", "markets"]} right={[1]}
               rows={[...rowsOf(u.fixture_unmapped_by_why).map(([k, n]) => [<span key="k">unmapped · <Code c={k} /></span>, n.toLocaleString("en-US")]),
                 ...rowsOf(u.no_fair_price_by_why).map(([k, n]) => [<span key="k">no price · <Code c={k} /></span>, n.toLocaleString("en-US")])]}
@@ -236,8 +237,8 @@ function Catalogue({ d }: { d: Obj }) {
 function Clocks({ d, now, candidates }: { d: Obj; now: number; candidates: Candidates | null }) {
   const rows: [string, unknown, ReactNode?][] = [
     ["status generated", d.generated_at],
-    ["newest tick", obj(d.last_tick)?.at, <>outcome <Tech>{text(obj(d.last_tick)?.outcome)}</Tech>{num(obj(d.last_tick)?.elapsed_s) !== null ? ` · took ${num(obj(d.last_tick)?.elapsed_s)!.toFixed(1)} s` : ""}</>],
-    ["account read", d.account_read_at, "the tick's account snapshot"],
+    ["newest tick", obj(d.last_tick)?.at, <><Tech>{text(obj(d.last_tick)?.outcome)}</Tech>{num(obj(d.last_tick)?.elapsed_s) !== null ? ` · ${num(obj(d.last_tick)?.elapsed_s)!.toFixed(1)} s` : ""}</>],
+    ["account read", d.account_read_at],
     ["account block", d.account_at],
     ["risk block", d.risk_at],
     ["coverage block", d.universe_at],
@@ -253,12 +254,12 @@ function Clocks({ d, now, candidates }: { d: Obj; now: number; candidates: Candi
   const last = obj(d.last_tick);
   const shed = obj(last?.shed);
   return (
-    <Panel testid="ops-clocks" title="Data freshness" meta="each block carries the clock of the tick row it came from">
+    <Panel testid="ops-clocks" title="Data freshness" info="Each block carries the clock of the tick row it came from.">
       <dl>
         {rows.map(([k, v, sub]) => (
           <KV key={k} k={k}>
-            {typeof v === "string" && v !== "" ? <><span className="tc-num">{when(v, true)}</span> <span className="text-ink-low">· {agoIso(v, now)} ago</span></> : <span className="text-ink-low">not sent</span>}
-            {sub ? <span className="block text-[11px] text-ink-low">{sub}</span> : null}
+            {typeof v === "string" && v !== "" ? <span className="tc-num" title={when(v, true)}>{agoIso(v, now)} ago</span> : <span className="text-ink-low">not sent</span>}
+            {sub ? <span className="block truncate text-[11px] text-ink-low">{sub}</span> : null}
           </KV>
         ))}
         {last && (last.truncated === true || (shed && Object.keys(shed).length > 0)) && (
@@ -275,8 +276,8 @@ function Retention({ d }: { d: Obj }) {
   const r = obj(d.journal_retention);
   return (
     <Panel testid="ops-retention" title="Journal retention">
-      {!r ? <InfoNote>not served yet — this backend sends no retention block</InfoNote>
-        : typeof r.error === "string" ? <InfoNote tone="warn">◆ the retention block failed on the backend: {r.error}</InfoNote> : (
+      {!r ? <InfoNote>not served yet</InfoNote>
+        : typeof r.error === "string" ? <InfoNote tone="warn">◆ retention block failed: {r.error}</InfoNote> : (
           <dl>
             {Object.entries(r).filter(([k, v]) => !["label", "basis", "prunable_kinds", "kept_kinds"].includes(k) && (typeof v !== "object" || v === null))
               .map(([k, v]) => <KV key={k} k={k.replace(/_/g, " ")}><span className="tc-num">{text(v)}</span></KV>)}
@@ -299,10 +300,11 @@ function FeedGaps({ d }: { d: Obj }) {
   if (!lastSkips && !lastRef) return null;
   const items = [...rowsOf(lastSkips), ...rowsOf(lastRef)].sort((a, b) => b[1] - a[1]);
   return (
-    <Panel title="In-play reasons, newest tick" meta="skips and refusals the newest in-play tick counted">
+    <Panel title="In-play reasons" info={<>Skips and refusals the newest in-play tick counted.
+      {items.map(([k]) => <span key={k} className="mt-1 block"><span className="text-ink-hi">{reasonTag(k)}</span> — {codeWords(k) ?? k} <span className="font-mono text-[10.5px]">{k}</span></span>)}</>}>
       {items.length === 0 ? <InfoNote>none on the newest tick</InfoNote> : (
-        <BarList items={items.map(([k, n]) => ({
-          key: k, value: n, label: codeWords(k) ?? k, sub: <span className="font-mono">{k}</span>,
+        <BarList dense items={items.map(([k, n]) => ({
+          key: k, value: n, label: <span title={`${codeWords(k) ?? k} (${k})`}>{reasonTag(k)}</span>,
           display: n.toLocaleString("en-US"),
         }))} />
       )}
@@ -315,7 +317,7 @@ export function SystemView({ d, now, candidates, go }: {
 }) {
   void go;
   return (
-    <div className="grid grid-cols-12 gap-4">
+    <div className="grid grid-cols-12 gap-3">
       <div className="col-span-12"><Activity d={d} /></div>
       <div className="col-span-12"><Catalogue d={d} /></div>
       <div className="col-span-12 xl:col-span-7"><Settlements d={d} now={now} /></div>

@@ -134,6 +134,77 @@ export function reasonGroup(code: string): ReasonGroup {
   return "other";
 }
 
+// ------------------------------------------------------- short tags
+
+/** THE QUIET PASS'S REASON TAGS (2026-10-07): a reason code said in one to
+ *  three words for the grid and the ranked bars. Presentation only — the
+ *  backend's full plain words and the raw code stay one click away (the
+ *  inspector, a hover). A code with no tag here is shown as its own words
+ *  with the underscores dropped, never hidden. */
+const TAG: Record<string, string> = {
+  no_edge: "no edge", no_fair_price: "no fair price", no_price_either_source: "no price",
+  model_only_stale: "stale model", stale_consensus: "stale odds", no_learning_context: "no learner context",
+  inplay_v2_no_learning_context: "no learner context", inplay_no_live_model: "no live model",
+  unproven_weight_over_cap: "weight over cap", inplay_edge_below_min: "edge below min",
+  outside_window: "outside window", outside_trading_window: "outside window", in_play: "in play",
+  inplay_too_late: "too late", inplay_period_not_running: "period stopped",
+  inplay_fixture_not_live: "fixture not live", inplay_expiry_invalid: "bad expiry",
+  inplay_expiry_too_long: "expiry too long",
+  inplay_cooldown: "cooldown", inplay_recent_goal_or_red: "cooldown: goal/red",
+  inplay_feed_unhealthy: "feed unhealthy", inplay_feed_unavailable: "feed unavailable",
+  inplay_dismissal_seen: "red card", inplay_momentum_against: "momentum against",
+  inplay_xg15_against: "xG against", inplay_ratings_against: "ratings against",
+  inplay_sot15_against: "shots against", inplay_exit_too_dear: "exit too dear",
+  inplay_exit_not_hot: "exit not hot", inplay_family_not_traded: "type not traded",
+  inplay_opposite_not_agents: "opposite not ours",
+  fixture_unmapped: "unmapped fixture", kickoff_unknown: "kickoff unknown",
+  candidate_unreadable: "unreadable", market_not_trading: "not trading",
+  not_in_trading_scope: "out of scope", inplay_minute_unknown: "minute unknown",
+  inplay_live_signals_unreadable: "live stats unreadable", inplay_dismissal_unwitnessed: "card unwitnessed",
+  book_mismatch: "book mismatch", order_malformed: "bad order", shard_unfunded: "shard unfunded",
+  no_bid_this_side: "no bid", no_bid_other_side: "no bid (other side)", crossed_book: "crossed book",
+  maker_price_unavailable: "no maker price", stale_book: "stale book", inplay_book_stale: "stale book",
+  inplay_book_thin: "thin book", would_cross: "would cross", maker_only: "maker only",
+  fee_rounding_loses: "fee rounding",
+  caps_exhausted: "caps exhausted", per_order_cap: "per-order cap", per_match_cap: "per-match cap",
+  bankroll_cap: "bankroll cap", daily_loss_halt: "daily loss halt", drawdown_halt: "drawdown halt",
+  drawdown_halted: "drawdown halt", daily_anchor_missing: "no daily anchor",
+  starting_balance_unrecorded: "no start balance", agent_pnl_unreadable: "P&L unreadable",
+  limit_misconfigured: "limit misconfigured", halted: "halted", killed: "killed",
+  kill_switch: "kill switch", trading_disabled: "trading disabled",
+  daily_budget_exhausted: "budget spent", daily_budget_unreadable: "budget unreadable",
+  account_snapshot_stale: "stale account", account_unreadable: "account unreadable",
+  approval_missing: "no approval", approval_mismatch: "approval mismatch",
+  approval_forged: "approval forged", approval_expired: "approval expired",
+  careful_hour_cap: "hour cap", careful_match_cap: "match cap",
+  news_since_consensus: "news since odds", news_since_model: "news since model",
+  market_moved_since_consensus: "price moved", market_moved_since_model: "price moved",
+  news_guard_unreadable: "news guard unreadable", anomaly_avoid: "anomaly",
+  order_already_resting: "already resting", opposite_position_held: "opposite held",
+  client_order_id_spent: "duplicate order",
+  reconcile_failed: "reconcile failed", pnl_unreadable: "P&L unreadable",
+  journal_unwritable: "journal unwritable", not_decided: "not decided", exception: "exception",
+  agent_on_request_thread: "wrong thread",
+};
+
+/** A reason code in one to three words (never empty, never invented: an
+ *  unknown code is its own name). */
+export function reasonTag(code: string | null | undefined): string {
+  if (!code) return "no reason sent";
+  if (TAG[code]) return TAG[code];
+  const m = /^\((\w+), no reason sent\)$/.exec(code);
+  if (m) return `${m[1].replace(/_/g, " ")}, no reason`;
+  return code.replace(/^inplay_/, "in-play ").replace(/_/g, " ");
+}
+
+/** The tag a candidate row wears: the code's tag, and a refusal by the
+ *  risk engine (or a strategy that could not run) is said as blocked. */
+export function rowTag(d: Pick<Decision, "action" | "reason">): string {
+  if (d.action === "placed") return "order sent";
+  const t = reasonTag(d.reason);
+  return d.action === "refused" || d.action === "not_run" ? `blocked: ${t}` : t;
+}
+
 /** A code's plain words: the backend's PLAIN (mirrored), else the
  *  registry-derived words, else the older skip words, else null — the
  *  caller then says no words came with it. */
@@ -142,7 +213,7 @@ export function codeWords(code: string): string | null {
 }
 
 export interface ReasonBar {
-  code: string; words: string; group: ReasonGroup; n: number; share: number;
+  code: string; words: string; tag: string; group: ReasonGroup; n: number; share: number;
 }
 
 /** {code: n} blocks summed, then ranked: the bars of "why not placed". */
@@ -157,7 +228,7 @@ export function rankReasons(blocks: (Record<string, number> | null | undefined)[
   }
   const total = [...m.values()].reduce((s, n) => s + n, 0);
   return [...m.entries()]
-    .map(([code, n]) => ({ code, n, share: total ? n / total : 0, group: reasonGroup(code),
+    .map(([code, n]) => ({ code, n, share: total ? n / total : 0, group: reasonGroup(code), tag: reasonTag(code),
       words: wordsFor[code] ?? codeWords(code) ?? `${code} (no plain words for this code yet)` }))
     .sort((a, b) => b.n - a.n || a.code.localeCompare(b.code));
 }
@@ -234,7 +305,7 @@ export function tickSummary(status: Obj | null, c: Candidates | null): TickSumma
       const parts = BADGE_ORDER.filter((k) => k !== "placed" && byBadge[k])
         .map((k) => `${byBadge[k]} ${k === "not_eligible" ? "not eligible" : k}`);
       zero = `No orders placed — ${parts.join(", ")}.`
-        + (top.length ? ` Most common: ${top.map((t) => `${t.words.replace(/\.$/, "")} (${t.n})`).join("; ")}.` : "");
+        + (top.length ? ` Most common: ${top.map((t) => `${t.tag} (${t.n})`).join(", ")}.` : "");
     }
   }
   return {
@@ -464,4 +535,44 @@ export function attention(i: AttentionInput): AttentionItem[] {
   if (i.ledger?.scanPartial) push({ id: "ledger-partial", severity: "info", subsystem: "ledger",
     title: "Ledger read only the newest journal rows", link: { view: "trades" } });
   return out.sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity]);
+}
+
+// ------------------------------------------------------- safety, folded
+
+/** WHEN THE SAFETY PANEL UNFOLDS (quiet pass, 2026-10-07). While every
+ *  safety state is normal, Safety & control folds into the status rail
+ *  (its states are already pills there; its controls sit in the rail's
+ *  Controls menu). It unfolds on the Overview — big, first — the moment
+ *  any of these holds, and each is said in a word or two. Nothing here
+ *  decides anything; it reads the same fields the rail and the old panel
+ *  read, and a field the backend did not send counts as NOT normal. */
+export function safetyTriggers(d: Obj, o: {
+  now: number; statusFailed: boolean; statusStale: boolean; readsFailed: string[];
+}): string[] {
+  const out: string[] = [];
+  const share = (b: Obj | null) => {
+    const u = num(b?.used), l = num(b?.limit);
+    return u !== null && l !== null && l > 0 ? u / l : null;
+  };
+  if (d.kill === true) out.push("kill on");
+  else if (d.kill !== false) out.push("kill not stated");
+  const halt = obj(d.halt);
+  if (halt?.active === true) out.push("halt hit");
+  else if (halt?.active !== false) out.push("halt not stated");
+  if (d.enabled === false) out.push("trading disabled");
+  else if (d.enabled !== true) out.push("trading not stated");
+  if (d.paper_only === true) out.push("paper only");
+  const b = obj(d.daily_budget);
+  if (b && b.readable === false) out.push("budget unreadable");
+  else if (b && ((share(b) ?? 0) >= 0.8 || (num(b.remaining) !== null && num(b.remaining)! <= 0))) out.push("budget ≥ 80%");
+  if ((share(obj(d.drawdown)) ?? 0) >= 0.8) out.push("drawdown ≥ 80%");
+  if ((share(obj(d.daily_loss)) ?? 0) >= 0.8) out.push("daily loss ≥ 80%");
+  const last = obj(d.last_tick);
+  const at = str(last?.at);
+  const age = at ? o.now - Date.parse(at) : NaN;
+  if (!last || !Number.isFinite(age) || age > 120_000) out.push("agent not ticking");
+  if (o.statusFailed) out.push("status read failing");
+  else if (o.statusStale) out.push("status stale");
+  for (const r of o.readsFailed) out.push(`${r} read failing`);
+  return out;
 }
