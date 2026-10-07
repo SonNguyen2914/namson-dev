@@ -45,7 +45,8 @@ const rgba = (hex: string, a: number) => {
 export function noModelHubCfg(slug: NoModelHub): HubCfg {
   const { hex, board } = NO_MODEL_HUBS[slug];
   const tag = LEAGUE_LABEL[slug] ?? slug;
-  const empty = "no model read for this competition — no prediction exists";
+  const empty =
+    "no shadow model for this competition, and no trader's read of this match";
   return {
     boardQuery: slug,
     api: `/api/comp/${slug}`,
@@ -61,12 +62,13 @@ export function noModelHubCfg(slug: NoModelHub): HubCfg {
     } as React.CSSProperties,
     accentHex: hex,
     version: "no model",
-    chip: () => "no model read · shadow · not advice",
+    chip: () => "no shadow model · shadow · not advice",
     temporal: false,
     marketFootnote:
-      `raw exchange prices only — a read, not a signal · no model is ` +
-      `fitted for ${tag}, so nothing on this page sets a model against ` +
-      `the market · shadow · not advice`,
+      `raw exchange prices · no shadow model is fitted for ${tag}; the ` +
+      `trader's model, where shown, is the trading agent's own ` +
+      `experimental pre-match read · a read, not a signal · shadow · ` +
+      `not advice`,
     modelEmptyText: empty,
     likelihoodTooltip: `empty — no model is fitted for ${tag}`,
     netEdgeTooltip:
@@ -85,7 +87,7 @@ export function noModelHubCfg(slug: NoModelHub): HubCfg {
         "xi from espn · context only — no model reads lineups here",
     },
     footer:
-      "live data + real exchange prices · no model read · a read, not a " +
-      "signal · shadow · not advice",
+      "live data + real exchange prices · no shadow model · trader's " +
+      "model where served · a read, not a signal · shadow · not advice",
   };
 }
