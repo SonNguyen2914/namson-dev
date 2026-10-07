@@ -19,7 +19,10 @@ import { carefulWords } from "../src/lib/tradingLedger";
 //                  situations {k: {paper_n, paper_x_c, real_n, real_x_c,
 //                  real_pnl_c, disagreement}}, grounds_paper / grounds_real
 //                  {g: {n, matches, mean, lo, hi}}, promoted, probation,
-//                  events
+//                  events; since 2026-10-07 tick {data_errors_pre_match,
+//                  data_errors_in_play} and paper_results {k: {n, clv_x_c,
+//                  results_n, wins, pnl_c_mean, pnl_c, sized_n,
+//                  pnl_dollars, disagreement}}
 //
 // Checked: the budget and its parts; the per-kickoff-hour usage against
 // $12; probable data errors counted; every one of the eleven competitions
@@ -44,7 +47,17 @@ const CAREFUL: Obj = {
     [c, { on: c !== "mls" }])),
   competitions_count: 11, promoted: [], probation: [],
   tick: { funded: 2, qualifying: 5, swaps: 1, data_errors: 3,
+    data_errors_pre_match: 2, data_errors_in_play: 1,
     usage: { hour: { "2026-10-10T19:00:00+00:00": "7.46" }, hour_max: "12" } },
+  // 2026-10-07: the paper bets' would-be results beside CLV
+  paper_results: {
+    "mls|GAME|pre_match": { n: 30, clv_x_c: 1.4, results_n: 22, wins: 6,
+      pnl_c_mean: -12.5, pnl_c: -275, sized_n: 0, pnl_dollars: null,
+      disagreement: true },
+    "epl|GAME|in_play": { n: 4, clv_x_c: -0.3, results_n: 3, wins: 2,
+      pnl_c_mean: 20.1, pnl_c: 60.3, sized_n: 3, pnl_dollars: "1.42",
+      disagreement: false },
+  },
   situations: {
     "epl|GAME|90-30": { paper_n: 40, paper_x_c: 1.2, real_n: 22,
       real_x_c: 0.8, real_settled_n: 22, real_pnl_c: -310, disagreement: true },
@@ -125,6 +138,37 @@ test.describe("the careful strategy on the console", () => {
       await expect(row.locator("td").last()).toHaveAttribute("title", "CLV and money disagree");
       await expect(page.getByTestId("careful-events")).toContainText("PROPOSED");
       await expect(page.getByTestId("careful-grounds")).toContainText("family:SPREAD");
+    });
+
+  test("would-be results sit beside CLV; a persistent disagreement is flagged",
+    async ({ page }) => {
+      await openConsole(page, SERVED);
+      const rows = page.getByTestId("careful-result");
+      await expect(rows).toHaveCount(2);
+      const mls = rows.filter({ hasText: "mls · GAME · pre-match" });
+      await expect(mls).toHaveAttribute("data-flag", "true");
+      await expect(mls).toContainText("+1.40c");
+      await expect(mls).toContainText("−12.50c");
+      // the flag in a word and a shape; its sentence one hover away (quiet pass)
+      await expect(mls).toContainText("◆ disagree");
+      await expect(mls.locator("td").last()).toHaveAttribute("title", "CLV and results disagree");
+      const epl = rows.filter({ hasText: "epl · GAME · in play" });
+      await expect(epl).toHaveAttribute("data-flag", "false");
+      await expect(epl).toContainText("+$1.42 (3)");
+    });
+
+  test("the data errors split into pre-match and in play", async ({ page }) => {
+    await openConsole(page, SERVED);
+    const t = page.getByTestId("careful-tick");
+    await expect(t).toContainText("pre-match 2 · in play 1");
+  });
+
+  test("a backend without paper results says so, never zeros",
+    async ({ page }) => {
+      const { paper_results: _drop, ...older } = CAREFUL;
+      void _drop;
+      await openConsole(page, { ...SERVED, careful: older });
+      await expect(page.getByTestId("careful-results-absent")).toContainText("not served yet");
     });
 
   test("a backend without the careful block says so, never zeros",

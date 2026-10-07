@@ -10,6 +10,10 @@
 //     /api/ops/trading-careful): off = paper only;
 //   * paper vs real per situation (competition × family × time bucket),
 //     a disagreement (CLV good, money losing) flagged;
+//   * (2026-10-07) the paper bets' would-be RESULTS beside their CLV, per
+//     competition × family × phase (`paper_results`), the same flag when
+//     CLV and results disagree; the probable data errors split into
+//     pre-match and in play;
 //   * the grounds' paper and real evidence (n, matches, mean CLV after the
 //     fee and its match-clustered 95% range), promoted and probation
 //     grounds, and the section-4 events (checks and proposals);
@@ -31,19 +35,24 @@ const num = (v: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 const str = (v: unknown): string | null => (typeof v === "string" && v !== "" ? v : null);
+const usdSigned = (v: unknown) => {
+  const n = num(v);
+  return n === null ? "—" : `${n >= 0 ? "+" : "−"}$${Math.abs(n).toFixed(2)}`;
+};
 const c2 = (v: unknown) => {
   const n = num(v);
   return n === null ? "—" : `${n >= 0 ? "+" : "−"}${Math.abs(n).toFixed(2)}c`;
 };
 const NOT_SERVED = "not served yet";
 
-function Cell({ k, v, sub, tone }: { k: string; v: string; sub?: string; tone?: string }) {
+function Cell({ k, v, sub, tone, inline }: { k: string; v: string; sub?: string; tone?: string; inline?: string }) {
   return (
     <div className="min-w-0">
       <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-low">
         {k}{sub && <Info label={k}>{sub}</Info>}
       </div>
       <p className={`tc-num mt-0.5 text-[16px] font-medium ${tone ?? "text-ink-hi"}`}>{v}</p>
+      {inline && <p className="tc-num mt-0.5 text-[11.5px] text-ink-low">{inline}</p>}
     </div>
   );
 }
@@ -84,6 +93,7 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
   const tick = obj(c?.tick);
   const comps = obj(c?.competitions) ?? {};
   const sits = obj(c?.situations) ?? {};
+  const results = obj(c?.paper_results);
   const gp = obj(c?.grounds_paper) ?? {};
   const gr = obj(c?.grounds_real) ?? {};
   const knobs = obj(c?.knobs);
@@ -91,12 +101,17 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
 
   const de = num(tick?.data_errors) ?? 0;
   const disagree = Object.values(sits).filter((v) => obj(v)?.disagreement === true).length;
+  const resultsDisagree = Object.values(results ?? {}).filter((v) => obj(v)?.disagreement === true).length;
+  // (2026-10-07, #110) the probable data errors, split by phase when sent
+  const split = tick && num(tick.data_errors_in_play) !== null
+    ? `pre-match ${num(tick.data_errors_pre_match) ?? "—"} · in play ${num(tick.data_errors_in_play)}` : null;
   const summary = !c ? [plain(NOT_SERVED)] : typeof c.error === "string" ? [warn("block failed")] : line(
     plain(c.enabled === true ? "on" : "off"),
     tick ? plain(`${num(tick.funded) ?? "—"} / ${num(tick.qualifying) ?? "—"} funded`) : null,
     plain(`${Object.values(comps).filter((v) => obj(v)?.on === false).length} paper-only`),
-    de > 0 ? warn(`${de} data errors`, "data errors") : null,
+    de > 0 ? warn(`${de} data errors${split ? ` (${split})` : ""}`, "data errors") : null,
     disagree > 0 ? warn(`${disagree} disagree`, "disagree") : null,
+    resultsDisagree > 0 ? warn(`${resultsDisagree} results disagree`, "results disagree") : null,
   );
   return (
     <Panel testid="ops-careful" title="Careful strategy" cid="careful" summary={summary}
@@ -117,6 +132,7 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
               <Cell k="swaps" v={tick ? String(num(tick.swaps) ?? "—") : NOT_SERVED} />
               <Cell k="data errors" v={tick ? `${(num(tick.data_errors) ?? 0) > 0 ? "◆ " : ""}${num(tick.data_errors) ?? "—"}` : NOT_SERVED}
                 tone={(num(tick?.data_errors) ?? 0) > 0 ? "text-warn" : "text-ink-hi"}
+                inline={split ?? undefined}
                 sub="Edges above the ceiling: probable data errors, never bet." />
             </div>
 
@@ -161,6 +177,42 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
                           <td className={`${TD} tc-num`}>{c2(s.real_x_c)}</td>
                           <td className={`${TD} tc-num`}>{c2(s.real_pnl_c)}</td>
                           <td className={`${TD} text-warn`} title={s.disagreement === true ? "CLV and money disagree" : undefined}>{s.disagreement === true ? "◆ disagree" : ""}</td>
+                        </tr>);
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <h3 className={H3}>paper results <Info label="the paper results">
+              The paper bets&apos; would-be results beside their CLV, per competition × family × phase. Would-be: had
+              the paper bet been placed, fee included; from the trader&apos;s own settlement reads, never guessed. The
+              learner still chooses on CLV.</Info></h3>
+            {results === null ? (
+              <p data-testid="careful-results-absent" className="text-[12px] text-ink-low">{NOT_SERVED}</p>
+            ) : Object.keys(results).length === 0 ? (
+              <p className="text-[12px] text-ink-low">no paper bet scored or settled yet</p>
+            ) : (
+              <div className="tc-scroll overflow-x-auto">
+                <table data-testid="careful-results" className="w-full min-w-[640px] border-collapse text-[12.5px]">
+                  <thead><tr>
+                    {["situation", "paper n", "CLV−fee", "settled", "wins", "would-be / contract", "would-be at size", ""].map((h) => (
+                      <th key={h} scope="col" className={TH}>{h}</th>))}
+                  </tr></thead>
+                  <tbody>
+                    {Object.entries(results).map(([k, v]) => {
+                      const r = obj(v) ?? {};
+                      return (
+                        <tr key={k} data-testid="careful-result" data-flag={r.disagreement === true ? "true" : "false"}>
+                          <td className={`${TD} text-ink-hi`}>{k.replaceAll("|", " · ").replace("pre_match", "pre-match").replace("in_play", "in play")}</td>
+                          <td className={`${TD} tc-num`}>{num(r.n) ?? "—"}</td>
+                          <td className={`${TD} tc-num`}>{c2(r.clv_x_c)}</td>
+                          <td className={`${TD} tc-num`}>{num(r.results_n) ?? "—"}</td>
+                          <td className={`${TD} tc-num`}>{num(r.wins) ?? "—"}</td>
+                          <td className={`${TD} tc-num`}>{c2(r.pnl_c_mean)}</td>
+                          <td className={`${TD} tc-num`}>{num(r.sized_n) ? `${usdSigned(r.pnl_dollars)} (${num(r.sized_n)})` : "—"}</td>
+                          <td className={`${TD} text-warn`} title={r.disagreement === true ? "CLV and results disagree" : undefined}>
+                            {r.disagreement === true ? "◆ disagree" : ""}</td>
                         </tr>);
                     })}
                   </tbody>
