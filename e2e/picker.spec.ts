@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openDetails } from "./review-details";
 import { expectForwarded } from "./proxy-forwarding";
 // the SAME day-key function the board groups by, so a test can never
 // disagree with the page about which band a kickoff belongs to
@@ -1893,6 +1894,16 @@ test("the tail's provenance line counts evidence, against its own n",
 test("a captured read and a reconstructed read are not drawn the same",
   async ({ page }) => {
     await open(page);
+    // THE FACE tells them apart in one line — "Board" on a solid rail,
+    // "Rebuilt" on a dashed one (the quiet pass, 2026-10-07) …
+    await expect(card(page, "761770").getByTestId("board-line"))
+      .toHaveAttribute("data-origin", "captured");
+    await expect(card(page, "761770").getByTestId("board-line"))
+      .toContainText("Board:");
+    await expect(card(page, "761762").getByTestId("board-line"))
+      .toContainText("Rebuilt:");
+    // … and the whole read, verbatim, is under Details
+    await openDetails(page);
     const captured = card(page, "761770");
     const rebuilt = card(page, "761762");
     await expect(captured).toHaveAttribute("data-origin", "captured");
@@ -1932,10 +1943,12 @@ test("a captured read and a reconstructed read are not drawn the same",
 
     // and the provenance actually discloses something auditable
     await rebuilt.getByRole("button", { name: "provenance" }).click();
-    await expect(rebuilt.getByTestId("recon-provenance"))
-      .toContainText("states-mls-2026.json");
-    await expect(rebuilt.getByTestId("recon-provenance"))
-      .toContainText("2026-08-30T00:30:00+00:00");
+    // the file and the instant are words on the page and exact on the
+    // hover (a path is machine text, even one click deep)
+    await expect(rebuilt.getByTestId("recon-season-file"))
+      .toHaveAttribute("title", /states-mls-2026\.json/);
+    await expect(rebuilt.getByTestId("recon-provenance")
+      .locator('[title="2026-08-30T00:30:00+00:00"]')).toHaveCount(1);
     await expect(rebuilt.getByTestId("recon-provenance"))
       .toContainText("319");
   });
@@ -1943,6 +1956,7 @@ test("a captured read and a reconstructed read are not drawn the same",
 test("only a captured read can carry a price, and a rebuild says why it has none",
   async ({ page }) => {
     await open(page);
+    await openDetails(page);
     // the capture froze the whole board row, book and all
     await expect(card(page, "761770").getByText("ask 58¢")).toBeVisible();
     await expect(card(page, "761770").getByText("spread 4¢")).toBeVisible();
@@ -1957,13 +1971,23 @@ test("no read at all is a third state, not an empty version of the other two",
     await open(page);
     const none = card(page, "401882903");
     await expect(none).toHaveAttribute("data-origin", "unavailable");
+    // on the face, the absence in words, never a paragraph
+    await expect(none.getByTestId("board-line")).toHaveText("no pre-kickoff read");
+    await openDetails(page);
     await expect(none.getByTestId("origin-chip"))
       .toHaveText("no pre-kickoff read");
-    await expect(none).toContainText("fixture_not_in_archive");
+    // the reason in words, the code on the hover
+    await expect(none.getByTestId("unavailable-reason"))
+      .toContainText("this match is not in our season archive");
+    await expect(none.getByTestId("unavailable-reason"))
+      .toHaveAttribute("data-code", "fixture_not_in_archive");
     // the archive files that were looked at are named — "the archive
-    // stops before this match" is fixable, and invisible otherwise
+    // stops before this match" is fixable, and invisible otherwise — on
+    // the hover, with how far the archive runs in words on the page
     await expect(none.getByTestId("recon-considered"))
-      .toContainText("states-la-liga-2026.json");
+      .toHaveAttribute("title", /states-la-liga-2026\.json/);
+    await expect(none.getByTestId("recon-considered"))
+      .toContainText("the latest match there is");
     // the match is still here, with its score and its tape
     await expect(none.getByTestId("review-score")).toContainText("5–2");
     await expect(none.getByTestId("checkpoint")).toHaveCount(3);
@@ -2033,6 +2057,7 @@ test("a win on a penalty from a low share reads nothing like a win from dominanc
 test("every finished card shows both verdicts, never one merged tick",
   async ({ page }) => {
     await open(page);
+    await openDetails(page);
     const cards = page.getByTestId("review-row");
     await expect(cards).toHaveCount(5);
     // both components, on every single card, with their own labels
@@ -2043,9 +2068,15 @@ test("every finished card shows both verdicts, never one merged tick",
     await expect(van.getByTestId("fit-result")).toContainText("yes");
     await expect(van.getByTestId("fit-read")).toContainText("in-play read at 20'");
     await expect(van.getByTestId("fit-read")).toContainText("did not confirm");
-    // the reason for each is on the card, not buried in a tooltip
+    // the reason for each is on the card, in words, not buried in a
+    // tooltip — the backend's own string rides the hover
     await expect(van.getByTestId("fit-read"))
-      .toContainText("tilt_label=TILT_FAV on_target 0-0");
+      .toContainText("volume tilted to the favourite; on target 0–0");
+    await expect(van.getByTestId("fit-read").locator(
+      '[title="tilt_label=TILT_FAV on_target 0-0"]')).toHaveCount(1);
+    // and on the face, the two verdicts are two chips, never one
+    await expect(van.getByTestId("fit-chip-result")).toHaveAttribute("data-value", "yes");
+    await expect(van.getByTestId("fit-chip-read")).toHaveAttribute("data-value", "no");
     // and the rule is labelled exploratory wherever it is used
     await expect(van.getByTestId("confirm-note"))
       .toContainText("NOT PREREGISTERED");
@@ -2140,6 +2171,7 @@ test("the exploratory label still rides every finished row — a different "
 
 test("a dead plays feed costs the tape, not the match", async ({ page }) => {
   await open(page);
+  await openDetails(page);
   const c = card(page, "401879295");
   await expect(c.getByTestId("shot-error"))
     .toContainText("plays feed 502");
@@ -2426,11 +2458,12 @@ test("the finished tail on a phone: no horizontal overflow", async ({ page }) =>
   await page.getByTestId("league-tabs")
     .locator('[role="tab"][data-slug="mls"]').click();
   await expect(page.getByTestId("review-row")).toHaveCount(5);
-  // open the widest thing on a card — the provenance block, with its
-  // absolute archive paths — before measuring
+  // open the widest thing on a card — Details, then its provenance
+  // block — before measuring
+  await openDetails(page);
   await card(page, "f-bravo").getByRole("button", { name: "provenance" }).click();
-  await expect(card(page, "f-bravo").getByTestId("recon-provenance"))
-    .toContainText("states-mls-2026.json");
+  await expect(card(page, "f-bravo").getByTestId("recon-season-file"))
+    .toHaveAttribute("title", /states-mls-2026\.json/);
   const overflow = await page.evaluate(() =>
     document.documentElement.scrollWidth
     - document.documentElement.clientWidth);

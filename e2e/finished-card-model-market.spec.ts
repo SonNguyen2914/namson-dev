@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { BOARD_EIGHT, REVIEW_EIGHT } from "./eight-columns";
 import { block, liveBlock, withModelMarket } from "./model-market";
+import { openDetails } from "./review-details";
 
 /* THE FINISHED CARD'S MODEL AND MARKET, FROZEN AT THE T-10 LOCK
  * (Son, 2026-10-07).
@@ -24,8 +25,14 @@ import { block, liveBlock, withModelMarket } from "./model-market";
  * tightest card)
  *
  * In neutral ink: never green or red for right or wrong. A match with no
- * lock says "model/market not recorded for this match" in grey. Nothing
- * is tallied.
+ * lock says "not recorded" in grey, its sentence on the hover. Nothing is
+ * tallied.
+ *
+ * AND THE CARD IS QUIET (Son, 2026-10-07: "too wordy … a new user won't
+ * read all of that"). The face is the header, this block, the board's
+ * read in one line and the verdicts as chips; everything else is under
+ * one "Details" disclosure, verbatim. Beside a lock that shows a market,
+ * the archive's own T−10 section never claims there is no market.
  *
  * Hermetic: the recorded eight-column board and its review, dressed in
  * the backend's exact wire shape. Every clock is the recorded kickoff's. */
@@ -96,6 +103,33 @@ function review() {
   const at = (id: string) => r.finished.find((x) => x.event_id === id)!;
   const set = (id: string, mm: unknown, rl: unknown) =>
     Object.assign(at(id), { mm_lock: mm, result_lean: rl });
+  // AGREE is the FULL card: a captured board read and both verdicts known,
+  // so the face's longest board line and chip row are measured too
+  Object.assign(at(AGREE), {
+    pre_kickoff: { ...(at(AGREE).pre_kickoff as object), origin: "captured",
+      origin_label: "CAPTURED", unavailable_reason: null,
+      captured_at: "2026-09-14T17:30:00Z", captured_seconds_before_kickoff: 5400,
+      captured_lead_band: "near_kickoff", board_date: "20260914",
+      reconstructed_from: null,
+      state: { refused: false, league: "laliga", home: "Villarreal",
+        away: "Real Betis", favourite: "Real Betis", opponent: "Villarreal",
+        fav_side: "away", resolution: {}, ppg_gap: 0.42, gdg_gap: 0.88,
+        rank_gap: 6, gp_current: { home: 4, away: 4, min: 4 },
+        cross_league: false, fav_source: "rank",
+        tiers: { ovr: [1, 3], atk: [1, 2], def: [2, 3] },
+        tier_gaps: { ovr: 2, atk: 1, def: 1 }, shape: "SPLIT",
+        form: { fav: null, opp: null, scope: "LaLiga", scope_is_cup: false },
+        src: "current", weights: null, kalshi: null, venue: null,
+        venue_class: null,
+        current_only: { gdg_gap: null, ppg_gap: null, rank_gap: null },
+        gap_note: null, reg_time_note: null,
+        table_notes: { home: null, away: null }, ranks: { fav: 4, opp: 10 },
+        refused_reason: null } },
+    fit: { ...(at(AGREE).fit as object), favourite_won: true,
+           favourite_won_reason: "winner=away fav_side=away",
+           confirmed_at_20: false,
+           confirm_reason: "tilt_label=TILT_OPP on_target 1-3" },
+  });
   set(AGREE, lock({ model: { h: 0.31, d: 0.26, a: 0.43 },
                     market: { h: 0.30, d: 0.25, a: 0.45 },
                     codes: { h: "VIL", a: "BET" }, kickoff: at(AGREE).kickoff }),
@@ -287,7 +321,9 @@ test.describe("a finished card without a lock", () => {
     await s.scrollIntoViewIfNeeded();
     await expect(s).toHaveAttribute("data-status", "not_recorded");
     const words = s.getByTestId("mm-lock-absent");
-    await expect(words).toHaveText("model/market not recorded for this match");
+    await expect(words).toHaveText("not recorded");
+    await expect(s.getByTestId("mm-lock-label")).toHaveText("model · market");
+    expect(await title(words)).toContain("Model/market not recorded for this match");
     expect(await words.evaluate((e) => getComputedStyle(e).color))
       .toBe(await ink(page, "text-ink-faint"));
     await expect(s.getByTestId("mm-lines")).toHaveCount(0);
@@ -300,8 +336,7 @@ test.describe("a finished card without a lock", () => {
     async ({ page }) => {
       const s = section(page, UNREAD);
       await expect(s).toHaveAttribute("data-status", "unread");
-      await expect(s.getByTestId("mm-lock-absent"))
-        .toHaveText("model/market lock could not be read");
+      await expect(s.getByTestId("mm-lock-absent")).toHaveText("not read");
       expect(await title(s.getByTestId("mm-lock-absent"))).toContain("store");
     });
 
@@ -309,9 +344,190 @@ test.describe("a finished card without a lock", () => {
     async ({ page }) => {
       const s = section(page, NO_KEY);
       await expect(s).toHaveAttribute("data-status", "missing");
-      await expect(s.getByTestId("mm-lock-absent"))
-        .toHaveText("model/market not in this payload");
+      await expect(s.getByTestId("mm-lock-absent")).toHaveText("not sent");
+      expect(await title(s.getByTestId("mm-lock-absent")))
+        .toContain("sends no model/market lock");
       await expect(card(page, NO_KEY).getByTestId("review-score")).toBeVisible();
+    });
+});
+
+/* ONE CARD, ONE CLAIM ABOUT THE MARKET (coordinator review, 2026-10-07).
+ * The "market at T-10" section is the match ARCHIVE's own capture of the
+ * book, in cents; the lock is the board's capture, as percentages. Beside
+ * a lock that shows a market, the archive section never says there is no
+ * market: when it has no book it is not drawn, and its absence rides the
+ * lock's market hover; when it has one it stays, labelled as the
+ * archive's capture so the two cannot be read as one claim. */
+test.describe("the archive's T−10 book beside a lock", () => {
+  const ABSENCE = /not in this payload|no T-10 book|no T-10 capture|none stored|sends no T-10/i;
+  const archiveBook = (status: "present" | "absent") => status === "absent"
+    ? { status: "absent", absent_reason: "no_t10_rung", absent_detail: null,
+        absent_note: "no T-10 capture stored for this fixture",
+        source: "match_archive.prematch.t10", rung: "t10", captured_at: null,
+        seconds_before_kickoff: null, price_clock: null, event_ticker: null,
+        legs: null, ask_sum_c: null, mid_sum_c: null, overround_c: null,
+        overround_reason: null, market_favourite: null, picker_favourite: null }
+    : { status: "present", absent_reason: null, absent_detail: null,
+        absent_note: null, source: "match_archive.prematch.t10", rung: "t10",
+        captured_at: "2026-09-13T15:21:00+00:00", seconds_before_kickoff: 540,
+        price_clock: { quotes_captured_at: "2026-09-13T15:21:04+00:00",
+                       seconds_before_kickoff: 536, basis: "archive clock" },
+        event_ticker: "SYNTH", legs: {
+          home: { label: "SV Elversberg", ask_c: 13, mid_c: 12, bid_c: 11 },
+          draw: { label: "Draw", ask_c: 19, mid_c: 18, bid_c: 17 },
+          away: { label: "Bayern Munich", ask_c: 72, mid_c: 71, bid_c: 70 } },
+        ask_sum_c: 104, mid_sum_c: 101, overround_c: 4, overround_reason: null,
+        market_favourite: { side: "away", label: "Bayern Munich", basis: "mid",
+                            price_c: 71, tie: false, tied_sides: [], reason: null },
+        picker_favourite: null };
+
+  async function openWith(page: Page, books: Record<string, unknown>) {
+    await page.setViewportSize({ width: 1440, height: 1200 });
+    const r = review();
+    for (const [id, b] of Object.entries(books)) {
+      Object.assign(r.finished.find((x) => x.event_id === id)!, { market_t10: b });
+    }
+    await page.route("**/api/picker/board**", (x) => x.fulfill(json(BOARD_EIGHT)));
+    await page.route("**/api/picker/review**", (x) => x.fulfill(json(r)));
+    await page.addInitScript((slugs) => {
+      try {
+        for (const sl of slugs) window.localStorage.setItem(`picker.reviewopen.${sl}`, "1");
+      } catch { /* the count below says so */ }
+    }, SLUGS);
+    await page.goto("/bet-suggester");
+    await expect(page.getByTestId("review-row")).toHaveCount(8);
+  }
+
+  test("a card with a lock that shows a market never says there is none — "
+    + "closed or open", async ({ page }) => {
+    // AGREE: no archive key at all; CONFLICT: the archive stored none;
+    // NO_MODEL: a lock with a market and no model
+    await openWith(page, { [CONFLICT]: archiveBook("absent") });
+    for (const id of [AGREE, CONFLICT, DRAW_LEAN, DRAWN, NO_MODEL]) {
+      const c = card(page, id);
+      expect(await c.innerText(), `${id} face`).not.toMatch(ABSENCE);
+      await openDetails(c);
+      expect(await c.innerText(), `${id} details`).not.toMatch(ABSENCE);
+      await expect(c.getByTestId("market-t10")).toHaveCount(0);
+    }
+    // the archive's absence is not lost: it rides the lock's market hover
+    expect(await title(section(page, CONFLICT).getByTestId("mm-market-label")))
+      .toContain("no T-10 capture stored for this fixture");
+    // CONTROL: with no lock, the archive section still names its absence
+    const nr = card(page, NOT_RECORDED);
+    await openDetails(nr);
+    await expect(nr.getByTestId("market-t10")).toContainText(/not in this payload/);
+  });
+
+  test("an archive book beside a lock stays, labelled as the archive's "
+    + "capture", async ({ page }) => {
+    await openWith(page, { [CONFLICT]: archiveBook("present") });
+    const c = card(page, CONFLICT);
+    await openDetails(c);
+    const m = c.getByTestId("market-t10");
+    await expect(m).toHaveAttribute("data-status", "present");
+    await expect(c.getByTestId("market-t10-label"))
+      .toHaveText(/book in cents · archive capture/i);
+    await expect(m.getByTestId("market-t10-leg")).toHaveCount(3);
+    expect(await title(section(page, CONFLICT).getByTestId("mm-market-label")))
+      .not.toContain("separate T−10 capture");
+  });
+});
+
+/* THE QUIET FACE (Son, 2026-10-07). A new user's card — no lock and no
+ * pre-kickoff read — shows the header, "not recorded", "no pre-kickoff
+ * read", the chips and "Details", and nothing else; Details opens and
+ * closes from the keyboard; closed, it costs every card the same. */
+test.describe("the quiet face", () => {
+  test.beforeEach(async ({ page }) => { await open(page); });
+
+  test("a new user's card: the header, two absences in words, the chips, "
+    + "Details — nothing else", async ({ page }) => {
+    const c = card(page, NOT_RECORDED);
+    await c.scrollIntoViewIfNeeded();
+    // every visible line, top to bottom
+    const lines = (await c.innerText()).split("\n").map((l) => l.trim())
+      .filter(Boolean);
+    const allowed = [
+      /^\d{2}$/, /^FT$/, /^[A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2}, \d{1,2}:\d{2} [AP]M$/,
+      /^San Diego FC$/, /^0–5$/, /^Philadelphia Union$/, /^→$/,
+      /^model · market$/, /^not recorded$/, /^no pre-kickoff read$/,
+      /^not judged$/, /^exploratory$/, /^Details$/, /^▸$/, /^Details ▸$/,
+    ];
+    // innerText carries the CSS uppercase, so the words compare caselessly
+    for (const l of lines) {
+      expect(allowed.some((a) => new RegExp(a.source, "i").test(l)),
+        `"${l}" is on a new user's card`)
+        .toBe(true);
+    }
+    await expect(c.getByTestId("mm-lock-absent")).toHaveText("not recorded");
+    await expect(c.getByTestId("board-line")).toHaveText("no pre-kickoff read");
+    await expect(c.getByTestId("fit-not-judged")).toHaveText("not judged");
+    await expect(c.getByTestId("fit-chip-result")).toHaveCount(0);
+    await expect(c.getByTestId("fit-chip-read")).toHaveCount(0);
+    expect(await title(c.getByTestId("exploratory-chip")))
+      .toContain("NOT PREREGISTERED");
+    expect(await c.innerText()).not.toMatch(/(^|\D)0(\.0)?%/);
+  });
+
+  test("a full card's face: the board's read in one line, both verdicts as "
+    + "chips, no paragraph", async ({ page }) => {
+    const c = card(page, AGREE);
+    await c.scrollIntoViewIfNeeded();
+    const bl = c.getByTestId("board-line");
+    await expect(bl).toHaveAttribute("data-origin", "captured");
+    expect((await bl.innerText()).replace(/\s+/g, " "))
+      .toBe("Board: Real Betis +0.88 GD/g · split tiers");
+    await expect(c.getByTestId("fit-chip-result")).toHaveText("Favourite won ✓");
+    await expect(c.getByTestId("fit-chip-read")).toHaveText("20′ read ✗");
+    await expect(c.getByTestId("fit-not-judged")).toHaveCount(0);
+    // neutral ink: the tick and the cross carry the answer, not a colour
+    const mid = await ink(page, "text-ink-mid");
+    for (const id of ["fit-chip-result", "fit-chip-read"]) {
+      expect(await c.getByTestId(id).evaluate((e) => getComputedStyle(e).color))
+        .toBe(mid);
+    }
+    // and inside Details the reasons read in words, the codes on the hover
+    await openDetails(c);
+    await expect(c.getByTestId("fit-result"))
+      .toContainText("the away side won; the favourite was the away side");
+    await expect(c.getByTestId("fit-read"))
+      .toContainText("volume tilted to the opponent; on target 1–3");
+    await expect(c.getByTestId("fit-read").locator(
+      '[title="tilt_label=TILT_OPP on_target 1-3"]')).toHaveCount(1);
+  });
+
+  test("Details opens and closes from the keyboard, and the words are inside",
+    async ({ page }) => {
+      const c = card(page, CONFLICT);
+      await c.scrollIntoViewIfNeeded();
+      const details = c.getByTestId("review-details");
+      const before = (await c.boundingBox())!.height;
+      await expect(c.getByTestId("pre-kickoff")).toBeHidden();
+      await c.getByTestId("review-details-toggle").focus();
+      await page.keyboard.press("Enter");
+      await expect(details).toHaveAttribute("open", "");
+      await expect(c.getByTestId("pre-kickoff")).toBeVisible();
+      await expect(c.getByTestId("what-happened")).toBeVisible();
+      await expect(c.getByTestId("fit-result")).toBeVisible();
+      await expect(c.getByTestId("confirm-note")).toContainText("NOT PREREGISTERED");
+      expect((await c.boundingBox())!.height).toBeGreaterThan(before + 100);
+      await page.keyboard.press("Space");
+      await expect(details).not.toHaveAttribute("open", "");
+      await expect(c.getByTestId("pre-kickoff")).toBeHidden();
+      expect(Math.abs((await c.boundingBox())!.height - before)).toBeLessThanOrEqual(1);
+    });
+
+  test("closed, every card with a lock is one height, and every card without "
+    + "is another", async ({ page }) => {
+      const h = async (ids: string[]) => Promise.all(ids.map(async (id) =>
+        Math.round((await card(page, id).boundingBox())!.height * 10) / 10));
+      const withLock = await h([AGREE, CONFLICT, DRAW_LEAN, DRAWN, NO_MODEL]);
+      const without = await h([NOT_RECORDED, UNREAD, NO_KEY]);
+      expect(Math.max(...withLock) - Math.min(...withLock), `${withLock}`)
+        .toBeLessThanOrEqual(2);
+      expect(Math.max(...without) - Math.min(...without), `${without}`)
+        .toBeLessThanOrEqual(2);
     });
 });
 
@@ -373,6 +589,24 @@ for (const width of [1440, 1280, 1180] as const) {
         const hs = rows.map((r) => r.height);
         expect(Math.max(...hs) - Math.min(...hs), `heights ${JSON.stringify(rows.map(
           (r) => [r.id, r.height]))}`).toBeLessThanOrEqual(2);
+        // the face's one-liners: the board line and the chip row, on EVERY
+        // card, are one line and not cut
+        const faceLines = await page.locator('[data-testid="review-row"]').evaluateAll(
+          (cs) => cs.map((c) => {
+            const bl = c.querySelector<HTMLElement>('[data-testid="board-line"]')!;
+            const chips = [...c.querySelectorAll<HTMLElement>(
+              '[data-testid="fit-chips"] > *')];
+            return { id: c.getAttribute("data-event"),
+                     board: bl.getBoundingClientRect().height,
+                     boardCut: bl.scrollWidth > bl.clientWidth + 1,
+                     chipTops: new Set(chips.map((e) =>
+                       Math.round(e.getBoundingClientRect().top))).size };
+          }));
+        for (const f of faceLines) {
+          expect(f.board, `${f.id} board line`).toBeLessThan(26);
+          expect(f.boardCut, `${f.id} board line cut`).toBe(false);
+          expect(f.chipTops, `${f.id} chips`).toBe(1);
+        }
         // the grey "not recorded" line is one line too
         const absent = await page.getByTestId("mm-lock-absent").evaluateAll((els) =>
           els.map((e) => ({ h: e.getBoundingClientRect().height,

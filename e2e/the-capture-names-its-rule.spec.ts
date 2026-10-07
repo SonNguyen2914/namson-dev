@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openDetails } from "./review-details";
 
 /* A FINISHED CARD MUST NOT ASSERT A FAVOURITE THE BOARD NO LONGER NAMES.
  *
@@ -128,8 +129,18 @@ const card = (page: import("@playwright/test").Page) =>
 test("a capture from the superseded rule says so, above everything signed "
    + "from it", async ({ page }) => {
     await open(page, [finished()]);
+    // ON THE FACE, beside the one-line read it qualifies (the quiet pass,
+    // 2026-10-07): a mark, with the sentence under Details
+    await expect(card(page).getByTestId("board-line-superseded")).toBeVisible();
+    await expect(card(page).getByTestId("board-line-superseded"))
+      .toHaveText(/old rule/i);
+    await openDetails(card(page));
     const note = card(page).getByTestId("fav-rule-superseded");
     await expect(note).toBeVisible();
+    // and inside Details it still stands above the read signed from it
+    const nb = (await note.boundingBox())!;
+    const pb = (await card(page).getByTestId("pre-kickoff").boundingBox())!;
+    expect(nb.y).toBeLessThan(pb.y);
     // it names the club the OLD rule chose, so the reader can see which
     // way round the card is oriented
     await expect(note).toContainText("Sabah FK");
@@ -216,6 +227,7 @@ test("the mark names the RULE, never the deploy that replaced it",
        is what is asserted: the reason it gives is READ OFF THE ROW (no
        field block), and no word in it places the capture in time. */
     await open(page, [finished()]);
+    await openDetails(card(page));
     const note = card(page).getByTestId("fav-rule-superseded");
     await expect(note).toBeVisible();
     // the reason is the row's own missing field, not a date

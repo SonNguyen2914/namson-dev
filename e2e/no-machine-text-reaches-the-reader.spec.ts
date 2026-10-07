@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { BOARD_EIGHT, serveEight } from "./eight-columns";
+import { BOARD_EIGHT, REVIEW_EIGHT, serveEight } from "./eight-columns";
 import { assertNoMachineText } from "./machine-text";
+import { openDetails } from "./review-details";
 
 // A READER IS SHOWN A SENTENCE, NEVER AN INTERNAL TOKEN.
 //
@@ -372,10 +373,13 @@ const reviewWith = (reason: string | null) => ({
   finished: [noReadRow(reason)],
 });
 
-/** The banner, with the tail opened. */
+/** The banner, with the tail opened — and the card's Details, where the
+ *  banner lives since the quiet pass (2026-10-07). */
 async function openBanner(page: Page, reason: string | null) {
   await open(page, { review: reviewWith(reason) });
   await openTail(page);
+  await expect(column(page).getByTestId("review-row")).toHaveCount(1);
+  await openDetails(column(page));
   const slot = column(page).getByTestId("unavailable-reason");
   await expect(slot).toBeVisible();
   return slot;
@@ -420,17 +424,70 @@ test("a Python exception on the rebuild's reason key does not reach the "
         + "the console — it was simply lost" }).toBe(true);
   });
 
-test("a REASON CODE is still printed as itself — the control that keeps "
-   + "this from being a blanket gag", async ({ page }) => {
+test("a REASON CODE reads in words and rides the hover — the control that "
+   + "keeps this from being a blanket gag", async ({ page }) => {
     /* NON-VACUOUS, AND THIS IS THE ONE THAT MATTERS. "Do not print
        machine text" is trivially satisfied by printing nothing, and
        `fixture_not_in_archive` is the reason a reader most often needs:
        it nearly always means the archive stops before this match, which
-       is fixable and invisible otherwise. It is `replay.py`'s own
-       vocabulary and it survives untouched. */
+       is fixable and invisible otherwise. RESTATED 2026-10-07 (Son: a
+       reader is shown a sentence, never an internal token — the refused
+       card's `no_prior_row` went the same way): the reason is SAID, in
+       words, and the code itself is kept on the hover and `data-code`,
+       where an operator looks. Neither half may go. */
     const slot = await openBanner(page, "fixture_not_in_archive");
     await expect(slot).toHaveAttribute("data-reason", "code");
-    await expect(slot).toContainText("fixture_not_in_archive");
+    await expect(slot).toContainText("this match is not in our season archive");
+    expect(await slot.innerText()).not.toContain("fixture_not_in_archive");
+    await expect(slot).toHaveAttribute("data-code", "fixture_not_in_archive");
+    expect(await slot.getAttribute("title")).toContain("fixture_not_in_archive");
+  });
+
+test("a finished card's face, and its Details, carry no reason code or file "
+   + "path — the code and the path ride the hover", async ({ page }) => {
+    /* THE QUIET PASS (2026-10-07). The recorded eight-column review is a
+       card per column with no pre-kickoff read: `fixture_not_in_archive`
+       and the archive files it looked in, the exact shape that reached a
+       reader's eye in gold and as a `research_archive/…json` line. The
+       shapes above see neither (no scheme, no host, no exception), so
+       these two are added FOR THIS SURFACE: a snake_case token and a
+       path. Checked closed (the face) and opened (Details), every card. */
+    const SNAKE = /\b[a-z]+(?:_[a-z0-9]+)+\b/;
+    const PATH = /\b[\w-]+\/[\w-]+\/[\w./-]+|\.(?:json|csv|py)\b/;
+    await page.route("**/api/picker/review**", (r) => r.fulfill({
+      status: 200, contentType: "application/json",
+      body: JSON.stringify(REVIEW_EIGHT) }));
+    await page.addInitScript(() => {
+      try {
+        for (const s of ["epl", "laliga", "mls", "ligamx", "bundesliga",
+                         "seriea", "ligue1", "eredivisie"]) {
+          window.localStorage.setItem(`picker.reviewopen.${s}`, "1");
+        }
+      } catch { /* the tails stay shut and the count below says so */ }
+    });
+    await serveEight(page, BOARD_EIGHT);
+    const cards = page.getByTestId("review-row");
+    await expect(cards).toHaveCount(8);
+    const faces = await cards.allInnerTexts();
+    await openDetails(page);
+    const opened = await cards.allInnerTexts();
+    for (const [i, text] of [...faces, ...opened].entries()) {
+      const where = `${i < 8 ? "face" : "details"} of card ${i % 8}`;
+      assertNoMachineText(where, text);
+      expect(text, `${where} prints a code`).not.toMatch(SNAKE);
+      expect(text, `${where} prints a path`).not.toMatch(PATH);
+    }
+    // AND THE FACTS ARE NOT LOST: on the hover, for the operator
+    const slots = page.getByTestId("unavailable-reason");
+    await expect(slots).toHaveCount(8);
+    for (const t of await slots.evaluateAll((els) =>
+      els.map((e) => e.getAttribute("title") ?? ""))) {
+      expect(t).toContain("fixture_not_in_archive");
+    }
+    for (const t of await page.getByTestId("recon-considered").evaluateAll(
+      (els) => els.map((e) => e.getAttribute("title") ?? ""))) {
+      expect(t).toMatch(/research_archive\/.+\.json/);
+    }
   });
 
 test("no reason at all is SAID, never left as a sentence that stops",

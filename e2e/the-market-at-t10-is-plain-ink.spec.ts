@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openDetails } from "./review-details";
 
 /* THE MARKET SIDE OF A FINISHED CARD (Son, 2026-10-01).
  *
@@ -230,6 +231,7 @@ for (const width of [375, 1280]) {
       await open(page, [finished(present()), finished(absent),
                         finished(undefined)]);
       await expect(page.getByTestId("market-t10")).toHaveCount(3);
+      await openDetails(page);
       await expect(market(page)).toBeVisible();
       await assertNoHorizontalScroll(page);
       const box = await market(page).boundingBox();

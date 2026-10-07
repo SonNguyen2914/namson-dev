@@ -131,7 +131,7 @@ export const IN_PLAY_TITLE = "agree/conflict compares pre-match reads only";
 
 /** The two lines, under the one header. */
 export function ModelMarketLines({ mm, home, away, quote, kickedOff = false,
-  frozen = null }: {
+  frozen = null, marketNote = null }: {
   mm: ModelVsMarket;
   home: string;
   away: string;
@@ -144,6 +144,9 @@ export function ModelMarketLines({ mm, home, away, quote, kickedOff = false,
    *  lines are drawn exactly as the board drew them at that moment — top
    *  outcome bright — because they ARE that moment's read. */
   frozen?: string | null;
+  /** a sentence appended to the market line's hover (the finished card
+   *  puts the archive's own T−10 book there when it has none) */
+  marketNote?: string | null;
 }) {
   const codes: Record<MmOutcome, string> = {
     h: teamCode(mm.codes?.h, home), d: "DRAW", a: teamCode(mm.codes?.a, away),
@@ -208,7 +211,8 @@ export function ModelMarketLines({ mm, home, away, quote, kickedOff = false,
         "no model read", kickedOff)}
       <span aria-hidden />
       {line("market", mm.market, mm.top?.market ?? [],
-        at(marketTitle(mm, codes, quote)), "no full Kalshi book")}
+        at(marketTitle(mm, codes, quote)
+          + (marketNote ? ` · ${marketNote}` : "")), "no full Kalshi book")}
       {mm.market && mm.book_flag
         ? (
           <span data-testid="mm-book-flag" data-flag={mm.book_flag}
