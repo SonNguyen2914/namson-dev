@@ -1,8 +1,9 @@
 // Liga MX match hub — a thin config over the shared MatchHub
-// (2026-09-01). Distinctives: the xG shown is the SIMULATOR's (no
-// provider feed exists), the market section keeps its dark pill, and no
-// card-v1 competition is wired yet — so no suggestion card and no Card
-// nav chip. Every string is the page's exact pre-refactor copy.
+// (2026-09-01). Distinctives: the market section keeps its dark pill,
+// and no card-v1 competition is wired yet — so no suggestion card and no
+// Card nav chip. (The rail's "sim xG" was a Liga MX switch until
+// 2026-10-07; every league's rail xG is the simulator's, so MatchHub now
+// says so for every league.) Every string is the page's exact pre-refactor copy.
 import MatchHub, { HubCfg } from "../../../components/MatchHub";
 
 const CFG: HubCfg = {
@@ -21,7 +22,6 @@ const CFG: HubCfg = {
   chip: (_model, run) =>
     run ? "liga-mx-2026-v0 · shadow · not advice"
       : "liga-mx-2026-v0 · dark — unapproved, no prediction exists",
-  simXg: true,
   marketPill: (run) =>
     run ? "shadow · not advice" : "model dark · not advice",
   temporal: true,
