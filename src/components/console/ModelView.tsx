@@ -83,7 +83,13 @@ function Learning({ l, now }: { l: Obj; now: number }) {
         <div className="mt-3">
           <SubHead info={<>n = trades / rewarded fills. A best arm is the learner&apos;s posterior on a handful of fills; &ldquo;prior only&rdquo; means no evidence yet.</>}>By competition</SubHead>
           <SimpleTable testid="learning-comps" head={["competition", "trades", "fills", "mean CLV", "best arm"]}
-            right={[1, 2, 3]}
+            right={[1, 2, 3]} sortId="model-learning-comps"
+            values={comps.map((c) => {
+              const t = obj(l.trades_by_competition), f = obj(l.fills_rewarded_by_competition);
+              return [compLabel(c), t === null ? null : c in t ? num(t[c]) : 0, f === null ? null : c in f ? num(f[c]) : 0,
+                num(clv[c]), obj(best[c]) ? num(obj(best[c])!.posterior_mean_c) : null];
+            })}
+            types={["text", "num", "num", "num", "num"]}
             rows={comps.map((c) => {
               const b = obj(best[c]);
               return [compLabel(c), tally(l.trades_by_competition, c), tally(l.fills_rewarded_by_competition, c),
@@ -140,7 +146,8 @@ function GuardPanel({ b, title, testid, wordsKey }: { b: Obj | null; title: stri
       {maps.map(([k, v]) => (
         <div key={k} className="mt-3">
           <SubHead>{k.replace(/_/g, " ")}</SubHead>
-          <SimpleTable head={["reason", "count"]} right={[1]}
+          <SimpleTable head={["reason", "count"]} right={[1]} sortId={`model-guard-${k}`}
+            values={Object.entries(obj(v)!).sort((a, z) => Number(z[1]) - Number(a[1])).map(([r, n]) => [r, num(n)])}
             rows={Object.entries(obj(v)!).sort((a, z) => Number(z[1]) - Number(a[1])).map(([r, n]) => [<Tech key="r" tone="text-ink-mid">{r}</Tech>, String(n)])}
             empty="none today" />
         </div>

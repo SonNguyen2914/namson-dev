@@ -59,13 +59,15 @@ function Activity({ d }: { d: Obj }) {
       <div className="mt-3 grid gap-x-8 gap-y-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <div>
           <SubHead>Rows by kind</SubHead>
-          <SimpleTable testid="by-kind" head={["kind", "rows"]} right={[1]}
+          <SimpleTable testid="by-kind" head={["kind", "rows"]} right={[1]} sortId="sys-by-kind"
+            values={byKind.map(([k, n]) => [k, n])}
             rows={byKind.map(([k, n]) => [<Code key="k" c={k} />, n.toLocaleString("en-US")])}
             empty="no journal rows today" />
         </div>
         <div>
           <SubHead info="Why it acted or skipped: kind · raw code · group. Hover a code for the backend's plain words.">By reason</SubHead>
-          <SimpleTable testid="by-reason" head={["kind · reason", "group", "rows"]} right={[2]}
+          <SimpleTable testid="by-reason" head={["kind · reason", "group", "rows"]} right={[2]} sortId="sys-by-reason"
+            values={byReason.map(([k, r, n]) => [`${k} · ${r}`, k === "tick" ? "tick outcome" : GROUP_LABEL[reasonGroup(r)], n])}
             rows={byReason.map(([k, r, n]) => [
               <CodeW key="r" c={r} prefix={`${k} · `} />,
               <span key="g" className="text-[11.5px] text-ink-low">{k === "tick" ? "tick outcome" : GROUP_LABEL[reasonGroup(r)]}</span>,
@@ -165,11 +167,13 @@ function Settlements({ d, now }: { d: Obj; now: number }) {
                   <p className="text-warn">◆ {count(fr.legacy_words_disagreed)} fill rows carried legacy words that disagreed with the canonical fields</p>
                 )}
                 <div className="mt-2 grid gap-x-8 md:grid-cols-2">
-                  <SimpleTable testid="fill-terms" head={["terms basis", "fills"]} right={[1]}
+                  <SimpleTable testid="fill-terms" head={["terms basis", "fills"]} right={[1]} sortId="sys-fill-terms"
+                    values={rowsOf(fr.by_terms_basis).map(([k, n]) => [k, n])}
                     rows={rowsOf(fr.by_terms_basis).map(([k, n]) => [<Code key="k" c={k} />, n.toLocaleString("en-US")])}
                     empty="no fills recorded" />
                   {obj(fr.by_direction_basis) && (
-                    <SimpleTable head={["direction basis", "fills"]} right={[1]}
+                    <SimpleTable head={["direction basis", "fills"]} right={[1]} sortId="sys-fill-direction"
+                      values={rowsOf(fr.by_direction_basis).map(([k, n]) => [k, n])}
                       rows={rowsOf(fr.by_direction_basis).map(([k, n]) => [<Code key="k" c={k} />, n.toLocaleString("en-US")])}
                       empty="no fills recorded" />
                   )}
@@ -230,13 +234,16 @@ function Catalogue({ d }: { d: Obj }) {
         <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">
           <div>
             <SubHead>Refusals by reason</SubHead>
-            <SimpleTable testid="refusals" head={["reason", "markets"]} right={[1]}
+            <SimpleTable testid="refusals" head={["reason", "markets"]} right={[1]} sortId="sys-refusals"
+              values={rowsOf(u.refusals_by_reason).map(([k, n]) => [k, n])}
               rows={rowsOf(u.refusals_by_reason).map(([k, n]) => [<CodeW key="k" c={k} />, n.toLocaleString("en-US")])}
               empty="no refusals recorded" />
           </div>
           <div>
             <SubHead>Unmapped / unpriced</SubHead>
-            <SimpleTable testid="unmapped" head={["why", "markets"]} right={[1]}
+            <SimpleTable testid="unmapped" head={["why", "markets"]} right={[1]} sortId="sys-unmapped"
+              values={[...rowsOf(u.fixture_unmapped_by_why).map(([k, n]) => [`unmapped · ${k}`, n]),
+                ...rowsOf(u.no_fair_price_by_why).map(([k, n]) => [`no price · ${k}`, n])]}
               rows={[...rowsOf(u.fixture_unmapped_by_why).map(([k, n]) => [<span key="k">unmapped · <Code c={k} /></span>, n.toLocaleString("en-US")]),
                 ...rowsOf(u.no_fair_price_by_why).map(([k, n]) => [<span key="k">no price · <Code c={k} /></span>, n.toLocaleString("en-US")])]}
               empty="none recorded" />

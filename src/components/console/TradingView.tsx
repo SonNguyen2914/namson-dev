@@ -11,8 +11,8 @@
 //
 // REFRESH NEVER MOVES THE OPERATOR: the filters, the search, the sort and
 // the open inspector live above this view (ConsoleApp) and survive every
-// read; a user sort holds its row order across refreshes (new rows append
-// below) until "Re-sort" is pressed, so rows never jump under the cursor.
+// read; a sort is re-applied to every read (the console's one table rule,
+// ./sorting.tsx: three presses — sorted, reversed, the backend's order).
 import { type KeyboardEvent, memo, useMemo, useRef, useState } from "react";
 import {
   BADGES, BADGE_MEANING, BADGE_ORDER, type ReasonBar,
@@ -30,6 +30,7 @@ import {
   FilterButton, Freshness, Info, InfoNote, KV, Panel, TH, Tech, ago, when, whenShort,
 } from "./primitives";
 import type { Source } from "./useConsoleData";
+import { type ColType, type SortVal, SortTh, nextSort, sortRows, timeVal, useTableSort } from "./sorting";
 import { badgeItems, freshItem, items as sum, plain, readItem, warn } from "./summaries";
 
 type Obj = Record<string, unknown>;
@@ -112,31 +113,31 @@ function applyFilters(rows: Candidate[], f: CandFilters, now: number, ignore?: k
 
 // --------------------------------------------------------------- sort
 
-type SortKey = "kickoff" | "model" | "consensus" | "fair" | "edge" | "decision" | "market";
-const sortVal = (r: Candidate, k: string, now: number): number | string | null => {
+type SortKey = "kickoff" | "model" | "consensus" | "fair" | "edge" | "decision" | "market"
+  | "reason" | "competition" | "ask";
+/** the value a candidate sorts by: never the display string, and a value
+ *  the row lacks is null (last, whichever the direction) */
+const sortVal = (r: Candidate, k: string): SortVal => {
   switch (k) {
-    case "kickoff": return r.minute !== null ? -1000 + r.minute : minutesTo(r, now);
+    case "kickoff": return timeVal(r.kickoff_utc);
     case "model": return r.p_model;
     case "consensus": return r.p_consensus;
     case "fair": return r.fair;
     case "edge": return bestEdge(r).edge;
     case "decision": return BADGE_ORDER.indexOf(decisionBadge(r.decision).key);
-    case "market": return r.title.toLowerCase();
+    case "market": return r.title;
+    case "reason": return r.decision.action === "placed" ? null : rowTag(r.decision);
+    case "competition": return r.competition ? compLabel(r.competition) : null;
+    case "ask": return r.yes_ask;
     default: return null;
   }
 };
-function sortRows(rows: Candidate[], k: string, dir: "asc" | "desc", now: number): Candidate[] {
-  const m = dir === "asc" ? 1 : -1;
-  return [...rows].sort((a, b) => {
-    const x = sortVal(a, k, now), y = sortVal(b, k, now);
-    if (x === null && y === null) return a.ticker.localeCompare(b.ticker);
-    if (x === null) return 1;
-    if (y === null) return -1;
-    if (x < y) return -1 * m;
-    if (x > y) return 1 * m;
-    return a.ticker.localeCompare(b.ticker);
-  });
-}
+const SORT_TYPE: Record<SortKey, ColType> = {
+  kickoff: "time", model: "num", consensus: "num", fair: "num", edge: "num",
+  // the decision sorts by the badge ladder (placed, error, blocked, …), read
+  // top-down first, like a word
+  decision: "text", market: "text", reason: "text", competition: "text", ask: "num",
+};
 
 // ------------------------------------------------------------ cells
 
@@ -454,27 +455,34 @@ function CandidatesSection({ d, now, source, filters: f, setFilters, selected, s
   const minute = Math.floor(now / 60_000) * 60_000;
 
   const cov = useMemo(() => (c ? coverage(c) : []), [c]);
+  const compSort = useTableSort("cand-by-comp");
+  const covSorted = useMemo(() => sortRows(cov, compSort.sort, (k, key) => {
+    const n = k.counts;
+    switch (key) {
+      case "competition": return k.label;
+      case "scope": return n?.in_scope === true ? "yes" : n?.in_scope === false ? "no" : null;
+      case "assessed": return n?.assessed ?? null;
+      case "eligible": return n?.eligible ?? null;
+      case "inplay": return n?.in_play_markets ?? null;
+      case "decided": return n?.decided ?? null;
+      case "model": return n?.model_priced ?? null;
+      case "placed": return n?.placed ?? null;
+      case "shown": return k.considered;
+      default: return null;
+    }
+  }), [cov, compSort.sort]);
   const filtered = useMemo(() => (c ? applyFilters(c.rows, f, minute) : []), [c, f, minute]);
   const inComp = useMemo(() => (c ? c.rows.filter((r) => !f.comp || (r.competition ?? "") === f.comp) : []), [c, f.comp]);
   const forDecisionCounts = useMemo(() => (c ? applyFilters(c.rows, f, minute, "decision") : []), [c, f, minute]);
   const families = useMemo(() => [...new Set((c?.rows ?? []).map((r) => r.family).filter((x): x is string => !!x))].sort(), [c]);
 
-  // LIVE SORT, HELD: a user sort snapshots the order; refreshes keep it
-  const [held, setHeld] = useState<string[] | null>(null);
-  const [heldFor, setHeldFor] = useState("");
-  const liveSorted = useMemo(() => (f.sort ? sortRows(filtered, f.sort, f.dir, minute) : filtered), [filtered, f.sort, f.dir, minute]);
-  // re-snapshot only when the sort itself changes, never on a refresh
-  const sortKey = f.sort ? `${f.sort}|${f.dir}` : "";
-  if (sortKey !== heldFor) {
-    setHeldFor(sortKey);
-    setHeld(f.sort ? liveSorted.map((r) => r.ticker) : null);
-  }
-  const shown = useMemo(() => {
-    if (!f.sort || !held) return liveSorted;
-    const pos = new Map(held.map((t, i) => [t, i]));
-    return [...filtered].sort((a, b) => (pos.get(a.ticker) ?? 1e9) - (pos.get(b.ticker) ?? 1e9));
-  }, [f.sort, held, liveSorted, filtered]);
-  const drift = !!f.sort && held !== null && shown.some((r, i) => liveSorted[i]?.ticker !== r.ticker);
+  // THE SORT, RE-APPLIED TO EVERY READ: a refresh re-sorts the new rows by
+  // the same key (the console's one table rule, ./sorting.tsx); stable,
+  // so ties keep the backend's priority order, and a missing value is last
+  const cs = f.sort ? { key: f.sort, dir: f.dir } : null;
+  const shown = useMemo(() => sortRows(filtered, cs, sortVal),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, f.sort, f.dir]);
 
   const tbody = useRef<HTMLTableSectionElement | null>(null);
   const onKey = (e: KeyboardEvent<HTMLTableRowElement>, t: string) => {
@@ -508,19 +516,14 @@ function CandidatesSection({ d, now, source, filters: f, setFilters, selected, s
     || (c?.rows ?? []).some((r) => decisionBadge(r.decision).key === k));
   const today = reasonsOfKinds(obj(d.today)?.by_reason, ["skipped", "refused"]);
 
-  const sortTh = (k: SortKey, children: string, right?: boolean) => {
-    const on = f.sort === k;
-    return (
-      <th key={k} scope="col" aria-sort={on ? (f.dir === "asc" ? "ascending" : "descending") : undefined}
-        className={`${TH} ${right ? "text-right" : "text-left"}`}>
-        <button type="button" data-testid={`cand-sort-${k}`}
-          onClick={() => setFilters((x) => ({ ...x, sort: k, dir: x.sort === k && x.dir === "desc" ? "asc" : "desc" }))}
-          className={`inline-flex items-center gap-1 uppercase outline-none hover:text-ink-hi focus-visible:text-ink-hi ${on ? "text-ink-hi" : ""}`}>
-          {children}<span aria-hidden className="text-[9px]">{on ? (f.dir === "asc" ? "▲" : "▼") : "↕"}</span>
-        </button>
-      </th>
-    );
-  };
+  const onSort = (k: string) => setFilters((x) => {
+    const n = nextSort(x.sort ? { key: x.sort, dir: x.dir } : null, k, SORT_TYPE[k as SortKey]);
+    return { ...x, sort: n?.key ?? "", dir: n?.dir ?? "desc" };
+  });
+  const sortTh = (k: SortKey, children: string, right?: boolean) => (
+    <SortTh key={k} label={children} k={k} type={SORT_TYPE[k]} sort={cs} onSort={onSort} right={right}
+      className={TH} testid={`cand-sort-${k}`} />
+  );
 
   const byBadge: Record<string, number> = {};
   for (const r of c?.rows ?? []) {
@@ -709,31 +712,20 @@ function CandidatesSection({ d, now, source, filters: f, setFilters, selected, s
                 </div>
               ) : (
                 <>
-                  {drift && (
-                    <div className="flex items-center justify-between gap-3 border-b border-tc-line bg-tc-raised px-4 py-1 text-[12px] text-ink-mid">
-                      <span className="inline-flex items-center gap-1.5">Order held
-                        <Info label="the held order">Held since you sorted — newer values would reorder the rows.</Info></span>
-                      <button type="button" data-testid="cand-resort" onClick={() => setHeld(liveSorted.map((r) => r.ticker))}
-                        className="rounded-md border border-tc-line-strong px-2 py-0.5 text-[12px] text-ink-hi outline-none hover:bg-tc-hover focus-visible:ring-2 focus-visible:ring-accent">Re-sort</button>
-                    </div>
-                  )}
                   <div className="tc-scroll max-h-[70vh] overflow-auto">
                     <table data-testid="cand-table" className="tc-table w-full min-w-[1100px] border-collapse">
                       <thead>
                         <tr>
-                          <th scope="col" className={`${TH} pl-4 text-left`}>
-                            <button type="button" data-testid="cand-sort-market"
-                              onClick={() => setFilters((x) => ({ ...x, sort: "market", dir: x.sort === "market" && x.dir === "asc" ? "desc" : "asc" }))}
-                              className="uppercase outline-none hover:text-ink-hi focus-visible:text-ink-hi">market{f.sort === "market" ? (f.dir === "asc" ? " ▲" : " ▼") : ""}</button>
-                          </th>
+                          <SortTh label="market" k="market" type="text" sort={cs} onSort={onSort}
+                            className={`${TH} pl-4`} testid="cand-sort-market" />
                           {sortTh("decision", "decision")}
-                          <th scope="col" className={`${TH} text-left`}>reason</th>
-                          <th scope="col" className={`${TH} text-left`}>competition</th>
+                          {sortTh("reason", "reason")}
+                          {sortTh("competition", "competition")}
                           {sortTh("kickoff", "kickoff / min")}
                           {sortTh("model", "model", true)}
                           {sortTh("consensus", "consensus", true)}
                           {sortTh("fair", "fair", true)}
-                          <th scope="col" className={`${TH} text-right`}>yes bid / ask</th>
+                          {sortTh("ask", "yes bid / ask", true)}
                           {sortTh("edge", "edge", true)}
                         </tr>
                       </thead>
@@ -773,14 +765,16 @@ function CandidatesSection({ d, now, source, filters: f, setFilters, selected, s
                   <table data-testid="cand-by-comp" className="w-full min-w-[600px] border-collapse text-[12.5px]">
                     <thead>
                       <tr>
-                        {["competition", "scope", "assessed", "eligible", "in play",
-                          "decided", "model", "placed", "shown"].map((h, i) => (
-                          <th key={h} scope="col" className={`${TH} first:pl-0 ${i === 0 ? "text-left" : "text-right"}`}>{h}</th>
+                        {([["competition", "competition", "text"], ["scope", "scope", "text"], ["assessed", "assessed", "num"],
+                          ["eligible", "eligible", "num"], ["inplay", "in play", "num"], ["decided", "decided", "num"],
+                          ["model", "model", "num"], ["placed", "placed", "num"], ["shown", "shown", "num"]] as [string, string, ColType][]).map(([k, h, t], i) => (
+                          <SortTh key={k} label={h} k={k} type={t} sort={compSort.sort} onSort={compSort.press}
+                            right={i > 0} className={`${TH} first:pl-0`} testid={`by-comp-sort-${k}`} />
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {cov.map((k) => (
+                      {covSorted.map((k) => (
                         <tr key={k.competition || "none"} data-testid="cand-by-comp-row" data-comp={k.competition}
                           className="hover:bg-tc-hover">
                           <td className="whitespace-nowrap border-b border-tc-line py-1 pr-3 text-ink-hi">{k.label}</td>

@@ -22,15 +22,15 @@
 // `{"available":false}`, `Cache-Control: private, no-store`.
 import type { NextApiRequest, NextApiResponse } from "next";
 import {
-  OPERATOR_BACKEND, operatorHeaders, relayOperator,
+  OPERATOR_BACKEND, OPERATOR_WRITE_PATHS, operatorHeaders, relayOperator,
 } from "../../../lib/operatorRelay";
 
 // a hand-over body is four short fields; nothing larger is read
 export const config = { api: { bodyParser: { sizeLimit: "2kb" } } };
 
 const BACKEND_PATH = {
-  handover: "/api/admin/trading/handover",
-  takeback: "/api/admin/trading/takeback",
+  handover: OPERATOR_WRITE_PATHS.handover,
+  takeback: OPERATOR_WRITE_PATHS.takeback,
 } as const;
 type Action = keyof typeof BACKEND_PATH;
 

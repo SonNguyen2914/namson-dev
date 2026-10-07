@@ -152,6 +152,28 @@ test("a folded section with an amber/red summary", async ({ page }) => {
   await fold(page, "ops-tick");
   await shot(page, "23-collapsed-amber-summary");
 });
+// SORTING AND THE EMERGENCY BUTTONS (2026-10-07)
+test("sorted: trades by P&L, highest first", async ({ page }) => {
+  await open(page, { hash: "#trades" });
+  await page.getByTestId("ledger-sort-pnl").click();
+  await shot(page, "24-trades-sorted-pnl");
+});
+test("sorted: positions by live value", async ({ page }) => {
+  await open(page, { hash: "#portfolio" });
+  await page.getByTestId("book-sort-live").click();
+  await shot(page, "25-portfolio-sorted-live");
+});
+test("emergency: the controls menu with KILL armed", async ({ page }) => {
+  await open(page, { status: qaStatusWithCareful({ operator_halt: { until: null, set_at: null } }) });
+  await page.getByTestId("rail-controls").locator("summary").click();
+  await page.getByTestId("rail-controls").getByTestId("emergency-kill").click();
+  await shot(page, "26-controls-kill-armed", false);
+});
+test("emergency: a halt in force", async ({ page }) => {
+  const at = (m: number) => new Date(Date.now() + m * 60_000).toISOString();
+  await open(page, { status: qaStatusWithCareful({ operator_halt: { until: at(55), set_at: at(-5) } }) });
+  await shot(page, "27-halt-active", false);
+});
 test("token gate", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/ops/trading");

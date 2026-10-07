@@ -16,6 +16,7 @@ import {
 } from "../../lib/tradingConsole";
 import { decisionBadge, reasonTag, rowTag } from "../../lib/consoleModel";
 import { type SumItem } from "./collapse";
+import { SortTh, sortRows, useTableSort } from "./sorting";
 import { badgeItems, items as sum, plain, warn } from "./summaries";
 import {
   DASH, DecisionBadge, Info, InfoNote, Metric, Panel, SimpleTable, SubHead, TH, Tech, count, numOf,
@@ -80,6 +81,9 @@ function Reasons({ block, testid, empty }: { block: ReasonsBlock; testid: string
 
 function ByComp({ v }: { v: unknown }) {
   const b = inPlayByCompetition(v);
+  const { sort, press } = useTableSort("inplay-by-comp");
+  const rows = sortRows(b.rows, sort, (r, k) => (k === "competition" ? r.label
+    : r.counts === null ? null : (r.counts[k as "legs" | "skipped" | "refused" | "placed"] ?? null)));
   return (
     <>
       {b.failed && <p className="mb-1 text-[12px] text-warn">◆ the per-competition in-play counts failed on the backend: {b.failed}</p>}
@@ -88,12 +92,13 @@ function ByComp({ v }: { v: unknown }) {
           <thead>
             <tr>
               {["competition", "legs", "skipped", "refused", "placed"].map((h, i) => (
-                <th key={h} scope="col" className={`${TH} first:pl-0 last:pr-0 ${i === 0 ? "text-left" : "text-right"}`}>{h}</th>
+                <SortTh key={h} label={h} k={h} type={i === 0 ? "text" : "num"} sort={sort} onSort={press}
+                  right={i > 0} className={`${TH} first:pl-0 last:pr-0`} testid={`inplay-comp-sort-${h}`} />
               ))}
             </tr>
           </thead>
           <tbody>
-            {b.rows.map((r) => (
+            {rows.map((r) => (
               <tr key={r.competition} data-testid="inplay-comp-row" data-comp={r.competition}>
                 <td className="whitespace-nowrap border-b border-tc-line py-1 pr-3 text-left text-ink-hi">{r.label}</td>
                 {r.counts === null ? (
@@ -155,7 +160,8 @@ export function ArmsInUse({ v, testid, title }: { v: unknown; testid: string; ti
     <div className="mt-3">
       <SubHead>{title}</SubHead>
       {error && <p className="mb-1 text-[12px] text-warn">◆ the arms read failed on the backend: {error}</p>}
-      <SimpleTable testid={testid} head={["context", "arm (w/t)", "markets"]}
+      <SimpleTable testid={testid} head={["context", "arm (w/t)", "markets"]} sortId={`arms-${testid}`}
+        values={rows.map((r) => [String(r[0]), String(r[1]), numOf(r[2])])}
         rows={rows.map((r) => [r[0], <Tech key="a" tone="text-ink-hi">{String(r[1])}</Tech>, r[2]])}
         right={[2]} empty="none on the newest tick" />
     </div>
@@ -296,14 +302,16 @@ export function InPlayPanel({ d, now, candidates }: { d: Obj; now: number; candi
           summary={sum(plain(`${liveRows.length} legs`), ...badgeItems(liveBadges), plain(`${shocks.reduce((n, [, k]) => n + k, 0)} shocks`))}
           meta={candidates ? `${liveRows.length} of ${candidates.rows.length}` : undefined}>
           {liveRows.length === 0 ? <InfoNote>{candidates ? "None in the snapshot" : "Not read yet"}</InfoNote> : (
-            <SimpleTable head={["market", "min", "decision", "reason"]} right={[1]}
+            <SimpleTable head={["market", "min", "decision", "reason"]} right={[1]} sortId="inplay-live-legs"
+              values={liveRows.slice(0, 12).map((r) => [r.title, r.minute, decisionBadge(r.decision).label,
+                r.decision.action === "placed" ? null : rowTag(r.decision)])}
               rows={liveRows.slice(0, 12).map((r) => [r.title, r.minute === null ? "in play" : `${r.minute}′`,
                 <DecisionBadge key="b" badge={decisionBadge(r.decision)} testid="live-leg-badge" />,
                 <span key="c" title={r.decision.reason ?? undefined}>{r.decision.action === "placed" ? DASH : rowTag(r.decision)}</span>])}
               empty="none" />
           )}
           <SubHead info="The status route serves shocks as counts by kind; per-event times are not served.">Shocks today</SubHead>
-          <SimpleTable testid="shocks" head={["kind", "count"]} right={[1]}
+          <SimpleTable testid="shocks" head={["kind", "count"]} right={[1]} sortId="inplay-shocks"
             rows={shocks.map(([k, n]) => [k, n])} empty="none today" />
         </Panel>
       </div>

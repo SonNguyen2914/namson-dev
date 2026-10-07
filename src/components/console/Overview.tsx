@@ -11,6 +11,7 @@ import {
 } from "../../lib/consoleModel";
 import { compLabel, isObj, liveTotals, num, str } from "../../lib/tradingConsole";
 import { TradingKillLift } from "../TradingKillLift";
+import { type EmergencyMemory, EmergencyControls, operatorHalt } from "./Emergency";
 import { OwnerChip, bookDollars, bookPl, plTone } from "../TradingBook";
 import { DailyPnlChart } from "./charts";
 import {
@@ -67,11 +68,11 @@ export function StopHowTo() {
           next tick places nothing), or delete the agent&apos;s Kalshi API key.
         </span>
         <span className="mt-1.5 block text-ink-low">
-          This console cannot place or stop anything. It changes three things: which of your positions the trader
-          may manage (a take-back also cancels the trader&apos;s own resting orders on that market, on its next
-          tick), the careful strategy&apos;s per-competition switch (off = paper only), and &ldquo;Lift operator
-          kill&rdquo;, which ends an operator kill set through the backend&apos;s kill route. It cannot lift
-          TRADING_KILL on Railway.
+          This console places nothing. It changes these things: KILL (an operator kill for a chosen time: every
+          resting agent order cancelled, nothing placed) and HALT (an operator halt: no new buys, protective sells
+          continue), each lifted early by its own lift; which of your positions the trader may manage (a take-back
+          also cancels the trader&apos;s own resting orders on that market, on its next tick); and the careful
+          strategy&apos;s per-competition switch (off = paper only). It cannot lift TRADING_KILL on Railway.
         </span>
       </Info>
     </span>
@@ -82,8 +83,8 @@ export function StopHowTo() {
  *  (consoleModel.safetyTriggers) — otherwise its states are the rail's
  *  pills and its controls the rail's Controls menu. `triggers` says why
  *  it is open, in a word or two each. */
-export function SafetyPanel({ d, token, bumpStatus, triggers }: {
-  d: Obj; now: number; token: string; bumpStatus: () => void; triggers: string[];
+export function SafetyPanel({ d, now, token, bumpStatus, triggers, emergency }: {
+  d: Obj; now: number; token: string; bumpStatus: () => void; triggers: string[]; emergency: EmergencyMemory;
 }) {
   const halt = obj(d.halt);
   const killed = d.kill === true;
@@ -112,9 +113,9 @@ export function SafetyPanel({ d, token, bumpStatus, triggers }: {
       <div id="safety-body">
       <div className="grid grid-cols-2 gap-x-6 gap-y-3 px-4 py-2.5 lg:grid-cols-6">
         <SafetyCell testid="safety-trading" label="Real trading"
-          value={loud ? "Blocked" : d.enabled === true ? (d.paper_only === true ? "Paper only" : "Enabled")
+          value={loud ? "Blocked" : operatorHalt(d, now).active ? "Buys halted" : d.enabled === true ? (d.paper_only === true ? "Paper only" : "Enabled")
             : d.enabled === false ? "Disabled" : "Not stated"}
-          state={loud ? "bad" : d.enabled === false || d.paper_only === true ? "warn" : d.enabled === true ? "info" : "warn"}
+          state={loud || operatorHalt(d, now).active ? "bad" : d.enabled === false || d.paper_only === true ? "warn" : d.enabled === true ? "info" : "warn"}
           sub={loud ? `${killed ? "the kill" : "a loss halt"} holds; TRADING_ENABLED is ${d.enabled === true ? "on" : "off"}`
             : d.paper_only === true ? (str(d.mode_banner) ?? "no real orders are sent")
             : d.enabled === false ? "TRADING_ENABLED is not true: cancel-first pass only" : "TRADING_ENABLED"} />
@@ -137,6 +138,9 @@ export function SafetyPanel({ d, token, bumpStatus, triggers }: {
           sub={ip ? <><Tech>{str(ip.strategy) ?? "strategy not sent"}</Tech>{ip.active === true ? " · active" : ""}</> : undefined} />
         <SafetyCell testid="safety-day" label="Trading day" value={str(day?.day) ?? DASH} state="info"
           sub={day ? <>{str(day.tz) ?? "zone not sent"}{day.valid === false ? " (zone unreadable: UTC)" : ""} · ends {when(day.ends_at)}</> : undefined} />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-2 border-t border-tc-line px-4 py-2">
+        <EmergencyControls d={d} token={token} onDone={bumpStatus} now={now} memory={emergency} />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-2 border-t border-tc-line px-4 py-2">
         <TradingKillLift token={token} onDone={bumpStatus} active={killed} />
@@ -598,18 +602,19 @@ export function PerformanceSnapshot({ reads, now, go, limit }: {
 
 // -------------------------------------------------------------- view
 
-export function Overview({ d, now, token, reads, attention, bumpStatus, go, statusStale, statusAt, safety }: {
+export function Overview({ d, now, token, reads, attention, bumpStatus, go, statusStale, statusAt, safety, emergency }: {
   d: Obj; now: number; token: string; reads: SectionReads; attention: AttentionItem[];
   bumpStatus: () => void; go: (v: string, p?: Record<string, string>) => void;
   statusStale: boolean; statusAt: number;
   /** why Safety & control is unfolded — empty while everything is normal */
   safety: string[];
+  emergency: EmergencyMemory;
 }) {
   const limit = numOf(obj(d.daily_loss)?.limit);
   return (
     <div className="grid grid-cols-12 gap-3">
       {safety.length > 0 && (
-        <div className="col-span-12"><SafetyPanel d={d} now={now} token={token} bumpStatus={bumpStatus} triggers={safety} /></div>
+        <div className="col-span-12"><SafetyPanel d={d} now={now} token={token} bumpStatus={bumpStatus} triggers={safety} emergency={emergency} /></div>
       )}
       <div className="col-span-12 xl:col-span-8"><CapitalPanel d={d} now={now} stale={statusStale} statusAt={statusAt} /></div>
       <div className="col-span-12 xl:col-span-4"><AttentionPanel items={attention} go={go} /></div>

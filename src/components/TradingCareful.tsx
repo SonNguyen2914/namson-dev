@@ -28,6 +28,7 @@ import { useState } from "react";
 import { compLabel } from "../lib/tradingConsole";
 import { Info, Panel } from "./console/primitives";
 import { items as line, plain, warn } from "./console/summaries";
+import { type ColType, type SortVal, SortTh, sortRows, useTableSort } from "./console/sorting";
 
 type Obj = Record<string, unknown>;
 const obj = (v: unknown): Obj | null =>
@@ -68,6 +69,8 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [said, setSaid] = useState<string | null>(null);
   const [local, setLocal] = useState<Record<string, boolean>>({});
+  const sitSort = useTableSort("careful-situations");
+  const resSort = useTableSort("careful-results");
 
   async function toggle(comp: string, on: boolean) {
     setBusy(comp);
@@ -165,11 +168,14 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
               <div className="tc-scroll overflow-x-auto">
                 <table data-testid="careful-situations" className="w-full min-w-[620px] border-collapse text-[12.5px]">
                   <thead><tr>
-                    {["situation", "paper n", "paper CLV−fee", "real n", "real CLV−fee", "real money", ""].map((h) => (
-                      <th key={h} scope="col" className={TH}>{h}</th>))}
+                    {([["situation", "situation", "text"], ["paper_n", "paper n", "num"], ["paper_x_c", "paper CLV−fee", "num"],
+                      ["real_n", "real n", "num"], ["real_x_c", "real CLV−fee", "num"], ["real_pnl_c", "real money", "num"]] as [string, string, ColType][]).map(([k, h, t]) => (
+                      <SortTh key={k} label={h} k={k} type={t} sort={sitSort.sort} onSort={sitSort.press} className={TH} />))}
+                    <th scope="col" className={TH}><span className="sr-only">flag</span></th>
                   </tr></thead>
                   <tbody>
-                    {Object.entries(sits).map(([k, v]) => {
+                    {sortRows(Object.entries(sits), sitSort.sort, ([k, v], key): SortVal =>
+                      (key === "situation" ? k : num(obj(v)?.[key]))).map(([k, v]) => {
                       const s = obj(v) ?? {};
                       return (
                         <tr key={k} data-testid="careful-situation" data-flag={s.disagreement === true ? "true" : "false"}>
@@ -199,11 +205,19 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
               <div className="tc-scroll overflow-x-auto">
                 <table data-testid="careful-results" className="w-full min-w-[640px] border-collapse text-[12.5px]">
                   <thead><tr>
-                    {["situation", "paper n", "CLV−fee", "settled", "wins", "would-be / contract", "would-be at size", ""].map((h) => (
-                      <th key={h} scope="col" className={TH}>{h}</th>))}
+                    {([["situation", "situation", "text"], ["n", "paper n", "num"], ["clv_x_c", "CLV−fee", "num"],
+                      ["results_n", "settled", "num"], ["wins", "wins", "num"], ["pnl_c_mean", "would-be / contract", "num"],
+                      ["pnl_dollars", "would-be at size", "num"]] as [string, string, ColType][]).map(([k, h, t]) => (
+                      <SortTh key={k} label={h} k={k} type={t} sort={resSort.sort} onSort={resSort.press} className={TH} />))}
+                    <th scope="col" className={TH}><span className="sr-only">flag</span></th>
                   </tr></thead>
                   <tbody>
-                    {Object.entries(results).map(([k, v]) => {
+                    {sortRows(Object.entries(results), resSort.sort, ([k, v], key): SortVal => {
+                      if (key === "situation") return k;
+                      const r = obj(v) ?? {};
+                      // the sized figure only where something was sized
+                      return key === "pnl_dollars" ? (num(r.sized_n) ? num(r.pnl_dollars) : null) : num(r[key]);
+                    }).map(([k, v]) => {
                       const r = obj(v) ?? {};
                       return (
                         <tr key={k} data-testid="careful-result" data-flag={r.disagreement === true ? "true" : "false"}>

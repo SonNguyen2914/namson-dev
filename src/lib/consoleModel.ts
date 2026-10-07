@@ -559,6 +559,10 @@ export function safetyTriggers(d: Obj, o: {
   const halt = obj(d.halt);
   if (halt?.active === true) out.push("halt hit");
   else if (halt?.active !== false) out.push("halt not stated");
+  // the operator halt (2026-10-07): buys stopped by hand
+  const oh = obj(d.operator_halt);
+  const ohUntil = Date.parse(String(oh?.until ?? ""));
+  if (oh && (oh.active === true || (Number.isFinite(ohUntil) && ohUntil > o.now))) out.push("operator halt");
   if (d.enabled === false) out.push("trading disabled");
   else if (d.enabled !== true) out.push("trading not stated");
   if (d.paper_only === true) out.push("paper only");
