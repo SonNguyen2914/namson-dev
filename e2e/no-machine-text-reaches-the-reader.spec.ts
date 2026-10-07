@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { BOARD_EIGHT, serveEight } from "./eight-columns";
 
 // A READER IS SHOWN A SENTENCE, NEVER AN INTERNAL TOKEN.
 //
@@ -463,4 +464,29 @@ test("no reason at all is SAID, never left as a sentence that stops",
     await expect(slot).toHaveAttribute("data-reason", "absent");
     await expect(slot).toContainText(/no reason came back/i);
     await expect(slot).not.toHaveText("");
+  });
+
+test("a refused card's reason code never reaches its face — it reads in "
+   + "words, and the code rides the hover", async ({ page }) => {
+    /* SON, 2026-10-07: the refused card's top-left printed `no_prior_row`
+       and `#refused`. The card now prints the reason as a reader's words
+       ("NEW TO THE LEAGUE"), in its own chip style; the backend's code
+       stays reachable on the hover, which is where an operator looks.
+       The recorded eight-column board carries one such refusal per
+       column, so this sweeps every one of them. */
+    await serveEight(page, BOARD_EIGHT);
+    const cards = page.getByTestId("picker-refusal");
+    const n = await cards.count();
+    expect(n, "the recorded board carries refused cards").toBeGreaterThan(0);
+    for (let i = 0; i < n; i++) {
+      const c = cards.nth(i);
+      const face = await c.innerText();
+      assertNoMachineText(`refused card ${i}`, face);
+      expect(face, `refused card ${i} prints a snake_case code`)
+        .not.toMatch(/\b[a-z]+(?:_[a-z0-9]+)+\b/);
+      expect(face).not.toContain("#refused");
+      const reason = c.getByTestId("refusal-reason");
+      await expect(reason).toHaveText(/new to the league/i);
+      expect(await reason.getAttribute("title")).toContain("no_prior_row");
+    }
   });

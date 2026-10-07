@@ -392,6 +392,51 @@ export interface FieldBlockLike {
   axes: Partial<Record<FieldAxisKey, FieldAxis>>;
 }
 
+/** THE CARD'S MODEL-VS-MARKET BLOCK (backend src/picker/model_market.py,
+ *  Son's approved card of 2026-10-07). Probabilities are FRACTIONS in
+ *  [0, 1], home / draw / away. DISPLAY ONLY: nothing that ranks a column
+ *  or decides a trade reads it — the board still ranks by the stat gap.
+ *
+ *  A missing read is a NULL with its reason (`model_why`, `market_why`),
+ *  never a block of zeros, and the card says so in words. `top` is the
+ *  backend's own argmax over the UNROUNDED values — the card brightens
+ *  exactly what the verdict compared rather than re-deriving it from the
+ *  one-decimal figures it prints. */
+export type MmOutcome = "h" | "d" | "a";
+export type MmTriple = Record<MmOutcome, number>;
+export interface MmLeg {
+  ticker: string | null;
+  ask_c: number | null;
+  bid_c: number | null;
+  spread_c: number | null;
+  ask_size: number | null;
+  bid_size: number | null;
+}
+export interface ModelVsMarket {
+  model: MmTriple | null;
+  market: MmTriple | null;
+  verdict: "agree" | "conflict" | "no_model" | "no_market";
+  model_meta: {
+    name: string | null;
+    status: "tested" | "untested";
+    read_at: string | null;
+    source?: string | null;
+    test_verdict?: string | null;
+  } | null;
+  book_flag: "WIDE" | "THIN" | null;
+  top: { model: MmOutcome[]; market: MmOutcome[] };
+  codes: { h: string | null; a: string | null };
+  model_why: string | null;
+  market_why: string | null;
+  market_meta: {
+    basis: string;
+    overround: number;
+    legs: Record<MmOutcome, MmLeg>;
+    book_flag_leg: MmOutcome | null;
+    stale: { captured_at?: string; age_seconds?: number } | null;
+  } | null;
+}
+
 export interface KalshiQuote {
   event_ticker: string | null;
   ticker: string | null;
@@ -647,6 +692,10 @@ export interface BoardRow {
   /** PREVIOUS MEETINGS on a club row, in the national block's own shape
    *  (see HeadToHead). Absent on a board built before 2026-09-25. */
   h2h?: HeadToHead | null;
+  /** the card's model-vs-market lines — see ModelVsMarket. Absent on a
+   *  board built before 2026-10-07, and the card then draws the old
+   *  price line. */
+  model_vs_market?: ModelVsMarket | null;
   /** the national card's headline — the backend's when it sends one,
    *  else the interim venue-adjusted Elo gap (see venueAdjusted) */
   headline?: NationalHeadline | null;
@@ -850,6 +899,10 @@ export interface BoardRefusal {
    *  a refusal to quote: the market prices this match either way, and
    *  the card says so in the same cell a ranked card uses. */
   kalshi?: KalshiQuote | null;
+  /** the card's model-vs-market lines: a refusal to RANK is not a
+   *  refusal to READ — the model may exist even when the table read is
+   *  refused. See ModelVsMarket. */
+  model_vs_market?: ModelVsMarket | null;
 
   /** THE REFUSAL'S OWN ACCOUNT OF ITSELF — picker/stages.refused_row,
    *  verbatim, and shipping on the live board since 2026-09-11.

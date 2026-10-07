@@ -335,8 +335,8 @@ test.describe("a phone draws one league, and its name fits", () => {
     const framing = page.getByTestId("board-framing");
     await expect(framing).toBeVisible();
     for (const phrase of [
-      /no model runs on this page/i,
-      /no number below is a probability or an edge of ours/i,
+      /neither line moves a card/i,
+      /No model ranks this page\. Each card's model and market lines are display only, a shadow read and not advice/i,
       /nothing here is a recommendation/i,
       /you are the one who picks/i,
     ]) await expect(framing).toContainText(phrase);
@@ -376,7 +376,11 @@ test.describe("a tablet scrolls the board instead of stacking it", () => {
         overflowX: getComputedStyle(e).overflowX,
         cols: e.style.getPropertyValue("--cols"),
         colw: Math.round(parseFloat(e.style.getPropertyValue("--colw")) || 0),
-        client: Math.round(e.clientWidth),
+        /* the track's own inline padding comes off first: since
+           2026-10-07 it carries a 4px gutter each end so the end
+           columns' borders sit inside the clip (board-right-edge.spec) */
+        client: Math.round(e.clientWidth - parseFloat(getComputedStyle(e).paddingLeft)
+          - parseFloat(getComputedStyle(e).paddingRight)),
       })));
       expect(geom.scrolls, "the board scrolls sideways at tablet width — it "
         + "used to stack four rows of two").toBe(true);
@@ -470,7 +474,9 @@ test.describe("the desktop board is exactly what shipped", () => {
       const g = await settled(page, () =>
         page.getByTestId("board-track").evaluate((e) => ({
           colw: Math.round(parseFloat(e.style.getPropertyValue("--colw")) || 0),
-          client: Math.round(e.clientWidth),
+          // less the track's 4px end gutters (see the tablet test above)
+          client: Math.round(e.clientWidth - parseFloat(getComputedStyle(e).paddingLeft)
+            - parseFloat(getComputedStyle(e).paddingRight)),
           scrolls: e.scrollWidth - e.clientWidth > 4,
         })));
       expect(g.scrolls).toBe(true);

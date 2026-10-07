@@ -44,7 +44,8 @@
 // `warn` is used for exactly one thing on this surface: a refusal, in
 // the backend's own words. Nothing here is coloured up/neg.
 import {
-  createContext, useCallback, useContext, useEffect, useMemo, useState,
+  ReactNode, createContext, useCallback, useContext, useEffect, useMemo,
+  useState,
 } from "react";
 import {
   WatchlistDeclareResponse, WatchlistResolveResponse, WatchlistState,
@@ -963,16 +964,28 @@ export function WatchPanel() {
 
 const btn = "rounded-md border px-2 py-0.5 font-mono text-[9px] uppercase "
   + "tracking-[0.14em] transition-colors";
+/** THE WATCH BOX'S OWN SHAPE, exported so the card's model-vs-market
+ *  verdict box beside it is the same box (Son, 2026-10-07: "same style as
+ *  the WATCH box"), not a lookalike that drifts. */
+export const WATCH_BOX = btn;
 
 /** The per-row control. SEVEN states, and every one of them says which
  *  it is on screen, in words, rather than by colour alone. */
-export function WatchToggle({ eventId, label }: {
+export function WatchToggle({ eventId, label, beside }: {
   eventId: string;
   /** the fixture in words, for the control's accessible name */
   label: string;
+  /** drawn IN the control's own row, after the watch box — the card's
+   *  model-vs-market verdict box. It renders even where there is no watch
+   *  control to sit beside (no provider mounted). */
+  beside?: ReactNode;
 }) {
   const ctx = useContext(WatchCtx);
-  if (!ctx) return null;                 // the board is the only mount
+  if (!ctx) {                            // the board is the only mount
+    return beside
+      ? <div className="mt-2 flex flex-wrap items-center gap-2">{beside}</div>
+      : null;
+  }
   const { hasToken, canAct, resolved, declaredFixtureIds, results, busy } = ctx;
   const result = results[eventId];
   const fx = resolved?.resolved?.[eventId] ?? null;
@@ -1065,6 +1078,7 @@ export function WatchToggle({ eventId, label }: {
         </>
       )}
 
+      {beside}
       {result && <ActRecord result={result} />}
     </div>
   );
