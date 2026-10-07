@@ -26,7 +26,8 @@
 // count over a handful of matches reads as evidence it is not.
 
 import {
-  BlendWeights, DEFAULT_DAYS, KalshiQuote, Shape, Src, TierPair,
+  BlendWeights, DEFAULT_DAYS, KalshiQuote, ModelVsMarket, Shape, Src,
+  TierPair,
 } from "./pickerApi";
 
 /** The two ways a pre-kickoff read can exist. A third state — neither —
@@ -216,6 +217,49 @@ export interface ReviewRow {
    *  older backend sends no such key; the card names that absence rather
    *  than drawing a blank. */
   market_t10?: MarketT10 | null;
+  /** THE MODEL AND MARKET AT THE T-10 LOCK (Son, 2026-10-07): the board
+   *  card's model-vs-market block as the backend's T-10 sweep froze it
+   *  inside the match's last ten minutes (backend src/mm_lock/), or
+   *  `not_recorded` when no lock was taken — never back-filled. OPTIONAL
+   *  because an older backend sends no such key; the card says so. */
+  mm_lock?: MmLock | null;
+  /** Which outcome happened and whether each side's top outcome at the
+   *  lock was it. PER MATCH ONLY: nothing on the site tallies these. */
+  result_lean?: ResultLean | null;
+}
+
+/** The frozen block: the board's `ModelVsMarket` shape, plus where and
+ *  when it was frozen. On `not_recorded` / `unread` every value is null
+ *  and `note` says why in words. */
+export interface MmLock extends Omit<ModelVsMarket, "verdict"> {
+  status: "recorded" | "not_recorded" | "unread";
+  reason: string | null;
+  note: string | null;
+  source?: string;
+  locked_at: string | null;
+  kickoff_at_lock: string | null;
+  seconds_before_kickoff: number | null;
+  verdict: ModelVsMarket["verdict"] | null;
+}
+
+export type LeanOutcome = "H" | "D" | "A";
+
+export interface ResultLean {
+  status: "compared" | "not_recorded" | "unread" | "no_result";
+  reason: string | null;
+  /** the 90-minute result where the row carries one, else the final
+   *  score — null when the match was decided after 90 minutes with no
+   *  90-minute result on the row */
+  outcome: LeanOutcome | null;
+  outcome_basis: "result_90" | "final_score" | null;
+  /** each side's single top outcome at the lock; null on a missing read
+   *  or a tie at the top (`*_lean_why`) */
+  model_lean: LeanOutcome | null;
+  model_lean_why: string | null;
+  model_matched: boolean | null;
+  market_lean: LeanOutcome | null;
+  market_lean_why: string | null;
+  market_matched: boolean | null;
 }
 
 export type MarketSide = "home" | "draw" | "away";

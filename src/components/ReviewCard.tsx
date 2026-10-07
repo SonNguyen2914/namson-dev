@@ -43,11 +43,13 @@
 // rebuilt, how many have none — and they are printed against their own n.
 import Link from "next/link";
 import { useEffect, useId, useState } from "react";
-import { fmtDate } from "../lib/matchday";
-import { leagueLabel, rowHref, rowNoHrefWhy } from "../lib/pickerApi";
+import { TZ, fmtDate } from "../lib/matchday";
 import {
-  Checkpoint, MarketSide, MarketT10, PreKickoff, ReviewLeagueMeta,
-  ReviewRefusal, ReviewRow, isRead, pct,
+  ModelVsMarket, leagueLabel, rowHref, rowNoHrefWhy,
+} from "../lib/pickerApi";
+import {
+  Checkpoint, LeanOutcome, MarketSide, MarketT10, MmLock, PreKickoff,
+  ResultLean, ReviewLeagueMeta, ReviewRefusal, ReviewRow, isRead, pct,
 } from "../lib/pickerReview";
 import {
   REVIEW_DEFAULT_SORT, REVIEW_SORT_MODES, ReviewSort, isDefaultReviewSort,
@@ -61,6 +63,7 @@ import {
   KalshiCell, SeasonWeight, TierGaps, dec, sign,
 } from "./PickerRead";
 import ErrorBoundary from "./ErrorBoundary";
+import { ModelMarketLines, VerdictBox, teamCode } from "./ModelMarket";
 import { Eyebrow } from "./ui";
 import { SHOT_GAP_WORDS, SHOT_SOURCE_WORDS, shotGap } from "../lib/hubParity";
 
@@ -684,6 +687,145 @@ function MarketT10Line({ m, home, away, pickerFav }: {
   );
 }
 
+/* ───────────── the model and market at the T-10 lock ─────────────
+
+   Son, 2026-10-07: the finished card shows the board card's two lines —
+   the trader's model and the de-vigged Kalshi market, home · DRAW · away —
+   AS THEY STOOD AT THE T-10 LOCK, with the verdict box as it stood then,
+   and one plain line saying what happened beside each side's lean.
+
+   FROZEN, AND DRAWN WITH THE BOARD'S OWN LINES. The backend froze the
+   board's block once, inside the match's last ten minutes (src/mm_lock/),
+   so this is not a second rendering of a recomputed read: it is the same
+   `ModelMarketLines` and `VerdictBox` the board card draws, handed the
+   frozen block, every hover saying when it was frozen.
+
+   NEUTRAL INK FOR THE RESULT. "ATM won · model leaned ATM, market leaned
+   RMA" says what happened and what each side leaned; it is not coloured
+   as right or wrong, and nothing on the site counts it. A match with no
+   lock says so in grey words — never a back-filled read, never zeros. */
+
+const LEAN_WORD = (k: LeanOutcome, codes: { h: string; a: string }) =>
+  k === "H" ? codes.h : k === "A" ? codes.a : "DRAW";
+
+/** The one result line, from the backend's per-match comparison. */
+export function leanSentence(lean: ResultLean | null | undefined,
+                             codes: { h: string; a: string }): string {
+  if (!lean) return "no comparison in this payload";
+  if (lean.status === "no_result") {
+    return lean.reason === "decided_after_90_minutes"
+      ? "Decided after 90 minutes · not compared"
+      : "No final score to compare";
+  }
+  const what = lean.outcome === "D" ? "Draw"
+    : lean.outcome ? `${LEAN_WORD(lean.outcome, codes)} won` : "Result unknown";
+  const none = (who: "model" | "market", why: string | null) =>
+    why === "level_at_top" ? `${who} level`
+      : who === "model" ? "no model read" : "no full book";
+  const ml = lean.model_lean, kl = lean.market_lean;
+  if (ml && ml === kl) return `${what} · both leaned ${LEAN_WORD(ml, codes)}`;
+  // ONE "leaned", carried across the comma when the model leaned at all:
+  // "model leaned DRAW, market LEE" — the card's tightest width (258px at
+  // 1280) does not hold the word twice beside a four-letter code
+  if (ml) {
+    return `${what} · model leaned ${LEAN_WORD(ml, codes)}, `
+      + (kl ? `market ${LEAN_WORD(kl, codes)}`
+        : none("market", lean.market_lean_why));
+  }
+  return `${what} · ${none("model", lean.model_lean_why)}, `
+    + (kl ? `market leaned ${LEAN_WORD(kl, codes)}`
+      : none("market", lean.market_lean_why));
+}
+
+function lockClock(iso: string | null): { hhmm: string; full: string } {
+  const d = iso ? new Date(iso) : null;
+  if (!d || Number.isNaN(d.getTime())) {
+    return { hhmm: "time not recorded", full: "at a time not recorded" };
+  }
+  return {
+    hhmm: d.toLocaleTimeString("en-GB", {
+      timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false }),
+    full: d.toLocaleString("en-US", {
+      timeZone: TZ, month: "short", day: "numeric", hour: "2-digit",
+      minute: "2-digit", hour12: false }) + " Pacific",
+  };
+}
+
+function MmLockSection({ row }: { row: ReviewRow }) {
+  const lock: MmLock | null | undefined = row.mm_lock;
+  const home = row.home ?? "home", away = row.away ?? "away";
+  const label = (
+    <span data-testid="mm-lock-label"
+      className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-faint">
+      model · market
+    </span>
+  );
+  if (!lock || lock.status !== "recorded" || !lock.verdict) {
+    const status = lock ? lock.status : "missing";
+    const words = !lock ? "model/market not in this payload"
+      : lock.status === "not_recorded"
+        ? "model/market not recorded for this match"
+        : "model/market lock could not be read";
+    const why = !lock
+      ? "The backend that answered sends no model/market lock for finished matches."
+      : (lock.note || words);
+    return (
+      <section data-testid="mm-lock" data-status={status}
+        className="mt-3 min-w-0 border-t border-line pt-2">
+        {label}
+        <p data-testid="mm-lock-absent" title={why}
+          className="mt-1 truncate whitespace-nowrap text-[11px] text-ink-faint">
+          {words}
+        </p>
+      </section>
+    );
+  }
+  const block = lock as unknown as ModelVsMarket;
+  const codes = { h: teamCode(lock.codes?.h, home),
+                  a: teamCode(lock.codes?.a, away) };
+  const clock = lockClock(lock.locked_at);
+  const mins = lock.seconds_before_kickoff == null ? null
+    : Math.max(1, Math.round(lock.seconds_before_kickoff / 60));
+  const frozen = `Frozen at the T−10 lock, ${clock.full}${
+    mins == null ? "" : `, ${mins} min before kickoff`}: the board's own `
+    + "lines as they stood then; they never update.";
+  const lean = row.result_lean ?? null;
+  const sentence = leanSentence(lean, codes);
+  const resultTitle = `${sentence}. `
+    + `${row.home ?? "Home"} ${row.result ? `${row.result.home}–${
+      row.result.away}` : "—"} ${row.away ?? "away"}`
+    + (lean?.outcome_basis === "result_90"
+      ? " (the 90-minute result, which is what both priced)" : "")
+    + ". Per match only — nothing here is tallied.";
+  return (
+    <section data-testid="mm-lock" data-status="recorded"
+      data-verdict={lock.verdict}
+      className="mt-3 min-w-0 border-t border-line pt-2">
+      <div className="flex min-w-0 items-baseline justify-between gap-2">
+        {label}
+        <span data-testid="mm-lock-when" title={frozen}
+          className="whitespace-nowrap font-mono text-[9px] uppercase tracking-[0.16em] text-ink-faint">
+          at T−10 · {clock.hhmm}
+        </span>
+      </div>
+      <div className="mt-1.5">
+        <ModelMarketLines mm={block} home={home} away={away}
+          frozen={frozen} />
+      </div>
+      <div data-testid="mm-lock-box" className="mt-2 flex">
+        <VerdictBox mm={block} frozen={frozen} />
+      </div>
+      <p data-testid="mm-result-line" title={resultTitle}
+        data-outcome={lean?.outcome ?? ""}
+        data-model-lean={lean?.model_lean ?? ""}
+        data-market-lean={lean?.market_lean ?? ""}
+        className="mt-1.5 truncate whitespace-nowrap text-[10.5px] text-ink-mid">
+        {sentence}
+      </p>
+    </section>
+  );
+}
+
 export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
   const pre = row.pre_kickoff;
   const state = pre.state;
@@ -989,6 +1131,10 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
           drew one inside the other would make them one statement. */}
       <MarketT10Line m={row.market_t10} home={row.home} away={row.away}
         pickerFav={read?.favourite ?? null} />
+
+      {/* The model and market AT THE LOCK, frozen, with the result line
+          under them — the board card's own bottom, as it stood at T−10. */}
+      <MmLockSection row={row} />
 
       {/* ─────────────────────── 2 · what happened ───────────────────────── */}
       <section data-testid="what-happened" className="mt-3">
