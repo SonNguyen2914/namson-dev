@@ -44,6 +44,7 @@
 import { readdirSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect, type Page } from "@playwright/test";
+import { openDetails } from "./review-details";
 import { NO_MODEL_HUBS } from "../src/lib/compHub";
 import {
   ARCHIVE_READ_UNKNOWN, EXTRA_FAMILIES, FAMILY_REASON_WORDS,
@@ -1200,6 +1201,7 @@ test("a national row whose play-by-play read really FAILED still says it failed"
   await openChampionships(page, r);
   const row = rowOf(await openTail(page, "unl"), "Albania");
   await expect(row).toHaveCount(1);
+  await openDetails(row);
   await expect(row.getByTestId("shot-error")).toBeVisible();
   await expect(row.getByTestId("shot-gap")).toHaveCount(0);
 });

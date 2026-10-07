@@ -754,6 +754,18 @@ export function rowHasKickedOff(row: {
     || row.live?.clock?.match_state === "post";
 }
 
+/** HAS THIS MATCH ENDED — the provider's own `post`, on the row or on its
+ *  live tape's clock (Son, 2026-10-07: the card's verdict box reads FULL
+ *  TIME rather than IN PLAY once the match is over). The same two facts
+ *  `rowHasKickedOff` reads its "over" half from, and nothing else: a row
+ *  under way is not ended, and nothing here reads a `pre` state. */
+export function rowHasEnded(row: {
+  state?: string | null;
+  live?: { clock?: { match_state?: string | null } | null } | null;
+}): boolean {
+  return row.state === "post" || row.live?.clock?.match_state === "post";
+}
+
 /** ONE CLUB'S OWN LINE off its OWN league's table — picker/stages
  *  .rated_side, verbatim. Every field is a fact about that one club and
  *  none of them is signed against the other side, so a refusal of the

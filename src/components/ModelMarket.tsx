@@ -130,7 +130,8 @@ export const PRE_KICKOFF_TITLE =
 export const IN_PLAY_TITLE = "agree/conflict compares pre-match reads only";
 
 /** The two lines, under the one header. */
-export function ModelMarketLines({ mm, home, away, quote, kickedOff = false }: {
+export function ModelMarketLines({ mm, home, away, quote, kickedOff = false,
+  frozen = null, marketNote = null }: {
   mm: ModelVsMarket;
   home: string;
   away: string;
@@ -138,10 +139,19 @@ export function ModelMarketLines({ mm, home, away, quote, kickedOff = false }: {
   quote?: KalshiQuote | null;
   /** the match is under way or over — see PRE_KICKOFF_TITLE */
   kickedOff?: boolean;
+  /** THE FINISHED CARD'S FROZEN COPY (Son, 2026-10-07): the sentence that
+   *  says when the block was frozen, put in front of every hover. The
+   *  lines are drawn exactly as the board drew them at that moment — top
+   *  outcome bright — because they ARE that moment's read. */
+  frozen?: string | null;
+  /** a sentence appended to the market line's hover (the finished card
+   *  puts the archive's own T−10 book there when it has none) */
+  marketNote?: string | null;
 }) {
   const codes: Record<MmOutcome, string> = {
     h: teamCode(mm.codes?.h, home), d: "DRAW", a: teamCode(mm.codes?.a, away),
   };
+  const at = (t: string) => (frozen ? `${frozen} ${t}` : t);
   const line = (lab: "model" | "market", p: ModelVsMarket["model"],
                 top: MmOutcome[], title: string, empty: string,
                 stale = false) => (
@@ -171,16 +181,20 @@ export function ModelMarketLines({ mm, home, away, quote, kickedOff = false }: {
             </span>);
         })
         : (
+          /* the CELL is a value's size (12px), the WORDS are smaller: the
+             line box then matches a line of figures, so a card whose read
+             is missing is the height of one whose read is not */
           <span data-testid={`mm-${lab}-empty`} title={title}
-            className={`col-span-3 whitespace-nowrap text-[10.5px] ${
+            className={`col-span-3 whitespace-nowrap text-[12px] ${
               stale ? "text-ink-faint" : "text-ink-low"}`}>
-            {empty}
+            <span className="text-[10.5px]">{empty}</span>
           </span>)}
     </>
   );
   return (
     <div data-testid="mm-lines" data-verdict={mm.verdict}
       data-kicked-off={kickedOff ? "1" : "0"}
+      data-frozen={frozen ? "1" : undefined}
       className="grid grid-cols-[54px_repeat(3,minmax(0,1fr))_auto] items-baseline gap-x-2 gap-y-1.5 font-mono tabular-nums">
       <span aria-hidden />
       {OUTCOMES.map((k) => (
@@ -192,16 +206,17 @@ export function ModelMarketLines({ mm, home, away, quote, kickedOff = false }: {
       ))}
       <span aria-hidden />
       {line("model", mm.model, mm.top?.model ?? [],
-        kickedOff ? `${PRE_KICKOFF_TITLE[0].toUpperCase()}${
-          PRE_KICKOFF_TITLE.slice(1)}. ${modelTitle(mm)}` : modelTitle(mm),
+        at(kickedOff ? `${PRE_KICKOFF_TITLE[0].toUpperCase()}${
+          PRE_KICKOFF_TITLE.slice(1)}. ${modelTitle(mm)}` : modelTitle(mm)),
         "no model read", kickedOff)}
       <span aria-hidden />
       {line("market", mm.market, mm.top?.market ?? [],
-        marketTitle(mm, codes, quote), "no full Kalshi book")}
+        at(marketTitle(mm, codes, quote)
+          + (marketNote ? ` · ${marketNote}` : "")), "no full Kalshi book")}
       {mm.market && mm.book_flag
         ? (
           <span data-testid="mm-book-flag" data-flag={mm.book_flag}
-            title={flagTitle(mm, codes)}
+            title={at(flagTitle(mm, codes))}
             className="justify-self-start rounded border border-warn/40 px-[5px] py-[2px] text-[8.5px] tracking-[0.14em] text-warn">
             {mm.book_flag}
           </span>)
@@ -223,20 +238,30 @@ const VERDICT = {
 
 /** The box beside WATCH, in the WATCH box's own shape. Dashed when the
  *  model has not passed its test. IN PLAY, grey and solid, once the match
- *  has kicked off — never AGREE or CONFLICT after kickoff. */
-export function VerdictBox({ mm, kickedOff = false }: {
-  mm: ModelVsMarket; kickedOff?: boolean;
+ *  has kicked off — never AGREE or CONFLICT after kickoff — and FULL TIME,
+ *  grey and solid, once it has ended (Son, 2026-10-07). `frozen` is the
+ *  finished card's copy: the box as it stood at the T-10 lock. */
+export function VerdictBox({ mm, kickedOff = false, ended = false,
+  frozen = null }: {
+  mm: ModelVsMarket; kickedOff?: boolean; ended?: boolean;
+  frozen?: string | null;
 }) {
   if (kickedOff) {
+    const over = ended;
     return (
       <span data-testid="mm-verdict" data-verdict={mm.verdict}
-        data-phase="in_play" data-untested="0"
+        data-phase={over ? "full_time" : "in_play"} data-untested="0"
         title={`${IN_PLAY_TITLE[0].toUpperCase()}${IN_PLAY_TITLE.slice(1)}: `
-          + "the match has kicked off, and the model line is its read from "
-          + "before kickoff while the market line is live. Shadow, not advice."}
+          + (over
+            ? "the match is over, and the model line is its read from before "
+              + "kickoff while the market line is the book's last read. "
+              + "Shadow, not advice."
+            : "the match has kicked off, and the model line is its read from "
+              + "before kickoff while the market line is live. Shadow, not "
+              + "advice.")}
         className={`${WATCH_BOX} inline-flex flex-none items-center gap-1.5 whitespace-nowrap border-solid border-line text-ink-low`}>
         <i aria-hidden className="h-[5px] w-[5px] rounded-full bg-current" />
-        IN PLAY
+        {over ? "FULL TIME" : "IN PLAY"}
       </span>
     );
   }
@@ -244,8 +269,10 @@ export function VerdictBox({ mm, kickedOff = false }: {
   const untested = Boolean(mm.model && mm.model_meta?.status === "untested");
   return (
     <span data-testid="mm-verdict" data-verdict={mm.verdict}
-      data-phase="pre_match" data-untested={untested ? "1" : "0"}
-      title={`${v.why}${untested ? " Model untested." : ""} A read, never a `
+      data-phase={frozen ? "at_lock" : "pre_match"}
+      data-untested={untested ? "1" : "0"}
+      title={`${frozen ? `${frozen} ` : ""}${v.why}${untested
+        ? " Model untested." : ""} A read, never a `
         + "pick: shadow, not advice, and it never moves a card."}
       className={`${WATCH_BOX} inline-flex flex-none items-center gap-1.5 whitespace-nowrap ${v.cls} ${
         untested ? "border-dashed" : "border-solid"}`}>

@@ -14,6 +14,7 @@
  *  HERMETIC: both boards and the review are served by page.route from
  *  recordings; anything unrouted reaches only the stand-in backend. */
 import { test, expect, type Page } from "@playwright/test";
+import { openDetails } from "./review-details";
 import { routeEight } from "./eight-columns";
 import { CHAMP_BOARD, CHAMP_CLOCK } from "./championships-recorded";
 import { NATIONS_REVIEW } from "./nations-review-recorded";
@@ -71,6 +72,8 @@ test("an Elo-only national row draws its overall tier and no attack or defence c
     }
     const rows = unl.getByTestId("review-row");
     await expect(rows.first()).toBeVisible();
+    // the tiers live under each card's Details since the quiet pass
+    await openDetails(unl);
     await expect(unl.locator('[data-tier-pair="ovr"]').first()).toBeVisible();
     await expect(unl.locator('[data-tier-pair="atk"]')).toHaveCount(0);
     await expect(unl.locator('[data-tier-pair="def"]')).toHaveCount(0);
@@ -86,6 +89,8 @@ test("the recorded three-axis rows still draw all three cells",
     if (await unl.getByTestId("review-body").count() === 0) {
       await unl.getByTestId("review-toggle").click();
     }
+    await expect(unl.getByTestId("review-row").first()).toBeVisible();
+    await openDetails(unl);
     await expect(unl.locator('[data-tier-pair="ovr"]').first()).toBeVisible();
     await expect(unl.locator('[data-tier-pair="atk"]').first()).toBeVisible();
     await expect(unl.locator('[data-tier-pair="def"]').first()).toBeVisible();

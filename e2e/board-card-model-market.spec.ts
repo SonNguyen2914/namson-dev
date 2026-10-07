@@ -295,7 +295,9 @@ test("the Championships board's cards carry the same bottom", async ({ page }) =
  * line is the pre-kickoff read and the market line is the live book, so
  * the card stops comparing them: the model line goes grey and says
  * "pre-kickoff", the market line is unchanged, and the box reads IN PLAY
- * (grey, solid) — never AGREE or CONFLICT. Full time is the same. */
+ * (grey, solid) — never AGREE or CONFLICT. At full time the same, except
+ * that the box reads FULL TIME (Son, 2026-10-07, the finished-card
+ * order). */
 test.describe("once the match has kicked off", () => {
   const LIVE = IDS.conflict, PRE = IDS.agree, DONE = IDS.wide,
     LIVE_UNTESTED = IDS.untested;
@@ -315,8 +317,10 @@ test.describe("once the match has kicked off", () => {
     await serveEight(page, b);
   });
 
-  for (const [what, id] of [["a live row", LIVE], ["a finished row", DONE]] as const) {
-    test(`${what}: grey pre-kickoff model line, live market line, IN PLAY box`,
+  for (const [what, id, word, phase] of [
+    ["a live row", LIVE, "IN PLAY", "in_play"],
+    ["a finished row", DONE, "FULL TIME", "full_time"]] as const) {
+    test(`${what}: grey pre-kickoff model line, live market line, ${word} box`,
       async ({ page }) => {
         const c = card(page, id);
         await c.scrollIntoViewIfNeeded();
@@ -345,10 +349,11 @@ test.describe("once the match has kicked off", () => {
         const mk = await c.locator('[data-testid^="mm-market-"][data-top="1"]')
           .evaluateAll((els) => els.map((e) => getComputedStyle(e).color));
         expect(mk).toEqual([hi]);
-        // the box: IN PLAY, grey, solid, and why on the hover
+        // the box: IN PLAY (FULL TIME once over), grey, solid, and why on
+        // the hover
         const box = c.getByTestId("mm-verdict");
-        await expect(box).toHaveText("IN PLAY");
-        await expect(box).toHaveAttribute("data-phase", "in_play");
+        await expect(box).toHaveText(word);
+        await expect(box).toHaveAttribute("data-phase", phase);
         const bs = await box.evaluate((e) => {
           const cs = getComputedStyle(e);
           return { color: cs.color, style: cs.borderTopStyle };

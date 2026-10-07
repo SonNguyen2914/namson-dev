@@ -43,11 +43,13 @@
 // rebuilt, how many have none — and they are printed against their own n.
 import Link from "next/link";
 import { useEffect, useId, useState } from "react";
-import { fmtDate } from "../lib/matchday";
-import { leagueLabel, rowHref, rowNoHrefWhy } from "../lib/pickerApi";
+import { TZ, fmtDate } from "../lib/matchday";
 import {
-  Checkpoint, MarketSide, MarketT10, PreKickoff, ReviewLeagueMeta,
-  ReviewRefusal, ReviewRow, isRead, pct,
+  ModelVsMarket, leagueLabel, rowHref, rowNoHrefWhy,
+} from "../lib/pickerApi";
+import {
+  Checkpoint, LeanOutcome, MarketSide, MarketT10, MmLock, PreKickoff,
+  ResultLean, ReviewLeagueMeta, ReviewRefusal, ReviewRow, isRead, pct,
 } from "../lib/pickerReview";
 import {
   REVIEW_DEFAULT_SORT, REVIEW_SORT_MODES, ReviewSort, isDefaultReviewSort,
@@ -61,6 +63,7 @@ import {
   KalshiCell, SeasonWeight, TierGaps, dec, sign,
 } from "./PickerRead";
 import ErrorBoundary from "./ErrorBoundary";
+import { ModelMarketLines, VerdictBox, teamCode } from "./ModelMarket";
 import { Eyebrow } from "./ui";
 import { SHOT_GAP_WORDS, SHOT_SOURCE_WORDS, shotGap } from "../lib/hubParity";
 
@@ -173,9 +176,14 @@ function CheckpointRow({ cp, slot }: { cp: Checkpoint | null; slot: string }) {
           <span data-testid="cp-tilt" data-tilt={cp.tilt_label ?? ""}
             title={cp.tilt == null
               ? "no tilt yet — an empty tape is not a 50/50 contest"
-              : `threat tilt ${cp.tilt.toFixed(2)} · band ${cp.tilt_band} · ${cp.tilt_note}`}
+              : `threat tilt ${cp.tilt.toFixed(2)} · band ${cp.tilt_band} · ${cp.tilt_note}${
+                cp.tilt_label ? ` · ${cp.tilt_label}` : ""}`}
             className={`ml-auto rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] ${tiltTone(cp.tilt_label)}`}>
-            {cp.tilt_label ?? "no tape"}
+            {cp.tilt_label
+              ? ({ TILT_FAV: "tilt fav", TILT_OPP: "tilt opp",
+                   CONTESTED: "contested" } as Record<string, string>)[
+                  cp.tilt_label] ?? cp.tilt_label.toLowerCase().replace(/_/g, " ")
+              : "no tape"}
           </span>
         )}
       </div>
@@ -314,13 +322,21 @@ function ReconBanner({ pre }: { pre: PreKickoff }) {
         </button>
         {open && (
           <dl className="mt-2 space-y-1 font-mono text-[10px] leading-relaxed text-ink-low">
+            {/* WORDS ON THE PAGE, THE PATH AND THE INSTANT ON THE HOVER
+                (2026-10-07: a file path is machine text, even one click
+                deep); `data-path` keeps them for a guard. */}
             <div>
               <dt className="inline text-ink-faint">archive · </dt>
-              <dd className="inline break-all">{src?.season_file ?? "—"}</dd>
+              <dd data-testid="recon-season-file" data-path={src?.season_file ?? ""}
+                title={src?.season_file ?? undefined} className="inline">
+                {src?.season_file ? "this season's file" : "—"}
+              </dd>
             </div>
             <div>
               <dt className="inline text-ink-faint">rewound to · </dt>
-              <dd className="inline tabular-nums">{src?.rewound_to ?? "—"}</dd>
+              <dd className="inline tabular-nums" title={src?.rewound_to ?? undefined}>
+                {src?.rewound_to ? fmtDate(src.rewound_to, "short") : "—"}
+              </dd>
             </div>
             <div>
               <dt className="inline text-ink-faint">results in table · </dt>
@@ -339,7 +355,8 @@ function ReconBanner({ pre }: { pre: PreKickoff }) {
             {src?.prior_file && (
               <div>
                 <dt className="inline text-ink-faint">prior season · </dt>
-                <dd className="inline break-all">{src.prior_file}</dd>
+                <dd data-path={src.prior_file} title={src.prior_file}
+                  className="inline">last season&rsquo;s file</dd>
               </div>
             )}
           </dl>
@@ -423,9 +440,33 @@ function readUnavailable(raw: string | null | undefined): {
   };
 }
 
+/** THE CODE IN A READER'S WORDS (Son's rule, 2026-10-07: a reader is
+ *  shown a sentence, never an internal token — the refused card's
+ *  `no_prior_row` went the same way). The code itself rides the hover and
+ *  `data-code`, where an operator looks. Glossed ONLY for the rebuild's
+ *  own closed vocabulary (`picker/replay.py` + `review.py`); a code added
+ *  upstream tomorrow is said to have no words here yet, never guessed at. */
+const REBUILD_WORDS: Record<string, string> = {
+  fixture_not_in_archive: "this match is not in our season archive",
+  no_season_file: "there is no season archive for this league",
+  archive_fixture_unsettled: "the archive has not settled this match",
+  no_prior_file: "last season's archive is missing",
+  unknown_league: "the archive does not know this league",
+  unparseable_kickoff: "its kickoff time could not be read",
+  cup_has_no_season_archive: "a cup has no season archive to rebuild from",
+};
+const rebuildWords = (code: string) => REBUILD_WORDS[code]
+  ?? "for a reason this page has no words for yet";
+
 function NoReadBanner({ pre }: { pre: PreKickoff }) {
   const considered = pre.reconstructed_from?.considered ?? [];
   const why = readUnavailable(pre.unavailable_reason);
+  /* WHERE THE REBUILD LOOKED, in words on the card and as paths on the
+     hover: "the archive stops before this match" is the fixable fact, and
+     a file path is machine text. */
+  const lasts = considered.map((c) => c.last_fixture).filter(
+    (v): v is string => Boolean(v)).sort();
+  const latest = lasts.length ? lasts[lasts.length - 1] : null;
   /* THE RAW TEXT IS NOT THROWN AWAY — it is exactly what is needed when
      a rebuild starts failing, and the answer to that is not to print it
      on the page. Same treatment every other provider failure on this
@@ -449,21 +490,23 @@ function NoReadBanner({ pre }: { pre: PreKickoff }) {
             `data-reason` says which one a guard is looking at, so the
             set can be asserted rather than the words counted. */}
         <span data-testid="unavailable-reason" data-reason={why.kind}
-          className={why.kind === "code"
-            ? "font-mono text-warn" : "text-ink-low"}>
-          {why.kind === "code" ? <>— {why.said}</> : why.said}
+          data-code={why.kind === "code" ? why.said : undefined}
+          title={why.kind === "code" ? `reason code: ${why.said}` : undefined}
+          className={why.kind === "code" ? "text-ink-mid" : "text-ink-low"}>
+          {why.kind === "code" ? <>— {rebuildWords(why.said)}</> : why.said}
         </span>. The match is still here with its result and its tape; the
         missing half is named rather than guessed at.
       </p>
       {considered.length > 0 && (
-        <ul data-testid="recon-considered"
-          className="mt-2 space-y-0.5 font-mono text-[10px] leading-relaxed text-ink-faint">
-          {considered.map((c) => (
-            <li key={c.path} className="break-all">
-              looked in {c.path} — last fixture {c.last_fixture ?? "unknown"}
-            </li>
-          ))}
-        </ul>
+        <p data-testid="recon-considered"
+          title={considered.map((c) => `looked in ${c.path} — last fixture ${
+            c.last_fixture ?? "unknown"}`).join("\n")}
+          className="mt-2 text-[10.5px] leading-relaxed text-ink-faint">
+          looked in {considered.length === 1 ? "the season archive"
+            : `${considered.length} season archives`}
+          {latest ? <> — the latest match there is {fmtDate(latest, "short")}</>
+            : " — none of them says how far it runs"}
+        </p>
       )}
     </>
   );
@@ -493,8 +536,29 @@ const NOT_KNOWN_SHOT_REASON =
   "no shot state for this match — not known, for the reason named above; "
   + "not a failed read";
 
+/** THE TWO COMPOSITE FORMS `review.fit_verdict` writes, read off the
+ *  values inside them rather than guessed at — `winner=away fav_side=home`
+ *  and `tilt_label=TILT_FAV on_target 3-1`. Anything else still renders
+ *  verbatim; the raw string is always on the hover. */
+const TILT_WORDS: Record<string, string> = {
+  TILT_FAV: "tilted to the favourite", TILT_OPP: "tilted to the opponent",
+  CONTESTED: "contested",
+};
+function compositeWords(r: string): string | null {
+  const w = /^winner=(home|away|draw) fav_side=(home|away)$/.exec(r);
+  if (w) {
+    return `${w[1] === "draw" ? "a draw" : `the ${w[1]} side won`}; the `
+      + `favourite was the ${w[2]} side`;
+  }
+  const t = /^tilt_label=(\S+) on_target (\d+)-(\d+)$/.exec(r);
+  if (t) {
+    return `volume ${TILT_WORDS[t[1]] ?? "read in terms this page has no "
+      + "words for"}; on target ${t[2]}–${t[3]}`;
+  }
+  return null;
+}
 const reasonWords = (r: string | null) =>
-  r == null ? null : (REASON_WORDS[r] ?? r);
+  r == null ? null : (REASON_WORDS[r] ?? compositeWords(r) ?? r);
 
 function Verdict({ testid, label, value, yes, no, reason }: {
   testid: string; label: string; value: boolean | null;
@@ -601,15 +665,27 @@ function marketFavourite(m: MarketT10, names: Record<MarketSide, string>):
     f.basis ?? ""}`.trim();
 }
 
-function MarketT10Line({ m, home, away, pickerFav }: {
+function MarketT10Line({ m, home, away, pickerFav, lock = "none" }: {
   m: MarketT10 | null | undefined; home: string | null; away: string | null;
   pickerFav: string | null;
+  /** WHAT THE MODEL/MARKET LOCK BELOW SHOWS (2026-10-07). This section is
+   *  the match ARCHIVE's own T-10 capture of the book, in cents; the lock
+   *  is a second capture, the board's, as de-vigged percentages. Beside a
+   *  lock this one is labelled as the archive's capture so the two cannot
+   *  be read as one claim, and when the lock shows a market this section
+   *  never claims there is none — the archive's absence moves to the
+   *  lock's market hover (`archiveBookNote`). */
+  lock?: "none" | "recorded" | "market";
 }) {
   const label = (
-    <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-faint">
-      market at T-10
+    <span data-testid="market-t10-label"
+      className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-faint">
+      {lock === "none" ? "market at T-10" : "book in cents · archive capture"}
     </span>
   );
+  if (lock === "market" && (!m || m.status !== "present" || !m.legs)) {
+    return null;
+  }
   if (!m) {
     return (
       <section data-testid="market-t10" data-status="missing"
@@ -681,6 +757,257 @@ function MarketT10Line({ m, home, away, pickerFav }: {
         </span>
       </p>
     </section>
+  );
+}
+
+/* ───────────── the model and market at the T-10 lock ─────────────
+
+   Son, 2026-10-07: the finished card shows the board card's two lines —
+   the trader's model and the de-vigged Kalshi market, home · DRAW · away —
+   AS THEY STOOD AT THE T-10 LOCK, with the verdict box as it stood then,
+   and one plain line saying what happened beside each side's lean.
+
+   FROZEN, AND DRAWN WITH THE BOARD'S OWN LINES. The backend froze the
+   board's block once, inside the match's last ten minutes (src/mm_lock/),
+   so this is not a second rendering of a recomputed read: it is the same
+   `ModelMarketLines` and `VerdictBox` the board card draws, handed the
+   frozen block, every hover saying when it was frozen.
+
+   NEUTRAL INK FOR THE RESULT. "ATM won · model leaned ATM, market leaned
+   RMA" says what happened and what each side leaned; it is not coloured
+   as right or wrong, and nothing on the site counts it. A match with no
+   lock says so in grey words — never a back-filled read, never zeros. */
+
+const LEAN_WORD = (k: LeanOutcome, codes: { h: string; a: string }) =>
+  k === "H" ? codes.h : k === "A" ? codes.a : "DRAW";
+
+/** The archive's own T-10 book, when it has none, said on the LOCK's
+ *  market hover instead of as a section that contradicts the lock. */
+function archiveBookNote(m: MarketT10 | null | undefined): string | null {
+  if (m && m.status === "present" && m.legs) return null;
+  return "The match archive's separate T−10 capture of the book: "
+    + (m ? (m.absent_note || "none stored") : "not in this payload") + ".";
+}
+
+/** The one result line, from the backend's per-match comparison. */
+export function leanSentence(lean: ResultLean | null | undefined,
+                             codes: { h: string; a: string }): string {
+  if (!lean) return "no comparison in this payload";
+  if (lean.status === "no_result") {
+    return lean.reason === "decided_after_90_minutes"
+      ? "Decided after 90 minutes · not compared"
+      : "No final score to compare";
+  }
+  const what = lean.outcome === "D" ? "Draw"
+    : lean.outcome ? `${LEAN_WORD(lean.outcome, codes)} won` : "Result unknown";
+  const none = (who: "model" | "market", why: string | null) =>
+    why === "level_at_top" ? `${who} level`
+      : who === "model" ? "no model read" : "no full book";
+  const ml = lean.model_lean, kl = lean.market_lean;
+  if (ml && ml === kl) return `${what} · both leaned ${LEAN_WORD(ml, codes)}`;
+  // ONE "leaned", carried across the comma when the model leaned at all:
+  // "model leaned DRAW, market LEE" — the card's tightest width (258px at
+  // 1280) does not hold the word twice beside a four-letter code
+  if (ml) {
+    return `${what} · model leaned ${LEAN_WORD(ml, codes)}, `
+      + (kl ? `market ${LEAN_WORD(kl, codes)}`
+        : none("market", lean.market_lean_why));
+  }
+  return `${what} · ${none("model", lean.model_lean_why)}, `
+    + (kl ? `market leaned ${LEAN_WORD(kl, codes)}`
+      : none("market", lean.market_lean_why));
+}
+
+function lockClock(iso: string | null): { hhmm: string; full: string } {
+  const d = iso ? new Date(iso) : null;
+  if (!d || Number.isNaN(d.getTime())) {
+    return { hhmm: "time not recorded", full: "at a time not recorded" };
+  }
+  return {
+    hhmm: d.toLocaleTimeString("en-GB", {
+      timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false }),
+    full: d.toLocaleString("en-US", {
+      timeZone: TZ, month: "short", day: "numeric", hour: "2-digit",
+      minute: "2-digit", hour12: false }) + " Pacific",
+  };
+}
+
+function MmLockSection({ row }: { row: ReviewRow }) {
+  const lock: MmLock | null | undefined = row.mm_lock;
+  const home = row.home ?? "home", away = row.away ?? "away";
+  const label = (
+    <span data-testid="mm-lock-label"
+      className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-faint">
+      model · market
+    </span>
+  );
+  if (!lock || lock.status !== "recorded" || !lock.verdict) {
+    /* ABSENCE IN ONE TO THREE WORDS (Son, 2026-10-07: "too wordy"); the
+       sentence rides the hover. Three different absences, three words. */
+    const status = lock ? lock.status : "missing";
+    const words = !lock ? "not sent"
+      : lock.status === "not_recorded" ? "not recorded" : "not read";
+    const why = !lock
+      ? "The backend that answered sends no model/market lock for finished "
+        + "matches."
+      : lock.status === "not_recorded"
+        ? "Model/market not recorded for this match: no lock was taken in "
+          + "its last ten minutes, and none is filled in afterwards."
+        : (lock.note || "The model/market lock could not be read.");
+    return (
+      <section data-testid="mm-lock" data-status={status}
+        className="mt-3 flex min-w-0 items-baseline gap-2 border-t border-line pt-2">
+        {label}
+        <span data-testid="mm-lock-absent" title={why}
+          className="truncate whitespace-nowrap text-[10.5px] text-ink-faint">
+          {words}
+        </span>
+      </section>
+    );
+  }
+  const block = lock as unknown as ModelVsMarket;
+  const codes = { h: teamCode(lock.codes?.h, home),
+                  a: teamCode(lock.codes?.a, away) };
+  const clock = lockClock(lock.locked_at);
+  const mins = lock.seconds_before_kickoff == null ? null
+    : Math.max(1, Math.round(lock.seconds_before_kickoff / 60));
+  const frozen = `Frozen at the T−10 lock, ${clock.full}${
+    mins == null ? "" : `, ${mins} min before kickoff`}: the board's own `
+    + "lines as they stood then; they never update.";
+  const lean = row.result_lean ?? null;
+  const sentence = leanSentence(lean, codes);
+  const resultTitle = `${sentence}. `
+    + `${row.home ?? "Home"} ${row.result ? `${row.result.home}–${
+      row.result.away}` : "—"} ${row.away ?? "away"}`
+    + (lean?.outcome_basis === "result_90"
+      ? " (the 90-minute result, which is what both priced)" : "")
+    + ". Per match only — nothing here is tallied.";
+  return (
+    <section data-testid="mm-lock" data-status="recorded"
+      data-verdict={lock.verdict}
+      className="mt-3 min-w-0 border-t border-line pt-2">
+      <div className="flex min-w-0 items-baseline justify-between gap-2">
+        {label}
+        <span data-testid="mm-lock-when" title={frozen}
+          className="whitespace-nowrap font-mono text-[9px] uppercase tracking-[0.16em] text-ink-faint">
+          at T−10 · {clock.hhmm}
+        </span>
+      </div>
+      <div className="mt-1.5">
+        <ModelMarketLines mm={block} home={home} away={away}
+          frozen={frozen}
+          marketNote={lock.market ? archiveBookNote(row.market_t10) : null} />
+      </div>
+      <div data-testid="mm-lock-box" className="mt-2 flex">
+        <VerdictBox mm={block} frozen={frozen} />
+      </div>
+      <p data-testid="mm-result-line" title={resultTitle}
+        data-outcome={lean?.outcome ?? ""}
+        data-model-lean={lean?.model_lean ?? ""}
+        data-market-lean={lean?.market_lean ?? ""}
+        className="mt-1.5 truncate whitespace-nowrap text-[10.5px] text-ink-mid">
+        {sentence}
+      </p>
+    </section>
+  );
+}
+
+/* ─────────────────────── the quiet face (2026-10-07) ───────────────────
+
+   Son: "remove unnecessary words from the finished cards, it is too
+   wordy. Imagine a new user uses this project — they won't read all of
+   that and they don't want or have to." So the face carries the header,
+   the frozen model · market block, the board's read in ONE line and the
+   verdicts as chips; everything else is behind one "Details" disclosure,
+   VERBATIM, so nothing is lost — and an absence on the face is one to
+   three words, never a paragraph and never a zero. */
+
+/** The board's read before kickoff, in one line. A capture and a rebuild
+ *  stay told apart on the face — by word ("Board" / "Rebuilt") and by
+ *  rail (solid accent / dashed) — as the rule at the top of this file
+ *  demands; the clock and the provenance are in Details. */
+function BoardLine({ origin, read, refused, superseded }: {
+  origin: string;
+  read: Extract<PreKickoff["state"], { refused?: false }> | null;
+  refused: { club: string; reason: string } | null;
+  superseded: boolean;
+}) {
+  if (!read) {
+    return (
+      <p data-testid="board-line" data-origin="unavailable"
+        title={refused ? `${refused.club} — ${refused.reason}` : undefined}
+        className="mt-2 truncate whitespace-nowrap text-[10.5px] text-ink-faint">
+        {refused ? "board refused this match" : "no pre-kickoff read"}
+      </p>
+    );
+  }
+  const captured = origin === "captured";
+  return (
+    <p data-testid="board-line" data-origin={origin}
+      title={`${captured ? "Captured from the live board before kickoff"
+        : "Rebuilt after the fact from the season archive — not a capture"}: `
+        + `${read.favourite} favourite over ${read.opponent}, GD/g gap ${
+          dec(read.gdg_gap)}, ${read.shape.toLowerCase()} tiers. The full `
+        + "read is under Details."}
+      className={`mt-2 flex min-w-0 items-baseline gap-1.5 whitespace-nowrap border-l-2 pl-2 text-[11px] ${
+        captured ? "border-l-accent" : "border-dashed border-l-skylive"}`}>
+      <span className="text-ink-faint">{captured ? "Board:" : "Rebuilt:"}</span>
+      <span className="truncate text-ink-hi">{read.favourite}</span>
+      <span className="font-mono tabular-nums text-ink-mid">
+        {dec(read.gdg_gap)} GD/g
+      </span>
+      <span className="text-ink-faint">·</span>
+      <span className="text-ink-mid">{read.shape.toLowerCase()} tiers</span>
+      {superseded && (
+        <span data-testid="board-line-superseded"
+          title="This favourite was named by the rule the field replaced — see Details."
+          className="rounded border border-warn/40 px-1 font-mono text-[8.5px] uppercase tracking-[0.1em] text-warn">
+          old rule
+        </span>
+      )}
+    </p>
+  );
+}
+
+/* SANS, SENTENCE CASE, NEUTRAL INK. Three chips must sit on one line in
+   the board's tightest card (258px of text at 1280) with the glyphs
+   widened, and gold is the brand, never a verdict: the tick or the cross
+   carries the answer, not a colour. */
+const CHIP = "inline-flex items-center gap-1 whitespace-nowrap rounded border "
+  + "px-1.5 py-px text-[10px] leading-tight";
+
+/** The two verdicts as chips. An unknown answer is no chip (its reason is
+ *  under Details); both unknown is "not judged", once. The exploratory
+ *  label rides every card, as a chip with its sentence on the hover. */
+function FitChips({ fit }: { fit: ReviewRow["fit"] }) {
+  const chip = (testid: string, label: string, v: boolean | null) =>
+    v == null ? null : (
+      <span data-testid={testid} data-value={v ? "yes" : "no"}
+        className={`${CHIP} border-line-strong text-ink-mid`}>
+        {label} <span aria-label={v ? "yes" : "no"}>{v ? "✓" : "✗"}</span>
+      </span>
+    );
+  const none = fit.favourite_won == null && fit.confirmed_at_20 == null;
+  return (
+    <div data-testid="fit-chips" className="mt-2 flex min-w-0 flex-nowrap items-center gap-1.5">
+      {chip("fit-chip-result", "Favourite won", fit.favourite_won)}
+      {chip("fit-chip-read", `${fit.checkpoint_minute}′ read`,
+        fit.confirmed_at_20)}
+      {none && (
+        <span data-testid="fit-not-judged"
+          className={`${CHIP} border-dashed border-line-strong text-ink-faint`}>
+          not judged
+        </span>
+      )}
+      <span data-testid="exploratory-chip"
+        title={"EXPLORATORY — NOT VALIDATED, NOT PREREGISTERED, NO LEDGER ROW. "
+          + "This rule was written after looking at three fixtures; it "
+          + "describes a row and forecasts nothing."
+          + (fit.confirm_note ? ` ${fit.confirm_note}` : "")}
+        className={`${CHIP} border-warn/40 text-warn`}>
+        exploratory
+      </span>
+    </div>
   );
 }
 
@@ -838,6 +1165,26 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
         </div>
       </ReviewWay>
 
+      {/* THE FACE: the model and market AT THE LOCK, frozen, with the
+          result line under them; the board's read in one line; the
+          verdicts as chips. */}
+      <MmLockSection row={row} />
+      <BoardLine origin={origin} read={read}
+        refused={refusedRead
+          ? { club: refusedRead.club, reason: refusedRead.reason } : null}
+        superseded={favRuleSuperseded} />
+      <FitChips fit={fit} />
+
+      {/* EVERYTHING ELSE, VERBATIM, ONE CLICK AWAY. A native disclosure:
+          it opens and closes from the keyboard, and closed it costs the
+          card one line, whatever is inside. */}
+      <details data-testid="review-details" className="group mt-2">
+        <summary data-testid="review-details-toggle"
+          className="inline-flex cursor-pointer list-none items-center gap-1 font-mono text-[9.5px] uppercase tracking-[0.14em] text-ink-faint transition-colors hover:text-ink-mid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent [&::-webkit-details-marker]:hidden">
+          Details
+          <span aria-hidden className="transition-transform group-open:rotate-90">▸</span>
+        </summary>
+
       {/* THE FAVOURITE ON THIS CARD WAS NAMED BY A RULE SINCE
           CORRECTED, SAID BEFORE ANYTHING SIGNED FROM IT.
 
@@ -988,7 +1335,9 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
           the read is the picker's, this is the book's, and a card that
           drew one inside the other would make them one statement. */}
       <MarketT10Line m={row.market_t10} home={row.home} away={row.away}
-        pickerFav={read?.favourite ?? null} />
+        pickerFav={read?.favourite ?? null}
+        lock={row.mm_lock?.status !== "recorded" ? "none"
+          : row.mm_lock.market ? "market" : "recorded"} />
 
       {/* ─────────────────────── 2 · what happened ───────────────────────── */}
       <section data-testid="what-happened" className="mt-3">
@@ -1067,6 +1416,7 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
           describes a row and forecasts nothing.
         </p>
       </section>
+      </details>
     </article>
   );
 }
