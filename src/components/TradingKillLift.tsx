@@ -71,8 +71,10 @@ export function describeLift(status: number, body: unknown): Outcome {
 
 const BTN = "whitespace-nowrap rounded-md border px-2.5 py-1 text-[12.5px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-40";
 
-export function TradingKillLift({ token, onDone }: {
+export function TradingKillLift({ token, onDone, active = false }: {
   token: string; onDone: () => void;
+  /** the status says a kill is in force: the control is drawn loud */
+  active?: boolean;
 }) {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -111,7 +113,7 @@ export function TradingKillLift({ token, onDone }: {
         {!asking ? (
           <button type="button" disabled={busy}
             onClick={() => { setOutcome(null); setAsking(true); }}
-            className={`${BTN} border-warn/50 text-warn hover:bg-warn/10`}>
+            className={`${BTN} ${active ? "border-warn/60 text-warn hover:bg-warn/10" : "border-tc-line-strong text-ink-mid hover:bg-tc-hover hover:text-ink-hi"}`}>
             Lift operator kill
           </button>
         ) : (

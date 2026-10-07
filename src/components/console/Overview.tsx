@@ -94,7 +94,7 @@ export function SafetyPanel({ d, now, token, bumpStatus }: {
           sub={day ? <>{str(day.tz) ?? "zone not sent"}{day.valid === false ? " (zone unreadable: UTC)" : ""} · ends {when(day.ends_at)}</> : undefined} />
       </div>
       <div className="grid gap-x-8 gap-y-3 border-t border-tc-line px-4 py-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <TradingKillLift token={token} onDone={bumpStatus} />
+        <TradingKillLift token={token} onDone={bumpStatus} active={killed} />
         <div data-testid="ops-stop" className="text-[12px] leading-relaxed text-ink-mid">
           <span className="mr-2 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-low">How to stop it</span>
           set <code className="font-mono text-ink-hi">TRADING_KILL=true</code>{" "}on the Railway backend service (the next
