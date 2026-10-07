@@ -16,16 +16,26 @@
 // a P&L with no journaled result reads "unsettled"; the CSV writes a
 // missing value as an empty cell. "Edge" is the trader's own estimate at
 // the time it placed — not a measured edge, not advice.
+//
+// THE WOULD-BE (Son, 2026-10-07): a cancelled or unfilled order carries a
+// dim tag — "NOT FILLED · would have WON +$0.52" — whose hover says it is
+// not a real result; its detail is in the inspector, a one-line summary
+// with a breakdown by cancel reason sits above the table and folds with
+// the section. Grey ink only, never the P&L's green or red, and never in
+// the totals, the P&L cell, its sort or the CSV's `pnl_dollars`. An old
+// backend that sends none draws nothing extra.
 import { Fragment, type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 import {
   type LedgerRow, NOT_RECORDED, ROW_TYPE_WORDS, blendWords, carefulWords, compLabel,
   consensusWords, dollars, edgeGroundWords, edgeNote, edgeWords, fairWords,
   familyWords, feeWords, fillWords, guardLines, handoverWords, inPlayLines,
   ledgerCsv, lifecycleLines, makerWords, modelWords, outcomeLines, phaseWords,
-  pnlWords, resultWords, riskLines, signedDollars,
+  pnlWords, reasonWords, resultWords, riskLines, signedDollars,
+  type WouldBeBucket, type WouldBeSummary, wouldBeLines, wouldBeSummaryWords, wouldBeTag, wouldBeTitle,
 } from "../../lib/tradingLedger";
 import {
-  CTRL, ErrorNote, Freshness, Info, InfoNote, Metric, Panel, TH, Tech, ago, count, usd, whenShort,
+  CTRL, Disclosure, ErrorNote, Freshness, Info, InfoNote, Metric, Panel, SimpleTable, TH, Tech, ago,
+  count, usd, whenShort,
 } from "./primitives";
 import type { LedgerSource } from "./useConsoleData";
 import { type ColType, type SortVal, SortTh, sortRows, textVal, timeVal, useTableSort } from "./sorting";
@@ -104,6 +114,11 @@ function Grounds({ r }: { r: LedgerRow }) {
           <h4 className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-ink-mid">Lifecycle &amp; result</h4>
           <G field="lifecycle" k="lifecycle"><Lines ls={lifecycleLines(r)} /></G>
           <G field="outcome" k="result (from the journal)"><Lines ls={outcomeLines(r)} /></G>
+          {r.would_be && (
+            <G field="would_be" k="would-be (not real money)">
+              <span className="text-ink-low"><Lines ls={wouldBeLines(r)} /></span>
+            </G>
+          )}
           <G field="cost" k="cost (fee in)">
             {dollars(r.cost_dollars)}{r.fee_dollars !== null ? ` · fee ${dollars(r.fee_dollars)}` : ""}
           </G>
@@ -164,6 +179,7 @@ function Row({ r, open, onToggle, boxW }: { r: LedgerRow; open: boolean; onToggl
   const fx = r.fixture;
   const note = edgeNote(r);
   const cleared = r.row_type === "order" && r.edge.cleared === true;
+  const wb = wouldBeTag(r);
   return (
     <>
       <tr data-testid="ledger-row" data-row-id={r.id} data-ticker={r.market.ticker ?? ""}
@@ -235,6 +251,14 @@ function Row({ r, open, onToggle, boxW }: { r: LedgerRow; open: boolean; onToggl
             className={`mt-0.5 block text-[12px] ${o === "won" ? "text-up" : o === "lost" ? "text-neg" : o === "unknown" ? "text-warn" : "text-ink-low"}`}>
             {resultWords(r)}
           </span>
+          {wb && (
+            // NOT MONEY: dim ink only, never the P&L's green or red
+            <span data-testid="ledger-would-be" data-would-be={r.would_be!.status}
+              title={wouldBeTitle(r) ?? undefined}
+              className="mt-0.5 block text-[11px] tracking-[0.02em] text-ink-low">
+              {wb}<span className="sr-only"> — not a real result</span>
+            </span>
+          )}
         </td>
         <td data-testid="ledger-pnl"
           className={`${TD} tc-num whitespace-nowrap pr-4 text-right font-medium ${o === "won" || o === "lost" ? plTone(r.outcome.pnl_dollars) : "text-ink-low"}`}>
@@ -263,6 +287,49 @@ function cents(c: number | null): string {
   const a = Math.abs(c);
   const r = a < 1 && a > 0 ? Math.round(c * 100) / 100 : Math.round(c * 10) / 10;
   return `${r < 0 ? "−" : ""}${Math.abs(r)}¢`;
+}
+
+/** THE WOULD-BE LINE above the table (NOT MONEY): "cancelled 12 · would
+ *  have won 5, lost 7 · would-be −$1.30", and behind a fold the breakdown
+ *  by the journal's cancel reason — sortable like every console table.
+ *  Nothing when the backend sent no summary or no order went unfilled. */
+function WouldBeLine({ s }: { s: WouldBeSummary | null }) {
+  const words = wouldBeSummaryWords(s);
+  if (!s || !words || !s.totals || !s.totals.orders) return null;
+  const v = (n: number | null) => (n === null ? "—" : String(n));
+  const open = (b: WouldBeBucket) => (b.pending ?? 0) + (b.postponed ?? 0) + (b.no_result ?? 0);
+  const settledPnl = (b: WouldBeBucket) => ((b.won ?? 0) + (b.lost ?? 0) > 0 ? b.pnl_dollars : null);
+  return (
+    <div data-testid="ledger-would-be-summary" className="mt-2 border-t border-dashed border-tc-line pt-2">
+      <p className="flex flex-wrap items-center gap-1.5 text-[12px] text-ink-low">
+        <span data-testid="ledger-would-be-line" className="tc-num">{words}</span>
+        <Info label="the would-be line" testid="ledger-would-be-info">
+          Not real money. Orders that were cancelled or expired with contracts unfilled: what those contracts
+          would have made at the order&apos;s own price, the fee included, against the market&apos;s result. Never
+          in the totals or the P&amp;L.
+        </Info>
+      </p>
+      {s.by_reason.length > 0 && (
+        <Disclosure testid="ledger-would-be-breakdown" summary={<span>by cancel reason</span>}>
+          <SimpleTable testid="ledger-would-be-reasons" sortId="ledger-would-be"
+            head={["reason", "group", "orders", "won", "lost", "not settled", "would-be"]}
+            right={[2, 3, 4, 5, 6]} minWidth={460}
+            types={["text", "text", "num", "num", "num", "num", "num"]}
+            values={s.by_reason.map((b) => [b.key, b.group, b.orders, b.won, b.lost,
+              open(b), settledPnl(b)])}
+            rows={s.by_reason.map((b) => [
+              <span key="r" title={b.words ?? undefined}>{reasonWords(b.key)}</span>,
+              (b.group ?? "other").replace(/_/g, " "), v(b.orders), v(b.won), v(b.lost),
+              String(open(b)),
+              // a reason with nothing won or lost has no would-be dollars: a
+              // dash, never $0.00
+              settledPnl(b) === null ? "—" : signedDollars(settledPnl(b)),
+            ])}
+            empty="no unfilled orders" />
+        </Disclosure>
+      )}
+    </div>
+  );
 }
 
 /** "20261006-1405Z" */
@@ -484,6 +551,7 @@ export function TradesView({ now, source, client, setClient, open, setOpen, stat
                     + "that could not be read, so their cost and P&L are not in these sums"}
                 </p>
               )}
+              <WouldBeLine s={l.would_be_summary} />
               <p data-testid="ledger-count" className="tc-num mt-2 text-[12px] text-ink-low">
                 {rows.length} row{rows.length === 1 ? "" : "s"}
                 {page?.matching !== null && page?.matching !== undefined && page.matching !== rows.length ? ` of ${page.matching}` : ""}

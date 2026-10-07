@@ -39,7 +39,9 @@
 //            lifecycle{state, filled_count, avg_fill_price_cents, …,
 //                      fills[], cancels[]},
 //            outcome{status, result, settled_at, payout_dollars,
-//                    pnl_dollars, words}, why, not_recorded[]}]}
+//                    pnl_dollars, words}, why, not_recorded[],
+//            would_be (v1.1) — see THE WOULD-BE below}],
+//    would_be_summary (v1.1)}
 //
 // UNITS are the backend's: prices and edges in CENTS (`*_cents`), money in
 // DOLLARS (`*_dollars`), probabilities 0..1, ages in seconds. Nothing is
@@ -57,6 +59,16 @@
 //
 // EXPERIMENTAL, UNPROVEN. "Edge" is the trader's own estimate at the time
 // it placed; nothing here measures one.
+//
+// THE WOULD-BE (Son, 2026-10-07; trading-ledger-v1.1): an order that ended
+// cancelled or expired with contracts UNFILLED carries `would_be` — what
+// those contracts would have made at the order's own price, the fee
+// included: won / lost / pending / no_result / postponed. NOT MONEY. It is
+// read by `parseWouldBe` and drawn by `wouldBeTag` / `wouldBeLines` in dim
+// ink only; nothing that sums money here (the totals, `pnlWords`, the
+// sort's P&L, the CSV's `pnl_dollars`) reads it — the CSV carries it in
+// its own `would_be_*` columns. An old backend that sends no `would_be`
+// draws nothing extra: absent is null, never a zero.
 import { ANCHOR_SOURCE_WORDS, compLabel } from "./tradingConsole";
 
 type Obj = Record<string, unknown>;
@@ -302,6 +314,9 @@ export interface LedgerRow {
   grounds: Grounds;
   lifecycle: Lifecycle;
   outcome: Outcome;
+  /** NOT MONEY (v1.1): the unfilled remainder's would-be result; null when
+   *  the row has none or the backend did not send one */
+  would_be: WouldBe | null;
   why: string | null;
   /** the paths this row did not record, as the backend named them */
   not_recorded: string[];
@@ -492,6 +507,7 @@ export function parseRow(r: unknown): LedgerRow | null {
     order_id: str(o.order_id),
     edge: parseEdge(o.edge), grounds: parseGrounds(o.grounds),
     lifecycle: parseLifecycle(o.lifecycle), outcome: parseOutcome(o.outcome),
+    would_be: parseWouldBe(o.would_be),
     why: str(o.why), not_recorded: strs(o.not_recorded) ?? [],
   };
 }
@@ -563,6 +579,161 @@ export function parseSummary(v: unknown): Summary | null {
   };
 }
 
+// ------------------------------------------------- the would-be (v1.1)
+
+/** THE WOULD-BE STATUSES (backend ledger.py WOULD_BE). Any other word is
+ *  not drawn: never guessed. */
+export const WOULD_BE_STATUSES = ["won", "lost", "pending", "no_result", "postponed"] as const;
+export type WouldBeStatus = typeof WOULD_BE_STATUSES[number];
+
+/** What a row's unfilled contracts would have made. NOT MONEY. */
+export interface WouldBe {
+  status: WouldBeStatus;
+  words: string | null;
+  result: Side | null;
+  /** the unfilled remainder */
+  contracts: number | null;
+  /** the order's own price, cents */
+  price_cents: number | null;
+  /** the maker fee of one order of the remainder, dollars */
+  fee_dollars: number | null;
+  /** won / lost only; null otherwise — never 0 */
+  pnl_dollars: number | null;
+  source: string | null;
+  /** cancelled | expired */
+  state: string | null;
+  cancel_reason: string | null;
+  reason_group: string | null;
+  label: string | null;
+  why: string | null;
+}
+
+/** The hover's first words when the backend sent none. */
+export const WOULD_BE_LABEL = "not a real result: this order never filled";
+
+export function parseWouldBe(v: unknown): WouldBe | null {
+  const w = obj(v);
+  if (!w) return null;
+  const st = str(w.status);
+  if (st === null || !(WOULD_BE_STATUSES as readonly string[]).includes(st)) return null;
+  // the backend marks it not money; a block that says otherwise is not drawn
+  if (w.real_money !== undefined && w.real_money !== false) return null;
+  const status = st as WouldBeStatus;
+  const settled = status === "won" || status === "lost";
+  return { status, words: str(w.words), result: sideOf(w.result),
+    contracts: num(w.contracts), price_cents: num(w.price_cents),
+    fee_dollars: num(w.fee_dollars),
+    pnl_dollars: settled ? num(w.pnl_dollars) : null,
+    source: str(w.source), state: str(w.state),
+    cancel_reason: str(w.cancel_reason), reason_group: str(w.reason_group),
+    label: str(w.label), why: str(w.why) };
+}
+
+export interface WouldBeBucket {
+  key: string; group: string | null; words: string | null;
+  orders: number | null; cancelled: number | null; expired: number | null;
+  contracts: number | null; won: number | null; lost: number | null;
+  pending: number | null; no_result: number | null; postponed: number | null;
+  /** the would-be P&L of the won and lost ones: NOT MONEY */
+  pnl_dollars: number | null;
+}
+
+export interface WouldBeSummary {
+  label: string | null; basis: string | null;
+  totals: WouldBeBucket | null;
+  by_reason: WouldBeBucket[];
+  by_group: WouldBeBucket[];
+  groups: Record<string, string>;
+}
+
+function wbBucket(v: Obj): WouldBeBucket | null {
+  const key = str(v.key);
+  if (key === null) return null;
+  return { key, group: str(v.group), words: str(v.words), orders: num(v.orders),
+    cancelled: num(v.cancelled), expired: num(v.expired), contracts: num(v.contracts),
+    won: num(v.won), lost: num(v.lost), pending: num(v.pending),
+    no_result: num(v.no_result), postponed: num(v.postponed),
+    pnl_dollars: num(v.pnl_dollars) };
+}
+
+const wbBuckets = (v: unknown): WouldBeBucket[] => (Array.isArray(v)
+  ? v.filter(isObj).map(wbBucket).filter((b): b is WouldBeBucket => b !== null) : []);
+
+export function parseWouldBeSummary(v: unknown): WouldBeSummary | null {
+  const s = obj(v);
+  if (!s) return null;
+  if (s.real_money !== undefined && s.real_money !== false) return null;
+  const t = obj(s.totals);
+  return { label: str(s.label), basis: str(s.basis),
+    totals: t ? wbBucket({ key: "all", ...t }) : null,
+    by_reason: wbBuckets(s.by_reason), by_group: wbBuckets(s.by_group),
+    groups: words(s.groups) };
+}
+
+/** The row's would-be tag, short: "NOT FILLED · would have WON +$0.52",
+ *  "NOT FILLED ×7 · would have LOST −$2.90" (the unfilled part of a
+ *  partly filled order), "NOT FILLED · result pending", "NOT FILLED ·
+ *  postponed", "NOT FILLED · no result". null when the row has none. */
+export function wouldBeTag(r: LedgerRow): string | null {
+  const w = r.would_be;
+  if (!w) return null;
+  const filled = r.lifecycle.filled_count;
+  const part = filled !== null && filled > 0 && w.contracts !== null ? ` ×${whole(w.contracts)}` : "";
+  const head = `NOT FILLED${part}`;
+  switch (w.status) {
+    case "won": case "lost":
+      return `${head} · would have ${w.status.toUpperCase()} ${signedDollars(w.pnl_dollars)}`;
+    case "pending": return `${head} · result pending`;
+    case "postponed": return `${head} · postponed`;
+    case "no_result": return `${head} · no result`;
+    default: return null;
+  }
+}
+
+/** The tag's hover: never a real result, then the backend's sentence. */
+export function wouldBeTitle(r: LedgerRow): string | null {
+  const w = r.would_be;
+  if (!w) return null;
+  return `${w.label ?? WOULD_BE_LABEL}${w.why ? ` — ${w.why}` : ""}`;
+}
+
+/** The inspector's lines for the would-be. */
+export function wouldBeLines(r: LedgerRow): string[] {
+  const w = r.would_be;
+  if (!w) return [];
+  const out = [`${w.status.replace(/_/g, " ")}${w.words ? ` — ${w.words}` : ""}`];
+  out.push(`${w.contracts === null ? NOT_RECORDED : whole(w.contracts)} unfilled`
+    + ` @ ${cents(w.price_cents)} · fee ${dollars(w.fee_dollars)}`
+    + ` · would-be ${w.pnl_dollars === null ? "—" : signedDollars(w.pnl_dollars)}`
+    + `${w.result ? ` · market ${w.result.toUpperCase()}` : ""}`);
+  out.push(`${w.state === "expired" ? "expired at Kalshi" : `cancelled: ${w.cancel_reason ?? NOT_RECORDED}`}`
+    + `${w.reason_group ? ` (${w.reason_group.replace(/_/g, " ")})` : ""}`
+    + ` · source ${w.source ? w.source.replace(/_/g, " ") : "none yet"}`);
+  if (w.why) out.push(w.why);
+  return out;
+}
+
+/** The summary line's words: "cancelled 12 · would have won 5, lost 7 ·
+ *  would-be −$1.30" (pending, postponed and no-result named when any). */
+export function wouldBeSummaryWords(s: WouldBeSummary | null): string | null {
+  const t = s?.totals;
+  if (!t || t.orders === null) return null;
+  const extra = [
+    t.pending ? `${t.pending} pending` : null,
+    t.postponed ? `${t.postponed} postponed` : null,
+    t.no_result ? `${t.no_result} no result` : null,
+  ].filter(Boolean).join(", ");
+  // nothing won or lost yet: no would-be dollars to state — never $0.00
+  const settled = (t.won ?? 0) + (t.lost ?? 0) > 0;
+  return `cancelled ${t.orders} · would have won ${t.won ?? "?"}, lost ${t.lost ?? "?"}`
+    + `${extra ? ` (${extra})` : ""}${settled ? ` · would-be ${t.pnl_dollars === null
+      ? NOT_RECORDED : signedDollars(t.pnl_dollars)}` : ""}`;
+}
+
+/** A cancel reason in short words; the backend's code otherwise. */
+export const reasonWords = (k: string): string =>
+  k === "venue_expired" ? "Kalshi expiry" : k.replace(/_/g, " ");
+
 // -------------------------------------------------------------- a page
 
 export interface Page {
@@ -579,6 +750,9 @@ export interface Ledger {
    *  row type) — counted and said, never dropped silently */
   unreadable: number;
   summary: Summary | null;
+  /** NOT MONEY (v1.1): the would-be results, overall and by cancel reason;
+   *  null when the backend did not send them */
+  would_be_summary: WouldBeSummary | null;
   page: Page | null;
   /** the offset of the next, older page — null when there is none */
   next_offset: number | null;
@@ -617,6 +791,7 @@ export function parseLedger(b: Obj): Ledger {
     // AS SENT: the backend serves newest first
     rows, unreadable,
     summary: parseSummary(b.summary),
+    would_be_summary: parseWouldBeSummary(b.would_be_summary),
     page,
     next_offset: next !== null && next <= LEDGER_OFFSET_MAX ? next : null,
     vocab: { phases: words(v.phases), row_types: words(v.row_types),
@@ -1053,6 +1228,11 @@ export const LEDGER_CSV_COLUMNS = [
   "anomaly", "risk_checks", "state", "filled_count", "avg_fill_price_cents",
   "fill_fees_dollars", "cancel_reasons", "result", "outcome", "pnl_dollars",
   "why", "not_recorded",
+  // NOT MONEY (v1.1): the unfilled remainder's would-be, apart from the
+  // real `pnl_dollars` above; empty when the row has none
+  "would_be_status", "would_be_result", "would_be_contracts",
+  "would_be_price_cents", "would_be_fee_dollars", "would_be_pnl_dollars",
+  "would_be_source", "would_be_cancel_reason", "would_be_reason_group",
 ] as const;
 
 type Cell = string | number | null;
@@ -1117,6 +1297,15 @@ export function ledgerCsvRow(r: LedgerRow): Cell[] {
     // a P&L only where the backend settled one: unsettled is EMPTY
     pnl_dollars: r.outcome.pnl_dollars,
     why: r.why, not_recorded: r.not_recorded.length ? r.not_recorded.join("|") : null,
+    would_be_status: r.would_be?.status ?? null,
+    would_be_result: r.would_be?.result ?? null,
+    would_be_contracts: r.would_be?.contracts ?? null,
+    would_be_price_cents: r.would_be?.price_cents ?? null,
+    would_be_fee_dollars: r.would_be?.fee_dollars ?? null,
+    would_be_pnl_dollars: r.would_be?.pnl_dollars ?? null,
+    would_be_source: r.would_be?.source ?? null,
+    would_be_cancel_reason: r.would_be?.cancel_reason ?? null,
+    would_be_reason_group: r.would_be?.reason_group ?? null,
   };
   return LEDGER_CSV_COLUMNS.map((c) => byCol[c]);
 }
