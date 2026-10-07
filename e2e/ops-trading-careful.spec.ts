@@ -6,6 +6,7 @@ import {
 import { FOCUS_COMPETITIONS } from "../src/lib/tradingConsole";
 import { parseCarefulBody } from "../src/pages/api/ops/trading-careful";
 import { carefulWords } from "../src/lib/tradingLedger";
+import { carefulCell } from "../src/lib/tradingConsole";
 
 // THE CAREFUL STRATEGY ON THE CONSOLE (2026-10-06, Son's decisions;
 // backend src/trading/careful.py, docs/TRADING-AGENT.md §38).
@@ -58,6 +59,12 @@ const CAREFUL: Obj = {
       pnl_c_mean: 20.1, pnl_c: 60.3, sized_n: 3, pnl_dollars: "1.42",
       disagreement: false },
   },
+  // 2026-10-07 (second set): the in-play three-point ladder
+  inplay_ladder: { ladder: "inplay_3pt", signals: ["deep", "fresh", "spare"],
+    score_of: 3, tiers: { "0": "0", "1": "0", "2": "1", "3": "2" },
+    fresh_s: "60", deep_book: "50", spare: "0.01", since_hours: 24,
+    paper_n: 5, by_score: { "2": 3, "3": 2 }, by_tier: { "1": 3, "2": 2 },
+    by_signal: { deep: 5, fresh: 4, spare: 3 } },
   situations: {
     "epl|GAME|90-30": { paper_n: 40, paper_x_c: 1.2, real_n: 22,
       real_x_c: 0.8, real_settled_n: 22, real_pnl_c: -310, disagreement: true },
@@ -184,6 +191,38 @@ test.describe("the careful strategy on the console", () => {
       .toBe(false);
     expect(parseCarefulBody({ op: "competition_on", competition: "EPL; drop" }).ok)
       .toBe(false);
+  });
+
+  test("the in-play ladder: its signals, tiers and the day's paper bets",
+    async ({ page }) => {
+      await openConsole(page, SERVED);
+      const l = page.getByTestId("careful-ladder");
+      await expect(l).toContainText("deep · fresh · spare");
+      await expect(l).toContainText("0: paper · 1: paper · 2: $1 · 3: $2");
+      await expect(l).toContainText("fresh ≤ 60 s");
+      await expect(l).toContainText("2/3: 3 · 3/3: 2");
+    });
+
+  test("a backend without the ladder says so, never zeros", async ({ page }) => {
+    const { inplay_ladder: _drop, ...older } = CAREFUL;
+    void _drop;
+    await openConsole(page, { ...SERVED, careful: older });
+    await expect(page.getByTestId("careful-ladder-absent")).toContainText("not served yet");
+  });
+
+  test("the console cell reads out of 3 in play, out of 5 pre-match", () => {
+    expect(carefulCell({ score: 2, size: "1", ground: "inplay_buying",
+      data_error: false, score_of: 3, signals: ["deep", "fresh"] })).toEqual({
+      score: 2, size: 1, ground: "inplay_buying", data_error: false,
+      score_of: 3, signals: ["deep", "fresh"] });
+    expect(carefulCell({ score: 4, size: "2", ground: "family:GAME",
+      data_error: false })?.score_of).toBeNull();
+  });
+
+  test("the ledger says an in-play order's ladder", () => {
+    expect(carefulWords({ score: 2, size_dollars: 1, worst_dollars: 0.68,
+      ground: "inplay_buying", score_of: 3, signals: ["deep", "fresh"] })).toBe(
+      "confidence 2/3 (deep, fresh) · size $1 (worst case $0.68) · inplay_buying");
   });
 
   test("the ledger says a careful order's score, size and ground", () => {
