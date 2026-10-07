@@ -564,7 +564,8 @@ export const NOT_SERVED = "not served yet";
 
 /** THE BACKEND'S PLAIN WORDS, VERBATIM: `PLAIN` in the backend's
  *  src/trading/console.py (SonNguyen2914/TRIVELA, branch b2-integration,
- *  read on 2026-10-06), the short sentences the candidates route serves
+ *  read on 2026-10-06; re-read at origin/main 1317f4f5 on 2026-10-07, 56
+ *  codes — two were missing here and are added), the short sentences the candidates route serves
  *  as a decision's `words`. Mirrored here because the status route sends
  *  in-play reasons as bare codes; when the backend's PLAIN changes, this
  *  copy is edited to match, word for word. */
@@ -585,6 +586,7 @@ export const PLAIN_WORDS: Record<string, string> = {
   candidate_unreadable: "The market's data is incomplete.",
   client_order_id_spent: "These exact terms were already sent once; Kalshi takes an order id only once.",
   no_fair_price: "No bookmaker consensus price, and no fresh price from our model.",
+  unproven_weight_over_cap: "Withdrawn: it gave our unproven model more than half the weight. Capped at 50% (Son, 2026-10-05) until it has evidence.",
   stale_book: "The Kalshi order book is too old to trade on.",
   no_bid_other_side: "Neither side has an ask (no bids to derive one).",
   in_play: "The match has kicked off: pre-match trading is closed.",
@@ -623,6 +625,7 @@ export const PLAIN_WORDS: Record<string, string> = {
   killed: "The kill switch is on: nothing is placed.",
   reconcile_failed: "The account could not be read: nothing is placed this tick.",
   pnl_unreadable: "The trader's own P&L could not be computed: nothing is placed.",
+  journal_unwritable: "The journal could not be written (a full volume, say): every trader order is withdrawn and nothing is placed.",
 };
 
 /** WORDS FOR THE CODES THE BACKEND'S PLAIN DOES NOT HOLD. Its route reads
