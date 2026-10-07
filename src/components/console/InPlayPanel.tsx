@@ -15,6 +15,8 @@ import {
   inPlayStrategy, isObj, num, type Candidates,
 } from "../../lib/tradingConsole";
 import { decisionBadge, reasonTag, rowTag } from "../../lib/consoleModel";
+import { type SumItem } from "./collapse";
+import { badgeItems, items as sum, plain, warn } from "./summaries";
 import {
   DASH, DecisionBadge, Info, InfoNote, Metric, Panel, SimpleTable, SubHead, TH, Tech, count, numOf,
   pnlTone, usd, when,
@@ -201,10 +203,34 @@ export function InPlayPanel({ d, now, candidates }: { d: Obj; now: number; candi
   const v2 = obj(t.v2);
   const gaps = obj(t.feed_gaps);
   const liveRows = (candidates?.rows ?? []).filter((r) => r.minute !== null || r.inplay !== null || r.phase === "in_play");
+  const skips = inPlayReasons(t.v2, "skipped_by_reason_today", "skips");
+  const refusals = inPlayReasons(t.v2, "refused_by_reason_today", "refusals");
+  const reasonSum = (b: ReasonsBlock): SumItem[] => ("notServed" in b ? [plain("not served")]
+    : b.rows.length === 0 ? [plain("none today")]
+      : [plain(`top: ${reasonTag(b.rows[0].code)} ${count(b.rows[0].n)}`),
+        plain(`${b.rows.reduce((n, r) => n + (r.n ?? 0), 0).toLocaleString("en-US")} in all`)]);
+  const byComp = inPlayByCompetition(t.by_competition);
+  const liveBadges: Record<string, number> = {};
+  for (const r of liveRows) { const k = decisionBadge(r.decision).key; liveBadges[k] = (liveBadges[k] ?? 0) + 1; }
+  const cool = numOf(t.cooldowns_active) ?? 0;
+  const mainSum = sum(
+    plain(t.enabled === true ? (t.active === true ? "active" : "enabled · idle") : t.enabled === false ? "off" : "not stated"),
+    t.feed_healthy === false ? warn("feed unhealthy") : t.feed_healthy === true ? plain("feed healthy") : null,
+    plain(`${count(t.legs_in_play)} legs`),
+    cool > 0 ? warn(`${cool} cool-downs`, "cool-downs") : null,
+    plain(`settled ${usd(tp.settled, true)}`),
+    strat.lag ? warn("label lags") : null,
+  );
+  const v2Sum = !v2 ? [plain("not on this backend")] : sum(
+    plain(v2.enabled === true ? "enabled" : v2.enabled === false ? "off" : "not stated"),
+    plain(`${count(v2.entries_placed_today)} entries`), plain(`${count(v2.exits_placed_today)} exits`),
+    typeof v2.error === "string" ? warn("summary failed") : null,
+    obj(v2.arms_in_use) && typeof obj(v2.arms_in_use)!.error === "string" ? warn("arms read failed") : null,
+  );
   return (
     <div data-testid="ops-inplay" className="grid grid-cols-12 gap-3">
       <div className="col-span-12">
-        <Panel title="In-play trading"
+        <Panel title="In-play trading" cid="inplay" summary={mainSum}
           meta={<><span data-testid="inplay-strategy" className="font-mono text-ink-hi">{strat.label ?? NOT_SERVED}</span>
             {" · "}{when(t.at, true)}</>}>
           {strat.lag && (
@@ -245,24 +271,29 @@ export function InPlayPanel({ d, now, candidates }: { d: Obj; now: number; candi
         </Panel>
       </div>
       <div className="col-span-12 lg:col-span-6">
-        <Panel title="Skipped today" info="Why in-play legs were skipped today — journal episodes, not ticks. Hover a reason for its full words and code.">
-          <Reasons testid="inplay-skips" block={inPlayReasons(t.v2, "skipped_by_reason_today", "skips")}
+        <Panel title="Skipped today" cid="inplay-skips" summary={reasonSum(skips)} info="Why in-play legs were skipped today — journal episodes, not ticks. Hover a reason for its full words and code.">
+          <Reasons testid="inplay-skips" block={skips}
             empty="none today" />
         </Panel>
       </div>
       <div className="col-span-12 lg:col-span-6">
-        <Panel title="Refused today" info="Refused by the risk engine in play today. Hover a reason for its full words and code.">
-          <Reasons testid="inplay-refusals" block={inPlayReasons(t.v2, "refused_by_reason_today", "refusals")}
+        <Panel title="Refused today" cid="inplay-refusals" summary={reasonSum(refusals)} info="Refused by the risk engine in play today. Hover a reason for its full words and code.">
+          <Reasons testid="inplay-refusals" block={refusals}
             empty="none today" />
         </Panel>
       </div>
       <div className="col-span-12 lg:col-span-6">
-        <Panel title="By competition" info={`In play, every competition${typeof t.by_competition_basis === "string" ? " — the newest tick" : ""}.`}>
+        <Panel title="By competition" cid="inplay-by-comp"
+          summary={sum(plain(`${byComp.rows.length} competitions`),
+            plain(`${byComp.rows.reduce((n, r) => n + (r.counts?.legs ?? 0), 0)} legs`),
+            byComp.failed ? warn("counts failed") : null)}
+          info={`In play, every competition${typeof t.by_competition_basis === "string" ? " — the newest tick" : ""}.`}>
           <ByComp v={t.by_competition} />
         </Panel>
       </div>
       <div className="col-span-12 lg:col-span-6">
-        <Panel title="Live legs" info="In-play rows in the newest candidate snapshot."
+        <Panel title="Live legs" cid="live-legs" info="In-play rows in the newest candidate snapshot."
+          summary={sum(plain(`${liveRows.length} legs`), ...badgeItems(liveBadges), plain(`${shocks.reduce((n, [, k]) => n + k, 0)} shocks`))}
           meta={candidates ? `${liveRows.length} of ${candidates.rows.length}` : undefined}>
           {liveRows.length === 0 ? <InfoNote>{candidates ? "None in the snapshot" : "Not read yet"}</InfoNote> : (
             <SimpleTable head={["market", "min", "decision", "reason"]} right={[1]}
@@ -277,7 +308,7 @@ export function InPlayPanel({ d, now, candidates }: { d: Obj; now: number; candi
         </Panel>
       </div>
       <div className="col-span-12">
-        <Panel title="In-play v2" info="Live stats, pressure entries, protective exits.">
+        <Panel title="In-play v2" cid="inplay-v2" summary={v2Sum} info="Live stats, pressure entries, protective exits.">
           <V2 v={v2} now={now} />
         </Panel>
       </div>

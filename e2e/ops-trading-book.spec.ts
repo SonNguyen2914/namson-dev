@@ -320,8 +320,9 @@ test.describe("the trader's book on the console", () => {
       .toHaveText("No open positions on the account.");
     await expect(page.getByTestId("book-orders-empty"))
       .toHaveText("No resting orders on the account.");
-    // no hand-over control (the ⓘ disclosures are not controls on a position)
-    await expect(page.locator('[data-testid="ops-book"] button:not([data-info])')).toHaveCount(0);
+    // no hand-over control (the ⓘ disclosures and the section's own fold
+    // toggle are not controls on a position)
+    await expect(page.locator('[data-testid="ops-book"] button:not([data-info]):not([data-testid="panel-toggle"])')).toHaveCount(0);
   });
 
   test("at 400 px the tables scroll inside their boxes and the page does "

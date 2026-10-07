@@ -12,6 +12,7 @@ import { attention, type ReadState, safetyTriggers } from "../../lib/consoleMode
 import { TradingKillLift } from "../TradingKillLift";
 import { liveTotals } from "../../lib/tradingConsole";
 import { Freshness } from "./primitives";
+import { CollapseAllControls, CollapseProvider } from "./collapse";
 import { OperatorStatusBar, ViewNav } from "./shell";
 import { useHashRoute } from "./route";
 import { type Read, useSectionReads } from "./useConsoleData";
@@ -167,6 +168,8 @@ export function ConsoleApp({ d, statusAt, statusRead, statusStale, now, token, b
           </p>
         )}
 
+        <CollapseProvider view={view}>
+        <div className="-mt-1 mb-2 flex justify-end"><CollapseAllControls /></div>
         {view === "overview" && (
           <Overview d={d} now={now} token={token} reads={reads} attention={items}
             bumpStatus={bumpStatus} go={go} statusStale={statusStale} statusAt={statusAt} safety={safety} />
@@ -191,6 +194,7 @@ export function ConsoleApp({ d, statusAt, statusRead, statusStale, now, token, b
         )}
         {view === "model" && <ModelView d={d} now={now} token={token} />}
         {view === "system" && <SystemView d={d} now={now} candidates={candidates} go={go} />}
+        </CollapseProvider>
 
         <p className="mt-8 font-mono text-[10.5px] text-ink-faint">
           {typeof d.version === "string" ? d.version : "status version not stated"} · generated {typeof d.generated_at === "string" ? d.generated_at : "—"}

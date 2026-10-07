@@ -17,6 +17,7 @@ import {
   SubHead, Tech, ago, count, when,
 } from "./primitives";
 import type { Source } from "./useConsoleData";
+import { freshItem, items as line, plain, readItem, warn } from "./summaries";
 
 type Obj = Record<string, unknown>;
 const obj = (v: unknown): Obj | null => (isObj(v) ? v : null);
@@ -27,7 +28,13 @@ function HandoverAggregates({ d, now }: { d: Obj; now: number }) {
   const h: Obj | null = obj(d.handover)
     ?? (keys.some((k) => k in d) ? { ...d, at: d.managed_at } : null);
   return (
-    <Panel testid="ops-handover" title="Hand-over"
+    <Panel testid="ops-handover" title="Hand-over" cid="handover"
+      summary={!h ? [plain("not on this backend")] : line(
+        plain(`${count(h.handed_over_contracts)} handed over`), plain(`${count(h.managed_contracts)} managed`),
+        plain(`${count(h.manual_contracts)} manual`),
+        typeof h.closes_error === "string" ? warn("closes not counted") : null,
+        (Number(h.vanished_ambiguous) || 0) > 0 ? warn(`${count(h.vanished_ambiguous)} vanished`, "vanished") : null,
+      )}
       info="As the newest tick counted it: contracts you handed to the trader, what it manages, what stays yours.">
       {!h ? (
         <p data-testid="handover-absent" className="text-[12px] text-ink-low">hand-over numbers are not on this backend</p>
@@ -127,9 +134,20 @@ export function PortfolioView({ d, now, token, source, onPosted, selected, setSe
   const atRisk = book ? book.positions.filter((p) => p.at_risk_dollars !== null) : [];
   const queued = book?.pending ? book.pending.filter((q) => q.status === "queued").length : null;
   const sel = selected && book ? book.positions.find((p) => keyOf(p) === selected) ?? null : null;
+  const summary = book ? line(
+    plain(`${count(book.totals.positions)} positions`), plain(`${count(book.totals.orders)} orders`),
+    atRisk.length ? plain(`at risk ${bookDollars(atRisk.reduce((s2, p) => s2 + (p.at_risk_dollars ?? 0), 0))}`) : null,
+    live ? plain(bookPl(live.unrealised)) : null,
+    queued ? plain(`${queued} queued`) : null,
+    book.totals.notListedPositions > 0 || book.totals.notListedOrders > 0 ? warn("untracked not shown") : null,
+    live && live.unmarked > 0 ? warn(`${live.unmarked} unmarked`, "unmarked") : null,
+    live && live.unrealisedMissing > 0 ? warn(`${live.unrealisedMissing} no unrealised`, "unrealised missing") : null,
+    atRisk.length < book.positions.length ? warn(`${book.positions.length - atRisk.length} at-risk not summed`, "at risk not summed") : null,
+    freshItem(at, now, source.cadenceMs, read.kind === "error", ago),
+  ) : line(readItem("book", read) ?? plain("reading…"));
   return (
     <div className="space-y-3">
-      <Panel testid="ops-book" title="Positions & orders"
+      <Panel testid="ops-book" title="Positions & orders" cid="book" summary={summary}
         meta={book ? <Freshness at={at} now={now} cadenceMs={source.cadenceMs} failed={read.kind === "error"} label="book" /> : undefined}>
         {read.kind === "unavailable" && (
           <p data-testid="book-unavailable" className="text-[12.5px] text-ink-low">

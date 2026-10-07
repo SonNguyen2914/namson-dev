@@ -16,9 +16,19 @@ import {
 import { FOCUS_COMPETITIONS } from "../../lib/tradingConsole";
 import { DailyPnlChart } from "./charts";
 import {
-  BarList, ErrorNote, Freshness, Info, InfoNote, Metric, Panel, TH, count, usd,
+  BarList, ErrorNote, Freshness, Info, InfoNote, Metric, Panel, TH, ago, count, usd,
 } from "./primitives";
 import type { LedgerSource } from "./useConsoleData";
+import type { SumItem } from "./collapse";
+import { freshItem, items as line, plain, readItem, warn } from "./summaries";
+
+/** a breakdown's folded line: its rows and its best and worst settled */
+function groupSum(groups: Bucket[] | null, label: (k: string) => string): SumItem[] {
+  if (groups === null) return [plain("not sent")];
+  if (groups.length === 0) return [plain("none in this window")];
+  const by = [...groups].sort((a, b) => (b.settled_pnl_dollars ?? 0) - (a.settled_pnl_dollars ?? 0));
+  return [plain(`${groups.length} rows`), plain(`top: ${label(by[0].key)} ${signedDollars(by[0].settled_pnl_dollars)}`)];
+}
 
 const plTone = (n: number | null) => (n === null || n === 0 ? "text-ink-mid" : n > 0 ? "text-up" : "text-neg");
 function wlu(b: Bucket): string {
@@ -147,10 +157,24 @@ export function PerformanceView({ now, source, go, statusDailyLimit }: {
   const byComp = useMemo(() => (s?.by_competition ? [...s.by_competition]
     .sort((a, b) => (b.settled_pnl_dollars ?? 0) - (a.settled_pnl_dollars ?? 0)) : null), [s]);
   const settled = t && t.won !== null && t.lost !== null ? t.won + t.lost : null;
+  const hits = (days ?? []).filter((d) => d.over_daily_limit ?? (d.settled_pnl_dollars !== null && limit !== null && d.settled_pnl_dollars <= -limit)).length;
+  const daySum = line(
+    plain(days ? `${days.length} days` : "not sent"),
+    days && days.length ? plain(`last ${signedDollars(days[days.length - 1].settled_pnl_dollars)}`) : null,
+    hits > 0 ? warn(`${hits} at limit`, "limit reached") : null,
+  );
+  const mainSum = t ? line(
+    plain(`settled ${signedDollars(t.settled_pnl_dollars)}`), plain(`n ${settled ?? "?"}`), plain(wlu(t)),
+    plain(`fees ${usd(t.fees_dollars)}`),
+    filtered ? warn("filtered") : null,
+    s && !s.complete ? warn("incomplete") : null,
+    t.unknown !== null && t.unknown > 0 ? warn(`${t.unknown} P&L unknown`, "pnl unknown") : null,
+    l ? freshItem(source.last!.at, now, source.cadenceMs, source.read.kind === "error", ago) : null,
+  ) : line(readItem("ledger", source.read) ?? plain(l ? "summary not sent" : "reading…"));
   return (
     <div data-testid="ops-performance" className="grid grid-cols-12 gap-3">
       <div className="col-span-12">
-        <Panel title="Performance"
+        <Panel title="Performance" cid="performance" summary={mainSum}
           info="A small, capped experiment: a handful of settled orders cannot separate skill from chance. These are counts and sums as the backend summed them — no figure here is evidence of an edge."
           meta={<>
           {l ? <Freshness at={source.last!.at} now={now} cadenceMs={source.cadenceMs} /> : null}
@@ -186,13 +210,13 @@ export function PerformanceView({ now, source, go, statusDailyLimit }: {
       {s && (
         <>
           <div className="col-span-12 2xl:col-span-7">
-            <Panel title="Settled P&L by day" info="Hover or focus a day for its exact figures. Settled P&L by the day the order was placed, as the backend summed it.">
+            <Panel title="Settled P&L by day" cid="pnl-chart" summary={daySum} info="Hover or focus a day for its exact figures. Settled P&L by the day the order was placed, as the backend summed it.">
               {days && days.length ? <DailyPnlChart testid="pnl-chart" days={days} limit={limit} height={200} />
                 : <InfoNote>{days === null ? "by-day totals not sent" : "no day in this window"}</InfoNote>}
             </Panel>
           </div>
           <div className="col-span-12 2xl:col-span-5">
-            <Panel title="By competition" info="Ranked by settled P&L; hover a row for its n, W–L–U and cost.">
+            <Panel title="By competition" cid="by-comp-bars" summary={groupSum(byComp, compL)} info="Ranked by settled P&L; hover a row for its n, W–L–U and cost.">
               {byComp === null ? <InfoNote>not sent</InfoNote> : byComp.length === 0 ? <InfoNote>none in this window</InfoNote> : (
                 <BarList signed testid="perf-by-comp" items={byComp.map((g) => ({
                   key: g.key, value: g.settled_pnl_dollars ?? 0,
@@ -204,30 +228,30 @@ export function PerformanceView({ now, source, go, statusDailyLimit }: {
             </Panel>
           </div>
           <div className="col-span-12">
-            <Panel title="Day by day">
+            <Panel title="Day by day" cid="days" summary={daySum}>
               {/* the table AS SENT (the chart above is drawn in date order) */}
               <Days days={s.by_day} limit={limit} limitFrom={limitFrom} />
             </Panel>
           </div>
           <div className="col-span-12 lg:col-span-6">
-            <Panel title="By competition · table" info="Every competition the window holds.">
+            <Panel title="By competition · table" cid="by-comp-table" summary={groupSum(s.by_competition, compL)} info="Every competition the window holds.">
               <GroupTable id="competition" groups={s.by_competition} label={compL}
                 order={(a, b) => (COMP_ORDER.get(a.key) ?? 99) - (COMP_ORDER.get(b.key) ?? 99) || a.key.localeCompare(b.key)} />
             </Panel>
           </div>
           <div className="col-span-12 lg:col-span-6">
-            <Panel title="By market type" info="CLV by market type is not served by the ledger route.">
+            <Panel title="By market type" cid="by-family" summary={groupSum(s.by_family, famLabel)} info="CLV by market type is not served by the ledger route.">
               <GroupTable id="family" groups={s.by_family} label={famLabel} />
             </Panel>
           </div>
           <div className="col-span-12 lg:col-span-4">
-            <Panel title="By phase"><GroupTable id="phase" groups={s.by_phase} label={phaseWords} /></Panel>
+            <Panel title="By phase" cid="by-phase" summary={groupSum(s.by_phase, phaseWords)}><GroupTable id="phase" groups={s.by_phase} label={phaseWords} /></Panel>
           </div>
           <div className="col-span-12 lg:col-span-4">
-            <Panel title="By price band" info="The price of the side bought."><GroupTable id="price" groups={s.by_price_bucket} label={priceBucketWords} /></Panel>
+            <Panel title="By price band" cid="by-price" summary={groupSum(s.by_price_bucket, priceBucketWords)} info="The price of the side bought."><GroupTable id="price" groups={s.by_price_bucket} label={priceBucketWords} /></Panel>
           </div>
           <div className="col-span-12 lg:col-span-4">
-            <Panel title="By edge at placement"
+            <Panel title="By edge at placement" cid="by-edge" summary={groupSum(s.by_edge_bucket, edgeBucketWords)}
               info="The trader's own estimate. Does a larger estimated edge go with better results? Read the settled P&L down this table with the n beside it. With samples this small, a difference between bands is not a finding.">
               <GroupTable id="edge" groups={s.by_edge_bucket} label={edgeBucketWords} />
             </Panel>

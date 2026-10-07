@@ -20,7 +20,8 @@
 // never 0.
 import { useState } from "react";
 import { compLabel } from "../lib/tradingConsole";
-import { Info } from "./console/primitives";
+import { Info, Panel } from "./console/primitives";
+import { items as line, plain, warn } from "./console/summaries";
 
 type Obj = Record<string, unknown>;
 const obj = (v: unknown): Obj | null =>
@@ -88,17 +89,20 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
   const knobs = obj(c?.knobs);
   const events = Array.isArray(c?.events) ? (c?.events as unknown[]) : [];
 
+  const de = num(tick?.data_errors) ?? 0;
+  const disagree = Object.values(sits).filter((v) => obj(v)?.disagreement === true).length;
+  const summary = !c ? [plain(NOT_SERVED)] : typeof c.error === "string" ? [warn("block failed")] : line(
+    plain(c.enabled === true ? "on" : "off"),
+    tick ? plain(`${num(tick.funded) ?? "—"} / ${num(tick.qualifying) ?? "—"} funded`) : null,
+    plain(`${Object.values(comps).filter((v) => obj(v)?.on === false).length} paper-only`),
+    de > 0 ? warn(`${de} data errors`, "data errors") : null,
+    disagree > 0 ? warn(`${disagree} disagree`, "disagree") : null,
+  );
   return (
-    <section data-testid="ops-careful" aria-labelledby="ops-careful-h"
-      className="rounded-lg border border-tc-line bg-tc-panel">
-      <header className="flex flex-wrap items-center gap-2 border-b border-tc-line px-4 py-2">
-        <h2 id="ops-careful-h" className="text-[13px] font-semibold text-ink-hi">Careful strategy</h2>
-        <Info label="the careful strategy">
-          Real money only on match winner, directly priced totals and
-          both-teams-to-score; everything else is paper. A bet needs the bookmakers AND our model to clear the bar.
-        </Info>
-      </header>
-      <div className="px-4 py-2.5">
+    <Panel testid="ops-careful" title="Careful strategy" cid="careful" summary={summary}
+      info={<>Real money only on match winner, directly priced totals and
+        both-teams-to-score; everything else is paper. A bet needs the bookmakers AND our model to clear the bar.</>}>
+      <div>
         {!c ? (
           <p data-testid="careful-absent" className="text-[12px] text-ink-low">careful strategy: {NOT_SERVED}</p>
         ) : typeof c.error === "string" ? (
@@ -211,6 +215,6 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
           </>
         )}
       </div>
-    </section>
+    </Panel>
   );
 }

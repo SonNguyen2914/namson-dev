@@ -14,8 +14,10 @@
 // with a word or a shape beside it; gold only for the active view, the
 // selected row and focus.
 import {
-  type CSSProperties, type ReactNode, useCallback, useEffect, useId, useRef, useState,
+  type CSSProperties, type MouseEvent, type ReactNode, useCallback, useEffect, useId, useRef, useState,
 } from "react";
+import { type SumItem, alarmOf, useCollapseCtx } from "./collapse";
+export type { SumItem } from "./collapse";
 import type { Badge } from "../../lib/consoleModel";
 
 // ------------------------------------------------------------ formatters
@@ -156,33 +158,118 @@ export function Info({ children, label = "details", testid, className = "" }: {
 
 // ------------------------------------------------------------- regions
 
+/** A SUMMARY LINE: figures joined by " · "; an amber state wears ◆ and
+ *  the warn ink, a red one ■ and the neg ink (never colour alone). */
+export function SummaryLine({ items, testid }: { items: SumItem[]; testid?: string }) {
+  const title = items.map((i) => (typeof i.t === "string" ? `${i.tone === "bad" ? "■ " : i.tone === "warn" ? "◆ " : ""}${i.t}` : "")).filter(Boolean).join(" · ");
+  return (
+    <span data-testid={testid} title={title || undefined}
+      className="tc-num min-w-0 truncate text-[11.5px] text-ink-low">
+      {items.map((i, n) => (
+        <span key={n}>
+          {n > 0 && <span className="text-ink-faint"> · </span>}
+          <span data-tone={i.tone} className={i.tone === "bad" ? "text-neg" : i.tone === "warn" ? "text-warn" : "text-ink-mid"}>
+            {i.tone === "bad" ? "■ " : i.tone === "warn" ? "◆ " : ""}{i.t}
+          </span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** A REGION. With a title and a console CollapseProvider above it, it
+ *  folds to its header (quiet pass + collapse, 2026-10-07): the header row
+ *  is the click target, the title is a real disclosure button
+ *  (aria-expanded / aria-controls, Enter and Space), and a folded header
+ *  shows `summary` — whose amber/red items also unfold it when they change
+ *  (see ./collapse.tsx). The body is hidden, never unmounted. */
 export function Panel({ title, meta, actions, children, testid, id, className = "",
-  bodyClass = "", tone, info }: {
+  bodyClass = "", tone, info, cid, summary, lockOpen = false, collapsible = true }: {
   title?: ReactNode; meta?: ReactNode; actions?: ReactNode; children: ReactNode;
   /** what the panel is, in a sentence — behind an ⓘ beside the title */
   info?: ReactNode;
   testid?: string; id?: string; className?: string; bodyClass?: string;
   /** a control area is drawn apart from data panels */
   tone?: "control";
+  /** the section's key for its fold (else its testid, else its title) */
+  cid?: string;
+  /** the one-line summary a folded header keeps — every amber/red state
+   *  inside must be in it, toned */
+  summary?: SumItem[];
+  /** an alarm holds: the section cannot fold */
+  lockOpen?: boolean;
+  collapsible?: boolean;
 }) {
   const hid = useId();
+  const bid = useId();
+  const ctx = useCollapseCtx();
+  const key = cid ?? testid ?? (typeof title === "string" ? title : null);
+  const fid = ctx && key && title && collapsible ? `${ctx.view}:${key}` : null;
+  const alarm = alarmOf(summary);
+  const entry = fid ? ctx!.get(fid) : undefined;
+  // folded, unless locked open or an amber/red state changed since the fold
+  const reopened = !!entry?.c && alarm !== "" && alarm !== (entry.a ?? "");
+  const folded = !!fid && !lockOpen && !!entry?.c && !reopened;
+  const register = ctx?.register;
+  const set = ctx?.set;
+  useEffect(() => {
+    if (!fid || !register) return;
+    return register(fid, { lock: lockOpen, alarm });
+  }, [fid, register, lockOpen, alarm]);
+  // write back what the render decided: an alarm that changed unfolds the
+  // section for good (until it is folded again); one that cleared while
+  // folded is forgotten, so its return unfolds it
+  useEffect(() => {
+    if (!fid || !set || !entry?.c) return;
+    if (reopened) set(fid, { c: false, a: null });
+    else if (alarm === "" && entry.a) set(fid, { c: true, a: null });
+  }, [fid, set, entry?.c, entry?.a, reopened, alarm]);
+  const toggle = () => {
+    if (!fid || !set || lockOpen) return;
+    set(fid, folded ? { c: false, a: null } : { c: true, a: alarm || null });
+  };
+  const btn = useRef<HTMLButtonElement | null>(null);
+  const onHeader = (e: MouseEvent<HTMLElement>) => {
+    if (!fid) return;
+    const t = e.target as HTMLElement;
+    if (btn.current?.contains(t)) return;   // the button toggles itself
+    if (t.closest("button, a, input, select, textarea, summary, label, [role=tooltip], [role=group]")) return;
+    toggle();
+  };
   return (
     <section data-testid={testid} id={id} aria-labelledby={title ? hid : undefined}
+      data-section={fid ?? undefined} data-collapsed={fid ? String(folded) : undefined}
       className={`min-w-0 rounded-lg border bg-tc-panel ${tone === "control"
         ? "border-tc-line-strong" : "border-tc-line"} ${className}`}>
       {(title || actions || meta) && (
-        <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-tc-line px-4 py-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+        <header onClick={onHeader}
+          className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2 ${folded ? "" : "border-b border-tc-line"} ${fid && !lockOpen ? "cursor-pointer select-none hover:bg-tc-hover/40" : ""}`}>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
             {title && (
-              <h2 id={hid} className="text-[13px] font-semibold tracking-[-0.005em] text-ink-hi">{title}</h2>
+              <h2 id={hid} className="text-[13px] font-semibold tracking-[-0.005em] text-ink-hi">
+                {fid ? (
+                  <button ref={btn} type="button" data-testid="panel-toggle"
+                    aria-expanded={!folded} aria-controls={bid}
+                    aria-disabled={lockOpen || undefined}
+                    title={lockOpen ? "Can't collapse while an alarm holds" : folded ? "Expand" : "Collapse"}
+                    onClick={toggle}
+                    className="-ml-1 inline-flex items-center gap-1.5 rounded px-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent">
+                    <span aria-hidden className={`inline-block text-[9px] text-ink-faint transition-transform ${folded ? "" : "rotate-90"}`}>
+                      {lockOpen ? "■" : "▶"}
+                    </span>
+                    {title}
+                  </button>
+                ) : title}
+              </h2>
             )}
             {info && <Info label={typeof title === "string" ? title : "this panel"}>{info}</Info>}
-            {meta && <div className="text-[11.5px] text-ink-low">{meta}</div>}
+            {folded && summary && summary.length > 0 && <SummaryLine items={summary} testid="panel-summary" />}
+            {meta && !folded && <div className="text-[11.5px] text-ink-low">{meta}</div>}
           </div>
-          {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+          {actions && !folded && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </header>
       )}
-      <div className={bodyClass || "px-4 py-2.5"}>{children}</div>
+      <div id={bid} hidden={folded} className={bodyClass || "px-4 py-2.5"}>{children}</div>
     </section>
   );
 }

@@ -14,10 +14,11 @@ import { TradingKillLift } from "../TradingKillLift";
 import { OwnerChip, bookDollars, bookPl, plTone } from "../TradingBook";
 import { DailyPnlChart } from "./charts";
 import {
-  DASH, DecisionBadge, Disclosure, Dot, EmptyNote, ErrorNote, Freshness, Info, InfoNote, Label, Metric,
+  DASH, DecisionBadge, Disclosure, Dot, EmptyNote, ErrorNote, Freshness, Info, InfoNote, Label, Metric, ago,
   Panel, RiskBar, SubHead, Tech, agoIso, clockTime, count, numOf, pnlTone, usd, when, whenShort,
 } from "./primitives";
 import { hrefOf } from "./route";
+import { badgeItems, bad, barItem, freshItem, items as sum, plain, readItem, warn } from "./summaries";
 import type { SectionReads } from "./useConsoleData";
 
 type Obj = Record<string, unknown>;
@@ -92,13 +93,23 @@ export function SafetyPanel({ d, token, bumpStatus, triggers }: {
   const loud = killed || halted;
   return (
     <section data-testid="ops-safety" data-focus="safety" aria-labelledby="safety-h"
+      data-collapsed="false" data-locked="true"
       className={`rounded-lg border ${loud ? "border-neg/50 bg-neg/[0.04]" : "border-warn/40 bg-tc-panel"}`}>
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-tc-line px-4 py-2">
-        <h2 id="safety-h" className="text-[13px] font-semibold text-ink-hi">Safety &amp; control</h2>
+        <h2 id="safety-h" className="text-[13px] font-semibold text-ink-hi">
+          {/* NEVER FOLDS: it is only drawn while an alarm holds, and an alarm
+              is exactly what must stay open (collapse rule, 2026-10-07) */}
+          <button type="button" data-testid="panel-toggle" aria-expanded="true" aria-controls="safety-body"
+            aria-disabled="true" title="Can't collapse while an alarm holds"
+            className="-ml-1 inline-flex cursor-default items-center gap-1.5 rounded px-1 outline-none focus-visible:ring-2 focus-visible:ring-accent">
+            <span aria-hidden className="text-[9px] text-ink-faint">■</span>Safety &amp; control
+          </button>
+        </h2>
         <span data-testid="safety-why" className={`text-[11.5px] ${loud ? "text-neg" : "text-warn"}`}>
           {loud ? "■" : "◆"} {triggers.join(" · ")}
         </span>
       </header>
+      <div id="safety-body">
       <div className="grid grid-cols-2 gap-x-6 gap-y-3 px-4 py-2.5 lg:grid-cols-6">
         <SafetyCell testid="safety-trading" label="Real trading"
           value={loud ? "Blocked" : d.enabled === true ? (d.paper_only === true ? "Paper only" : "Enabled")
@@ -130,6 +141,7 @@ export function SafetyPanel({ d, token, bumpStatus, triggers }: {
       <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-2 border-t border-tc-line px-4 py-2">
         <TradingKillLift token={token} onDone={bumpStatus} active={killed} />
         <StopHowTo />
+      </div>
       </div>
     </section>
   );
@@ -208,8 +220,24 @@ export function CapitalPanel({ d, now, stale, statusAt }: { d: Obj; now: number;
   const dd = obj(d.drawdown) ?? {};
   const play = obj(d.in_play) ?? {};
   const dayUsed = numOf(daily.used);
+  const b = obj(d.daily_budget);
+  const usage = obj(obj(obj(d.careful)?.tick)?.usage);
+  const worstHour = usage ? Math.max(0, ...Object.values(obj(usage.hour) ?? {}).map((v) => numOf(v) ?? 0)) : null;
+  const summary = sum(
+    plain(`equity ${usd(d.marked_equity)}`),
+    plain(`today ${dayUsed === null ? DASH : usd(-dayUsed, true)}`),
+    barItem("at risk", d.total_at_risk, d.total_limit),
+    !b || b.used === undefined ? null
+      : b.readable === false ? warn("budget unreadable")
+        : numOf(b.remaining) !== null && numOf(b.remaining)! <= 0 ? warn(`budget spent`, "budget spent")
+          : barItem("budget", b.used, b.limit),
+    barItem("daily loss", daily.used, daily.limit),
+    barItem("drawdown", dd.used, dd.limit),
+    usage && worstHour !== null ? barItem("kickoff hour", worstHour, usage.hour_max) : null,
+    stale ? warn(`status stale ${Math.round((now - statusAt) / 1000)} s`, "status stale") : null,
+  );
   return (
-    <Panel testid="ops-money" title="Capital & risk"
+    <Panel testid="ops-money" title="Capital & risk" cid="capital" summary={summary}
       meta={<>account {agoIso(d.account_read_at, now) ? `${agoIso(d.account_read_at, now)} ago` : DASH}{stale ? <span className="text-warn"> · ◆ status stale, {Math.round((now - statusAt) / 1000)} s old</span> : null}</>}>
       <div className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
         <Metric size="lg" label="Cash" cls="account" value={usd(d.balance)}
@@ -299,8 +327,14 @@ export function AttentionPanel({ items, go }: {
   const crit = items.filter((i) => i.severity === "critical").length;
   const warn = items.filter((i) => i.severity === "warning").length;
   const info = items.length - crit - warn;
+  const ids = (sev: string) => items.filter((i) => i.severity === sev).map((i) => i.id).sort().join(",");
+  const summary = items.length === 0 ? [plain("all clear")] : sum(
+    crit ? bad(`${crit} critical`, `critical:${ids("critical")}`) : null,
+    warn ? { t: `${warn} warning`, tone: "warn" as const, key: `warning:${ids("warning")}` } : null,
+    plain(`${info} info`),
+  );
   return (
-    <Panel testid="ops-attention" id="attention" title="Attention"
+    <Panel testid="ops-attention" id="attention" title="Attention" cid="attention" summary={summary}
       meta={<span className="tc-num">{crit ? <span className="text-neg">{crit} critical · </span> : null}{warn ? <span className="text-warn">{warn} warning · </span> : null}{info} info</span>}
       bodyClass="px-1 py-1">
       <div data-focus="attention" />
@@ -357,8 +391,18 @@ export function LatestTick({ d, reads, now, go }: {
   const u = obj(d.universe);
   const ct = obj(obj(d.careful)?.tick);
   const r = reads.candidates.read;
+  const de = num(ct?.data_errors) ?? 0;
+  const summary = sum(
+    plain(t.at ? `${agoIso(t.at, now)} ago` : "no tick on record"),
+    c ? plain(`${t.placed} placed`) : null,
+    t.considered !== null ? plain(`${t.considered.toLocaleString("en-US")} considered`) : null,
+    ...badgeItems(t.byBadge),
+    r.kind === "error" || r.kind === "refused" ? warn("candidates read failed") : null,
+    de > 0 ? warn(`${de} data errors`, "data errors") : null,
+    d.paper_only === true ? warn("paper only") : null,
+  );
   return (
-    <Panel testid="ops-tick" title="Newest tick"
+    <Panel testid="ops-tick" title="Newest tick" cid="tick" summary={summary}
       meta={<span className="tc-num">{t.at ? <>{clockTime(t.at)} · {agoIso(t.at, now)} ago</> : "no tick on record"}{t.elapsed_s !== null ? ` · ${t.elapsed_s.toFixed(1)} s` : ""}{t.outcome ? <> · <Tech>{t.outcome}</Tech></> : null}</span>}
       actions={<a href={hrefOf("trading")} onClick={(e) => { e.preventDefault(); go("trading"); }}
         className="text-[12px] text-ink-mid outline-none hover:text-ink-hi focus-visible:ring-2 focus-visible:ring-accent">Candidates →</a>}>
@@ -426,8 +470,15 @@ export function BookSnapshot({ reads, now, go }: {
   const book = src.last?.data ?? null;
   const live = book ? liveTotals(book.positions.map((p) => p.live)) : null;
   const agentOrders = book ? book.orders.filter((o) => o.owner === "trader").length : 0;
+  const summary = book ? sum(
+    plain(`${count(book.totals.positions)} positions`),
+    plain(`${count(book.totals.orders)} orders`),
+    live && live.value !== null ? plain(`live ${bookDollars(live.value)}`) : null,
+    live ? plain(bookPl(live.unrealised)) : null,
+    freshItem(src.last!.at, now, src.cadenceMs, src.read.kind === "error", ago),
+  ) : sum(readItem("book", src.read) ?? plain("reading…"));
   return (
-    <Panel testid="ops-book-snapshot" title="Open positions & orders"
+    <Panel testid="ops-book-snapshot" title="Open positions & orders" cid="book" summary={summary}
       meta={book ? <Freshness at={src.last!.at} now={now} cadenceMs={src.cadenceMs} failed={src.read.kind === "error"} /> : undefined}
       actions={<a href={hrefOf("portfolio")} onClick={(e) => { e.preventDefault(); go("portfolio"); }}
         className="text-[12px] text-ink-mid outline-none hover:text-ink-hi focus-visible:ring-2 focus-visible:ring-accent">Portfolio →</a>}>
@@ -508,8 +559,15 @@ export function PerformanceSnapshot({ reads, now, go, limit }: {
   const days = (l?.summary?.by_day ?? []).slice().sort((a, b) => a.key.localeCompare(b.key)).slice(-21);
   const filtered = Object.values(src.filters).some((v) => v !== "");
   const wlu = t ? `${t.won ?? "?"}–${t.lost ?? "?"}–${t.unsettled ?? "?"}` : DASH;
+  const summary = t ? sum(
+    plain(`settled ${usd(t.settled_pnl_dollars, true)}`),
+    plain(wlu),
+    plain(`fees ${usd(t.fees_dollars)}`),
+    filtered ? warn("filtered") : null,
+    src.read.kind === "error" ? warn("ledger read failed") : null,
+  ) : sum(readItem("ledger", src.read) ?? plain(l ? "summary not sent" : "reading…"));
   return (
-    <Panel testid="ops-perf-snapshot" title="Performance"
+    <Panel testid="ops-perf-snapshot" title="Performance" cid="performance" summary={summary}
       info="The trader's own orders and handed-over contracts only. A small sample: no figure here is evidence of an edge."
       meta={<>{l ? <Freshness at={src.last!.at} now={now} cadenceMs={src.cadenceMs} /> : null}{filtered ? <span className="text-warn"> · ◆ filtered</span> : null}</>}
       actions={<a href={hrefOf("performance")} onClick={(e) => { e.preventDefault(); go("performance"); }}

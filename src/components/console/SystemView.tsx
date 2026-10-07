@@ -8,6 +8,7 @@
 import type { ReactNode } from "react";
 import { GROUP_LABEL, codeWords, reasonGroup, reasonTag } from "../../lib/consoleModel";
 import { type Candidates, isObj, num, str } from "../../lib/tradingConsole";
+import { items as line, plain, warn } from "./summaries";
 import {
   BarList, DASH, InfoNote, KV, Metric, Panel, SimpleTable, SubHead, Tech, agoIso, count, when,
 } from "./primitives";
@@ -43,7 +44,10 @@ function Activity({ d }: { d: Obj }) {
   byReason.sort((a, b) => b[2] - a[2] || a[0].localeCompare(b[0]) || a[1].localeCompare(b[1]));
   const day = obj(d.trading_day);
   return (
-    <Panel testid="ops-activity" title="Journal today"
+    <Panel testid="ops-activity" title="Journal today" cid="journal"
+      summary={line(plain(`${count(d.placed_today)} placed`), plain(`${count(d.fills_today)} fills`),
+        plain(`${byKind.reduce((n, [, k]) => n + k, 0).toLocaleString("en-US")} rows`),
+        byReason[0] ? plain(`top: ${byReason[0][0]} · ${byReason[0][1]} ${byReason[0][2].toLocaleString("en-US")}`) : null)}
       meta={`${str(day?.day) ?? "(UTC)"}${str(day?.tz) ? ` · ${str(day?.tz)}` : ""}`}
       info="Journal activity on the trading day. Hover a reason code for the backend's plain words.">
       <div className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
@@ -107,7 +111,15 @@ function Settlements({ d, now }: { d: Obj; now: number }) {
   const uf = d.unreadable_fills;
   const ufo = obj(uf);
   return (
-    <Panel testid="ops-settlements" title="Settlement & fill reads"
+    <Panel testid="ops-settlements" title="Settlement & fill reads" cid="settlements"
+      summary={!s ? [plain("not on this backend")] : line(
+        plain(`last read ${pass ? PASS_WORDS[text(pass.outcome)] ?? text(pass.outcome) : DASH}`),
+        plain(`due ${count(pass?.due)}`),
+        typeof s.error === "string" ? warn("settlement summary failed") : null,
+        fr && typeof fr.error === "string" ? warn("fill summary failed") : null,
+        (num(fr?.unreadable_today) ?? 0) > 0 ? warn(`${count(fr!.unreadable_today)} unreadable fills today`, "unreadable fills") : null,
+        (num(fr?.legacy_words_disagreed) ?? 0) > 0 ? warn("legacy words disagree") : null,
+      )}
       info="Held markets that stopped trading are asked for their result; until one clean yes/no comes back the halts value them at 0 — a win is never assumed.">
       {!s ? (
         <p data-testid="settlements-absent" className="text-[12px] text-ink-low">settlement-read outcomes are not on this backend</p>
@@ -180,13 +192,16 @@ function Settlements({ d, now }: { d: Obj; now: number }) {
 function Catalogue({ d }: { d: Obj }) {
   const u = obj(d.universe);
   if (!u) {
-    return <Panel testid="ops-catalogue" title="Catalogue coverage"><InfoNote>no coverage block on record</InfoNote></Panel>;
+    return <Panel testid="ops-catalogue" title="Catalogue coverage" summary={[plain("no coverage block")]}><InfoNote>no coverage block on record</InfoNote></Panel>;
   }
   const cat = obj(u.catalogue) ?? {};
   const stages = [["known", u.known], ["in scope", u.in_scope], ["priced", u.priced], ["eligible", u.eligible]] as const;
   const top = num(u.known);
   return (
-    <Panel testid="ops-catalogue" title="Catalogue coverage" meta={`as of ${when(d.universe_at, true)} · ${text(u.version)}`}>
+    <Panel testid="ops-catalogue" title="Catalogue coverage"
+      summary={line(plain(`${count(u.known)} known`), plain(`${count(u.in_scope)} in scope`), plain(`${count(u.priced)} priced`),
+        plain(`${count(u.eligible)} eligible`), typeof u.error === "string" ? warn("coverage read failed") : null)}
+      meta={`as of ${when(d.universe_at, true)} · ${text(u.version)}`}>
       {typeof u.error === "string" && <p className="mb-2 text-[12px] text-warn">◆ coverage read failed: {u.error}</p>}
       <div className="grid gap-x-8 gap-y-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <div>
@@ -253,8 +268,11 @@ function Clocks({ d, now, candidates }: { d: Obj; now: number; candidates: Candi
   ];
   const last = obj(d.last_tick);
   const shed = obj(last?.shed);
+  const over = !!last && (last.truncated === true || (!!shed && Object.keys(shed).length > 0));
   return (
-    <Panel testid="ops-clocks" title="Data freshness" info="Each block carries the clock of the tick row it came from.">
+    <Panel testid="ops-clocks" title="Data freshness" cid="clocks"
+      summary={line(plain(`status ${agoIso(d.generated_at, now) ?? DASH} ago`), plain(`tick ${agoIso(obj(d.last_tick)?.at, now) ?? DASH} ago`),
+        plain(`account ${agoIso(d.account_read_at, now) ?? DASH} ago`), over ? warn("tick row over the journal cap") : null)} info="Each block carries the clock of the tick row it came from.">
       <dl>
         {rows.map(([k, v, sub]) => (
           <KV key={k} k={k}>
@@ -275,7 +293,9 @@ function Clocks({ d, now, candidates }: { d: Obj; now: number; candidates: Candi
 function Retention({ d }: { d: Obj }) {
   const r = obj(d.journal_retention);
   return (
-    <Panel testid="ops-retention" title="Journal retention">
+    <Panel testid="ops-retention" title="Journal retention"
+      summary={!r ? [plain("not served yet")] : typeof r.error === "string" ? [warn("retention block failed")]
+        : line(plain(`mode ${text(r.mode)}`), plain(`keep ${text(r.keep_days)} days`))}>
       {!r ? <InfoNote>not served yet</InfoNote>
         : typeof r.error === "string" ? <InfoNote tone="warn">◆ retention block failed: {r.error}</InfoNote> : (
           <dl>
@@ -300,7 +320,9 @@ function FeedGaps({ d }: { d: Obj }) {
   if (!lastSkips && !lastRef) return null;
   const items = [...rowsOf(lastSkips), ...rowsOf(lastRef)].sort((a, b) => b[1] - a[1]);
   return (
-    <Panel title="In-play reasons" info={<>Skips and refusals the newest in-play tick counted.
+    <Panel title="In-play reasons" cid="inplay-reasons"
+      summary={items.length ? line(plain(`top: ${reasonTag(items[0][0])} ${items[0][1]}`), plain(`${items.reduce((n, [, k]) => n + k, 0)} in all`)) : [plain("none")]}
+      info={<>Skips and refusals the newest in-play tick counted.
       {items.map(([k]) => <span key={k} className="mt-1 block"><span className="text-ink-hi">{reasonTag(k)}</span> — {codeWords(k) ?? k} <span className="font-mono text-[10.5px]">{k}</span></span>)}</>}>
       {items.length === 0 ? <InfoNote>none on the newest tick</InfoNote> : (
         <BarList dense items={items.map(([k, n]) => ({
@@ -325,7 +347,7 @@ export function SystemView({ d, now, candidates, go }: {
       <div className="col-span-12 xl:col-span-6"><FeedGaps d={d} /></div>
       <div className="col-span-12 xl:col-span-6"><Retention d={d} /></div>
       <div className="col-span-12">
-        <Panel title="Versions">
+        <Panel title="Versions" summary={[plain(`status ${text(d.version)}`), plain(`strategy ${text(d.strategy)}`), plain(`env ${text(d.env)}`)]}>
           <p className="font-mono text-[11px] leading-relaxed text-ink-low">
             status {text(d.version)} · strategy {text(d.strategy)} · in-play {text(obj(d.in_play_trading)?.strategy)}
             {" "}(at tick {text(obj(d.in_play_trading)?.strategy_at_tick)}) · learner {text(obj(d.learning)?.strategy)}

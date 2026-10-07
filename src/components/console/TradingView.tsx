@@ -30,6 +30,7 @@ import {
   FilterButton, Freshness, Info, InfoNote, KV, Panel, TH, Tech, ago, when, whenShort,
 } from "./primitives";
 import type { Source } from "./useConsoleData";
+import { badgeItems, freshItem, items as sum, plain, readItem, warn } from "./summaries";
 
 type Obj = Record<string, unknown>;
 const obj = (v: unknown): Obj | null => (isObj(v) ? v : null);
@@ -336,8 +337,11 @@ function WhyNotPlaced({ rows, today, compLabelText, onReason, activeReason }: {
     : rankReasons([today]);
   const total = bars.reduce((s, b) => s + b.n, 0);
   const max = Math.max(1, bars[0]?.n ?? 1);
+  const summary = bars.length ? sum(plain(`top: ${bars[0].tag} ${bars[0].n.toLocaleString("en-US")}`),
+    plain(src === "tick" ? `${total} markets` : `${total.toLocaleString("en-US")} rows today`))
+    : [plain(src === "tick" ? "nothing unplaced" : "none today")];
   return (
-    <Panel testid="ops-why" title="Why not placed"
+    <Panel testid="ops-why" title="Why not placed" cid="why" summary={summary}
       info={<>
         {src === "tick" ? "The newest tick's not-placed markets, ranked by reason. Click a reason to filter the candidates to it."
           : "Today's journaled skips and refusals, ranked by reason."}
@@ -492,10 +496,24 @@ function CandidatesSection({ d, now, source, filters: f, setFilters, selected, s
     );
   };
 
+  const byBadge: Record<string, number> = {};
+  for (const r of c?.rows ?? []) {
+    const k = decisionBadge(r.decision).key;
+    byBadge[k] = (byBadge[k] ?? 0) + 1;
+  }
+  const candSummary = c ? sum(
+    plain(`${c.rows.length} shown`), plain(`${placedN} placed`),
+    c.considered !== null ? plain(`${c.considered.toLocaleString("en-US")} considered`) : null,
+    active > 0 ? plain(`${active} filter${active === 1 ? "" : "s"} · ${filtered.length} rows`) : null,
+    ...badgeItems(byBadge),
+    c.truncated ? warn("snapshot cut to its bound") : null,
+    c.unreadable > 0 ? warn(`${c.unreadable} unreadable`, "unreadable rows") : null,
+    freshItem(at, now, source.cadenceMs, read.kind === "error", ago),
+  ) : sum(readItem("candidates", read) ?? plain("reading…"));
   return (
     <div className="grid grid-cols-12 gap-3">
       <div className="col-span-12">
-        <Panel testid="ops-candidates" title="Candidates"
+        <Panel testid="ops-candidates" title="Candidates" cid="candidates" summary={candSummary}
           info={<>Prices in cents; edges after the maker fee; our model&apos;s probability is unvalidated; a placement
             is the trader&apos;s rule at work. Row order is the backend&apos;s priority order until a column is sorted.
             Click a row or press Enter for the inspector; ↑ ↓ move between rows. Edge: the side considered (else the
@@ -720,7 +738,10 @@ function CandidatesSection({ d, now, source, filters: f, setFilters, selected, s
               activeReason={f.reason} />
           </div>
           <div className="col-span-12 xl:col-span-7">
-            <Panel title="By competition" info={`Every competition, this tick — ${src === "focus" ? "the eleven focus competitions" : "the trader's scope"}.`}>
+            <Panel title="By competition" cid="by-comp"
+              summary={sum(plain(`${cov.length} competitions`), plain(`${cov.filter((k) => k.considered > 0).length} with rows`),
+                plain(`${cov.reduce((n, k) => n + (k.placed ?? 0), 0)} placed`))}
+              info={`Every competition, this tick — ${src === "focus" ? "the eleven focus competitions" : "the trader's scope"}.`}>
               {c.by_competition ? (
                 <div className="tc-scroll overflow-x-auto">
                   <table data-testid="cand-by-comp" className="w-full min-w-[600px] border-collapse text-[12.5px]">

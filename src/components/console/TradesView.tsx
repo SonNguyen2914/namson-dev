@@ -28,6 +28,7 @@ import {
   CTRL, ErrorNote, Freshness, Info, InfoNote, Metric, Panel, TH, Tech, ago, count, usd, whenShort,
 } from "./primitives";
 import type { LedgerSource } from "./useConsoleData";
+import { freshItem, items as line, plain, readItem, warn } from "./summaries";
 
 export interface LedgerClientFilters { family: string; result: string; side: string; q: string }
 export const NO_LEDGER_CLIENT: LedgerClientFilters = { family: "", result: "", side: "", q: "" };
@@ -310,10 +311,22 @@ export function TradesView({ now, source, client, setClient, open, setOpen, stat
   const page = l?.page ?? null;
   const t = l?.summary?.totals ?? null;
   const setC = (k: keyof LedgerClientFilters, v: string) => setClient((c) => ({ ...c, [k]: v }));
+  const summary = l ? line(
+    plain(`${rows.length} rows`),
+    t ? plain(`settled ${signedDollars(t.settled_pnl_dollars)}`) : null,
+    t ? plain(`${t.won ?? "?"}–${t.lost ?? "?"}–${t.unsettled ?? "?"}`) : null,
+    serverFiltered || clientFiltered ? plain(`filtered · ${shown.length} shown`) : null,
+    page?.scan_complete === false ? warn("newest rows only", "scan partial") : null,
+    l.summary && !l.summary.complete ? warn("P&L incomplete") : null,
+    t && t.unknown !== null && t.unknown > 0 ? warn(`${t.unknown} P&L unknown`, "pnl unknown") : null,
+    l.unreadable > 0 ? warn(`${l.unreadable} unreadable`, "unreadable rows") : null,
+    source.more.error ? warn("older page failed") : null,
+    freshItem(at, now, source.cadenceMs, read.kind === "error", ago),
+  ) : line(readItem("ledger", read) ?? plain("reading…"));
 
   return (
     <div className="space-y-3">
-      <Panel testid="ops-ledger" title="Trades"
+      <Panel testid="ops-ledger" title="Trades" cid="ledger" summary={summary}
         info={<>Every order the trader placed and every contract you handed over to it: the grounds it recorded when
           it placed, what became of the order, and — once its market settled in the trader&apos;s journal — the result
           and that order&apos;s own P&amp;L. &ldquo;Edge&rdquo; is the trader&apos;s own estimate at the time, not

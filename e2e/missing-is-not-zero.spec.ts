@@ -521,6 +521,28 @@ export const REGISTERED_SWALLOWS: Record<string, Swallow> = {
       "the remembered view carries anything a reader is told about — at "
       + "which point a failed read must say so rather than fall back.",
   },
+  "console-collapse:load": {
+    finding:
+      "The trading console reads which of its sections this viewer folded "
+      + "from localStorage, and swallows a storage that throws or holds "
+      + "junk (private mode, blocked site data, a hand-edited value). "
+      + "Nothing is drawn from the failure: every section opens expanded, "
+      + "which is the default and shows MORE, never less; no figure "
+      + "depends on it.",
+    closes_when:
+      "a folded section is ever relied on to hide something, or the page "
+      + "claims a fold was remembered — then the read's failure must be said.",
+  },
+  "console-collapse:save": {
+    finding:
+      "The trading console remembers a viewer's folded sections and "
+      + "swallows a storage write that throws. The fold has already "
+      + "happened in state; only the next visit's folds are lost, and they "
+      + "open expanded — more, never less.",
+    closes_when:
+      "the page tells the reader their folds were saved, which would then "
+      + "have to be derived from the write succeeding.",
+  },
   "field:mode-write": {
     finding:
       "The field page remembers the view the viewer switched to, and "

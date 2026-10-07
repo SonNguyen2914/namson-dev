@@ -126,6 +126,32 @@ test("mobile overview", async ({ page }) => {
 test("mobile candidates", async ({ page }) => {
   await open(page, { width: 390, height: 844, hash: "#trading" }); await shot(page, "19-mobile-candidates");
 });
+// COLLAPSIBLE SECTIONS (2026-10-07): folded headers keep their summary
+async function fold(page: Page, testid: string) {
+  await page.getByTestId(testid).getByTestId("panel-toggle").first().click();
+  // back to the top, so the full-page shot does not draw the sticky bars
+  // where the click scrolled to; and past the chevron's turn
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(250);
+}
+test("overview with performance and positions folded", async ({ page }) => {
+  await open(page);
+  await fold(page, "ops-perf-snapshot");
+  await fold(page, "ops-book-snapshot");
+  await shot(page, "21-overview-collapsed");
+});
+test("candidates with why-not-placed folded", async ({ page }) => {
+  await open(page, { hash: "#trading" });
+  await fold(page, "ops-why");
+  await shot(page, "22-candidates-why-collapsed");
+});
+test("a folded section with an amber/red summary", async ({ page }) => {
+  await open(page, { status: qaStatusWarning() });
+  await fold(page, "ops-money");
+  await fold(page, "ops-attention");
+  await fold(page, "ops-tick");
+  await shot(page, "23-collapsed-amber-summary");
+});
 test("token gate", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/ops/trading");

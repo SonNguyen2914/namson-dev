@@ -10,6 +10,7 @@
 import { compLabel, isObj, num, str } from "../../lib/tradingConsole";
 import { TradingCareful } from "../TradingCareful";
 import { ArmsInUse } from "./InPlayPanel";
+import { items as line, plain, warn } from "./summaries";
 import {
   DASH, InfoNote, Metric, Panel, SimpleTable, SubHead, Tech, count, when,
 } from "./primitives";
@@ -44,7 +45,14 @@ function Learning({ l, now }: { l: Obj; now: number }) {
   const rm = obj(l.ratings_model);
   const totalFills = Object.values(fills).reduce<number>((s, n) => s + (num(n) ?? 0), 0);
   return (
-    <Panel testid="ops-learning" title="Learning (pre-match)"
+    <Panel testid="ops-learning" title="Learning (pre-match)" cid="learning"
+      summary={line(
+        plain(l.enabled === true ? "on" : l.enabled === false ? "off" : "not stated"),
+        plain(`mean CLV ${cents(l.mean_clv_c)} n ${totalFills}`),
+        plain(`${count(l.model_priced_markets)} model-priced`),
+        typeof l.error === "string" ? warn("summary failed") : null,
+        obj(l.arms_in_use) && typeof obj(l.arms_in_use)!.error === "string" ? warn("arms read failed") : null,
+      )}
       info={<>{text(l.label) === ABSENT ? "" : `${text(l.label)}. `}CLV is cents per contract after fees against the last stored mid before kickoff — a learning signal, not a result.
         In-play learning (arms, entry and exit rewards, in-play CLV) is under Trading → In play. CLV by market type,
         phase or model-only is not served by any route.</>}>
@@ -92,10 +100,10 @@ function Learning({ l, now }: { l: Obj; now: number }) {
  *  counts, today's per-reason counts, and its per-competition rows. */
 function GuardPanel({ b, title, testid, wordsKey }: { b: Obj | null; title: string; testid: string; wordsKey?: string }) {
   if (!b) {
-    return <Panel testid={testid} title={title}><InfoNote>not served yet</InfoNote></Panel>;
+    return <Panel testid={testid} title={title} summary={[plain("not served yet")]}><InfoNote>not served yet</InfoNote></Panel>;
   }
   if (typeof b.error === "string") {
-    return <Panel testid={testid} title={title}><InfoNote tone="warn">◆ block failed: {b.error}</InfoNote></Panel>;
+    return <Panel testid={testid} title={title} summary={[warn("block failed")]}><InfoNote tone="warn">◆ block failed: {b.error}</InfoNote></Panel>;
   }
   const scalars = Object.entries(b).filter(([k, v]) => !["label", "version", "basis", "wording", "at", "by_competition", "absences", "not_built", "threshold_bounds"].includes(k)
     && (typeof v === "number" || typeof v === "boolean" || (typeof v === "string" && v.length < 40)));
@@ -104,6 +112,7 @@ function GuardPanel({ b, title, testid, wordsKey }: { b: Obj | null; title: stri
   const phases = (["pre_match", "in_play"] as const).map((k) => [k, obj(b[k])] as const).filter(([, v]) => v);
   return (
     <Panel testid={testid} title={title} meta={b.at ? when(b.at, true) : undefined}
+      summary={scalars.slice(0, 3).map(([k, v]) => plain(`${k.replace(/_/g, " ")} ${typeof v === "boolean" ? (v ? "yes" : "no") : String(v)}`))}
       info={(str(b.label) || (wordsKey && typeof b[wordsKey] === "string")) ? <>
         {str(b.label) ?? ""}
         {wordsKey && typeof b[wordsKey] === "string" && <span className="mt-1 block">{String(b[wordsKey])}</span>}
@@ -146,7 +155,7 @@ export function ModelView({ d, now, token }: { d: Obj; now: number; token: strin
     <div className="grid grid-cols-12 gap-3">
       <div className="col-span-12">
         {learning ? <Learning l={learning} now={now} /> : (
-          <Panel title="Learning (pre-match)"><InfoNote>learning is not on this backend</InfoNote></Panel>
+          <Panel title="Learning (pre-match)" cid="learning" summary={[plain("not on this backend")]}><InfoNote>learning is not on this backend</InfoNote></Panel>
         )}
       </div>
       <div className="col-span-12"><TradingCareful d={d} token={token} /></div>
