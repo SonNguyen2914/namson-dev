@@ -146,7 +146,8 @@ export interface ReasonBar {
 }
 
 /** {code: n} blocks summed, then ranked: the bars of "why not placed". */
-export function rankReasons(blocks: (Record<string, number> | null | undefined)[]): ReasonBar[] {
+export function rankReasons(blocks: (Record<string, number> | null | undefined)[],
+  wordsFor: Record<string, string> = {}): ReasonBar[] {
   const m = new Map<string, number>();
   for (const b of blocks) {
     if (!b) continue;
@@ -157,7 +158,7 @@ export function rankReasons(blocks: (Record<string, number> | null | undefined)[
   const total = [...m.values()].reduce((s, n) => s + n, 0);
   return [...m.entries()]
     .map(([code, n]) => ({ code, n, share: total ? n / total : 0, group: reasonGroup(code),
-      words: codeWords(code) ?? `${code} (no plain words for this code yet)` }))
+      words: wordsFor[code] ?? codeWords(code) ?? `${code} (no plain words for this code yet)` }))
     .sort((a, b) => b.n - a.n || a.code.localeCompare(b.code));
 }
 
@@ -184,6 +185,18 @@ export function rowReasons(rows: Candidate[]): Record<string, number> {
     if (r.decision.action === "placed") continue;
     const k = r.decision.reason ?? `(${r.decision.action}, no reason sent)`;
     out[k] = (out[k] ?? 0) + 1;
+  }
+  return out;
+}
+
+/** The words each not-placed reason is said in on the rows themselves,
+ *  so the ranked bars and the grid never word one code two ways. */
+export function rowReasonWords(rows: Candidate[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const r of rows) {
+    if (r.decision.action === "placed") continue;
+    const k = r.decision.reason ?? `(${r.decision.action}, no reason sent)`;
+    if (!(k in out)) out[k] = decisionWords(r.decision).text;
   }
   return out;
 }
@@ -217,7 +230,7 @@ export function tickSummary(status: Obj | null, c: Candidates | null): TickSumma
     if (c.rows.length === 0) {
       zero = "No orders placed — the newest snapshot holds no rows.";
     } else {
-      const top = rankReasons([rowReasons(c.rows)]).slice(0, 2);
+      const top = rankReasons([rowReasons(c.rows)], rowReasonWords(c.rows)).slice(0, 2);
       const parts = BADGE_ORDER.filter((k) => k !== "placed" && byBadge[k])
         .map((k) => `${byBadge[k]} ${k === "not_eligible" ? "not eligible" : k}`);
       zero = `No orders placed — ${parts.join(", ")}.`

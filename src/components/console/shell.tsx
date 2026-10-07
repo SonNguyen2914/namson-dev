@@ -88,7 +88,7 @@ export function OperatorStatusBar({ d, now, attention, freshness }: {
   return (
     <div data-testid="ops-strip" className="border-b border-tc-line bg-tc-app/95">
       <div className="mx-auto flex max-w-[1760px] items-center gap-3 px-4 py-1.5 sm:px-6">
-        <div className="tc-scroll flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto" role="list" aria-label="operator status">
+        <div className="tc-scroll tap-floor-room flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto" role="list" aria-label="operator status">
           {items.map((it) => (
             <span role="listitem" key={it.key}>
               <StatusPill testid={`rail-${it.key}`} state={it.state} label={it.label} value={it.value}
@@ -113,7 +113,7 @@ export function OperatorStatusBar({ d, now, attention, freshness }: {
 
 export function ViewNav({ view, counts }: { view: ViewKey; counts: Partial<Record<ViewKey, ReactNode>> }) {
   return (
-    <nav aria-label="console views" className="tc-scroll -mb-px flex min-w-0 items-end gap-1 overflow-x-auto">
+    <nav aria-label="console views" className="tc-scroll tap-floor-room -mb-px flex min-w-0 items-end gap-1 overflow-x-auto">
       {VIEWS.map((v) => {
         const on = v.key === view;
         return (

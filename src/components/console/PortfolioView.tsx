@@ -214,7 +214,8 @@ export function PortfolioView({ d, now, token, source, onPosted, selected, setSe
         )}
         <div className="mt-4 space-y-1 border-t border-tc-line pt-3">
           <p data-testid="book-note" className="text-[12px] leading-relaxed text-ink-low">
-            The trader never touches positions marked Yours (MANUAL). Handed-over positions
+            The trader never touches positions marked Yours (MANUAL).
+            Handed-over positions
             are fully managed: it may add or close within its limits; a close that
             lowers risk may go over a cap, but the halts and the kill switch
             still stop it. Experimental, unproven.

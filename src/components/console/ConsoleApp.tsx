@@ -41,7 +41,7 @@ export function ConsoleApp({ d, statusAt, statusRead, statusStale, now, token, b
   const [cand, setCand] = useState<CandFilters>(NO_CAND_FILTERS);
   const [candSel, setCandSel] = useState<string | null>(null);
   const [ledgerClient, setLedgerClient] = useState<LedgerClientFilters>(NO_LEDGER_CLIENT);
-  const [ledgerSel, setLedgerSel] = useState<number | null>(null);
+  const [ledgerOpen, setLedgerOpen] = useState<Set<number>>(() => new Set());
   const [posSel, setPosSel] = useState<string | null>(null);
   const [tradingTab, setTradingTab] = useState<"candidates" | "inplay">("candidates");
 
@@ -159,7 +159,7 @@ export function ConsoleApp({ d, statusAt, statusRead, statusStale, now, token, b
         )}
         {view === "trades" && (
           <TradesView now={now} source={reads.ledger} client={ledgerClient} setClient={setLedgerClient}
-            selected={ledgerSel} setSelected={setLedgerSel}
+            open={ledgerOpen} setOpen={setLedgerOpen}
             statusDailyLimit={numOrNull((d.daily_loss as Obj | undefined)?.limit)} />
         )}
         {view === "performance" && (

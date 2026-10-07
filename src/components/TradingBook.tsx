@@ -419,13 +419,13 @@ export function PositionsTable({ book, token, onPosted, onInspect, selected }: {
                     <tr data-testid="book-position" data-ticker={p.ticker}
                       data-side={p.side} data-selected={sel || undefined}
                       className={`transition-colors hover:bg-tc-hover ${sel ? "bg-tc-raised shadow-[inset_2px_0_0_var(--accent)]" : ""}`}>
-                      <td className={`${TD} min-w-[170px] max-w-[300px]`}>
-                        {onInspect ? (
-                          <button type="button" data-testid="book-inspect" onClick={() => onInspect(k)}
-                            className="block text-left outline-none focus-visible:ring-2 focus-visible:ring-accent">
-                            <Market title={p.title} ticker={p.ticker} />
-                          </button>
-                        ) : <Market title={p.title} ticker={p.ticker} />}
+                      <td data-testid={onInspect ? "book-inspect" : undefined}
+                        role={onInspect ? "button" : undefined} tabIndex={onInspect ? 0 : undefined}
+                        aria-label={onInspect ? `inspect ${p.title}` : undefined}
+                        onClick={onInspect ? () => onInspect(k) : undefined}
+                        onKeyDown={onInspect ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onInspect(k); } } : undefined}
+                        className={`${TD} min-w-[170px] max-w-[300px] ${onInspect ? "cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent" : ""}`}>
+                        <Market title={p.title} ticker={p.ticker} />
                       </td>
                       <td className={`${TD} font-medium uppercase text-ink-hi`}>{p.side}</td>
                       <td className={`${TD} text-right`}>

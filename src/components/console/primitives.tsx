@@ -343,7 +343,6 @@ export function Tech({ children, title, className = "", tone = "text-ink-low" }:
 }) {
   return (
     <span title={title ?? (typeof children === "string" ? children : undefined)}
-      tabIndex={title || typeof children === "string" ? 0 : undefined}
       className={`font-mono text-[11px] ${tone} outline-none focus-visible:text-ink-hi ${className}`}>
       {children}
     </span>
@@ -390,18 +389,22 @@ export function Drawer({ open, onClose, title, subtitle, children, testid, width
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const opener = useRef<Element | null>(null);
+  // the latest close, so a refresh (a new closure) never re-runs the focus
+  // hand-off below — focus moves only when the drawer opens or closes
+  const close = useRef(onClose);
+  useEffect(() => { close.current = onClose; });
   useEffect(() => {
     if (!open) return;
     opener.current = document.activeElement;
     ref.current?.focus({ preventScroll: true });
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close.current(); };
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
       const o = opener.current as HTMLElement | null;
       if (o && typeof o.focus === "function" && document.contains(o)) o.focus({ preventScroll: true });
     };
-  }, [open, onClose]);
+  }, [open]);
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[60] flex justify-end" role="presentation">

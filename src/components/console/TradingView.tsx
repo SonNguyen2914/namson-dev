@@ -16,7 +16,7 @@
 import { type KeyboardEvent, memo, useMemo, useRef, useState } from "react";
 import {
   BADGES, BADGE_MEANING, BADGE_ORDER, GROUP_LABEL, type ReasonBar, type ReasonGroup,
-  decisionBadge, rankReasons, reasonsOfKinds, rowReasons,
+  decisionBadge, rankReasons, reasonsOfKinds, rowReasonWords, rowReasons,
 } from "../../lib/consoleModel";
 import {
   BOUND_REASONS, type Candidate, type Candidates, type Pair,
@@ -170,8 +170,8 @@ const CandRow = memo(function CandRow({ r, selected, onOpen, onKey }: {
       className={`cursor-pointer outline-none transition-colors hover:bg-tc-hover focus-visible:bg-tc-hover focus-visible:shadow-[inset_2px_0_0_var(--accent)] ${
         selected ? "bg-tc-raised shadow-[inset_2px_0_0_var(--accent)]" : ""}`}>
       <td className="border-b border-tc-line py-2 pl-4 pr-3 align-top">
-        <span className="block max-w-[340px] text-[13px] leading-snug text-ink-hi">{r.title}</span>
-        <Tech className="mt-0.5 block max-w-[300px] truncate" title={r.ticker}>{r.ticker}</Tech>
+        <span className="block max-w-[170px] text-[13px] leading-snug text-ink-hi sm:max-w-[340px]">{r.title}</span>
+        <Tech className="mt-0.5 block max-w-[170px] truncate sm:max-w-[300px]" title={r.ticker}>{r.ticker}</Tech>
         <span className="block text-[11px] text-ink-low">{r.family ? familyWords(r.family) : "type not stated"}</span>
       </td>
       <td className="border-b border-tc-line px-3 py-2 align-top">
@@ -330,7 +330,8 @@ function WhyNotPlaced({ rows, today, compLabelText, onReason, activeReason }: {
   onReason: (code: string) => void; activeReason: string;
 }) {
   const [src, setSrc] = useState<"tick" | "today">("tick");
-  const bars: ReasonBar[] = rankReasons([src === "tick" ? rowReasons(rows) : today]);
+  const bars: ReasonBar[] = src === "tick" ? rankReasons([rowReasons(rows)], rowReasonWords(rows))
+    : rankReasons([today]);
   const groups = new Map<ReasonGroup, ReasonBar[]>();
   for (const b of bars) groups.set(b.group, [...(groups.get(b.group) ?? []), b]);
   const ordered = [...groups.entries()].sort((a, b) =>

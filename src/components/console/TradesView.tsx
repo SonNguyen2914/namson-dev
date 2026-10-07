@@ -244,10 +244,13 @@ const stamp = () => new Date().toISOString().replace(/[-:]/g, "").replace(/^(\d{
 
 // --------------------------------------------------------------- view
 
-export function TradesView({ now, source, client, setClient, selected, setSelected, statusDailyLimit }: {
+export function TradesView({ now, source, client, setClient, open, setOpen, statusDailyLimit }: {
   now: number; source: LedgerSource; client: LedgerClientFilters;
   setClient: (f: LedgerClientFilters | ((f: LedgerClientFilters) => LedgerClientFilters)) => void;
-  selected: number | null; setSelected: (id: number | null) => void; statusDailyLimit: number | null;
+  /** the rows whose grounds are open — held above the view, so a refresh
+   *  or a view switch never collapses them */
+  open: Set<number>; setOpen: (f: (s: Set<number>) => Set<number>) => void;
+  statusDailyLimit: number | null;
 }) {
   void statusDailyLimit;
   const { read, filters, setFilter, clearFilters, known } = source;
@@ -256,7 +259,6 @@ export function TradesView({ now, source, client, setClient, selected, setSelect
   const stale = at !== null && (read.kind !== "ok" || now - at > 3 * source.cadenceMs);
   const serverFiltered = Object.values(filters).some((v) => v !== "");
   const clientFiltered = Object.values(client).some((v) => v !== "");
-  const [open, setOpen] = useState<Set<number>>(() => new Set(selected !== null ? [selected] : []));
   const [boxW, setBoxW] = useState<number | null>(null);
   const observer = useRef<ResizeObserver | null>(null);
   const box = useCallback((el: HTMLDivElement | null) => {
@@ -286,14 +288,11 @@ export function TradesView({ now, source, client, setClient, selected, setSelect
     });
   }, [rows, client]);
 
-  const toggle = (k: number) => {
-    setOpen((s) => {
-      const n = new Set(s);
-      if (n.has(k)) n.delete(k); else n.add(k);
-      return n;
-    });
-    setSelected(open.has(k) ? null : k);
-  };
+  const toggle = (k: number) => setOpen((s) => {
+    const n = new Set(s);
+    if (n.has(k)) n.delete(k); else n.add(k);
+    return n;
+  });
 
   const exportCsv = () => {
     // a BOM, so a spreadsheet reads the file as UTF-8 (≥, —, ¢)

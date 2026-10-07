@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
-import { hydrated } from "./operator-console";
+import { hydrated, view } from "./operator-console";
 import {
   LEDGER_PAGE_1, LEDGER_PAGE_2, LEDGER_RECORDED,
 } from "./trading-ledger-recorded";
@@ -81,7 +81,7 @@ async function openConsole(page: Page,
     reads.push(r.request());
     return r.fulfill(json(200, ledger(new URL(r.request().url()))));
   });
-  await page.goto("/ops/trading");
+  await page.goto("/ops/trading#trades");
   await hydrated(page);
   await page.locator("#watch-token").fill(TOKEN);
   await expect(page.getByTestId("ops-ledger")).toBeVisible();
@@ -271,6 +271,8 @@ test.describe("the ledger reads the backend's trading-ledger-v1", () => {
         ["open", "$3.56"], ["cost", "$28.58"]] as const) {
         await expect(totals.getByTestId(`ledger-total-${k}`), k).toContainText(v);
       }
+      // the day-by-day and the breakdowns live in Performance (redesign)
+      await view(page, "#performance");
       await expect(page.getByTestId("ledger-day-limit"))
         .toContainText("daily loss limit $10.00");
       await expect(page.getByTestId("ledger-day-limit"))

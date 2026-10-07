@@ -204,7 +204,8 @@ export function PerformanceView({ now, source, go, statusDailyLimit }: {
           </div>
           <div className="col-span-12">
             <Panel title="Day by day">
-              <Days days={days} limit={limit} limitFrom={limitFrom} />
+              {/* the table AS SENT (the chart above is drawn in date order) */}
+              <Days days={s.by_day} limit={limit} limitFrom={limitFrom} />
             </Panel>
           </div>
           <div className="col-span-12 lg:col-span-6">

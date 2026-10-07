@@ -92,7 +92,7 @@ async function openConsole(page: Page, status: unknown) {
   await page.route(STATUS, (r) => r.fulfill(json(200, status)));
   await page.route(BOOK, (r) => r.fulfill(json(200, BOOK_RECORDED)));
   await page.route(CANDIDATES, (r) => r.fulfill(json(200, CANDIDATES_RECORDED)));
-  await page.goto("/ops/trading");
+  await page.goto("/ops/trading#trading?tab=inplay");
   await hydrated(page);
   await page.locator("#watch-token").fill(TOKEN);
   await expect(page.getByTestId("ops-inplay")).toBeVisible();
