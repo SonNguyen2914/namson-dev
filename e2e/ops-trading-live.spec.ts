@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
-import { hydrated } from "./operator-console";
+import { hydrated, view } from "./operator-console";
 
 // LIVE VALUE AND THE REST OF THE STATUS ON THE CONSOLE (2026-10-05).
 //
@@ -144,7 +144,7 @@ async function open(page: Page, status: unknown, books: unknown[],
     bookReads.push(r.request());
     return r.fulfill(json(200, books[Math.min(bookReads.length - 1, books.length - 1)]));
   });
-  await page.goto("/ops/trading");
+  await page.goto("/ops/trading#portfolio");
   await hydrated(page, fakeClock);
   await page.locator("#watch-token").fill(TOKEN);
   // UNDER AN INSTALLED CLOCK the token's 600 ms debounce waits for it —
@@ -191,18 +191,18 @@ test.describe("live value on the book", () => {
 
       // the legend: each source in use, in the backend's own sentence
       const legend = page.getByTestId("book-mark-legend");
-      await expect(legend.locator("li")).toHaveCount(3);
+      await expect(page.getByTestId("book-mark-legend-item")).toHaveCount(3);
       await expect(legend).toContainText("catalogue book bid — before kickoff: the catalogue's order book bid");
       await expect(legend).toContainText("live feed — in play: the running in-play WebSocket feed's best bid");
       await expect(legend).toContainText("no live price — no live price: in play with no vouched feed book");
 
       const totals = page.getByTestId("book-live-totals");
-      await expect(totals).toContainText("live value $4.92");
-      await expect(totals).toContainText("unrealised +$0.35");
-      await expect(totals).toContainText("2 of 3 with a live mark");
+      await expect(totals).toContainText("live $4.92");
+      await expect(totals).toContainText("+$0.35");
+      await expect(totals).toContainText("2 of 3 marked");
+      await expect(totals).toHaveAttribute("title", /live value · unrealised/);
       await expect(page.getByTestId("book-live-unmarked"))
         .toContainText("1 without one, not counted");
-      await expect(totals).toContainText("experimental, unproven");
       await expect(page.getByTestId("book-live-note"))
         .toContainText("the loss halts still count an in-play position at its cost");
     });
@@ -270,6 +270,7 @@ test.describe("in-play v2, learning, hand-over and settlement reads", () => {
   test("every block the status carries is drawn", async ({ page }) => {
     await open(page, FULL_STATUS, [book(FIRST)]);
 
+    await view(page, "#trading?tab=inplay");
     const v2 = page.getByTestId("inplay-v2");
     for (const s of ["inplay-v2", "legs with a live-stat read", "mean w 0.40",
       "2 placed", "1 cancelled", "2 refused · 0 cancelled", "+1.25¢",
@@ -282,6 +283,7 @@ test.describe("in-play v2, learning, hand-over and settlement reads", () => {
     await expect(page.getByTestId("inplay-v2-arms")).toContainText("exit · MLS");
     await expect(page.getByTestId("inplay-v2-arms")).toContainText("0.2/0.02");
 
+    await view(page, "#portfolio");
     const ho = page.getByTestId("ops-handover");
     for (const s of ["handed-over contracts", "in 1 markets", "managed contracts",
       "in 2 markets", "yours (manual) contracts", "risk-lowering closes today",
@@ -290,6 +292,7 @@ test.describe("in-play v2, learning, hand-over and settlement reads", () => {
     }
     await expect(page.getByTestId("handover-absent")).toHaveCount(0);
 
+    await view(page, "#model");
     const learning = page.getByTestId("ops-learning");
     await expect(learning).toContainText("w 0.5 · t 0.02");
     await expect(page.getByTestId("learning-basis"))
@@ -308,11 +311,13 @@ test.describe("in-play v2, learning, hand-over and settlement reads", () => {
     await expect(comps.locator("tbody tr").first()).toContainText("Premier League");
     await expect(comps.locator("tbody tr").nth(3)).toHaveText(/Liga MX\s*0\s*—\s*—\s*prior only/);
 
+    await view(page, "#system");
     const out = page.getByTestId("settlement-outcomes");
     await expect(out.locator("thead")).toContainText("last 240 ticks");
     await expect(out.locator("tbody tr")).toHaveCount(4);
-    await expect(out.locator("tbody tr").nth(0)).toHaveText(
-      /settled — the account's settlement data gave one yes\/no result\s*1\s*2/);
+    await expect(out.locator("tbody tr").nth(0)).toHaveText(/settled\s*1\s*2/);
+    await expect(out.locator("tbody tr").nth(0).locator("td span").first()).toHaveAttribute("title",
+      "settled — the account's settlement data gave one yes/no result");
     await expect(out.locator("tbody tr").nth(1)).toHaveText(/not listed yet.*\s*1\s*9/);
     await expect(out.locator("tbody tr").nth(1)).toContainText("not listed yet");
     await expect(out.locator("tbody tr").nth(2)).toContainText("unclear result");
@@ -333,22 +338,31 @@ test.describe("in-play v2, learning, hand-over and settlement reads", () => {
     + "sideways", async ({ page }) => {
       await page.setViewportSize({ width: 400, height: 900 });
       await open(page, FULL_STATUS, [book(FIRST)]);
-      await expect(page.getByTestId("settlement-outcomes")).toBeVisible();
-      await expect(page.getByTestId("inplay-v2-arms")).toBeVisible();
-      const m = await page.evaluate(() => ({
-        page: document.documentElement.scrollWidth,
-        view: document.documentElement.clientWidth,
-      }));
-      expect(m.page, "no sideways page scroll").toBeLessThanOrEqual(m.view);
+      // every view, filled, at 400 px
+      for (const [hash, id] of [["#system", "settlement-outcomes"],
+        ["#trading?tab=inplay", "inplay-v2-arms"], ["#overview", "ops-money"],
+        ["#portfolio", "book-positions"], ["#model", "learning-comps"],
+        ["#trades", "ops-ledger"], ["#performance", "ops-performance"]] as const) {
+        await view(page, hash);
+        await expect(page.getByTestId(id), hash).toBeVisible();
+        const m = await page.evaluate(() => ({
+          page: document.documentElement.scrollWidth,
+          view: document.documentElement.clientWidth,
+        }));
+        expect(m.page, `${hash}: no sideways page scroll`).toBeLessThanOrEqual(m.view);
+      }
     });
 
   test("an older backend: each missing block says 'not on this backend'",
     async ({ page }) => {
       await open(page, BASE_STATUS, [book(FIRST)]);
-      await expect(page.getByTestId("inplay-v2-absent"))
-        .toHaveText("in-play v2 is not on this backend");
       await expect(page.getByTestId("handover-absent"))
         .toHaveText("hand-over numbers are not on this backend");
+      await view(page, "#trading?tab=inplay");
+      await expect(page.getByTestId("inplay-v2-absent"))
+        .toHaveText("in-play v2 is not on this backend");
+      await expect(page.getByTestId("inplay-v2")).toHaveCount(0);
+      await view(page, "#system");
       await expect(page.getByTestId("settlements-absent"))
         .toHaveText("settlement-read outcomes are not on this backend");
       await expect(page.getByTestId("unreadable-fills"))
@@ -366,6 +380,7 @@ test.describe("in-play v2, learning, hand-over and settlement reads", () => {
       }, [book(FIRST)]);
       await expect(page.getByTestId("handover-absent")).toHaveCount(0);
       await expect(page.getByTestId("ops-handover")).toContainText("0");
+      await view(page, "#system");
       await expect(page.getByTestId("settlements-absent")).toHaveCount(0);
       await expect(page.getByTestId("ops-settlements"))
         .toContainText("nothing held awaits a result");

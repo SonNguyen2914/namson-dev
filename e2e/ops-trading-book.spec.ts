@@ -1,3 +1,4 @@
+import { view } from "./operator-console";
 import { expect, test, type Page, type Request } from "@playwright/test";
 import { LIVE, STANDIN_URL } from "./backend";
 
@@ -92,7 +93,7 @@ async function openConsole(page: Page, book: { status: number; body: unknown }) 
     bookReads.push(r.request());
     return r.fulfill(json(book.status, book.body));
   });
-  await page.goto("/ops/trading");
+  await page.goto("/ops/trading#portfolio");
   await page.locator("#watch-token").fill(TOKEN);
   await expect(page.getByTestId("ops-book")).toBeVisible();
   return { bookReads, dialogs };
@@ -126,9 +127,9 @@ test.describe("the trader's book on the console", () => {
       expect(bookReads[0].headers()["x-admin-token"]).toBe(TOKEN);
 
       const mixed = row(page, MIXED);
-      await expect(mixed.getByTestId("chip-trader")).toHaveText("Trader 2");
-      await expect(mixed.getByTestId("chip-handed")).toHaveText("Handed over 3");
-      await expect(mixed.getByTestId("chip-yours")).toHaveText("Yours 1");
+      await expect(mixed.getByTestId("chip-trader")).toHaveText("AGENT 2");
+      await expect(mixed.getByTestId("chip-handed")).toHaveText("HANDOVER 3");
+      await expect(mixed.getByTestId("chip-yours")).toHaveText("MANUAL 1");
       await expect(mixed).toContainText("in play");
       await expect(mixed).toContainText(MIXED);
       await expect(mixed).toContainText("41.5¢");
@@ -137,7 +138,7 @@ test.describe("the trader's book on the console", () => {
       await expect(mixed.getByTestId("take-back")).toHaveText("Take back");
 
       const manual = row(page, MANUAL);
-      await expect(manual.getByTestId("chip-yours")).toHaveText("Yours 4");
+      await expect(manual.getByTestId("chip-yours")).toHaveText("MANUAL 4");
       await expect(manual.getByTestId("chip-trader")).toHaveCount(0);
       await expect(manual.getByTestId("chip-handed")).toHaveCount(0);
       await expect(manual.getByTestId("hand-over")).toHaveCount(1);
@@ -145,7 +146,7 @@ test.describe("the trader's book on the console", () => {
 
       // the trader's own: nothing to hand over, nothing to take back
       const own = row(page, TRADER);
-      await expect(own.getByTestId("chip-trader")).toHaveText("Trader 5");
+      await expect(own.getByTestId("chip-trader")).toHaveText("AGENT 5");
       await expect(own.getByTestId("chip-yours")).toHaveCount(0);
       await expect(own.locator("button")).toHaveCount(0);
 
@@ -153,17 +154,18 @@ test.describe("the trader's book on the console", () => {
       await expect(orders.getByTestId("book-order")).toHaveCount(2);
       await expect(orders.locator("button")).toHaveCount(0);
       await expect(page.locator('[data-testid="book-order"][data-ticker="'
-        + MANUAL + '"]').getByTestId("chip-yours")).toHaveText("Yours");
+        + MANUAL + '"]').getByTestId("chip-yours")).toHaveText("MANUAL");
       await expect(page.locator('[data-testid="book-order"][data-ticker="'
-        + TRADER + '"]').getByTestId("chip-trader")).toHaveText("Trader");
+        + TRADER + '"]').getByTestId("chip-trader")).toHaveText("AGENT");
       await expect(page.getByTestId("book-orders-line")).toHaveText(
         "Resting orders can't be handed over yet — positions only.");
       await expect(page.getByTestId("book-note")).toContainText(
-        "The trader never touches positions marked Yours.");
+        "The trader never touches positions marked Yours (MANUAL).");
       await expect(page.getByTestId("book-note")).toContainText(
         "a close that lowers risk may go over a cap, but the halts and the "
-        + "kill switch still stop it. Experimental, unproven.");
-      await expect(page.getByTestId("book-totals")).toContainText("3 positions");
+        + "kill switch still stop it.");
+      // the totals sentence moved behind the line's hover (quiet pass)
+      expect(await page.getByTestId("book-totals").getAttribute("title")).toContain("3 positions");
     });
 
   test("hand to trader: inline count, Confirm posts the exact body, says "
@@ -258,6 +260,7 @@ test.describe("the trader's book on the console", () => {
         .toContainText("Book not available yet");
       await expect(page.getByTestId("book-positions")).toHaveCount(0);
       await expect(page.getByTestId("ops-strip")).toBeVisible();
+      await view(page, "#overview");
       await expect(page.getByTestId("ops-money")).toContainText("$48.12");
     });
 
@@ -269,7 +272,7 @@ test.describe("the trader's book on the console", () => {
           manual_contracts: 0, not_listed_positions: 2, not_listed_orders: 1 },
       } });
       await expect(page.getByTestId("book-not-listed")).toHaveText(
-        "2 more positions and 1 more resting order on markets the trader "
+        "◆ 2 more positions and 1 more resting order on markets the trader "
         + "does not track are not shown.");
       await expect(page.getByTestId("book-positions-empty"))
         .toHaveText("No open positions on markets the trader tracks.");
@@ -317,7 +320,9 @@ test.describe("the trader's book on the console", () => {
       .toHaveText("No open positions on the account.");
     await expect(page.getByTestId("book-orders-empty"))
       .toHaveText("No resting orders on the account.");
-    await expect(page.locator('[data-testid="ops-book"] button')).toHaveCount(0);
+    // no hand-over control (the ⓘ disclosures and the section's own fold
+    // toggle are not controls on a position)
+    await expect(page.locator('[data-testid="ops-book"] button:not([data-info]):not([data-testid="panel-toggle"])')).toHaveCount(0);
   });
 
   test("at 400 px the tables scroll inside their boxes and the page does "

@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
-import { hydrated } from "./operator-console";
+import { hydrated, view } from "./operator-console";
 import { LIVE, STANDIN_URL } from "./backend";
 
 // THE TRADER'S CANDIDATES ON THE OPERATOR CONSOLE (2026-10-05).
@@ -193,7 +193,7 @@ async function openConsole(page: Page, answers: Answer[],
       ? r.fulfill({ status: a.status, contentType: "text/plain", body: a.raw })
       : r.fulfill(json(a.status, a.body));
   });
-  await page.goto("/ops/trading");
+  await page.goto("/ops/trading#trading");
   await hydrated(page, fakeClock);
   await page.locator("#watch-token").fill(TOKEN);
   // UNDER AN INSTALLED CLOCK the token's 600 ms debounce waits for it —
@@ -213,6 +213,13 @@ const row = (page: Page, ticker: string) =>
   page.locator(`[data-testid="cand-row"][data-ticker="${ticker}"]`);
 const chip = (page: Page, comp: string) =>
   page.locator(`[data-testid="cand-comp"][data-comp="${comp}"]`);
+/** open a row's inspector and hand it back */
+async function inspect(page: Page, ticker: string) {
+  await row(page, ticker).click();
+  const insp = page.locator(`[data-testid="cand-inspector"][data-ticker="${ticker}"]`);
+  await expect(insp).toBeVisible();
+  return insp;
+}
 const pill = (page: Page, d: string) =>
   page.locator(`[data-testid="cand-decision"][data-decision="${d}"]`);
 
@@ -231,79 +238,117 @@ test.describe("the trader's candidates on the console", () => {
       expect(reads[0].headers()["x-admin-token"]).toBe(TOKEN);
       await expect(page.getByTestId("cand-summary"))
         .toContainText("6 shown · 2 placed · 4 not placed · 212 considered");
-      await expect(page.getByTestId("ops-candidates"))
-        .toContainText("Experimental, unproven");
+      // ONE DISCLAIMER (quiet pass, 2026-10-07): the header says it once; the
+      // panel's own caveat is behind its ⓘ
+      await expect(page.getByTestId("ops-disclosure"))
+        .toContainText("experimental · unproven · not advice");
       await expect(page.getByTestId("ops-candidates"))
         .toContainText("our model's probability is unvalidated");
 
-      // the placed EPL row, number by number
+      // the placed EPL row: the grid carries the essentials; the inspector
+      // (redesign, 2026-10-07) carries every number, one click away
       const epl = row(page, PLACED_EPL);
       await expect(epl).toHaveAttribute("data-decision", "placed");
-      for (const s of ["Arsenal vs West Ham — Arsenal", PLACED_EPL, "GAME",
-        "Premier League", "54.0%", "51.0%", "0.50", "52.5%", "47¢ / 50¢",
-        "maker 48¢", "50¢ / 53¢", "maker 51¢", "+2.62¢", "−4.40¢", "1.5¢",
-        "pre-match", "YES · 4 @ 48¢",
-        "Placed: yes at 48c x 4, resting as a maker order."]) {
+      await expect(epl).toHaveAttribute("data-badge", "placed");
+      for (const s of ["Arsenal vs West Ham — Arsenal", PLACED_EPL,
+        "Premier League", "54.0%", "51.0%", "52.5%", "47¢ / 50¢", "+2.62¢",
+        "≥1.5¢", "YES · 4 @ 48¢"]) {
         await expect(epl, s).toContainText(s);
       }
-      await expect(epl.getByTestId("cand-placed-chip")).toHaveText("Placed");
-      // the edge that clears the bar is marked, the one that does not is not
-      await expect(epl.getByTestId("cand-edge-yes")).toHaveAttribute("data-clears", "true");
-      await expect(epl.getByTestId("cand-edge-no")).not.toHaveAttribute("data-clears", /.*/);
-
-      // HIGHLIGHTED: a placed row carries an inset accent bar and a tint
-      // that the others do not — read off the computed style, so a class
-      // that stopped meaning anything would fail here
+      // the words moved one hover away (quiet pass): the market type on the
+      // name, the placement's sentence on the reason cell
+      expect(await epl.locator("td").first().locator("span").first().getAttribute("title")).toContain("match result");
+      expect(await epl.getByTestId("cand-reason-tag").getAttribute("title"))
+        .toContain("Placed: yes at 48c x 4, resting as a maker order.");
+      await expect(epl.getByTestId("cand-action")).toContainText("Placed · YES");
+      await expect(epl.getByTestId("cand-placed-chip")).toHaveText("YES · 4 @ 48¢");
+      // NEVER A COLOURED ROW (redesign brief, 2026-10-07): a placed row is
+      // said by its badge, not by tinting the row — read off the computed
+      // style, so a tint that crept back would fail here
       const shadow = (t: string) => row(page, t).evaluate(
         (el) => getComputedStyle(el).boxShadow);
-      expect(await shadow(PLACED_EPL)).not.toBe("none");
-      expect(await shadow(INPLAY_MLS)).not.toBe("none");
-      expect(await shadow(WORDS_LALIGA)).toBe("none");
-      expect(await shadow(HELD_BACK_BUND)).toBe("none");
+      for (const t of [PLACED_EPL, INPLAY_MLS, WORDS_LALIGA, HELD_BACK_BUND]) {
+        expect(await shadow(t), t).toBe("none");
+      }
+
+      let insp = await inspect(page, PLACED_EPL);
+      for (const s of ["GAME", "54.0%", "51.0%", "0.50", "52.5%", "47¢ / 50¢",
+        "maker 48¢", "50¢ / 53¢", "maker 51¢", "+2.62¢", "−4.40¢", "1.5¢",
+        "pre-match", "YES · 4 @ 48¢", "Placed: yes at 48c x 4, resting as a maker order.",
+        "an order the venue accepted this tick"]) {
+        await expect(insp, s).toContainText(s);
+      }
+      // the edge that clears the bar is marked, the one that does not is not
+      await expect(insp.getByTestId("cand-edge-yes")).toHaveAttribute("data-clears", "true");
+      await expect(insp.getByTestId("cand-edge-no")).not.toHaveAttribute("data-clears", /.*/);
+      await page.keyboard.press("Escape");
+      await expect(page.getByTestId("cand-inspector")).toHaveCount(0);
 
       // the backend's own words win, with its code and detail beside them…
       const laliga = row(page, WORDS_LALIGA);
       await expect(laliga).toHaveAttribute("data-decision", "skipped");
-      await expect(laliga.getByTestId("cand-action")).toHaveText("Skipped");
-      await expect(laliga.getByTestId("cand-words"))
-        .toHaveText("Neither side clears the bar.");
-      await expect(laliga).toContainText("no_edge · no side >= 0.02");
+      await expect(laliga.getByTestId("cand-action")).toContainText("Skipped");
+      // the grid says a short tag; the words and the code are one hover
+      // away on it, and in the inspector (quiet pass, 2026-10-07)
+      await expect(laliga.getByTestId("cand-reason-tag")).toHaveText("no edge");
+      await expect(laliga.getByTestId("cand-reason-tag"))
+        .toHaveAttribute("title", "Neither side clears the bar. (no_edge)");
       // no model price was sent: the model cell is a dash, not 0.0%
-      await expect(laliga.locator("td").nth(4)).toHaveText("—");
+      await expect(laliga.locator("td").nth(5)).toHaveText("—");
+      insp = await inspect(page, WORDS_LALIGA);
+      await expect(insp).toContainText("no side >= 0.02");
+      await expect(insp).toContainText("no_edge");
+      await page.keyboard.press("Escape");
       // …a known code with no words is said from this page's table…
       const mls = row(page, KNOWN_CODE_MLS);
-      await expect(mls.getByTestId("cand-action")).toHaveText("Skipped · NO");
-      await expect(mls.getByTestId("cand-words"))
-        .toHaveText("the bookmaker price is too old to trust");
-      // …and an unknown code is drawn as itself, said to have no words
+      await expect(mls.getByTestId("cand-action")).toContainText("Skipped · NO");
+      await expect(mls.getByTestId("cand-reason-tag")).toHaveText("stale odds");
+      await expect(mls.getByTestId("cand-reason-tag"))
+        .toHaveAttribute("title", "the bookmaker price is too old to trust (stale_consensus)");
+      // …and an unknown code is drawn as itself, said to have no words; a
+      // risk-engine refusal wears the amber BLOCKED badge, its action kept
       const unl = row(page, UNKNOWN_CODE_UNL);
-      await expect(unl.getByTestId("cand-action")).toHaveText("Refused · YES");
-      await expect(unl.getByTestId("cand-words"))
-        .toHaveText("a_code_no_table_has_yet (no plain words were sent for this code)");
+      await expect(unl).toHaveAttribute("data-decision", "refused");
+      await expect(unl.getByTestId("cand-action")).toContainText("Blocked · YES");
+      await expect(unl.getByTestId("cand-reason-tag")).toHaveText("blocked: a code no table has yet");
+      await expect(unl.getByTestId("cand-reason-tag")).toHaveAttribute("title",
+        /^a_code_no_table_has_yet \(no plain words were sent for this code\)/);
       // a held-back market: every number it lacks is a dash
       const bund = row(page, HELD_BACK_BUND);
-      await expect(bund.getByTestId("cand-action")).toHaveText("Not eligible");
-      await expect(bund.getByTestId("cand-edge-yes")).toHaveText("—");
+      await expect(bund.getByTestId("cand-action")).toContainText("Not eligible");
+      await expect(bund.getByTestId("cand-best-edge")).toHaveText("—");
       await expect(bund).toContainText("61¢ / 63¢");
-      await expect(bund).toContainText("maker —");
+      insp = await inspect(page, HELD_BACK_BUND);
+      await expect(insp.getByTestId("cand-edge-yes")).toHaveText("—");
+      await expect(insp).toContainText("maker —");
+      await page.keyboard.press("Escape");
 
-      // the in-play row: the minute, HOT, the (home, away) reads, danger
-      // per side, the engine and live-stat prices, the placement
+      // the in-play row: the minute and the placement in the grid; HOT, the
+      // (home, away) reads, danger per side, the engine and live-stat prices
+      // in the inspector
       const ip = row(page, INPLAY_MLS);
       await expect(ip).toContainText("in play 63′");
-      await expect(ip.getByTestId("cand-hot")).toHaveText(["HOT against YES"]);
-      await expect(ip).toContainText("mode protective_exit");
-      await expect(ip).toContainText("momentum home +0.12 · away +0.39");
-      await expect(ip).toContainText("xG15 home +0.21 · away +0.64");
-      await expect(ip).toContainText("danger YES 22.0% · NO 8.0%");
-      await expect(ip).toContainText("engine 40.0% · live-stat 38.0%");
       await expect(ip).toContainText("NO · 2 @ 31¢");
-      await expect(ip).toContainText("protective exit: HOT against the held YES");
+      await expect(ip.getByTestId("cand-reason-tag"))
+        .toHaveAttribute("title", /protective exit: HOT against the held YES/);
+      insp = await inspect(page, INPLAY_MLS);
+      await expect(insp.getByTestId("cand-hot")).toHaveText(["HOT against YES"]);
+      await expect(insp).toContainText("mode protective_exit");
+      await expect(insp).toContainText("momentum home +0.12 · away +0.39");
+      await expect(insp).toContainText("xG15 home +0.21 · away +0.64");
+      await expect(insp).toContainText("danger YES 22.0% · NO 8.0%");
+      await expect(insp).toContainText("engine 40.0% · live-stat 38.0%");
+      await page.keyboard.press("Escape");
 
-      // why not placed, counted in words
+      // why not placed, counted in words, ranked
       const why = page.getByTestId("cand-why");
       await expect(why.locator("li")).toHaveCount(4);
-      await expect(why).toContainText("the bookmaker price is too old to trust");
+      // a tag per reason; the words and the code on the bar's hover and in
+      // the panel's ⓘ legend (quiet pass, 2026-10-07)
+      await expect(why).toContainText("stale odds");
+      await expect(page.locator('[data-testid="why-bar"][data-code="stale_consensus"]'))
+        .toHaveAttribute("title", /the bookmaker price is too old to trust \(stale_consensus\)/);
+      await expect(page.getByTestId("ops-why")).toContainText("the bookmaker price is too old to trust");
     });
 
   test("filters by competition and by decision narrow the table and hold "
@@ -314,7 +359,7 @@ test.describe("the trader's candidates on the console", () => {
       await expect(page.getByTestId("cand-row")).toHaveCount(6);
       // the decision pills: placed and skipped always, then each action held
       await expect(page.getByTestId("cand-decision")).toHaveText([
-        "All decisions · 6", "Placed · 2", "Refused · 1", "Skipped · 2",
+        "All · 6", "Placed · 2", "Blocked · 1", "Skipped · 2",
         "Not eligible · 1"]);
 
       await chip(page, "mls").click();
@@ -331,8 +376,9 @@ test.describe("the trader's candidates on the console", () => {
       // "why not placed" follows the COMPETITION, not the decision filter:
       // MLS's one skip is still said while only its placement is listed
       await expect(page.getByTestId("cand-why").locator("li")).toHaveCount(1);
-      await expect(page.getByTestId("cand-why"))
-        .toContainText("the bookmaker price is too old to trust");
+      await expect(page.getByTestId("cand-why")).toContainText("stale odds");
+      expect(await page.getByTestId("why-bar").first().getAttribute("title"))
+        .toContain("the bookmaker price is too old to trust");
 
       // THE NEXT READ, fifteen seconds on: the filters are the tab's and stay
       const before = reads.length;
@@ -385,24 +431,25 @@ test.describe("the trader's candidates on the console", () => {
       await expect(chip(page, "mls")).toHaveText("MLS · 2, 1 placed");
       await expect(chip(page, "unl")).toHaveText("UEFA Nations League · 1");
       for (const k of ["ligamx", "seriea", "ligue1", "eredivisie", "cnl", "afcon"]) {
-        await expect(chip(page, k), k).toContainText("none in this snapshot");
+        await expect(chip(page, k), k).toContainText("none");
+        expect(await chip(page, k).getAttribute("title"), k).toContain("none in this snapshot");
         await expect(chip(page, k), k).not.toContainText(" 0");
       }
       // the non-vacuity half: a competition WITH rows never says none
-      await expect(chip(page, "epl")).not.toContainText("none in this snapshot");
-      await expect(page.getByTestId("ops-candidates")).toContainText("the trader's scope");
+      await expect(chip(page, "epl")).not.toContainText("none");
+      await expect(page.getByTestId("cand-scope-label")).toHaveAttribute("title", "the trader's scope");
     });
 
   test("a payload that names no competitions falls back to the eleven focus "
     + "competitions", async ({ page }) => {
       await openConsole(page, [{ status: 200, body: withoutCounts() }]);
       await expect(page.getByTestId("cand-row")).toHaveCount(6);
-      await expect(page.getByTestId("ops-candidates"))
-        .toContainText("the eleven focus competitions");
+      await expect(page.getByTestId("cand-scope-label"))
+        .toHaveAttribute("title", "the eleven focus competitions");
       await expect(page.getByTestId("cand-comp")).toHaveCount(12);
       await expect(page.getByTestId("cand-by-comp")).toHaveCount(0);
       await expect(chip(page, "afcon"))
-        .toHaveText("Africa Cup of Nations · none in this snapshot");
+        .toHaveText("Africa Cup of Nations · none");
     });
 
   test("a stated scope is the scope; a row outside it is still shown and "
@@ -410,7 +457,7 @@ test.describe("the trader's candidates on the console", () => {
       await openConsole(page, [{ status: 200,
         body: { ...withoutCounts(), scope: ["epl", "mls"] } }]);
       await expect(page.getByTestId("cand-row")).toHaveCount(6);
-      await expect(page.getByTestId("ops-candidates")).toContainText("the trader's scope");
+      await expect(page.getByTestId("cand-scope-label")).toHaveAttribute("title", "the trader's scope");
       // All + the two in scope + the three the rows name outside it
       await expect(page.getByTestId("cand-comp")).toHaveCount(6);
       await expect(chip(page, "laliga")).toContainText("(not in scope list)");
@@ -447,11 +494,15 @@ test.describe("the trader's candidates on the console", () => {
       };
       await openConsole(page, [{ status: 200, body: brief }]);
       const epl = row(page, PLACED_EPL);
-      for (const s of ["47¢ / 50¢", "maker 48¢", "+2.62¢", "−4.40¢", "1.5¢",
-        "YES · 4 @ 48¢", "momentum −0.27", "xG15 +0.64", "danger 22.0%"]) {
+      for (const s of ["47¢ / 50¢", "+2.62¢", "≥1.5¢", "YES · 4 @ 48¢"]) {
         await expect(epl, s).toContainText(s);
       }
-      await expect(epl.getByTestId("cand-hot")).toHaveText(["HOT"]);
+      const insp = await inspect(page, PLACED_EPL);
+      for (const s of ["maker 48¢", "+2.62¢", "−4.40¢", "1.5¢",
+        "YES · 4 @ 48¢", "momentum −0.27", "xG15 +0.64", "danger 22.0%"]) {
+        await expect(insp, s).toContainText(s);
+      }
+      await expect(insp.getByTestId("cand-hot")).toHaveText(["HOT"]);
       await expect(epl).toHaveAttribute("data-decision", "placed");
     });
 
@@ -509,6 +560,7 @@ test.describe("the trader's candidates on the console", () => {
         .toContainText("Candidates not available yet");
       await expect(page.getByTestId("cand-table")).toHaveCount(0);
       await expect(page.getByTestId("ops-strip")).toBeVisible();
+      await view(page, "#portfolio");
       await expect(page.getByTestId("ops-book")).toBeVisible();
     });
 

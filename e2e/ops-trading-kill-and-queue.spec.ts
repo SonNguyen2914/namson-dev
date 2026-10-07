@@ -55,12 +55,12 @@ const PENDING = [
     status: "cancelled" },
 ];
 
-async function openConsole(page: Page, status: Obj, book: Obj) {
+async function openConsole(page: Page, status: Obj, book: Obj, hash = "") {
   await page.route(STATUS, (r) => r.fulfill(json(200, status)));
   await page.route(BOOK, (r) => r.fulfill(json(200, book)));
   await page.route(CANDIDATES, (r) => r.fulfill(json(200, CANDIDATES_RECORDED)));
   page.on("dialog", (d) => { throw new Error(`a dialog opened: ${d.message()}`); });
-  await page.goto("/ops/trading");
+  await page.goto(`/ops/trading${hash}`);
   await hydrated(page);
   await page.locator("#watch-token").fill(TOKEN);
   await expect(page.getByTestId("ops-console")).toBeVisible();
@@ -77,10 +77,10 @@ test.describe("Lift kill", () => {
     await openConsole(page, { ...STATUS_RECORDED, kill: true }, BOOK_RECORDED);
     const box = page.getByTestId("kill-lift");
     await expect(box).toContainText("cannot lift TRADING_KILL");
-    await box.getByRole("button", { name: "Lift kill" }).click();
+    await box.getByRole("button", { name: "Lift operator kill" }).click();
     expect(sent).toEqual([]);   // nothing is sent before Confirm
     await box.getByTestId("kill-lift-confirm").click();
-    await expect(page.getByTestId("kill-lift-result")).toContainText("Kill lifted");
+    await expect(page.getByTestId("kill-lift-result")).toContainText("Operator kill lifted");
     await expect(page.getByTestId("kill-lift-result")).toHaveAttribute("data-ok", "true");
     expect(sent).toEqual([{ token: TOKEN, method: "POST" }]);
   });
@@ -90,7 +90,7 @@ test.describe("Lift kill", () => {
     await page.route(LIFT, async (r) => { hits += 1; await r.fulfill(json(200, {})); });
     await openConsole(page, STATUS_RECORDED, BOOK_RECORDED);
     const box = page.getByTestId("kill-lift");
-    await box.getByRole("button", { name: "Lift kill" }).click();
+    await box.getByRole("button", { name: "Lift operator kill" }).click();
     await box.getByTestId("kill-lift-cancel").click();
     await expect(box.getByTestId("kill-lift-confirm")).toHaveCount(0);
     expect(hits).toBe(0);
@@ -101,7 +101,7 @@ test.describe("Lift kill", () => {
       { lifted: false, kill_until: "2026-10-10T15:00:00+00:00" })));
     await openConsole(page, { ...STATUS_RECORDED, kill: true }, BOOK_RECORDED);
     const box = page.getByTestId("kill-lift");
-    await box.getByRole("button", { name: "Lift kill" }).click();
+    await box.getByRole("button", { name: "Lift operator kill" }).click();
     await box.getByTestId("kill-lift-confirm").click();
     const res = page.getByTestId("kill-lift-result");
     await expect(res).toHaveAttribute("data-ok", "false");
@@ -113,7 +113,7 @@ test.describe("Lift kill", () => {
     await page.route(LIFT, (r) => r.fulfill(json(404, { available: false })));
     await openConsole(page, STATUS_RECORDED, BOOK_RECORDED);
     const box = page.getByTestId("kill-lift");
-    await box.getByRole("button", { name: "Lift kill" }).click();
+    await box.getByRole("button", { name: "Lift operator kill" }).click();
     await box.getByTestId("kill-lift-confirm").click();
     await expect(page.getByTestId("kill-lift-result"))
       .toContainText("not available on this backend yet");
@@ -123,7 +123,7 @@ test.describe("Lift kill", () => {
 test.describe("queued hand-overs", () => {
   test("each status in plain words", async ({ page }) => {
     await openConsole(page, STATUS_RECORDED,
-      { ...BOOK_WITH_MANUAL, pending_handovers: PENDING });
+      { ...BOOK_WITH_MANUAL, pending_handovers: PENDING }, "#portfolio");
     const rows = page.getByTestId("book-pending");
     await expect(rows).toHaveCount(4);
     await expect(rows.nth(0)).toHaveAttribute("data-status", "queued");
@@ -135,7 +135,7 @@ test.describe("queued hand-overs", () => {
   });
 
   test("a book without the field draws nothing", async ({ page }) => {
-    await openConsole(page, STATUS_RECORDED, BOOK_WITH_MANUAL);
+    await openConsole(page, STATUS_RECORDED, BOOK_WITH_MANUAL, "#portfolio");
     await expect(page.getByTestId("book-position")).toHaveCount(1);
     await expect(page.getByTestId("book-pending-list")).toHaveCount(0);
   });
@@ -143,7 +143,7 @@ test.describe("queued hand-overs", () => {
   test("a 202 {queued:true} hand-over reads as queued, not an error",
     async ({ page }) => {
       await page.route(HANDOVER, (r) => r.fulfill(json(202, { queued: true })));
-      await openConsole(page, STATUS_RECORDED, BOOK_WITH_MANUAL);
+      await openConsole(page, STATUS_RECORDED, BOOK_WITH_MANUAL, "#portfolio");
       await page.getByTestId("hand-over").click();
       await page.getByTestId("book-confirm").click();
       const o = page.getByTestId("book-outcome");

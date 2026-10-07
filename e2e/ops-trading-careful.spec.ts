@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { hydrated } from "./operator-console";
+import { hydrated, view } from "./operator-console";
 import {
   BOOK_RECORDED, CANDIDATES_RECORDED, STATUS_RECORDED,
 } from "./trading-console-recorded";
@@ -80,31 +80,36 @@ const BUDGET: Obj = { used: "6.20", remaining: "13.80", limit: "20",
   trading_day: "2026-10-10", trading_day_tz: "America/Los_Angeles" };
 const SERVED: Obj = { ...STATUS_RECORDED, careful: CAREFUL, daily_budget: BUDGET };
 
-async function openConsole(page: Page, status: unknown) {
+async function openConsole(page: Page, status: unknown, hash = "#model") {
   await page.route(STATUS, (r) => r.fulfill(json(200, status)));
   await page.route(BOOK, (r) => r.fulfill(json(200, BOOK_RECORDED)));
   await page.route(CANDIDATES, (r) => r.fulfill(json(200, CANDIDATES_RECORDED)));
-  await page.goto("/ops/trading");
+  await page.goto(`/ops/trading${hash}`);
   await hydrated(page);
   await page.locator("#watch-token").fill(TOKEN);
-  await expect(page.getByTestId("ops-careful")).toBeVisible();
+  await expect(page.getByTestId("ops-console")).toBeVisible();
 }
 
 test.describe("the careful strategy on the console", () => {
   test("the budget: used, remaining, $20, its NET parts and the LA day",
     async ({ page }) => {
-      await openConsole(page, SERVED);
+      // money at risk: with the capital on Overview (redesign, 2026-10-07)
+      await openConsole(page, SERVED, "");
       const b = page.getByTestId("careful-budget");
-      await expect(b).toContainText("$6.20 / $20.00");
-      await expect(b).toContainText("$13.80");
-      await expect(b).toContainText("−$2.00 · $5.40 · $2.80");
+      await expect(b).toContainText("$6.20 of $20.00");
+      await expect(b).toContainText("remaining $13.80");
+      await expect(b).toContainText("realised (net) −$2.00 · open $5.40 · resting $2.80");
       await expect(b).toContainText("America/Los_Angeles");
     });
 
   test("per kickoff hour against $12, and edges above 8c counted",
     async ({ page }) => {
-      await openConsole(page, SERVED);
-      await expect(page.getByTestId("careful-hours")).toContainText("$7.46 / $12.00");
+      await openConsole(page, SERVED, "");
+      // each hour's figure against the cap is one hover away (quiet pass)
+      await expect(page.getByTestId("careful-hours")).toContainText("$7.46");
+      await expect(page.getByTestId("careful-hours").locator("li").first())
+        .toHaveAttribute("title", /\$7\.46 of \$12\.00/);
+      await view(page, "#model");
       const t = page.getByTestId("careful-tick");
       await expect(t).toContainText("2 / 5");
       await expect(t).toContainText("probable data errors");
@@ -136,8 +141,9 @@ test.describe("the careful strategy on the console", () => {
       await openConsole(page, SERVED);
       const row = page.getByTestId("careful-situation");
       await expect(row).toHaveAttribute("data-flag", "true");
-      await expect(row).toContainText("CLV and money disagree");
-      await expect(page.getByTestId("careful-events")).toContainText("PROPOSED (Son decides)");
+      await expect(row).toContainText("◆ disagree");
+      await expect(row.locator("td").last()).toHaveAttribute("title", "CLV and money disagree");
+      await expect(page.getByTestId("careful-events")).toContainText("PROPOSED");
       await expect(page.getByTestId("careful-grounds")).toContainText("family:SPREAD");
     });
 
@@ -150,7 +156,9 @@ test.describe("the careful strategy on the console", () => {
       await expect(mls).toHaveAttribute("data-flag", "true");
       await expect(mls).toContainText("+1.40c");
       await expect(mls).toContainText("−12.50c");
-      await expect(mls).toContainText("CLV and results disagree");
+      // the flag in a word and a shape; its sentence one hover away (quiet pass)
+      await expect(mls).toContainText("◆ disagree");
+      await expect(mls.locator("td").last()).toHaveAttribute("title", "CLV and results disagree");
       const epl = rows.filter({ hasText: "epl · GAME · in play" });
       await expect(epl).toHaveAttribute("data-flag", "false");
       await expect(epl).toContainText("+$1.42 (3)");
@@ -175,10 +183,12 @@ test.describe("the careful strategy on the console", () => {
       await page.route(STATUS, (r) => r.fulfill(json(200, STATUS_RECORDED)));
       await page.route(BOOK, (r) => r.fulfill(json(200, BOOK_RECORDED)));
       await page.route(CANDIDATES, (r) => r.fulfill(json(200, CANDIDATES_RECORDED)));
-      await page.goto("/ops/trading");
+      await page.goto("/ops/trading#model");
       await hydrated(page);
       await page.locator("#watch-token").fill(TOKEN);
       await expect(page.getByTestId("careful-absent")).toContainText("not served yet");
+      await view(page, "#overview");
+      await expect(page.getByTestId("careful-budget-absent")).toContainText("not served yet");
     });
 
   test("the proxy rebuilds the body and refuses anything else", () => {

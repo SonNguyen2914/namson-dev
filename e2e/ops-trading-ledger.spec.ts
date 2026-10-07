@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test, type Page, type Request } from "@playwright/test";
-import { hydrated } from "./operator-console";
+import { hydrated, view } from "./operator-console";
 import { LIVE, STANDIN_URL } from "./backend";
 import { LEDGER_PAGE_1, LEDGER_RECORDED } from "./trading-ledger-recorded";
 
@@ -87,7 +87,7 @@ async function openConsole(page: Page,
       ? r.fulfill({ status: a.status, contentType: "text/plain", body: a.raw })
       : r.fulfill(json(a.status, a.body));
   });
-  await page.goto("/ops/trading");
+  await page.goto("/ops/trading#trades");
   await hydrated(page);
   await page.locator("#watch-token").fill(TOKEN);
   await expect(page.getByTestId("ops-ledger")).toBeVisible();
@@ -126,6 +126,7 @@ test.describe("trades & grounds on the console", () => {
     + "is used and named", async ({ page }) => {
       const summary = { ...LEDGER_RECORDED.summary, daily_loss_limit_dollars: null };
       await openConsole(page, serveOk({ ...LEDGER_RECORDED, summary }));
+      await view(page, "#performance");
       await expect(page.getByTestId("ledger-day-limit"))
         .toContainText("daily loss limit $10.00 (from the status route)");
     });
@@ -286,6 +287,7 @@ test.describe("trades & grounds on the console", () => {
         .toContainText("Trades & grounds not available yet");
       await expect(page.getByTestId("ledger-table")).toHaveCount(0);
       await expect(page.getByTestId("ops-strip")).toBeVisible();
+      await view(page, "#portfolio");
       await expect(page.getByTestId("ops-book")).toBeVisible();
     });
 
@@ -293,7 +295,9 @@ test.describe("trades & grounds on the console", () => {
     + "estimate; your own bets are not here", async ({ page }) => {
       await openConsole(page, serveOk());
       const s = page.getByTestId("ops-ledger");
-      await expect(s).toContainText("experimental · unproven");
+      // ONE DISCLAIMER (quiet pass): the header says it; the panel's words
+      // are behind its ⓘ
+      await expect(page.getByTestId("ops-disclosure")).toContainText("experimental · unproven");
       await expect(s).toContainText("the trader's own estimate at the time");
       await expect(s).toContainText("not evidence of an edge");
       await expect(s).toContainText("your own manual bets are not here");

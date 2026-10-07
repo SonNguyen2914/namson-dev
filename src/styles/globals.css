@@ -1372,3 +1372,40 @@ img.glyph-soft   { opacity: 0.11; filter: grayscale(1) brightness(1.1); }
 @media (prefers-reduced-motion: reduce) {
   .field-flip { animation: none; }
 }
+
+/* THE TRADING CONSOLE (redesign, 2026-10-07) — an operator application,
+   not a showcase. Layered charcoal: the app ground, the workspace panel,
+   the interactive surface (inputs, raised rows), its hover. Borders are
+   hairlines and only where a region needs one. Gold stays the brand:
+   the active view, the selected row, focus. Status colour is the traffic
+   light only, and never alone (always a word or an icon beside it). */
+:root {
+  --tc-app: #070709;
+  --tc-panel: #0c0c10;
+  --tc-raised: #131318;
+  --tc-hover: #18181f;
+  --tc-line: rgba(255, 255, 255, 0.065);
+  --tc-line-strong: rgba(255, 255, 255, 0.12);
+}
+@theme inline {
+  --color-tc-app: var(--tc-app);
+  --color-tc-panel: var(--tc-panel);
+  --color-tc-raised: var(--tc-raised);
+  --color-tc-hover: var(--tc-hover);
+  --color-tc-line: var(--tc-line);
+  --color-tc-line-strong: var(--tc-line-strong);
+}
+.tc-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+@keyframes tc-drawer-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.tc-drawer { animation: tc-drawer-in 0.18s cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes tc-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.tc-fade { animation: tc-fade-in 0.16s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .tc-drawer, .tc-fade { animation: none; }
+}
+/* the console's tables: a sticky head inside its own scroll box */
+.tc-table thead th { position: sticky; top: 0; z-index: 1; background: var(--tc-panel); }
+.tc-scroll { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.14) transparent; }

@@ -1,66 +1,50 @@
-// THE TRADER'S BOOK, ON THE OPERATOR CONSOLE (2026-10-03).
+// THE TRADER'S BOOK, ON THE OPERATOR CONSOLE (2026-10-03; redesigned into
+// the Portfolio view 2026-10-07).
 //
 // Son: "should the trader display every orders, bets, then flag my orders
 // and then I can choose in the console whenever I want the trader to take
-// care of it, if not then it cant touch it?" — so this section shows every
-// open position and resting order on the account, each flagged by whose
-// it is, and lets him hand a position to the trader or take it back. Those
-// on markets the trader's catalogue does not list (combos, markets newer
-// than its last refresh) are not drawn; the backend COUNTS them
-// (totals.not_listed_*) and this section says how many.
+// care of it, if not then it cant touch it?" — so the Portfolio view shows
+// every open position and resting order on the account, each flagged by
+// whose it is, and lets him hand a position to the trader or take it back.
+// Those on markets the trader's catalogue does not list (combos, markets
+// newer than its last refresh) are not drawn; the backend COUNTS them
+// (totals.not_listed_*) and the view says how many.
 //
-// WHAT THE CHIPS MEAN, per position (from GET /api/ops/trading-book,
-// trading-book-v1):
-//   Trader N        contracts the trader opened itself (`own`)
-//   Handed over N   contracts he handed to it (`handed_over`) — FULLY
-//                   managed: it may add or close within its limits
-//   Yours N         contracts the trader never touches (`manual`)
-// Only the non-zero ones are drawn.
+// OWNERSHIP, per position (GET /api/ops/trading-book, trading-book-v1):
+//   AGENT N      contracts the trader opened itself (`own`)
+//   HANDOVER N   contracts he handed to it (`handed_over`) — FULLY managed:
+//                it may add or close within its limits
+//   MANUAL N     contracts the trader never touches (`manual`, "Yours")
+// Only the non-zero ones are drawn. An order whose owner is not stated as
+// "trader" is shown as his — this page never claims the trader holds
+// something the backend did not say it holds.
 //
-// WHAT CAN BE HANDED OVER: filled contracts only ("Positions only for
-// now"). Resting orders are listed and flagged, with no buttons; the ones
-// he placed stay his. An order whose owner is not stated as "trader" is
-// shown as his — this page never claims the trader holds something the
-// backend did not say it holds.
+// WHAT CAN BE HANDED OVER: filled contracts only. Resting orders are
+// listed and flagged, with no buttons.
 //
 // CONFIRMATION IS INLINE (a count field with Confirm / Cancel), never
 // window.confirm. After every POST the outcome is said in plain words and
-// the book is read again at once.
+// the book is read again at once. A hand-over the backend queued answers
+// 202 {queued: true}: "Queued — hands over at the next live price".
 //
-// OPEN STATE ONLY: no settled result and no per-match P&L is on the
-// payload, so none can be here. Experimental, unproven.
+// LIVE VALUE is DISPLAY ONLY: the halts keep his "in play at cost until it
+// settles" rule. A position with no live mark draws "—" and "no live
+// price"; a missing value is never summed as $0. Experimental, unproven.
 //
-// LIVE VALUE (2026-10-05). Son, 2026-10-04: the console should show the
-// ACTUAL fluctuating value of in-play positions, not the fixed cost. Each
-// position now draws the backend's live mark (the running in-play feed's
-// book for a held in-play market, the catalogue's bid otherwise), what
-// the position is worth at it, its unrealised P&L against cost, and how
-// the mark was taken — refreshed with the book every 15 s. DISPLAY ONLY:
-// the halts keep his "in play at cost until it settles" rule, and this
-// page says so beside the numbers. A position with no live mark draws
-// "—" and "no live price", and the totals name how many were left out; a
-// missing value is never summed as $0.
-//
-// QUEUED HAND-OVERS (2026-10-06). A hand-over may now be queued until the
-// market's next live price: the POST answers 202 {queued: true}, said as
-// "Queued — hands over at the next live price", and the book's
-// `pending_handovers` are drawn under the positions with a status chip in
-// plain words. A book without the field draws nothing.
-import { useEffect, useState, type ReactNode } from "react";
+// The book is READ by components/console/useConsoleData.tsx (above every
+// view, so a view switch never drops it); this file parses it and holds
+// the one write — the hand-over and take-back.
+import { Fragment, useState, type ReactNode } from "react";
 import {
-  compLabel, type LiveValue, liveTotals, markSourceWords, parseLiveValue,
+  compLabel, type LiveValue, markSourceWords, parseLiveValue,
 } from "../lib/tradingConsole";
-import { usePoll, type PollOutcome } from "../lib/usePoll";
-
-const POLL_MS = 15_000;
-/** A read older than three cadences is shown dimmed. */
-const STALE_MS = 3 * POLL_MS;
+import { Info } from "./console/primitives";
 
 type Obj = Record<string, unknown>;
 type Side = "yes" | "no";
 type Action = "handover" | "takeback";
 
-interface Position {
+export interface Position {
   ticker: string; title: string; competition: string | null;
   kickoff_utc: string | null; in_play: boolean; side: Side;
   contracts: number; own: number; handed_over: number; managed: number;
@@ -70,20 +54,20 @@ interface Position {
   live: LiveValue;
 }
 
-interface Order {
+export interface Order {
   order_id: string; ticker: string; title: string; competition: string | null;
   side: Side; price_cents: number | null; remaining: number;
   owner: "trader" | "manual"; expires_utc: string | null;
 }
 
 /** A hand-over the backend queued until the market's next live price. */
-interface Pending {
+export interface Pending {
   ticker: string; side: Side | null; count: number | null;
   requested_at: string | null; status: string; reason: string | null;
   price_cents: number | null;
 }
 
-interface Book {
+export interface Book {
   /** the backend's queued hand-overs; null when it does not send them */
   pending: Pending[] | null;
   version: string | null; generated_at: string | null;
@@ -94,13 +78,6 @@ interface Book {
   /** the backend's own sentence for each live mark source, when sent */
   markSources: Record<string, string>;
 }
-
-type BookRead =
-  | { kind: "idle" }
-  | { kind: "ok" }
-  | { kind: "unavailable" }
-  | { kind: "refused"; detail: string }
-  | { kind: "error"; status: number; detail: string };
 
 interface Edit { key: string; action: Action; ticker: string; side: Side; value: string }
 interface Outcome { ok: boolean; text: string }
@@ -122,7 +99,7 @@ const str = (v: unknown): string | null =>
   typeof v === "string" && v !== "" ? v : null;
 const sideOf = (v: unknown): Side | null => (v === "yes" || v === "no" ? v : null);
 
-function parseBook(b: Obj): Book {
+export function parseBook(b: Obj): Book {
   const positions: Position[] = [];
   for (const p of Array.isArray(b.positions) ? b.positions : []) {
     if (!isObj(p)) continue;
@@ -198,31 +175,24 @@ function parseBook(b: Obj): Book {
 
 // --------------------------------------------------------- formatting
 
-const ABSENT = "—";
-const cents = (n: number | null) =>
+export const ABSENT = "—";
+export const bookCents = (n: number | null) =>
   n === null ? ABSENT : `${Number.isInteger(n) ? n : n.toFixed(1)}¢`;
-const dollars = (n: number | null) => (n === null ? ABSENT : `$${n.toFixed(2)}`);
+export const bookDollars = (n: number | null) => (n === null ? ABSENT : `$${n.toFixed(2)}`);
 /** a gain or a loss: "+$1.20", "−$0.40" */
-const pl = (n: number | null) => (n === null ? ABSENT
+export const bookPl = (n: number | null) => (n === null ? ABSENT
   : `${n > 0 ? "+" : n < 0 ? "−" : ""}$${Math.abs(n).toFixed(2)}`);
-const plTone = (n: number | null) => (n === null || n === 0 ? "text-ink-mid"
+export const plTone = (n: number | null) => (n === null || n === 0 ? "text-ink-mid"
   : n > 0 ? "text-up" : "text-neg");
-const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
+export const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 
-function when(iso: string | null): string {
+export function bookWhen(iso: string | null): string {
   if (!iso) return ABSENT;
   const t = Date.parse(iso);
   if (!Number.isFinite(t)) return iso;
   return new Date(t).toLocaleString([], {
     month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
   });
-}
-
-function ago(ms: number): string {
-  const s = Math.max(0, Math.round(ms / 1000));
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
 // ------------------------------------------------- what an answer says
@@ -292,7 +262,7 @@ export function pendingWords(q: {
   switch (q.status) {
     case "queued": return "queued — will hand over at the next live price";
     case "completed":
-      return q.price_cents === null ? "completed" : `completed at ${cents(q.price_cents)}`;
+      return q.price_cents === null ? "completed" : `completed at ${bookCents(q.price_cents)}`;
     case "expired": return `expired: ${q.reason ?? "no reason given"}`;
     case "cancelled": return q.reason ? `cancelled — ${q.reason}` : "cancelled";
     default: return `status not recognised (${q.status || "none sent"})`;
@@ -300,118 +270,72 @@ export function pendingWords(q: {
 }
 
 const PENDING_TONE: Record<string, string> = {
-  queued: "border-accent/50 text-accent",
-  completed: "border-line-strong text-ink-hi",
+  queued: "border-tc-line-strong text-ink-hi",
+  completed: "border-tc-line text-ink-mid",
   expired: "border-warn/50 text-warn",
-  cancelled: "border-line text-ink-low",
+  cancelled: "border-tc-line text-ink-low",
 };
 
 // ------------------------------------------------------------- pieces
 
-const CHIP: Record<"trader" | "handed" | "yours", string> = {
-  trader: "border-line bg-elev2 text-ink-mid",
-  handed: "border-accent/50 text-accent",
-  yours: "border-ink-hi/60 font-semibold text-ink-hi",
+/** OWNERSHIP, unmistakable and never colour alone: a word and a count. */
+const OWNER: Record<"trader" | "handed" | "yours", { cls: string; word: string; title: string }> = {
+  trader: { cls: "border-tc-line-strong text-ink-mid", word: "AGENT",
+    title: "Contracts the trader opened itself" },
+  handed: { cls: "border-ink-mid/50 text-ink-hi", word: "HANDOVER",
+    title: "Contracts you handed to the trader: it fully manages them within its limits" },
+  yours: { cls: "border-ink-hi/70 bg-ink-hi/[0.06] font-semibold text-ink-hi", word: "MANUAL",
+    title: "Yours: the trader never touches these" },
 };
 
-function Chip({ tone, children }: {
-  tone: keyof typeof CHIP; children: ReactNode;
-}) {
+export function OwnerChip({ tone, n }: { tone: keyof typeof OWNER; n?: number }) {
+  const o = OWNER[tone];
   return (
-    <span data-testid={`chip-${tone}`}
-      className={`inline-block whitespace-nowrap rounded-full border px-2 py-0.5 font-mono text-[10px] ${CHIP[tone]}`}>
-      {children}
+    <span data-testid={`chip-${tone}`} title={o.title}
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-[4px] border px-1.5 py-[1px] text-[10.5px] tracking-[0.04em] ${o.cls}`}>
+      {o.word}{n !== undefined && <>{" "}<span className="tc-num">{n}</span></>}
     </span>
   );
 }
 
-const TH = "border-b border-line pb-1 pr-3 font-normal uppercase tracking-[0.12em] text-[10px] text-ink-faint whitespace-nowrap";
-const TD = "py-1.5 pr-3 align-top";
-const BTN = "whitespace-nowrap rounded-md border px-2 py-0.5 font-mono text-[11px] transition-colors disabled:opacity-40";
+const TH = "border-b border-tc-line px-2.5 py-1.5 text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low whitespace-nowrap";
+const TD = "border-b border-tc-line px-2.5 py-1 align-top whitespace-nowrap";
+const BTN = "whitespace-nowrap rounded-md border px-2 py-1 text-[12px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-40";
 
 function Market({ title, ticker }: { title: string; ticker: string }) {
   return (
     <>
-      <span className="block font-sans text-[12px] text-ink-hi">{title}</span>
-      <span className="block break-all text-[10px] text-ink-faint">{ticker}</span>
+      <span title={title} className="block truncate text-[12.5px] leading-snug text-ink-hi">{title}</span>
+      <span title={ticker} className="block truncate font-mono text-[10.5px] text-ink-low">{ticker}</span>
     </>
   );
 }
 
-const keyOf = (p: { ticker: string; side: Side }) => `${p.ticker}|${p.side}`;
+export const keyOf = (p: { ticker: string; side: Side }) => `${p.ticker}|${p.side}`;
 
-/** The positions table's columns. "live value" stacks what the position
- *  would fetch now over the live mark and how it was taken (display only —
- *  the halts count in-play positions at cost until they settle); it sits
- *  next to the market, so at phone width the live numbers are on screen
- *  before anything is scrolled to. "cost · mark" stacks the average cost
- *  over the catalogue mark the book always carried. */
+/** The positions table's columns. Live value and unrealised sit next to the
+ *  market, so at phone width the live numbers are on screen before
+ *  anything is scrolled to. */
 const POSITION_HEAD = ["market", "side", "live value", "unrealised",
   "contracts", "owner", "cost · mark", "at risk", "league · time", ""];
 const RIGHT = new Set([2, 3, 4, 6, 7]);
 
-// --------------------------------------------------------------- body
+// --------------------------------------------------- positions + write
 
-export function TradingBook({ token }: { token: string }) {
-  const [read, setRead] = useState<BookRead>({ kind: "idle" });
-  const [last, setLast] = useState<{ book: Book; at: number } | null>(null);
-  const [bump, setBump] = useState(0);
+export function PositionsTable({ book, token, onPosted, onInspect, selected }: {
+  book: Book; token: string; onPosted: () => void;
+  onInspect?: (key: string) => void; selected?: string | null;
+}) {
   const [edit, setEdit] = useState<Edit | null>(null);
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
-  const [now, setNow] = useState(() => Date.now());
-
-  // `bump` is in the deps: a POST re-reads the book at once
-  usePoll(async (signal): Promise<PollOutcome> => {
-    const r = await fetch("/api/ops/trading-book", {
-      headers: { "x-admin-token": token }, cache: "no-store", signal,
-    });
-    let body: unknown = null;
-    try { body = await r.json(); } catch {
-      /* SWALLOWED(tradingbook:book-body-parse) — registered in
-         e2e/missing-is-not-zero.spec.ts with its closes_when. */
-    }
-    if (r.status === 404 || (isObj(body) && body.available === false)) {
-      // a definite answer: keep asking at the usual cadence, so the
-      // section fills in once the backend has the route
-      setRead({ kind: "unavailable" });
-      setLast(null);
-      return "ok";
-    }
-    const detail = isObj(body) && typeof body.detail === "string"
-      ? body.detail : `HTTP ${r.status}`;
-    if (r.ok && isObj(body)) {
-      const at = Date.now();
-      setRead({ kind: "ok" });
-      setLast({ book: parseBook(body), at });
-      setNow(at);
-      return "ok";
-    }
-    if (r.status === 403) {
-      setRead({ kind: "refused", detail });
-      setLast(null);
-      return "stop";
-    }
-    setRead({ kind: "error", status: r.status, detail });
-    return "failed";
-  }, POLL_MS, [token, bump], token !== "");
-
-  useEffect(() => {
-    if (!last) return;
-    const t = setInterval(() => setNow(Date.now()), 5_000);
-    return () => clearInterval(t);
-  }, [last]);
-
-  const book = last?.book ?? null;
-  const stale = last !== null && (read.kind !== "ok" || now - last.at > STALE_MS);
-  const live = book ? liveTotals(book.positions.map((p) => p.live)) : null;
 
   const open = (p: Position, action: Action) => {
     const max = action === "handover" ? p.manual : p.handed_over;
     // a hand-over defaults to what is FREE: his contracts less those his
     // own resting orders would close (a buy of the other side), which the
     // backend refuses to hand over (more_than_yours)
-    const committed = action !== "handover" || !book ? 0
+    const committed = action !== "handover" ? 0
       : book.orders.filter((o) => o.ticker === p.ticker
         && o.owner === "manual" && o.side !== p.side)
         .reduce((s, o) => s + o.remaining, 0);
@@ -447,355 +371,275 @@ export function TradingBook({ token }: { token: string }) {
     setBusy(false);
     setEdit(null);
     setOutcome(o);
-    setBump((b) => b + 1);
+    onPosted();
   };
 
   return (
-    <section data-testid="ops-book" aria-labelledby="ops-book-h"
-      className="rounded-2xl border border-line bg-elev p-4 sm:p-5">
-      <h2 id="ops-book-h"
-        className="font-mono text-[11px] uppercase tracking-[0.18em] text-ink-low">
-        Positions &amp; orders
-      </h2>
-      {book && (
-        <p data-testid="book-totals" className="mt-1 font-mono text-[11px] text-ink-faint">
-          {plural(book.totals.positions, "position")} · {plural(book.totals.orders, "resting order")}
-          {" "}· trader manages {book.totals.managed} · yours {book.totals.manual}
-          {" "}· account read {book.account_read_at
-            ? `${when(book.account_read_at)}${Number.isFinite(Date.parse(book.account_read_at))
-              ? ` (${ago(now - Date.parse(book.account_read_at))} ago)` : ""}`
-            : "— not yet"}
-          {stale && ` · stale, ${ago(now - last!.at)} old`}
+    <>
+      {outcome && (
+        <p data-testid="book-outcome" data-ok={outcome.ok ? "true" : "false"}
+          role={outcome.ok ? "status" : "alert"}
+          className={`mb-3 rounded-md border px-3 py-2 text-[12.5px] ${
+            outcome.ok ? "border-tc-line-strong text-ink-hi" : "border-warn/40 text-warn"}`}>
+          {outcome.text}
         </p>
       )}
-      {book && (book.totals.notListedPositions > 0
-        || book.totals.notListedOrders > 0) && (
-        <p data-testid="book-not-listed" className="mt-0.5 font-mono text-[11px] text-warn">
-          {plural(book.totals.notListedPositions, "more position")} and{" "}
-          {plural(book.totals.notListedOrders, "more resting order")} on markets
-          the trader does not track are not shown.
+      {book.positions.length === 0 ? (
+        <p data-testid="book-positions-empty"
+          className="rounded-md border border-dashed border-tc-line px-3 py-3 text-[12.5px] text-ink-low">
+          {book.totals.notListedPositions > 0
+            ? "No open positions on markets the trader tracks."
+            : "No open positions on the account."}
         </p>
-      )}
-      {book && live && book.positions.length > 0 && (
-        <p data-testid="book-live-totals" className="mt-0.5 font-mono text-[11px] text-ink-faint">
-          live value <span className="text-ink-hi">{dollars(live.value)}</span>
-          {" "}· unrealised{" "}
-          <span data-testid="book-live-unrealised" className={plTone(live.unrealised)}>
-            {pl(live.unrealised)}
-          </span>
-          {" "}· {live.marked} of {book.positions.length} with a live mark
-          {live.unmarked > 0 && (
-            <span data-testid="book-live-unmarked" className="text-warn">
-              {" "}· {live.unmarked} without one, not counted
-            </span>
-          )}
-          {live.unrealisedMissing > 0 && (
-            <span className="text-warn">
-              {" "}· {live.unrealisedMissing} with a value but no unrealised P&amp;L, not counted in it
-            </span>
-          )}
-          {" "}· refreshed every 15 s · experimental, unproven
-        </p>
-      )}
-
-      <div className="mt-3">
-        {read.kind === "unavailable" && (
-          <p data-testid="book-unavailable" className="font-mono text-[12px] text-ink-low">
-            Book not available yet — this backend does not serve the trader&apos;s
-            positions and orders. The rest of the console is unaffected.
-          </p>
-        )}
-        {read.kind === "refused" && (
-          <p data-testid="book-error" role="alert" className="font-mono text-[12px] text-neg">
-            token rejected — the backend refused it ({read.detail})
-          </p>
-        )}
-        {read.kind === "error" && (
-          <p data-testid="book-error" role="alert" className="font-mono text-[12px] text-warn">
-            the book read failed (HTTP {read.status}) — {read.detail}
-          </p>
-        )}
-        {read.kind === "idle" && !book && (
-          <p className="font-mono text-[11px] text-ink-faint">reading the book…</p>
-        )}
-
-        {outcome && (
-          <p data-testid="book-outcome" data-ok={outcome.ok ? "true" : "false"}
-            role={outcome.ok ? "status" : "alert"}
-            className={`mb-3 rounded-xl border px-3 py-2 font-mono text-[12px] ${
-              outcome.ok ? "border-line-strong text-ink-hi" : "border-warn/40 text-warn"}`}>
-            {outcome.text}
-          </p>
-        )}
-
-        {book && (
-          <div data-stale={stale || undefined}
-            className={`transition-opacity ${stale ? "opacity-50" : ""}`}>
-            <h3 className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
-              positions
-            </h3>
-            {book.positions.length === 0 ? (
-              <p data-testid="book-positions-empty" className="font-mono text-[11px] text-ink-faint">
-                {book.totals.notListedPositions > 0
-                  ? "No open positions on markets the trader tracks."
-                  : "No open positions on the account."}
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table data-testid="book-positions"
-                  className="w-full min-w-[820px] border-collapse font-mono text-xs tabular-nums">
-                  <thead>
-                    <tr>
-                      {POSITION_HEAD.map((h, i) => (
-                        <th key={`${h}-${i}`} scope="col"
-                          className={`${TH} ${RIGHT.has(i) ? "text-right" : "text-left"}`}>
-                          {h}
-                        </th>
-                      ))}
+      ) : (
+        <div className="tc-scroll overflow-x-auto">
+          <table data-testid="book-positions"
+            className="w-full min-w-[820px] border-collapse text-[12.5px]">
+            <thead>
+              <tr>
+                {POSITION_HEAD.map((h, i) => (
+                  <th key={`${h}-${i}`} scope="col"
+                    className={`${TH} ${RIGHT.has(i) ? "text-right" : "text-left"}`}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {book.positions.map((p) => {
+                const k = keyOf(p);
+                const editing = edit && edit.key === k ? edit : null;
+                const max = editing
+                  ? (editing.action === "handover" ? p.manual : p.handed_over) : 0;
+                const n = editing && /^\d+$/.test(editing.value.trim())
+                  ? Number(editing.value.trim()) : NaN;
+                const valid = Number.isInteger(n) && n >= 1 && n <= max;
+                const sel = selected === k;
+                return (
+                  <Fragment key={k}>
+                    <tr data-testid="book-position" data-ticker={p.ticker}
+                      data-side={p.side} data-selected={sel || undefined}
+                      className={`transition-colors hover:bg-tc-hover ${sel ? "bg-tc-raised shadow-[inset_2px_0_0_var(--accent)]" : ""}`}>
+                      <td data-testid={onInspect ? "book-inspect" : undefined}
+                        role={onInspect ? "button" : undefined} tabIndex={onInspect ? 0 : undefined}
+                        aria-label={onInspect ? `inspect ${p.title}` : undefined}
+                        onClick={onInspect ? () => onInspect(k) : undefined}
+                        onKeyDown={onInspect ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onInspect(k); } } : undefined}
+                        className={`${TD} max-w-[150px] sm:max-w-[300px] ${onInspect ? "cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent" : ""}`}>
+                        <Market title={p.title} ticker={p.ticker} />
+                      </td>
+                      <td className={`${TD} font-medium uppercase text-ink-hi`}>{p.side}</td>
+                      <td className={`${TD} text-right`}>
+                        <span data-testid="book-live-value"
+                          className="tc-num block whitespace-nowrap text-ink-hi">
+                          {bookDollars(p.live.live_value_dollars)}
+                        </span>
+                        {/* the sub line WRAPS, so the column stays narrow
+                            enough to sit on a phone's first screen */}
+                        <span className="block min-w-[84px] whitespace-normal text-[10.5px] leading-tight text-ink-low">
+                          at <span data-testid="book-live-mark" className="tc-num">{bookCents(p.live.live_mark_cents)}</span>
+                          {" "}·{" "}
+                          <span data-testid="book-mark-source"
+                            data-source={p.live.mark_source ?? "none"}>
+                            {markSourceWords(p.live.mark_source)}
+                          </span>
+                        </span>
+                      </td>
+                      <td data-testid="book-unrealised"
+                        className={`${TD} tc-num whitespace-nowrap text-right ${plTone(p.live.unrealised_pl_dollars)}`}>
+                        {bookPl(p.live.unrealised_pl_dollars)}
+                      </td>
+                      <td className={`${TD} tc-num text-right text-ink-hi`}>{p.contracts}</td>
+                      <td className={TD}>
+                        <span className="flex flex-wrap gap-1">
+                          {p.own > 0 && <OwnerChip tone="trader" n={p.own} />}
+                          {p.handed_over > 0 && <OwnerChip tone="handed" n={p.handed_over} />}
+                          {p.manual > 0 && <OwnerChip tone="yours" n={p.manual} />}
+                        </span>
+                      </td>
+                      <td className={`${TD} tc-num whitespace-nowrap text-right text-ink-mid`}>
+                        <span className="block">{bookCents(p.avg_cost_cents)}</span>
+                        <span className="block text-[10.5px] text-ink-low">
+                          mark {bookCents(p.mark_cents)}
+                        </span>
+                      </td>
+                      <td className={`${TD} tc-num text-right text-ink-hi`}>{bookDollars(p.at_risk_dollars)}</td>
+                      <td className={`${TD} max-w-[160px]`}>
+                        <span className="block truncate text-ink-mid">
+                          {p.competition ? compLabel(p.competition) : ABSENT}
+                        </span>
+                        <span className="block whitespace-nowrap text-[10.5px]">
+                          {p.in_play
+                            ? <span className="text-live">in play</span>
+                            : <span className="text-ink-low">{bookWhen(p.kickoff_utc)}</span>}
+                        </span>
+                      </td>
+                      <td className={`${TD} text-right`}>
+                        <span className="flex justify-end gap-1">
+                          {p.manual > 0 && (
+                            <button type="button" data-testid="hand-over"
+                              disabled={busy} onClick={() => open(p, "handover")}
+                              className={`${BTN} border-tc-line-strong text-ink-hi hover:bg-tc-hover`}>
+                              Hand to trader
+                            </button>
+                          )}
+                          {p.handed_over > 0 && (
+                            <button type="button" data-testid="take-back"
+                              disabled={busy} onClick={() => open(p, "takeback")}
+                              className={`${BTN} border-tc-line-strong text-ink-hi hover:bg-tc-hover`}>
+                              Take back
+                            </button>
+                          )}
+                        </span>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {book.positions.map((p) => {
-                      const k = keyOf(p);
-                      const editing = edit && edit.key === k ? edit : null;
-                      const max = editing
-                        ? (editing.action === "handover" ? p.manual : p.handed_over) : 0;
-                      const n = editing && /^\d+$/.test(editing.value.trim())
-                        ? Number(editing.value.trim()) : NaN;
-                      const valid = Number.isInteger(n) && n >= 1 && n <= max;
-                      return [
-                        <tr key={k} data-testid="book-position" data-ticker={p.ticker}
-                          data-side={p.side} className="border-b border-line/50">
-                          <td className={`${TD} min-w-[150px]`}>
-                            <Market title={p.title} ticker={p.ticker} />
-                          </td>
-                          <td className={`${TD} uppercase text-ink-hi`}>{p.side}</td>
-                          <td className={`${TD} text-right`}>
-                            <span data-testid="book-live-value"
-                              className="block whitespace-nowrap text-ink-hi">
-                              {dollars(p.live.live_value_dollars)}
-                            </span>
-                            {/* the sub line WRAPS, so the column stays narrow
-                                enough to sit on a phone's first screen */}
-                            <span className="block min-w-[84px] text-[10px] leading-tight text-ink-faint">
-                              at <span data-testid="book-live-mark">{cents(p.live.live_mark_cents)}</span>
-                              {" "}·{" "}
-                              <span data-testid="book-mark-source"
-                                data-source={p.live.mark_source ?? "none"}>
-                                {markSourceWords(p.live.mark_source)}
-                              </span>
-                            </span>
-                          </td>
-                          <td data-testid="book-unrealised"
-                            className={`${TD} whitespace-nowrap text-right ${plTone(p.live.unrealised_pl_dollars)}`}>
-                            {pl(p.live.unrealised_pl_dollars)}
-                          </td>
-                          <td className={`${TD} text-right text-ink-hi`}>{p.contracts}</td>
-                          <td className={TD}>
-                            <span className="flex flex-wrap gap-1">
-                              {p.own > 0 && <Chip tone="trader">Trader {p.own}</Chip>}
-                              {p.handed_over > 0 && (
-                                <Chip tone="handed">Handed over {p.handed_over}</Chip>
-                              )}
-                              {p.manual > 0 && <Chip tone="yours">Yours {p.manual}</Chip>}
-                            </span>
-                          </td>
-                          <td className={`${TD} whitespace-nowrap text-right text-ink-mid`}>
-                            <span className="block">{cents(p.avg_cost_cents)}</span>
-                            <span className="block text-[10px] text-ink-faint">
-                              mark {cents(p.mark_cents)}
-                            </span>
-                          </td>
-                          <td className={`${TD} text-right text-ink-hi`}>{dollars(p.at_risk_dollars)}</td>
-                          <td className={TD}>
-                            <span className="block text-ink-mid">
-                              {p.competition ? compLabel(p.competition) : ABSENT}
-                            </span>
-                            <span className="block whitespace-nowrap text-[10px]">
-                              {p.in_play
-                                ? <span className="text-live">in play</span>
-                                : <span className="text-ink-faint">{when(p.kickoff_utc)}</span>}
-                            </span>
-                          </td>
-                          <td className={`${TD} text-right`}>
-                            <span className="flex justify-end gap-1">
-                              {p.manual > 0 && (
-                                <button type="button" data-testid="hand-over"
-                                  disabled={busy} onClick={() => open(p, "handover")}
-                                  className={`${BTN} border-accent/50 text-accent hover:bg-accent/10`}>
-                                  Hand to trader
-                                </button>
-                              )}
-                              {p.handed_over > 0 && (
-                                <button type="button" data-testid="take-back"
-                                  disabled={busy} onClick={() => open(p, "takeback")}
-                                  className={`${BTN} border-line-strong text-ink-hi hover:bg-elev2`}>
-                                  Take back
-                                </button>
-                              )}
-                            </span>
-                          </td>
-                        </tr>,
-                        editing && max > 0 && (
-                          <tr key={`${k}-edit`} data-testid="book-edit"
-                            className="border-b border-line/50 bg-bs">
-                            <td colSpan={POSITION_HEAD.length} className="px-2 py-2">
-                              <form className="flex flex-wrap items-center gap-2"
-                                onSubmit={(ev) => {
-                                  ev.preventDefault();
-                                  if (valid && !busy) void submit(editing, n, p.title);
-                                }}>
-                                <label className="flex items-center gap-2">
-                                  <span className="text-[11px] text-ink-mid">
-                                    {editing.action === "handover"
-                                      ? `Hand to trader — how many of your ${max}?`
-                                      : `Take back — how many of the ${max} handed over?`}
-                                  </span>
-                                  <input data-testid="book-count" type="number"
-                                    inputMode="numeric" min={1} max={max} step={1}
-                                    value={editing.value}
-                                    onChange={(ev) => setEdit({ ...editing, value: ev.target.value })}
-                                    className="w-20 rounded-md border border-line bg-elev px-2 py-0.5 font-mono text-[12px] text-ink-hi outline-none focus-visible:ring-2 focus-visible:ring-accent" />
-                                </label>
-                                <button type="submit" data-testid="book-confirm"
-                                  disabled={!valid || busy}
-                                  className={`${BTN} border-accent/60 text-accent hover:bg-accent/10`}>
-                                  {busy ? "Sending…" : "Confirm"}
-                                </button>
-                                <button type="button" data-testid="book-cancel"
-                                  disabled={busy} onClick={() => setEdit(null)}
-                                  className={`${BTN} border-line text-ink-mid hover:bg-elev2`}>
-                                  Cancel
-                                </button>
-                                {!valid && (
-                                  <span className="text-[11px] text-warn">a whole number from 1 to {max}</span>
-                                )}
-                              </form>
-                              <p className="mt-1 text-[11px] text-ink-faint">
+                    {editing && max > 0 && (
+                      <tr data-testid="book-edit" className="bg-tc-raised">
+                        <td colSpan={POSITION_HEAD.length} className="border-b border-tc-line px-3 py-3">
+                          <form className="flex flex-wrap items-center gap-2"
+                            onSubmit={(ev) => {
+                              ev.preventDefault();
+                              if (valid && !busy) void submit(editing, n, p.title);
+                            }}>
+                            <label className="flex items-center gap-2">
+                              <span className="text-[12.5px] text-ink-hi">
                                 {editing.action === "handover"
-                                  ? "The trader will fully manage these: it may add to them or close them within its limits."
-                                  : "These become yours again; the trader stops managing them. A close it already had resting is cancelled on its next tick (up to ~15 s) and could fill before then."}
-                              </p>
-                            </td>
-                          </tr>
-                        ),
-                      ];
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {book.positions.length > 0 && (() => {
-              // THE LEGEND: each mark source the positions use, in the
-              // backend's own sentence when it sent one
-              const used = [...new Set(book.positions.map((p) => p.live.mark_source ?? "none"))];
-              return (
-                <ul data-testid="book-mark-legend" className="mt-1.5 space-y-0.5 text-[11px] text-ink-faint">
-                  {used.map((k) => (
-                    <li key={k}>
-                      <span className="font-mono text-ink-low">{markSourceWords(k === "none" ? null : k)}</span>
-                      {" "}— {book.markSources[k] ?? "the backend sent no description of this source"}
-                    </li>
-                  ))}
-                </ul>
-              );
-            })()}
-
-            {book.pending && book.pending.length > 0 && (
-              <div data-testid="book-pending-list">
-                <h3 className="mb-1.5 mt-4 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
-                  queued hand-overs
-                </h3>
-                <ul className="space-y-1">
-                  {book.pending.map((q, i) => {
-                    const title = book.positions.find((p) => p.ticker === q.ticker)?.title
-                      ?? q.ticker;
-                    return (
-                      <li key={`${q.ticker}-${q.side}-${q.requested_at}-${i}`}
-                        data-testid="book-pending" data-status={q.status || "none"}
-                        className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-line/50 py-1 font-mono text-[11px]">
-                        <span className="min-w-0 break-all font-sans text-[12px] text-ink-hi">{title}</span>
-                        <span className="uppercase text-ink-mid">{q.side ?? ABSENT}</span>
-                        <span className="text-ink-mid">
-                          {q.count === null ? ABSENT : plural(q.count, "contract")}
-                        </span>
-                        <span className="text-ink-faint">asked {when(q.requested_at)}</span>
-                        <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] ${
-                          PENDING_TONE[q.status] ?? "border-warn/50 text-warn"}`}>
-                          {pendingWords(q)}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
-
-            <h3 className="mb-1.5 mt-4 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
-              resting orders
-            </h3>
-            <p data-testid="book-orders-line" className="mb-1.5 text-[11px] text-ink-faint">
-              Resting orders can&apos;t be handed over yet — positions only.
-            </p>
-            {book.orders.length === 0 ? (
-              <p data-testid="book-orders-empty" className="font-mono text-[11px] text-ink-faint">
-                {book.totals.notListedOrders > 0
-                  ? "No resting orders on markets the trader tracks."
-                  : "No resting orders on the account."}
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table data-testid="book-orders"
-                  className="w-full min-w-[560px] border-collapse font-mono text-xs tabular-nums">
-                  <thead>
-                    <tr>
-                      {["market", "side", "price", "remaining", "owner", "expires"].map((h, i) => (
-                        <th key={h} scope="col"
-                          className={`${TH} ${i === 2 || i === 3 ? "text-right" : "text-left"}`}>
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {book.orders.map((o) => (
-                      <tr key={o.order_id} data-testid="book-order" data-ticker={o.ticker}
-                        className="border-b border-line/50">
-                        <td className={`${TD} min-w-[180px]`}>
-                          <Market title={o.title} ticker={o.ticker} />
+                                  ? `Hand to trader — how many of your ${max}?`
+                                  : `Take back — how many of the ${max} handed over?`}
+                              </span>
+                              <input data-testid="book-count" type="number"
+                                inputMode="numeric" min={1} max={max} step={1}
+                                value={editing.value} autoFocus
+                                onChange={(ev) => setEdit({ ...editing, value: ev.target.value })}
+                                className="tc-num h-8 w-20 rounded-md border border-tc-line-strong bg-tc-panel px-2 text-[13px] text-ink-hi outline-none focus-visible:ring-2 focus-visible:ring-accent" />
+                            </label>
+                            <button type="submit" data-testid="book-confirm"
+                              disabled={!valid || busy}
+                              className={`${BTN} border-accent/70 bg-accent/10 font-medium text-ink-hi hover:bg-accent/20`}>
+                              {busy ? "Sending…" : "Confirm"}
+                            </button>
+                            <button type="button" data-testid="book-cancel"
+                              disabled={busy} onClick={() => setEdit(null)}
+                              className={`${BTN} border-tc-line text-ink-mid hover:bg-tc-hover`}>
+                              Cancel
+                            </button>
+                            {!valid && (
+                              <span className="text-[12px] text-warn">a whole number from 1 to {max}</span>
+                            )}
+                          </form>
+                          <p className="mt-1.5 text-[12px] text-ink-low">
+                            {editing.action === "handover"
+                              ? "The trader will fully manage these: it may add to them or close them within its limits."
+                              : "These become yours again; the trader stops managing them. A close it already had resting is cancelled on its next tick (up to ~15 s) and could fill before then."}
+                          </p>
                         </td>
-                        <td className={`${TD} uppercase text-ink-hi`}>{o.side}</td>
-                        <td className={`${TD} text-right text-ink-mid`}>{cents(o.price_cents)}</td>
-                        <td className={`${TD} text-right text-ink-hi`}>{o.remaining}</td>
-                        <td className={TD}>
-                          {o.owner === "trader"
-                            ? <Chip tone="trader">Trader</Chip>
-                            : <Chip tone="yours">Yours</Chip>}
-                        </td>
-                        <td className={`${TD} whitespace-nowrap text-ink-mid`}>{when(o.expires_utc)}</td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  );
+}
 
-      <p data-testid="book-note" className="mt-4 text-xs leading-relaxed text-ink-faint">
-        The trader never touches positions marked Yours. Handed-over positions
-        are fully managed: it may add or close within its limits; a close that
-        lowers risk may go over a cap, but the halts and the kill switch
-        still stop it. Experimental, unproven.
+/** THE LEGEND: each mark source the positions use, in the backend's own
+ *  sentence when it sent one. */
+export function MarkLegend({ book }: { book: Book }) {
+  if (book.positions.length === 0) return null;
+  const used = [...new Set(book.positions.map((p) => p.live.mark_source ?? "none"))];
+  return (
+    <div className="mt-1.5 flex items-center gap-1.5 text-[11.5px] text-ink-low">
+      Marks
+      <Info label="the live marks">
+        <span data-testid="book-mark-legend" className="block space-y-0.5">
+          {used.map((k) => (
+            <span key={k} data-testid="book-mark-legend-item" className="block">
+              <span className="text-ink-hi">{markSourceWords(k === "none" ? null : k)}</span>
+              {" "}— {book.markSources[k] ?? "the backend sent no description of this source"}
+            </span>
+          ))}
+        </span>
+      </Info>
+    </div>
+  );
+}
+
+export function PendingList({ book }: { book: Book }) {
+  if (!book.pending || book.pending.length === 0) return null;
+  return (
+    <ul data-testid="book-pending-list" className="divide-y divide-tc-line">
+      {book.pending.map((q, i) => {
+        const title = book.positions.find((p) => p.ticker === q.ticker)?.title ?? q.ticker;
+        return (
+          <li key={`${q.ticker}-${q.side}-${q.requested_at}-${i}`}
+            data-testid="book-pending" data-status={q.status || "none"}
+            className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-1 text-[12.5px]">
+            <span className="min-w-0 break-words text-ink-hi">{title}</span>
+            <span className="font-medium uppercase text-ink-mid">{q.side ?? ABSENT}</span>
+            <span className="tc-num text-ink-mid">
+              {q.count === null ? ABSENT : plural(q.count, "contract")}
+            </span>
+            <span className="text-ink-low">asked {bookWhen(q.requested_at)}</span>
+            <span className={`ml-auto inline-block rounded-[4px] border px-1.5 py-[1px] text-[11px] ${
+              PENDING_TONE[q.status] ?? "border-warn/50 text-warn"}`}>
+              {pendingWords(q)}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+export function OrdersTable({ book }: { book: Book }): ReactNode {
+  if (book.orders.length === 0) {
+    return (
+      <p data-testid="book-orders-empty"
+        className="rounded-md border border-dashed border-tc-line px-3 py-3 text-[12.5px] text-ink-low">
+        {book.totals.notListedOrders > 0
+          ? "No resting orders on markets the trader tracks."
+          : "No resting orders on the account."}
       </p>
-      <p data-testid="book-live-note" className="mt-1 text-xs leading-relaxed text-ink-faint">
-        Live value is what a position would fetch at its live mark now — the
-        running in-play feed&apos;s book when the market is in play, the
-        catalogue&apos;s bid otherwise. It is for watching only: the loss
-        halts still count an in-play position at its cost until it settles.
-      </p>
-    </section>
+    );
+  }
+  return (
+    <div className="tc-scroll overflow-x-auto">
+      <table data-testid="book-orders"
+        className="w-full min-w-[560px] border-collapse text-[12.5px]">
+        <thead>
+          <tr>
+            {["market", "side", "price", "remaining", "owner", "expires"].map((h, i) => (
+              <th key={h} scope="col"
+                className={`${TH} ${i === 2 || i === 3 ? "text-right" : "text-left"}`}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {book.orders.map((o) => (
+            <tr key={o.order_id} data-testid="book-order" data-ticker={o.ticker}
+              className="hover:bg-tc-hover">
+              <td className={`${TD} min-w-[180px] max-w-[320px]`}>
+                <Market title={o.title} ticker={o.ticker} />
+              </td>
+              <td className={`${TD} font-medium uppercase text-ink-hi`}>{o.side}</td>
+              <td className={`${TD} tc-num text-right text-ink-mid`}>{bookCents(o.price_cents)}</td>
+              <td className={`${TD} tc-num text-right text-ink-hi`}>{o.remaining}</td>
+              <td className={TD}>
+                {o.owner === "trader"
+                  ? <OwnerChip tone="trader" />
+                  : <OwnerChip tone="yours" />}
+              </td>
+              <td className={`${TD} tc-num whitespace-nowrap text-ink-mid`}>{bookWhen(o.expires_utc)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

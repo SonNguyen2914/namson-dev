@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
 import { STANDIN_URL } from "./backend";
+import { view } from "./operator-console";
 
 // THE OPERATOR'S TRADING CONSOLE, /ops/trading (2026-10-03).
 //
@@ -186,31 +187,45 @@ test.describe("the operator trading console", () => {
         expect(c.headers()["x-admin-token"]).toBe(TOKEN);
       }
 
-      for (const id of ["strip", "book", "candidates", "ledger", "money", "activity",
-                        "inplay", "handover", "learning", "settlements",
-                        "catalogue", "stop"]) {
-        await expect(page.getByTestId(`ops-${id}`), id).toBeVisible();
+      // EVERY SECTION RENDERS, in the view that holds it (redesign,
+      // 2026-10-07: an app of views, not one stacked page)
+      for (const [hash, ids] of [
+        ["#overview", ["strip", "money", "stop", "safety", "attention", "tick"]],
+        ["#portfolio", ["book", "handover"]],
+        ["#trading", ["candidates"]],
+        ["#trading?tab=inplay", ["inplay"]],
+        ["#trades", ["ledger"]],
+        ["#performance", ["performance"]],
+        ["#model", ["learning"]],
+        ["#system", ["activity", "settlements", "catalogue"]],
+      ] as [string, string[]][]) {
+        await view(page, hash);
+        for (const id of ids) await expect(page.getByTestId(`ops-${id}`), `${hash} ${id}`).toBeVisible();
       }
+      await view(page, "#overview");
       const strip = page.getByTestId("ops-strip");
       await expect(strip).toContainText("experimental, unproven");
-      await expect(strip).toContainText("prod");
+      await expect(strip).toContainText("PROD");
       const money = page.getByTestId("ops-money");
       await expect(money).toContainText("$48.12");
       await expect(money).toContainText("$49.37");
       await expect(money).toContainText("−$0.63");
       await expect(page.getByTestId("meter-risk")).toContainText("37%");
       // "why it skipped": the largest reason first
+      await view(page, "#system");
       await expect(page.getByTestId("by-reason").locator("tbody tr").first())
         .toContainText("tick · ok");
       await expect(page.getByTestId("by-reason").locator("tbody tr").nth(1))
         .toContainText("skipped · below_threshold");
-      await expect(page.getByTestId("shocks")).toContainText("goal");
-      // competitions are named (2026-10-05), not printed as their keys
-      await expect(page.getByTestId("learning-comps")).toContainText("Premier League");
-      await expect(page.getByTestId("learning-comps")).toContainText("+0.81¢");
       await expect(page.getByTestId("refusals").locator("tbody tr").first())
         .toContainText("no_fair_price");
       await expect(page.getByTestId("ops-catalogue")).toContainText("14,552");
+      await view(page, "#trading?tab=inplay");
+      await expect(page.getByTestId("shocks")).toContainText("goal");
+      // competitions are named (2026-10-05), not printed as their keys
+      await view(page, "#model");
+      await expect(page.getByTestId("learning-comps")).toContainText("Premier League");
+      await expect(page.getByTestId("learning-comps")).toContainText("+0.81¢");
       await expect(page.getByTestId("ops-state")).toContainText("last updated");
 
       // held in React state only, and a reload forgets it
@@ -236,6 +251,8 @@ test.describe("the operator trading console", () => {
       await page.goto("/ops/trading");
       await page.locator("#watch-token").fill(TOKEN);
       await expect(page.getByTestId("ops-money")).toBeVisible();
+      await view(page, "#model");
+      await expect(page.getByText("learning is not on this backend")).toBeVisible();
       await expect(page.getByTestId("ops-learning")).toHaveCount(0);
       await expect(page.getByTestId("ops-strip"))
         .toContainText("not on this backend");

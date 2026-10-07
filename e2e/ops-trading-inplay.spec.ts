@@ -92,13 +92,15 @@ async function openConsole(page: Page, status: unknown) {
   await page.route(STATUS, (r) => r.fulfill(json(200, status)));
   await page.route(BOOK, (r) => r.fulfill(json(200, BOOK_RECORDED)));
   await page.route(CANDIDATES, (r) => r.fulfill(json(200, CANDIDATES_RECORDED)));
-  await page.goto("/ops/trading");
+  await page.goto("/ops/trading#trading?tab=inplay");
   await hydrated(page);
   await page.locator("#watch-token").fill(TOKEN);
   await expect(page.getByTestId("ops-inplay")).toBeVisible();
 }
 
 const reasonRows = (table: Locator) => table.getByTestId("inplay-reason-row");
+/** the reason cell: its title carries the backend's words and the code */
+const words = (row: Locator) => row.getByTestId("inplay-reason-cell");
 const compRows = (page: Page) => page.getByTestId("inplay-comp-row");
 const compRow = (page: Page, comp: string) =>
   page.locator(`[data-testid="inplay-comp-row"][data-comp="${comp}"]`);
@@ -120,20 +122,23 @@ test.describe("the console says why the trader skips in play", () => {
       expect(codes).toEqual(["inplay_live_signals_unreadable",
         "inplay_cooldown", "inplay_too_late", "inplay_brand_new_code"]);
       // the backend's PLAIN words, verbatim (src/trading/console.py)
+      // the row says a short tag; the backend's words and the code are on
+      // the row's hover and in the panel's ⓘ legend (quiet pass, 2026-10-07)
       const first = reasonRows(skips).first();
-      await expect(first).toContainText(
-        "Live stats (momentum, last-15 xG, ratings) are missing or old.");
-      await expect(first).toContainText("inplay_live_signals_unreadable");
+      await expect(words(first)).toHaveAttribute("title",
+        /^Live stats \(momentum, last-15 xG, ratings\) are missing or old\./);
+      await expect(words(first)).toHaveAttribute("title", /inplay_live_signals_unreadable/);
       await expect(first.getByTestId("inplay-reason-count")).toHaveText("37");
-      await expect(reasonRows(skips).nth(1)).toContainText(
-        "A shock cool-down holds (a price jump, a goal, a red card).");
-      await expect(reasonRows(skips).nth(2)).toContainText(
+      await expect(words(reasonRows(skips).nth(1))).toHaveAttribute("title",
+        /A shock cool-down holds \(a price jump, a goal, a red card\)\./);
+      await expect(words(reasonRows(skips).nth(2))).toHaveAttribute("title",
+        /Too late in the match for a new in-play order\./);
+      await expect(page.getByTestId("inplay-skips-words")).toContainText(
         "Too late in the match for a new in-play order.");
       // a code no registry names: itself, and said to have no words
-      await expect(reasonRows(skips).nth(3)).toContainText(
-        "inplay_brand_new_code");
-      await expect(reasonRows(skips).nth(3)).toContainText(
-        "no plain words for this code yet");
+      await expect(reasonRows(skips).nth(3)).toContainText("in-play brand new code");
+      await expect(words(reasonRows(skips).nth(3))).toHaveAttribute("title",
+        /no plain words for this code yet.*inplay_brand_new_code/);
     });
 
   test("the day's in-play refusals are drawn per reason, in plain words",
@@ -143,13 +148,13 @@ test.describe("the console says why the trader skips in play", () => {
       await expect(reasonRows(refused)).toHaveCount(2);
       const first = reasonRows(refused).first();
       await expect(first).toHaveAttribute("data-code", "per_match_cap");
-      await expect(first).toContainText("$10 per-match cap");
+      await expect(words(first)).toHaveAttribute("title", /\$10 per-match cap/);
       await expect(first.getByTestId("inplay-reason-count")).toHaveText("2");
-      await expect(reasonRows(refused).nth(1)).toContainText(
-        "under the in-play minimum edge");
+      await expect(words(reasonRows(refused).nth(1))).toHaveAttribute("title",
+        /under the in-play minimum edge/);
       // the risk engine's code, not a word from nowhere
-      await expect(reasonRows(refused).nth(1)).toContainText(
-        "inplay_edge_below_min");
+      await expect(words(reasonRows(refused).nth(1))).toHaveAttribute("title",
+        /inplay_edge_below_min/);
     });
 
   test("the backend's own words win when it sends them", async ({ page }) => {
@@ -162,12 +167,11 @@ test.describe("the console says why the trader skips in play", () => {
         refused_by_reason_today: {} },
     }));
     const row = reasonRows(page.getByTestId("inplay-skips")).first();
-    await expect(row).toContainText("The backend's own sentence.");
-    await expect(row).not.toContainText("A shock cool-down holds");
+    await expect(words(row)).toHaveAttribute("title", /^The backend's own sentence\./);
+    await expect(words(row)).not.toHaveAttribute("title", /A shock cool-down holds/);
     await expect(row.getByTestId("inplay-reason-count")).toHaveText("5");
     // served and empty: none today — a real answer, said as one
-    await expect(page.getByTestId("inplay-refusals")).toHaveText(
-      "no in-play refusals recorded today");
+    await expect(page.getByTestId("inplay-refusals")).toHaveText("none today");
   });
 
   test("every focus competition is an in-play row, in the registry's "

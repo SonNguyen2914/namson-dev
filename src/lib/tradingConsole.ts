@@ -245,6 +245,10 @@ export interface Candidates {
   by_competition: Record<string, CompCounts> | null;
   /** how many markets the tick considered in all, when the backend says */
   considered: number | null;
+  /** how many of them a strategy decided on, when the backend says */
+  decided: number | null;
+  /** the tick's own outcome word, when sent (e.g. "traded") */
+  outcome: string | null;
   /** markets left out of the snapshot, by reason (mostly by design) */
   omitted: Record<string, number>;
   /** of those, the ones CUT by the snapshot's bound (row_bound,
@@ -393,6 +397,7 @@ export function parseCandidates(b: Obj): Candidates {
     tick_at: str(b.tick_at), stale: bool(b.stale), age_s: num(b.age_s),
     scope, by_competition: byCompetition(b.by_competition),
     considered: considered === null ? null : Math.trunc(considered),
+    decided: num(b.decided), outcome: str(b.outcome),
     omitted, cut, not_served: num(b.not_served),
     truncated: b.truncated === true || cut > 0,
     actions, rows, unreadable,
@@ -572,7 +577,8 @@ export const NOT_SERVED = "not served yet";
 
 /** THE BACKEND'S PLAIN WORDS, VERBATIM: `PLAIN` in the backend's
  *  src/trading/console.py (SonNguyen2914/TRIVELA, branch b2-integration,
- *  read on 2026-10-06), the short sentences the candidates route serves
+ *  read on 2026-10-06; re-read at origin/main 1317f4f5 on 2026-10-07, 56
+ *  codes — two were missing here and are added), the short sentences the candidates route serves
  *  as a decision's `words`. Mirrored here because the status route sends
  *  in-play reasons as bare codes; when the backend's PLAIN changes, this
  *  copy is edited to match, word for word. */
@@ -593,6 +599,7 @@ export const PLAIN_WORDS: Record<string, string> = {
   candidate_unreadable: "The market's data is incomplete.",
   client_order_id_spent: "These exact terms were already sent once; Kalshi takes an order id only once.",
   no_fair_price: "No bookmaker consensus price, and no fresh price from our model.",
+  unproven_weight_over_cap: "Withdrawn: it gave our unproven model more than half the weight. Capped at 50% (Son, 2026-10-05) until it has evidence.",
   stale_book: "The Kalshi order book is too old to trade on.",
   no_bid_other_side: "Neither side has an ask (no bids to derive one).",
   in_play: "The match has kicked off: pre-match trading is closed.",
@@ -631,6 +638,7 @@ export const PLAIN_WORDS: Record<string, string> = {
   killed: "The kill switch is on: nothing is placed.",
   reconcile_failed: "The account could not be read: nothing is placed this tick.",
   pnl_unreadable: "The trader's own P&L could not be computed: nothing is placed.",
+  journal_unwritable: "The journal could not be written (a full volume, say): every trader order is withdrawn and nothing is placed.",
 };
 
 /** WORDS FOR THE CODES THE BACKEND'S PLAIN DOES NOT HOLD. Its route reads

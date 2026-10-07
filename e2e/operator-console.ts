@@ -22,3 +22,13 @@ export async function hydrated(page: Page, fakeClock = false) {
       Object.keys(el).some((k) => k.startsWith("__reactProps")));
   }, "the console page has hydrated").toBe(true);
 }
+
+// THE CONSOLE IS AN APP OF VIEWS (redesign, 2026-10-07): Overview by
+// default, the rest under a bare hash. A view is opened by setting the
+// hash IN the page — a navigation would reload it and drop the token,
+// which lives in React state only.
+export async function view(page: Page, hash: string) {
+  await page.evaluate((h) => { window.location.hash = h; }, hash);
+  await expect.poll(() => page.evaluate(() => window.location.hash))
+    .toContain(hash.replace(/\?.*$/, ""));
+}

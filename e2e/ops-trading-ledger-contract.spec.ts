@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
-import { hydrated } from "./operator-console";
+import { hydrated, view } from "./operator-console";
 import {
   LEDGER_PAGE_1, LEDGER_PAGE_2, LEDGER_RECORDED,
 } from "./trading-ledger-recorded";
@@ -81,7 +81,7 @@ async function openConsole(page: Page,
     reads.push(r.request());
     return r.fulfill(json(200, ledger(new URL(r.request().url()))));
   });
-  await page.goto("/ops/trading");
+  await page.goto("/ops/trading#trades");
   await hydrated(page);
   await page.locator("#watch-token").fill(TOKEN);
   await expect(page.getByTestId("ops-ledger")).toBeVisible();
@@ -113,7 +113,7 @@ test.describe("the ledger reads the backend's trading-ledger-v1", () => {
         .toEqual(REC.map((r) => r.id));
       await expect(page.getByTestId("ledger-count")).not.toContainText("unreadable");
       await expect(page.getByTestId("ledger-count"))
-        .toContainText(`${REC.length} rows · newest first · all loaded`);
+        .toContainText(`${REC.length} rows · all loaded`);
     });
 
   test("the won pre-match order, number by number, from its nested blocks",
@@ -122,14 +122,21 @@ test.describe("the ledger reads the backend's trading-ledger-v1", () => {
       for (const [id, text] of [
         ["match", "Synthetic Home v Synthetic Away"], ["match", "Premier League"],
         ["contract", "Synthetic Home to win"], ["contract", WON.market.ticker],
-        ["contract", "match result · home_win"], ["side", "YES"],
+        ["side", "YES"],
         ["price", "41¢"], ["price", "YES book 41¢"], ["size", "12"],
         ["cost", "$4.98"], ["cost", "fee $0.06"], ["phase", "pre-match"],
         ["edge", "+6.9¢ vs 3¢"], ["fill", "filled 12/12 @ 41¢"],
-        ["result", "YES · won"], ["pnl", "+$7.02"], ["why", WON.why!],
+        ["result", "YES · won"], ["pnl", "+$7.02"],
       ] as const) {
         await expect(cell(page, WON, id), `${id}: ${text}`).toContainText(text);
       }
+      // moved one hover away (quiet pass, 2026-10-07): the market type and
+      // outcome key on the contract's name; the trader's sentence on the
+      // row, and first in its grounds
+      expect(await cell(page, WON, "contract").locator("span").first().getAttribute("title"))
+        .toContain("match result · home_win");
+      await expect(row(page, WON)).toHaveAttribute("title", WON.why!);
+      await expect(await open(page, WON)).toContainText(WON.why!);
       await expect(cell(page, WON, "edge")).toHaveAttribute("data-clears", "true");
       await expect(row(page, WON)).toHaveAttribute("data-result", "won");
       await expect(row(page, WON)).toHaveAttribute("data-kind", "order");
@@ -179,7 +186,8 @@ test.describe("the ledger reads the backend's trading-ledger-v1", () => {
       await expect(cell(page, EXIT, "phase")).toContainText("protective exit");
       await expect(cell(page, EXIT, "phase")).toContainText("71′");
       await expect(cell(page, EXIT, "edge")).toContainText("−0.37¢ vs −2¢");
-      await expect(cell(page, EXIT, "edge")).toContainText("exit tolerance");
+      expect(await cell(page, EXIT, "edge").locator("span").first().getAttribute("title"))
+        .toContain("exit tolerance");
     });
 
   test("handover and takeback are their own rows, from the mark",
@@ -193,7 +201,7 @@ test.describe("the ledger reads the backend's trading-ledger-v1", () => {
       await expect(cell(page, HANDOVER, "edge")).toHaveText("not applicable");
       await expect(cell(page, HANDOVER, "pnl")).toHaveText("+$3.71");
       await expect(cell(page, TAKEBACK, "pnl")).toHaveText("−$1.14");
-      await expect(cell(page, HANDOVER, "why")).toContainText("handed 6 YES");
+      expect(await row(page, HANDOVER).getAttribute("title")).toContain("handed 6 YES");
     });
 
   test("the old row: every missing value says so, never a zero",
@@ -202,10 +210,10 @@ test.describe("the ledger reads the backend's trading-ledger-v1", () => {
       await expect(cell(page, OLD, "edge")).toHaveText("not recorded");
       // its fixture was not recorded: the backend borrowed the one an order
       // on the same Kalshi event recorded, and the page says so
-      await expect(cell(page, OLD, "match")).toContainText(
-        "fixture from an order on the same Kalshi event");
-      await expect(cell(page, WON, "match")).not.toContainText("same Kalshi event");
-      await expect(cell(page, OLD, "why")).toContainText("Fair not recorded");
+      await expect(cell(page, OLD, "match").getByTestId("ledger-fixture-borrowed"))
+        .toHaveAttribute("title", /fixture from an order on the same Kalshi event/);
+      await expect(cell(page, WON, "match").getByTestId("ledger-fixture-borrowed")).toHaveCount(0);
+      expect(await row(page, OLD).getAttribute("title")).toContain("Fair not recorded");
       const panel = await open(page, OLD);
       for (const f of ["fair", "edge", "guards", "risk"]) {
         await expect(ground(panel, f), f).toContainText("not recorded");
@@ -271,6 +279,8 @@ test.describe("the ledger reads the backend's trading-ledger-v1", () => {
         ["open", "$3.56"], ["cost", "$28.58"]] as const) {
         await expect(totals.getByTestId(`ledger-total-${k}`), k).toContainText(v);
       }
+      // the day-by-day and the breakdowns live in Performance (redesign)
+      await view(page, "#performance");
       await expect(page.getByTestId("ledger-day-limit"))
         .toContainText("daily loss limit $10.00");
       await expect(page.getByTestId("ledger-day-limit"))

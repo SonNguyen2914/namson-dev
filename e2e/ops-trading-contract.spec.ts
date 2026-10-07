@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { hydrated } from "./operator-console";
+import { hydrated, view } from "./operator-console";
 import {
   BOOK_RECORDED, CANDIDATES_RECORDED, STATUS_RECORDED,
 } from "./trading-console-recorded";
@@ -44,7 +44,7 @@ async function openConsole(page: Page, candidates: unknown) {
   await page.route(STATUS, (r) => r.fulfill(json(200, STATUS_RECORDED)));
   await page.route(BOOK, (r) => r.fulfill(json(200, BOOK_RECORDED)));
   await page.route(CANDIDATES, (r) => r.fulfill(json(200, candidates)));
-  await page.goto("/ops/trading");
+  await page.goto("/ops/trading#trading");
   await hydrated(page);
   await page.locator("#watch-token").fill(TOKEN);
   await expect(page.getByTestId("ops-candidates")).toBeVisible();
@@ -84,8 +84,10 @@ test.describe("the console reads the integrated backend's payloads", () => {
       const summary = page.getByTestId("cand-summary");
       await expect(page.getByTestId("cand-truncated")).toHaveCount(0);
       await expect(summary).not.toContainText("cut to its bound");
-      await expect(page.getByTestId("cand-not-shown")).toHaveText(
-        "· 160 not shown by design (outside_window 120, market_not_trading 40)");
+      // said short ("160 hidden"), the breakdown one ⓘ away (quiet pass)
+      await expect(page.getByTestId("cand-not-shown")).toContainText("160 hidden");
+      await expect(page.getByTestId("cand-not-shown")).toContainText(
+        "160 not shown by design (outside_window 120, market_not_trading 40)");
     });
 
   test("a cut to the snapshot's bound is still a warning", async ({ page }) => {
@@ -103,23 +105,30 @@ test.describe("the console reads the integrated backend's payloads", () => {
       const placed = row(page, PLACED);
       await expect(placed).toHaveAttribute("data-decision", "placed");
       await expect(placed).toContainText("in play 38′");
-      await expect(placed).toContainText("engine 39.0%");
-      await expect(placed.getByTestId("cand-anchor")).toHaveText(
+      // the in-play reads are in the inspector (redesign, 2026-10-07)
+      await placed.click();
+      const insp = page.getByTestId("cand-inspector");
+      await expect(insp).toContainText("engine 39.0%");
+      await expect(insp.getByTestId("cand-anchor")).toHaveText(
         "anchor w 0.50 · ratings model, club (unvalidated)");
+      await page.keyboard.press("Escape");
       // a leg whose decision carried no anchor draws none — not "w 0"
-      await expect(row(page, STALE_LEG).getByTestId("cand-anchor"))
-        .toHaveCount(0);
+      await row(page, STALE_LEG).click();
+      await expect(page.locator(`[data-testid="cand-inspector"][data-ticker="${STALE_LEG}"]`)).toBeVisible();
+      await expect(page.getByTestId("cand-anchor")).toHaveCount(0);
     });
 
   test("the status page draws the anchor's arms and reward and the ratings "
     + "model's share, said to be unvalidated", async ({ page }) => {
       await openConsole(page, CANDIDATES_RECORDED);
+      await view(page, "#trading?tab=inplay");
       const arms = page.getByTestId("inplay-v2-arms");
       await expect(arms).toContainText("anchor · Bundesliga");
       await expect(arms).toContainText("0.5 (ratings_club)");
       await expect(arms).toContainText("entry · Bundesliga");
       await expect(page.getByTestId("inplay-v2"))
         .toContainText("mean anchor reward");
+      await view(page, "#model");
       const learning = page.getByTestId("ops-learning");
       await expect(learning).toContainText("ratings model · unvalidated");
       await expect(learning).toContainText("ratings-poisson-v1");
@@ -127,6 +136,7 @@ test.describe("the console reads the integrated backend's payloads", () => {
 
   test("the book draws the recorded position's live value", async ({ page }) => {
     await openConsole(page, CANDIDATES_RECORDED);
+    await view(page, "#portfolio");
     const p = page.locator(`[data-testid="book-position"][data-ticker="${HELD}"]`);
     await expect(p.getByTestId("book-live-mark")).toHaveText("50¢");
     await expect(p.getByTestId("book-live-value")).toHaveText("$4.82");
