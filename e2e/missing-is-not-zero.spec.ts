@@ -521,6 +521,62 @@ export const REGISTERED_SWALLOWS: Record<string, Swallow> = {
       "the remembered view carries anything a reader is told about — at "
       + "which point a failed read must say so rather than fall back.",
   },
+  "emergency:post-body-parse": {
+    finding:
+      "A KILL or HALT answer whose body is not JSON is folded to null and "
+      + "described by describeEmergency() from its HTTP status, so the "
+      + "operator always reads a sentence naming what happened (set until, "
+      + "not on this backend, no token, token rejected, no answer in time, "
+      + "HTTP <n>); a non-2xx is never reported as set.",
+    closes_when:
+      "a non-2xx or unparseable answer is ever reported as set, or the "
+      + "result line stops naming the status.",
+  },
+  "emergency:post-no-answer": {
+    finding:
+      "A KILL or HALT POST that throws (network, abort) is NAMED in the "
+      + "result line ('no answer came back') and the status is read again at "
+      + "once to show whether it went through; nothing claims it was set.",
+    closes_when:
+      "the result line stops printing the failure, or the status re-read "
+      + "after a failed POST is removed.",
+  },
+  "emergency:lift-body-parse": {
+    finding:
+      "A halt-lift answer whose body is not JSON is folded to null and "
+      + "described from its HTTP status; a non-2xx is never reported as a "
+      + "lift.",
+    closes_when:
+      "a non-2xx or unparseable answer is ever reported as lifted.",
+  },
+  "emergency:lift-no-answer": {
+    finding:
+      "A halt-lift POST that throws is NAMED in the result line and the "
+      + "status is read again; nothing claims the halt was lifted.",
+    closes_when:
+      "the result line stops printing the failure, or the status re-read "
+      + "after a failed POST is removed.",
+  },
+  "console-sort:load": {
+    finding:
+      "The trading console reads which column each of its tables was last "
+      + "sorted by from localStorage, and swallows a storage that throws or "
+      + "holds junk. Nothing is drawn from the failure: every table opens "
+      + "in the backend's own order, the default, and no figure changes.",
+    closes_when:
+      "the page ever claims a remembered sort is in force, which would then "
+      + "have to be derived from the read succeeding.",
+  },
+  "console-sort:save": {
+    finding:
+      "The trading console remembers a table's sort and swallows a storage "
+      + "write that throws. The sort has already happened in state; only "
+      + "the next visit's sort is lost, and that table opens in the "
+      + "backend's order.",
+    closes_when:
+      "the page tells the reader their sort was saved, which would then "
+      + "have to be derived from the write succeeding.",
+  },
   "console-collapse:load": {
     finding:
       "The trading console reads which of its sections this viewer folded "

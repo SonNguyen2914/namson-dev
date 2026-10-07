@@ -19,6 +19,20 @@ import {
   BarList, ErrorNote, Freshness, Info, InfoNote, Metric, Panel, TH, ago, count, usd,
 } from "./primitives";
 import type { LedgerSource } from "./useConsoleData";
+import { type ColType, type SortVal, SortTh, sortRows, timeVal, useTableSort } from "./sorting";
+
+/** a breakdown row's sort value: its own numbers; W–L–U by its wins */
+const bucketVal = (b: Bucket & { key: string }, k: string, label?: (k: string) => string): SortVal => {
+  switch (k) {
+    case "key": return label ? label(b.key) : timeVal(b.key) ?? b.key;
+    case "n": return b.rows;
+    case "wlu": return b.won;
+    case "cost": return b.cost_dollars;
+    case "pnl": return b.settled_pnl_dollars;
+    case "open": return b.open_cost_dollars;
+    default: return null;
+  }
+};
 import type { SumItem } from "./collapse";
 import { freshItem, items as line, plain, readItem, warn } from "./summaries";
 
@@ -56,7 +70,9 @@ function DayBar({ pnl, limit, scale }: { pnl: number | null; limit: number | nul
   );
 }
 
-function Days({ days, limit, limitFrom }: { days: DayBucket[] | null; limit: number | null; limitFrom: "summary" | "status" | null }) {
+function Days({ days: sent, limit, limitFrom }: { days: DayBucket[] | null; limit: number | null; limitFrom: "summary" | "status" | null }) {
+  const { sort, press } = useTableSort("perf-days");
+  const days = sent ? sortRows(sent, sort, (d, k) => bucketVal(d, k)) : null;
   const scale = Math.max(limit ?? 0, ...(days ?? []).map((d) => Math.abs(d.settled_pnl_dollars ?? 0)), 0.01);
   return (
     <>
@@ -74,7 +90,12 @@ function Days({ days, limit, limitFrom }: { days: DayBucket[] | null; limit: num
             <table className="w-full min-w-[560px] border-collapse text-[12.5px]">
               <thead>
                 <tr>
-                  {["UTC day", "rows", "W–L–U", "settled P&L", "open", ""].map((h, i) => (
+                  {([["key", "UTC day", "time"], ["n", "rows", "num"], ["wlu", "W–L–U", "num"], ["pnl", "settled P&L", "num"],
+                    ["open", "open", "num"]] as [string, string, ColType][]).map(([k, h, t], i) => (
+                    <SortTh key={k} label={h} k={k} type={t} sort={sort} onSort={press} right={i > 0}
+                      className={`${TH} first:pl-0`} testid={`days-sort-${k}`} />
+                  ))}
+                  {[""].map((h, i) => (
                     <th key={h || i} scope="col" className={`${TH} first:pl-0 ${i === 0 || i === 5 ? "text-left" : "text-right"}`}>{h}</th>
                   ))}
                 </tr>
@@ -107,10 +128,16 @@ function Days({ days, limit, limitFrom }: { days: DayBucket[] | null; limit: num
 
 const COMP_ORDER = new Map(FOCUS_COMPETITIONS.map((c, i) => [c, i]));
 
+const GROUP_NAME: Record<string, string> = {
+  competition: "competition", family: "market type", phase: "phase", price: "price band", edge: "edge band",
+};
+
 function GroupTable({ id, groups, label, order }: {
   id: string; groups: Bucket[] | null; label: (k: string) => string; order?: (a: Bucket, b: Bucket) => number;
 }) {
-  const rows = groups ? (order ? [...groups].sort(order) : groups) : null;
+  const { sort, press } = useTableSort(`perf-${id}`);
+  const base = groups ? (order ? [...groups].sort(order) : groups) : null;
+  const rows = base ? sortRows(base, sort, (b, k) => bucketVal(b, k, label)) : null;
   if (rows === null) return <InfoNote>not sent</InfoNote>;
   if (rows.length === 0) return <InfoNote>none in this window</InfoNote>;
   return (
@@ -118,8 +145,10 @@ function GroupTable({ id, groups, label, order }: {
       <table data-testid={`ledger-by-${id}`} className="w-full min-w-[460px] border-collapse text-[12.5px]">
         <thead>
           <tr>
-            {["", "n", "W–L–U", "cost", "settled P&L", "open"].map((h, i) => (
-              <th key={h || i} scope="col" className={`${TH} first:pl-0 last:pr-0 ${i === 0 ? "text-left" : "text-right"}`}>{h}</th>
+            {([["key", GROUP_NAME[id] ?? "group", "text"], ["n", "n", "num"], ["wlu", "W–L–U", "num"], ["cost", "cost", "num"],
+              ["pnl", "settled P&L", "num"], ["open", "open", "num"]] as [string, string, ColType][]).map(([k, h, t], i) => (
+              <SortTh key={k} label={h} k={k} type={t} sort={sort} onSort={press} right={i > 0}
+                className={`${TH} first:pl-0 last:pr-0`} testid={`group-sort-${k}`} />
             ))}
           </tr>
         </thead>

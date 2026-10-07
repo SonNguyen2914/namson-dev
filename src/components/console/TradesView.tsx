@@ -28,6 +28,7 @@ import {
   CTRL, ErrorNote, Freshness, Info, InfoNote, Metric, Panel, TH, Tech, ago, count, usd, whenShort,
 } from "./primitives";
 import type { LedgerSource } from "./useConsoleData";
+import { type ColType, type SortVal, SortTh, sortRows, textVal, timeVal, useTableSort } from "./sorting";
 import { freshItem, items as line, plain, readItem, warn } from "./summaries";
 
 export interface LedgerClientFilters { family: string; result: string; side: string; q: string }
@@ -130,6 +131,30 @@ function Grounds({ r }: { r: LedgerRow }) {
 // of the grounds, one click away, and the row's tooltip.
 const HEAD = ["", "time", "match", "market", "side", "price", "size", "edge vs bar", "status", "p&l"];
 const RIGHT = new Set([5, 6, 7, 9]);
+/** each column's sort key and kind (the expand column does not sort) */
+const COLS: ([string, ColType] | null)[] = [null, ["time", "time"], ["match", "text"], ["market", "text"],
+  ["side", "text"], ["price", "num"], ["size", "num"], ["edge", "num"], ["status", "text"], ["pnl", "num"]];
+
+/** the value a ledger row sorts by — the row's own number, never its words;
+ *  what it did not record (or what is not settled yet) is null: last */
+export function ledgerSortVal(r: LedgerRow, k: string): SortVal {
+  switch (k) {
+    case "time": return timeVal(r.placed_at);
+    case "match": return textVal(r.fixture.label ?? (r.fixture.home !== null || r.fixture.away !== null
+      ? `${r.fixture.home ?? ""} v ${r.fixture.away ?? ""}` : null));
+    case "market": return textVal(r.market.contract);
+    case "side": return textVal(r.side);
+    case "price": return r.price_cents;
+    case "size": return r.count;
+    case "edge": return r.row_type === "order" ? (r.edge.cents ?? r.edge.gate_cents) : null;
+    case "status": return textVal(`${fillWords(r)} ${resultWords(r)}`);
+    // a settled result, or a not-filled order's own (sent) figure; unsettled
+    // and unknown are not a zero
+    case "pnl": return r.outcome.status === "won" || r.outcome.status === "lost" || r.outcome.status === "not_filled"
+      ? r.outcome.pnl_dollars : null;
+    default: return null;
+  }
+}
 const TD = "border-b border-tc-line px-2.5 py-1 align-top whitespace-nowrap";
 
 function Row({ r, open, onToggle, boxW }: { r: LedgerRow; open: boolean; onToggle: () => void; boxW: number | null }) {
@@ -289,6 +314,11 @@ export function TradesView({ now, source, client, setClient, open, setOpen, stat
     });
   }, [rows, client]);
 
+  // THE SORT applies to the rows LOADED (and filtered); it survives every
+  // poll, view switch and fold, and the CSV follows it
+  const { sort, press } = useTableSort("ledger");
+  const sorted = useMemo(() => sortRows(shown, sort, ledgerSortVal), [shown, sort]);
+
   const toggle = (k: number) => setOpen((s) => {
     const n = new Set(s);
     if (n.has(k)) n.delete(k); else n.add(k);
@@ -297,7 +327,7 @@ export function TradesView({ now, source, client, setClient, open, setOpen, stat
 
   const exportCsv = () => {
     // a BOM, so a spreadsheet reads the file as UTF-8 (≥, —, ¢)
-    const blob = new Blob([`﻿${ledgerCsv(rows)}`], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob([`﻿${ledgerCsv(sortRows(rows, sort, ledgerSortVal))}`], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -458,6 +488,9 @@ export function TradesView({ now, source, client, setClient, open, setOpen, stat
                 {rows.length} row{rows.length === 1 ? "" : "s"}
                 {page?.matching !== null && page?.matching !== undefined && page.matching !== rows.length ? ` of ${page.matching}` : ""}
                 {" "}· {source.nextOffset !== null ? "more on the backend" : "all loaded"}
+                {sort && source.nextOffset !== null && (
+                  <span data-testid="ledger-sort-note" className="text-ink-mid"> · sorted within loaded rows</span>
+                )}
                 {clientFiltered ? ` · ${shown.length} match the page's filters` : ""}
                 {l.unreadable > 0 && (
                   <span className="text-warn"> · {l.unreadable} row{l.unreadable === 1 ? "" : "s"} unreadable (not a ledger row), not drawn</span>
@@ -480,13 +513,17 @@ export function TradesView({ now, source, client, setClient, open, setOpen, stat
             <table data-testid="ledger-table" className="tc-table w-full min-w-[980px] border-collapse text-[12.5px]">
               <thead>
                 <tr>
-                  {HEAD.map((h, i) => (
-                    <th key={h || i} scope="col" className={`${TH} ${i === 0 ? "pl-4" : ""} ${RIGHT.has(i) ? "text-right" : "text-left"}`}>{h}</th>
-                  ))}
+                  {HEAD.map((h, i) => {
+                    const c = COLS[i];
+                    return c ? (
+                      <SortTh key={h} label={h} k={c[0]} type={c[1]} sort={sort} onSort={press}
+                        right={RIGHT.has(i)} className={TH} testid={`ledger-sort-${c[0]}`} />
+                    ) : <th key={i} scope="col" className={`${TH} pl-4 text-left`}><span className="sr-only">grounds</span></th>;
+                  })}
                 </tr>
               </thead>
               <tbody>
-                {shown.map((r) => (
+                {sorted.map((r) => (
                   <Fragment key={r.id}>
                     <Row r={r} open={open.has(r.id)} onToggle={() => toggle(r.id)} boxW={boxW} />
                   </Fragment>

@@ -13,6 +13,8 @@ import { TradingKillLift } from "../TradingKillLift";
 import { liveTotals } from "../../lib/tradingConsole";
 import { Freshness } from "./primitives";
 import { CollapseAllControls, CollapseProvider } from "./collapse";
+import { SortProvider, useTableSort } from "./sorting";
+import { EmergencyControls, type Outcome } from "./Emergency";
 import { OperatorStatusBar, ViewNav } from "./shell";
 import { useHashRoute } from "./route";
 import { type Read, useSectionReads } from "./useConsoleData";
@@ -31,7 +33,13 @@ const asReadState = (r: Read): ReadState => r.kind === "error"
   : r.kind === "refused" || r.kind === "not_ready" ? { kind: r.kind, detail: r.detail }
     : { kind: r.kind };
 
-export function ConsoleApp({ d, statusAt, statusRead, statusStale, now, token, bumpStatus, tokenField }: {
+type AppProps = Parameters<typeof ConsoleAppInner>[0];
+/** the sort store sits above everything that sorts (./sorting.tsx) */
+export function ConsoleApp(p: AppProps) {
+  return <SortProvider><ConsoleAppInner {...p} /></SortProvider>;
+}
+
+function ConsoleAppInner({ d, statusAt, statusRead, statusStale, now, token, bumpStatus, tokenField }: {
   d: Obj; statusAt: number; statusRead: Read; statusStale: boolean; now: number;
   token: string; bumpStatus: () => void; tokenField: ReactNode;
 }) {
@@ -40,7 +48,15 @@ export function ConsoleApp({ d, statusAt, statusRead, statusStale, now, token, b
   const view = route.view;
 
   // ---- UI state that outlives every refresh and every view switch
-  const [cand, setCand] = useState<CandFilters>(NO_CAND_FILTERS);
+  // THE CANDIDATES' SORT rides in the hash (deep links) and is remembered
+  // per viewer like every other table's (./sorting.tsx)
+  const candSort = useTableSort("candidates");
+  const [cand, setCand] = useState<CandFilters>(() => (candSort.sort
+    ? { ...NO_CAND_FILTERS, sort: candSort.sort.key, dir: candSort.sort.dir } : NO_CAND_FILTERS));
+  const setCandSort = candSort.set;
+  useEffect(() => {
+    setCandSort(cand.sort ? { key: cand.sort, dir: cand.dir } : null);
+  }, [cand.sort, cand.dir, setCandSort]);
   const [candSel, setCandSel] = useState<string | null>(null);
   const [ledgerClient, setLedgerClient] = useState<LedgerClientFilters>(NO_LEDGER_CLIENT);
   const [ledgerOpen, setLedgerOpen] = useState<Set<number>>(() => new Set());
@@ -55,7 +71,13 @@ export function ConsoleApp({ d, statusAt, statusRead, statusStale, now, token, b
     // adjusting state to a new route, during render (no effect cascade)
     setSeenRoute(routeKey);
     if (route.view === "trading") {
-      if (Object.keys(route.params).some((k) => k !== "tab")) setCand(candFiltersFrom(route.params));
+      // a link that names no sort keeps the one in force
+      if (Object.keys(route.params).some((k) => k !== "tab")) {
+        setCand((cur) => {
+          const f = candFiltersFrom(route.params);
+          return route.params.sort ? f : { ...f, sort: cur.sort, dir: cur.dir };
+        });
+      }
       setTradingTab(route.params.tab === "inplay" ? "inplay" : "candidates");
     }
   }
@@ -107,9 +129,13 @@ export function ConsoleApp({ d, statusAt, statusRead, statusStale, now, token, b
     statusStale, readsFailed: [...readsFailed],
   });
   const panelOnScreen = view === "overview" && safety.length > 0;
+  const [said, setSaid] = useState<Outcome | null>(null);
+  const [haltMissing, setHaltMissing] = useState(false);
+  const emergency = { said, setSaid, haltMissing, setHaltMissing };
   const day = (d.trading_day && typeof d.trading_day === "object" ? d.trading_day : {}) as Obj;
   const controls = panelOnScreen ? null : (
     <>
+      <EmergencyControls d={d} token={token} onDone={bumpStatus} now={now} memory={emergency} />
       <TradingKillLift token={token} onDone={bumpStatus} active={d.kill === true} />
       <div className="flex items-center justify-between gap-3">
         <StopHowTo />
@@ -172,7 +198,8 @@ export function ConsoleApp({ d, statusAt, statusRead, statusStale, now, token, b
         <div className="-mt-1 mb-2 flex justify-end"><CollapseAllControls /></div>
         {view === "overview" && (
           <Overview d={d} now={now} token={token} reads={reads} attention={items}
-            bumpStatus={bumpStatus} go={go} statusStale={statusStale} statusAt={statusAt} safety={safety} />
+            bumpStatus={bumpStatus} go={go} statusStale={statusStale} statusAt={statusAt} safety={safety}
+            emergency={emergency} />
         )}
         {view === "trading" && (
           <TradingView d={d} now={now} source={reads.candidates} filters={cand} setFilters={setCand}

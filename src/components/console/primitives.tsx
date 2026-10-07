@@ -17,6 +17,7 @@ import {
   type CSSProperties, type MouseEvent, type ReactNode, useCallback, useEffect, useId, useRef, useState,
 } from "react";
 import { type SumItem, alarmOf, useCollapseCtx } from "./collapse";
+import { type ColType, type SortVal, SortTh, numVal, sortRows, useTableSort } from "./sorting";
 export type { SumItem } from "./collapse";
 import type { Badge } from "../../lib/consoleModel";
 
@@ -701,30 +702,48 @@ export const TH = "border-b border-tc-line px-2.5 py-1.5 text-[10.5px] font-medi
 export const TD = "border-b border-tc-line px-2.5 py-1 align-top whitespace-nowrap";
 
 /** A plain dense table for small read-only blocks. */
-export function SimpleTable({ head, rows, empty, testid, right = [], minWidth }: {
+export function SimpleTable({ head, rows, empty, testid, right = [], minWidth, sortId, values, types }: {
   head: string[]; rows: ReactNode[][]; empty: string; testid?: string;
   /** indices of numeric (right-aligned) columns */
   right?: number[]; minWidth?: number;
+  /** sortable (./sorting.tsx): the table's key for its remembered sort */
+  sortId?: string;
+  /** each cell's sort value; else a string or number cell is its own */
+  values?: SortVal[][];
+  /** each column's kind; else right-aligned columns are numbers */
+  types?: ColType[];
 }) {
+  const { sort, press } = useTableSort(sortId ?? "");
+  const R = new Set(right);
   if (rows.length === 0) {
     return <p data-testid={testid} className="text-[12px] text-ink-low">{empty}</p>;
   }
-  const R = new Set(right);
+  const valOf = (ri: number, ci: number): SortVal => {
+    const v = values?.[ri]?.[ci];
+    if (v !== undefined) return v;
+    const c = rows[ri][ci];
+    return typeof c === "number" ? (Number.isFinite(c) ? c : null)
+      : typeof c === "string" ? (c === DASH || c.trim() === "" ? null : (R.has(ci) ? numVal(c.replace(/[,$¢%+]/g, "").replace("−", "-")) ?? c : c)) : null;
+  };
+  const order = sortId ? sortRows(rows.map((_, i) => i), sort, (i, k) => valOf(i, Number(k))) : rows.map((_, i) => i);
   return (
     <div className="tc-scroll overflow-x-auto">
-      <table data-testid={testid} className="w-full border-collapse text-[12.5px]"
+      <table data-testid={testid} data-sort-table={sortId} className="w-full border-collapse text-[12.5px]"
         style={minWidth ? { minWidth } : undefined}>
         <thead>
           <tr>
-            {head.map((h, i) => (
+            {head.map((h, i) => sortId ? (
+              <SortTh key={`${h}-${i}`} label={h} k={String(i)} type={types?.[i] ?? (R.has(i) ? "num" : "text")}
+                sort={sort} onSort={press} right={R.has(i)} className={`${TH} first:pl-0 last:pr-0`} />
+            ) : (
               <th key={`${h}-${i}`} scope="col" className={`${TH} ${R.has(i) ? "text-right" : "text-left"} first:pl-0 last:pr-0`}>{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, ri) => (
+          {order.map((ri) => (
             <tr key={ri}>
-              {r.map((c, i) => (
+              {rows[ri].map((c, i) => (
                 <td key={i} className={`${TD} max-w-[360px] truncate first:pl-0 last:pr-0 ${R.has(i) ? "tc-num text-right text-ink-hi" : "text-ink-mid"}`}
                   title={typeof c === "string" ? c : undefined}>{c}</td>
               ))}

@@ -39,6 +39,9 @@ import {
   compLabel, type LiveValue, markSourceWords, parseLiveValue,
 } from "../lib/tradingConsole";
 import { Info } from "./console/primitives";
+import {
+  type ColType, type SortVal, SortTh, sortRows, textVal, timeVal, useTableSort,
+} from "./console/sorting";
 
 type Obj = Record<string, unknown>;
 type Side = "yes" | "no";
@@ -319,6 +322,40 @@ export const keyOf = (p: { ticker: string; side: Side }) => `${p.ticker}|${p.sid
 const POSITION_HEAD = ["market", "side", "live value", "unrealised",
   "contracts", "owner", "cost · mark", "at risk", "league · time", ""];
 const RIGHT = new Set([2, 3, 4, 6, 7]);
+/** each position column's sort key and kind (the action column does not) */
+const POSITION_COLS: ([string, ColType] | null)[] = [["market", "text"], ["side", "text"],
+  ["live", "num"], ["unrealised", "num"], ["contracts", "num"], ["owner", "text"],
+  ["cost", "num"], ["risk", "num"], ["kickoff", "time"], null];
+const ownerWord = (p: { manual: number; handed_over: number }) =>
+  p.manual > 0 ? "manual" : p.handed_over > 0 ? "handover" : "agent";
+/** the value a position sorts by; a figure the book lacks is null (last) */
+export function positionSortVal(p: Position, k: string): SortVal {
+  switch (k) {
+    case "market": return textVal(p.title);
+    case "side": return p.side;
+    case "live": return p.live.live_value_dollars;
+    case "unrealised": return p.live.unrealised_pl_dollars;
+    case "contracts": return p.contracts;
+    case "owner": return ownerWord(p);
+    case "cost": return p.avg_cost_cents;
+    case "risk": return p.at_risk_dollars;
+    case "kickoff": return timeVal(p.kickoff_utc);
+    default: return null;
+  }
+}
+const ORDER_COLS: [string, string, ColType][] = [["market", "market", "text"], ["side", "side", "text"],
+  ["price", "price", "num"], ["remaining", "remaining", "num"], ["owner", "owner", "text"], ["expires", "expires", "time"]];
+export function orderSortVal(o: Order, k: string): SortVal {
+  switch (k) {
+    case "market": return textVal(o.title);
+    case "side": return o.side;
+    case "price": return o.price_cents;
+    case "remaining": return o.remaining;
+    case "owner": return o.owner === "trader" ? "agent" : "manual";
+    case "expires": return timeVal(o.expires_utc);
+    default: return null;
+  }
+}
 
 // --------------------------------------------------- positions + write
 
@@ -327,6 +364,7 @@ export function PositionsTable({ book, token, onPosted, onInspect, selected }: {
   onInspect?: (key: string) => void; selected?: string | null;
 }) {
   const [edit, setEdit] = useState<Edit | null>(null);
+  const { sort, press } = useTableSort("positions");
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
 
@@ -397,16 +435,19 @@ export function PositionsTable({ book, token, onPosted, onInspect, selected }: {
             className="w-full min-w-[820px] border-collapse text-[12.5px]">
             <thead>
               <tr>
-                {POSITION_HEAD.map((h, i) => (
-                  <th key={`${h}-${i}`} scope="col"
-                    className={`${TH} ${RIGHT.has(i) ? "text-right" : "text-left"}`}>
-                    {h}
-                  </th>
-                ))}
+                {POSITION_HEAD.map((h, i) => {
+                  const c = POSITION_COLS[i];
+                  return c ? (
+                    <SortTh key={`${h}-${i}`} label={h} k={c[0]} type={c[1]} sort={sort} onSort={press}
+                      right={RIGHT.has(i)} className={TH} testid={`book-sort-${c[0]}`} />
+                  ) : (
+                    <th key={`${h}-${i}`} scope="col" className={`${TH} text-left`}>{h}</th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
-              {book.positions.map((p) => {
+              {sortRows(book.positions, sort, positionSortVal).map((p) => {
                 const k = keyOf(p);
                 const editing = edit && edit.key === k ? edit : null;
                 const max = editing
@@ -596,6 +637,7 @@ export function PendingList({ book }: { book: Book }) {
 }
 
 export function OrdersTable({ book }: { book: Book }): ReactNode {
+  const { sort, press } = useTableSort("orders");
   if (book.orders.length === 0) {
     return (
       <p data-testid="book-orders-empty"
@@ -612,16 +654,14 @@ export function OrdersTable({ book }: { book: Book }): ReactNode {
         className="w-full min-w-[560px] border-collapse text-[12.5px]">
         <thead>
           <tr>
-            {["market", "side", "price", "remaining", "owner", "expires"].map((h, i) => (
-              <th key={h} scope="col"
-                className={`${TH} ${i === 2 || i === 3 ? "text-right" : "text-left"}`}>
-                {h}
-              </th>
+            {ORDER_COLS.map(([k, h, t], i) => (
+              <SortTh key={k} label={h} k={k} type={t} sort={sort} onSort={press}
+                right={i === 2 || i === 3} className={TH} testid={`orders-sort-${k}`} />
             ))}
           </tr>
         </thead>
         <tbody>
-          {book.orders.map((o) => (
+          {sortRows(book.orders, sort, orderSortVal).map((o) => (
             <tr key={o.order_id} data-testid="book-order" data-ticker={o.ticker}
               className="hover:bg-tc-hover">
               <td className={`${TD} min-w-[180px] max-w-[320px]`}>

@@ -17,13 +17,13 @@
 // route as 404 `{"available":false}`, `Cache-Control: private, no-store`.
 import type { NextApiRequest, NextApiResponse } from "next";
 import {
-  OPERATOR_BACKEND, operatorHeaders, relayOperator,
+  OPERATOR_BACKEND, OPERATOR_WRITE_PATHS, operatorHeaders, relayOperator,
 } from "../../../lib/operatorRelay";
 
 // nothing from the caller's body is used; read none of it
 export const config = { api: { bodyParser: { sizeLimit: "1kb" } } };
 
-export const KILL_LIFT_BACKEND_PATH = "/api/admin/trading/kill/lift";
+export const KILL_LIFT_BACKEND_PATH = OPERATOR_WRITE_PATHS.killLift;
 
 export default async function handler(
   req: NextApiRequest,

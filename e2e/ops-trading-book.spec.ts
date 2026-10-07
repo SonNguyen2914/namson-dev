@@ -152,7 +152,8 @@ test.describe("the trader's book on the console", () => {
 
       const orders = page.getByTestId("book-orders");
       await expect(orders.getByTestId("book-order")).toHaveCount(2);
-      await expect(orders.locator("button")).toHaveCount(0);
+      // no control on an order (the header's sort buttons are not on one)
+      await expect(orders.locator("tbody button")).toHaveCount(0);
       await expect(page.locator('[data-testid="book-order"][data-ticker="'
         + MANUAL + '"]').getByTestId("chip-yours")).toHaveText("MANUAL");
       await expect(page.locator('[data-testid="book-order"][data-ticker="'

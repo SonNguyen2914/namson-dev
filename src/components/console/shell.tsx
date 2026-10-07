@@ -9,7 +9,8 @@
 import { type ReactNode, useEffect, useRef } from "react";
 import type { AttentionItem } from "../../lib/consoleModel";
 import { isObj, num, str } from "../../lib/tradingConsole";
-import { Dot, StatusPill, type State, agoIso } from "./primitives";
+import { Dot, StatusPill, type State, agoIso, whenShort } from "./primitives";
+import { operatorHalt } from "./Emergency";
 import { VIEWS, type ViewKey, hrefOf } from "./route";
 
 type Obj = Record<string, unknown>;
@@ -29,8 +30,11 @@ export function railItems(d: Obj, now: number): RailItem[] {
   const halted = halt?.active === true;
   const items: RailItem[] = [];
   // TRADING: what stops it first
+  const oh = operatorHalt(d, now);
+  const hm = (iso: string | null) => (iso ? ` · until ${whenShort(iso, now)}` : "");
   let trading: [string, State, string];
   if (killed) trading = ["KILLED", "bad", "A kill is in force: nothing is placed."];
+  else if (oh.active) trading = ["HALTED", "bad", "An operator halt holds: no new buys; positions held, protective sells continue."];
   else if (halted) trading = ["HALTED", "bad", `A loss halt holds (${str(halt?.reason) ?? "reason not sent"}).`];
   else if (d.enabled === false) trading = ["DISABLED", "warn", "TRADING_ENABLED is not true: the cancel-first pass only."];
   else if (d.paper_only === true) trading = ["PAPER ONLY", "warn", "TRADING_PAPER_ONLY: it runs and learns and sends no real order."];
@@ -69,13 +73,17 @@ export function railItems(d: Obj, now: number): RailItem[] {
     state: !lastAt ? "warn" : age > 120_000 ? "warn" : "info",
     title: lastAt ? `${lastAt}${num(last?.elapsed_s) !== null ? ` · took ${num(last?.elapsed_s)!.toFixed(1)} s` : ""} · outcome ${str(last?.outcome) ?? "not sent"}` : "no tick",
     href: hrefOf("system") });
-  items.push({ key: "kill", label: "Kill", value: killed ? "ACTIVE" : d.kill === false ? "OFF" : "—",
+  const killUntil = typeof d.kill_until === "string" && d.kill_until !== "" ? d.kill_until : null;
+  items.push({ key: "kill", label: "Kill", value: killed ? `ACTIVE${hm(killUntil)}` : d.kill === false ? "OFF" : "—",
     state: killed ? "bad" : d.kill === false ? "info" : "warn",
     title: killed ? "A kill is in force (TRADING_KILL or an operator kill — the status route does not say which)." : "No kill in force.",
     href: hrefOf("overview", { focus: "safety" }) });
-  items.push({ key: "halt", label: "Halt", value: halted ? (str(halt?.reason) ?? "ACTIVE").replace(/_/g, " ").toUpperCase() : halt?.active === false ? "NONE" : "—",
-    state: halted ? "bad" : halt?.active === false ? "info" : "warn",
-    title: halted ? (str(halt?.rearm) ?? "") : "No loss halt holds.", href: hrefOf("overview", { focus: "safety" }) });
+  items.push({ key: "halt", label: "Halt",
+    value: halted ? (str(halt?.reason) ?? "ACTIVE").replace(/_/g, " ").toUpperCase()
+      : oh.active ? `ACTIVE${hm(oh.until)}` : halt?.active === false ? "NONE" : "—",
+    state: halted || oh.active ? "bad" : halt?.active === false ? "info" : "warn",
+    title: halted ? (str(halt?.rearm) ?? "") : oh.active ? "An operator halt holds: no new buys, resting buys cancelled, positions held, protective sells continue."
+      : "No loss halt or operator halt holds.", href: hrefOf("overview", { focus: "safety" }) });
   return items;
 }
 

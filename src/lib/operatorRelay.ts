@@ -3,7 +3,9 @@
 // 2026-10-06).
 //
 // pages/api/ops/trading-book.ts, trading-candidates.ts,
-// trading-ledger.ts, trading-handover.ts and trading-kill-lift.ts are the same shape as
+// trading-ledger.ts, trading-handover.ts, trading-kill-lift.ts and (2026-10-07)
+// the emergency routes trading-kill.ts, trading-halt.ts and
+// trading-halt-lift.ts are the same shape as
 // trading-status.ts beside them, and for the same reasons:
 //
 //   * FIXED BACKEND PATHS. Each route names its backend path(s) as
@@ -93,4 +95,80 @@ export async function relayOperator(
   res.setHeader("content-type",
     r.headers.get("content-type") || "application/json");
   res.send(raw);
+}
+
+// ------------------------------------------------- the operator writes
+
+/** THE ALLOWLIST OF OPERATOR WRITES (2026-10-07): every backend path a
+ *  console route may POST to, as literals. A route names its path from
+ *  here; e2e/ops-trading-emergency.spec.ts checks that each route uses one
+ *  of these and nothing else. */
+export const OPERATOR_WRITE_PATHS = {
+  handover: "/api/admin/trading/handover",
+  takeback: "/api/admin/trading/takeback",
+  careful: "/api/admin/trading/careful",
+  kill: "/api/admin/trading/kill",
+  killLift: "/api/admin/trading/kill/lift",
+  halt: "/api/admin/trading/halt",
+  haltLift: "/api/admin/trading/halt/lift",
+} as const;
+
+/** A KILL or HALT body: `{minutes}` only, a whole number 1..1440. Checked
+ *  and REBUILT here; the caller's bytes never reach the backend. */
+export function parseMinutesBody(body: unknown):
+  { ok: true; payload: { minutes: number } } | { ok: false; detail: string } {
+  let b = body;
+  if (typeof b === "string") {
+    try { b = JSON.parse(b); } catch { return { ok: false, detail: "the body is not JSON" }; }
+  }
+  if (typeof b !== "object" || b === null || Array.isArray(b)) {
+    return { ok: false, detail: "the body must be a JSON object" };
+  }
+  const o = b as Record<string, unknown>;
+  const extra = Object.keys(o).filter((k) => k !== "minutes");
+  if (extra.length) return { ok: false, detail: `unexpected field(s): ${extra.join(", ")}` };
+  const m = o.minutes;
+  if (typeof m !== "number" || !Number.isInteger(m) || m < 1 || m > 1440) {
+    return { ok: false, detail: "minutes must be a whole number from 1 to 1440" };
+  }
+  return { ok: true, payload: { minutes: m } };
+}
+
+/** An emergency write with no token is refused HERE (401), never sent:
+ *  a press that reaches the backend unauthenticated must not be what the
+ *  operator learns a missing token from. */
+export function refuseWithoutToken(req: NextApiRequest, res: NextApiResponse): boolean {
+  if (operatorHeaders(req)["x-admin-token"]) return false;
+  res.status(401).json({ ok: false, error: "token_missing",
+    detail: "no operator token was sent; nothing was forwarded" });
+  return true;
+}
+
+/** The emergency POST routes' one handler: POST only, a token, the body
+ *  rebuilt (or none), one literal backend path. */
+export async function emergencyRoute(req: NextApiRequest, res: NextApiResponse,
+  path: string, what: string, withMinutes: boolean): Promise<void> {
+  res.setHeader("Cache-Control", "private, no-store");
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    res.status(405).json({ ok: false, error: "method_not_allowed",
+      detail: `${what} is a POST; ${req.method} is not a verb this route has` });
+    return;
+  }
+  if (refuseWithoutToken(req, res)) return;
+  if (withMinutes) {
+    const p = parseMinutesBody(req.body);
+    if (!p.ok) {
+      res.status(400).json({ ok: false, error: "bad_request", detail: p.detail });
+      return;
+    }
+    return relayOperator(res, `${OPERATOR_BACKEND}${path}`, {
+      method: "POST",
+      headers: { ...operatorHeaders(req), "content-type": "application/json" },
+      body: JSON.stringify(p.payload),
+    }, what);
+  }
+  return relayOperator(res, `${OPERATOR_BACKEND}${path}`, {
+    method: "POST", headers: operatorHeaders(req),
+  }, what);
 }

@@ -19,12 +19,12 @@
 // `{"available":false}`, `Cache-Control: private, no-store`.
 import type { NextApiRequest, NextApiResponse } from "next";
 import {
-  OPERATOR_BACKEND, operatorHeaders, relayOperator,
+  OPERATOR_BACKEND, OPERATOR_WRITE_PATHS, operatorHeaders, relayOperator,
 } from "../../../lib/operatorRelay";
 
 export const config = { api: { bodyParser: { sizeLimit: "2kb" } } };
 
-const BACKEND_PATH = "/api/admin/trading/careful";
+const BACKEND_PATH = OPERATOR_WRITE_PATHS.careful;
 const OPS = ["competition_off", "competition_on", "promote", "demote"] as const;
 type Op = typeof OPS[number];
 const KEYS = new Set(["op", "competition", "ground"]);
