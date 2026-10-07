@@ -1036,7 +1036,7 @@ test("no book: the backend's own reasons are shown, every family UNREAD, and no 
       families: {}, other_series: OTHER_SERIES,
       families_not_read_because: FAMILIES_NOT_READ } }),
     news: { status: 200, body: news() } });
-  await expect(page.getByText(/no open kalshi book matched/i)).toBeVisible();
+  await expect(page.getByText(/no open kalshi book for this fixture/i)).toBeVisible();
   await expect(page.getByTestId("book-meta")).toContainText(means);
   await expect(page.getByTestId("families-none")).toContainText(
     "every family is UNREAD here, which is not a finding that none is listed");

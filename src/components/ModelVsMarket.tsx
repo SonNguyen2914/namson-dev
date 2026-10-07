@@ -51,6 +51,14 @@ export type Series = {
   latest?: { captured_at?: string; minute?: number | null;
              age_seconds?: number } | null;
   generated_at?: string;
+  /** "NO MODEL" on a state-only competition: the solid line is the
+   *  in-play engine run on the de-vigged T-10 Kalshi book, not a model */
+  model_label?: string | null;
+  model_basis?: string; market_basis?: string;
+  /** where the market line came from (hub-champ-fix, 2026-10-06): the
+   *  Kalshi event the live plane STORED quotes for while it was open */
+  market_source?: { venue?: string; event_ticker?: string | null;
+    series?: string | null; means?: string } | null;
 };
 export type Refused = { available: false; code?: string; reason?: string };
 
@@ -220,9 +228,9 @@ function useWidth(ref: React.RefObject<HTMLDivElement | null>) {
   return w;
 }
 
-function Chart({ b, cursor, setCursor, cols, names }: {
+function Chart({ b, cursor, setCursor, cols, names, lw }: {
   b: Built; cursor: number; setCursor: (t: number) => void;
-  cols: Record<O, string>; names: Record<O, string>;
+  cols: Record<O, string>; names: Record<O, string>; lw: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const W = useWidth(box);
@@ -295,7 +303,7 @@ function Chart({ b, cursor, setCursor, cols, names }: {
     <div ref={box} className="relative w-full">
       <svg data-testid="mvm-chart-svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`}
         className="block select-none" role="img"
-        aria-label={`model and market, ${names.home}, draw and ${names.away}, on one axis ${b.lo} to ${b.hi} percent`}>
+        aria-label={`${lw} and Kalshi market, ${names.home}, draw and ${names.away}, on one axis ${b.lo} to ${b.hi} percent`}>
         <defs>
           <pattern id="mvm-hatch" width="6" height="6" patternUnits="userSpaceOnUse"
             patternTransform="rotate(45)">
@@ -479,6 +487,14 @@ function Board({ series, match, readAtMs }: {
     else if (e.key === "Home") { e.preventDefault(); setPinned(b.steps[0]); }
     else if (e.key === "End") { e.preventDefault(); setPinned(null); }
   };
+  // A STATE-ONLY COMPETITION HAS NO MODEL (series.model_label "NO MODEL"):
+  // its solid line is the in-play engine run on the de-vigged T-10 Kalshi
+  // book. Every word that would call it "the model" says "engine" instead,
+  // so the chart cannot contradict the page's "no shadow model" line.
+  const anchored = series.model_label === "NO MODEL";
+  const lw = anchored ? "engine" : "model";
+  const src = series.market_source;
+  const ticker = src?.event_ticker ?? null;
   const rd = b.readAt(cursor);
   const ko = b.readAt(b.steps[0]);
   const lastEv = b.mode === "pre"
@@ -506,7 +522,7 @@ function Board({ series, match, readAtMs }: {
   const pill = b.mode === "held"
     ? { text: `held · ${b.lastStep}${PRIME}, not current`, cls: "border-warn/50 text-warn" }
     : b.mode === "post" ? { text: "full time · recorded", cls: "border-line text-ink-low" }
-    : b.mode === "pre" ? { text: series.lock ? `model locked T${MINUS}10` : "model not locked yet", cls: "border-line text-ink-low" }
+    : b.mode === "pre" ? { text: anchored ? "no model · Kalshi steps only" : series.lock ? `model locked T${MINUS}10` : "model not locked yet", cls: "border-line text-ink-low" }
     : { text: "live", cls: "" };
 
   const score = rd.score ? `${rd.score.home}–${rd.score.away}` : null;
@@ -522,7 +538,9 @@ function Board({ series, match, readAtMs }: {
                 ? `${names[closest.o]} sits ${signed(closest.g as number)} against its fee floor of +${f1(closest.fl as number)}.`
                 : `No outcome clears its fee floor. Closest: ${names[closest.o]}, gap ${signed(closest.g as number)} against +${f1(closest.fl as number)}, ${f1(closest.short)} short.`)
               : "Model runs and market captures before kickoff, as steps.")
-            : "The market already knows the score; the model reads minute and score."}
+            : anchored
+              ? "The market already knows the score; the engine reads minute and score off the T−10 Kalshi book."
+              : "The market already knows the score; the model reads minute and score."}
         </p>
 
         {/* ===== the time row ===== */}
@@ -560,12 +578,12 @@ function Board({ series, match, readAtMs }: {
         )}
         <p data-testid="mvm-fresh" className="mt-1 font-mono text-[12px] text-ink-low">
           {b.mode === "pre"
-            ? `market ${wall(rd.marketAt) ?? "—"} · model ${series.lock && cursor >= series.lock.t ? `locked ${wall(series.lock.at) ?? ""}` : "latest run"}`
+            ? `Kalshi ${wall(rd.marketAt) ?? "—"} · ${anchored ? "no model run" : `model ${series.lock && cursor >= series.lock.t ? `locked ${wall(series.lock.at) ?? ""}` : "latest run"}`}`
             : `tape ${wall(latestAt) ?? "—"}${b.mode === "held" ? " · feed late, not current" : ""}`}
         </p>
 
         <div className="mt-2 flex items-center justify-between font-mono text-[12px] text-ink-low">
-          <span>── model &nbsp;- - - market</span>
+          <span data-testid="mvm-legend">── {lw} &nbsp;- - - Kalshi</span>
           <span>one axis <span className="text-ink-mid">{b.lo}–{b.hi}%</span></span>
         </div>
 
@@ -574,18 +592,20 @@ function Board({ series, match, readAtMs }: {
           aria-label="minute shown in the chart and rows"
           aria-valuemin={b.steps[0]} aria-valuemax={b.lastStep} aria-valuenow={cursor}
           aria-valuetext={`${tLabel(b.mode, cursor)}: ${OUT.map((o) => {
-            const g = sayGap(o); return `${names[o]} gap ${g == null ? "none" : signed(g)}`; }).join(", ")}`}
+            const g = sayGap(o); const fl = b.floors[o];
+            const short = b.mode === "pre" && g != null && fl != null ? r1(fl - g) : null;
+            return `${names[o]} gap ${g == null ? "none" : signed(g)}${short == null ? "" : short <= 0 ? ", clears its fee floor" : `, ${f1(short)} short of its fee floor`}`; }).join(", ")}`}
           onKeyDown={onKey} className="mt-1 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-ink-mid">
           <Chart b={b} cursor={cursor} setCursor={(t) => setPinned(t === b.lastStep ? null : t)}
-            cols={cols} names={names} />
+            cols={cols} names={names} lw={lw} />
         </div>
 
         {/* ===== the price rows: the cursor's readout ===== */}
         <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-x-3 gap-y-0 font-mono text-[12px] text-ink-low">
           <span />
-          <span className="text-right">mkt</span>
-          <span className="text-right">model</span>
-          <span className="min-w-[6.5rem] text-right">since · mkt model</span>
+          <span data-testid="mvm-col-market" className="text-right">Kalshi</span>
+          <span data-testid="mvm-col-model" className="text-right">{lw}</span>
+          <span className="min-w-[6.5rem] text-right">since · kalshi {lw}</span>
         </div>
         {OUT.map((o) => {
           const g = sayGap(o);
@@ -624,7 +644,7 @@ function Board({ series, match, readAtMs }: {
                   <div className="font-mono text-[11px] text-warn">held {b.lastStep}{PRIME}</div>
                 )}
                 {m == null && rd.refused && (
-                  <div className="font-mono text-[11px] text-ink-faint">no model read</div>
+                  <div className="font-mono text-[11px] text-ink-faint">no {lw} read</div>
                 )}
               </div>
               <div className="min-w-[6.5rem] text-right font-mono text-[12px] leading-snug tabular-nums text-ink-low">
@@ -644,9 +664,9 @@ function Board({ series, match, readAtMs }: {
           </b>
           {score ? `${score}. ` : ""}
           {rd.refused
-            ? `No model read at this minute: ${rd.refused}. `
+            ? `No ${lw} read at this minute: ${rd.refused}. `
             : rd.stale && rd.modelFrom != null
-              ? `Missed tape refresh: the model is held from ${rd.modelFrom}${PRIME}. `
+              ? `Missed tape refresh: the ${lw} is held from ${rd.modelFrom}${PRIME}. `
               : ""}
           {b.mode === "held" && atNow
             ? `Last reading before the feed went late${wall(latestAt) ? `, ${wall(latestAt)}` : ""}: not current.`
@@ -654,18 +674,39 @@ function Board({ series, match, readAtMs }: {
         </p>
         <p className="mt-2 text-[12px] leading-relaxed text-ink-low">
           One axis for all three outcomes, {b.lo}–{b.hi}%, fixed for this match.
-          Gap = model {MINUS} market. Beside each name at the line end, the gap
+          Gap = {lw} {MINUS} Kalshi. Beside each name at the line end, the gap
           at the cursor: <span style={{ color: "var(--up)" }}>green</span> when
-          the model is above the market (+), <span style={{ color: "var(--neg)" }}>red</span> when
+          the {lw} is above the market (+), <span style={{ color: "var(--neg)" }}>red</span> when
           it is below ({MINUS}).
           {b.mode === "pre" ? " The shaded band is the fee floor stacked on the market." : ""}
           {b.mode === "held" ? " Hatched: no data since the feed went late." : ""}
         </p>
+        {/* WHERE EACH LINE COMES FROM, in words (hub-champ-fix), under the
+            key so the R5 order (time row, chart, rows) is unchanged. The
+            market is the Kalshi book STORED while it was open — not the
+            current open book the Kalshi panel further down reads, which a
+            settled book leaves. */}
+        <p data-testid="mvm-source" data-venue={src?.venue ?? "kalshi"}
+          data-ticker={ticker ?? ""} data-anchored={anchored ? "yes" : "no"}
+          className="mt-1 text-[12px] leading-relaxed text-ink-low">
+          Dashed: <span className="text-ink-mid">Kalshi</span>
+          {ticker ? <> <span className="font-mono">{ticker}</span></> : null},
+          the three-way book as stored while it was open, overround
+          removed — not the current open book.{" "}
+          {anchored
+            ? <>Solid: <span className="text-ink-mid">no model</span> is
+                fitted for this competition, so the line is the in-play
+                engine run on the T{MINUS}10 Kalshi book, not a model{"’"}s
+                belief. The trader{"’"}s model line above is a separate
+                pre-match read.</>
+            : <>Solid: the shadow model.</>}
+        </p>
         <details className="mt-2 text-[12px] text-ink-low">
           <summary className="cursor-pointer text-ink-mid">How to read it</summary>
           <p className="mt-1 leading-relaxed">
-            Solid lines are the model, dashed lines the market with its
-            overround removed; colour says which outcome. Drag across the
+            Solid lines are the {anchored ? "in-play engine on the T−10 Kalshi book (no model is fitted here)" : "model"},
+            dashed lines the Kalshi market with its overround removed; colour
+            says which outcome. Drag across the
             chart, tap it, use ‹ › or the arrow keys: one cursor reads all six
             lines at that minute, and the rows below read the same minute. A
             dimmed model reading is held from the minute it names. Shadow, not
