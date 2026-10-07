@@ -107,16 +107,23 @@ function BookCell({ bid, ask, maker }: {
 
 /** An edge, drawn brighter when it clears the bar. Clearing the bar is
  *  the trader's rule, not a verdict, so it is ink weight, not a colour. */
-/** THE CAREFUL STRATEGY's cell: score of 5, the worst-case size (paper
- *  when 0), the ground, and a probable data error said in words. */
+/** THE CAREFUL STRATEGY's cell: the score out of 5 (pre-match) or 3 (the
+ *  in-play ladder, 2026-10-07, with the signals it scored), the
+ *  worst-case size (paper when 0), the ground, and a probable data error
+ *  said in words. */
 function CarefulCellView({ c }: { c: CarefulCell | null }) {
   if (!c) return <span className="text-ink-faint">—</span>;
   return (
     <span className="whitespace-nowrap">
-      {c.score !== null && <span className="text-ink-hi">{c.score}/5</span>}
+      {c.score !== null && (
+        <span data-testid="careful-score" className="text-ink-hi">{c.score}/{c.score_of ?? 5}</span>)}
       {c.size !== null && (
         <span className={c.size > 0 ? "text-ink-mid" : "text-ink-faint"}>
           {" · "}{c.size > 0 ? `$${c.size}` : "paper"}
+        </span>)}
+      {c.signals !== null && (
+        <span data-testid="careful-signals" className="block text-[10px] text-ink-faint">
+          {c.signals.length ? c.signals.join(" · ") : "no signal"}
         </span>)}
       {c.ground && <span className="block text-[10px] text-ink-faint">{c.ground}</span>}
       {c.data_error && (
