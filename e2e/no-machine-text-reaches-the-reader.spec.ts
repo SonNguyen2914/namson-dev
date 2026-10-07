@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { BOARD_EIGHT, serveEight } from "./eight-columns";
+import { assertNoMachineText } from "./machine-text";
 
 // A READER IS SHOWN A SENTENCE, NEVER AN INTERNAL TOKEN.
 //
@@ -35,32 +36,10 @@ import { BOARD_EIGHT, serveEight } from "./eight-columns";
 // own `textContent` and asks whether a URL, a query string, a host, a
 // Python exception class or a traceback is anywhere in it.
 
-/** Every shape that is machine text wherever it appears, with the words
- *  a failure message should use instead. Derived from what the providers
- *  actually emit — `requests`' `HTTPError` repr, `urllib3`'s pool
- *  errors, an upstream HTML error page — not from a list of strings this
- *  file happens to send below. */
-const MACHINE_TEXT: readonly (readonly [RegExp, string])[] = [
-  [/[a-z][a-z0-9+.-]*:\/\//i, "a URL scheme"],
-  [/\b(?:[a-z0-9-]+\.)+(?:com|net|org|io|dev|app|co|uk|ai)\b/i, "a hostname"],
-  [/\bfor\s+url\b/i, "`requests`' own `for url:` tail"],
-  [/[?&][A-Za-z_][\w.-]*=/, "a query string"],
-  [/\b[A-Za-z_][A-Za-z0-9_.]*(?:Error|Exception)\s*:/,
-    "a Python exception class"],
-  [/\b\d{3}\s+(?:Client|Server)\s+Error\b/i, "a `requests` status line"],
-  [/Traceback \(most recent call last\)/, "a traceback"],
-  [/File "[^"]*", line \d+/, "a stack frame"],
-  [/<\s*\/?\s*(?:html|body|head|h1|title|pre|div)\b/i, "raw HTML"],
-];
-
-function assertNoMachineText(where: string, text: string) {
-  for (const [shape, what] of MACHINE_TEXT) {
-    const hit = shape.exec(text);
-    expect(hit, `${where} shows ${what} — "${hit?.[0]}" — to a reader. `
-      + "A reader is shown a sentence, never an internal token.")
-      .toBeNull();
-  }
-}
+// The shapes live in e2e/machine-text.ts since 2026-10-07, so a second
+// surface (the live panel's refusal, e2e/a-refusal-says-which-feed-ran
+// .spec.ts) screens with THIS list rather than a hand-typed copy of it —
+// Playwright will not let one spec file import another.
 
 // ── what the providers really send, verbatim ────────────────────────
 //

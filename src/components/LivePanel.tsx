@@ -39,6 +39,32 @@ type Saved = {
 
 const storeKey = (matchId: string) => `bs-liveread-${matchId}`;
 
+/** A SOURCE POINTER IN PARENTHESES — `(live_feed._fail_until)` — is the
+ *  backend citing its own code, not part of the sentence. It comes out
+ *  whole and the prose closes over the gap, the treatment
+ *  src/lib/providerFailure.ts gives a machine-text parenthetical. */
+const SOURCE_POINTER = /\s*\(\s*[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+\s*\)/g;
+
+/** THE REFUSAL, IN THE BACKEND'S OWN WORDS (2026-10-07). This branched
+ *  on `reason === "feed not configured"`, a string the backend stopped
+ *  sending on 2026-09-09: with no API-Football key it now reads the
+ *  KEYLESS ESPN scoreboard instead, and its reason says which provider
+ *  ran and that the feature is not switched off. So every refusal fell
+ *  through to "No live match found right now" and the one sentence
+ *  written to tell the operator which provider answered never reached
+ *  them. Matching the prose is how it broke; it is rendered instead,
+ *  and screened by the board's machine-text shapes (e2e/machine-text.ts;
+ *  e2e/a-refusal-says-which-feed-ran.spec.ts). */
+function refusalWords(reason: unknown): string {
+  const said = typeof reason === "string"
+    ? reason.replace(SOURCE_POINTER, "").replace(/\s+/g, " ")
+        .replace(/[\s.]+$/, "").trim()
+    : "";
+  return said
+    ? `Nothing to fill from the live feed: ${said}. Enter the state manually below.`
+    : "No live match found right now — enter the state manually below.";
+}
+
 function loadSaved(matchId: string): Saved | null {
   if (typeof window === "undefined") return null;
   try {
@@ -129,11 +155,7 @@ export default function LivePanel({ matchId, liveLevers }: {
     try {
       const s = await api.liveState(matchId);
       if (!s.available) {
-        setAutoMsg(
-          s.reason === "feed not configured"
-            ? "Live feed not set up — enter the state manually below."
-            : "No live match found right now — enter the state manually below."
-        );
+        setAutoMsg(refusalWords(s.reason));
         return;
       }
       // MISSING IS NEVER ZERO — AND A PREDICTION RUNS ON THESE NUMBERS.
@@ -154,7 +176,15 @@ export default function LivePanel({ matchId, liveLevers }: {
       } else {
         notCarried.push("score");
       }
-      if (s.minutes_elapsed != null) {
+      // AN UNREAD CLOCK IS NOT A MINUTE (2026-10-07). With no clock from
+      // the provider the backend still sends `minutes_elapsed` — its
+      // `or 0.0` fold, laundered by `sim_minutes` into a period floor
+      // (45 under 2H, 0 under 1H) — and says so in `minute_unread`
+      // ("disclosed rather than silently repaired", api/main.py
+      // fetch_live_state). Filling that put a minute nobody observed
+      // into the operator's form, and a live prediction then ran on it.
+      // The disclosure is the read: unread is absent.
+      if (s.minutes_elapsed != null && s.minute_unread !== true) {
         const m = Math.round(s.minutes_elapsed);
         setMinute(m);
         setPhaseId(phaseForMinute(m));
