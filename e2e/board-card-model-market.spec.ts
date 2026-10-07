@@ -34,7 +34,9 @@ function board() {
     const r = [...b.rows, ...b.refusals].find((x) => x.event_id === id)!;
     r.model_vs_market = mm;
   };
-  set(IDS.conflict, block({ codes: { h: "ATM", a: "RMA" } }));
+  // Elche (HOME) v Real Madrid (AWAY, the favourite): the codes are the
+  // fixture's own home and away, never favourite-first
+  set(IDS.conflict, block({ codes: { h: "ELC", a: "RMA" } }));
   set(IDS.agree, block({ model: { h: 0.301, d: 0.250, a: 0.449 } }));
   set(IDS.untested, block({ model: { h: 0.310, d: 0.262, a: 0.428 },
                             tested: false }));
@@ -72,7 +74,7 @@ test.describe("the card's model and market lines", () => {
     await serveEight(page, board());
   });
 
-  test("the derby: one decimal, home / draw / away, model first", async ({ page }) => {
+  test("the derby's numbers: one decimal, home / draw / away, model first", async ({ page }) => {
     const c = card(page, IDS.conflict);
     const vals = async (lab: string) => Promise.all(["h", "d", "a"].map(
       (k) => text(c.getByTestId(`mm-${lab}-${k}`))));
@@ -80,7 +82,7 @@ test.describe("the card's model and market lines", () => {
     expect(await vals("market")).toEqual(["27.2%", "24.3%", "48.5%"]);
     // header: home code, the word DRAW, away code
     expect(await Promise.all(["h", "d", "a"].map(
-      (k) => text(c.getByTestId(`mm-head-${k}`))))).toEqual(["ATM", "DRAW", "RMA"]);
+      (k) => text(c.getByTestId(`mm-head-${k}`))))).toEqual(["ELC", "DRAW", "RMA"]);
     // model line ABOVE the market line
     const mb = (await c.getByTestId("mm-model-label").boundingBox())!;
     const kb = (await c.getByTestId("mm-market-label").boundingBox())!;
@@ -117,7 +119,7 @@ test.describe("the card's model and market lines", () => {
     expect(m).toContain("shadow, not advice");
     const k = await title(c.getByTestId("mm-market-label"));
     expect(k).toContain("Kalshi, overround removed so H + D + A = 100");
-    for (const part of ["ATM ask 28¢", "bid 27¢", "spread 1¢", "size 421,736",
+    for (const part of ["ELC ask 28¢", "bid 27¢", "spread 1¢", "size 421,736",
                         "DRAW ask 25¢", "RMA ask 50¢"]) expect(k).toContain(part);
     expect(await title(c.getByTestId("mm-model-h"))).toBe(m);
     expect(await title(c.getByTestId("mm-market-a"))).toBe(k);
@@ -376,4 +378,86 @@ test.describe("once the match has kicked off", () => {
     expect(await c.getByTestId("mm-model-a").evaluate((e) => getComputedStyle(e).color))
       .toBe(hi);
   });
+});
+
+/* THE COLUMNS ARE THE FIXTURE'S HOME · DRAW · AWAY, NEVER FAVOURITE-FIRST.
+ *
+ * The card's headline leads with the FAVOURITE, and when the favourite is
+ * the away side its side badge reads "A" — Elche (home) v Real Madrid
+ * (away) draws "Real Madrid [A] vs Elche". The model and market columns
+ * must still read ELC · DRAW · RMA, with Elche's numbers under ELC and
+ * Real Madrid's under RMA, before kickoff and after it. Values are
+ * deliberately lopsided so a swap cannot pass. */
+test.describe("the favourite is AWAY: the columns are still home · DRAW · away", () => {
+  const ID = IDS.conflict;               // Elche v Real Madrid
+  const MODEL = { h: 0.168, d: 0.221, a: 0.611 };
+  const MARKET = { h: 0.047, d: 0.091, a: 0.862 };
+
+  async function open(page: Page, opts: { live: boolean; codes: boolean }) {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const b = board();
+    const r = [...b.rows, ...b.refusals].find((x) => x.event_id === ID)!;
+    expect(r.home).toBe("Elche");
+    expect(r.away).toBe("Real Madrid");
+    expect(r.favourite).toBe("Real Madrid");
+    r.model_vs_market = block({ model: MODEL, market: MARKET,
+      codes: opts.codes ? { h: "ELC", a: "RMA" } : { h: null, a: null } });
+    if (opts.live) Object.assign(r, { state: "in", in_play: true,
+                                      live: liveBlock("in") });
+    await serveEight(page, b);
+    const c = card(page, ID);
+    await c.scrollIntoViewIfNeeded();
+    return c;
+  }
+
+  for (const live of [false, true]) {
+    for (const codes of [true, false]) {
+      test(`${live ? "in play" : "pre-match"}, ${codes ? "backend codes"
+        : "codes from the names"}`, async ({ page }) => {
+        const c = await open(page, { live, codes });
+        // the headline leads with the away favourite, and says so
+        await expect(c.getByTestId("home-badge")).toHaveText("A");
+        // the header, in DOM order AND left to right
+        const want = codes ? ["ELC", "DRAW", "RMA"] : ["ELC", "DRAW", "REA"];
+        const heads = await Promise.all(["h", "d", "a"].map(async (k) => {
+          const l = c.getByTestId(`mm-head-${k}`);
+          return { k, text: await text(l), box: (await l.boundingBox())! };
+        }));
+        expect(heads.map((h) => h.text)).toEqual(want);
+        expect(heads[0].box.x).toBeLessThan(heads[1].box.x);
+        expect(heads[1].box.x).toBeLessThan(heads[2].box.x);
+        // each value sits under its own team's code
+        const want_v = {
+          model: { h: "16.8%", d: "22.1%", a: "61.1%" },
+          market: { h: "4.7%", d: "9.1%", a: "86.2%" },
+        } as const;
+        for (const lab of ["model", "market"] as const) {
+          for (const h of heads) {
+            const v = c.getByTestId(`mm-${lab}-${h.k}`);
+            await expect(v).toHaveText(want_v[lab][h.k as "h" | "d" | "a"]);
+            const vb = (await v.boundingBox())!;
+            expect(Math.abs((vb.x + vb.width / 2) - (h.box.x + h.box.width / 2)),
+              `${lab} ${h.k} is centred under ${h.text}`).toBeLessThanOrEqual(1.5);
+          }
+        }
+        // the hover names each leg by the same code, in the same order
+        if (codes) {
+          const k = await title(c.getByTestId("mm-market-label"));
+          expect(k.indexOf("ELC ask")).toBeLessThan(k.indexOf("DRAW ask"));
+          expect(k.indexOf("DRAW ask")).toBeLessThan(k.indexOf("RMA ask"));
+        }
+        // the bright market figure is the away favourite's, under its code
+        await expect(c.getByTestId("mm-market-a")).toHaveAttribute("data-top", "1");
+        // before kickoff the model's top is Real Madrid's too (AGREE);
+        // after it, the model line is grey and the box reads IN PLAY
+        if (live) {
+          await expect(c.getByTestId("mm-model-a")).toHaveAttribute("data-top", "0");
+          await expect(c.getByTestId("mm-verdict")).toHaveText("IN PLAY");
+        } else {
+          await expect(c.getByTestId("mm-model-a")).toHaveAttribute("data-top", "1");
+          await expect(c.getByTestId("mm-verdict")).toHaveText("MODEL · AGREE");
+        }
+      });
+    }
+  }
 });
