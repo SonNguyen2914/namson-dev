@@ -108,7 +108,10 @@ export default function TradingConsole() {
           the back arrow and the chips go to the board, the leagues and the
           field. The Trading chip itself is TopBar's, drawn — and lit as
           this page — only while the tab holds a token. */}
-      <TopBar back={{ href: "/bet-suggester", label: "board" }}
+      {/* "← board" goes TO THE BOARD, the BOARD chip's own target — never
+          history.back() (Son, 2026-10-07: it stepped back through every
+          console view he had visited before reaching the board) */}
+      <TopBar back={{ href: "/bet-suggester", label: "board", direct: true }}
         title="trading console" inner="max-w-[1760px] px-4 sm:px-6">
         <NavChip href="/bet-suggester">board</NavChip>
         <NavChip href="/bet-suggester/leagues">leagues</NavChip>

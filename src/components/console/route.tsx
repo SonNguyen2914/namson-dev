@@ -7,6 +7,17 @@
 // the Attention list opens the filtered view; the view writes its filters
 // back with replaceState — never a navigation, never a scroll jump, and
 // never the operator token (which is React state only).
+//
+// SWITCHING VIEWS LEAVES NO HISTORY (Son's bug, 2026-10-07): a view switch
+// REPLACES the URL's hash instead of pushing an entry, so the browser's Back
+// leaves the console in one step — it used to walk back through every view
+// visited (Trades → Portfolio → Trading → …) before reaching the board. The
+// URL still names the view, so a deep link (`/ops/trading#trades`) and a
+// reload on a view open it as before. Every same-page view link (the nav,
+// the rail's pills, Attention, "Candidates →") goes through `go`; a click
+// on any `#<view>` anchor in the page is caught for it, so a plain anchor
+// can never push one again. A modified click (new tab / window) is left
+// to the browser.
 import { useCallback, useEffect, useState } from "react";
 
 export const VIEWS = [
@@ -47,16 +58,31 @@ export function useHashRoute() {
     window.addEventListener("hashchange", read);
     return () => window.removeEventListener("hashchange", read);
   }, []);
-  /** go to a view (a history entry), scrolled to its top */
+  /** go to a view — REPLACING the URL's hash, never a history entry —
+   *  scrolled to its top */
   const go = useCallback((view: string, params?: Record<string, string>) => {
     const href = hrefOf(view, params);
-    if (window.location.hash === href) {
-      setRoute(parseHash(href));
-    } else {
-      window.location.hash = href;
+    if (window.location.hash !== href) {
+      window.history.replaceState(window.history.state, "",
+        `${window.location.pathname}${window.location.search}${href}`);
     }
+    setRoute(parseHash(href));
     window.scrollTo({ top: 0 });
   }, []);
+  // every same-page `#<view>` anchor goes through `go` (no history entry)
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = (e.target as Element | null)?.closest?.("a[href^='#']") as HTMLAnchorElement | null;
+      if (!a || a.target === "_blank") return;
+      const r = parseHash(a.getAttribute("href") ?? "");
+      if (!KEYS.has((a.getAttribute("href") ?? "").replace(/^#/, "").split("?")[0])) return;
+      e.preventDefault();
+      go(r.view, r.params);
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, [go]);
   /** write a view's own params back, with no history entry and no scroll.
    *  The default view keeps a bare URL while it has nothing to say. */
   const replaceParams = useCallback((view: string, params: Record<string, string>) => {
