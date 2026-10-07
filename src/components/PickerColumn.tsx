@@ -1565,6 +1565,10 @@ function RefusalCard({ r, col, dated = true, dense = false, rank }: {
   dense?: boolean;
 }) {
   const adm = r.admission;
+  /* A PLAIN LEAGUE REFUSAL'S CHIP ROW: number, reason, kickoff — nothing
+     else drawn in it (no cup badge, no national group or XI chip), so it
+     can be held to one line. See the chip row below. */
+  const plainChips = r.league === col && !r.national;
   const own = r.this_season;
   const opp = r.opponent_row;
 
@@ -1713,9 +1717,21 @@ function RefusalCard({ r, col, dated = true, dense = false, rank }: {
           `flex-none`, at the card's content edge — the date's placement
           is then independent of how many chips precede it, at every
           width, and only the chips wrap. */}
-      <div className="flex items-baseline gap-3">
-        <span className={`flex min-w-0 flex-1 flex-wrap items-baseline gap-y-1 ${
-          dense ? "gap-x-3 md:gap-x-2" : "gap-x-3"}`}>
+      {/* ONE LINE, AS A RANKED CARD'S CHIP ROW IS (2026-10-07). "02 · NEW TO
+          THE LEAGUE · Sun, Sep 20, 6:00 AM" measured 296.4px in a 298px
+          card on macOS, and Linux's font metrics tipped it onto a second
+          line in CI: the refused card came out 317px against a ranked
+          card's 294 — exactly the "bigger than the cards around it" Son
+          asked to be rid of. So the gaps are 8px rather than 12, the tag's
+          tracking is 0.1em rather than 0.14 (about 16px of room at 1440),
+          and on a plain league refusal the row does NOT wrap: if a track
+          is narrower still, the tag truncates and its words stay on the
+          hover. A row carrying more chips (a cup badge, a national group)
+          keeps wrapping, as a ranked card's own chip row does. */}
+      <div className="flex items-baseline gap-2">
+        <span className={`flex min-w-0 flex-1 items-baseline gap-x-2 gap-y-1 ${
+          plainChips ? "flex-nowrap" : "flex-wrap"}`}
+          data-chips={plainChips ? "plain" : "extra"}>
           {/* WHERE `01` GOES. A rank is a POSITION in this day's ladder
               and a refused fixture is not in the ladder — so the slot
               says that, in the ladder's own place, rather than going
@@ -1755,15 +1771,15 @@ function RefusalCard({ r, col, dated = true, dense = false, rank }: {
                 + "measured field puts those tables on one scale, ")
               + "so this fixture has no position in the day's ladder. A "
               + `number here would be a placement nobody measured. (${r.reason})`}
-            className="font-mono text-[11px] tabular-nums text-ink-low">
+            className="flex min-w-0 font-mono text-[11px] tabular-nums text-ink-low">
             <span data-testid="refusal-reason"
               data-subject={r.club ? "club" : "pairing"}
               data-reason={r.reason}
               title={`${r.club ?? pairing} — not ranked (${r.reason})`}
               className={REFUSAL_WORDS[r.reason]
                 || !/\s/.test((r.reason ?? "").trim())
-                ? "rounded border border-line px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] text-ink-low"
-                : undefined}>
+                ? "min-w-0 truncate rounded border border-line px-1.5 py-0.5 text-[9px] uppercase tracking-[0.1em] text-ink-low"
+                : "min-w-0 truncate"}>
               {refusalWords(r.reason)}
             </span>
           </span>
