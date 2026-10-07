@@ -237,6 +237,10 @@ export interface Candidates {
   by_competition: Record<string, CompCounts> | null;
   /** how many markets the tick considered in all, when the backend says */
   considered: number | null;
+  /** how many of them a strategy decided on, when the backend says */
+  decided: number | null;
+  /** the tick's own outcome word, when sent (e.g. "traded") */
+  outcome: string | null;
   /** markets left out of the snapshot, by reason (mostly by design) */
   omitted: Record<string, number>;
   /** of those, the ones CUT by the snapshot's bound (row_bound,
@@ -385,6 +389,7 @@ export function parseCandidates(b: Obj): Candidates {
     tick_at: str(b.tick_at), stale: bool(b.stale), age_s: num(b.age_s),
     scope, by_competition: byCompetition(b.by_competition),
     considered: considered === null ? null : Math.trunc(considered),
+    decided: num(b.decided), outcome: str(b.outcome),
     omitted, cut, not_served: num(b.not_served),
     truncated: b.truncated === true || cut > 0,
     actions, rows, unreadable,

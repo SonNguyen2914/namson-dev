@@ -1,0 +1,336 @@
+// SYSTEM (redesign, 2026-10-07): the raw diagnostics, dense — the journal's
+// activity today by kind and reason (raw codes beside the backend's plain
+// words), the settlement and fill reads, the catalogue's coverage funnel
+// (exactly the four stages the backend counts: known → in scope → priced →
+// eligible), why markets were refused, unmapped or unpriced, the journal's
+// retention, every block's own clock, and the versions. Human description
+// first; the raw code is always beside it.
+import type { ReactNode } from "react";
+import { GROUP_LABEL, codeWords, reasonGroup } from "../../lib/consoleModel";
+import { type Candidates, isObj, num, str } from "../../lib/tradingConsole";
+import {
+  BarList, DASH, InfoNote, KV, Metric, Panel, SimpleTable, SubHead, Tech, agoIso, count, when,
+} from "./primitives";
+
+type Obj = Record<string, unknown>;
+const obj = (v: unknown): Obj | null => (isObj(v) ? v : null);
+const text = (v: unknown) => (v === null || v === undefined || v === "" ? DASH : typeof v === "string" ? v : typeof v === "number" || typeof v === "boolean" ? String(v) : JSON.stringify(v));
+
+/** A {key: n} block as rows, largest first. */
+function rowsOf(v: unknown): [string, number][] {
+  const o = obj(v);
+  if (!o) return [];
+  return Object.entries(o).map(([k, n]) => [k, num(n) ?? 0] as [string, number])
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+const Code = ({ c }: { c: string }) => <Tech className="text-ink-mid">{c}</Tech>;
+const Words = ({ c }: { c: string }) => {
+  const w = codeWords(c);
+  return w ? <span className="block text-[11.5px] leading-snug text-ink-low">{w}</span> : null;
+};
+
+// ------------------------------------------------------------- activity
+
+function Activity({ d }: { d: Obj }) {
+  const today = obj(d.today) ?? {};
+  const byKind = rowsOf(today.by_kind);
+  const byReason: [string, string, number][] = [];
+  for (const [kind, reasons] of Object.entries(obj(today.by_reason) ?? {})) {
+    for (const [reason, n] of rowsOf(reasons)) byReason.push([kind, reason, n]);
+  }
+  byReason.sort((a, b) => b[2] - a[2] || a[0].localeCompare(b[0]) || a[1].localeCompare(b[1]));
+  const day = obj(d.trading_day);
+  return (
+    <Panel testid="ops-activity" title="Journal activity today"
+      meta={`the trading day ${str(day?.day) ?? "(UTC)"}${str(day?.tz) ? ` · ${str(day?.tz)}` : ""}`}>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
+        <Metric size="md" label="open agent orders" value={count(d.open_agent_orders)} />
+        <Metric size="md" label="other (manual) orders" value={count(d.open_other_orders)} />
+        <Metric size="md" label="orders placed today" value={count(d.placed_today)} />
+        <Metric size="md" label="fills today" value={count(d.fills_today)} />
+      </div>
+      <div className="mt-4 grid gap-x-8 gap-y-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <div>
+          <SubHead>Rows by kind</SubHead>
+          <SimpleTable testid="by-kind" head={["kind", "rows"]} right={[1]}
+            rows={byKind.map(([k, n]) => [<Code key="k" c={k} />, n.toLocaleString("en-US")])}
+            empty="no journal rows today" />
+        </div>
+        <div>
+          <SubHead right="raw code · the backend's plain words · group">By reason — why it acted or skipped</SubHead>
+          <SimpleTable testid="by-reason" head={["kind · reason", "group", "rows"]} right={[2]}
+            rows={byReason.map(([k, r, n]) => [
+              <span key="r"><Tech className="text-ink-hi">{`${k} · ${r}`}</Tech><Words c={r} /></span>,
+              <span key="g" className="text-[11.5px] text-ink-low">{k === "tick" ? "tick outcome" : GROUP_LABEL[reasonGroup(r)]}</span>,
+              n.toLocaleString("en-US")])}
+            empty="no reasons recorded today" />
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+// ---------------------------------------------------------- settlements
+
+/** WHAT EACH SETTLEMENT-READ OUTCOME MEANS (src/trading/agent.py
+ *  journal_settlements). An unsettled market is valued at 0 by the halts:
+ *  a win is never assumed. */
+const SETTLEMENT_WORDS: [string, string][] = [
+  ["settled", "settled — the account's settlement data gave one yes/no result"],
+  ["not_listed", "not listed yet — Kalshi has no settlement row for it; asked again later"],
+  ["unknown_result", "unclear result — not one clean yes/no; left unsettled"],
+  ["refused", "read refused — asked again later"],
+];
+const SETTLEMENT_META = new Set(["outcome", "at", "due", "asked", "today",
+  "label", "basis", "version", "window_ticks", "window_since", "passes",
+  "latest", "settled_rows_today", "error"]);
+const PASS_WORDS: Record<string, string> = {
+  read: "asked Kalshi", nothing_held: "nothing held awaits a result", error: "the read raised",
+};
+
+function Settlements({ d, now }: { d: Obj; now: number }) {
+  void now;
+  const s = obj(d.settlement_reads);
+  const latest = s ? obj(s.latest) : null;
+  const today = s ? obj(s.today) : null;
+  const pass: Obj | null = latest ?? (s && !("window_ticks" in s) ? s : null);
+  const windowed = s !== null && "window_ticks" in s;
+  const known = new Set(SETTLEMENT_WORDS.map(([k]) => k));
+  const extra = s ? Object.keys(s).filter((k) => !known.has(k) && !SETTLEMENT_META.has(k) && num(s[k]) !== null).sort() : [];
+  const head = ["outcome", "last read", ...(windowed ? [`last ${count(s!.window_ticks)} ticks`] : []), ...(today ? ["today"] : [])];
+  const cells = (k: string) => [count(pass?.[k]), ...(windowed ? [count(s![k])] : []), ...(today ? [count(today[k])] : [])];
+  const passes = s ? obj(s.passes) : null;
+  const fr = obj(d.fill_reads);
+  const uf = d.unreadable_fills;
+  const ufo = obj(uf);
+  return (
+    <Panel testid="ops-settlements" title="Settlement & fill reads"
+      meta="held markets that stopped trading are asked for their result; until one clean yes/no comes back the halts value them at 0 — a win is never assumed">
+      {!s ? (
+        <p data-testid="settlements-absent" className="text-[12px] text-ink-low">settlement-read outcomes are not on this backend</p>
+      ) : (
+        <>
+          {typeof s.error === "string" && (
+            <p data-testid="settlements-error" className="mb-2 text-[12px] text-warn">◆ the settlement-read summary failed on the backend: {s.error}</p>
+          )}
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
+            <Metric size="md" label="last read" value={pass ? PASS_WORDS[text(pass.outcome)] ?? text(pass.outcome) : DASH}
+              sub={`as of ${when(pass?.at ?? s.at, true)}`} />
+            <Metric size="md" label="due a read" value={count(pass?.due)} sub={windowed ? `${count(s.due)} over the window` : undefined} />
+            <Metric size="md" label="asked on the last read" value={count(pass?.asked)} sub={windowed ? `${count(s.asked)} over the window` : undefined} />
+            {"settled_rows_today" in s && <Metric size="md" label="settled rows today" value={count(s.settled_rows_today)} />}
+          </div>
+          {windowed && (
+            <p className="mt-2 text-[11.5px] text-ink-low">
+              window: the last {count(s.window_ticks)} ticks, since {when(s.window_since, true)}
+              {passes ? ` · passes ${Object.entries(passes).map(([k, n]) => `${PASS_WORDS[k] ?? k} ${count(n)}`).join(" · ")}` : ""}
+            </p>
+          )}
+          <div className="mt-3">
+            <SubHead>Outcomes</SubHead>
+            <SimpleTable testid="settlement-outcomes" head={head} right={head.map((_, i) => i).slice(1)}
+              rows={[...SETTLEMENT_WORDS.map(([k, w]) => [w, ...cells(k)]), ...extra.map((k) => [k, ...cells(k)])]}
+              empty="no outcomes recorded" />
+          </div>
+        </>
+      )}
+      <div className="mt-4">
+        <SubHead>Fill reads</SubHead>
+        <div data-testid="unreadable-fills" className="text-[12.5px] text-ink-hi">
+          {fr ? (
+            typeof fr.error === "string" ? (
+              <p className="text-warn">◆ the fill-read summary failed on the backend: {fr.error}</p>
+            ) : (
+              <>
+                <p className="tc-num">
+                  unreadable: <span className={(num(fr.unreadable_today) ?? 0) > 0 ? "text-warn" : ""}>{count(fr.unreadable_today)}</span> today · {count(fr.unreadable)} in all
+                  <span className="text-ink-low"> (of {count(fr.today)} fills today · {count(fr.total)} in all)</span>
+                </p>
+                {num(fr.legacy_words_disagreed) !== null && num(fr.legacy_words_disagreed)! > 0 && (
+                  <p className="text-warn">◆ {count(fr.legacy_words_disagreed)} fill rows carried legacy words that disagreed with the canonical fields</p>
+                )}
+                <div className="mt-2 grid gap-x-8 md:grid-cols-2">
+                  <SimpleTable testid="fill-terms" head={["how the terms were decided", "fills"]} right={[1]}
+                    rows={rowsOf(fr.by_terms_basis).map(([k, n]) => [<Code key="k" c={k} />, n.toLocaleString("en-US")])}
+                    empty="no fills recorded" />
+                  {obj(fr.by_direction_basis) && (
+                    <SimpleTable head={["how the direction was decided", "fills"]} right={[1]}
+                      rows={rowsOf(fr.by_direction_basis).map(([k, n]) => [<Code key="k" c={k} />, n.toLocaleString("en-US")])}
+                      empty="no fills recorded" />
+                  )}
+                </div>
+              </>
+            )
+          ) : uf === undefined ? (
+            <p className="text-ink-low">not on this backend</p>
+          ) : (
+            <p className="tc-num">unreadable: {ufo ? `${count(ufo.today)} today · ${count(ufo.total)} in all` : count(uf)}</p>
+          )}
+          <p className="mt-1 text-[11px] text-ink-low">a fill whose venue fields could not be read takes its own order&apos;s side and price, and is counted here</p>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+// ------------------------------------------------------------ catalogue
+
+function Catalogue({ d }: { d: Obj }) {
+  const u = obj(d.universe);
+  if (!u) {
+    return <Panel testid="ops-catalogue" title="Catalogue coverage"><InfoNote>no coverage block on record</InfoNote></Panel>;
+  }
+  const cat = obj(u.catalogue) ?? {};
+  const stages = [["known", u.known], ["in scope", u.in_scope], ["priced", u.priced], ["eligible", u.eligible]] as const;
+  const top = num(u.known);
+  return (
+    <Panel testid="ops-catalogue" title="Catalogue coverage" meta={`as of ${when(d.universe_at, true)} · ${text(u.version)}`}>
+      {typeof u.error === "string" && <p className="mb-2 text-[12px] text-warn">◆ the coverage read failed on the tick: {u.error}</p>}
+      <div className="grid gap-x-8 gap-y-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <div>
+          <SubHead right="the backend's four stages">Funnel</SubHead>
+          <ol className="space-y-2">
+            {stages.map(([k, v]) => {
+              const n = num(v);
+              return (
+                <li key={k}>
+                  <div className="flex items-baseline justify-between text-[12.5px]">
+                    <span className="text-ink-hi">{k}</span>
+                    <span className="tc-num text-ink-hi">{n === null ? DASH : n.toLocaleString("en-US")}
+                      {n !== null && top ? <span className="ml-2 text-ink-low">{Math.round((n / top) * 1000) / 10}%</span> : null}</span>
+                  </div>
+                  <div className="mt-1 h-1.5 rounded-full bg-tc-raised">
+                    <div className="h-full rounded-full bg-ink-mid/60" style={{ width: `${n !== null && top ? (n / top) * 100 : 0}%` }} />
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+          <p className="mt-3 text-[12px] text-ink-low">
+            catalogue rows <span className="tc-num text-ink-hi">{count(cat.rows)}</span> of {count(cat.max_rows)} · full refresh {when(cat.last_full_refresh_at)}
+          </p>
+        </div>
+        <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">
+          <div>
+            <SubHead>Refusals by reason</SubHead>
+            <SimpleTable testid="refusals" head={["reason", "markets"]} right={[1]}
+              rows={rowsOf(u.refusals_by_reason).map(([k, n]) => [<span key="k"><Code c={k} /><Words c={k} /></span>, n.toLocaleString("en-US")])}
+              empty="no refusals recorded" />
+          </div>
+          <div>
+            <SubHead>Unmapped fixtures / no fair price</SubHead>
+            <SimpleTable testid="unmapped" head={["why", "markets"]} right={[1]}
+              rows={[...rowsOf(u.fixture_unmapped_by_why).map(([k, n]) => [<span key="k">unmapped · <Code c={k} /></span>, n.toLocaleString("en-US")]),
+                ...rowsOf(u.no_fair_price_by_why).map(([k, n]) => [<span key="k">no price · <Code c={k} /></span>, n.toLocaleString("en-US")])]}
+              empty="none recorded" />
+          </div>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+// ------------------------------------------------- clocks and retention
+
+function Clocks({ d, now, candidates }: { d: Obj; now: number; candidates: Candidates | null }) {
+  const rows: [string, unknown, ReactNode?][] = [
+    ["status generated", d.generated_at],
+    ["newest tick", obj(d.last_tick)?.at, <>outcome <Tech>{text(obj(d.last_tick)?.outcome)}</Tech>{num(obj(d.last_tick)?.elapsed_s) !== null ? ` · took ${num(obj(d.last_tick)?.elapsed_s)!.toFixed(1)} s` : ""}</>],
+    ["account read", d.account_read_at, "the tick's account snapshot"],
+    ["account block", d.account_at],
+    ["risk block", d.risk_at],
+    ["coverage block", d.universe_at],
+    ["in-play block", obj(d.in_play_trading)?.at],
+    ["in-play live update", obj(d.in_play)?.last_live_update_at],
+    ["hand-over block", obj(d.handover)?.at ?? d.managed_at],
+    ["learner block", obj(d.learning)?.at],
+    ["daily budget", obj(d.daily_budget)?.at],
+    ["news guard", obj(d.news_guard)?.at],
+    ["anomaly", obj(d.anomaly_avoid)?.at],
+    ["candidate snapshot", candidates?.tick_at ?? null, candidates ? `${candidates.version ?? "version not stated"}${candidates.age_s !== null ? ` · age ${Math.round(candidates.age_s)} s` : ""}` : "not read"],
+  ];
+  const last = obj(d.last_tick);
+  const shed = obj(last?.shed);
+  return (
+    <Panel testid="ops-clocks" title="Data freshness" meta="each block carries the clock of the tick row it came from">
+      <dl>
+        {rows.map(([k, v, sub]) => (
+          <KV key={k} k={k}>
+            {typeof v === "string" && v !== "" ? <><span className="tc-num">{when(v, true)}</span> <span className="text-ink-low">· {agoIso(v, now)} ago</span></> : <span className="text-ink-low">not sent</span>}
+            {sub ? <span className="block text-[11px] text-ink-low">{sub}</span> : null}
+          </KV>
+        ))}
+        {last && (last.truncated === true || (shed && Object.keys(shed).length > 0)) && (
+          <KV k="newest tick row">
+            <span className="text-warn">◆ over the journal cap — {last.truncated === true ? "stored as a marker" : `left out: ${Object.entries(shed!).map(([k, n]) => `${k} (${n} bytes)`).join(", ")}`}</span>
+          </KV>
+        )}
+      </dl>
+    </Panel>
+  );
+}
+
+function Retention({ d }: { d: Obj }) {
+  const r = obj(d.journal_retention);
+  return (
+    <Panel testid="ops-retention" title="Journal retention">
+      {!r ? <InfoNote>not served yet — this backend sends no retention block</InfoNote>
+        : typeof r.error === "string" ? <InfoNote tone="warn">◆ the retention block failed on the backend: {r.error}</InfoNote> : (
+          <dl>
+            {Object.entries(r).filter(([k, v]) => !["label", "basis", "prunable_kinds", "kept_kinds"].includes(k) && (typeof v !== "object" || v === null))
+              .map(([k, v]) => <KV key={k} k={k.replace(/_/g, " ")}><span className="tc-num">{text(v)}</span></KV>)}
+            {Object.entries(r).filter(([k, v]) => !["kept_kinds", "prunable_kinds"].includes(k) && obj(v))
+              .map(([k, v]) => (
+                <KV key={k} k={k.replace(/_/g, " ")}>
+                  {Object.entries(obj(v)!).map(([kk, vv]) => <span key={kk} className="mr-3 inline-block"><span className="text-ink-low">{kk.replace(/_/g, " ")}</span> <span className="tc-num">{text(vv)}</span></span>)}
+                </KV>
+              ))}
+          </dl>
+        )}
+    </Panel>
+  );
+}
+
+function FeedGaps({ d }: { d: Obj }) {
+  const ip = obj(d.in_play_trading);
+  const lastSkips = obj(ip?.skips_by_reason_last_tick);
+  const lastRef = obj(ip?.refusals_by_reason_last_tick);
+  if (!lastSkips && !lastRef) return null;
+  const items = [...rowsOf(lastSkips), ...rowsOf(lastRef)].sort((a, b) => b[1] - a[1]);
+  return (
+    <Panel title="In-play reasons, newest tick" meta="skips and refusals the newest in-play tick counted">
+      {items.length === 0 ? <InfoNote>none on the newest tick</InfoNote> : (
+        <BarList items={items.map(([k, n]) => ({
+          key: k, value: n, label: codeWords(k) ?? k, sub: <span className="font-mono">{k}</span>,
+          display: n.toLocaleString("en-US"),
+        }))} />
+      )}
+    </Panel>
+  );
+}
+
+export function SystemView({ d, now, candidates, go }: {
+  d: Obj; now: number; candidates: Candidates | null; go: (v: string, p?: Record<string, string>) => void;
+}) {
+  void go;
+  return (
+    <div className="grid grid-cols-12 gap-4">
+      <div className="col-span-12"><Activity d={d} /></div>
+      <div className="col-span-12"><Catalogue d={d} /></div>
+      <div className="col-span-12 xl:col-span-7"><Settlements d={d} now={now} /></div>
+      <div className="col-span-12 xl:col-span-5"><Clocks d={d} now={now} candidates={candidates} /></div>
+      <div className="col-span-12 xl:col-span-6"><FeedGaps d={d} /></div>
+      <div className="col-span-12 xl:col-span-6"><Retention d={d} /></div>
+      <div className="col-span-12">
+        <Panel title="Versions">
+          <p className="font-mono text-[11px] leading-relaxed text-ink-low">
+            status {text(d.version)} · strategy {text(d.strategy)} · in-play {text(obj(d.in_play_trading)?.strategy)}
+            {" "}(at tick {text(obj(d.in_play_trading)?.strategy_at_tick)}) · learner {text(obj(d.learning)?.strategy)}
+            {" "}· careful {text(obj(d.careful)?.version)} · candidates {text(candidates?.version)} · env {text(d.env)}
+          </p>
+        </Panel>
+      </div>
+    </div>
+  );
+}

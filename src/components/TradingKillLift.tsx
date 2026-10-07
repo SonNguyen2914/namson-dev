@@ -1,4 +1,6 @@
-// LIFT KILL, BESIDE THE KILL SWITCH (2026-10-06).
+// LIFT THE OPERATOR KILL, IN THE SAFETY & CONTROL PANEL (2026-10-06;
+// redesigned 2026-10-07: the copy never says "resume", and the button
+// names what it lifts — the OPERATOR kill — and what it cannot).
 //
 // The backend journals an operator kill until a bounded time (POST
 // /api/admin/trading/kill); this lifts it early through
@@ -36,14 +38,20 @@ export function describeLift(status: number, body: unknown): Outcome {
   const until = typeof b.kill_until === "string" && b.kill_until !== ""
     ? b.kill_until : null;
   if (status >= 200 && status < 300 && typeof b.lifted === "boolean") {
+    if (b.env_kill === true && !until) {
+      // the backend says TRADING_KILL is set (its `env_kill`), with no end
+      return { ok: false, text: `${b.lifted ? "Operator kill lifted, but"
+        : "Nothing lifted:"} TRADING_KILL is set on the backend. ${STILL}` };
+    }
     if (until) {
       return { ok: false, text: `${b.lifted ? "Operator kill lifted, but a"
         : "Nothing lifted: a"} kill is still in force until ${when(until)}. `
         + STILL };
     }
     return b.lifted
-      ? { ok: true, text: "Kill lifted — nothing holds the trader now; its "
-          + "next tick may place." }
+      ? { ok: true, text: "Operator kill lifted — no kill is in force now. "
+          + "Trading re-enables only where nothing else holds it (a loss "
+          + "halt, TRADING_ENABLED, paper-only); its next tick may place." }
       : { ok: true, text: "Nothing to lift — no operator kill was in force." };
   }
   const code = typeof b.error === "string" ? b.error : null;
@@ -61,7 +69,7 @@ export function describeLift(status: number, body: unknown): Outcome {
   return { ok: false, text: `Lift failed: ${why}.` };
 }
 
-const BTN = "whitespace-nowrap rounded-md border px-2 py-0.5 font-mono text-[11px] transition-colors disabled:opacity-40";
+const BTN = "whitespace-nowrap rounded-md border px-2.5 py-1 text-[12.5px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-40";
 
 export function TradingKillLift({ token, onDone }: {
   token: string; onDone: () => void;
@@ -97,27 +105,28 @@ export function TradingKillLift({ token, onDone }: {
   };
 
   return (
-    <div data-testid="kill-lift" className="mt-3 text-[12px] text-ink-mid">
+    <div data-testid="kill-lift" className="text-[12.5px] text-ink-mid">
       <div className="flex flex-wrap items-center gap-2">
         {!asking ? (
           <button type="button" disabled={busy}
             onClick={() => { setOutcome(null); setAsking(true); }}
             className={`${BTN} border-warn/50 text-warn hover:bg-warn/10`}>
-            Lift kill
+            Lift operator kill
           </button>
         ) : (
           <>
-            <span className="text-[11px] text-ink-hi">
-              Lift the operator kill? The trader may place again on its next tick.
+            <span className="text-[12.5px] text-ink-hi">
+              Lift the operator kill? If TRADING_KILL is not set and no halt
+              holds, the trader may place again on its next tick.
             </span>
             <button type="button" data-testid="kill-lift-confirm" disabled={busy}
               onClick={() => void lift()}
-              className={`${BTN} border-warn/60 text-warn hover:bg-warn/10`}>
-              {busy ? "Sending…" : "Confirm"}
+              className={`${BTN} border-warn/60 bg-warn/10 font-medium text-warn hover:bg-warn/20`}>
+              {busy ? "Sending…" : "Confirm lift"}
             </button>
             <button type="button" data-testid="kill-lift-cancel" disabled={busy}
               onClick={() => setAsking(false)}
-              className={`${BTN} border-line text-ink-mid hover:bg-elev2`}>
+              className={`${BTN} border-tc-line-strong text-ink-mid hover:bg-tc-hover`}>
               Cancel
             </button>
           </>
@@ -126,15 +135,16 @@ export function TradingKillLift({ token, onDone }: {
       {outcome && (
         <p data-testid="kill-lift-result" data-ok={outcome.ok ? "true" : "false"}
           role={outcome.ok ? "status" : "alert"}
-          className={`mt-2 rounded-xl border px-3 py-2 font-mono text-[12px] ${
-            outcome.ok ? "border-line-strong text-ink-hi" : "border-warn/40 text-warn"}`}>
+          className={`mt-2 rounded-md border px-3 py-2 text-[12.5px] leading-snug ${
+            outcome.ok ? "border-tc-line-strong text-ink-hi" : "border-warn/40 text-warn"}`}>
           {outcome.text}
         </p>
       )}
-      <p className="mt-1 text-[11px] text-ink-faint">
-        Lifts a kill set through the backend&apos;s kill route only. It cannot
-        lift TRADING_KILL set on the Railway backend service — while that is
-        set, nothing is placed whatever this says.
+      <p className="mt-1.5 text-[11.5px] leading-snug text-ink-low">
+        Re-enables trading only if backend TRADING_KILL is not active. It
+        lifts a kill set through the backend&apos;s kill route only and
+        cannot lift TRADING_KILL on the Railway service — while that is set,
+        nothing is placed whatever this says.
       </p>
     </div>
   );
