@@ -206,13 +206,21 @@ export interface Candidate {
 export interface CarefulCell {
   score: number | null; size: number | null; ground: string | null;
   data_error: boolean;
+  /** (2026-10-07) what the score is out of: 5 pre-match, 3 on the in-play
+   *  ladder; null from a backend that does not send it (read as 5) */
+  score_of: number | null;
+  /** (2026-10-07) the in-play ladder's signals it scored (deep, fresh,
+   *  spare); null pre-match or from an older backend */
+  signals: string[] | null;
 }
 
 export function carefulCell(v: unknown): CarefulCell | null {
   if (!isObj(v)) return null;
   const o = v;
   return { score: num(o.score), size: num(o.size), ground: str(o.ground),
-    data_error: o.data_error === true };
+    data_error: o.data_error === true, score_of: num(o.score_of),
+    signals: Array.isArray(o.signals)
+      ? o.signals.filter((x): x is string => typeof x === "string") : null };
 }
 
 export interface CompCounts {

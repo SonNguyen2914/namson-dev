@@ -855,19 +855,28 @@ export function modelWords(m: ModelGround | null): string {
 export interface CarefulGround {
   score: number | null; size_dollars: number | null;
   worst_dollars: number | null; ground: string | null;
+  /** (2026-10-07) out of 5 pre-match, 3 on the in-play ladder */
+  score_of?: number | null;
+  /** (2026-10-07) the in-play ladder's signals (deep, fresh, spare) */
+  signals?: string[] | null;
 }
 
 function parseCareful(v: unknown): CarefulGround | null {
   const c = obj(v);
   if (!c) return null;
   return { score: num(c.score), size_dollars: num(c.size_dollars),
-    worst_dollars: num(c.worst_dollars), ground: str(c.ground) };
+    worst_dollars: num(c.worst_dollars), ground: str(c.ground),
+    score_of: num(c.score_of),
+    signals: Array.isArray(c.signals)
+      ? c.signals.filter((x): x is string => typeof x === "string") : null };
 }
 
 /** The careful strategy's grounds, in words; "" for another strategy. */
 export function carefulWords(c: CarefulGround | null): string {
   if (!c) return "";
-  return `confidence ${c.score ?? "?"}/5 · size $${c.size_dollars ?? "?"}`
+  const sig = c.signals == null ? ""
+    : ` (${c.signals.length ? c.signals.join(", ") : "no signal"})`;
+  return `confidence ${c.score ?? "?"}/${c.score_of ?? 5}${sig} · size $${c.size_dollars ?? "?"}`
     + ` (worst case ${dollars(c.worst_dollars)}) · ${c.ground ?? "ground not recorded"}`;
 }
 

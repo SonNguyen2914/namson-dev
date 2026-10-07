@@ -140,6 +140,13 @@ function sortRows(rows: Candidate[], k: string, dir: "asc" | "desc", now: number
 
 // ------------------------------------------------------------ cells
 
+/** the careful cell in one line, for the grid tag's hover */
+const carefulLine = (c: NonNullable<Candidate["careful"]>) =>
+  `careful ${c.score ?? "?"}/${c.score_of ?? 5}${c.score_of === 3 ? " (in-play ladder)" : ""}`
+  + `${c.signals !== null ? ` · signals: ${c.signals.length ? c.signals.join(", ") : "none"}` : ""}`
+  + ` · ${c.size === null ? "size not sent" : c.size > 0 ? `$${c.size}` : "paper"}`
+  + `${c.ground ? ` · ${c.ground}` : ""}${c.data_error ? " · probable data error" : ""}`;
+
 /** one dense grid cell: never wraps, top-aligned */
 const CELL = "whitespace-nowrap border-b border-tc-line px-2.5 py-1 align-top";
 
@@ -183,6 +190,19 @@ const CandRow = memo(function CandRow({ r, selected, onOpen, onKey }: {
           {d.action === "placed" && (
             <span data-testid="cand-placed-chip" className="tc-num whitespace-nowrap text-[11px] text-ink-hi">
               {SIDE ?? "side not stated"} · {d.count === null ? DASH : d.count} @ {cents(d.price_cents)}
+            </span>
+          )}
+          {/* THE CAREFUL SCORE, short (#112, 2026-10-07): out of 5 pre-match,
+              out of 3 on the in-play ladder with the signals it scored; the
+              words are in the inspector */}
+          {r.careful && r.careful.score !== null && (
+            <span data-testid="cand-careful-tag" title={carefulLine(r.careful)}
+              className="tc-num whitespace-nowrap text-[11px] text-ink-low">
+              <span data-testid="careful-score" className="text-ink-mid">{r.careful.score}/{r.careful.score_of ?? 5}</span>
+              {r.careful.signals !== null && (
+                <span data-testid="careful-signals"> · {r.careful.signals.length ? r.careful.signals.join(" ") : "no signal"}</span>
+              )}
+              {r.careful.data_error && <span className="text-warn"> · ◆ data error</span>}
             </span>
           )}
         </span>
@@ -307,7 +327,13 @@ function CandidateInspector({ r, c, gone, actionsMeaning }: {
       <DrawerSection title="Careful strategy">
         {r.careful ? (
           <div data-testid="cand-careful">
-            <KV k="confidence score">{r.careful.score === null ? DASH : `${r.careful.score}/5`}</KV>
+            <KV k="confidence score" testid="insp-careful-score">{r.careful.score === null ? DASH
+              : `${r.careful.score}/${r.careful.score_of ?? 5}${r.careful.score_of === 3 ? " (the in-play three-point ladder)" : " (pre-match)"}`}</KV>
+            {r.careful.signals !== null && (
+              <KV k="ladder signals" testid="insp-careful-signals">{r.careful.signals.length
+                ? `${r.careful.signals.join(", ")} (of deep, fresh, spare — thresholds on Model → Careful strategy)`
+                : "no signal scored"}</KV>
+            )}
             <KV k="size">{r.careful.size === null ? DASH : r.careful.size > 0 ? `$${r.careful.size} (worst case)` : "paper"}</KV>
             <KV k="ground">{r.careful.ground ?? DASH}</KV>
             {r.careful.data_error && <KV k="data check"><span className="text-warn">◆ edge above the ceiling: probable data error, never bet</span></KV>}

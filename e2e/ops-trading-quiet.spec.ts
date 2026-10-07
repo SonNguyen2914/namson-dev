@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { hydrated, view } from "./operator-console";
 import {
-  qaBook, qaCandidates, qaLedger, qaStatusWarning, qaStatusWithCareful,
+  qaBook, qaCandidateRows, qaCandidates, qaLedger, qaStatusWarning, qaStatusWithCareful,
 } from "./console-fixtures";
 import { reasonTag, safetyTriggers } from "../src/lib/consoleModel";
 
@@ -21,10 +21,10 @@ import { reasonTag, safetyTriggers } from "../src/lib/consoleModel";
 const TOKEN = "ops-quiet-token-typed-by-a-person";
 const json = (status: number, body: unknown) => ({ status, contentType: "application/json", body: JSON.stringify(body) });
 
-async function open(page: Page, o: { status?: unknown; hash?: string } = {}) {
+async function open(page: Page, o: { status?: unknown; hash?: string; cand?: unknown } = {}) {
   await page.route("**/api/ops/trading-status", (r) => r.fulfill(json(200, o.status ?? qaStatusWithCareful())));
   await page.route("**/api/ops/trading-book", (r) => r.fulfill(json(200, qaBook())));
-  await page.route("**/api/ops/trading-candidates", (r) => r.fulfill(json(200, qaCandidates())));
+  await page.route("**/api/ops/trading-candidates", (r) => r.fulfill(json(200, o.cand ?? qaCandidates())));
   await page.route("**/api/ops/trading-ledger**", (r) => r.fulfill(json(200, qaLedger())));
   await page.goto(`/ops/trading${o.hash ?? ""}`);
   await hydrated(page);
@@ -70,6 +70,27 @@ test.describe("the quiet pass keeps every long word one tap away", () => {
     await expect(reason).toBeVisible();
     await expect(reason).toContainText("Neither side clears the bar");
     await expect(reason).toContainText("no_edge");
+  });
+
+  test("the careful score: out of 3 on the in-play ladder with its signals, out of 5 pre-match (#112)", async ({ page }) => {
+    const rows = qaCandidateRows();
+    const ladder = { score: 2, score_of: 3, signals: ["deep", "fresh"], size: "1", ground: "inplay_buying", data_error: false };
+    const pre = { score: 4, size: "2", ground: "family:GAME", data_error: false };
+    rows[0] = { ...rows[0], careful: ladder };
+    rows[1] = { ...rows[1], careful: pre };
+    await open(page, { hash: "#trading", cand: qaCandidates({ rows }) });
+    const inplay = page.locator(`[data-testid="cand-row"][data-ticker="${rows[0].ticker}"]`);
+    // the grid: short
+    await expect(inplay.getByTestId("careful-score")).toHaveText("2/3");
+    await expect(inplay.getByTestId("careful-signals")).toContainText("deep fresh");
+    await expect(inplay.getByTestId("cand-careful-tag")).toHaveAttribute("title", /in-play ladder.*signals: deep, fresh.*\$1.*inplay_buying/);
+    const prem = page.locator(`[data-testid="cand-row"][data-ticker="${rows[1].ticker}"]`);
+    await expect(prem.getByTestId("careful-score")).toHaveText("4/5");
+    await expect(prem.getByTestId("careful-signals")).toHaveCount(0);
+    // the inspector: the words
+    await inplay.click();
+    await expect(page.getByTestId("insp-careful-score")).toContainText("2/3 (the in-play three-point ladder)");
+    await expect(page.getByTestId("insp-careful-signals")).toContainText("deep, fresh");
   });
 
   test("all normal: no Safety panel; the kill how-to and the lift are in the rail's Controls", async ({ page }) => {

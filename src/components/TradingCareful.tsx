@@ -13,7 +13,9 @@
 //   * (2026-10-07) the paper bets' would-be RESULTS beside their CLV, per
 //     competition × family × phase (`paper_results`), the same flag when
 //     CLV and results disagree; the probable data errors split into
-//     pre-match and in play;
+//     pre-match and in play; the IN-PLAY three-point ladder (deep, fresh,
+//     spare: 0-1 paper, 2 $1, 3 $2) and the last day's in-play paper bets
+//     by score, tier and signal (`inplay_ladder`);
 //   * the grounds' paper and real evidence (n, matches, mean CLV after the
 //     fee and its match-clustered 95% range), promoted and probation
 //     grounds, and the section-4 events (checks and proposals);
@@ -94,6 +96,7 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
   const comps = obj(c?.competitions) ?? {};
   const sits = obj(c?.situations) ?? {};
   const results = obj(c?.paper_results);
+  const ladder = obj(c?.inplay_ladder);
   const gp = obj(c?.grounds_paper) ?? {};
   const gr = obj(c?.grounds_real) ?? {};
   const knobs = obj(c?.knobs);
@@ -186,8 +189,8 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
 
             <h3 className={H3}>paper results <Info label="the paper results">
               The paper bets&apos; would-be results beside their CLV, per competition × family × phase. Would-be: had
-              the paper bet been placed, fee included; from the trader&apos;s own settlement reads, never guessed. The
-              learner still chooses on CLV.</Info></h3>
+              the paper bet been placed, fee included; from the trader&apos;s own settlement reads, else Kalshi&apos;s
+              public market record; never guessed. The learner still chooses on CLV.</Info></h3>
             {results === null ? (
               <p data-testid="careful-results-absent" className="text-[12px] text-ink-low">{NOT_SERVED}</p>
             ) : Object.keys(results).length === 0 ? (
@@ -217,6 +220,25 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
                     })}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            <h3 className={H3}>in-play ladder <Info label="the in-play ladder">
+              The in-play three-point ladder: deep, fresh, spare — 0–1 paper, 2 $1, 3 $2. In play a score is out of 3;
+              pre-match keeps its 5. The last day&apos;s in-play paper bets by score, tier and signal.</Info></h3>
+            {ladder === null ? (
+              <p data-testid="careful-ladder-absent" className="text-[12px] text-ink-low">{NOT_SERVED}</p>
+            ) : (
+              <div data-testid="careful-ladder" className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
+                <Cell k="signals" v={Array.isArray(ladder.signals) ? (ladder.signals as string[]).join(" · ") : "—"}
+                  sub={`deep ≥ ${num(ladder.deep_book) ?? "—"} a side · fresh ≤ ${num(ladder.fresh_s) ?? "—"} s · spare ${num(ladder.spare) !== null ? `${((num(ladder.spare) as number) * 100).toFixed(0)}c` : "—"}`} />
+                <Cell k="tiers" v={Object.entries(obj(ladder.tiers) ?? {}).map(([k, v]) =>
+                  `${k}: ${num(v) ? `$${num(v)}` : "paper"}`).join(" · ") || "—"}
+                  sub={`score of ${num(ladder.score_of) ?? "—"}; pre-match keeps its 5`} />
+                <Cell k={`paper, ${num(ladder.since_hours) ?? "—"} h`} v={String(num(ladder.paper_n) ?? "—")}
+                  inline={Object.entries(obj(ladder.by_score) ?? {}).map(([k, v]) => `${k}/${num(ladder.score_of) ?? 3}: ${num(v) ?? 0}`).join(" · ") || "none"}
+                  sub={`in-play paper bets in the last ${num(ladder.since_hours) ?? "—"} h, by score${obj(ladder.by_tier) ? ` · by tier ${Object.entries(obj(ladder.by_tier)!).map(([k, v]) => `${k}: ${num(v) ?? 0}`).join(" · ")}` : ""}`} />
+                <Cell k="by signal" v={Object.entries(obj(ladder.by_signal) ?? {}).map(([k, v]) => `${k} ${num(v) ?? 0}`).join(" · ") || "none"} />
               </div>
             )}
 
