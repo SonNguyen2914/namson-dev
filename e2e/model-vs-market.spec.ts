@@ -219,15 +219,29 @@ for (const width of [375, 1280]) {
       await expect(root).toHaveAttribute("data-cursor", "0");
       await expect(page.getByTestId("mvm-minute")).toHaveText("0′");
       await expectGapsAgree(page);
-      // a tap on the chart, about a third of the way across
-      const box = await page.getByTestId("mvm-scrub").boundingBox();
-      if (!box) throw new Error("no scrub area");
-      await page.mouse.click(box.x + box.width * 0.3, box.y + box.height / 2);
-      const t = Number(await root.getAttribute("data-cursor"));
-      expect(t).toBeGreaterThan(15);
-      expect(t).toBeLessThan(40);
-      await expect(page.getByTestId("mvm-minute")).toHaveText(`${t}′`);
-      await expect(page.getByTestId("mvm-cursor")).toHaveAttribute("data-t", String(t));
+      // a tap on the chart, ON the drawn 30′ tick: the tap point is read
+      // from the rendered plot, never assumed. (It was once a raw
+      // page.mouse.click at the scrub rect's mid-height; at 375px that
+      // point sits a few px either side of the 900px fold depending on
+      // the platform's font metrics, so on macOS the tap fell off-screen,
+      // never arrived, and read as "minute 0".) locator.click scrolls
+      // the rect into view and fails if anything else takes the tap.
+      const scrub = page.getByTestId("mvm-scrub");
+      await scrub.scrollIntoViewIfNeeded();
+      const box = await scrub.boundingBox();
+      const tick = await page.getByTestId("mvm-chart-svg")
+        .locator("text", { hasText: /^30′$/ }).boundingBox();
+      if (!box || !tick) throw new Error("no scrub area or no 30′ tick");
+      const tapX = tick.x + tick.width / 2;
+      await scrub.click({ position: { x: tapX - box.x, y: box.height / 2 } });
+      // the minute under the finger is the minute the cursor shows
+      await expect(root).toHaveAttribute("data-cursor", "30");
+      await expect(page.getByTestId("mvm-minute")).toHaveText("30′");
+      await expect(page.getByTestId("mvm-cursor")).toHaveAttribute("data-t", "30");
+      const line = await page.getByTestId("mvm-cursor").locator(":scope > line").boundingBox();
+      if (!line) throw new Error("no cursor line");
+      // within half a minute's width of where the finger landed
+      expect(Math.abs(line.x + line.width / 2 - tapX)).toBeLessThan(box.width / 63 / 2);
       // the six cursor dots sit on the cursor's x
       const cx = await page.getByTestId("mvm-cursor").locator("circle").evaluateAll(
         (cs) => [...new Set(cs.map((c) => c.getAttribute("cx")))]);
