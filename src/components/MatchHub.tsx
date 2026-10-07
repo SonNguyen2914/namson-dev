@@ -151,7 +151,10 @@ type BookMeta = { status?: string | null; means?: string | null;
 /** The backend's prose names a payload key in backticks; the reader gets
  *  words, never the key. */
 const plainWords = (t: string) =>
-  t.replace(/`board_read`/g, "the board read below").replace(/`([^`]*)`/g, "$1");
+  t.replace(/`board_read`/g, "the board read below")
+    .replace(/ \(`traders_model`\)/g, " above")
+    .replace(/`traders_model`/g, "the trader's model line above")
+    .replace(/`([^`]*)`/g, "$1");
 export type ModelInfo = { model_version?: string; shadow?: boolean;
   primary?: ModelRun; latest?: ModelRun; t10_lock?: ModelRun | null };
 
@@ -582,8 +585,11 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                 {!model && refusal && (
                   <div data-testid="model-refusal" data-state={refusal.state ?? ""}
                     className="mt-3 rounded-xl border border-dashed border-line px-4 py-3">
+                    {/* "no SHADOW model": the trader's model line above is
+                        a model read, so this heading names exactly what is
+                        absent and never denies that line (hub-champ-fix) */}
                     <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
-                      no model read for this competition
+                      no shadow model for this competition
                     </p>
                     {refusal.why && (
                       <p className="mt-1 text-[12px] leading-relaxed text-ink-faint">
@@ -745,7 +751,7 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
               <Reveal>
                 <div className="rounded-2xl border border-line bg-elev p-5">
                   <div className="mb-1 flex items-center justify-between">
-                    <Eyebrow tone="accent">market · kalshi three-way</Eyebrow>
+                    <Eyebrow tone="accent">market · kalshi three-way · open book now</Eyebrow>
                     {cfg.marketPill && (
                       <span className="rounded-full border border-line px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.15em] text-ink-faint">
                         {cfg.marketPill(run)}
@@ -777,6 +783,18 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                       {plainWords(bookMeta.means)}
                     </p>
                   )}
+                  {/* THE PANEL AND THE CHART READ DIFFERENT KALSHI CLOCKS
+                      (hub-champ-fix). A finished CNL hub drew Kalshi
+                      prices in the chart above a panel saying no book
+                      matched; both were right, about different moments. */}
+                  {!book && (
+                    <p data-testid="book-vs-chart"
+                      className="mt-1 font-mono text-[10px] leading-relaxed text-ink-faint">
+                      this panel reads Kalshi&apos;s CURRENT open list; the
+                      model vs market chart above draws the Kalshi quotes
+                      stored while the book was open, when any were
+                    </p>
+                  )}
                   {!book && books.length === 0 && (
                     <p data-testid="families-none"
                       className="mt-1 font-mono text-[10px] leading-relaxed text-ink-faint">
@@ -791,10 +809,28 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                   )}
                   <OtherSeries list={bookMeta?.other_series} />
                   <div className="mt-5 border-t border-line pt-4">
-                    <Eyebrow className="mb-1">model outcome probabilities</Eyebrow>
-                    <TripleBar m={m} probs={modelProbs(run)} hex={cfg.accentHex}
-                      caption={run ? `${cfg.version} · ${run.n_simulations?.toLocaleString()} sims · seed ${run.seed}${run.run_type === "t10" ? " · T-10 LOCK — frozen pre-kickoff" : ""}` : undefined}
-                      emptyText={cfg.modelEmptyText} />
+                    {/* NO SHADOW RUN, BUT THE TRADER HAS A READ: draw the
+                        trader's own 1X2 here, under its own name, rather
+                        than an empty "no model" bar beside it (Son,
+                        2026-10-06: "I didn't see any model"). */}
+                    {!run && trader?.available ? (
+                      <div data-testid="markets-traders-model"
+                        data-tested={trader.tested ? "yes" : "no"}>
+                        <Eyebrow className="mb-1">
+                          {trader.title ?? "trader's model (untested)"} · shadow · not advice
+                        </Eyebrow>
+                        <TripleBar m={m} probs={traderProbs(trader)} hex={cfg.accentHex}
+                          caption={`${trader.model ?? "trader's model"} · ${trader.label ?? "experimental, unproven"} · the trading agent's own pre-match read, not an approved shadow model`}
+                          emptyText={cfg.modelEmptyText} />
+                      </div>
+                    ) : (
+                      <>
+                        <Eyebrow className="mb-1">model outcome probabilities</Eyebrow>
+                        <TripleBar m={m} probs={modelProbs(run)} hex={cfg.accentHex}
+                          caption={run ? `${cfg.version} · ${run.n_simulations?.toLocaleString()} sims · seed ${run.seed}${run.run_type === "t10" ? " · T-10 LOCK — frozen pre-kickoff" : ""}` : undefined}
+                          emptyText={cfg.modelEmptyText} />
+                      </>
+                    )}
                   </div>
                   <InputQuality run={run} />
                   <p className="mt-4 font-mono text-[9px] uppercase leading-relaxed tracking-[0.12em] text-ink-faint">
@@ -1153,7 +1189,7 @@ function MarketBar({ m, book, run, hex }: {
     ? `implied % — normalized ${probs.method}; contains the exchange's spread`
     : undefined;
   return <TripleBar m={m} probs={probs} caption={caption} hex={hex}
-    emptyText="no open kalshi book matched to this fixture" />;
+    emptyText="no open kalshi book for this fixture right now" />;
 }
 
 function TripleBar({ m, probs, caption, emptyText, hex }: {
@@ -2076,7 +2112,16 @@ type TradersModel = {
   means?: string; why?: string | null; detail?: string | null;
   model?: string | null; source?: string | null; verdict?: string | null;
   p_home?: number; p_draw?: number; p_away?: number;
+  read_at?: string | null;
 };
+
+/** The trader's 1X2 as the hub's TripleBar reads it; null unless all
+ *  three are real numbers (missing is never zero). */
+function traderProbs(t: TradersModel): Triple {
+  const ok = (p: unknown): p is number => typeof p === "number" && Number.isFinite(p);
+  if (!ok(t.p_home) || !ok(t.p_draw) || !ok(t.p_away)) return null;
+  return { home: t.p_home, draw: t.p_draw, away: t.p_away };
+}
 
 function tmPct(p: unknown): string {
   return typeof p === "number" && Number.isFinite(p)
@@ -2085,21 +2130,37 @@ function tmPct(p: unknown): string {
 
 function TradersModelLine({ t, home, away }: {
   t: TradersModel | null; home?: string; away?: string }) {
-  if (!t) return null;
+  // NOT SERVED IS NAMED TOO: an older payload without the key says so
+  if (!t) {
+    return (
+      <p data-testid="traders-model-missing"
+        className="mt-3 font-mono text-[10px] leading-relaxed text-ink-faint">
+        trader&apos;s model · not in this payload, so whether the trader has a
+        read of this match is not known here
+      </p>
+    );
+  }
   const title = t.title ?? "trader's model (untested)";
   return (
     <div data-testid="traders-model" data-tested={t.tested ? "yes" : "no"}
       data-available={t.available ? "yes" : "no"}
       className="mt-3 rounded-xl border border-line px-4 py-3">
-      <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
-        {title} · {t.label ?? "experimental, unproven"}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
+          {title} · {t.label ?? "experimental, unproven"}
+        </p>
+        <span data-testid="traders-model-shadow"
+          className="rounded-md border border-line px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
+          shadow · not advice
+        </span>
+      </div>
       {t.available ? (
         <p data-testid="traders-model-1x2"
           className="mt-1 font-mono text-[12px] tabular-nums text-ink-hi">
           {home ?? "home"} {tmPct(t.p_home)} · draw {tmPct(t.p_draw)} · {away ?? "away"} {tmPct(t.p_away)}
           <span className="ml-2 text-ink-faint">
             {t.model ?? ""}{t.verdict ? ` · ${t.verdict.toLowerCase().replace("_", " ")} vs the model it replaced` : ""}
+            {t.read_at ? ` · read as of ${fmtTime(t.read_at)}` : ""}
           </span>
         </p>
       ) : (

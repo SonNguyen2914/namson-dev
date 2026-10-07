@@ -213,7 +213,7 @@ test.describe("La Liga match page", () => {
       ).toBeVisible();
       // the market bar's own empty state (no open book matched)
       await expect(
-        page.getByText(/no open kalshi book matched/i)
+        page.getByText(/no open kalshi book for this fixture/i)
       ).toBeVisible();
       // decision safety holds here too
       await expect(page.getByText(/\bTAKE\b/)).toHaveCount(0);

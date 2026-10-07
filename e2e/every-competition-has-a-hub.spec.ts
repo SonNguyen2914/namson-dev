@@ -33,10 +33,14 @@ const CHAMPS = new Set(["unl", "cnl", "afcon"]);
 
 const REFUSAL = {
   state: "no_model_plane",
+  // TRIVELA src/match_hubs.py NO_MODEL_WHY since hub-champ-fix (2026-10-06)
   why: "no shadow model is fitted for this competition, so no approval "
-    + "decision exists and no model number appears on this page. The "
-    + "board's own pre-kickoff read, when one was frozen, is under "
-    + "`board_read` — a read, not a signal.",
+    + "decision exists and no shadow-model number appears on this page. The "
+    + "trader's model line (`traders_model`), when served, is the trading "
+    + "agent's own pre-match read — experimental, labelled tested or "
+    + "untested, not an approved shadow model. The board's own pre-kickoff "
+    + "read, when one was frozen, is under `board_read` — a read, not a "
+    + "signal.",
   instead: "board_read", note: null,
 };
 const ABSENT_READ = {
@@ -104,7 +108,8 @@ for (const key of SEVEN) {
       const refusal = page.getByTestId("model-refusal");
       await expect(refusal).toBeVisible();
       await expect(refusal).toHaveAttribute("data-state", "no_model_plane");
-      await expect(refusal).toContainText("no model read for this competition");
+      await expect(refusal).toContainText("no shadow model for this competition");
+      await expect(refusal).not.toContainText("traders_model");
       // the payload's key never reaches the reader; words do
       await expect(refusal).not.toContainText("`");
       await expect(refusal).not.toContainText("board_read");
@@ -148,7 +153,7 @@ test("a hub whose payload is missing sections draws what it has and names what i
   await expect(page.getByTestId("model-refusal")).toBeVisible();
   await expect(page.getByTestId("board-read")).toContainText("no board read on record");
   // the page is still a page: its footer drew
-  await expect(page.locator("body")).toContainText("no model read · a read, not a signal");
+  await expect(page.locator("body")).toContainText("no shadow model · trader's model where served");
   expect(errors, "a section's throw escaped its boundary").toEqual([]);
 });
 
