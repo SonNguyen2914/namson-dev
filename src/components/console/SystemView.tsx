@@ -24,7 +24,7 @@ function rowsOf(v: unknown): [string, number][] {
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
 
-const Code = ({ c }: { c: string }) => <Tech className="text-ink-mid">{c}</Tech>;
+const Code = ({ c }: { c: string }) => <Tech tone="text-ink-mid">{c}</Tech>;
 const Words = ({ c }: { c: string }) => {
   const w = codeWords(c);
   return w ? <span className="block text-[11.5px] leading-snug text-ink-low">{w}</span> : null;
@@ -61,7 +61,7 @@ function Activity({ d }: { d: Obj }) {
           <SubHead right="raw code · the backend's plain words · group">By reason — why it acted or skipped</SubHead>
           <SimpleTable testid="by-reason" head={["kind · reason", "group", "rows"]} right={[2]}
             rows={byReason.map(([k, r, n]) => [
-              <span key="r"><Tech className="text-ink-hi">{`${k} · ${r}`}</Tech><Words c={r} /></span>,
+              <span key="r"><Tech tone="text-ink-hi">{`${k} · ${r}`}</Tech><Words c={r} /></span>,
               <span key="g" className="text-[11.5px] text-ink-low">{k === "tick" ? "tick outcome" : GROUP_LABEL[reasonGroup(r)]}</span>,
               n.toLocaleString("en-US")])}
             empty="no reasons recorded today" />

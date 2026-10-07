@@ -61,8 +61,9 @@ export function railItems(d: Obj, now: number): RailItem[] {
     state: ip?.enabled === true ? "info" : "off",
     title: "TRADING_INPLAY_ENABLED, and whether the newest in-play tick was active", href: hrefOf("trading", { tab: "inplay" }) });
   items.push({ key: "learning", label: "Learning",
-    value: !learning ? "not on this backend" : learning.enabled === true ? "ON" : learning.enabled === false ? "OFF" : "—",
-    state: learning?.enabled === true ? "info" : "off",
+    value: !learning ? "not on this backend" : typeof learning.error === "string" ? "READ FAILED"
+      : learning.enabled === true ? "ON" : learning.enabled === false ? "OFF" : "—",
+    state: learning && typeof learning.error === "string" ? "warn" : learning?.enabled === true ? "info" : "off",
     title: "TRADING_LEARNING_ENABLED — the learner's arms (experimental)", href: hrefOf("model") });
   items.push({ key: "tick", label: "Last tick", value: lastAt ? `${agoIso(lastAt, now)} ago` : "—",
     state: !lastAt ? "warn" : age > 120_000 ? "warn" : "info",
@@ -95,12 +96,12 @@ export function OperatorStatusBar({ d, now, attention, freshness }: {
             </span>
           ))}
         </div>
-        <div className="hidden shrink-0 items-center gap-3 lg:flex">
+        <div className="hidden shrink-0 items-center gap-2 lg:flex">
           <a href={hrefOf("overview", { focus: "attention" })} data-testid="rail-attention"
             className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-[12px] outline-none hover:bg-tc-hover focus-visible:ring-2 focus-visible:ring-accent ${
               crit ? "text-neg" : warn ? "text-warn" : "text-ink-low"}`}>
             <Dot state={crit ? "bad" : warn ? "warn" : "info"} />
-            {crit + warn === 0 ? "nothing needs attention" : `${crit + warn} need${crit + warn === 1 ? "s" : ""} attention`}
+            {crit + warn === 0 ? "all clear" : `${crit + warn} attention`}
           </a>
           {freshness}
         </div>

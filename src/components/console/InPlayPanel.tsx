@@ -14,8 +14,9 @@ import {
   NOT_SERVED, type ReasonsBlock, compLabel, inPlayByCompetition, inPlayReasons,
   inPlayStrategy, isObj, num, type Candidates,
 } from "../../lib/tradingConsole";
+import { decisionBadge } from "../../lib/consoleModel";
 import {
-  DASH, InfoNote, Metric, Panel, SimpleTable, SubHead, TH, Tech, count, numOf,
+  DASH, DecisionBadge, InfoNote, Metric, Panel, SimpleTable, SubHead, TH, Tech, count, numOf,
   pnlTone, usd, when,
 } from "./primitives";
 
@@ -144,7 +145,7 @@ export function ArmsInUse({ v, testid, title }: { v: unknown; testid: string; ti
       <SubHead>{title}</SubHead>
       {error && <p className="mb-1 text-[12px] text-warn">◆ the arms read failed on the backend: {error}</p>}
       <SimpleTable testid={testid} head={["phase · competition", "arm (w/threshold)", "markets"]}
-        rows={rows.map((r) => [r[0], <Tech key="a" className="text-ink-hi">{String(r[1])}</Tech>, r[2]])}
+        rows={rows.map((r) => [r[0], <Tech key="a" tone="text-ink-hi">{String(r[1])}</Tech>, r[2]])}
         right={[2]} empty="no arm was drawn on the newest tick" />
     </div>
   );
@@ -254,7 +255,7 @@ export function InPlayPanel({ d, now, candidates }: { d: Obj; now: number; candi
           {liveRows.length === 0 ? <InfoNote>{candidates ? "No in-play row in the newest candidate snapshot." : "The candidates are not read yet."}</InfoNote> : (
             <SimpleTable head={["market", "minute", "decision", "reason"]} right={[1]}
               rows={liveRows.slice(0, 12).map((r) => [r.title, r.minute === null ? "in play" : `${r.minute}′`,
-                r.decision.action, <Tech key="c">{r.decision.reason ?? DASH}</Tech>])}
+                <DecisionBadge key="b" badge={decisionBadge(r.decision)} testid="live-leg-badge" />, <Tech key="c">{r.decision.reason ?? DASH}</Tech>])}
               empty="none" />
           )}
           <SubHead>Shocks today, by kind</SubHead>

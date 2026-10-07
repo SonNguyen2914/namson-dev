@@ -27,7 +27,7 @@ import { familyWords } from "../../lib/tradingLedger";
 import { InPlayPanel } from "./InPlayPanel";
 import {
   BarList, CTRL, DASH, DecisionBadge, Drawer, DrawerSection, EmptyNote, ErrorNote,
-  FilterButton, Freshness, InfoNote, KV, Panel, SubHead, TH, Tech, ago, when,
+  FilterButton, Freshness, InfoNote, KV, Panel, TH, Tech, ago, when,
 } from "./primitives";
 import type { Source } from "./useConsoleData";
 
@@ -171,10 +171,8 @@ const CandRow = memo(function CandRow({ r, selected, onOpen, onKey }: {
         selected ? "bg-tc-raised shadow-[inset_2px_0_0_var(--accent)]" : ""}`}>
       <td className="border-b border-tc-line py-2 pl-4 pr-3 align-top">
         <span className="block max-w-[340px] text-[13px] leading-snug text-ink-hi">{r.title}</span>
-        <span className="mt-0.5 flex items-center gap-2">
-          <Tech className="max-w-[240px] truncate" title={r.ticker}>{r.ticker}</Tech>
-          <span className="text-[11px] text-ink-low">{r.family ? familyWords(r.family) : "type not stated"}</span>
-        </span>
+        <Tech className="mt-0.5 block max-w-[300px] truncate" title={r.ticker}>{r.ticker}</Tech>
+        <span className="block text-[11px] text-ink-low">{r.family ? familyWords(r.family) : "type not stated"}</span>
       </td>
       <td className="border-b border-tc-line px-3 py-2 align-top">
         <span className="flex flex-col items-start gap-1">
@@ -349,11 +347,14 @@ function WhyNotPlaced({ rows, today, compLabelText, onReason, activeReason }: {
       {bars.length === 0 ? (
         <InfoNote>{src === "tick" ? "Every market in this view was placed, or there are none." : today === null ? "Today's reasons are not served." : "No skips or refusals journaled today."}</InfoNote>
       ) : (
-        <div data-testid="cand-why" className="space-y-3">
+        <div data-testid="cand-why" className="space-y-2">
           {ordered.map(([g, list]) => (
             <div key={g}>
-              <SubHead right={<span className="tc-num">{list.reduce((s, x) => s + x.n, 0).toLocaleString("en-US")} · {Math.round(list.reduce((s, x) => s + x.share, 0) * 100)}%</span>}>{GROUP_LABEL[g]}</SubHead>
-              <BarList items={list.map((b) => ({
+              <div className="flex items-baseline justify-between px-2 text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low">
+                <span>{GROUP_LABEL[g]}</span>
+                <span className="tc-num normal-case tracking-normal">{list.reduce((s, x) => s + x.n, 0).toLocaleString("en-US")} · {Math.round(list.reduce((s, x) => s + x.share, 0) * 100)}%</span>
+              </div>
+              <BarList dense scaleMax={bars[0]?.n} items={list.map((b) => ({
                 key: b.code, value: b.n, testid: "why-bar", data: { "data-code": b.code },
                 label: <span className={activeReason === b.code ? "text-accent" : ""}>{b.words}</span>,
                 sub: <span className="font-mono">{b.code}</span>,
@@ -706,11 +707,11 @@ function CandidatesSection({ d, now, source, filters: f, setFilters, selected, s
             <Panel title="Every competition, this tick" meta={src === "focus" ? "the eleven focus competitions" : "the trader's scope"}>
               {c.by_competition ? (
                 <div className="tc-scroll overflow-x-auto">
-                  <table data-testid="cand-by-comp" className="w-full min-w-[640px] border-collapse text-[12.5px]">
+                  <table data-testid="cand-by-comp" className="w-full min-w-[600px] border-collapse text-[12.5px]">
                     <thead>
                       <tr>
-                        {["competition", "in scope", "assessed", "eligible", "in play",
-                          "decided", "model-priced", "placed", "in this snapshot"].map((h, i) => (
+                        {["competition", "scope", "assessed", "eligible", "in play",
+                          "decided", "model", "placed", "shown"].map((h, i) => (
                           <th key={h} scope="col" className={`${TH} first:pl-0 ${i === 0 ? "text-left" : "text-right"}`}>{h}</th>
                         ))}
                       </tr>

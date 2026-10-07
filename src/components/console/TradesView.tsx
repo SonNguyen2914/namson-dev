@@ -105,13 +105,13 @@ function Grounds({ r }: { r: LedgerRow }) {
           <G field="cost" k="cost (fee in)">
             {dollars(r.cost_dollars)}{r.fee_dollars !== null ? ` · fee ${dollars(r.fee_dollars)}` : ""}
           </G>
-          <G field="strategy_version" k="strategy"><Tech className="text-ink-hi">{r.strategy_version ?? NOT_RECORDED}</Tech></G>
+          <G field="strategy_version" k="strategy"><Tech tone="text-ink-hi">{r.strategy_version ?? NOT_RECORDED}</Tech></G>
           <G field="ticker" k="market">
-            <Tech className="text-ink-hi">{r.market.ticker ?? NOT_RECORDED}</Tech>
+            <Tech tone="text-ink-hi">{r.market.ticker ?? NOT_RECORDED}</Tech>
             {r.market.outcome_key_source ? ` · key from ${r.market.outcome_key_source}` : ""}
           </G>
           <G field="placed_at" k="placed (UTC)">
-            <Tech className="text-ink-hi">{r.placed_at ?? NOT_RECORDED}</Tech>{r.order_id ? <> · order <Tech className="text-ink-hi">{r.order_id}</Tech></> : ""}
+            <Tech tone="text-ink-hi">{r.placed_at ?? NOT_RECORDED}</Tech>{r.order_id ? <> · order <Tech tone="text-ink-hi">{r.order_id}</Tech></> : ""}
           </G>
           <G field="not_recorded" k="not recorded on this row">
             {r.not_recorded.length ? r.not_recorded.join(", ") : "nothing missing"}
@@ -211,7 +211,7 @@ function Row({ r, open, onToggle, boxW }: { r: LedgerRow; open: boolean; onToggl
           className={`${TD} tc-num whitespace-nowrap text-right font-medium ${o === "won" || o === "lost" ? plTone(r.outcome.pnl_dollars) : "text-ink-low"}`}>
           {pnlWords(r)}
         </td>
-        <td data-testid="ledger-why" className={`${TD} min-w-[240px] max-w-[340px] pr-4 text-[12px] leading-snug text-ink-mid`}>
+        <td data-testid="ledger-why" className={`${TD} min-w-[200px] max-w-[300px] pr-4 text-[12px] leading-snug text-ink-mid`}>
           <span className="line-clamp-2" title={r.why ?? undefined}>{r.why ?? NOT_RECORDED}</span>
         </td>
       </tr>
@@ -467,7 +467,7 @@ export function TradesView({ now, source, client, setClient, selected, setSelect
           </div>
         ) : (
           <div ref={box} className="tc-scroll max-h-[75vh] overflow-auto border-t border-tc-line">
-            <table data-testid="ledger-table" className="tc-table w-full min-w-[1280px] border-collapse">
+            <table data-testid="ledger-table" className="tc-table w-full min-w-[1180px] border-collapse text-[12.5px]">
               <thead>
                 <tr>
                   {HEAD.map((h, i) => (

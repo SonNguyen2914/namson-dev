@@ -127,7 +127,7 @@ function GuardPanel({ b, title, testid, wordsKey }: { b: Obj | null; title: stri
         <div key={k} className="mt-3">
           <SubHead>{k.replace(/_/g, " ")}</SubHead>
           <SimpleTable head={["reason", "count"]} right={[1]}
-            rows={Object.entries(obj(v)!).sort((a, z) => Number(z[1]) - Number(a[1])).map(([r, n]) => [<Tech key="r" className="text-ink-mid">{r}</Tech>, String(n)])}
+            rows={Object.entries(obj(v)!).sort((a, z) => Number(z[1]) - Number(a[1])).map(([r, n]) => [<Tech key="r" tone="text-ink-mid">{r}</Tech>, String(n)])}
             empty="none today" />
         </div>
       ))}

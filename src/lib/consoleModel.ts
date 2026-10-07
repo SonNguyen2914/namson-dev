@@ -290,7 +290,7 @@ export function attention(i: AttentionInput): AttentionItem[] {
   if (d) {
     if (d.kill === true) {
       push({ id: "kill", severity: "critical", subsystem: "safety", title: "Kill switch active",
-        detail: typeof d.kill_until === "string" ? `until ${d.kill_until}` : "no end time sent",
+        detail: typeof d.kill_until === "string" ? "TRADING_KILL or an operator kill · ends" : "TRADING_KILL or an operator kill · no end time sent",
         at: str(d.kill_until), link: { view: "overview", params: { focus: "safety" } } });
     }
     const halt = obj(d.halt);

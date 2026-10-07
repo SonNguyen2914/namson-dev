@@ -107,6 +107,7 @@ export function TradingKillLift({ token, onDone }: {
   return (
     <div data-testid="kill-lift" className="text-[12.5px] text-ink-mid">
       <div className="flex flex-wrap items-center gap-2">
+        <span className="mr-1 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-low">Operator kill</span>
         {!asking ? (
           <button type="button" disabled={busy}
             onClick={() => { setOutcome(null); setAsking(true); }}
@@ -141,10 +142,9 @@ export function TradingKillLift({ token, onDone }: {
         </p>
       )}
       <p className="mt-1.5 text-[11.5px] leading-snug text-ink-low">
-        Re-enables trading only if backend TRADING_KILL is not active. It
-        lifts a kill set through the backend&apos;s kill route only and
-        cannot lift TRADING_KILL on the Railway service — while that is set,
-        nothing is placed whatever this says.
+        Re-enables trading only if backend TRADING_KILL is not active: it
+        ends a kill set through the backend&apos;s kill route and cannot lift
+        TRADING_KILL on the Railway service.
       </p>
     </div>
   );

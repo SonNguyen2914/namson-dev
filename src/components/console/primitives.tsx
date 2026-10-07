@@ -182,8 +182,8 @@ export function RiskBar({ label, used, limit, testid, sub, gainAware = true, cls
   const share = u !== null && l !== null && l > 0 ? (u <= 0 ? 0 : Math.min(1, u / l)) : null;
   const gain = gainAware && u !== null && u < 0;
   const fill = share === null ? "bg-line-strong"
-    : share >= 0.8 ? "bg-neg" : share >= 0.5 ? "bg-warn" : "bg-ink-mid";
-  const word = share === null ? null : share >= 0.8 ? "near limit" : share >= 0.5 ? "over half" : null;
+    : share >= 0.8 ? "bg-neg" : share >= 0.6 ? "bg-ink-hi/80" : "bg-ink-mid";
+  const word = share === null ? null : share >= 1 ? "at limit" : share >= 0.8 ? "near limit" : null;
   return (
     <div data-testid={testid} className="min-w-0">
       <div className="flex items-baseline justify-between gap-3">
@@ -195,7 +195,7 @@ export function RiskBar({ label, used, limit, testid, sub, gainAware = true, cls
           {gain ? <span className="text-up">+{usd(-(u as number))} up</span> : usd(used)}
           <span className="text-ink-faint"> of </span>{usd(limit)}
           {share !== null && (
-            <span className={`ml-1.5 ${share >= 0.8 ? "text-neg" : share >= 0.5 ? "text-warn" : "text-ink-low"}`}>
+            <span className={`ml-1.5 ${share >= 0.8 ? "text-neg" : "text-ink-low"}`}>
               {Math.round(share * 100)}%
             </span>
           )}
@@ -208,7 +208,7 @@ export function RiskBar({ label, used, limit, testid, sub, gainAware = true, cls
       </div>
       {(sub || word) && (
         <div className="mt-1 text-[11.5px] leading-snug text-ink-low">
-          {word && <span className={share! >= 0.8 ? "text-neg" : "text-warn"}>{word}{sub ? " · " : ""}</span>}
+          {word && <span className="text-neg">■ {word}{sub ? " · " : ""}</span>}
           {sub}
         </div>
       )}
@@ -241,11 +241,11 @@ export function StatusPill({ state, label, value, title, testid, href }: {
   const body = (
     <>
       <Dot state={state} />
-      <span className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low">{label}</span>
+      <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-ink-low">{label}</span>
       <span className={`tc-num text-[12px] font-medium ${STATE_TEXT[state]}`}>{value}</span>
     </>
   );
-  const cls = `flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 ${
+  const cls = `flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-1.5 py-1 ${
     state === "bad" ? "bg-neg/10" : state === "warn" ? "bg-warn/[0.07]" : ""}`;
   return href ? (
     <a href={href} data-testid={testid} title={title} data-state={state}
@@ -338,13 +338,13 @@ export function InfoNote({ children, testid, tone = "low" }: {
 }
 
 /** A technical value: mono, small, the full value on hover and focus. */
-export function Tech({ children, title, className = "" }: {
-  children: ReactNode; title?: string; className?: string;
+export function Tech({ children, title, className = "", tone = "text-ink-low" }: {
+  children: ReactNode; title?: string; className?: string; tone?: string;
 }) {
   return (
     <span title={title ?? (typeof children === "string" ? children : undefined)}
       tabIndex={title || typeof children === "string" ? 0 : undefined}
-      className={`font-mono text-[11px] text-ink-low outline-none focus-visible:text-ink-hi ${className}`}>
+      className={`font-mono text-[11px] ${tone} outline-none focus-visible:text-ink-hi ${className}`}>
       {children}
     </span>
   );
@@ -443,7 +443,7 @@ export const CTRL = "h-8 rounded-md border border-tc-line-strong bg-tc-raised px
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-low">{label}</span>
+      <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-ink-low">{label}</span>
       {children}
     </label>
   );
@@ -473,12 +473,14 @@ export interface BarItem {
 
 /** RANKED HORIZONTAL BARS: label left, value right, the bar under the
  *  label scaled to the largest |value|. Clickable when it filters. */
-export function BarList({ items, testid, signed = false }: {
+export function BarList({ items, testid, signed = false, scaleMax, dense = false }: {
   items: BarItem[]; testid?: string; signed?: boolean;
+  /** scale against this instead of the list's own largest (lists that share an axis) */
+  scaleMax?: number; dense?: boolean;
 }) {
-  const max = Math.max(1e-9, ...items.map((i) => Math.abs(i.value)));
+  const max = Math.max(1e-9, scaleMax ?? 0, ...items.map((i) => Math.abs(i.value)));
   return (
-    <ol data-testid={testid} className="space-y-1">
+    <ol data-testid={testid} className={dense ? "space-y-0" : "space-y-1"}>
       {items.map((it) => {
         const w = `${(Math.abs(it.value) / max) * (signed ? 50 : 100)}%`;
         const fill = it.tone === "up" ? "bg-up/70" : it.tone === "neg" ? "bg-neg/70"
@@ -502,10 +504,10 @@ export function BarList({ items, testid, signed = false }: {
           <li key={it.key} data-testid={it.testid} {...it.data}>
             {it.onClick ? (
               <button type="button" onClick={it.onClick}
-                className="block w-full rounded-md px-2 py-1.5 outline-none transition-colors hover:bg-tc-hover focus-visible:ring-2 focus-visible:ring-accent">
+                className={`block w-full rounded-md px-2 ${dense ? "py-1" : "py-1.5"} outline-none transition-colors hover:bg-tc-hover focus-visible:ring-2 focus-visible:ring-accent`}>
                 {inner}
               </button>
-            ) : <div className="px-2 py-1.5">{inner}</div>}
+            ) : <div className={`px-2 ${dense ? "py-1" : "py-1.5"}`}>{inner}</div>}
           </li>
         );
       })}

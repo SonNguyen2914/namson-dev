@@ -14,7 +14,7 @@ import { TradingKillLift } from "../TradingKillLift";
 import { OwnerChip, bookDollars, bookPl, plTone } from "../TradingBook";
 import { DailyPnlChart } from "./charts";
 import {
-  DASH, DecisionBadge, Dot, EmptyNote, ErrorNote, Freshness, InfoNote, Label, Metric,
+  DASH, DecisionBadge, Disclosure, Dot, EmptyNote, ErrorNote, Freshness, InfoNote, Label, Metric,
   Panel, RiskBar, SubHead, Tech, agoIso, clockTime, count, numOf, pnlTone, usd, when,
 } from "./primitives";
 import { hrefOf } from "./route";
@@ -64,12 +64,13 @@ export function SafetyPanel({ d, now, token, bumpStatus }: {
           {loud ? "Nothing is placed while this holds." : "Read from the status route; the console cannot place or stop orders."}
         </span>
       </header>
-      <div className="grid gap-x-6 gap-y-4 px-4 py-3 sm:grid-cols-2 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-x-6 gap-y-4 px-4 py-3 lg:grid-cols-6">
         <SafetyCell testid="safety-trading" label="Real trading"
-          value={d.enabled === true ? (d.paper_only === true ? "Paper only" : "Enabled")
+          value={loud ? "Blocked" : d.enabled === true ? (d.paper_only === true ? "Paper only" : "Enabled")
             : d.enabled === false ? "Disabled" : "Not stated"}
-          state={d.enabled === false || d.paper_only === true ? "warn" : d.enabled === true ? "info" : "warn"}
-          sub={d.paper_only === true ? (str(d.mode_banner) ?? "no real orders are sent")
+          state={loud ? "bad" : d.enabled === false || d.paper_only === true ? "warn" : d.enabled === true ? "info" : "warn"}
+          sub={loud ? `${killed ? "the kill" : "a loss halt"} holds; TRADING_ENABLED is ${d.enabled === true ? "on" : "off"}`
+            : d.paper_only === true ? (str(d.mode_banner) ?? "no real orders are sent")
             : d.enabled === false ? "TRADING_ENABLED is not true: cancel-first pass only" : "TRADING_ENABLED"} />
         <SafetyCell testid="safety-kill" label="Kill switch"
           value={killed ? "ACTIVE" : d.kill === false ? "Off" : "Not stated"}
@@ -92,28 +93,21 @@ export function SafetyPanel({ d, now, token, bumpStatus }: {
         <SafetyCell testid="safety-day" label="Trading day" value={str(day?.day) ?? DASH} state="info"
           sub={day ? <>{str(day.tz) ?? "zone not sent"}{day.valid === false ? " (zone unreadable: UTC)" : ""} · ends {when(day.ends_at)}</> : undefined} />
       </div>
-      <div className="grid gap-4 border-t border-tc-line px-4 py-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div>
-          <SubHead>Operator kill</SubHead>
-          <TradingKillLift token={token} onDone={bumpStatus} />
-        </div>
-        <div data-testid="ops-stop" className="text-[12.5px] leading-relaxed text-ink-mid">
-          <SubHead>How to stop it</SubHead>
-          <ul className="list-disc space-y-0.5 pl-4 marker:text-ink-faint">
-            <li>
-              Set <code className="font-mono text-ink-hi">TRADING_KILL=true</code> on the Railway
-              backend service. The next tick places nothing.
-            </li>
-            <li>Or delete the agent&apos;s Kalshi API key in Kalshi&apos;s settings.</li>
-          </ul>
-          <p className="mt-1.5 text-[11.5px] text-ink-low">
-            This console cannot place or stop anything. It changes three things: which of
-            your positions the trader may manage (a take-back also cancels the
-            trader&apos;s own resting orders on that market, on its next tick), the
-            careful strategy&apos;s per-competition switch (off = paper only), and
-            &ldquo;Lift operator kill&rdquo;, which ends an operator kill set through the
-            backend&apos;s kill route. It cannot lift TRADING_KILL on Railway.
-          </p>
+      <div className="grid gap-x-8 gap-y-3 border-t border-tc-line px-4 py-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <TradingKillLift token={token} onDone={bumpStatus} />
+        <div data-testid="ops-stop" className="text-[12px] leading-relaxed text-ink-mid">
+          <span className="mr-2 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-low">How to stop it</span>
+          set <code className="font-mono text-ink-hi">TRADING_KILL=true</code>{" "}on the Railway backend service (the next
+          tick places nothing), or delete the agent&apos;s Kalshi API key.
+          <Disclosure summary="What this console can and cannot change">
+            <p className="text-[11.5px] leading-relaxed text-ink-low">
+              It cannot place or stop anything. It changes three things: which of your positions the trader may
+              manage (a take-back also cancels the trader&apos;s own resting orders on that market, on its next
+              tick), the careful strategy&apos;s per-competition switch (off = paper only), and &ldquo;Lift operator
+              kill&rdquo;, which ends an operator kill set through the backend&apos;s kill route. It cannot lift
+              TRADING_KILL on Railway.
+            </p>
+          </Disclosure>
         </div>
       </div>
       <span className="sr-only">checked {agoIso(d.generated_at, now) ?? DASH} ago</span>
@@ -231,6 +225,51 @@ export function CapitalPanel({ d, now, stale, statusAt }: { d: Obj; now: number;
 
 // ------------------------------------------------------------ attention
 
+function AttentionList({ items, go, compact = false }: {
+  items: AttentionItem[]; go: (v: string, p?: Record<string, string>) => void; compact?: boolean;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <ul className="divide-y divide-tc-line">
+      {items.map((a) => {
+        const s = SEV[a.severity];
+        const body = (
+          <>
+            <span className="mt-[5px]"><Dot state={s.dot} /></span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-baseline justify-between gap-2">
+                <span className={`text-[12.5px] leading-snug ${a.severity === "info" ? "text-ink-hi" : s.cls} ${a.severity === "critical" ? "font-semibold" : ""}`}>
+                  <span className="sr-only">{s.word}: </span>{a.title}
+                </span>
+                {a.count !== undefined && a.count !== null && (
+                  <span className="tc-num shrink-0 text-[12.5px] text-ink-hi">{a.count.toLocaleString("en-US")}</span>
+                )}
+              </span>
+              {!compact || a.detail ? (
+                <span className="block text-[11px] leading-snug text-ink-low">
+                  {a.subsystem}{a.detail ? ` · ${a.detail}` : ""}{a.at ? ` · ${when(a.at)}` : ""}
+                </span>
+              ) : null}
+            </span>
+            {a.link && <span aria-hidden className="mt-[2px] text-[11px] text-ink-faint">→</span>}
+          </>
+        );
+        return (
+          <li key={a.id} data-testid="attention-item" data-severity={a.severity} data-id={a.id}>
+            {a.link ? (
+              <a href={hrefOf(a.link.view, a.link.params)}
+                onClick={(e) => { e.preventDefault(); go(a.link!.view, a.link!.params); }}
+                className={`flex gap-2.5 rounded-md px-3 ${compact ? "py-1.5" : "py-2"} outline-none transition-colors hover:bg-tc-hover focus-visible:ring-2 focus-visible:ring-accent`}>
+                {body}
+              </a>
+            ) : <div className={`flex gap-2.5 px-3 ${compact ? "py-1.5" : "py-2"}`}>{body}</div>}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export function AttentionPanel({ items, go }: {
   items: AttentionItem[]; go: (v: string, p?: Record<string, string>) => void;
 }) {
@@ -248,41 +287,19 @@ export function AttentionPanel({ items, go }: {
           settlement and fill reads, hand-over, careful data errors, and every read this console makes.
         </p>
       ) : (
-        <ul className="divide-y divide-tc-line">
-          {items.map((a) => {
-            const s = SEV[a.severity];
-            const body = (
-              <>
-                <span className="mt-[5px]"><Dot state={s.dot} /></span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-baseline justify-between gap-2">
-                    <span className={`text-[12.5px] leading-snug ${a.severity === "info" ? "text-ink-hi" : s.cls}`}>
-                      <span className="sr-only">{s.word}: </span>{a.title}
-                    </span>
-                    {a.count !== undefined && a.count !== null && (
-                      <span className="tc-num shrink-0 text-[12.5px] text-ink-hi">{a.count.toLocaleString("en-US")}</span>
-                    )}
-                  </span>
-                  <span className="block text-[11px] leading-snug text-ink-low">
-                    {a.subsystem}{a.detail ? ` · ${a.detail}` : ""}{a.at ? ` · ${when(a.at)}` : ""}
-                  </span>
-                </span>
-                {a.link && <span aria-hidden className="mt-[2px] text-[11px] text-ink-faint">→</span>}
-              </>
-            );
-            return (
-              <li key={a.id} data-testid="attention-item" data-severity={a.severity} data-id={a.id}>
-                {a.link ? (
-                  <a href={hrefOf(a.link.view, a.link.params)}
-                    onClick={(e) => { e.preventDefault(); go(a.link!.view, a.link!.params); }}
-                    className="flex gap-2.5 rounded-md px-3 py-2 outline-none transition-colors hover:bg-tc-hover focus-visible:ring-2 focus-visible:ring-accent">
-                    {body}
-                  </a>
-                ) : <div className="flex gap-2.5 px-3 py-2">{body}</div>}
-              </li>
-            );
-          })}
-        </ul>
+        <div className="tc-scroll max-h-[560px] overflow-y-auto">
+          {crit + warn === 0 && (
+            <p className="px-3 pb-1 pt-2.5 text-[12.5px] text-ink-mid">Nothing critical and no warnings. Routine counts:</p>
+          )}
+          <AttentionList items={items.filter((i) => i.severity !== "info")} go={go} />
+          {info > 0 && (crit + warn > 0 ? (
+            <div className="border-t border-tc-line px-3 pb-2">
+              <Disclosure testid="attention-routine" summary={`Routine counts (${info})`}>
+                <AttentionList items={items.filter((i) => i.severity === "info")} go={go} compact />
+              </Disclosure>
+            </div>
+          ) : <AttentionList items={items} go={go} compact />)}
+        </div>
       )}
     </Panel>
   );
