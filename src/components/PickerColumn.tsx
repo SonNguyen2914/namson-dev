@@ -1778,7 +1778,7 @@ function RefusalCard({ r, col, dated = true, dense = false, rank }: {
               title={`${r.club ?? pairing} — not ranked (${r.reason})`}
               className={REFUSAL_WORDS[r.reason]
                 || !/\s/.test((r.reason ?? "").trim())
-                ? "min-w-0 truncate rounded border border-line px-1.5 py-0.5 text-[9px] uppercase tracking-[0.1em] text-ink-low"
+                ? "min-w-0 truncate rounded border border-line px-1.5 py-[2px] text-[9px] uppercase leading-none tracking-[0.1em] text-ink-low"
                 : "min-w-0 truncate"}>
               {refusalWords(r.reason)}
             </span>
@@ -1933,8 +1933,8 @@ function RefusalCard({ r, col, dated = true, dense = false, rank }: {
           card's vertical rhythm identical to a ranked one's. */}
       <span data-testid="refused-dumbbell" data-refused="dumbbell"
         title={withheld}
-        className="mt-2 flex h-[9px] items-center font-mono text-[8px] uppercase leading-none tracking-[0.12em] text-ink-faint">
-        no shared ladder · refused
+        className="mt-2 flex h-[9px] items-center overflow-hidden whitespace-nowrap font-mono text-[8px] uppercase leading-none tracking-[0.12em] text-ink-faint">
+        <span className="min-w-0 truncate">no shared ladder · refused</span>
       </span>
 
       {/* ── STAGE 1, in RowRead's own row and order: the ranks pair, the
@@ -1952,8 +1952,14 @@ function RefusalCard({ r, col, dated = true, dense = false, rank }: {
           are not extra rows) — so the same type size, spacing and
           justification, and the same `stats-row` handle the one-line
           guard reads. */}
+      {/* ONE LINE, NOT A LAST-RESORT WRAP (2026-10-07): this row stands
+          in for the ranked card's stats row, and a refused card that grows
+          a line on another machine's font is the size difference Son asked
+          to be rid of. Each cell truncates rather than wraps on a track too
+          narrow for it, and every cell carries its whole sentence on its
+          hover, so nothing is cut without its words. */}
       <div data-testid="stats-row"
-        className="mt-2.5 flex flex-wrap items-baseline justify-between gap-x-1.5 gap-y-0.5 font-mono text-[10px] tabular-nums">
+        className="mt-2.5 flex flex-nowrap items-baseline justify-between gap-x-1.5 font-mono text-[10px] tabular-nums [&>*]:min-w-0 [&>*]:truncate">
         {/* `#N v #N`, AND WHY IT IS NOT HALF A PAIR. One of these clubs
             HAS a rank — it has a row in the table, and printing its
             position is no more a comparison than printing its name. The
@@ -2059,7 +2065,11 @@ function RefusalCard({ r, col, dated = true, dense = false, rank }: {
           keeps its tiers and its circled i, so the two cards have the
           same skeleton and the same height. The axes are still NAMED:
           a reader must know which figures are gone. */}
-      <div className="relative mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+      {/* ONE LINE, the ranked tiers row's height (2026-10-07): the cells
+          truncate rather than wrap, each with its hover, and the "i" sits
+          in a flex box so its inline wrapper adds no 24px line box. */}
+      <div data-testid="refused-tiers-row"
+        className="relative mt-3 flex flex-nowrap items-center gap-x-2 [&>*]:min-w-0">
         {/* FOUR NAMED ABSENCES, ONE WORD. The trio said `refused` under
             its three labels and the shape chip said it again beside them;
             the header said it a third time. Every axis is still NAMED —
@@ -2069,7 +2079,7 @@ function RefusalCard({ r, col, dated = true, dense = false, rank }: {
         <span data-testid="refused-tiers" data-refused="tiers"
           data-shape-refused="1"
           title={withheld}
-          className="inline-flex items-baseline gap-1 font-mono text-[10px] leading-none">
+          className="inline-flex items-baseline gap-1 overflow-hidden whitespace-nowrap font-mono text-[10px] leading-none">
           <span className="text-[7.5px] uppercase tracking-[0.12em] text-ink-faint">
             {AXIS_ORDER.join(" ")} shape
           </span>
@@ -2080,7 +2090,7 @@ function RefusalCard({ r, col, dated = true, dense = false, rank }: {
             data-k={adm.k} data-gp={adm.gp ?? undefined}
             data-to-go={adm.games_until_rated ?? undefined}
             title={`${adm.gate} — rated at ${adm.k} games, played ${adm.gp ?? "not stated"}`}
-            className="rounded border border-warn/35 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.08em] text-warn">
+            className="truncate rounded border border-warn/35 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.08em] text-warn">
             {adm.games_until_rated == null
               ? <>rated at {adm.k}</>
               : <>{adm.games_until_rated} to go</>}
@@ -2100,7 +2110,7 @@ function RefusalCard({ r, col, dated = true, dense = false, rank }: {
             centre answered the SECTION behind it. The room grows, the ink
             does not, which is the whole principle of the floor. Coarse
             pointers only; the desktop card is unchanged. */}
-        <span className="ml-auto tap-floor-room">
+        <span className="ml-auto flex flex-none items-center tap-floor-room">
           <NotesPanel
             idPrefix={`refusal-${r.event_id ?? `${r.home}-${r.away}`}`}
             testidOpen="refusal-why-open" testidPanel="refusal-notes"

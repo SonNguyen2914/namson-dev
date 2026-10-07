@@ -92,37 +92,57 @@ test("the refused card is the size of the ranked cards around it", async ({ page
   expect(await blocks(ref)).toBe(await blocks(nap));
 });
 
-/* AND ON ANOTHER MACHINE'S FONT METRICS (CI, 2026-10-07). On Linux the
- * refused card's chip row — "02 · NEW TO THE LEAGUE · Sun, Sep 20, 6:00 AM"
- * — measured wider than on macOS, wrapped, and the card came out 317px
- * against its neighbour's 294. The fix is the CARD (a one-line chip row
- * with room to spare, truncating rather than wrapping); this proves it
- * by widening every glyph on the page the way a different rasteriser
- * does, and by narrowing the track, and asking the same two questions:
- * is the chip row one line, and is the card its neighbour's size? */
-for (const [label, width, spacing] of [
-  ["wider glyphs at 1440", 1440, "0.03em"],
-  ["a narrower track at 1280", 1280, "0em"],
-] as const) {
-  test(`the refused chip row stays one line — ${label}`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 1200 });
-    await page.addStyleTag({ content: `[data-testid="picker-row"],
-      [data-testid="picker-refusal"] { letter-spacing: ${spacing} !important }` });
-    const ref = page.locator(`[data-testid="picker-refusal"][data-event="${MONZA}"]`);
-    const nap = page.locator(`[data-testid="picker-row"][data-event="${NAPOLI}"]`);
-    await ref.scrollIntoViewIfNeeded();
-    const tops = await ref.evaluate((c) => [...c.querySelectorAll(
-      '[data-testid="refused-number"], [data-testid="refusal-reason"], '
-      + '[data-testid="refused-kickoff"]')]
-      .map((e) => Math.round(e.getBoundingClientRect().top)));
-    expect(tops.length).toBe(3);
-    expect(Math.max(...tops) - Math.min(...tops), `chip tops ${tops}`)
-      .toBeLessThanOrEqual(2);
-    const r = (await ref.boundingBox())!, n = (await nap.boundingBox())!;
-    expect(Math.abs(r.height - n.height),
-      `refused ${r.height}px v ranked ${n.height}px`).toBeLessThanOrEqual(6);
-    // the reason is never cut without its words on the hover
-    expect(await ref.getByTestId("refusal-reason").getAttribute("title"))
-      .toContain("no_prior_row");
-  });
+/* AND ON ANOTHER MACHINE'S FONT METRICS (CI, 2026-10-07).
+ *
+ * Twice CI's Linux text came out a different width from a Mac's and the
+ * refused card grew: first its chip row wrapped (317px v 294.25 at 1440),
+ * then, at 1280, its WATCH row did ("WATCH · NEEDS TOKEN" beside
+ * "MODEL · CONFLICT" is wider than beside "MODEL · AGREE", so a card's
+ * height came to depend on its verdict word): 327px v 294.25. A rasteriser
+ * can be narrower OR wider, so every case below runs with the glyphs
+ * squeezed, as drawn, and widened, at the board's tightest four-column
+ * width (1280), at 1440, and at 1180 — and asks the same questions each
+ * time: is every row that must be one line one line, and is the refused
+ * card its ranked neighbour's height? */
+const SPACINGS = ["-0.03em", "0em", "0.03em"] as const;
+for (const width of [1440, 1280, 1180] as const) {
+  for (const spacing of SPACINGS) {
+    test(`one-line rows and equal heights at ${width}px, letter-spacing ${spacing}`,
+      async ({ page }) => {
+        await page.setViewportSize({ width, height: 1200 });
+        await page.addStyleTag({ content: `[data-testid="picker-row"],
+          [data-testid="picker-refusal"] { letter-spacing: ${spacing} !important }` });
+        const ref = page.locator(`[data-testid="picker-refusal"][data-event="${MONZA}"]`);
+        const nap = page.locator(`[data-testid="picker-row"][data-event="${NAPOLI}"]`);
+        await ref.scrollIntoViewIfNeeded();
+        await page.waitForTimeout(150);
+        // the refused chip row: number, reason, kickoff on one line
+        const tops = await ref.evaluate((c) => [...c.querySelectorAll(
+          '[data-testid="refused-number"], [data-testid="refusal-reason"], '
+          + '[data-testid="refused-kickoff"]')]
+          .map((e) => Math.round(e.getBoundingClientRect().top)));
+        expect(tops.length).toBe(3);
+        expect(Math.max(...tops) - Math.min(...tops), `chip tops ${tops}`)
+          .toBeLessThanOrEqual(2);
+        // every card's WATCH row — the watch box and the verdict box — is
+        // one line, whatever the verdict word (all four are on this board)
+        const rows = await page.$$eval('[data-testid="watch-toggle"]', (els) =>
+          els.map((e) => {
+            const boxes = [...e.querySelectorAll<HTMLElement>(
+              '[data-testid="mm-verdict"], button, span[class*="rounded"]')]
+              .filter((b) => b.getBoundingClientRect().height > 0);
+            const ts = new Set(boxes.map((b) => Math.round(b.getBoundingClientRect().top)));
+            return { n: ts.size, text: (e as HTMLElement).innerText.replace(/\s+/g, " ") };
+          }));
+        expect(rows.length).toBeGreaterThan(10);
+        expect(rows.filter((r) => r.n > 1)).toEqual([]);
+        // and the refused card is its neighbour's height
+        const r = (await ref.boundingBox())!, n = (await nap.boundingBox())!;
+        expect(Math.abs(r.height - n.height),
+          `refused ${r.height}px v ranked ${n.height}px`).toBeLessThanOrEqual(2);
+        // nothing is cut without its words on the hover
+        expect(await ref.getByTestId("refusal-reason").getAttribute("title"))
+          .toContain("no_prior_row");
+      });
+  }
 }

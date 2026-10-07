@@ -962,8 +962,16 @@ export function WatchPanel() {
 
 // ----------------------------------------------------------- the toggle
 
-const btn = "rounded-md border px-2 py-0.5 font-mono text-[9px] uppercase "
-  + "tracking-[0.14em] transition-colors";
+/* 8.5px, 0.08em and 6px of side padding (2026-10-07; was 9px, 0.14em,
+   8px). "WATCH · NEEDS TOKEN" beside "MODEL · CONFLICT" measured 288px of
+   row in a 258px card at 1280 — the board's tightest four-column width —
+   so the row wrapped there on CONFLICT cards and not on AGREE ones, and a
+   card's height came to depend on its verdict word (CI: 327px v 294.25).
+   At this size the pair is 249px. The row is also held to one line (see
+   WatchToggle), so on a narrower track still the watch box truncates
+   rather than the card growing. */
+const btn = "rounded-md border px-1.5 py-0.5 font-mono text-[8.5px] uppercase "
+  + "tracking-[0.08em] transition-colors";
 /** THE WATCH BOX'S OWN SHAPE, exported so the card's model-vs-market
  *  verdict box beside it is the same box (Son, 2026-10-07: "same style as
  *  the WATCH box"), not a lookalike that drifts. */
@@ -1008,39 +1016,52 @@ export function WatchToggle({ eventId, label, beside }: {
   return (
     <div data-testid="watch-toggle" data-event={eventId} data-state={state}
       className="mt-2 flex flex-wrap items-center gap-2">
+      {/* THE CONTROLS AND THE VERDICT BOX: ONE LINE, ALWAYS (2026-10-07).
+          A card's height must not depend on which words its boxes carry,
+          so the pair never wraps: the watch control may truncate (its
+          words on its hover and its accessible name), the verdict box
+          beside it never does. The backend's answer to an act still opens
+          its own line below. */}
+      <span data-testid="watch-line"
+        className="flex min-w-0 max-w-full basis-full flex-nowrap items-center gap-2">
+      {/* `min-w-0` on each control and the TEXT truncates inside it — never
+          `overflow: hidden` on the control itself, which would clip the
+          44px tap floor its ::after draws on a coarse pointer. */}
+      <span className="flex min-w-0 items-center gap-2 [&>*]:min-w-0">
       {state === "needs-token" && (
         <button type="button" onClick={ctx.openPanel}
           aria-describedby={NEEDS_ID}
           aria-label={`declare ${label} watched — needs the operator token; opens the panel that asks for it`}
+          title="watch · needs token"
           className={`${btn} border-line text-ink-faint hover:border-line-strong hover:text-ink-low`}>
-          watch · needs token
+          <span className="block min-w-0 truncate">watch · needs token</span>
         </button>
       )}
 
       {state === "resolving" && (
         <span className={`${btn} border-line text-ink-faint`}>
-          watch · resolving
+          <span className="block min-w-0 truncate">watch · resolving</span>
         </span>
       )}
 
       {state === "dormant" && (
         <span data-testid="watch-row-dormant"
           className={`${btn} border-warn/40 text-warn`}>
-          live plane not configured
+          <span className="block min-w-0 truncate">live plane not configured</span>
         </span>
       )}
 
       {state === "unread" && (
         <span data-testid="watch-row-unread"
           className={`${btn} border-warn/40 text-warn`}>
-          declared set unread
+          <span className="block min-w-0 truncate">declared set unread</span>
         </span>
       )}
 
       {state === "no-fixture" && (
         <span data-testid="watch-no-fixture"
           className={`${btn} border-warn/40 text-warn`}>
-          not a live-plane fixture
+          <span className="block min-w-0 truncate">not a live-plane fixture</span>
         </span>
       )}
 
@@ -1049,14 +1070,14 @@ export function WatchToggle({ eventId, label, beside }: {
           <span data-testid="watch-mark"
             className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-mid">
             <i aria-hidden className="h-2 w-2 rounded-[1px] bg-ink-mid" />
-            watching
+            <span className="block min-w-0 truncate">watching</span>
           </span>
           <button type="button" disabled={!canAct || inFlight}
             onClick={() => ctx.act(eventId, "remove")}
             aria-describedby={canAct ? undefined : NEEDS_ID}
             aria-label={`ask for ${label} to leave the watched set`}
             className={`${btn} border-line text-ink-faint hover:border-line-strong hover:text-ink-low disabled:opacity-40`}>
-            {inFlight ? "asking…" : "ask to remove"}
+            <span className="block min-w-0 truncate">{inFlight ? "asking…" : "ask to remove"}</span>
           </button>
         </>
       )}
@@ -1066,19 +1087,21 @@ export function WatchToggle({ eventId, label, beside }: {
           <span data-testid="watch-mark"
             className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
             <i aria-hidden className="h-2 w-2 rounded-[1px] border border-line-strong" />
-            not watched
+            <span className="block min-w-0 truncate">not watched</span>
           </span>
           <button type="button" disabled={!canAct || inFlight}
             onClick={() => ctx.act(eventId, "add")}
             aria-describedby={canAct ? undefined : NEEDS_ID}
             aria-label={`declare ${label} watched`}
             className={`${btn} border-line text-ink-low hover:border-line-strong hover:text-ink-hi disabled:opacity-40`}>
-            {inFlight ? "declaring…" : "watch"}
+            <span className="block min-w-0 truncate">{inFlight ? "declaring…" : "watch"}</span>
           </button>
         </>
       )}
 
-      {beside}
+      </span>
+      {beside && <span className="flex flex-none items-center">{beside}</span>}
+      </span>
       {result && <ActRecord result={result} />}
     </div>
   );

@@ -234,7 +234,7 @@ export function VerdictBox({ mm, kickedOff = false }: {
         title={`${IN_PLAY_TITLE[0].toUpperCase()}${IN_PLAY_TITLE.slice(1)}: `
           + "the match has kicked off, and the model line is its read from "
           + "before kickoff while the market line is live. Shadow, not advice."}
-        className={`${WATCH_BOX} inline-flex items-center gap-1.5 border-solid border-line text-ink-low`}>
+        className={`${WATCH_BOX} inline-flex flex-none items-center gap-1.5 whitespace-nowrap border-solid border-line text-ink-low`}>
         <i aria-hidden className="h-[5px] w-[5px] rounded-full bg-current" />
         IN PLAY
       </span>
@@ -247,7 +247,7 @@ export function VerdictBox({ mm, kickedOff = false }: {
       data-phase="pre_match" data-untested={untested ? "1" : "0"}
       title={`${v.why}${untested ? " Model untested." : ""} A read, never a `
         + "pick: shadow, not advice, and it never moves a card."}
-      className={`${WATCH_BOX} inline-flex items-center gap-1.5 ${v.cls} ${
+      className={`${WATCH_BOX} inline-flex flex-none items-center gap-1.5 whitespace-nowrap ${v.cls} ${
         untested ? "border-dashed" : "border-solid"}`}>
       <i aria-hidden className="h-[5px] w-[5px] rounded-full bg-current" />
       {v.word}

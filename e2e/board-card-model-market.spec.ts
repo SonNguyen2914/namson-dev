@@ -149,7 +149,7 @@ test.describe("the card's model and market lines", () => {
       expect(s.style, id).toBe(style);
       // same box as WATCH: same radius, type size and height
       const w = await card(page, id).getByTestId("watch-toggle")
-        .locator("button, span").first().evaluate((e) => {
+        .locator("button").first().evaluate((e) => {
           const cs = getComputedStyle(e);
           return { h: e.getBoundingClientRect().height, radius: cs.borderTopLeftRadius,
                    font: cs.fontSize };
@@ -159,7 +159,7 @@ test.describe("the card's model and market lines", () => {
       expect(Math.abs(s.h - w.h), id).toBeLessThanOrEqual(1);
       // and it sits BESIDE the watch box, on its row
       const wb = (await card(page, id).getByTestId("watch-toggle")
-        .locator("button, span").first().boundingBox())!;
+        .locator("button").first().boundingBox())!;
       const bb = (await box.boundingBox())!;
       expect(Math.abs(bb.y - wb.y), id).toBeLessThanOrEqual(2);
       expect(bb.x, id).toBeGreaterThan(wb.x);
