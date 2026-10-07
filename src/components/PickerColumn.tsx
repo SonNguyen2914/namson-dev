@@ -45,7 +45,7 @@ import {
   LeagueMeta,
   HeadToHead, NationalBlock, NationalColumn, RatePair, RowField,
   RowFieldPartial, SEASON_BLEND_K,
-  columnsOf, fieldRanksBlock, homeBadge, leagueLabel, licensedRead, rowHref, rowIsInPlay, rowNoHrefWhy,
+  columnsOf, fieldRanksBlock, homeBadge, leagueLabel, licensedRead, rowHasKickedOff, rowHref, rowIsInPlay, rowNoHrefWhy,
   seasonDisagreement,
   seasonSpan, seasonSpanLabel, venueDisagreement,
 } from "../lib/pickerApi";
@@ -1357,7 +1357,7 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
             draws the old price line rather than nothing. */}
         {mmOf(row)
           ? <ModelMarketLines mm={mmOf(row)!} home={row.home} away={row.away}
-              quote={row.kalshi} />
+              quote={row.kalshi} kickedOff={rowHasKickedOff(row)} />
           : <KalshiCell quote={row.kalshi} side={priceSide(row)} />}
         {/* WHAT THAT PRICE ACTUALLY SETTLES ON — the settlement rule of
             a whole competition, so on a cup column it is identical on
@@ -1381,7 +1381,9 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
             all: there is no provider, so there is no control. */}
         <WatchToggle eventId={row.event_id}
           label={`${row.favourite} v ${row.opponent}`}
-          beside={mmOf(row) ? <VerdictBox mm={mmOf(row)!} /> : undefined} />
+          beside={mmOf(row)
+            ? <VerdictBox mm={mmOf(row)!} kickedOff={rowHasKickedOff(row)} />
+            : undefined} />
       </div>
     </article>
   );
@@ -2167,7 +2169,7 @@ function RefusalCard({ r, col, dated = true, dense = false, rank }: {
             behalf. */}
         {mmOf(r)
           ? <ModelMarketLines mm={mmOf(r)!} home={r.home} away={r.away}
-              quote={r.kalshi} />
+              quote={r.kalshi} kickedOff={rowHasKickedOff(r)} />
           : "kalshi" in r
           ? <KalshiCell quote={r.kalshi} side={priceSide(r)} />
           : (
@@ -2180,7 +2182,9 @@ function RefusalCard({ r, col, dated = true, dense = false, rank }: {
         {r.event_id
           ? <WatchToggle eventId={r.event_id}
               label={`${r.home} v ${r.away}`}
-              beside={mmOf(r) ? <VerdictBox mm={mmOf(r)!} /> : undefined} />
+              beside={mmOf(r)
+                ? <VerdictBox mm={mmOf(r)!} kickedOff={rowHasKickedOff(r)} />
+                : undefined} />
           : (
             <p data-testid="refused-no-watch"
               className="mt-2 font-mono text-[10px] leading-relaxed text-ink-faint">

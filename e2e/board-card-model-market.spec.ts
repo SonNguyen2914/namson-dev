@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { BOARD_EIGHT, routeEight, serveEight } from "./eight-columns";
 import { CHAMP_BOARD, CHAMP_CLOCK } from "./championships-recorded";
-import { DERBY, block, withModelMarket } from "./model-market";
+import { DERBY, block, liveBlock, withModelMarket } from "./model-market";
 
 /* THE CARD'S MODEL AND MARKET LINES (Son's approved card, 2026-10-07;
  * spec claude.ai/artifact/FELBHkNhRZaQiXe9UyFgxw).
@@ -287,4 +287,93 @@ test("the Championships board's cards carry the same bottom", async ({ page }) =
   const first = page.locator('[data-testid="mm-lines"][data-verdict="conflict"]').first();
   await expect(first.getByTestId("mm-model-h")).toHaveText("42.2%");
   void DERBY;
+});
+
+/* ONCE THE MATCH HAS KICKED OFF (Son, 2026-10-07, option A). The model
+ * line is the pre-kickoff read and the market line is the live book, so
+ * the card stops comparing them: the model line goes grey and says
+ * "pre-kickoff", the market line is unchanged, and the box reads IN PLAY
+ * (grey, solid) — never AGREE or CONFLICT. Full time is the same. */
+test.describe("once the match has kicked off", () => {
+  const LIVE = IDS.conflict, PRE = IDS.agree, DONE = IDS.wide,
+    LIVE_UNTESTED = IDS.untested;
+
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const b = board();
+    const at = (id: string) => [...b.rows, ...b.refusals]
+      .find((x) => x.event_id === id)!;
+    Object.assign(at(LIVE), { state: "in", in_play: true, live: liveBlock("in") });
+    Object.assign(at(LIVE_UNTESTED), { state: "in", in_play: true,
+                                       live: liveBlock("in") });
+    // full time: the provider's own `post`, for the one cached board a
+    // finished match can still ride on
+    Object.assign(at(DONE), { state: "post", in_play: false,
+                              live: liveBlock("post") });
+    await serveEight(page, b);
+  });
+
+  for (const [what, id] of [["a live row", LIVE], ["a finished row", DONE]] as const) {
+    test(`${what}: grey pre-kickoff model line, live market line, IN PLAY box`,
+      async ({ page }) => {
+        const c = card(page, id);
+        await c.scrollIntoViewIfNeeded();
+        const faint = await ink(page, "text-ink-faint", "color");
+        const hi = await ink(page, "text-ink-hi", "color");
+        const low = await ink(page, "text-ink-low", "color");
+        // the model line: every value dim, none bright
+        for (const k of ["h", "d", "a"]) {
+          const v = c.getByTestId(`mm-model-${k}`);
+          await expect(v).toHaveAttribute("data-top", "0");
+          const s = await v.evaluate((e) => {
+            const cs = getComputedStyle(e);
+            return { color: cs.color, weight: cs.fontWeight };
+          });
+          expect(s.color, k).toBe(faint);
+          expect(s.weight, k).not.toBe("600");
+        }
+        // its label says pre-kickoff, and the hover says why
+        const lab = c.getByTestId("mm-model-label");
+        await expect(c.getByTestId("mm-pre-kickoff")).toBeVisible();
+        expect((await lab.textContent())?.replace(/\s+/g, " ").trim())
+          .toBe("model · pre-kickoff");
+        expect(await title(lab)).toContain(
+          "read before kickoff; it does not update during the match");
+        // the market line is unchanged: its top outcome is still bright
+        const mk = await c.locator('[data-testid^="mm-market-"][data-top="1"]')
+          .evaluateAll((els) => els.map((e) => getComputedStyle(e).color));
+        expect(mk).toEqual([hi]);
+        // the box: IN PLAY, grey, solid, and why on the hover
+        const box = c.getByTestId("mm-verdict");
+        await expect(box).toHaveText("IN PLAY");
+        await expect(box).toHaveAttribute("data-phase", "in_play");
+        const bs = await box.evaluate((e) => {
+          const cs = getComputedStyle(e);
+          return { color: cs.color, style: cs.borderTopStyle };
+        });
+        expect(bs).toEqual({ color: low, style: "solid" });
+        expect(await title(box))
+          .toMatch(/agree\/conflict compares pre-match reads only/i);
+        // and no verdict word anywhere on the card
+        expect(await c.innerText()).not.toMatch(/\b(AGREE|CONFLICT)\b/);
+      });
+  }
+
+  test("an untested model in play is still a SOLID IN PLAY box", async ({ page }) => {
+    const box = card(page, LIVE_UNTESTED).getByTestId("mm-verdict");
+    await expect(box).toHaveText("IN PLAY");
+    expect(await box.evaluate((e) => getComputedStyle(e).borderTopStyle))
+      .toBe("solid");
+  });
+
+  test("a pre-match row is unchanged", async ({ page }) => {
+    const c = card(page, PRE);
+    const hi = await ink(page, "text-ink-hi", "color");
+    await expect(c.getByTestId("mm-verdict")).toHaveText("MODEL · AGREE");
+    await expect(c.getByTestId("mm-verdict")).toHaveAttribute("data-phase", "pre_match");
+    await expect(c.getByTestId("mm-pre-kickoff")).toHaveCount(0);
+    await expect(c.getByTestId("mm-model-label")).toHaveText("model");
+    expect(await c.getByTestId("mm-model-a").evaluate((e) => getComputedStyle(e).color))
+      .toBe(hi);
+  });
 });

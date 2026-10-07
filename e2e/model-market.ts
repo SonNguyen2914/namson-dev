@@ -94,3 +94,24 @@ export function withModelMarket<B extends { rows: readonly unknown[]; refusals: 
   }
   return copy;
 }
+
+/** A board row's `live` block, the shape `live_state` attaches: under way
+ *  (`match_state: "in"`) or at full time (`"post"`). */
+export function liveBlock(state: "in" | "post" = "in") {
+  const ft = state === "post";
+  return {
+    in_play: true, read_at: "2026-09-15T21:16:00Z", window_seconds: 600,
+    row_age_seconds: 42.0,
+    clock: {
+      minute: ft ? 90 : 61, clock_display: ft ? "90'+4'" : "61'",
+      score_home: 2, score_away: 1,
+      status_detail: ft ? "FT" : "61'", period: ft ? "stopped" : "second_half",
+      period_basis: ft ? "the tape's status detail is 'FT'"
+        : "the tape's status detail is a running clock",
+      match_state: state, captured_at: "2026-09-15T21:15:18Z",
+    },
+    absent: null,
+    basis: "WHERE THE MATCH IS, off the live plane's state tape. "
+      + "THE MATCH IS LIVE; THE NUMBERS ARE NOT.",
+  };
+}

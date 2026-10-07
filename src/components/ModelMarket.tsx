@@ -118,39 +118,69 @@ function flagTitle(mm: ModelVsMarket, codes: Record<MmOutcome, string>): string 
     + "the market % is less reliable.";
 }
 
+/** ONCE THE MATCH HAS KICKED OFF (Son, 2026-10-07, option A). The model
+ *  line is the read taken BEFORE kickoff and does not move during the
+ *  match, while the market line is the live book — so comparing the two
+ *  would set a stale belief against a price that has seen goals. The
+ *  model line therefore goes grey and says "pre-kickoff", the market line
+ *  stays as it is, and the verdict box reads IN PLAY instead of AGREE or
+ *  CONFLICT. Full time is the same, until the card leaves the board. */
+export const PRE_KICKOFF_TITLE =
+  "the model's read before kickoff; it does not update during the match";
+export const IN_PLAY_TITLE = "agree/conflict compares pre-match reads only";
+
 /** The two lines, under the one header. */
-export function ModelMarketLines({ mm, home, away, quote }: {
+export function ModelMarketLines({ mm, home, away, quote, kickedOff = false }: {
   mm: ModelVsMarket;
   home: string;
   away: string;
   /** the card's existing quote — read only for a no-market hover */
   quote?: KalshiQuote | null;
+  /** the match is under way or over — see PRE_KICKOFF_TITLE */
+  kickedOff?: boolean;
 }) {
   const codes: Record<MmOutcome, string> = {
     h: teamCode(mm.codes?.h, home), d: "DRAW", a: teamCode(mm.codes?.a, away),
   };
   const line = (lab: "model" | "market", p: ModelVsMarket["model"],
-                top: MmOutcome[], title: string, empty: string) => (
+                top: MmOutcome[], title: string, empty: string,
+                stale = false) => (
     <>
       <span data-testid={`mm-${lab}-label`} title={title}
-        className="text-[11px] text-ink-low">{lab}</span>
+        data-stale={stale ? "1" : undefined}
+        className="text-[11px] leading-tight text-ink-low">
+        {lab}
+        {/* "model · pre-kickoff", on two lines inside the label column so
+            the three value columns keep their width */}
+        {stale && (
+          <span data-testid="mm-pre-kickoff"
+            className="block whitespace-nowrap text-[8.5px] tracking-[-0.02em] text-ink-faint">
+            <span className="sr-only"> · </span>pre-kickoff
+          </span>)}
+      </span>
       {p
-        ? OUTCOMES.map((k) => (
-          <span key={k} data-testid={`mm-${lab}-${k}`}
-            data-top={top.includes(k) ? "1" : "0"} title={title}
-            className={`text-center text-[12px] ${top.includes(k)
-              ? "font-semibold text-ink-hi" : "text-ink-mid"}`}>
-            {pct1(p[k])}
-          </span>))
+        ? OUTCOMES.map((k) => {
+          const bright = !stale && top.includes(k);
+          return (
+            <span key={k} data-testid={`mm-${lab}-${k}`}
+              data-top={bright ? "1" : "0"} title={title}
+              className={`text-center text-[12px] ${bright
+                ? "font-semibold text-ink-hi"
+                : stale ? "text-ink-faint" : "text-ink-mid"}`}>
+              {pct1(p[k])}
+            </span>);
+        })
         : (
           <span data-testid={`mm-${lab}-empty`} title={title}
-            className="col-span-3 whitespace-nowrap text-[10.5px] text-ink-low">
+            className={`col-span-3 whitespace-nowrap text-[10.5px] ${
+              stale ? "text-ink-faint" : "text-ink-low"}`}>
             {empty}
           </span>)}
     </>
   );
   return (
     <div data-testid="mm-lines" data-verdict={mm.verdict}
+      data-kicked-off={kickedOff ? "1" : "0"}
       className="grid grid-cols-[54px_repeat(3,minmax(0,1fr))_auto] items-baseline gap-x-2 gap-y-1.5 font-mono tabular-nums">
       <span aria-hidden />
       {OUTCOMES.map((k) => (
@@ -161,8 +191,10 @@ export function ModelMarketLines({ mm, home, away, quote }: {
         </span>
       ))}
       <span aria-hidden />
-      {line("model", mm.model, mm.top?.model ?? [], modelTitle(mm),
-        "no model read")}
+      {line("model", mm.model, mm.top?.model ?? [],
+        kickedOff ? `${PRE_KICKOFF_TITLE[0].toUpperCase()}${
+          PRE_KICKOFF_TITLE.slice(1)}. ${modelTitle(mm)}` : modelTitle(mm),
+        "no model read", kickedOff)}
       <span aria-hidden />
       {line("market", mm.market, mm.top?.market ?? [],
         marketTitle(mm, codes, quote), "no full Kalshi book")}
@@ -190,13 +222,29 @@ const VERDICT = {
 } as const;
 
 /** The box beside WATCH, in the WATCH box's own shape. Dashed when the
- *  model has not passed its test. */
-export function VerdictBox({ mm }: { mm: ModelVsMarket }) {
+ *  model has not passed its test. IN PLAY, grey and solid, once the match
+ *  has kicked off — never AGREE or CONFLICT after kickoff. */
+export function VerdictBox({ mm, kickedOff = false }: {
+  mm: ModelVsMarket; kickedOff?: boolean;
+}) {
+  if (kickedOff) {
+    return (
+      <span data-testid="mm-verdict" data-verdict={mm.verdict}
+        data-phase="in_play" data-untested="0"
+        title={`${IN_PLAY_TITLE[0].toUpperCase()}${IN_PLAY_TITLE.slice(1)}: `
+          + "the match has kicked off, and the model line is its read from "
+          + "before kickoff while the market line is live. Shadow, not advice."}
+        className={`${WATCH_BOX} inline-flex items-center gap-1.5 border-solid border-line text-ink-low`}>
+        <i aria-hidden className="h-[5px] w-[5px] rounded-full bg-current" />
+        IN PLAY
+      </span>
+    );
+  }
   const v = VERDICT[mm.verdict] ?? VERDICT.no_model;
   const untested = Boolean(mm.model && mm.model_meta?.status === "untested");
   return (
     <span data-testid="mm-verdict" data-verdict={mm.verdict}
-      data-untested={untested ? "1" : "0"}
+      data-phase="pre_match" data-untested={untested ? "1" : "0"}
       title={`${v.why}${untested ? " Model untested." : ""} A read, never a `
         + "pick: shadow, not advice, and it never moves a card."}
       className={`${WATCH_BOX} inline-flex items-center gap-1.5 ${v.cls} ${

@@ -738,6 +738,22 @@ export function rowIsInPlay(row: { in_play?: boolean }): boolean {
   return row.in_play === true;
 }
 
+/** HAS THIS MATCH KICKED OFF — under way, OR OVER (Son, 2026-10-07: the
+ *  card's model-vs-market verdict stops at kickoff and stays stopped
+ *  until the card leaves the board). Under way is `rowIsInPlay`, the
+ *  backend's own verdict. Over is the provider's own `post`, on the row
+ *  or on its live tape's clock: the board drops a finished match at its
+ *  next assembly, so a row can only say `post` for the length of one
+ *  cached board, and in that window it must not go back to a pre-match
+ *  verdict. Nothing here reads a `pre` state into anything. */
+export function rowHasKickedOff(row: {
+  in_play?: boolean; state?: string | null;
+  live?: { clock?: { match_state?: string | null } | null } | null;
+}): boolean {
+  return rowIsInPlay(row) || row.state === "post"
+    || row.live?.clock?.match_state === "post";
+}
+
 /** ONE CLUB'S OWN LINE off its OWN league's table — picker/stages
  *  .rated_side, verbatim. Every field is a fact about that one club and
  *  none of them is signed against the other side, so a refusal of the
