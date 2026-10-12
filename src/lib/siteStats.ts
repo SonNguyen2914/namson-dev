@@ -15,7 +15,7 @@
 // backend can be down (Railway had no active deployment on 2026-10-12),
 // slow, or answering with something that is not a payload. The page then
 // shows FALLBACK: the four figures as the approved draft baked them on
-// 7 Oct 2026 from this same route (45,500 / 11 / 98,000+ / 12,000+),
+// 7 Oct 2026 from this same route (45,500 / 11 / 1,600+ / 12,000+; markets lowered from 98,000+ on 12 Oct to match the live football-only catalogue),
 // which are floors of true counts under their true labels. Nothing waits
 // on the network: the server renders FALLBACK, the first client render
 // agrees with it (no hydration mismatch), and a good answer replaces
@@ -47,7 +47,7 @@ export type FigureSource = "baked" | "live";
 export const FALLBACK: readonly Figure[] = [
   { key: "matches", display: "45,500", label: "matches studied", sub: "49 competitions since 2010" },
   { key: "competitions", display: "11", label: "competitions" },
-  { key: "markets", display: "98,000+", label: "Kalshi markets tracked" },
+  { key: "markets", display: "1,600+", label: "Kalshi markets tracked" },
   { key: "tests", display: "12,000+", label: "backend test functions" },
 ];
 

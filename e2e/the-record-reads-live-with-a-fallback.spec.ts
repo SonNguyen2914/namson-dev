@@ -8,7 +8,7 @@ import { FALLBACK, mergeStats } from "../src/lib/siteStats";
    The four counts come from GET /api/site/stats (site-stats-v1). The
    backend can be down — Railway had no active deployment the day this
    shipped — and the page then shows the figures the approved draft
-   baked from the same route: 45,500 / 11 / 98,000+ / 12,000+, under
+   baked from the same route: 45,500 / 11 / 1,600+ / 12,000+, under
    their own labels. These specs pin both paths, and that the baked path
    is also what a backend that answers with something that is not a
    payload gets. The hermetic stand-in answers every /api/ read with a
@@ -29,7 +29,7 @@ async function shown(page: import("@playwright/test").Page) {
 const BAKED = [
   { key: "matches", label: "matches studied49 competitions since 2010", value: "45,500" },
   { key: "competitions", label: "competitions", value: "11" },
-  { key: "markets", label: "Kalshi markets tracked", value: "98,000+" },
+  { key: "markets", label: "Kalshi markets tracked", value: "1,600+" },
   { key: "tests", label: "backend test functions", value: "12,000+" },
 ];
 
@@ -98,7 +98,7 @@ test("a zero is never shown for a figure: raw 0 or a display of 0 stays baked", 
     markets: { raw: 0, display: "1,600+" },
     tests: { raw: null, display: null } } });
   expect(z.source).toBe("baked");
-  expect(z.figures.map((f) => f.display)).toEqual(["45,500", "11", "98,000+", "12,000+"]);
+  expect(z.figures.map((f) => f.display)).toEqual(["45,500", "11", "1,600+", "12,000+"]);
 });
 
 /* TODAY'S PAYLOAD, AS THE ROUTE SERVED IT ON 2026-10-12 (trimmed to the

@@ -27,7 +27,7 @@
 // are baked from read-only routes at authoring time (lib/landingData.ts).
 // The record's four counts are read once per visit from GET
 // /api/site/stats (lib/siteStats.ts) and fall back to the figures the
-// approved draft baked from that same route (45,500 / 11 / 98,000+ /
+// approved draft baked from that same route (45,500 / 11 / 1,600+ /
 // 12,000+) when it answers anything but a payload: the page must render
 // with the backend down, and it must never touch the board routes, each
 // of which writes a permanent snapshot row on every read.
