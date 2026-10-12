@@ -942,26 +942,21 @@ const FOLDED_BOARD = {
   },
 };
 
-test("a same-league cup tie is drawn in that league's column, and the cup column is gone", async ({ page }) => {
+// 2026-10-12 — CUP TIES LEFT THE LEAGUE COLUMNS (Son, 2026-10-07, roadmap
+// 05b). The fold above still arrives on the wire, but the landing page no
+// longer draws a cup tie inside a league column: it is reached from the
+// Cups tab, on the cup's own page. The two tests that pinned the folded
+// card (its badge, its data-league) went with it.
+test("a same-league cup tie is NOT drawn in that league's column, and the cup column is still gone", async ({ page }) => {
   await open(page, FOLDED_BOARD);
   await expect(col(page, "leaguescup")).toHaveCount(0);
   const ligamx = col(page, "ligamx");
   await expect(ligamx).toBeVisible();
-  await expect(ligamx.locator('[data-testid="picker-row"]')).toHaveCount(2);
-  await expect(ligamx.getByText("Toluca", { exact: false }).first())
-    .toBeVisible();
-});
-
-test("a folded row still says which competition it is", async ({ page }) => {
-  // the whole reason the fold is safe: these legs settle on 90 minutes
-  // plus stoppage, so a card that read as a plain Liga MX fixture would
-  // carry a wrong assumption straight into the price.
-  await open(page, FOLDED_BOARD);
-  const row = col(page, "ligamx").locator('[data-testid="picker-row"]').first();
-  await expect(row.locator('[data-testid="competition-badge"]'))
-    .toHaveText(/leagues cup/i);
-  await expect(row).toHaveAttribute("data-league", "leaguescup");
-  await expect(row).toHaveAttribute("data-column", "ligamx");
+  await expect(ligamx.locator('[data-testid="picker-row"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="picker-row"][data-league="leaguescup"]'))
+    .toHaveCount(0);
+  // and the page says what it left out, with the count it counted
+  await expect(page.getByTestId("cup-ties-left")).toContainText("2 cup ties");
 });
 
 test("a league fixture gets no competition badge", async ({ page }) => {
@@ -1193,39 +1188,18 @@ test("a Leagues Cup card opens the competition page, not a hub that does not exi
       "href", "/bet-suggester/comp/leagues-cup");
   });
 
-test("a folded cup card in a league column still opens the cup's page",
-  async ({ page }) => {
-    await open(page, FOLDED_BOARD);
-    const row = col(page, "ligamx").getByTestId("picker-row").first();
-    await expect(row).toHaveAttribute("data-league", "leaguescup");
-    await expect(wayIn(row)).toHaveAttribute(
-      "href", "/bet-suggester/comp/leagues-cup");
-  });
-
-test("a folded cup card keeps its OWN settlement note — the league header "
-   + "must not claim it for the column", async ({ page }) => {
-    // THE CLAUSE THAT KEEPS A HOISTED NOTE HONEST (2026-09-09). Moving a
-    // note to the column header is only true when the note is the
-    // COLUMN'S. `reg_time_note` belongs to a COMPETITION, and a Leagues
-    // Cup tie between two Liga MX clubs is drawn in the LIGA MX column
-    // because that table describes it completely — so hoisting it there
-    // would print "the price is 90 minutes, not the tie" over cards that
-    // settle outright, a false sentence over ten rows to save ink on
-    // one. `columnNotes` skips every row whose league is not the
-    // column's, and this is that skip: the fact is about THIS FIXTURE,
-    // so it stays on THIS FIXTURE's card — the operator's rule read from
-    // its other side.
+test("a league column claims no cup's settlement note — the cup ties it "
+   + "would describe are not drawn in it", async ({ page }) => {
+    // THE CLAUSE THAT KEEPS A HOISTED NOTE HONEST (2026-09-09): a
+    // `reg_time_note` belongs to a COMPETITION, never to the column a
+    // fold put its ties in. Since 2026-10-12 those ties are not drawn in
+    // the league column at all, so neither the column header nor any
+    // card in it may carry the cup's note.
     await open(page, FOLDED_BOARD);
     const mx = col(page, "ligamx");
-    await expect(mx.getByTestId("picker-row")).toHaveCount(2);
-    await expect(mx.getByTestId("picker-row").first())
-      .toHaveAttribute("data-league", "leaguescup");
-    // no header affordance — this column has no note of its own to give
+    await expect(mx).toBeVisible();
     await expect(colHead(page, "ligamx").getByTestId("col-notes-open")).toHaveCount(0);
-    // and the note is still on each folded card, in the backend's words
-    await expect(mx.getByTestId("reg-time-note")).toHaveCount(2);
-    await expect(mx.getByTestId("reg-time-note").first())
-      .toContainText(/regulation time only/i);
+    await expect(mx.getByTestId("reg-time-note")).toHaveCount(0);
   });
 
 test("a league card keeps its hub link", async ({ page }) => {

@@ -76,6 +76,7 @@ import {
   BOARD_RETRY_DELAY_MS, Board, BoardTimeout, CUP_COMP_KEY, DEFAULT_DAYS,
   SEASON_BLEND_K, THIN_ASK_SIZE,
   WIDE_SPREAD_C, askHonoured, boardColumns, columnsOf, declarationOf,
+  isFoldedCupTie,
   fetchBoard, fetchChampionships, leagueLabel,
   nationalColumn, venueAdjusted,
 } from "../../lib/pickerApi";
@@ -92,8 +93,10 @@ import { failureSentence, readFailure } from "../../lib/providerFailure";
 import { Eyebrow } from "../../components/ui";
 import { ArchiveMenu } from "../../components/ArchiveMenu";
 import {
-  BoardMode, BoardModeSwitch,
+  BoardMode, BoardModeSwitch, boardModeFrom,
 } from "../../components/BoardModeSwitch";
+import { CupsTab } from "../../components/CupsTab";
+import { CUPS_WITH_PAGES } from "../../lib/cupsTab";
 import { ColumnChooser } from "../../components/ColumnChooser";
 import { CompRail } from "../../components/CompRail";
 import LiveSection from "../../components/LiveCard";
@@ -192,7 +195,11 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      board narrowed to one column; it is Leagues by construction and
      starts there without waiting on storage. */
   const [mode, setMode] = useState<BoardMode | null>(only ? "leagues" : null);
-  const champ = mode === "championships";
+  /* `champ` is the NATIONS board (UI name since 2026-10-12; its data is
+     still GET /api/championships/*). `cups` is the Cups tab, which reads
+     no board at all — see components/CupsTab.tsx. */
+  const champ = mode === "nations";
+  const cups = mode === "cups";
   useEffect(() => {
     if (only) return;
     let remembered: string | null = null;
@@ -201,7 +208,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
          e2e/missing-is-not-zero.spec.ts with its closes_when. */
     }
     const t = setTimeout(() => {
-      setMode(remembered === "championships" ? "championships" : "leagues");
+      setMode(boardModeFrom(remembered));
     }, 0);
     return () => clearTimeout(t);
   }, [only]);
@@ -317,13 +324,16 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      the fetch — does not change on every render. */
   const ask = only ? [...only].join(",") : "";
   const load = useCallback(async (signal: AbortSignal) => {
-    if (mode === null) return;
+    /* THE CUPS TAB ASKS FOR NO BOARD. It is a list of the cup pages that
+       already exist; reading either board behind it would be a request
+       whose answer nothing draws. */
+    if (mode === null || mode === "cups") return;
     setLoading(true);
     setBuilding(false);
     /* ONE ROUTE PER MODE, NEVER BOTH. The Leagues read is the string it
        has always been; the Championships read is its own route, which
        writes nothing. e2e/championships-board.spec.ts counts both. */
-    const read = () => mode === "championships"
+    const read = () => mode === "nations"
       ? fetchChampionships(days, signal)
       : fetchBoard(days, signal, ask === "" ? undefined : ask.split(","));
     try {
@@ -369,6 +379,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   useEffect(() => {
     if (deepLink !== null) return;        // redirecting; do not fetch
     if (mode === null) return;            // the remembered board is not read yet
+    if (mode === "cups") return;          // the Cups tab reads no board
     const ac = new AbortController();
     // async, not called sync in the effect body, so every setState inside
     // load() lands in a callback rather than cascading a render
@@ -395,7 +406,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
       /* THE CHAMPIONSHIPS BOARD ASKS ITS OWN REVIEW (2026-09-27): the
          national finished tail, read from the match archive. It is not
          the club board's route and it writes nothing. */
-      const r = mode === "championships"
+      const r = mode === "nations"
         ? await fetchChampionshipsReview(back, signal)
         : await fetchReview(back, signal,
                             ask === "" ? undefined : ask.split(","));
@@ -422,7 +433,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
        the Championships board asked for none and every national tail
        said it was never asked; GET /api/championships/review now serves
        the national one, off the match archive. */
-    if (mode === null) return;
+    if (mode === null || mode === "cups") return;
     const ac = new AbortController();
     const t = setTimeout(() => { void loadReview(ac.signal); }, 0);
     return () => { clearTimeout(t); ac.abort(); };
@@ -434,18 +445,38 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      the backend's when it serves one, the interim venue-adjusted Elo gap
      otherwise — which can name the other side the favourite, and then
      the whole row is read from that side. The club board is untouched. */
-  const rows = champ ? (board?.rows ?? []).map(venueAdjusted)
-    : board?.rows ?? [];
+  /* ── CUP TIES LEAVE THE LEAGUE COLUMNS (Son, 2026-10-07, roadmap 05b) ──
+
+     A cup tie used to be drawn inside a league column when the backend
+     folded it there: an EFL Cup tie between two Premier League clubs in
+     the EPL column, the Campeones Cup in both MLS and Liga MX
+     (`tables.FOLDED_INTO_COLUMNS`). The Leagues board is LEAGUE fixtures
+     now; cup ties are reached from the Cups tab, on the cup's own page.
+
+     The test is structural, not a slug list: a row is a cup tie in a
+     league column when the competition it IS (`league`) is none of the
+     columns it is drawn in (`columnsOf`). A league fixture is always in
+     its own column, so it can never match. Only the full Leagues board
+     drops them — a narrowed cup route (`/ucl`, `/efl-cup`) is the cup's
+     own page and keeps every row it was served. The backend payload is
+     unchanged; this is which rows the page draws. */
+  const dropCupTies = !champ && !only;
+  const keepRow = (r: Parameters<typeof isFoldedCupTie>[0]) =>
+    !dropCupTies || !isFoldedCupTie(r);
+  const allRows = board?.rows ?? [];
+  const rows = champ ? allRows.map(venueAdjusted) : allRows.filter(keepRow);
+  const cupTiesLeft = allRows.length - rows.length
+    + (board?.refusals ?? []).filter((r) => !keepRow(r)).length;
   /* the menu's own case: every other option is lower-case words, and the
      backend serves the label as the card prints it ("ELO GAP") */
   const headlineLabel = (rows.find((r) => r.headline)?.headline?.label
     ?? "headline gap").toLowerCase();
-  const refusals = board?.refusals ?? [];
+  const refusals = (board?.refusals ?? []).filter(keepRow);
   const leaguesMap = board?.leagues ?? {};
 
   const reviewHere = reviewFor === mode ? review : null;
-  const finished = reviewHere?.finished ?? [];
-  const finishedRefusals = reviewHere?.refusals ?? [];
+  const finished = (reviewHere?.finished ?? []).filter(keepRow);
+  const finishedRefusals = (reviewHere?.refusals ?? []).filter(keepRow);
   const reviewLeagues = reviewHere?.leagues ?? {};
   /* THE WHOLE-BOARD FAILURE, SCREENED. `restructure.spec.ts` already
      keeps the browser's raw vocabulary off this box ("a dead network
@@ -1252,7 +1283,9 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
               ragged edges instead of one shape. */}
           <div className="flex flex-wrap items-baseline justify-center gap-x-4 gap-y-1">
             <Eyebrow tone="accent">
-              {champ ? "championships · national teams" : "picker · stage 1 + stage 2"}
+              {champ ? "nations · national teams"
+                : cups ? "cups · club competitions"
+                : "picker · stage 1 + stage 2"}
             </Eyebrow>
             {/* ONE HUE LOOKUP, HERE TOO (2026-09-22). These four lights
                 used to build `var(--lg-${slug})` by concatenation, which
@@ -1275,6 +1308,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   day — the Asian Cup out, the Gulf Cup in, the Gulf Cup
                   out. None before the payload lands. */}
               {(champ ? columnSlugs
+                : cups ? CUPS_WITH_PAGES
                 : ["mls", "epl", "laliga", "ligamx"] as const).map((s2) => (
                 <i key={s2} data-testid="hero-light" data-slug={s2}
                   className="h-1.5 w-1.5 rounded-full"
@@ -1337,6 +1371,8 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             className="text-center text-[13px] leading-relaxed text-ink-low max-md:pt-2">
             {champ
               ? "Ranked by how far apart the two national teams sit on their competition's own field, home ground counted."
+              : cups
+              ? "The cup competitions, each on its own page. A cup tie is read there, not in a league column."
               : soleOwnSort
               ? `Ranked by ${soleOwnSort.mode} — nearly every tie here pairs two different domestic tables, and the gap between them is withheld.`
               : "Ranked by how far apart the two clubs sit in their own league's table."}
@@ -1362,6 +1398,22 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
           )}
         </div>
 
+        {/* THE CUPS TAB (2026-10-12) replaces everything from here to the
+            legend: it is a list of cup pages, not a board, so the board's
+            provenance, watch panel, columns and legend have nothing to say
+            about it. Nothing below is fetched while it is shown. */}
+        {cups ? <CupsTab /> : (<>
+        {cupTiesLeft > 0 && (
+          <p data-testid="cup-ties-left"
+            className="mt-3 text-center font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+            {cupTiesLeft} cup tie{cupTiesLeft === 1 ? "" : "s"} in this window
+            {cupTiesLeft === 1 ? " is" : " are"} not in these league columns ·{" "}
+            <button type="button" onClick={() => chooseMode("cups")}
+              className="uppercase text-ink-mid underline decoration-line underline-offset-2 hover:text-ink-hi">
+              see the cups tab
+            </button>
+          </p>
+        )}
         {/* ------------------------- controls ------------------------- */}
         {/* ── THE PROVENANCE, ONE LINE ON A PHONE (operator,
             2026-09-16) ──────────────────────────────────────────────
@@ -2336,6 +2388,8 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             </div>
           </dl>
         </Collapse>
+        </>
+        )}
 
         <footer className="mt-16 border-t border-line pt-6 font-mono text-[11px] leading-relaxed text-ink-faint">
           Research surface. The picker ranks and annotates; it sets no

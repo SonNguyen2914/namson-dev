@@ -1358,29 +1358,45 @@ const DIM_WORD: Record<string, string> = {
   ovr: "overall", atk: "attack", def: "defence",
 };
 
-/** The landing board, with whatever row list a test needs. Every route
+/** THE NARROWED BOARD, with whatever row list a test needs. Every route
  *  is served; an unmatched `/api/` answers 599 rather than reaching a
- *  live backend. */
+ *  live backend.
+ *
+ *  WHY /bet-suggester/ucl AND NOT THE LANDING PAGE (2026-10-12). Until
+ *  then these cards were drawn on the landing page, folded into the MLS
+ *  and Liga MX columns. Son's 2026-10-07 decision took cup ties OUT of
+ *  the league columns (e2e/board-cups-tab.spec.ts), so the landing page
+ *  no longer draws this fixture at all. What this section guards is the
+ *  CARD — how a partial field block is drawn — and that card is still
+ *  drawn wherever a cup row has a column of its own. So the recorded
+ *  rows are served on the narrowed board, every one of them re-columned
+ *  into its single column; the rows themselves, and their blocks, are
+ *  the recording's. */
+const ONE_COLUMN = "ucl";
 async function openFolded(page: import("@playwright/test").Page,
                           rows: unknown[] = CAMPEONES_PARTIAL_BOARD.rows,
                           board: object = CAMPEONES_PARTIAL_BOARD) {
+  const recolumned = (rows as Record<string, unknown>[]).map((r) => ({
+    ...r, column: ONE_COLUMN, columns: [ONE_COLUMN] }));
   await page.route("**/api/**", (r) =>
     r.fulfill(json({ detail: "unmocked route" }, 599)));
   await page.route("**/api/picker/board**", (r) =>
-    r.fulfill(json({ ...board, rows })));
+    r.fulfill(json({ ...board, rows: recolumned, narrowed_to: [ONE_COLUMN],
+                     leagues: { [ONE_COLUMN]: { ...meta, kind: "league",
+                                                 rated_on: undefined } } })));
   await page.route("**/api/picker/review**", (r) =>
     r.fulfill(json(REVIEW_EMPTY)));
   await page.route("**/api/comp/**", (r) => r.fulfill(json({ fixtures: [] })));
   await page.route("**/api/bet-suggester/watched-strip**", (r) =>
     r.fulfill(json(STRIP_EMPTY)));
-  await page.goto("/bet-suggester");
+  await page.goto("/bet-suggester/ucl");
   await expect(page.getByTestId("picker-row").first()).toBeVisible();
 }
 
-/** The fixture's card AS DRAWN IN one column. It rides in two —
- *  `FOLDED_INTO_COLUMNS` — and both must draw the same reading. */
-const foldedCard = (page: import("@playwright/test").Page, slug: string) =>
-  page.locator(`[data-testid="league-col"][data-league="${slug}"]`)
+/** The fixture's card AS DRAWN IN its column (see `openFolded`; the
+ *  slug argument is kept for the call sites, and is that column). */
+const foldedCard = (page: import("@playwright/test").Page) =>
+  page.locator(`[data-testid="league-col"][data-league="${ONE_COLUMN}"]`)
     .locator(`[data-testid="picker-row"][data-event="${P_ROW.event_id}"]`);
 
 /** The span the trio's three cells hang off — the one that carries the
@@ -1443,7 +1459,7 @@ test("the axes the block carries are drawn exactly as a three-axis "
        card with the data behind it substituted; this is that same card
        with a shorter list of axes behind it, and nothing else. */
     await openFolded(page);
-    const c = foldedCard(page, "mls");
+    const c = foldedCard(page);
     await expect(c).toBeVisible();
 
     // it says which ladder it is reading, and which axes of it
@@ -1474,12 +1490,6 @@ test("the axes the block carries are drawn exactly as a three-axis "
     // and its cell is coloured by the FIELD's gap, not by the row's
     await expect(c.locator('[data-testid="tier-cell"][data-dim="overall"]'))
       .toHaveAttribute("data-gap", String(P_BLOCK.axes.ovr.tier_gap));
-
-    // both columns it rides in draw the same reading — it is one fixture
-    const other = foldedCard(page, "ligamx");
-    await expect(other).toHaveAttribute("data-field-axes", P_HAS.join(","));
-    await expect(other.getByTestId("rank-pair")).toHaveText(
-      `#${P_BLOCK.axes.ovr.fav.rank} v #${P_BLOCK.axes.ovr.opp.rank}`);
   });
 
 test("the straddle dagger still fires on a partial block — the mark says "
@@ -1494,7 +1504,7 @@ test("the straddle dagger still fires on a partial block — the mark says "
     expect(opp.straddles).toBe(true);
     expect(WIDE_PARTIAL.axes.ovr.fav.straddles).toBe(false);
     await openFolded(page, [{ ...P_ROW, field_partial: WIDE_PARTIAL }]);
-    const ovr = foldedCard(page, "mls").locator('[data-tier="ovr"]');
+    const ovr = foldedCard(page).locator('[data-tier="ovr"]');
     // the POINT tier is printed, and the dagger beside it says that
     // point is not a placement the evidence will narrow to
     expect((await ovr.textContent())!.replace(/\s+/g, "")).toBe(
@@ -1520,7 +1530,7 @@ test("the one axis a partial block HAS is drawn with its number, "
        So: the same block, from a backend that carries the pair. */
     const ax = WIDE_PARTIAL_MEASURED.axes.ovr;
     await openFolded(page, [{ ...P_ROW, field_partial: WIDE_PARTIAL_MEASURED }]);
-    const ovr = foldedCard(page, "mls").locator('[data-tier="ovr"]');
+    const ovr = foldedCard(page).locator('[data-tier="ovr"]');
 
     // the figure is drawn, on the scale the AXIS declares it is on
     const m = ovr.locator('[data-measure="ovr"]');
@@ -1556,7 +1566,7 @@ test("a partial block from a backend that predates the measurement draws "
        rather than a club whose elo is 0.00. */
     expect("value" in WIDE_PARTIAL.axes.ovr.fav).toBe(false);
     await openFolded(page, [{ ...P_ROW, field_partial: WIDE_PARTIAL }]);
-    const c = foldedCard(page, "mls");
+    const c = foldedCard(page);
     await expect(c.locator("[data-measure]")).toHaveCount(0);
     // the band is still drawn — an absent figure removes a line, not the axis
     await expect(c.locator('[data-tier="ovr"]')).toHaveCount(1);
@@ -1578,7 +1588,7 @@ test("an axis the block does not carry is drawn nowhere — not as an "
        reassembled inside the mark that replaced it. */
     expect(P_ABSENT.length).toBeGreaterThan(0);
     await openFolded(page);
-    const c = foldedCard(page, "mls");
+    const c = foldedCard(page);
 
     for (const k of P_ABSENT) {
       await expect(c.locator(`[data-tier="${k}"]`)).toHaveCount(0);
@@ -1635,7 +1645,7 @@ test("the axes nobody measured are NAMED, in the backend's own words, "
        it; restated here it would be this surface asserting a
        measurement it never made. */
     await openFolded(page);
-    const c = foldedCard(page, "mls");
+    const c = foldedCard(page);
     const trigger = c.getByTestId("field-ranks-open");
 
     // the affordance says there is something missing before it is opened
@@ -1692,7 +1702,7 @@ test("the shape chip is the ROW's own backend shape — the block carries "
        from one measured gap and two absences would be a sentence about
        the fixture that no measurement stands behind. */
     await openFolded(page);
-    const c = foldedCard(page, "mls");
+    const c = foldedCard(page);
     /* THE CARD IS READING THE FIELD, asserted first and not assumed. A
        card that ignored `field_partial` altogether would also print the
        row's shape — that is the no-field path — so without this line
@@ -1722,13 +1732,13 @@ test("the `i` that explains a shape is not drawn on a partial card "
        measures neither would put two within-league quintiles into a
        sentence about a cross-league fixture. */
     await openFolded(page);
-    const c = foldedCard(page, "mls");
+    const c = foldedCard(page);
     await expect(c.getByTestId("field-ranks-open")).toHaveCount(1);
     await expect(c.getByTestId("tier-read")).toHaveCount(0);
     // and an ordinary league card on the same board keeps it — the
     // control that stops this becoming "no `i` anywhere"
     const league = page
-      .locator('[data-testid="league-col"][data-league="mls"]')
+      .locator(`[data-testid="league-col"][data-league="${ONE_COLUMN}"]`)
       .locator('[data-testid="picker-row"]:not([data-field])');
     await expect(league.first().getByTestId("tier-read")).toHaveCount(1);
     await expect(league.first().getByTestId("field-ranks-open"))
@@ -1753,7 +1763,7 @@ test("a block with no OVERALL axis keeps the card's league ranks rather "
       shape_absent: { ...P_BLOCK.shape_absent, axes_absent: ["ovr", "def"] },
     };
     await openFolded(page, [{ ...P_ROW, field_partial: moved }]);
-    const c = foldedCard(page, "mls");
+    const c = foldedCard(page);
     await expect(c).toBeVisible();
     await expect(c).toHaveAttribute("data-field-axes", "atk");
     // the ranks fall back to the row's own two league positions, and the
@@ -1788,7 +1798,7 @@ test("the Campeones Cup ARRIVES WHOLE now — re-recorded 2026-09-25, its "
     expect(CAMPEONES_FIELD_ROW.favourite).toBe(W.clubs.fav);
 
     await openFolded(page, CAMPEONES_FIELD_BOARD.rows, CAMPEONES_FIELD_BOARD);
-    for (const slug of ["mls", "ligamx"]) {
+    for (const slug of [ONE_COLUMN]) {
       const c = page.locator(`[data-testid="league-col"][data-league="${slug}"]`)
         .locator(`[data-testid="picker-row"][data-event="${CAMPEONES_FIELD_ROW.event_id}"]`);
       await expect(c).toBeVisible();

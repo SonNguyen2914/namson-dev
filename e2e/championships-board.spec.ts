@@ -89,7 +89,7 @@ test.describe("the Championships board", () => {
       await page.goto("/bet-suggester");
       await page.waitForSelector('[data-testid="league-col"][data-league="epl"]');
       const boardBefore = calls.board;
-      await page.click('[data-testid="board-mode-championships"]');
+      await page.click('[data-testid="board-mode-nations"]');
       await page.waitForSelector('[data-testid="league-col"][data-league="unl"]');
       await expect(page.locator('[data-testid="league-col"][data-league="epl"]'))
         .toHaveCount(0);
@@ -105,11 +105,11 @@ test.describe("the Championships board", () => {
     await routeBoth(page);
     await page.goto("/bet-suggester");
     await page.waitForSelector('[data-testid="league-col"]');
-    await page.click('[data-testid="board-mode-championships"]');
+    await page.click('[data-testid="board-mode-nations"]');
     await page.waitForSelector('[data-testid="league-col"][data-league="unl"]');
     await page.reload();
     await page.waitForSelector('[data-testid="league-col"][data-league="unl"]');
-    await expect(page.locator('[data-testid="board-mode-championships"]'))
+    await expect(page.locator('[data-testid="board-mode-nations"]'))
       .toHaveAttribute("aria-pressed", "true");
   });
 

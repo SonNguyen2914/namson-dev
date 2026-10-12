@@ -1,8 +1,5 @@
 import { expect, test } from "@playwright/test";
 import { CAMPEONES_BOARD } from "./campeones-board";
-// the SAME day-key function the board groups by, so this file can never
-// disagree with the page about which band a kickoff belongs to
-import { localDay as localDayOf } from "../src/lib/matchday";
 
 /* ONE FIXTURE, TWO COLUMNS, AND A FAVOURITE REFUSED BY NAME.
  *
@@ -37,6 +34,18 @@ import { localDay as localDayOf } from "../src/lib/matchday";
  *      comparison cells print `refused`, and what was MEASURED is
  *      filled. `sides` is what makes that possible here.
  *
+ * 2026-10-12 — CUP TIES LEFT THE LEAGUE COLUMNS. Son's naming decision
+ * of 2026-10-07 (roadmap 05b) reversed property 1: the landing page no
+ * longer draws a cup tie inside a league column, so this fixture is now
+ * drawn in NEITHER, and the page says how many cup ties it left out
+ * (e2e/board-cups-tab.spec.ts). The tests that pinned the fold itself —
+ * one card per declared column, its `+1` chip, "also in", the same event
+ * twice — went with it. Properties 3 and 4 are about the CARD, which is
+ * still drawn wherever a cup row has a column of its own, so they run on
+ * the narrowed board (`/bet-suggester/ucl`) with the recorded refusal
+ * re-columned into that one column; the refusal itself is the
+ * recording's.
+ *
  * Hermetic: the payload is the backend's own, recorded in
  * `campeones-board.ts`, and every route is served below. An unmatched
  * `/api/` request fails the test rather than reaching production.
@@ -61,21 +70,40 @@ const ROW = CAMPEONES_BOARD.refusals[0];
 /** ITS DECLARED COLUMNS, DERIVED. Every expectation below iterates this
  *  — the seven subset-blind guards found in three days were all a list
  *  typed beside the thing it was supposed to be checking. */
-const COLS: readonly string[] = ROW.columns;
+const FOLDED_COLS: readonly string[] = ROW.columns;
+/** The one column the CARD tests draw it in — see the header. */
+const ONE_COLUMN = "ucl";
+const COLS: readonly string[] = [ONE_COLUMN];
 
-async function open(page: import("@playwright/test").Page) {
+/** THE CARD, on the narrowed board: every recorded row and refusal
+ *  re-columned into the one column, and the board saying it answered
+ *  the narrowed ask. */
+const CARD_BOARD = (() => {
+  const into = (r: Record<string, unknown>) =>
+    ({ ...r, column: ONE_COLUMN, columns: [ONE_COLUMN] });
+  const b = CAMPEONES_BOARD as unknown as {
+    leagues: Record<string, unknown>; rows: Record<string, unknown>[];
+    refusals: Record<string, unknown>[];
+  };
+  return { ...CAMPEONES_BOARD, narrowed_to: [ONE_COLUMN],
+           leagues: { [ONE_COLUMN]: b.leagues.mls },
+           rows: b.rows.map(into), refusals: b.refusals.map(into) };
+})();
+
+async function open(page: import("@playwright/test").Page,
+                    landing = false) {
   const stray: string[] = [];
   await page.route("**/api/**", (r) => {
     stray.push(r.request().url());
     return r.fulfill(json({ detail: "unmocked route" }, 599));
   });
   await page.route("**/api/picker/board**", (r) =>
-    r.fulfill(json(CAMPEONES_BOARD)));
+    r.fulfill(json(landing ? CAMPEONES_BOARD : CARD_BOARD)));
   await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW)));
   await page.route("**/api/comp/**", (r) => r.fulfill(json({ fixtures: [] })));
   await page.route("**/api/bet-suggester/watched-strip**", (r) =>
     r.fulfill(json(STRIP)));
-  await page.goto("/bet-suggester");
+  await page.goto(landing ? "/bet-suggester" : "/bet-suggester/ucl");
   // the board has rendered before anything is asserted about it
   await expect(page.getByTestId("picker-row").first()).toBeVisible();
   return () => stray;
@@ -87,36 +115,24 @@ const col = (page: import("@playwright/test").Page, slug: string) =>
 const cardIn = (page: import("@playwright/test").Page, slug: string) =>
   col(page, slug).getByTestId("picker-refusal");
 
-// ───────────────────────────────── 1. the row is in BOTH columns ─────
+// ─────────────── 1. the row is in NO league column (2026-10-12) ──────
 
-test("the fixture is drawn in every column it declares, and in no other",
-  async ({ page }) => {
-    await open(page);
-    // it is IN each declared column …
-    for (const slug of COLS) {
+test("the cup tie is drawn in none of the league columns it was folded "
+  + "into, and the page says it left one out", async ({ page }) => {
+    await open(page, true);
+    for (const slug of FOLDED_COLS) {
+      await expect(col(page, slug), `the ${slug} column is drawn`).toHaveCount(1);
       await expect(cardIn(page, slug),
-        `the fixture declares column "${slug}" and is not drawn there`)
-        .toHaveCount(1);
-      await expect(cardIn(page, slug)).toContainText(ROW.home);
-      await expect(cardIn(page, slug)).toContainText(ROW.away);
+        `the cup tie is still drawn in the ${slug} column`).toHaveCount(0);
     }
-    // … and nowhere else on the board. DERIVED: every column the page
-    // actually drew, minus the ones the row asked for.
-    const drawn = await page.locator('[data-testid="league-col"]')
-      .evaluateAll((els) => els.map((e) => e.getAttribute("data-league") ?? ""));
-    expect(drawn.length, "the board drew no columns at all").toBeGreaterThan(0);
-    for (const slug of drawn.filter((s) => !COLS.includes(s))) {
-      await expect(cardIn(page, slug),
-        `the fixture does not declare "${slug}" but is drawn there`)
-        .toHaveCount(0);
-    }
-    // TOTAL COUNT, so a card appearing twice inside ONE column cannot
-    // pass the per-column checks above.
-    await expect(page.getByTestId("picker-refusal")).toHaveCount(COLS.length);
+    await expect(page.locator(`[data-event="${ROW.event_id}"]`)).toHaveCount(0);
+    // the league fixtures beside it are untouched
+    await expect(page.getByTestId("picker-row").first()).toBeVisible();
+    await expect(page.getByTestId("cup-ties-left")).toContainText("1 cup tie");
   });
 
 test("a folded competition draws NO column of its own", async ({ page }) => {
-  await open(page);
+  await open(page, true);
   /* `campeones` is in neither `BOARD_COLUMNS` nor the payload's
      `leagues` map, which IS the column set. A fifth column here would
      be the page inventing a declaration the operator did not make
@@ -126,130 +142,6 @@ test("a folded competition draws NO column of its own", async ({ page }) => {
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-league")));
   expect(drawn.sort()).toEqual(Object.keys(CAMPEONES_BOARD.leagues).sort());
 });
-
-test("each column numbers its own ladder, and the folded row is in "
-  + "neither", async ({ page }) => {
-    await open(page);
-    /* Rank is assigned per column over that column's filtered list. A
-       refused row is not in the ladder at all, so the ranked card in
-       each column keeps `01` — the folded row must not consume a
-       number, and must not renumber the column it joined. */
-    for (const slug of COLS) {
-      await expect(col(page, slug).getByTestId("picker-row")).toHaveCount(1);
-      /* THE SLOT WHERE `01` WOULD GO SAYS WHY THERE IS NO NUMBER. It
-         read the words "rank refused" until 2026-09-15 — a third copy of
-         a fact the `#refused` tag beside it and the axes row below it
-         both carry. It carries the REASON now, which is what neither of
-         them says; the status is still in words on the tag, and the
-         ladder sentence is still in the slot's own hover. What may never
-         come back is a POSITION: a refused row is not in the ladder. */
-      const slot = col(page, slug).getByTestId("refused-rank");
-      await expect(slot.getByTestId("refusal-reason")).toHaveCount(1);
-      // the reason in a reader's words since 2026-10-07; the code rides
-      // the hover and `data-reason`
-      await expect(slot).toHaveText(/no shared ladder/i);
-      await expect(slot.getByTestId("refusal-reason"))
-        .toHaveAttribute("data-reason", ROW.reason);
-      expect(await slot.getAttribute("title"))
-        .toContain("no position in the day's ladder");
-      // `#refused` retired 2026-10-07 — the plain-words reason above is
-      // the card's one status chip
-      await expect(col(page, slug).getByTestId("refused-tag")).toHaveCount(0);
-      // and the ranked card in this column keeps `01` — the folded row
-      // consumed no number and renumbered nothing
-      await expect(col(page, slug).getByTestId("row-rank")).toHaveCount(1);
-      await expect(col(page, slug).getByTestId("row-rank")).toHaveText("01");
-    }
-  });
-
-test("both copies sit in the fixture's own matchday band, beside a "
-  + "ranked card", async ({ page }) => {
-    await open(page);
-    const day = localDayOf(ROW.kickoff);
-    for (const slug of COLS) {
-      const band = col(page, slug)
-        .locator(`[data-testid="day-track"][data-day="${day}"]`);
-      await expect(band.getByTestId("picker-refusal")).toHaveCount(1);
-      await expect(band.getByTestId("picker-row")).toHaveCount(1);
-      // never swept into the undated foot block
-      await expect(col(page, slug).getByTestId("refusals")).toHaveCount(0);
-    }
-  });
-
-// ─────────────────────────── 2. it reads as ONE fixture, not two ─────
-
-test("the card says it is one fixture in two columns, and names the "
-  + "other one — from the payload, not from this file", async ({ page }) => {
-    await open(page);
-    for (const slug of COLS) {
-      const others = COLS.filter((c) => c !== slug);
-      /* THE FOLD MARKER IS A CHIP NOW, in Stage 2's row beside the
-         circled i — `+1`, with the declared set still riding as data and
-         the columns named in its hover. The paragraph it replaced said
-         "One fixture, drawn in 2 columns — MLS and Liga MX… listed again
-         and not played again", a second copy of what the competition
-         badge two lines up already says in the chip row where a reader
-         first meets the card. What may not be lost is the SET, and it is
-         asserted off the payload rather than off the cards found. */
-      const note = cardIn(page, slug).getByTestId("folded-into");
-      await expect(note).toHaveCount(1);
-      await expect(note).toHaveAttribute("data-columns", COLS.join(" "));
-      await expect(note).toHaveText(`+${COLS.length - 1}`);
-      expect(await note.getAttribute("title"))
-        .toBe(`this fixture is drawn in ${
-          COLS.map((c) => c === "mls" ? "MLS" : "Liga MX").join(" and ")}`);
-      // WHERE THIS CARD IS stayed on the card itself, which is where it
-      // was always the more reliable fact — `data-drawn-in` duplicated it
-      await expect(cardIn(page, slug)).toHaveAttribute("data-column", slug);
-      // and the OTHER column is named IN WORDS, in the chip row, which is
-      // the copy that survives a screenshot and a reader who never hovers
-      const badge = cardIn(page, slug).getByTestId("competition-badge");
-      await expect(badge).toHaveAttribute("data-also-in", others.join(" "));
-      await expect(badge).toContainText("also in");
-      await expect(badge).toContainText(
-        others.map((c) => c === "mls" ? "MLS" : "Liga MX").join(" + "));
-      // "one fixture, not one per column" is still said, on the badge
-      expect(await badge.getAttribute("title"))
-        .toContain("It is ONE fixture listed in both, not one fixture per "
-          + "column.");
-    }
-  });
-
-test("the two cards are the same EVENT, and each says which column it "
-  + "is in", async ({ page }) => {
-    await open(page);
-    const seen: string[] = [];
-    for (const slug of COLS) {
-      const card = cardIn(page, slug);
-      // the identity that proves "one fixture": the same event id
-      await expect(card).toHaveAttribute("data-event", ROW.event_id);
-      await expect(card).toHaveAttribute("data-columns", COLS.join(" "));
-      // WHERE THIS CARD IS. It read `r.column` — the row's FIRST column
-      // — until #136, so the copy in the second column claimed to be in
-      // the first.
-      await expect(card).toHaveAttribute("data-column", slug);
-      seen.push(slug);
-    }
-    expect(seen).toEqual([...COLS]);
-  });
-
-test("the competition badge names the column the card is actually in",
-  async ({ page }) => {
-    await open(page);
-    for (const slug of COLS) {
-      const badge = cardIn(page, slug).getByTestId("competition-badge");
-      await expect(badge).toHaveCount(1);
-      /* The title used to be built from `r.column`, so the Liga MX copy
-         said "shown in the MLS column". `toHaveAttribute` retries for
-         15s and would wait out a transient — this value never changes
-         after hydration, so a retry can only confirm it. */
-      const title = await badge.getAttribute("title");
-      expect(title).toContain("Campeones Cup fixture, shown in the");
-      expect(title).toContain(slug === "mls" ? "MLS column"
-        : "Liga MX column");
-      expect(title).toContain("ONE fixture listed in both");
-    }
-  });
 
 // ──────────────────────────── 3. no raw null reaches the reader ──────
 
@@ -618,13 +510,12 @@ test("no league slug reaches the reader where this card names a "
        that escaped. Sweeping those would make this guard fail on the
        evidence it exists to keep. Every element below is one this file's
        own code builds out of `leagueLabel`. */
-    const slugs = [ROW.league, ...COLS,
+    const slugs = [ROW.league, ...FOLDED_COLS,
                    ROW.sides.home.rated_in, ROW.sides.away.rated_in];
     for (const slug of COLS) {
       const card = cardIn(page, slug);
       const parts: string[] = [];
-      for (const id of ["competition-badge", "folded-into",
-                        "refused-rank-pair"]) {
+      for (const id of ["competition-badge", "refused-rank-pair"]) {
         const el = card.getByTestId(id);
         await expect(el, `${id} is missing`).toHaveCount(1);
         parts.push((await el.textContent()) ?? "");

@@ -30,9 +30,9 @@ export const NO_MODEL_HUBS = {
   seriea: { hex: "#7bd943", board: "leagues" },
   ligue1: { hex: "#c86ef5", board: "leagues" },
   eredivisie: { hex: "#ff7a2e", board: "leagues" },
-  unl: { hex: "#8192fd", board: "championships" },
-  cnl: { hex: "#ed5edf", board: "championships" },
-  afcon: { hex: "#e699cc", board: "championships" },
+  unl: { hex: "#8192fd", board: "nations" },
+  cnl: { hex: "#ed5edf", board: "nations" },
+  afcon: { hex: "#e699cc", board: "nations" },
 } as const;
 
 export type NoModelHub = keyof typeof NO_MODEL_HUBS;
@@ -51,9 +51,9 @@ export function noModelHubCfg(slug: NoModelHub): HubCfg {
     boardQuery: slug,
     api: `/api/comp/${slug}`,
     tag,
-    boardLabel: board === "championships" ? "championships board" : "board",
+    boardLabel: board === "nations" ? "nations board" : "board",
     back: { href: "/bet-suggester",
-            label: board === "championships" ? "championships board" : "board" },
+            label: board === "nations" ? "nations board" : "board" },
     accentVars: {
       "--accent": hex,
       "--accent-dim": rgba(hex, 0.35),
@@ -88,7 +88,7 @@ export function noModelHubCfg(slug: NoModelHub): HubCfg {
     },
     // Form/H2H was measured non-predictive on the CLUB corpus only; a
     // national hub says so rather than borrowing the club finding.
-    ...(board === "championships"
+    ...(board === "nations"
       ? { scoutingNote: "display only — never measured for national teams" }
       : {}),
     footer:

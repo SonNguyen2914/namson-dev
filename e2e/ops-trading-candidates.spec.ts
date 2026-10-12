@@ -412,7 +412,7 @@ test.describe("the trader's candidates on the console", () => {
       const names = ["Premier League", "La Liga", "MLS", "Liga MX",
         "Bundesliga", "Serie A", "Ligue 1", "Eredivisie",
         "UEFA Nations League", "Concacaf Nations League",
-        "Africa Cup of Nations"];
+        "AFCON Qualifiers"];
       // All + the eleven, in the route's order
       await expect(page.getByTestId("cand-comp")).toHaveCount(12);
       const table = page.getByTestId("cand-by-comp");
@@ -449,7 +449,7 @@ test.describe("the trader's candidates on the console", () => {
       await expect(page.getByTestId("cand-comp")).toHaveCount(12);
       await expect(page.getByTestId("cand-by-comp")).toHaveCount(0);
       await expect(chip(page, "afcon"))
-        .toHaveText("Africa Cup of Nations · none");
+        .toHaveText("AFCON Qualifiers · none");
     });
 
   test("a stated scope is the scope; a row outside it is still shown and "
