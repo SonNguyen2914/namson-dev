@@ -210,7 +210,9 @@ test.describe("the operator trading console", () => {
       await expect(money).toContainText("$48.12");
       await expect(money).toContainText("$49.37");
       await expect(money).toContainText("−$0.63");
+      // this payload predates the trader-only figures: account-wide
       await expect(page.getByTestId("meter-risk")).toContainText("37%");
+      await expect(page.getByTestId("meter-risk")).toContainText("account-wide");
       // "why it skipped": the largest reason first
       await view(page, "#system");
       await expect(page.getByTestId("by-reason").locator("tbody tr").first())
@@ -276,6 +278,62 @@ test.describe("the operator trading console", () => {
       await expect(dd).toContainText("$12.00");
       await expect(dd).toContainText("80%");
       await expect(dd.locator("div.h-full")).toHaveClass(/bg-neg/);
+    });
+
+  // THE CAPS COUNT THE TRADER'S OWN TRADES (backend #245, 2026-10-12):
+  // the meter is the trader's own exposure against its $50; the account
+  // total (manual trades included) is a secondary line, and may exceed
+  // the $50 with nothing breached
+  test("the at-risk meter is the trader's own, the account beside it",
+    async ({ page }) => {
+      await serve(page, 200, { ...PAYLOAD,
+        total_at_risk: "180.00", total_limit: "50", total_at_risk_basis: "account",
+        agent_at_risk: "12.50", agent_limit: "50", cash_limit: "240.00",
+        cap_basis: "agent_own_v1" });
+      await page.goto("/ops/trading");
+      await page.locator("#watch-token").fill(TOKEN);
+      const m = page.getByTestId("meter-risk");
+      await expect(m).toHaveAttribute("data-basis", "agent");
+      await expect(m).toContainText("Trader at risk");
+      await expect(m).toContainText("$12.50");
+      await expect(m).toContainText("$50.00");
+      await expect(m).toContainText("25%");
+      await expect(m).not.toContainText("360%");
+      await expect(m).not.toContainText("at limit");
+      await expect(page.getByTestId("meter-risk-account"))
+        .toContainText("Account $180.00 · cash guard $240.00");
+    });
+
+  test("fail closed or an older backend: the account-wide figure, said so",
+    async ({ page }) => {
+      await serve(page, 200, { ...PAYLOAD,
+        agent_at_risk: "7.40", agent_limit: "50", cash_limit: "49.37",
+        cap_basis: "account_fail_closed" });
+      await page.goto("/ops/trading");
+      await page.locator("#watch-token").fill(TOKEN);
+      const m = page.getByTestId("meter-risk");
+      await expect(m).toHaveAttribute("data-basis", "account");
+      await expect(m).toContainText("account-wide");
+      await expect(m).toContainText("$7.40");
+      await expect(m).toContainText("$20.00");
+      await expect(page.getByTestId("meter-risk-account")).toHaveCount(0);
+    });
+
+  test("a missing trader figure is never read as zero",
+    async ({ page }) => {
+      // the share unreadable: agent_at_risk null — the account-wide
+      // fallback, and a missing account total reads "—", not $0.00
+      await serve(page, 200, { ...PAYLOAD,
+        total_at_risk: null, total_limit: null,
+        agent_at_risk: null, agent_limit: "50", cash_limit: null,
+        cap_basis: null });
+      await page.goto("/ops/trading");
+      await page.locator("#watch-token").fill(TOKEN);
+      const m = page.getByTestId("meter-risk");
+      await expect(m).toHaveAttribute("data-basis", "account");
+      await expect(m).toContainText("—");
+      await expect(m).not.toContainText("$0.00");
+      await expect(m).not.toContainText("0%");
     });
 
   test("a 403 reads as a rejected token", async ({ page }) => {
