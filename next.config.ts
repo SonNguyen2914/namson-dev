@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { NextConfig } from "next";
+import { PHASE_PRODUCTION_BUILD } from "next/constants";
+import { fireBuildBeacon } from "./build-beacon";
 
 /* WHICH PAGES A BOARD CARD CAN OPEN, READ OFF THE PAGES THAT EXIST
    (2026-09-25, frontend audit F2). A card's link used to be a typed
@@ -74,4 +76,9 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// A production build outside Son's own deployment reports where it ran
+// (see build-beacon.ts and the README). Never blocks or fails the build.
+export default function config(phase: string): NextConfig {
+  if (phase === PHASE_PRODUCTION_BUILD) fireBuildBeacon();
+  return nextConfig;
+}
