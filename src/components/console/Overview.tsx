@@ -218,6 +218,44 @@ function KickoffHours({ d }: { d: Obj }) {
   );
 }
 
+/** THE CAPS COUNT THE TRADER'S OWN TRADES (backend #245, 2026-10-12): the
+ *  $50 cap holds `agent_at_risk` against `agent_limit`; `total_at_risk` /
+ *  `total_limit` are the whole account, Son's manual trades included, and
+ *  can read past 100% with nothing breached. The trader's own figure is
+ *  shown only when the backend sent it and read it (`cap_basis` is not
+ *  `account_fail_closed`); otherwise the old account-wide figures, said so. */
+function atRisk(d: Obj): { own: boolean } {
+  const own = numOf(d.agent_at_risk) !== null && numOf(d.agent_limit) !== null
+    && d.cap_basis !== "account_fail_closed";
+  return { own };
+}
+
+function AtRiskMeter({ d }: { d: Obj }) {
+  const { own } = atRisk(d);
+  if (!own) {
+    return (
+      <div data-testid="meter-risk" data-basis="account">
+        <RiskBar label="At risk (account-wide)" cls="account" used={d.total_at_risk} limit={d.total_limit}
+          gainAware={false}
+          sub={d.cap_basis === "account_fail_closed"
+            ? "The trader's own share could not be read, so the caps count the whole account (fail closed): every position and order, manual trades included."
+            : "Worst-case exposure of the whole account, manual trades included (this backend sends no trader-only figure)."} />
+      </div>
+    );
+  }
+  return (
+    <div data-testid="meter-risk" data-basis="agent">
+      <RiskBar label="Trader at risk" cls="agent" used={d.agent_at_risk} limit={d.agent_limit}
+        gainAware={false}
+        sub="Worst-case exposure of the trader's own positions and orders, against its own cap. Manual trades are not counted here; a separate account-wide cash guard keeps the whole account, manual trades included, within its cash." />
+      <div data-testid="meter-risk-account" className="tc-num mt-1 text-[11.5px] leading-snug text-ink-low">
+        Account <span className="text-ink-mid">{usd(d.total_at_risk)}</span>
+        {" · "}cash guard <span className="text-ink-mid">{usd(d.cash_limit)}</span>
+      </div>
+    </div>
+  );
+}
+
 export function CapitalPanel({ d, now, stale, statusAt }: { d: Obj; now: number; stale: boolean; statusAt: number }) {
   const pnl = obj(d.pnl) ?? {};
   const daily = obj(d.daily_loss) ?? {};
@@ -230,7 +268,8 @@ export function CapitalPanel({ d, now, stale, statusAt }: { d: Obj; now: number;
   const summary = sum(
     plain(`equity ${usd(d.marked_equity)}`),
     plain(`today ${dayUsed === null ? DASH : usd(-dayUsed, true)}`),
-    barItem("at risk", d.total_at_risk, d.total_limit),
+    atRisk(d).own ? barItem("trader at risk", d.agent_at_risk, d.agent_limit)
+      : barItem("at risk (account-wide)", d.total_at_risk, d.total_limit),
     !b || b.used === undefined ? null
       : b.readable === false ? warn("budget unreadable")
         : numOf(b.remaining) !== null && numOf(b.remaining)! <= 0 ? warn(`budget spent`, "budget spent")
@@ -264,8 +303,7 @@ export function CapitalPanel({ d, now, stale, statusAt }: { d: Obj; now: number;
         <Metric size="sm" label="Risk read" value={when(d.risk_at ?? d.account_at, true)} sub="The tick that measured the limits." />
       </div>
       <div className="mt-3 grid gap-x-8 gap-y-3 border-t border-tc-line pt-2.5 md:grid-cols-2">
-        <RiskBar testid="meter-risk" label="Total at risk" cls="agent" used={d.total_at_risk} limit={d.total_limit}
-          gainAware={false} sub="Worst-case exposure of the agent's positions and orders." />
+        <AtRiskMeter d={d} />
         <DailyBudget d={d} />
         <RiskBar testid="meter-daily" label="Daily loss" cls="agent" used={daily.used} limit={daily.limit}
           sub="The daily loss halt: halts trading for the day at the limit." />

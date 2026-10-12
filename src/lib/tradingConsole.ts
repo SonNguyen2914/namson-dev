@@ -661,7 +661,7 @@ export const REGISTRY_WORDS: Record<string, string> = {
   // the risk engine's money caps and halts
   per_order_cap: "The order would cost more than the $5 per-order cap.",
   per_match_cap: "The order would take the match's worst-case loss over the $10 per-match cap.",
-  bankroll_cap: "The order would take the account's worst-case loss over the $50 equity cap.",
+  bankroll_cap: "The order would take the trader's own worst-case loss over its $50 cap, or the account's over its cash (a separate account-wide guard). When the trader's share cannot be read, the cap counts the whole account (fails closed).",
   daily_anchor_missing: "No P&L anchor for today, so the day's loss cannot be measured.",
   daily_loss_halt: "The trader's own loss today reached the daily loss limit.",
   drawdown_halt: "The trader's own loss since its start reached the drawdown limit.",
