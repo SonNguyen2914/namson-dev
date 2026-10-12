@@ -1,4 +1,12 @@
-/** THE BOARD'S MODE SWITCH — Leagues | Championships (2026-09-24).
+/** THE BOARD'S MODE SWITCH — Leagues | Cups | Nations (2026-10-12).
+ *
+ *  It was Leagues | Championships from 2026-09-24. Son's naming decision
+ *  of 2026-10-07 (roadmap 05b) made it three: "Championships" reads
+ *  "Nations" — IN THE UI ONLY: the national board is still fetched from
+ *  `/api/championships/*` and the backend routes keep their names — and a
+ *  Cups tab sits between the two. Cups is a separate TAB, not columns on
+ *  the Leagues board: the board's columns stay Son's declaration
+ *  (memory `board-columns-are-declared`).
  *
  *  The field page's Leagues | Cups switch (components/PinnedPassField.tsx
  *  `ModeSwitch`), part for part: the board's filled ground, its hairline,
@@ -11,14 +19,25 @@
  *  `aria-pressed`, not a tablist: the two modes are two boards with two
  *  reads behind them, not two panels of one, exactly as on the field
  *  page. */
-export type BoardMode = "leagues" | "championships";
+export type BoardMode = "leagues" | "cups" | "nations";
 
-export const BOARD_MODES: readonly BoardMode[] = ["leagues", "championships"];
+export const BOARD_MODES: readonly BoardMode[] = ["leagues", "cups", "nations"];
 
 const LABEL: Record<BoardMode, string> = {
   leagues: "Leagues",
-  championships: "Championships",
+  cups: "Cups",
+  nations: "Nations",
 };
+
+/** A REMEMBERED CHOICE, READ BACK. "championships" is what this switch
+ *  wrote to storage until 2026-10-12; a viewer who left on that board
+ *  comes back to it under its new name rather than being dropped on
+ *  Leagues. Anything unrecognised is Leagues. */
+export function boardModeFrom(stored: string | null): BoardMode {
+  if (stored === "championships" || stored === "nations") return "nations";
+  if (stored === "cups") return "cups";
+  return "leagues";
+}
 
 export function BoardModeSwitch({ mode, onChange }: {
   mode: BoardMode; onChange: (m: BoardMode) => void;

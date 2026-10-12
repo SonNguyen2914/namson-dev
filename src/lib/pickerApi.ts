@@ -995,6 +995,18 @@ export const columnsOf = (
 ): string[] => (r.columns?.length ? r.columns
   : r.column ? [r.column] : [r.league]);
 
+/** A CUP TIE DRAWN IN A LEAGUE'S COLUMN: the competition the row IS is
+ *  none of the columns it renders in. True for a cup fixture the backend
+ *  folded into its clubs' league (an EFL Cup tie between two Premier
+ *  League clubs, the Campeones Cup in MLS and Liga MX); never true for a
+ *  league fixture, which is always in its own column; and false for a
+ *  cross-league cup row that keeps its cup slug as its column. The
+ *  Leagues board drops these (2026-10-07, roadmap 05b); they live on the
+ *  Cups tab's pages. */
+export const isFoldedCupTie = (
+  r: { columns?: string[]; column?: string; league: string },
+): boolean => !columnsOf(r).includes(r.league);
+
 export interface LeagueMeta {
   src: Src | null;
   min_current_gp: number | null;
@@ -1498,8 +1510,19 @@ export const LEAGUE_LABEL: Record<string, string> = {
   // columns are `tables.BOARD_COLUMNS` and these are not in it.
   unl: "UEFA Nations League",
   cnl: "Concacaf Nations League",
-  afcon: "Africa Cup of Nations",
+  // "AFCON QUALIFIERS" WHILE IT IS QUALIFYING (Son, 2026-10-07, roadmap
+  // 05b). One key carries both stages (backend registry: `caf.nations_qual`
+  // then `caf.nations`), and every AFCON fixture until March 2027 is a
+  // qualifier — Kalshi's own competition name for them is "AFCON
+  // Qualifiers". The finals (Kenya / Uganda / Tanzania, 19 Jun-17 Jul
+  // 2027) restore the full name; `AFCON_FINALS_LABEL` is that name.
+  // Static rather than clock-derived, so the server and the first client
+  // render agree (AGENTS.md section 5).
+  afcon: "AFCON Qualifiers",
 };
+
+/** AFCON's name once the finals are being played; see LEAGUE_LABEL.afcon. */
+export const AFCON_FINALS_LABEL = "Africa Cup of Nations";
 
 /** THE BADGE BESIDE THE FAVOURITE, and what it is allowed to claim.
  *

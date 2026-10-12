@@ -52,7 +52,7 @@ export type HubSlug = PlaneHub | keyof typeof NO_MODEL_HUBS;
 /** The three national-team competitions, DERIVED from the hub config's
  *  own board assignment rather than typed a second time. */
 export const NATION_HUBS: readonly string[] = Object.entries(NO_MODEL_HUBS)
-  .filter(([, v]) => v.board === "championships").map(([k]) => k);
+  .filter(([, v]) => v.board === "nations").map(([k]) => k);
 
 export const isNationHub = (slug: string) => NATION_HUBS.includes(slug);
 export const isPlaneHub = (slug: string) =>

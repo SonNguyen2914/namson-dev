@@ -20,8 +20,8 @@ import { BOARD_EIGHT, REVIEW_EIGHT } from "./eight-columns";
 import { CLUB_H2H_BOARD, CLUB_H2H_CLOCK } from "./club-h2h-recorded";
 import { CHAMP_BOARD, CHAMP_CLOCK } from "./championships-recorded";
 import { rebased } from "./efl-cup-recorded";
-import { CAMPEONES_BOARD } from "./campeones-board";
 import { CAMPEONES_FIELD_BOARD } from "./campeones-field";
+import { CAMPEONES_BOARD } from "./campeones-board";
 
 const json = (b: unknown, status = 200) => ({
   status, contentType: "application/json", body: JSON.stringify(b),
@@ -29,6 +29,15 @@ const json = (b: unknown, status = 200) => ({
 const EMPTY_REVIEW = { rows: [], refusals: [], leagues: {} };
 
 type Board = { rows: readonly { league: string }[]; refusals?: readonly unknown[] };
+/** A recorded board with every row and refusal drawn in one column, as
+ *  the narrowed `/bet-suggester/ucl` route asks for it. */
+function oneColumn(b: { rows: readonly object[]; refusals: readonly object[] }) {
+  const into = <T extends object>(r: T) => ({ ...r, column: "ucl", columns: ["ucl"] });
+  const meta = (CAMPEONES_BOARD.leagues as Record<string, unknown>).mls;
+  return { ...b, narrowed_to: ["ucl"], leagues: { ucl: meta },
+           rows: b.rows.map(into), refusals: b.refusals.map(into) };
+}
+
 const BOARDS: Array<{ name: string; path: string; board: unknown; review?: unknown;
                       clock?: string; champ?: boolean }> = [
   { name: "the eight-column board + its finished tail", path: "/bet-suggester",
@@ -38,10 +47,16 @@ const BOARDS: Array<{ name: string; path: string; board: unknown; review?: unkno
   { name: "the Championships board", path: "/bet-suggester",
     board: CHAMP_BOARD, clock: CHAMP_CLOCK, champ: true },
   { name: "the EFL Cup page", path: "/bet-suggester/efl-cup", board: rebased() },
-  { name: "the Campeones Cup fold", path: "/bet-suggester", board: CAMPEONES_BOARD,
+  /* THE CAMPEONES CUP, ON A COLUMN OF ITS OWN (2026-10-12). Its tie used
+     to be folded into the MLS and Liga MX columns; cup ties no longer
+     are (e2e/board-cups-tab.spec.ts), so the recording is served on the
+     narrowed board with every row re-columned there. It is the one board
+     here whose cards have no page to open, which is what keeps the
+     "says it has none" half of this test from being vacuous. */
+  { name: "the Campeones Cup", path: "/bet-suggester/ucl", board: oneColumn(CAMPEONES_BOARD),
     clock: "2026-12-10T12:00:00Z" },
-  { name: "the Campeones Cup field fold", path: "/bet-suggester", board: CAMPEONES_FIELD_BOARD,
-    clock: "2026-12-10T12:00:00Z" },
+  { name: "the Campeones Cup field", path: "/bet-suggester/ucl",
+    board: oneColumn(CAMPEONES_FIELD_BOARD), clock: "2026-12-10T12:00:00Z" },
 ];
 
 async function open(page: Page, b: typeof BOARDS[number]) {
