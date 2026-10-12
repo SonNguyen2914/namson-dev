@@ -75,10 +75,48 @@ const CAREFUL: Obj = {
   events: [{ at: "2026-10-10T18:00:00+00:00", reason: "promotion_check",
     ground: "family:SPREAD", milestone: 150, proposed: true }],
 };
+// 2026-10-12 (backend #246): the paper grounds by gate verdict; #248: the
+// shadow sizing block; #249: the in-play paper ground, SEALED until Nov 8
+const SEALED = "inplay:sell_trailer_first_goal";
+const VERDICT: Obj = {
+  paper_only: true, band_c: "1", max_per_tick: 4,
+  means: { "gate:books_only": "the bookmakers cleared T, our model did not" },
+  grounds: {
+    "gate:pass": { n: 40, matches: 12, mean: 0.61, lo: -0.2, hi: 1.42 },
+    "gate:books_only": { n: 25, matches: 9, mean: -0.35, lo: -1.1, hi: 0.4 },
+    "gate:model_only": { n: 0, matches: 0, mean: null, lo: null, hi: null },
+    "gate:none": { n: 3, matches: 1, mean: 0.2, lo: null, hi: null },
+    "near:books": { n: 0, matches: 0, mean: null, lo: null, hi: null },
+    "near:model": { n: 0, matches: 0, mean: null, lo: null, hi: null },
+    "near:both": { n: 0, matches: 0, mean: null, lo: null, hi: null },
+  },
+};
+const SIZING: Obj = {
+  version: "sizing-v1", mode: "shadow", mode_configured: "shadow",
+  live_allowed: false,
+  knobs: { SIZING_KELLY_FRACTION: "0.125", SIZING_CI_Z: "1.96" },
+  terms: ["kelly", "tier"],
+};
+const CAREFUL_V2: Obj = {
+  ...CAREFUL,
+  tick: { ...(CAREFUL.tick as Obj), sizing: { version: "sizing-v1",
+    mode: "shadow", live_allowed: false, sized: 7, zero: 4, fee_drag: 1,
+    raised: 0, below_tier: 3, binding: { kelly: 5, tier: 2 } } },
+  sizing: SIZING,
+  grounds_by_verdict: VERDICT,
+  grounds_paper: { ...(CAREFUL.grounds_paper as Obj),
+    "gate:pass": { n: 40, matches: 12, mean: 0.61, lo: -0.2, hi: 1.42 },
+    // its numbers are results, sealed: only n and matches may show
+    [SEALED]: { n: 9, matches: 6, mean: 13.37, lo: 4.21, hi: 22.53,
+      held: 5, ground: SEALED, paper_only: true,
+      by_band: { "0-30": { n: 4, matches: 3, mean: 17.77, lo: null, hi: null } },
+      clv: { n: 9, matches: 6, mean: 2.468, lo: null, hi: null } } },
+};
 const BUDGET: Obj = { used: "6.20", remaining: "13.80", limit: "20",
   realised: "-2.00", open_positions: "5.40", resting_orders: "2.80",
   trading_day: "2026-10-10", trading_day_tz: "America/Los_Angeles" };
 const SERVED: Obj = { ...STATUS_RECORDED, careful: CAREFUL, daily_budget: BUDGET };
+const SERVED_V2: Obj = { ...STATUS_RECORDED, careful: CAREFUL_V2, daily_budget: BUDGET };
 
 async function openConsole(page: Page, status: unknown, hash = "#model") {
   await page.route(STATUS, (r) => r.fulfill(json(200, status)));
@@ -224,9 +262,74 @@ test.describe("the careful strategy on the console", () => {
     expect(carefulCell({ score: 2, size: "1", ground: "inplay_buying",
       data_error: false, score_of: 3, signals: ["deep", "fresh"] })).toEqual({
       score: 2, size: 1, ground: "inplay_buying", data_error: false,
-      score_of: 3, signals: ["deep", "fresh"] });
+      score_of: 3, signals: ["deep", "fresh"], sizing: null });
     expect(carefulCell({ score: 4, size: "2", ground: "family:GAME",
       data_error: false })?.score_of).toBeNull();
+  });
+
+  test("the gate-verdict grounds: seven rows, n, matches, CLV and range",
+    async ({ page }) => {
+      await openConsole(page, SERVED_V2);
+      const rows = page.getByTestId("careful-verdict-row");
+      await expect(rows).toHaveCount(7);
+      await expect(rows.first()).toHaveAttribute("data-ground", "gate:pass");
+      const pass = page.locator('[data-testid="careful-verdict-row"][data-ground="gate:pass"]');
+      await expect(pass).toContainText("40");
+      await expect(pass).toContainText("12");
+      await expect(pass).toContainText("+0.61c");
+      await expect(pass).toContainText("[−0.20c, +1.42c]");
+      const books = page.locator('[data-testid="careful-verdict-row"][data-ground="gate:books_only"]');
+      await expect(books.locator("td").first()).toHaveAttribute("title", /bookmakers cleared T/);
+      // an empty ground: n 0 as served, its mean and range missing, never 0
+      const none = page.locator('[data-testid="careful-verdict-row"][data-ground="near:both"]');
+      await expect(none.locator("td").nth(3)).toHaveText("—");
+      await expect(none.locator("td").nth(4)).toHaveText("—");
+      // a verdict ground is in the table, not twice in the list
+      await expect(page.locator('[data-testid="careful-ground"][data-ground="gate:pass"]')).toHaveCount(0);
+      await expect(page.locator('[data-testid="careful-ground"][data-ground="family:SPREAD"]')).toHaveCount(1);
+    });
+
+  test("the sealed in-play ground shows its counts only", async ({ page }) => {
+    await openConsole(page, SERVED_V2);
+    const g = page.locator(`[data-testid="careful-ground"][data-ground="${SEALED}"]`);
+    await expect(g).toHaveAttribute("data-sealed", "true");
+    await expect(g).toContainText("n 9 · 6 matches");
+    await expect(g).toContainText("sealed");
+    const panel = page.getByTestId("ops-careful");
+    for (const leak of ["13.37", "4.21", "22.53", "17.77", "2.47"]) {
+      await expect(panel).not.toContainText(leak);
+    }
+  });
+
+  test("sizing: shadow with live locked in the header, its tick and knobs",
+    async ({ page }) => {
+      await openConsole(page, SERVED_V2);
+      await expect(page.getByTestId("careful-sizing-mode")).toHaveText("Sizing: shadow (live locked)");
+      const s = page.getByTestId("careful-sizing");
+      await expect(s).toContainText("shadow");
+      await expect(s).toContainText("locked");
+      await expect(s).toContainText("7");
+      await expect(s).toContainText("zero 4 · fee drag 1 · below tier 3");
+      await expect(s).toContainText("kelly 5 · tier 2");
+      await expect(page.getByTestId("careful-sizing-knobs")).toContainText("SIZING_KELLY_FRACTION");
+    });
+
+  test("a backend without verdicts or sizing says so, never zeros",
+    async ({ page }) => {
+      await openConsole(page, SERVED);
+      await expect(page.getByTestId("careful-verdict-absent")).toContainText("not served yet");
+      await expect(page.getByTestId("careful-sizing-absent")).toContainText("not served yet");
+      await expect(page.getByTestId("careful-sizing-mode")).toHaveText("Sizing: not served yet");
+    });
+
+  test("the console cell and the ledger carry the shadow size", () => {
+    expect(carefulCell({ score: 4, size: "2", ground: "family:GAME",
+      data_error: false, score_of: 5, signals: null,
+      sizing: "⅛K on lb 0.31¢ → $0.42 (tier $2)" })?.sizing).toBe(
+      "⅛K on lb 0.31¢ → $0.42 (tier $2)");
+    expect(carefulWords({ score: 4, size_dollars: 2, worst_dollars: 1.76,
+      ground: "family:GAME", shadow_size: "⅛K on lb 0.31¢ → $0.42 (tier $2)" })).toBe(
+      "confidence 4/5 · size $2 (worst case $1.76) · family:GAME · shadow size ⅛K on lb 0.31¢ → $0.42 (tier $2)");
   });
 
   test("the ledger says an in-play order's ladder", () => {

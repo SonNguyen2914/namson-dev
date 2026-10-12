@@ -212,6 +212,10 @@ export interface CarefulCell {
   /** (2026-10-07) the in-play ladder's signals it scored (deep, fresh,
    *  spare); null pre-match or from an older backend */
   signals: string[] | null;
+  /** (2026-10-12, backend #248, §42) the would-be Kelly size in words,
+   *  SHADOW only ("⅛K on lb 0.31¢ → $0.42 (tier $1)"); null when sizing
+   *  is off or from an older backend */
+  sizing: string | null;
 }
 
 export function carefulCell(v: unknown): CarefulCell | null {
@@ -220,7 +224,8 @@ export function carefulCell(v: unknown): CarefulCell | null {
   return { score: num(o.score), size: num(o.size), ground: str(o.ground),
     data_error: o.data_error === true, score_of: num(o.score_of),
     signals: Array.isArray(o.signals)
-      ? o.signals.filter((x): x is string => typeof x === "string") : null };
+      ? o.signals.filter((x): x is string => typeof x === "string") : null,
+    sizing: str(o.sizing) };
 }
 
 export interface CompCounts {
