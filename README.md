@@ -1,4 +1,4 @@
-> Build notice: a production build of this repo run outside the official namson.dev deployment sends one anonymous request reporting its host, repo and platform (see `build-beacon.ts`; set `NAMSON_BEACON=off` to skip it).
+> Build notice: a production build of this repo run outside the official namson.dev deployment sends one anonymous request reporting its deploy host (or just "local"), repo and platform, and never a machine name (see `build-beacon.ts`; set `NAMSON_BEACON=off` to skip it). Son's own local builds, and his agents' worktrees, should set `NAMSON_BEACON=off`.
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
 

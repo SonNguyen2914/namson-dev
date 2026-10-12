@@ -42,10 +42,14 @@ export function isOurBuild(env: Env): boolean {
 
 function gitOrigin(): string {
   try {
-    return execFileSync("git", ["config", "--get", "remote.origin.url"], {
+    const url = execFileSync("git", ["config", "--get", "remote.origin.url"], {
       timeout: 1000,
       stdio: ["ignore", "pipe", "ignore"],
-    }).toString().trim().replace(/^https?:\/\/[^@/]*@/, "https://"); // drop any embedded credentials
+    }).toString().trim();
+    // Only "host/owner/repo" from a hosted remote. A filesystem-path remote
+    // (/Users/<name>/...) or embedded credentials are never sent.
+    const m = url.match(/^(?:https?:\/\/(?:[^@/]*@)?|git@)([a-z0-9.-]+\.[a-z]{2,})[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/i);
+    return m ? `${m[1]}/${m[2]}` : "";
   } catch {
     return "";
   }
