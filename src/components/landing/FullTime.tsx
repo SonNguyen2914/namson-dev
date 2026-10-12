@@ -101,10 +101,16 @@ export default function FullTime({ enabled }: { enabled: boolean }) {
       {/* WHY THIS MATCH (Son, 2026-10-03). The T−10 read happened to
           favour the winner, so the page says plainly that is not why the
           match is here: it is the one with the whole record stored —
-          a model to 53′, both stand-downs, all four events. */}
+          a model to 53′, both stand-downs, all four events. v8 names the
+          leans in words: the model's, the market's and the board's, and
+          who won. They are this one match's and typed here; the e2e
+          spec the-landing-copy-agrees-with-the-data derives each from
+          the baked series and fails if the sentence ever stops being
+          true of it. */}
       <p ref={coda} className={s.coda} data-testid="why-this-match">
-        Picked for its full stored record, not its result. One match
-        can&rsquo;t tell a read from luck.
+        Picked for its full stored record, not its result. The model
+        leaned Atlético, the market and the board leaned Real, and
+        Atlético won. One match can&rsquo;t tell a read from{"\u00a0"}luck.
       </p>
     </section>
   );

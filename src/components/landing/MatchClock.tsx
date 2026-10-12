@@ -99,12 +99,19 @@ const minuteAt = (q: number) => {
   return LAST;
 };
 
+/* "stands down" is still true of the live engine (backend
+   src/live/inplay.py @1317f4f5 refuses from the first red card). The
+   red-card term is A11 of research_archive/ml_win_gap_2026-09-25/
+   PREREGISTRATION.md, adopted 2026-09-29 as a FORWARD TEST scored on
+   matches from 1 Oct: it is in testing, not in the live model, and the
+   68′ caption says exactly that. The kick-off caption's two numbers are
+   the 0′ row of the same series the readout prints. */
 type Cap = { id: string; from: number; to: number; tag: string; text: ReactNode };
 const pct = (v: number | undefined | null) => (v == null ? "—" : `${fmt1(v)}%`);
 const CAPS: Cap[] = (() => {
-  const m50 = at(50), m51 = at(51), g = at(53), m60 = at(60);
+  const m0 = at(0), m50 = at(50), m51 = at(51), g = at(53), m60 = at(60);
   return [
-    { id: "ko", from: 0, to: 1, tag: `0${PRIME}`, text: <>Kick-off. The model&rsquo;s read was locked ten minutes before.</> },
+    { id: "ko", from: 0, to: 1, tag: `0${PRIME}`, text: <>Kick-off. Locked ten minutes before, the model leans Atlético, <b>{pct(m0.model?.home)}</b>; the market leans Real, <b>{pct(m0.market?.away)}</b>.</> },
     { id: "play", from: 2, to: 44, tag: `2${PRIME}`, text: <>In play, model and market start within a point.</> },
     { id: "ht", from: 45, to: 45, tag: "HT", text: <>Half-time. No play, no read.</> },
     { id: "h2", from: 46, to: 50, tag: `46${PRIME}`, text: <>Still 0–0. Both lines lean toward the draw.</> },
@@ -112,7 +119,7 @@ const CAPS: Cap[] = (() => {
     { id: "goal1", from: 53, to: 53, tag: `53${PRIME}`, text: <>Goal, Atlético. {sc(53)}. Model <b>{pct(g.model?.home)}</b>, market <b>{pct(g.market?.home)}</b>.</> },
     { id: "red", from: 54, to: 59, tag: `54${PRIME}`, text: <>Red card, Real Madrid. The model stands down&nbsp;— it reads 11&nbsp;v&nbsp;11 only. The market reads on.</> },
     { id: "goal2", from: 60, to: 67, tag: `60${PRIME}`, text: <>{sc(60)} Atlético. Market: <b>{pct(m60.market?.home)}</b>.</> },
-    { id: "flat", from: 68, to: 89, tag: `68${PRIME}`, text: <>The model stays out. The market runs to full time.</> },
+    { id: "flat", from: 68, to: 89, tag: `68${PRIME}`, text: <>The model stays out&nbsp;— a red-card term is in testing, not yet live. The market runs to full&nbsp;time.</> },
     { id: "ft", from: 90, to: 90, tag: `90${PRIME}`, text: <>Real Madrid pull one back. {sc(90)}, full time.</> },
   ];
 })();
