@@ -112,10 +112,13 @@ const ALT: Record<BoardMode, string> = {
    cache by URL. Pins: 1 the gap (under the gap number, right-aligned to
    it, below its label — the same place in both), 2 the tiers (after the
    # chip), 3 the book (after the last thing on the book's line),
-   measured off the captures' pixels. */
+   measured off the captures' pixels. The derby's pin 1 is 4 capture px
+   higher and 2 left of the draft's (95.22 / 47.38): measured, "+0.58"
+   ends at x 676 and "GD/G GAP" at y 413, so it now sits on the same
+   corner as the Nations League pin (e2e/the-board-has-both-halves). */
 const SHOTS: Record<BoardMode, Shot> = {
   leagues: { src: "/landing/board-leagues-laliga-derby.jpg", w: 712, h: 880,
-    alt: ALT.leagues, pins: [[95.22, 47.38, "under"], [54.78, 63.98], [77.94, 73.75]] },
+    alt: ALT.leagues, pins: [[94.94, 46.93, "under"], [54.78, 63.98], [77.94, 73.75]] },
   championships: { src: "/landing/board-championships-unl.jpg", w: 966, h: 880,
     alt: ALT.championships, pins: [[96.27, 61.70, "under"], [45.13, 77.39], [54.66, 86.65]] },
 };

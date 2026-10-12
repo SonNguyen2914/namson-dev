@@ -28,7 +28,7 @@ export default function LandingIndex() {
     });
     const make = (cb: IntersectionObserverCallback, o: IntersectionObserverInit) => {
       try { return new IntersectionObserver(cb, { root: document, ...o }); }
-      catch { return new IntersectionObserver(cb, o); }
+      catch { /* SWALLOWED(landing:io-document-root) */ return new IntersectionObserver(cb, o); }
     };
     const io = make((es) => es.forEach((e) => {
       if (e.isIntersecting) mark((e.target as HTMLElement).dataset.index ?? "");

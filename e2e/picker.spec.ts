@@ -1198,6 +1198,12 @@ test("the site root is TRIVELA's home page, and it leads to the board",
     const body = (await page.textContent("body")) || "";
     expect(body).not.toContain("To get started, edit");
     await page.waitForLoadState("networkidle");
+    // the board routes write a snapshot row per read: banned by name, so
+    // a widened allowance below can never let them back in silently
+    for (const banned of ["/api/picker/board", "/api/championships/board"]) {
+      expect(api.filter((u) => new URL(u).pathname.startsWith(banned)),
+        `the home page read ${banned}`).toEqual([]);
+    }
     expect(api.map((u) => new URL(u).pathname),
       "the home page reached for something other than the record numbers")
       .toEqual(["/api/site/stats"]);

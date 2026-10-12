@@ -162,9 +162,12 @@
    transform on .planeInner. Lifting a competition moves dots by transform
    and opacity only. */
 .hero { position: absolute; z-index: 2; left: 0; right: 0; top: 0; padding: clamp(16px, 3vh, 40px) var(--gutter) clamp(8px, 1.6vh, 28px); pointer-events: none; will-change: transform; }
-.root:not([data-motion="on"]) .fieldSec .stage { height: auto; min-height: 0; }
+/* the HERO's stage and plane only (the draft's `#field`): the still match
+   figure (#field-match, .stageMatch / .planeMatch) keeps its own fixed
+   height and its absolutely placed text and plane, or it collapses to 0 */
+.root:not([data-motion="on"]) .fieldSec .stage:not(.stageMatch) { height: auto; min-height: 0; }
 .root:not([data-motion="on"]) .hero { position: relative; }
-.root:not([data-motion="on"]) .fieldSec .plane { top: 0; bottom: auto; height: 320px; }
+.root:not([data-motion="on"]) .fieldSec .plane:not(.planeMatch) { top: 0; bottom: auto; height: 320px; }
 .heroIn { max-width: 1240px; margin-inline: auto; }
 .hero .h1 { font-size: clamp(42px, 12.2vw, 76px); }
 @media (min-width: 640px) { .hero .h1 { font-size: clamp(56px, 9.6vw, 98px); } }
@@ -217,11 +220,11 @@
 }
 /* the cycle's progress line sits on the pill's straight run, above the
    rounded corners, so it is a clean bar from its first frame */
-.ctabs button::after { content: ""; position: absolute; left: max(var(--pad), 12px); right: max(var(--pad), 12px); bottom: 5px; height: 2px; border-radius: 1px; background: var(--hue); transform: scaleX(0); transform-origin: 0 50%; }
-.heroUi[data-run] .ctabs button[aria-selected="true"]::after { animation: fill 5s linear both; }
+.ctabs button::before { content: ""; position: absolute; left: max(var(--pad), 12px); right: max(var(--pad), 12px); bottom: 5px; height: 2px; border-radius: 1px; background: var(--hue); transform: scaleX(0); transform-origin: 0 50%; }
+.heroUi[data-run] .ctabs button[aria-selected="true"]::before { animation: fill 5s linear both; }
 /* a pointer or focus resting on the switch, the planes or the panel, or the
    switch leaving the screen, holds the step: the line stops where it is */
-.heroUi[data-hold] .ctabs button[aria-selected="true"]::after { animation-play-state: paused; }
+.heroUi[data-hold] .ctabs button[aria-selected="true"]::before { animation-play-state: paused; }
 @keyframes fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .pp { min-height: 40px; flex: none; display: inline-flex; align-items: center; gap: 8px; padding: 0 14px 0 12px; border-radius: 999px;
   border: 1px solid var(--line-strong); background: var(--bg); color: var(--ink-hi); cursor: pointer; white-space: nowrap;
@@ -236,6 +239,17 @@
 /* below 1180px the control is its icon (named for screen readers): a 40px
    round target, so the twelve keys keep the row */
 @media (max-width: 1179px) { .pp { position: relative; width: 40px; min-width: 40px; padding: 0; justify-content: center; } .ppTxt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } }
+/* THE SITE'S TOUCH FLOOR (globals.css, --tap-floor 44px). The draft
+   sized the switch at 40px. Its progress bar is drawn by ::before (the
+   draft's ::after), leaving ::after to the global floor — and a mouse
+   with no grown hit area — but .ctabs scrolls sideways, which clips a
+   taller hit area, so on any coarse pointer the controls themselves are
+   44 tall. A mouse keeps the draft's 40. Guarded by
+   e2e/the-floor-is-the-pointer-not-the-width. */
+@media (any-pointer: coarse) {
+  .ctabs button, .pp { min-height: var(--tap-floor, 44px); }
+}
+@media (any-pointer: coarse) and (max-width: 1179px) { .pp { width: var(--tap-floor, 44px); min-width: var(--tap-floor, 44px); } }
 
 /* the two planes (left) and the detail panel (right, or below) */
 .heroGrid { display: grid; gap: 18px; margin-top: clamp(10px, 1.8vh, 20px); }
@@ -577,5 +591,5 @@
   .cta, .cta span, .shotLayer, .modeSwitch button, .riseIn, .ctabs button, .go span[aria-hidden] { transition: none; }
   .fieldStage .dot, .nd, .fieldStage .focusDot i, .lab, .lab.on, .lead, .lead.on, .rng, .rng.on, .cp, .cp.on { transition: none !important; }
   .sweep::after { display: none; }
-  .heroUi[data-run] .ctabs button[aria-selected="true"]::after { animation: none; }
+  .heroUi[data-run] .ctabs button[aria-selected="true"]::before { animation: none; }
 }

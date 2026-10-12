@@ -447,6 +447,26 @@ type Swallow = { finding: string; closes_when: string };
  *  each with why it is judged safe and what would close it. Keyed by
  *  the marker written into the source at the site. */
 export const REGISTERED_SWALLOWS: Record<string, Swallow> = {
+  "landing:io-document-root": {
+    finding:
+      "The home page (pages/index.tsx, landing/FieldStage.tsx, "
+      + "landing/LandingIndex.tsx) builds its IntersectionObservers with "
+      + "`root: document` and, where a browser rejects a Document root, "
+      + "builds the same observer on the viewport instead. Nothing is "
+      + "read: it is feature detection, and both branches observe.",
+    closes_when:
+      "the fallback ever leaves a scene without an observer, or a catch "
+      + "here starts wrapping a network read.",
+  },
+  "landing:focus-visible-probe": {
+    finding:
+      "landing/FieldStage.tsx asks `el.matches(':focus-visible')` to tell "
+      + "a keyboard focus from a pointer one; an engine without the "
+      + "selector throws, and the probe answers with the safe default "
+      + "(not keyboard / keep the keyboard path). Nothing is read.",
+    closes_when:
+      "the probe's default ever hides a control from a keyboard reader.",
+  },
   "tradingbook:book-body-parse": {
     finding:
       "TradingBook's poll folds a book response whose body is not JSON to "

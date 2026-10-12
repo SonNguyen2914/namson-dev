@@ -25,10 +25,12 @@
 //
 // A FIGURE IS REPLACED ONLY BY A WHOLE, WELL-FORMED ONE. A figure the
 // backend has not counted yet is served as `raw: null` — never zero — and
-// stays on its baked value; one with a `display` that is not a number is
-// ignored. A label is taken from the route only when it is a plain
-// string of sane length, so a figure never stands under a label it does
-// not mean; otherwise the baked label stays.
+// stays on its baked value, as does one served as a zero (raw 0 or a
+// display of "0"): the page never shows a zero for a missing figure.
+// One with a `display` that is not a number is ignored. A label is taken
+// from the route only when it is a plain string of sane length, so a
+// figure never stands under a label it does not mean; otherwise the baked
+// label stays.
 //
 // READ ONCE PER VISIT, never polled: the backend caches the payload for
 // ten minutes and the figures change daily at the fastest. Public,
@@ -73,9 +75,11 @@ export function mergeStats(body: unknown): { figures: Figure[]; source: FigureSo
   let live = 0;
   const figures = baked.map((f) => {
     const r = got[ROUTE_KEY[f.key]];
-    if (!r || typeof r.raw !== "number" || !Number.isFinite(r.raw) || r.raw < 0) return f;
+    // a count of zero is a figure nobody has counted yet as far as this
+    // page is concerned: never show "0", keep the baked floor
+    if (!r || typeof r.raw !== "number" || !Number.isFinite(r.raw) || r.raw <= 0) return f;
     const display = text(r.display, 16);
-    if (!display || !DISPLAY.test(display)) return f;
+    if (!display || !DISPLAY.test(display) || /^[0,]+\+?$/.test(display)) return f;
     live += 1;
     return { key: f.key, display,
       label: text(r.label, 60) ?? f.label,

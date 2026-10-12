@@ -82,7 +82,7 @@ export default function Home() {
     if (reduced || !el || typeof IntersectionObserver === "undefined") return;
     const make = (cb: IntersectionObserverCallback, o: IntersectionObserverInit) => {
       try { return new IntersectionObserver(cb, { root: document, ...o }); }
-      catch { return new IntersectionObserver(cb, o); }
+      catch { /* SWALLOWED(landing:io-document-root) */ return new IntersectionObserver(cb, o); }
     };
     const io: IntersectionObserver = make((es) => {
       const e = es[es.length - 1];

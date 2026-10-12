@@ -236,7 +236,7 @@ export default function FieldStage({ mode, enabled }: { mode: Mode; enabled: boo
     if (!ui || !back) return;
     back.inert = !on;
     const a = document.activeElement;
-    const kb = (el: Element | null) => { try { return !!el?.matches(":focus-visible"); } catch { return false; } };
+    const kb = (el: Element | null) => { try { return !!el?.matches(":focus-visible"); } catch { /* SWALLOWED(landing:focus-visible-probe) */ return false; } };
     if (on && ui.contains(a)) (kb(a) ? back : storyH.current)?.focus({ preventScroll: true });
     if (!on && a === back) { ui.inert = false; tabRefs.current[selRef.current + 1]?.focus({ preventScroll: true }); }
     ui.inert = on;
@@ -460,7 +460,7 @@ export default function FieldStage({ mode, enabled }: { mode: Mode; enabled: boo
       const top = parseFloat(getComputedStyle(st).top) || 0;
       const q = Math.min(M.tv, Math.max(0, top - sec.getBoundingClientRect().top));
       let kbd = true;
-      try { kbd = el.matches(":focus-visible"); } catch { /* keep true */ }
+      try { kbd = el.matches(":focus-visible"); } catch { /* SWALLOWED(landing:focus-visible-probe) keep true */ }
       if (!kbd && q <= M.extra) return;                              // a click on something already in view
       const hb = heroBox.current!.getBoundingClientRect(), er = el.getBoundingClientRect();
       const top0 = top + M.lift;
@@ -501,7 +501,7 @@ export default function FieldStage({ mode, enabled }: { mode: Mode; enabled: boo
          ignored */
       const make = (cb: IntersectionObserverCallback, o: IntersectionObserverInit) => {
         try { return new IntersectionObserver(cb, { root: document, ...o }); }
-        catch { return new IntersectionObserver(cb, o); }
+        catch { /* SWALLOWED(landing:io-document-root) */ return new IntersectionObserver(cb, o); }
       };
       const a = make((es) => {
         const e = es[es.length - 1];

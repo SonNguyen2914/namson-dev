@@ -91,6 +91,41 @@ test("mergeStats refuses a figure that is not a count", () => {
   expect(bad.figures).toEqual(FALLBACK.map((f) => ({ ...f })));
 });
 
+test("a zero is never shown for a figure: raw 0 or a display of 0 stays baked", () => {
+  const z = mergeStats({ schema: "site-stats-v1", figures: {
+    corpus_matches: { raw: 0, display: "0", label: "matches studied" },
+    competitions: { raw: 11, display: "0" },
+    markets: { raw: 0, display: "1,600+" },
+    tests: { raw: null, display: null } } });
+  expect(z.source).toBe("baked");
+  expect(z.figures.map((f) => f.display)).toEqual(["45,500", "11", "98,000+", "12,000+"]);
+});
+
+/* TODAY'S PAYLOAD, AS THE ROUTE SERVED IT ON 2026-10-12 (trimmed to the
+   fields the page reads): the route's own extra `matches` figure is not
+   one of the page's four and is ignored; markets has dropped to a
+   1,600+ floor and is shown as served; tests is not counted yet, so its
+   baked figure stands under its own label. */
+test("the route's real 12 Oct shape: three live, tests on its baked figure", async ({ page }) => {
+  await page.route("**/api/site/stats", (r) => r.fulfill({
+    status: 200, contentType: "application/json",
+    body: JSON.stringify({ schema: "site-stats-v1", as_of: "2026-10-12T15:15:26+00:00", figures: {
+      matches: { raw: 325, display: "325", label: "matches archived" },
+      corpus_matches: { raw: 45_500, display: "45,500", label: "matches studied", sublabel: "49 competitions since 2010" },
+      competitions: { raw: 11, display: "11", label: "competitions" },
+      markets: { raw: 1_688, display: "1,600+", label: "Kalshi markets tracked" },
+      tests: { raw: null, display: null, label: "backend test functions" },
+    } }) }));
+  await page.goto("/");
+  await expect(figures(page)).toHaveAttribute("data-source", "live");
+  expect(await shown(page)).toEqual([
+    BAKED[0], BAKED[1],
+    { key: "markets", label: "Kalshi markets tracked", value: "1,600+" },
+    BAKED[3],
+  ]);
+  for (const f of await shown(page)) expect(f.value, f.key).not.toMatch(/^[0,]+\+?$/);
+});
+
 /* THE REVIEW'S SENTENCE IS TRUE OF THE DATA. "The model leaned Atlético,
    the market and the board leaned Real, and Atlético won." is typed in
    components/landing/FullTime.tsx; each clause is derived here from the
