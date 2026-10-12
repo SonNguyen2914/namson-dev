@@ -127,11 +127,11 @@ test.describe("the card's model and market lines", () => {
 
   test("the verdict box: word, colour and solid or dashed", async ({ page }) => {
     const up = await ink(page, "text-up", "color");
-    const warn = await ink(page, "text-warn", "color");
+    const neg = await ink(page, "text-neg", "color");
     const low = await ink(page, "text-ink-low", "color");
     const watch = page.getByTestId("watch-toggle").first();
     const want = [
-      [IDS.conflict, "MODEL · CONFLICT", warn, "solid"],
+      [IDS.conflict, "MODEL · CONFLICT", neg, "solid"],
       [IDS.agree, "MODEL · AGREE", up, "solid"],
       [IDS.untested, "MODEL · AGREE", up, "dashed"],
       [IDS.noModel, "MODEL · NONE", low, "solid"],

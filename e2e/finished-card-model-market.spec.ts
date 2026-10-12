@@ -266,7 +266,7 @@ test.describe("a finished card with a lock", () => {
     await s.scrollIntoViewIfNeeded();
     await expect(s.getByTestId("mm-verdict")).toHaveText("MODEL · CONFLICT");
     expect(await s.getByTestId("mm-verdict").evaluate((e) => getComputedStyle(e).color))
-      .toBe(await ink(page, "text-warn"));
+      .toBe(await ink(page, "text-neg"));
     await expect(s.getByTestId("mm-model-h")).toHaveAttribute("data-top", "1");
     await expect(s.getByTestId("mm-market-a")).toHaveAttribute("data-top", "1");
     await expect(s.getByTestId("mm-model-h")).toHaveText("45.2%");

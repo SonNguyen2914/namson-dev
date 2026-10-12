@@ -1,0 +1,61 @@
+name: Prod watchdog
+
+# Pings the TRIVELA backend's readiness every 10 minutes and opens ONE GitHub
+# issue when it is down, so Son is notified on his phone. Added 2026-10-12
+# after a 10-hour outage (Railway usage-limit stop) went unnoticed. Lives in
+# this public repo because its Actions minutes are free. No secrets: it uses
+# only the workflow's own GITHUB_TOKEN to open, comment on and close issues.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+concurrency:
+  group: prod-watchdog
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check readiness (3 tries)
+        id: ready
+        run: |
+          ok=false
+          for i in 1 2 3; do
+            body=$(curl -s -m 30 https://wc26-bet-suggester-production.up.railway.app/api/ready || true)
+            if echo "$body" | grep -q '"ready":true'; then ok=true; break; fi
+            sleep 30
+          done
+          echo "ok=$ok" >> "$GITHUB_OUTPUT"
+          echo "detail=$(echo "$body" | head -c 300 | tr -d '\n\"')" >> "$GITHUB_OUTPUT"
+      - name: Open or update the outage issue
+        if: steps.ready.outputs.ok != 'true'
+        uses: actions/github-script@v7
+        env:
+          DETAIL: ${{ steps.ready.outputs.detail }}
+        with:
+          script: |
+            const title = "PROD DOWN: TRIVELA backend not ready";
+            const open = await github.paginate(github.rest.issues.listForRepo, {owner: context.repo.owner, repo: context.repo.repo, state: "open", labels: "prod-down"});
+            const body = `Readiness failed at ${new Date().toISOString()}.\n\nResponse: \`${process.env.DETAIL || "no response"}\`\n\nFirst checks: Railway usage limit (\`railway usage\`), \`railway status\`.`;
+            if (open.length) {
+              await github.rest.issues.createComment({owner: context.repo.owner, repo: context.repo.repo, issue_number: open[0].number, body});
+            } else {
+              await github.rest.issues.create({owner: context.repo.owner, repo: context.repo.repo, title, body, labels: ["prod-down"], assignees: [context.repo.owner]});
+            }
+      - name: Close the outage issue when back up
+        if: steps.ready.outputs.ok == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const open = await github.paginate(github.rest.issues.listForRepo, {owner: context.repo.owner, repo: context.repo.repo, state: "open", labels: "prod-down"});
+            for (const i of open) {
+              await github.rest.issues.createComment({owner: context.repo.owner, repo: context.repo.repo, issue_number: i.number, body: `Back up at ${new Date().toISOString()}.`});
+              await github.rest.issues.update({owner: context.repo.owner, repo: context.repo.repo, issue_number: i.number, state: "closed"});
+            }

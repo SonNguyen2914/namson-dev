@@ -228,7 +228,9 @@ export function ModelMarketLines({ mm, home, away, quote, kickedOff = false,
 const VERDICT = {
   agree: { word: "MODEL · AGREE", cls: "border-up/45 text-up",
            why: "Model and market rate the same outcome highest." },
-  conflict: { word: "MODEL · CONFLICT", cls: "border-warn/45 text-warn",
+  // Red, not amber (Son, 2026-10-12): when model and market split on the
+  // favourite the pick has won 18% against 33% priced — a warning, so neg.
+  conflict: { word: "MODEL · CONFLICT", cls: "border-neg/45 text-neg",
               why: "Model and market rate different outcomes highest." },
   no_model: { word: "MODEL · NONE", cls: "border-line text-ink-low",
               why: "Nothing to compare: there is no model read for this match." },
