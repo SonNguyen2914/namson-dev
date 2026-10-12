@@ -144,6 +144,60 @@ export function useReducedMotion(): boolean {
     () => window.matchMedia(RM).matches, () => false);
 }
 
+/** A CSS media query, SSR-safe: the server answers `fallback`, the client
+ *  answers on hydration (the same two-render shape as useReducedMotion). */
+export function useMediaQuery(query: string, fallback = false): boolean {
+  return useSyncExternalStore(
+    (fn) => {
+      const mq = window.matchMedia(query);
+      mq.addEventListener("change", fn);
+      return () => mq.removeEventListener("change", fn);
+    },
+    () => window.matchMedia(query).matches,
+    () => fallback);
+}
+
+// ---- the motion gate -------------------------------------------------
+/* THE MOTION GATE. Scenes pin only when motion is allowed AND the screen
+   is tall enough to hold a stage: 540px, or 620px from 1024px wide (a
+   short laptop window cannot hold the hero's first screen pinned).
+   Anything else renders every scene as its still.
+
+   A phone's address bar grows and shrinks the viewport by 50–100px as
+   the reader scrolls and must never re-flip the gate: the answer is
+   recomputed on a resize only when the width changed or the height moved
+   by 120px or more (a rotation, a window drag, a keyboard). */
+const gate = { w: 0, h: 0, on: true };
+const gateOpen = () => {
+  const w = window.innerWidth, h = window.innerHeight;
+  return !window.matchMedia(RM).matches && h >= 540 && !(w >= 1024 && h < 620);
+};
+function gateRead() {
+  if (typeof window === "undefined") return true;
+  if (gate.w === 0) { gate.w = window.innerWidth; gate.h = window.innerHeight; gate.on = gateOpen(); }
+  return gate.on;
+}
+function gateSubscribe(fn: () => void) {
+  const mq = window.matchMedia(RM);
+  const onChange = () => { gate.w = window.innerWidth; gate.h = window.innerHeight; gate.on = gateOpen(); fn(); };
+  const onResize = () => {
+    const w = window.innerWidth, h = window.innerHeight;
+    if (w === gate.w && Math.abs(h - gate.h) < 120) return;
+    onChange();
+  };
+  mq.addEventListener("change", onChange);
+  window.addEventListener("resize", onResize, { passive: true });
+  return () => {
+    mq.removeEventListener("change", onChange);
+    window.removeEventListener("resize", onResize);
+  };
+}
+/** True when the scenes may pin. The server renders the moving page
+ *  (true) and the client answers on hydration. */
+export function useMotionGate(): boolean {
+  return useSyncExternalStore(gateSubscribe, gateRead, () => true);
+}
+
 /** The size of an element, measured by ResizeObserver. `fallback` is
  *  what the server renders with (and what the first client render uses,
  *  so hydration matches); the real size arrives a frame later. */

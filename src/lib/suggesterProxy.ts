@@ -438,6 +438,17 @@ export const LEAGUE_PROXY_ALLOWED: Record<string, readonly string[]> = {
   // `review` (2026-09-27): the national finished tail, read from the
   // backend's match archive — GET-only and it writes nothing either.
   championships: ["board", "review"],
+  // THE HOME PAGE'S RECORD NUMBERS (2026-10-12): `site/stats`, schema
+  // site-stats-v1 — four counts (matches studied, competitions, Kalshi
+  // markets, backend test functions) each as `raw` and a `display` floor.
+  // Public, GET-only and provider-free on the backend (a COUNT over the
+  // match archive, a committed manifest, the registry and two numbers
+  // held in memory; src/site_stats.py), cached there for ten minutes. It
+  // reaches no board and writes nothing. The home page reads it once per
+  // visit and falls back to its baked figures when this answers anything
+  // else (components/landing/useSiteStats.ts); reached through the
+  // dynamic `[league]/[...path].ts` proxy, so no file of its own.
+  site: ["stats"],
   // COMP HAS NO LITERAL ROUTES — every one of its paths begins with a
   // competition KEY, so its whole surface lives in the id-route table
   // below. It is listed here anyway, with an empty list, because THIS

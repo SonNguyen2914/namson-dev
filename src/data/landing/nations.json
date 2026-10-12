@@ -1,0 +1,583 @@
+{
+ "about": "Every national team of the three Championships-board national competitions on the national plane, as GET /api/field/nations served it (v2.1 bundle, read-only, committed bytes; no board, no capture). Re-verified 2026-10-07 (the draft carried the same 139 values from 2 Oct). Only the competition, the team and the rating are kept, in ascending rating order. This axis is the national plane’s own: never the club axis.",
+ "route": "GET /api/field/nations",
+ "fetched": "2026-10-07",
+ "passes": 5,
+ "corpus_sha256": "2164771f",
+ "competitions": [
+  {
+   "key": "unl",
+   "display": "UEFA Nations League",
+   "teams": [
+    {
+     "team": "San Marino",
+     "elo": 923
+    },
+    {
+     "team": "Liechtenstein",
+     "elo": 992
+    },
+    {
+     "team": "Gibraltar",
+     "elo": 1117
+    },
+    {
+     "team": "Andorra",
+     "elo": 1156
+    },
+    {
+     "team": "Lithuania",
+     "elo": 1315
+    },
+    {
+     "team": "Latvia",
+     "elo": 1318
+    },
+    {
+     "team": "Moldova",
+     "elo": 1321
+    },
+    {
+     "team": "Malta",
+     "elo": 1343
+    },
+    {
+     "team": "Cyprus",
+     "elo": 1363
+    },
+    {
+     "team": "Faroe Islands",
+     "elo": 1371
+    },
+    {
+     "team": "Armenia",
+     "elo": 1394
+    },
+    {
+     "team": "Azerbaijan",
+     "elo": 1397
+    },
+    {
+     "team": "Estonia",
+     "elo": 1407
+    },
+    {
+     "team": "Kazakhstan",
+     "elo": 1437
+    },
+    {
+     "team": "Luxembourg",
+     "elo": 1454
+    },
+    {
+     "team": "Bulgaria",
+     "elo": 1478
+    },
+    {
+     "team": "Montenegro",
+     "elo": 1493
+    },
+    {
+     "team": "Belarus",
+     "elo": 1530
+    },
+    {
+     "team": "Finland",
+     "elo": 1544
+    },
+    {
+     "team": "North Macedonia",
+     "elo": 1555
+    },
+    {
+     "team": "Iceland",
+     "elo": 1558
+    },
+    {
+     "team": "Albania",
+     "elo": 1561
+    },
+    {
+     "team": "Northern Ireland",
+     "elo": 1569
+    },
+    {
+     "team": "Bosnia-Herzegovina",
+     "elo": 1578
+    },
+    {
+     "team": "Israel",
+     "elo": 1609
+    },
+    {
+     "team": "Georgia",
+     "elo": 1621
+    },
+    {
+     "team": "Romania",
+     "elo": 1623
+    },
+    {
+     "team": "Kosovo",
+     "elo": 1634
+    },
+    {
+     "team": "Slovakia",
+     "elo": 1635
+    },
+    {
+     "team": "Republic of Ireland",
+     "elo": 1636
+    },
+    {
+     "team": "Wales",
+     "elo": 1653
+    },
+    {
+     "team": "Slovenia",
+     "elo": 1680
+    },
+    {
+     "team": "Scotland",
+     "elo": 1700
+    },
+    {
+     "team": "Hungary",
+     "elo": 1704
+    },
+    {
+     "team": "Czechia",
+     "elo": 1704
+    },
+    {
+     "team": "Poland",
+     "elo": 1707
+    },
+    {
+     "team": "Greece",
+     "elo": 1707
+    },
+    {
+     "team": "Serbia",
+     "elo": 1714
+    },
+    {
+     "team": "Sweden",
+     "elo": 1716
+    },
+    {
+     "team": "Ukraine",
+     "elo": 1763
+    },
+    {
+     "team": "Austria",
+     "elo": 1795
+    },
+    {
+     "team": "Türkiye",
+     "elo": 1796
+    },
+    {
+     "team": "Denmark",
+     "elo": 1808
+    },
+    {
+     "team": "Switzerland",
+     "elo": 1831
+    },
+    {
+     "team": "Norway",
+     "elo": 1831
+    },
+    {
+     "team": "Croatia",
+     "elo": 1855
+    },
+    {
+     "team": "Italy",
+     "elo": 1866
+    },
+    {
+     "team": "Belgium",
+     "elo": 1875
+    },
+    {
+     "team": "Germany",
+     "elo": 1878
+    },
+    {
+     "team": "Netherlands",
+     "elo": 1888
+    },
+    {
+     "team": "Portugal",
+     "elo": 1923
+    },
+    {
+     "team": "England",
+     "elo": 1937
+    },
+    {
+     "team": "France",
+     "elo": 1971
+    },
+    {
+     "team": "Spain",
+     "elo": 2051
+    }
+   ]
+  },
+  {
+   "key": "cnl",
+   "display": "Concacaf Nations League",
+   "teams": [
+    {
+     "team": "US Virgin Islands",
+     "elo": 1051
+    },
+    {
+     "team": "Bahamas",
+     "elo": 1067
+    },
+    {
+     "team": "Anguilla",
+     "elo": 1090
+    },
+    {
+     "team": "British Virgin Islands",
+     "elo": 1106
+    },
+    {
+     "team": "Turks and Caicos Islands",
+     "elo": 1131
+    },
+    {
+     "team": "Cayman Islands",
+     "elo": 1158
+    },
+    {
+     "team": "Antigua and Barbuda",
+     "elo": 1196
+    },
+    {
+     "team": "Bonaire",
+     "elo": 1199
+    },
+    {
+     "team": "Barbados",
+     "elo": 1218
+    },
+    {
+     "team": "Dominica",
+     "elo": 1262
+    },
+    {
+     "team": "Aruba",
+     "elo": 1268
+    },
+    {
+     "team": "St. Kitts and Nevis",
+     "elo": 1296
+    },
+    {
+     "team": "St. Martin",
+     "elo": 1299
+    },
+    {
+     "team": "St. Lucia",
+     "elo": 1308
+    },
+    {
+     "team": "Grenada",
+     "elo": 1317
+    },
+    {
+     "team": "Sint Maarten",
+     "elo": 1331
+    },
+    {
+     "team": "Belize",
+     "elo": 1332
+    },
+    {
+     "team": "Bermuda",
+     "elo": 1351
+    },
+    {
+     "team": "Montserrat",
+     "elo": 1352
+    },
+    {
+     "team": "Puerto Rico",
+     "elo": 1364
+    },
+    {
+     "team": "St. Vincent and the Grenadines",
+     "elo": 1384
+    },
+    {
+     "team": "French Guiana",
+     "elo": 1407
+    },
+    {
+     "team": "Cuba",
+     "elo": 1432
+    },
+    {
+     "team": "Dominican Republic",
+     "elo": 1452
+    },
+    {
+     "team": "Guyana",
+     "elo": 1468
+    },
+    {
+     "team": "Martinique",
+     "elo": 1471
+    },
+    {
+     "team": "Nicaragua",
+     "elo": 1473
+    },
+    {
+     "team": "Guadeloupe",
+     "elo": 1483
+    },
+    {
+     "team": "El Salvador",
+     "elo": 1485
+    },
+    {
+     "team": "Trinidad and Tobago",
+     "elo": 1502
+    },
+    {
+     "team": "Curaçao",
+     "elo": 1513
+    },
+    {
+     "team": "Suriname",
+     "elo": 1545
+    },
+    {
+     "team": "Guatemala",
+     "elo": 1573
+    },
+    {
+     "team": "Haiti",
+     "elo": 1607
+    },
+    {
+     "team": "Honduras",
+     "elo": 1610
+    },
+    {
+     "team": "Jamaica",
+     "elo": 1619
+    },
+    {
+     "team": "Costa Rica",
+     "elo": 1665
+    }
+   ]
+  },
+  {
+   "key": "afcon",
+   "display": "AFCON qualifying",
+   "teams": [
+    {
+     "team": "Somalia",
+     "elo": 1311
+    },
+    {
+     "team": "South Sudan",
+     "elo": 1316
+    },
+    {
+     "team": "Congo",
+     "elo": 1345
+    },
+    {
+     "team": "Lesotho",
+     "elo": 1387
+    },
+    {
+     "team": "Central African Republic",
+     "elo": 1403
+    },
+    {
+     "team": "Liberia",
+     "elo": 1407
+    },
+    {
+     "team": "Guinea-Bissau",
+     "elo": 1417
+    },
+    {
+     "team": "Malawi",
+     "elo": 1423
+    },
+    {
+     "team": "Burundi",
+     "elo": 1437
+    },
+    {
+     "team": "Ethiopia",
+     "elo": 1438
+    },
+    {
+     "team": "Eritrea",
+     "elo": 1442
+    },
+    {
+     "team": "Sierra Leone",
+     "elo": 1445
+    },
+    {
+     "team": "Botswana",
+     "elo": 1455
+    },
+    {
+     "team": "Tanzania",
+     "elo": 1458
+    },
+    {
+     "team": "Niger",
+     "elo": 1470
+    },
+    {
+     "team": "Namibia",
+     "elo": 1472
+    },
+    {
+     "team": "Rwanda",
+     "elo": 1473
+    },
+    {
+     "team": "Madagascar",
+     "elo": 1483
+    },
+    {
+     "team": "Mozambique",
+     "elo": 1489
+    },
+    {
+     "team": "Sudan",
+     "elo": 1490
+    },
+    {
+     "team": "Equatorial Guinea",
+     "elo": 1491
+    },
+    {
+     "team": "Zambia",
+     "elo": 1497
+    },
+    {
+     "team": "Zimbabwe",
+     "elo": 1507
+    },
+    {
+     "team": "Togo",
+     "elo": 1516
+    },
+    {
+     "team": "Comoros",
+     "elo": 1518
+    },
+    {
+     "team": "Kenya",
+     "elo": 1523
+    },
+    {
+     "team": "Libya",
+     "elo": 1525
+    },
+    {
+     "team": "Mauritania",
+     "elo": 1526
+    },
+    {
+     "team": "Guinea",
+     "elo": 1535
+    },
+    {
+     "team": "Benin",
+     "elo": 1539
+    },
+    {
+     "team": "Uganda",
+     "elo": 1544
+    },
+    {
+     "team": "Gambia",
+     "elo": 1554
+    },
+    {
+     "team": "Gabon",
+     "elo": 1564
+    },
+    {
+     "team": "Ghana",
+     "elo": 1595
+    },
+    {
+     "team": "Angola",
+     "elo": 1616
+    },
+    {
+     "team": "South Africa",
+     "elo": 1623
+    },
+    {
+     "team": "Burkina Faso",
+     "elo": 1651
+    },
+    {
+     "team": "Mali",
+     "elo": 1666
+    },
+    {
+     "team": "Cape Verde",
+     "elo": 1668
+    },
+    {
+     "team": "Tunisia",
+     "elo": 1669
+    },
+    {
+     "team": "Cameroon",
+     "elo": 1672
+    },
+    {
+     "team": "Congo DR",
+     "elo": 1686
+    },
+    {
+     "team": "Nigeria",
+     "elo": 1740
+    },
+    {
+     "team": "Ivory Coast",
+     "elo": 1771
+    },
+    {
+     "team": "Egypt",
+     "elo": 1777
+    },
+    {
+     "team": "Senegal",
+     "elo": 1783
+    },
+    {
+     "team": "Algeria",
+     "elo": 1821
+    },
+    {
+     "team": "Morocco",
+     "elo": 1891
+    }
+   ]
+  }
+ ]
+}

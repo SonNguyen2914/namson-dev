@@ -1,7 +1,7 @@
 {
-"about": "Every current-season club of the eight board leagues on the overall axis of the league field, as GET /api/field/leagues served it (read-only, committed bytes; no board, no capture). Fetched once while authoring the landing page, 2026-10-02. Only club, column and the rating are kept.",
+"about": "Every current-season club of the eight board leagues on the overall axis of the league field, as GET /api/field/leagues served it (read-only, committed bytes; no board, no capture). Fetched while authoring the landing page, 2026-10-02, and re-verified identical on 2026-10-07. Only club, column and the rating are kept.",
 "route": "GET /api/field/leagues",
-"fetched": "2026-10-02",
+"fetched": "2026-10-07",
 "passes": 10,
 "corpus_sha256": "bf58f88facb0378a4e70fd294ba85c96b03521b81720f8b6cc93be349bac5695",
 "slices_sha256": "a5fcf62bb277fec3b92db1d681391d68de71da7f1607b2d055d1672f89edfc1b",

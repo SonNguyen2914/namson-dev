@@ -254,6 +254,23 @@ test("the laliga proxy refuses approval, which the backend never served",
     expect(await r.text()).toContain("unknown laliga route");
   });
 
+test("the site proxy forwards stats, the home page's record numbers, and only that",
+  async ({ request }) => {
+    // The home page reads GET /api/site/stats (site-stats-v1) for its
+    // four record figures. The prefix has no directory of its own, so
+    // this is also the proof that the dynamic [league] handler reaches
+    // it. Pinned by name, not only by the derived passes above, so the
+    // list cannot be widened (or the page's one read dropped) without
+    // this saying so.
+    expect(LEAGUE_PROXY_ALLOWED.site).toEqual(["stats"]);
+    await expectForwarded(request, "site", "stats");
+    for (const other of ["stat", "stats/extra", "ready", "figures"]) {
+      const r = await request.get(`/api/site/${other}`);
+      expect(r.status(), `site/${other} must be refused`).toBe(404);
+      expect(await r.text()).toContain("unknown site route");
+    }
+  });
+
 test("each proxy still refuses a route that is on no list",
   async ({ request }) => {
     // DERIVED over every prefix (2026-09-07). This used to name four of

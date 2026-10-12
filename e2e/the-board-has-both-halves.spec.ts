@@ -14,10 +14,10 @@ import { test, expect, type Page } from "@playwright/test";
        changes nothing (round 9: the single frame flipped, under the
        reader's eyes, to a one-column capture that left half of it
        black; round 10: the club frame was cut through its neighbours);
-     - AT 1024, 1440 AND 1920 the heading, the intro and the pair span
-       the same content column as the section below, and the heading
-       keeps to two lines (round 9 capped them at 1020px: a 220px empty
-       band at 1440, a three-line heading at 1920);
+     - AT 1024, 1440 AND 1920 the heading row and the pair share the
+       page's centre and the intro's lines end on the row's edge (v8,
+       2026-10-12: the board settles inside one screen, so the pair is
+       narrower than the content column — rounds 9–12 spanned it);
      - ON A PHONE (390) the board's own switch: a real button group, two
        buttons, `aria-pressed`, Leagues first and pressed, each at least
        44px tall; a press swaps which capture is shown and which is
@@ -39,13 +39,11 @@ import { test, expect, type Page } from "@playwright/test";
      - each crop is one card wide, border to border, so the Nations
        League date rule ends where the card does (round 11: it ran ~6px
        past the card's right edge — the capture's own edge);
-     - and the intro under the heading is two even lines from 390 to
-       1920 (round 10: "picked." alone on a third line at 1920, on a
-       second at 768), and beside the heading (1024–1920) both lines END
-       on the frames' right edge (round 11: flush left, it stopped ~44px
-       short of it);
-     - and none of it fetches anything: the home page makes no /api/
-       request at all (the board routes WRITE a snapshot per read).
+     - and the intro under the heading leaves no word alone on its
+       last line (v8's intro is three to five lines, not two);
+     - and none of it reads a board: the home page's only /api/ request
+       is /api/site/stats, the record's numbers (the board routes WRITE a
+       snapshot per read).
    And the one automatic flip, phones only: once the frame's middle has
    passed a quarter of the screen it shows Championships, and back below
    35% — but not under reduced motion, not while focus is inside the
@@ -123,8 +121,10 @@ async function pairState(page: Page) {
    side, and the card's own border box (each crop is one card wide). */
 const GAP_NUMBER: Record<string, {
   num: number[]; under: number[][]; below: number[][]; card: number[] }> = {
-  "board-leagues-eredivisie.jpg": { num: [560, 389, 677, 419], under: [[580, 435, 675, 450]],
-    below: [[529, 532, 640, 549]], card: [0, 298, 712, 800] },
+  /* the derby card (landing v8, 2026-10-12): "+0.58", "GD/G GAP" under
+     it, the "gp 6/6" end of the stats row below, the card's gold border */
+  "board-leagues-laliga-derby.jpg": { num: [560, 352, 676, 382], under: [[581, 398, 675, 413]],
+    below: [[421, 495, 494, 514]], card: [0, 259, 712, 755] },
   "board-championships-unl.jpg": { num: [861, 459, 930, 489], under: [[620, 506, 928, 543]],
     below: [[34, 600, 418, 630]], card: [0, 362, 966, 868] },
 };
@@ -216,7 +216,9 @@ test("on a wide screen both halves are shown at once, side by side, and nothing 
     for (const f of await framesAndPins(page)) {
       expect(Math.min(...f.inset), JSON.stringify(f)).toBeGreaterThanOrEqual(8);
     }
-    expect(a[0].w).toBeGreaterThan(400);
+    // v8 (2026-10-12): the pair settles inside one screen, so the club
+    // frame is ~384px at 1440x900 — the approved draft's own width
+    expect(a[0].w).toBeGreaterThan(360);
     // scrolling the frames through the whole screen changes nothing
     for (const share of [0.7, 0.3, 0.1, -0.5, 0.7]) {
       await page.evaluate((share) => {
@@ -228,30 +230,32 @@ test("on a wide screen both halves are shown at once, side by side, and nothing 
       expect((await pairState(page)).map((c) => c.opacity)).toEqual([1, 1]);
     }
     await page.waitForLoadState("networkidle");
-    expect(api, "the home page reached for the backend").toEqual([]);
+    expect(api.map((u) => new URL(u).pathname),
+      "the home page reached for something other than the record numbers")
+      .toEqual(["/api/site/stats"]);
   });
 
-for (const width of [1024, 1440, 1920]) {
-  test(`the board spans the page's one content column and its heading keeps to two lines — ${width}px`,
+for (const [width, height] of [[1024, 768], [1440, 900], [1920, 1080]] as const) {
+  test(`the board's heading, intro and pair share one centre, and the intro ends on the pictures' column — ${width}px`,
     async ({ page }) => {
-      await page.setViewportSize({ width, height: 900 });
+      /* CHANGED ON PURPOSE (landing v8, 2026-10-12). Rounds 9–12 spanned
+         the board across the page's 1240px content column. The approved
+         v8 draft settles the board inside ONE screen from 1024px
+         (Board.tsx scales the pair to fit), so the pair is narrower than
+         the column and centred on the page, and the heading + intro row
+         sits centred over it. Measured off the draft at these sizes and
+         matched by the port within 1px: grid [312,1129] / pair
+         [262,1178] at 1440x900; [340,1580] / [266,1654] at 1920x1080. */
+      await page.setViewportSize({ width, height });
       await openSection(page);
       await page.evaluate(() => document.fonts.ready);
       const m = await page.evaluate(() => {
-        const content = (sec: Element) => {
-          const b = sec.getBoundingClientRect(), cs = getComputedStyle(sec);
-          return [b.left + parseFloat(cs.paddingLeft), b.right - parseFloat(cs.paddingRight)]
-            .map(Math.round);
-        };
         const edges = (el: Element) => {
           const b = el.getBoundingClientRect();
-          return [Math.round(b.left), Math.round(b.right)];
+          return [b.left, b.right];
         };
         const h2 = document.getElementById("landing-board")!;
         const grid = h2.parentElement!.parentElement!;
-        const r = document.createRange();
-        r.selectNodeContents(h2);
-        // where each line of the intro ENDS (its last text run's right)
         const ir = document.createRange();
         ir.selectNodeContents(grid.lastElementChild!);
         const ends = new Map<number, number>();
@@ -260,25 +264,25 @@ for (const width of [1024, 1440, 1920]) {
           ends.set(k, Math.max(ends.get(k) ?? -Infinity, b.right));
         }
         return {
-          board: content(h2.closest("section")!),
-          below: content(document.getElementById("landing-record")!.closest("section")!),
+          vw: document.documentElement.clientWidth,
           grid: edges(grid),
           intro: edges(grid.lastElementChild!),
           pair: edges(document.querySelector('[data-testid="board-shot-pair"]')!),
-          lines: new Set([...r.getClientRects()].map((x) => Math.round(x.top))).size,
           introEnds: [...ends.values()],
         };
       });
       const said = JSON.stringify(m);
-      expect(m.board, said).toEqual(m.below);
-      expect(m.grid, said).toEqual(m.below);
-      expect(m.pair, said).toEqual(m.below);
-      // the intro ends where the pictures end — its box, and every line
-      // of its text (set right: balanced lines are shorter than the box)
-      expect(m.intro[1], said).toBe(m.pair[1]);
-      expect(m.introEnds.length, said).toBe(2);
-      for (const e of m.introEnds) expect(Math.abs(e - m.pair[1]), said).toBeLessThanOrEqual(1);
-      expect(m.lines, said).toBe(2);
+      const mid = (e: number[]) => (e[0] + e[1]) / 2;
+      // one centre: the page's, the pair's and the heading row's
+      expect(Math.abs(mid(m.pair) - m.vw / 2), said).toBeLessThanOrEqual(1.5);
+      expect(Math.abs(mid(m.grid) - mid(m.pair)), said).toBeLessThanOrEqual(1.5);
+      // the heading row sits inside the pictures' span, never past it
+      expect(m.grid[0], said).toBeGreaterThanOrEqual(m.pair[0] - 1);
+      expect(m.grid[1], said).toBeLessThanOrEqual(m.pair[1] + 1);
+      // the intro's box and every line of its text end on the row's edge
+      expect(Math.abs(m.intro[1] - m.grid[1]), said).toBeLessThanOrEqual(1);
+      expect(m.introEnds.length, said).toBeGreaterThanOrEqual(2);
+      for (const e of m.introEnds) expect(Math.abs(e - m.grid[1]), said).toBeLessThanOrEqual(1);
     });
 }
 
@@ -297,7 +301,7 @@ for (const [w, h] of [[390, 844], [768, 1024]] as const) {
       const said = JSON.stringify(seen);
       // the wide pair's own crops: one whole column each, one card
       expect(seen.map((f) => f.file).sort(), said)
-        .toEqual(["board-championships-unl.jpg", "board-leagues-eredivisie.jpg"]);
+        .toEqual(["board-championships-unl.jpg", "board-leagues-laliga-derby.jpg"]);
       // one scale, so the type is one size in both; one height
       expect(Math.abs(seen[0].scale / seen[1].scale - 1), said).toBeLessThan(0.002);
       expect(Math.abs((seen[0].img[3] - seen[0].img[1]) - (seen[1].img[3] - seen[1].img[1])), said)
@@ -371,7 +375,10 @@ for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1440, 900], [1920, 
 }
 
 for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1440, 900], [1920, 1080]] as const) {
-  test(`the intro is two even lines, no word left alone — ${w}px`, async ({ page }) => {
+  /* v8 (2026-10-12): the approved draft's intro is longer ("On this
+     card, Real Madrid by a little…"), three to five lines; the claim
+     that stays is the one about a word left alone on its last line */
+  test(`the intro has no word left alone — ${w}px`, async ({ page }) => {
     await page.setViewportSize({ width: w, height: h });
     await openSection(page);
     await page.evaluate(() => document.fonts.ready);
@@ -387,9 +394,9 @@ for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1440, 900], [1920, 
       }
       return [...by.values()].map(Math.round);
     });
-    expect(lines.length, JSON.stringify(lines)).toBe(2);
-    expect(Math.min(...lines) / Math.max(...lines), JSON.stringify(lines))
-      .toBeGreaterThanOrEqual(0.6);
+    expect(lines.length, JSON.stringify(lines)).toBeGreaterThanOrEqual(2);
+    expect(lines.at(-1)! / Math.max(...lines), JSON.stringify(lines))
+      .toBeGreaterThanOrEqual(0.4);
   });
 }
 
@@ -435,7 +442,9 @@ test("on a phone the switch shows clubs, then national teams, and fetches nothin
     expect((await frameState(page)).frameH).toBe(before.frameH);
 
     await page.waitForLoadState("networkidle");
-    expect(api, "the home page reached for the backend").toEqual([]);
+    expect(api.map((u) => new URL(u).pathname),
+      "the home page reached for something other than the record numbers")
+      .toEqual(["/api/site/stats"]);
   });
 
 /** scroll so the phone frame's middle sits at this share of the viewport */

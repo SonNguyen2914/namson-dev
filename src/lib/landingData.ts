@@ -7,6 +7,9 @@
 //   data/landing/field.json  GET /api/field/leagues — committed bytes
 //                            (backend src/picker/field_page.py: "no
 //                            board, no capture, no write")
+//   data/landing/nations.json GET /api/field/nations — the national
+//                            plane's 139 teams (v2.1 bundle, same rules
+//                            as the league field)
 //   data/landing/derby.json  GET /api/minutes/laliga/401882865 — stored
 //                            rows only (backend src/live/minutes.py)
 //
@@ -21,6 +24,7 @@
 // the same two numbers it is printed beside (AGENTS.md §3).
 import field from "../data/landing/field.json";
 import derby from "../data/landing/derby.json";
+import nations from "../data/landing/nations.json";
 
 export type Tri = { home: number; draw: number; away: number };
 export type Outcome = keyof Tri;
@@ -35,6 +39,15 @@ export const FIELD = field as unknown as {
    *  reads as lib/pickerApi.HOME_ELO. Baked rather than imported so this
    *  page does not load the board's API module for one number. */
   home_term_elo: number;
+};
+
+/** The national plane: the three national competitions of the
+ *  Championships board, each team at its own rating, ascending. Its axis
+ *  is its own (900–2,100) and is never drawn on the club axis. */
+export type NationTeam = { team: string; elo: number };
+export const NATIONS = nations as unknown as {
+  route: string; fetched: string; passes: number; corpus_sha256: string;
+  competitions: { key: string; display: string; teams: NationTeam[] }[];
 };
 
 export type Minute = {
