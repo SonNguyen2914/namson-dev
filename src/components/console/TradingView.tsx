@@ -146,7 +146,8 @@ const carefulLine = (c: NonNullable<Candidate["careful"]>) =>
   `careful ${c.score ?? "?"}/${c.score_of ?? 5}${c.score_of === 3 ? " (in-play ladder)" : ""}`
   + `${c.signals !== null ? ` · signals: ${c.signals.length ? c.signals.join(", ") : "none"}` : ""}`
   + ` · ${c.size === null ? "size not sent" : c.size > 0 ? `$${c.size}` : "paper"}`
-  + `${c.ground ? ` · ${c.ground}` : ""}${c.data_error ? " · probable data error" : ""}`;
+  + `${c.ground ? ` · ${c.ground}` : ""}${c.data_error ? " · probable data error" : ""}`
+  + `${c.sizing ? ` · shadow size ${c.sizing}` : ""}`;
 
 /** one dense grid cell: never wraps, top-aligned */
 const CELL = "whitespace-nowrap border-b border-tc-line px-2.5 py-1 align-top";
@@ -337,6 +338,9 @@ function CandidateInspector({ r, c, gone, actionsMeaning }: {
             )}
             <KV k="size">{r.careful.size === null ? DASH : r.careful.size > 0 ? `$${r.careful.size} (worst case)` : "paper"}</KV>
             <KV k="ground">{r.careful.ground ?? DASH}</KV>
+            {r.careful.sizing !== null && (
+              <KV k="would-be size (shadow)" testid="insp-careful-sizing">{r.careful.sizing}</KV>
+            )}
             {r.careful.data_error && <KV k="data check"><span className="text-warn">◆ edge above the ceiling: probable data error, never bet</span></KV>}
           </div>
         ) : <KV k="careful">not judged by the careful strategy on this row</KV>}

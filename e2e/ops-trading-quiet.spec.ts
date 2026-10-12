@@ -75,7 +75,8 @@ test.describe("the quiet pass keeps every long word one tap away", () => {
   test("the careful score: out of 3 on the in-play ladder with its signals, out of 5 pre-match (#112)", async ({ page }) => {
     const rows = qaCandidateRows();
     const ladder = { score: 2, score_of: 3, signals: ["deep", "fresh"], size: "1", ground: "inplay_buying", data_error: false };
-    const pre = { score: 4, size: "2", ground: "family:GAME", data_error: false };
+    const pre = { score: 4, size: "2", ground: "family:GAME", data_error: false,
+      sizing: "⅛K on lb 0.31¢ → $0.42 (tier $2)" };
     rows[0] = { ...rows[0], careful: ladder };
     rows[1] = { ...rows[1], careful: pre };
     await open(page, { hash: "#trading", cand: qaCandidates({ rows }) });
@@ -91,6 +92,12 @@ test.describe("the quiet pass keeps every long word one tap away", () => {
     await inplay.click();
     await expect(page.getByTestId("insp-careful-score")).toContainText("2/3 (the in-play three-point ladder)");
     await expect(page.getByTestId("insp-careful-signals")).toContainText("deep, fresh");
+    // (#248) the would-be shadow size, only where the backend sent one
+    await expect(page.getByTestId("insp-careful-sizing")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(prem.getByTestId("cand-careful-tag")).toHaveAttribute("title", /shadow size ⅛K on lb 0\.31¢/);
+    await prem.click();
+    await expect(page.getByTestId("insp-careful-sizing")).toContainText("⅛K on lb 0.31¢ → $0.42 (tier $2)");
   });
 
   test("all normal: no Safety panel; the kill how-to and the lift are in the rail's Controls", async ({ page }) => {

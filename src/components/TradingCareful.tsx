@@ -19,7 +19,17 @@
 //   * the grounds' paper and real evidence (n, matches, mean CLV after the
 //     fee and its match-clustered 95% range), promoted and probation
 //     grounds, and the section-4 events (checks and proposals);
-//   * the knobs in force.
+//   * the knobs in force;
+//   * (2026-10-12, backend #246) the paper grounds by gate verdict and near
+//     miss (`grounds_by_verdict`: gate:pass, gate:books_only,
+//     gate:model_only, gate:none, near:books, near:model, near:both), beside
+//     the bands and families. PAPER ONLY;
+//   * (2026-10-12, backend #248, §42) bet sizing in SHADOW mode (`sizing`):
+//     the mode, the code's live lock, the knobs, and the newest tick's
+//     would-be sizes (`tick.sizing`). Nothing here is money.
+// The in-play paper ground (`inplay:*`, e.g. inplay:sell_trailer_first_goal)
+// rides in grounds_paper, but its numbers are settled RESULTS under the
+// second seal until 2026-11-08: only its counts (n, matches) are drawn.
 // The DAILY BUDGET and the PER-KICKOFF-HOUR usage are money at risk, so
 // they are drawn with the capital on Overview (components/console/
 // Overview.tsx). A block the backend does not send reads "not served yet",
@@ -47,6 +57,24 @@ const c2 = (v: unknown) => {
   return n === null ? "—" : `${n >= 0 ? "+" : "−"}${Math.abs(n).toFixed(2)}c`;
 };
 const NOT_SERVED = "not served yet";
+/** a ground whose result numbers are sealed (second-seal look, until
+ *  2026-11-08): counts only, never its mean, interval or wins */
+export const isSealedGround = (g: string) => g.startsWith("inplay:");
+/** the gate-verdict grounds, in the backend's order
+ *  (careful.MEASUREMENT_GROUNDS) */
+export const VERDICT_GROUNDS = ["gate:pass", "gate:books_only", "gate:model_only",
+  "gate:none", "near:books", "near:model", "near:both"] as const;
+
+/** The careful section header's sizing words, e.g. "Sizing: shadow (live
+ *  locked)"; null from a backend that does not send the block. */
+export function sizingHeadline(v: unknown): string | null {
+  const s = obj(v);
+  if (!s) return null;
+  const mode = str(s.mode);
+  const lock = s.live_allowed === false ? " (live locked)"
+    : s.live_allowed === true ? " (live allowed)" : "";
+  return `Sizing: ${mode ?? "mode not stated"}${lock}`;
+}
 
 function Cell({ k, v, sub, tone, inline }: { k: string; v: string; sub?: string; tone?: string; inline?: string }) {
   return (
@@ -103,6 +131,14 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
   const gp = obj(c?.grounds_paper) ?? {};
   const gr = obj(c?.grounds_real) ?? {};
   const knobs = obj(c?.knobs);
+  const verdict = obj(c?.grounds_by_verdict);
+  const vGrounds = obj(verdict?.grounds);
+  const vMeans = obj(verdict?.means) ?? {};
+  const sizing = obj(c?.sizing);
+  const sizingWords = sizingHeadline(c?.sizing);
+  const sizingKnobs = obj(sizing?.knobs);
+  const tickSizing = obj(tick?.sizing);
+  const tickBinding = obj(tickSizing?.binding);
   const events = Array.isArray(c?.events) ? (c?.events as unknown[]) : [];
 
   const de = num(tick?.data_errors) ?? 0;
@@ -113,6 +149,7 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
     ? `pre-match ${num(tick.data_errors_pre_match) ?? "—"} · in play ${num(tick.data_errors_in_play)}` : null;
   const summary = !c ? [plain(NOT_SERVED)] : typeof c.error === "string" ? [warn("block failed")] : line(
     plain(c.enabled === true ? "on" : "off"),
+    plain(sizingWords ?? `Sizing: ${NOT_SERVED}`),
     tick ? plain(`${num(tick.funded) ?? "—"} / ${num(tick.qualifying) ?? "—"} funded`) : null,
     plain(`${Object.values(comps).filter((v) => obj(v)?.on === false).length} paper-only`),
     de > 0 ? warn(`${de} data errors${split ? ` (${split})` : ""}`, "data errors") : null,
@@ -121,6 +158,9 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
   );
   return (
     <Panel testid="ops-careful" title="Careful strategy" cid="careful" summary={summary}
+      meta={c && typeof c.error !== "string" ? (
+        <span data-testid="careful-sizing-mode" title="Bet sizing (§42): shadow records the size Kelly would give; real orders keep their tiers">
+          {sizingWords ?? `Sizing: ${NOT_SERVED}`}</span>) : undefined}
       info={<>Real money only on match winner, directly priced totals and
         both-teams-to-score; everything else is paper. A bet needs the bookmakers AND our model to clear the bar.</>}>
       <div>
@@ -262,19 +302,98 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
               {" · "}probation: {Array.isArray(c.probation) && c.probation.length ? (c.probation as string[]).join(", ") : "none"}
             </p>
             <ul data-testid="careful-grounds" className="mt-1.5 divide-y divide-tc-line text-[12.5px]">
-              {[...Object.entries(gp).map(([g, v]) => [g, v, "paper"] as const),
+              {[...Object.entries(gp).filter(([g]) => !(vGrounds && g in vGrounds))
+                .map(([g, v]) => [g, v, "paper"] as const),
                 ...Object.entries(gr).map(([g, v]) => [g, v, "real"] as const)].map(([g, v, kind]) => {
                 const s = obj(v) ?? {};
+                const sealed = isSealedGround(g);
                 return (
-                  <li key={`${kind}:${g}`} className="flex flex-wrap justify-between gap-2 py-0.5">
+                  <li key={`${kind}:${g}`} data-testid="careful-ground" data-ground={g}
+                    data-sealed={sealed ? "true" : undefined} className="flex flex-wrap justify-between gap-2 py-0.5">
                     <span className="text-ink-hi"><span className="font-mono text-[11.5px]">{g}</span> <span className="text-ink-low">({kind})</span></span>
-                    <span className="tc-num text-ink-mid">
-                      n {num(s.n) ?? "—"} · {num(s.matches) ?? "—"} matches · {c2(s.mean)}
-                      {num(s.lo) !== null ? ` [${c2(s.lo)}, ${c2(s.hi)}]` : ""}
-                    </span>
+                    {sealed ? (
+                      <span className="tc-num text-ink-mid" title="Its results are sealed until 8 Nov (second-seal look): counts only">
+                        n {num(s.n) ?? "—"} · {num(s.matches) ?? "—"} matches · results sealed until 8 Nov
+                      </span>
+                    ) : (
+                      <span className="tc-num text-ink-mid">
+                        n {num(s.n) ?? "—"} · {num(s.matches) ?? "—"} matches · {c2(s.mean)}
+                        {num(s.lo) !== null ? ` [${c2(s.lo)}, ${c2(s.hi)}]` : ""}
+                      </span>
+                    )}
                   </li>);
               })}
             </ul>
+
+            <h3 className={H3}>by gate verdict (paper) <Info label="the gate-verdict grounds">
+              The paper bets by the gate&apos;s verdict and the near misses
+              {verdict && str(verdict.band_c) ? ` (within ${str(verdict.band_c)}c of the bar` : ""}
+              {verdict && num(verdict.max_per_tick) !== null ? `, at most ${num(verdict.max_per_tick)} a tick)` : verdict && str(verdict.band_c) ? ")" : ""}:
+              mean CLV after the fee with its match-clustered 95% range, beside the bands and families. Paper only;
+              hover a ground for what it holds.</Info></h3>
+            {!vGrounds ? (
+              <p data-testid="careful-verdict-absent" className="text-[12px] text-ink-low">{NOT_SERVED}</p>
+            ) : (
+              <div className="tc-scroll overflow-x-auto">
+                <table data-testid="careful-verdict" className="w-full min-w-[480px] border-collapse text-[12.5px]">
+                  <thead><tr>
+                    {["ground", "n", "matches", "CLV−fee", "95% range"].map((h) => (
+                      <th key={h} scope="col" className={TH}>{h}</th>))}
+                  </tr></thead>
+                  <tbody>
+                    {[...VERDICT_GROUNDS.filter((g) => g in vGrounds),
+                      ...Object.keys(vGrounds).filter((g) => !(VERDICT_GROUNDS as readonly string[]).includes(g))]
+                      .map((g) => {
+                        const s = obj(vGrounds[g]) ?? {};
+                        return (
+                          <tr key={g} data-testid="careful-verdict-row" data-ground={g}>
+                            <td className={`${TD} font-mono text-[11.5px] text-ink-hi`} title={str(vMeans[g]) ?? undefined}>{g}</td>
+                            <td className={`${TD} tc-num`}>{num(s.n) ?? "—"}</td>
+                            <td className={`${TD} tc-num`}>{num(s.matches) ?? "—"}</td>
+                            <td className={`${TD} tc-num`}>{c2(s.mean)}</td>
+                            <td className={`${TD} tc-num`}>{num(s.lo) !== null && num(s.hi) !== null ? `[${c2(s.lo)}, ${c2(s.hi)}]` : "—"}</td>
+                          </tr>);
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <h3 className={H3}>bet sizing <Info label="bet sizing">
+              The size ⅛ Kelly would give each careful candidate, on the lower bound of its ground&apos;s
+              match-clustered CLV range, used only as a min() with every tier, cap and budget. In shadow mode it is
+              recorded, never placed: real orders keep their tiers. Live is locked in the backend&apos;s code.</Info></h3>
+            {!sizing ? (
+              <p data-testid="careful-sizing-absent" className="text-[12px] text-ink-low">{NOT_SERVED}</p>
+            ) : (
+              <div data-testid="careful-sizing">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
+                  <Cell k="mode" v={str(sizing.mode) ?? "—"} sub={str(sizing.version) ?? undefined}
+                    inline={str(sizing.mode_configured) && str(sizing.mode_configured) !== "None"
+                      && str(sizing.mode_configured)!.toLowerCase() !== str(sizing.mode)
+                      ? `configured ${str(sizing.mode_configured)}` : undefined} />
+                  <Cell k="live" v={sizing.live_allowed === false ? "locked" : sizing.live_allowed === true ? "allowed" : "—"}
+                    sub="The backend's code lock (SIZING_LIVE_ALLOWED); no setting lifts it." />
+                  <Cell k="sized, newest tick" v={tickSizing ? String(num(tickSizing.sized) ?? "—") : NOT_SERVED}
+                    inline={tickSizing ? `zero ${num(tickSizing.zero) ?? "—"} · fee drag ${num(tickSizing.fee_drag) ?? "—"} · below tier ${num(tickSizing.below_tier) ?? "—"}` : undefined} />
+                  <Cell k="bound by" v={tickBinding && Object.keys(tickBinding).length
+                    ? Object.entries(tickBinding).map(([k, v]) => `${k.replace(/_/g, " ")} ${num(v) ?? "—"}`).join(" · ")
+                    : tickSizing ? "none" : NOT_SERVED} />
+                </div>
+                {sizingKnobs && (
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-[11.5px] text-ink-low outline-none hover:text-ink-mid focus-visible:text-ink-hi">Sizing knobs ({Object.keys(sizingKnobs).length})</summary>
+                    <dl data-testid="careful-sizing-knobs" className="mt-2 grid gap-x-6 sm:grid-cols-2 xl:grid-cols-3">
+                      {Object.entries(sizingKnobs).map(([k, v]) => (
+                        <div key={k} className="flex justify-between gap-3 border-b border-tc-line py-1 text-[11.5px]">
+                          <dt className="font-mono text-ink-low">{k}</dt><dd className="tc-num text-ink-hi">{String(v)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </details>
+                )}
+              </div>
+            )}
             {events.length > 0 && (
               <>
                 <h3 className={H3}>checks · proposals</h3>

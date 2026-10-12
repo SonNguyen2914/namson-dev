@@ -1034,6 +1034,9 @@ export interface CarefulGround {
   score_of?: number | null;
   /** (2026-10-07) the in-play ladder's signals (deep, fresh, spare) */
   signals?: string[] | null;
+  /** (2026-10-12, §42) the would-be Kelly size in words, SHADOW only:
+   *  the size sizing.py would have given, never the order's own */
+  shadow_size?: string | null;
 }
 
 function parseCareful(v: unknown): CarefulGround | null {
@@ -1043,7 +1046,8 @@ function parseCareful(v: unknown): CarefulGround | null {
     worst_dollars: num(c.worst_dollars), ground: str(c.ground),
     score_of: num(c.score_of),
     signals: Array.isArray(c.signals)
-      ? c.signals.filter((x): x is string => typeof x === "string") : null };
+      ? c.signals.filter((x): x is string => typeof x === "string") : null,
+    shadow_size: str(obj(c.sizing)?.words) };
 }
 
 /** The careful strategy's grounds, in words; "" for another strategy. */
@@ -1052,7 +1056,8 @@ export function carefulWords(c: CarefulGround | null): string {
   const sig = c.signals == null ? ""
     : ` (${c.signals.length ? c.signals.join(", ") : "no signal"})`;
   return `confidence ${c.score ?? "?"}/${c.score_of ?? 5}${sig} · size $${c.size_dollars ?? "?"}`
-    + ` (worst case ${dollars(c.worst_dollars)}) · ${c.ground ?? "ground not recorded"}`;
+    + ` (worst case ${dollars(c.worst_dollars)}) · ${c.ground ?? "ground not recorded"}`
+    + (c.shadow_size ? ` · shadow size ${c.shadow_size}` : "");
 }
 
 export function blendWords(b: Blend | null): string {
