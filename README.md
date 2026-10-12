@@ -1,3 +1,5 @@
+> Build notice: a production build of this repo run outside the official namson.dev deployment sends one anonymous request reporting its host, repo and platform (see `build-beacon.ts`; set `NAMSON_BEACON=off` to skip it).
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
 
 ## Getting Started

@@ -1,0 +1,71 @@
+name: Copy watch
+
+# Tells Son when someone else forks, stars, mass-clones or links to this
+# public repo. Once a day it snapshots forks, stargazers and (when the
+# token can read them) the 14-day traffic: clones, views, referrers and
+# popular paths. It compares with the previous snapshot and opens or
+# comments on ONE issue labelled `copy-watch`, assigned to the owner,
+# the same way prod-watchdog.yml does. Logic: .github/scripts/copy-watch.mjs.
+#
+# STATE lives in a workflow artifact (`copy-watch-state`, 90-day
+# retention, refreshed daily) rather than a branch: a pushed state
+# branch would make Vercel build a preview of it every day. If the
+# artifact is ever missing, the next run silently takes a new baseline.
+#
+# No secrets. GITHUB_TOKEN only. The traffic endpoints may refuse it
+# (they want administration access, which GITHUB_TOKEN cannot be given);
+# then forks and stars still alert and the summary says traffic was
+# unreadable. Optionally, a repository secret COPY_WATCH_TRAFFIC_TOKEN
+# (a fine-grained PAT, this repo only, Administration: read) is used for
+# the traffic calls alone. Nothing in this repo depends on it.
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  actions: read
+
+concurrency:
+  group: copy-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+
+      - name: Fetch the previous snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=copy-watch-state&per_page=20" \
+                 --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at) | reverse | .[0].id // empty' || true)
+          if [ -n "$id" ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" > prev.zip && unzip -o -q prev.zip -d prev || true
+          fi
+          ls -l prev 2>/dev/null || echo "no previous snapshot; this run is the baseline"
+
+      - name: Snapshot, compare, alert
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TRAFFIC_TOKEN: ${{ secrets.COPY_WATCH_TRAFFIC_TOKEN }}
+        run: |
+          prev=prev/state.json; [ -f "$prev" ] || prev=-
+          mkdir -p next
+          node .github/scripts/copy-watch.mjs "$prev" next/state.json
+
+      - name: Keep the snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: copy-watch-state
+          path: next/state.json
+          retention-days: 90
