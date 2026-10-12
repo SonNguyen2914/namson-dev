@@ -5,14 +5,19 @@
 //  keep everything smooth"                         (Son, 2026-10-03)
 //
 // The real board has a Leagues | Championships switch
-// (components/BoardModeSwitch.tsx). Both captures are real (2 Oct 2026,
-// pre-kickoff cards only), cropped, never composed.
+// (components/BoardModeSwitch.tsx). Both captures are real, cropped,
+// never composed. THE LEAGUES HALF IS THE DERBY (v8): the La Liga column
+// rendered from the archived pre-match read of Atlético Madrid v Real
+// Madrid, 20 Sep 2026 — the same match the field story and the clock
+// follow, so the board card the page shows is the card of the match it
+// then plays through. The Championships half is the 2 Oct capture of a
+// Nations League card, Finland v Albania (pre-kickoff cards only).
 //
 // ON A WIDE SCREEN (≥1024px) BOTH HALVES ARE SHOWN AT ONCE, side by side
 // — clubs | national teams — with no switch and nothing that moves
 // (2026-10-03). Each frame holds ONE whole column of its board, header
 // and card, at the SAME capture scale, so the type on both cards is the
-// same size: the Eredivisie column (712×880 capture pixels) and the
+// same size: the La Liga column (712×880 capture pixels) and the
 // Nations League column (966×880). A club column is narrower than a
 // one-column championship board, so the two frames are as wide as their
 // crops (cells that grow in the crops' own ratio) — equal height, equal
@@ -33,7 +38,7 @@
 // rule that ran into the frame's edge. Now:
 //   - both captures draw at ONE scale (crop pixels per CSS pixel): the
 //     Nations League crop is the wider, so it fills the frame and the
-//     Eredivisie column sits centred at its own 712/966 of that width,
+//     La Liga column sits centred at its own 712/966 of that width,
 //     the rest the board's own ground — padded, never stretched;
 //   - both crops are 880 rows tall, so at one scale they are one height,
 //     stacked in one grid cell: a switch moves no pixel of layout, and
@@ -83,10 +88,13 @@ type Pin = readonly [number, number] | readonly [number, number, "under"];
 type Shot = { src: string; w: number; h: number; alt: string; pins: readonly Pin[] };
 
 const ALT: Record<BoardMode, string> = {
-  leagues: "The Eredivisie column of the TRIVELA board in Leagues mode, "
-    + "captured 2 October 2026: its one fixture card, PSV Eindhoven v "
-    + "Heerenveen, a +1.62 goal-difference gap, a split tier read and the "
-    + "exchange's book, ask 81 cents.",
+  leagues: "The La Liga column of the TRIVELA board in Leagues mode, "
+    + "rendered from its archived pre-match read of 20 September 2026: the "
+    + "Atlético Madrid v Real Madrid card. The board ranks Real Madrid, "
+    + "away, as the favourite: a +0.58 goal-difference gap, #2 v #3 in the "
+    + "table, ppg +0.40, rank +1, six games each; a split tier read, "
+    + "overall 1v1, attack 1v1, defence 1v2; and the exchange's book on "
+    + "Real Madrid, ask 48 cents, bid 47, spread 1.",
   championships: "The TRIVELA board in Championships mode, captured 2 "
     + "October 2026: a UEFA Nations League card, Finland v Albania, with "
     + "a +48 Elo gap split into rating and home terms, tier chips and the "
@@ -106,8 +114,8 @@ const ALT: Record<BoardMode, string> = {
    # chip), 3 the book (after the last thing on the book's line),
    measured off the captures' pixels. */
 const SHOTS: Record<BoardMode, Shot> = {
-  leagues: { src: "/landing/board-leagues-eredivisie.jpg", w: 712, h: 880,
-    alt: ALT.leagues, pins: [[95.08, 51.14, "under"], [61.24, 68.98], [89.04, 78.52]] },
+  leagues: { src: "/landing/board-leagues-laliga-derby.jpg", w: 712, h: 880,
+    alt: ALT.leagues, pins: [[95.22, 47.38, "under"], [54.78, 63.98], [77.94, 73.75]] },
   championships: { src: "/landing/board-championships-unl.jpg", w: 966, h: 880,
     alt: ALT.championships, pins: [[96.27, 61.70, "under"], [45.13, 77.39], [54.66, 86.65]] },
 };
@@ -188,7 +196,7 @@ export default function BoardShot() {
           return (
             <div key={m} className={s.pairCell} data-pair={m}
               style={{ "--grow": sh.w } as CSSProperties}>
-              <p className={s.pairLabel}><b>{LABEL[m]}</b> · {WHO[m]}</p>
+              <p className={s.pairLabel} data-label><b>{LABEL[m]}</b> · {WHO[m]}</p>
               <div className={s.shotFrame}>
                 <div className={s.shotLayer}>
                   <Image src={sh.src} width={sh.w} height={sh.h} alt={sh.alt}
@@ -239,7 +247,9 @@ export default function BoardShot() {
           <li><b>3</b>the exchange&rsquo;s book</li>
         </ol>
         <span className={s.shotMeta}>
-          captured 2 Oct 2026 · <span className={s.chip}>shadow · not advice</span>
+          La Liga: Atlético v Real Madrid, 20 Sep 2026, rendered from its
+          archived pre-match read · Nations League: captured 2 Oct 2026 ·{" "}
+          <span className={s.chip}>shadow · not advice</span>
         </span>
       </figcaption>
     </figure>

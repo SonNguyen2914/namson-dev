@@ -69,7 +69,7 @@
 .h3 { font-size: clamp(34px, 4.6vw, 72px); margin-top: 12px; line-height: 0.9; }
 .team { white-space: nowrap; }
 .vs { color: var(--ink-low); font-stretch: 100%; font-weight: 500; font-size: 0.6em; vertical-align: 0.18em; padding-inline: 0.1em; }
-.eyebrow { margin: 0; font: 400 11px/1.4 var(--f-mono); text-transform: uppercase; letter-spacing: 0.18em; color: var(--ink-low); }
+.eyebrow { text-wrap: balance; margin: 0; font: 400 11px/1.4 var(--f-mono); text-transform: uppercase; letter-spacing: 0.18em; color: var(--ink-low); }
 .body { margin: 22px 0 0; max-width: 34rem; font-size: clamp(16px, 1.15vw, 19px); line-height: 1.6; color: var(--ink-mid); }
 .body, .heroLine, .steps li, .caption, .note, .coda, .colSub, .fieldNote span, .timeline li > span:last-child, .findings p, .reads dd { text-wrap: pretty; }
 .chip { display: inline-block; border: 1px solid var(--line-strong); border-radius: 6px; padding: 2px 7px;
@@ -295,7 +295,7 @@
   transition: opacity 160ms ease, transform 450ms cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s linear 450ms; }
 .cp.on { opacity: 1; visibility: visible; transform: none;
   transition: opacity 280ms ease 160ms, transform 450ms cubic-bezier(0.2, 0.8, 0.2, 1) 100ms, visibility 0s linear 0s; }
-.cpKick { margin: 0; display: flex; align-items: center; gap: 8px; font: 400 10px/1.4 var(--f-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-low); }
+.cpKick { text-wrap: balance; margin: 0; display: flex; align-items: center; gap: 8px; font: 400 10px/1.4 var(--f-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-low); }
 .pip { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--hue); box-shadow: 0 0 6px color-mix(in srgb, var(--hue) 60%, transparent); }
 .cpName { font-size: clamp(28px, 2.4vw, 34px); line-height: 0.92; text-wrap: balance; }
 .cpMeta { margin: 0; font: 400 11px/1.55 var(--f-mono); color: var(--ink-mid); font-variant-numeric: tabular-nums; }
@@ -474,7 +474,7 @@
 .readout tbody th { text-align: left; color: var(--ink-mid); white-space: nowrap; }
 .readout tbody th i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 10px; }
 .readout td { color: var(--ink-hi); width: 22%; }
-.readout td.quiet { color: var(--ink-low); }
+.readout td.cellQuiet { color: var(--ink-low); }
 @media (max-width: 767px) { .readout th, .readout td { padding: 3px 0; } }
 .note { margin: 8px 0 0; min-height: 1.5em; font-size: 12px; line-height: 1.5; color: var(--ink-mid); }
 .provenance { margin: 4px 0 0; font: 400 10px/1.6 var(--f-mono); letter-spacing: 0.06em; color: var(--ink-low); }
@@ -537,8 +537,7 @@
 
 /* ── 8 · the door ─────────────────────────────────────────────────── */
 .end { padding-block: clamp(120px, 18vh, 220px) clamp(72px, 10vh, 120px); display: flex; flex-direction: column; align-items: flex-start; }
-.end .wmBig { margin: 0 0 28px; gap: 0.5em; }
-.end .wmBig .wmLetters { font-size: clamp(28px, 4.4vw, 52px); letter-spacing: 0.16em; margin-right: -0.16em; }
+.endMark { margin: 0 0 28px; }
 /* D5 · one pass of the floodlight across the closing headline. At rest it
    is plain ink; the light is the page's own pale light, never gold. */
 .sweep { position: relative; display: inline-block; }

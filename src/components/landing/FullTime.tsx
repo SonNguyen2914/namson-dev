@@ -52,7 +52,7 @@ export default function FullTime({ enabled }: { enabled: boolean }) {
 
   const lock = DERBY.lock, mk = MARKET_AT_LOCK;
   return (
-    <section aria-labelledby="landing-ft" className={`${s.wrap} ${s.still}`}>
+    <section id="review" data-index="review" aria-labelledby="landing-ft" className={`${s.wrap} ${s.still}`}>
       <p className={s.eyebrow}>FT · the review</p>
       <h2 id="landing-ft" className={`${s.display} ${s.h2}`}>What was said, what happened.</h2>
 

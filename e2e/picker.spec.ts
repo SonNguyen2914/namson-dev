@@ -1175,10 +1175,13 @@ test("the site root is TRIVELA's home page, and it leads to the board",
     /* CHANGED ON PURPOSE (2026-10-02). "/" redirected to the board until
        the home page existed; now it IS the page, so the claim is that it
        renders (with the shared chrome), names itself, ends at the
-       board's door — and fetches NOTHING. Every number on it is baked
-       at authoring time (lib/landingData.ts): a home page that read the
-       board would write a permanent snapshot row per visitor, and one
-       that read anything would go blank with the backend. */
+       board's door — and reads ONE thing. The field, the nations and
+       the derby are baked at authoring time (lib/landingData.ts): a home
+       page that read the board would write a permanent snapshot row per
+       visitor. Since 2026-10-12 (landing v8) the record's four counts
+       are read from /api/site/stats, with a baked fallback so the page
+       never goes blank with the backend
+       (e2e/the-record-reads-live-with-a-fallback.spec.ts). */
     const api: string[] = [];
     page.on("request", (r) => {
       if (new URL(r.url()).pathname.startsWith("/api/")) api.push(r.url());
@@ -1195,7 +1198,9 @@ test("the site root is TRIVELA's home page, and it leads to the board",
     const body = (await page.textContent("body")) || "";
     expect(body).not.toContain("To get started, edit");
     await page.waitForLoadState("networkidle");
-    expect(api, "the home page reached for the backend").toEqual([]);
+    expect(api.map((u) => new URL(u).pathname),
+      "the home page reached for something other than the record numbers")
+      .toEqual(["/api/site/stats"]);
   });
 
 test("the picker proxy forwards board — unmocked on purpose",

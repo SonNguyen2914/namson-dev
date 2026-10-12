@@ -538,7 +538,7 @@ export default function MatchClock({ mode, enabled }: {
   const modelCell = (v: number | null | undefined) => (v != null ? fmt1(v) : "—");
 
   return (
-    <section ref={section} data-testid={`clock-${mode}`} aria-labelledby="landing-clock"
+    <section ref={section} id="clock" data-index="clock" data-testid={`clock-${mode}`} aria-labelledby="landing-clock"
       className={still ? s.stillScene : s.sceneClock}>
       <div ref={stage} className={`${s.stage} ${s.clockStage}`}>
         <div className={`${s.wrap} ${s.clockGrid}`}>

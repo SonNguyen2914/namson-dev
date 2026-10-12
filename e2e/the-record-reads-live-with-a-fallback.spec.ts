@@ -1,0 +1,109 @@
+import { test, expect } from "@playwright/test";
+import { DERBY, GAP, MARKET_AT_LOCK, FINAL } from "../src/lib/landingData";
+import { FALLBACK, mergeStats } from "../src/lib/siteStats";
+
+/* THE HOME PAGE'S RECORD NUMBERS ARE READ LIVE, AND NEVER LEFT BLANK
+   (landing v8, 2026-10-12).
+
+   The four counts come from GET /api/site/stats (site-stats-v1). The
+   backend can be down — Railway had no active deployment the day this
+   shipped — and the page then shows the figures the approved draft
+   baked from the same route: 45,500 / 11 / 98,000+ / 12,000+, under
+   their own labels. These specs pin both paths, and that the baked path
+   is also what a backend that answers with something that is not a
+   payload gets. The hermetic stand-in answers every /api/ read with a
+   named 503, so the default (unmocked) run IS the failure path. */
+
+const figures = (page: import("@playwright/test").Page) =>
+  page.getByTestId("record-figures");
+
+async function shown(page: import("@playwright/test").Page) {
+  return page.evaluate(() => [...document.querySelectorAll(
+    '[data-testid="record-figures"] > div')].map((d) => ({
+    key: (d as HTMLElement).dataset.figure,
+    label: d.querySelector("dt")!.textContent,
+    value: d.querySelector("dd")!.textContent,
+  })));
+}
+
+const BAKED = [
+  { key: "matches", label: "matches studied49 competitions since 2010", value: "45,500" },
+  { key: "competitions", label: "competitions", value: "11" },
+  { key: "markets", label: "Kalshi markets tracked", value: "98,000+" },
+  { key: "tests", label: "backend test functions", value: "12,000+" },
+];
+
+test("with the backend answering 503 the record shows the baked figures", async ({ page }) => {
+  // the stand-in's own answer, unmocked: this is the real failure path
+  await page.goto("/");
+  await expect(figures(page)).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  expect(await shown(page)).toEqual(BAKED);
+  await expect(figures(page)).toHaveAttribute("data-source", "baked");
+});
+
+for (const [name, answer] of [
+  ["a gateway that never reached the backend", { status: 502, body: { error: "backend unreachable" } }],
+  ["a 200 that is HTML", { status: 200, contentType: "text/html", body: "<!doctype html><title>x</title>" }],
+  ["a 200 that is some other schema", { status: 200, body: { schema: "other-v1", figures: {} } }],
+  ["a payload whose figures are all uncounted", { status: 200, body: { schema: "site-stats-v1", figures: {
+    corpus_matches: { raw: null, display: null }, competitions: { raw: null, display: null },
+    markets: { raw: null, display: null }, tests: { raw: null, display: null } } } }],
+] as const) {
+  test(`${name} leaves the baked figures standing`, async ({ page }) => {
+    await page.route("**/api/site/stats", (r) => r.fulfill({
+      status: answer.status,
+      contentType: "contentType" in answer ? answer.contentType : "application/json",
+      body: typeof answer.body === "string" ? answer.body : JSON.stringify(answer.body) }));
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    expect(await shown(page)).toEqual(BAKED);
+    await expect(figures(page)).toHaveAttribute("data-source", "baked");
+  });
+}
+
+test("a good answer replaces the figures, label and all; an uncounted one stays baked", async ({ page }) => {
+  await page.route("**/api/site/stats", (r) => r.fulfill({
+    status: 200, contentType: "application/json",
+    body: JSON.stringify({ schema: "site-stats-v1", as_of: "2026-10-12T00:00:00+00:00", pending: ["tests"],
+      figures: {
+        corpus_matches: { raw: 46_010, display: "46,000+", label: "matches studied", sublabel: "50 competitions since 2010" },
+        competitions: { raw: 12, display: "12", label: "competitions" },
+        markets: { raw: 101_234, display: "100,000+", label: "Kalshi markets tracked" },
+        tests: { raw: null, display: null, label: "backend test functions", unavailable: "counting" },
+      } }) }));
+  await page.goto("/");
+  await expect(figures(page)).toHaveAttribute("data-source", "live");
+  expect(await shown(page)).toEqual([
+    { key: "matches", label: "matches studied50 competitions since 2010", value: "46,000+" },
+    { key: "competitions", label: "competitions", value: "12" },
+    { key: "markets", label: "Kalshi markets tracked", value: "100,000+" },
+    BAKED[3], // tests: not counted yet, so its baked figure — never zero
+  ]);
+});
+
+test("mergeStats refuses a figure that is not a count", () => {
+  const bad = mergeStats({ schema: "site-stats-v1", figures: {
+    competitions: { raw: 12, display: "twelve" },
+    markets: { raw: -1, display: "1" },
+    tests: { raw: 5, display: "<b>5</b>" } } });
+  expect(bad.source).toBe("baked");
+  expect(bad.figures).toEqual(FALLBACK.map((f) => ({ ...f })));
+});
+
+/* THE REVIEW'S SENTENCE IS TRUE OF THE DATA. "The model leaned Atlético,
+   the market and the board leaned Real, and Atlético won." is typed in
+   components/landing/FullTime.tsx; each clause is derived here from the
+   baked series and the field, and the typed sentence must match them. */
+test("the review's one sentence agrees with the baked series", async ({ page }) => {
+  const lean = (t: { home: number; draw: number; away: number }) =>
+    (Object.keys(t) as (keyof typeof t)[]).sort((a, b) => t[b] - t[a])[0];
+  const name = { home: "Atlético", away: "Real", draw: "the draw" } as const;
+  expect(lean(DERBY.lock.model)).toBe("home");        // the model leaned Atlético
+  expect(lean(MARKET_AT_LOCK!.market)).toBe("away");  // the market leaned Real
+  expect(GAP.net).toBeGreaterThan(0);                 // the board's gap: Real
+  expect(FINAL!.home).toBeGreaterThan(FINAL!.away);   // Atlético won
+  await page.goto("/");
+  const text = (await page.getByTestId("why-this-match").textContent())!.replace(/\s+/g, " ");
+  expect(text).toContain(`The model leaned ${name.home}, the market and the board leaned ${name.away}, and ${name.home} won.`);
+});
