@@ -1,16 +1,16 @@
-// THE BOARD, BOTH OF ITS HALVES — Leagues | Championships.
+// THE BOARD, BOTH OF ITS HALVES — Leagues | Nations.
 //
-// "The every fixture, ranked section only have Championships matches,
+// "The every fixture, ranked section only have Nations matches,
 //  show clubs matches example too, do it without losing the flow and
 //  keep everything smooth"                         (Son, 2026-10-03)
 //
-// The real board has a Leagues | Championships switch
+// The real board has a Leagues | Nations switch
 // (components/BoardModeSwitch.tsx). Both captures are real, cropped,
 // never composed. THE LEAGUES HALF IS THE DERBY (v8): the La Liga column
 // rendered from the archived pre-match read of Atlético Madrid v Real
 // Madrid, 20 Sep 2026 — the same match the field story and the clock
 // follow, so the board card the page shows is the card of the match it
-// then plays through. The Championships half is the 2 Oct capture of a
+// then plays through. The Nations half is the 2 Oct capture of a
 // Nations League card, Finland v Albania (pre-kickoff cards only).
 //
 // ON A WIDE SCREEN (≥1024px) BOTH HALVES ARE SHOWN AT ONCE, side by side
@@ -48,7 +48,7 @@
 //     card's edge — touches the frame;
 //   - a switch is an opacity crossfade (240 ms), nothing else;
 //   - and once, as the frame scrolls up out of the reading zone, it
-//     flips to Championships by itself (and back, scrolling down), so a
+//     flips to Nations by itself (and back, scrolling down), so a
 //     reader who never touches the switch still sees both halves. It
 //     waits until the frame's middle has passed a QUARTER of the screen
 //     (round 8 flipped at 40%, while the club card was still centred
@@ -64,13 +64,13 @@ import type { CSSProperties } from "react";
 import { useReducedMotion } from "../../lib/useScrollScene";
 import s from "./landing.module.css";
 
-export type BoardMode = "leagues" | "championships";
-const MODES: readonly BoardMode[] = ["leagues", "championships"];
+export type BoardMode = "leagues" | "nations";
+const MODES: readonly BoardMode[] = ["leagues", "nations"];
 const LABEL: Record<BoardMode, string> = {
-  leagues: "Leagues", championships: "Championships" };
+  leagues: "Leagues", nations: "Nations" };
 /** who plays in each half, said once beside the board's own name */
 const WHO: Record<BoardMode, string> = {
-  leagues: "clubs", championships: "national teams" };
+  leagues: "clubs", nations: "national teams" };
 
 /** A pin, set just AFTER the thing it names: [the thing's right edge,
  *  its vertical centre], each a share (%) of its image's own box. The pin
@@ -95,7 +95,7 @@ const ALT: Record<BoardMode, string> = {
     + "table, ppg +0.40, rank +1, six games each; a split tier read, "
     + "overall 1v1, attack 1v1, defence 1v2; and the exchange's book on "
     + "Real Madrid, ask 48 cents, bid 47, spread 1.",
-  championships: "The TRIVELA board in Championships mode, captured 2 "
+  nations: "The TRIVELA board in Nations mode, captured 2 "
     + "October 2026: a UEFA Nations League card, Finland v Albania, with "
     + "a +48 Elo gap split into rating and home terms, tier chips and the "
     + "exchange's book, ask 39 cents.",
@@ -119,8 +119,8 @@ const ALT: Record<BoardMode, string> = {
 const SHOTS: Record<BoardMode, Shot> = {
   leagues: { src: "/landing/board-leagues-laliga-derby.jpg", w: 712, h: 880,
     alt: ALT.leagues, pins: [[94.94, 46.93, "under"], [54.78, 63.98], [77.94, 73.75]] },
-  championships: { src: "/landing/board-championships-unl.jpg", w: 966, h: 880,
-    alt: ALT.championships, pins: [[96.27, 61.70, "under"], [45.13, 77.39], [54.66, 86.65]] },
+  nations: { src: "/landing/board-championships-unl.jpg", w: 966, h: 880,
+    alt: ALT.nations, pins: [[96.27, 61.70, "under"], [45.13, 77.39], [54.66, 86.65]] },
 };
 /** the wider crop sets the switch frame's scale; the other is centred at
  *  its own share of that width */
@@ -132,11 +132,11 @@ const SOLO_W = Math.max(...MODES.map((m) => SHOTS[m].w));
    460px at most, 100vw − 32px below that, less two 10px insets. */
 const PAIR_SIZES: Record<BoardMode, string> = {
   leagues: "(min-width: 1352px) 494px, calc(42.4vw - 80px)",
-  championships: "(min-width: 1352px) 670px, calc(57.6vw - 108px)",
+  nations: "(min-width: 1352px) 670px, calc(57.6vw - 108px)",
 };
 const SOLO_SIZES: Record<BoardMode, string> = {
   leagues: "(min-width: 492px) 325px, calc(73.7vw - 38px)",
-  championships: "(min-width: 492px) 440px, calc(100vw - 52px)",
+  nations: "(min-width: 492px) 440px, calc(100vw - 52px)",
 };
 
 function Pins({ pins }: { pins: readonly Pin[] }) {
@@ -180,7 +180,7 @@ export default function BoardShot() {
       io.observe(el);
       return io;
     };
-    const up = watch("-75%", (above) => { if (above) setMode("championships"); });
+    const up = watch("-75%", (above) => { if (above) setMode("nations"); });
     const down = watch("-65%", (above) => { if (!above) setMode("leagues"); });
     return () => { up.disconnect(); down.disconnect(); };
   }, [reduced]);

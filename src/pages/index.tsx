@@ -14,7 +14,7 @@
 //   2  ↳ scroll moment 1: the camera moves in on one real match
 //   3  three hours before — the board (real captures: the derby's card
 //      and a national-team card side by side on a wide screen, behind
-//      the board's own Leagues | Championships switch on a narrow one;
+//      the board's own Leagues | Nations switch on a narrow one;
 //      settles for one screen from 1024px — Board.tsx, BoardShot.tsx)
 //   4  scroll moment 2: the match clock, model vs market, 0′→90′
 //   5  scroll moment 3: full time, the review card unfolds

@@ -63,7 +63,7 @@ export type Comp = {
   i: number; k: string; name: string; half: Half; items: Team[];
   n: number; pl: Plane; lo: number; hi: number; idx: string; med: number;
   /** the top three by rating, leagues only */
-  top: Team[] | null; grp: "Leagues" | "Championships";
+  top: Team[] | null; grp: "Leagues" | "Nations";
 };
 
 export const COMPS: Comp[] = (() => {
@@ -82,7 +82,7 @@ export const COMPS: Comp[] = (() => {
       idx: String(i + 1).padStart(2, "0"),
       med: n % 2 ? items[(n - 1) / 2].v : (items[n / 2 - 1].v + items[n / 2].v) / 2,
       top: c.half === "L" ? items.slice(-3).reverse() : null,
-      grp: c.half === "L" ? "Leagues" : "Championships",
+      grp: c.half === "L" ? "Leagues" : "Nations",
     } satisfies Comp;
   });
 })();
