@@ -1,5 +1,4 @@
 import { execFileSync } from "node:child_process";
-import os from "node:os";
 
 /* BUILD BEACON (2026-10-12). This repo is public, so anyone can clone it
    and build the site. When a production build runs somewhere that is not
@@ -70,7 +69,9 @@ export function beaconUrl(env: Env, now = new Date()): string {
     env.REPOSITORY_URL || // Netlify
     gitOrigin();
   const host =
-    env.VERCEL_PROJECT_PRODUCTION_URL || env.VERCEL_URL || env.URL || env.CF_PAGES_URL || os.hostname();
+    // a hosted build reports its public deploy URL; a local machine reports only
+    // "local" -- never its hostname, which can identify a person
+    env.VERCEL_PROJECT_PRODUCTION_URL || env.VERCEL_URL || env.URL || env.CF_PAGES_URL || "local";
   const q = new URLSearchParams({
     h: host.slice(0, 200),
     r: repo.slice(0, 200),
