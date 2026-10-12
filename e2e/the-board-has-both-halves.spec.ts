@@ -45,7 +45,8 @@ import { test, expect, type Page } from "@playwright/test";
        is /api/site/stats, the record's numbers (the board routes WRITE a
        snapshot per read).
    And the one automatic flip, phones only: once the frame's middle has
-   passed a quarter of the screen it shows Championships, and back below
+   passed a quarter of the screen it shows Nations (the board's
+   "Championships" until cups Phase A, #127), and back below
    35% — but not under reduced motion, not while focus is inside the
    figure, and not once the reader has pressed. */
 
@@ -68,12 +69,12 @@ async function frameState(page: Page) {
       '[data-testid="board-shot"] [data-layer]')]
       .filter((l) => l.parentElement!.checkVisibility());
     const of = (m: string) => frames.find((l) => l.dataset.layer === m)!;
-    const lg = of("leagues"), ch = of("championships");
+    const lg = of("leagues"), ch = of("nations");
     const imgs = [lg, ch].map((l) => l.querySelector("img")!);
     return {
       frameH: lg.parentElement!.getBoundingClientRect().height,
       leagues: Number(getComputedStyle(lg).opacity),
-      championships: Number(getComputedStyle(ch).opacity),
+      nations: Number(getComputedStyle(ch).opacity),
       hidden: frames.filter((l) => l.getAttribute("aria-hidden") === "true")
         .map((l) => l.dataset.layer),
       loaded: imgs.every((i) => i.complete && i.naturalWidth > 0),
@@ -131,9 +132,9 @@ const GAP_NUMBER: Record<string, {
 
 /** press the switch to one capture and wait out the crossfade, so it is
  *  the only one drawn */
-async function shownAlone(page: Page, m: "leagues" | "championships") {
+async function shownAlone(page: Page, m: "leagues" | "nations") {
   await page.getByTestId(`board-shot-${m}`).click();
-  const other = m === "leagues" ? "championships" : "leagues";
+  const other = m === "leagues" ? "nations" : "leagues";
   await expect.poll(async () => {
     const st = await frameState(page);
     return st[m] === 1 && st[other] === 0;
@@ -194,9 +195,9 @@ test("on a wide screen both halves are shown at once, side by side, and nothing 
     await expect.poll(async () => (await pairState(page)).every((c) => c.loaded))
       .toBe(true);
     const a = await pairState(page);
-    expect(a.map((c) => c.pair)).toEqual(["leagues", "championships"]);
+    expect(a.map((c) => c.pair)).toEqual(["leagues", "nations"]);
     expect(a.map((c) => c.label)).toEqual(["Leagues · clubs",
-      "Championships · national teams"]);
+      "Nations · national teams"]);
     for (const c of a) {
       expect(c.visible, `${c.pair} frame not on screen`).toBe(true);
       expect(c.opacity).toBe(1);
@@ -294,7 +295,7 @@ for (const [w, h] of [[390, 844], [768, 1024]] as const) {
       await expect.poll(async () => (await frameState(page)).loaded).toBe(true);
       // both layers are measurable whichever is shown: show each in turn
       const seen: Awaited<ReturnType<typeof framesAndPins>> = [];
-      for (const m of ["championships", "leagues"] as const) {
+      for (const m of ["nations", "leagues"] as const) {
         await shownAlone(page, m);
         seen.push((await framesAndPins(page))[0]);
       }
@@ -344,7 +345,7 @@ for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1440, 900], [1920, 
       await page.evaluate(() => document.fonts.ready);
       const seen: Awaited<ReturnType<typeof framesAndPins>> = [];
       if (w < 1024) {
-        for (const m of ["leagues", "championships"] as const) {
+        for (const m of ["leagues", "nations"] as const) {
           await shownAlone(page, m);
           seen.push((await framesAndPins(page))[0]);
         }
@@ -407,9 +408,9 @@ test("on a phone the switch shows clubs, then national teams, and fetches nothin
     await expect(shot.getByTestId("board-shot-pair")).toBeHidden();
     const group = shot.getByRole("group");
     const buttons = group.getByRole("button");
-    await expect(buttons).toHaveText(["Leagues", "Championships"]);
+    await expect(buttons).toHaveText(["Leagues", "Nations"]);
     const leagues = group.getByRole("button", { name: "Leagues" });
-    const champs = group.getByRole("button", { name: "Championships" });
+    const champs = group.getByRole("button", { name: "Nations" });
     await expect(leagues).toHaveAttribute("aria-pressed", "true");
     await expect(champs).toHaveAttribute("aria-pressed", "false");
     for (const b of [leagues, champs]) {
@@ -423,13 +424,13 @@ test("on a phone the switch shows clubs, then national teams, and fetches nothin
     }).toBe("loaded");
     const before = await frameState(page);
     expect(before.leagues).toBe(1);
-    expect(before.championships).toBe(0);
-    expect(before.hidden).toEqual(["championships"]);
+    expect(before.nations).toBe(0);
+    expect(before.hidden).toEqual(["nations"]);
 
     await champs.click();
     await expect(champs).toHaveAttribute("aria-pressed", "true");
     await expect(leagues).toHaveAttribute("aria-pressed", "false");
-    await expect.poll(async () => (await frameState(page)).championships)
+    await expect.poll(async () => (await frameState(page)).nations)
       .toBe(1);
     const after = await frameState(page);
     expect(after.leagues).toBe(0);
@@ -468,16 +469,16 @@ test("on a phone, scrolling the frame up past a quarter flips it once, and back 
     await page.waitForTimeout(250);
     await expect(shot).toHaveAttribute("data-mode", "leagues");
     await frameMidAt(page, 0.15);
-    await expect(shot).toHaveAttribute("data-mode", "championships");
+    await expect(shot).toHaveAttribute("data-mode", "nations");
     // inside the hysteresis band nothing changes
     await frameMidAt(page, 0.3);
     await page.waitForTimeout(250);
-    await expect(shot).toHaveAttribute("data-mode", "championships");
+    await expect(shot).toHaveAttribute("data-mode", "nations");
     await frameMidAt(page, 0.7);
     await expect(shot).toHaveAttribute("data-mode", "leagues");
     // a fling straight past the whole band still lands on the right side
     await frameMidAt(page, -0.5);
-    await expect(shot).toHaveAttribute("data-mode", "championships");
+    await expect(shot).toHaveAttribute("data-mode", "nations");
     await frameMidAt(page, 0.7);
     await expect(shot).toHaveAttribute("data-mode", "leagues");
     // focus inside the figure: the picture is not swapped out from under it
@@ -505,7 +506,7 @@ test("under reduced motion nothing flips by itself", async ({ browser }) => {
   await page.waitForTimeout(300);
   await expect(shot).toHaveAttribute("data-mode", "leagues");
   // and a press swaps at once, with no transition to wait for
-  await shot.getByRole("button", { name: "Championships" }).click();
-  expect((await frameState(page)).championships).toBe(1);
+  await shot.getByRole("button", { name: "Nations" }).click();
+  expect((await frameState(page)).nations).toBe(1);
   await ctx.close();
 });

@@ -42,7 +42,7 @@ export const FIELD = field as unknown as {
 };
 
 /** The national plane: the three national competitions of the
- *  Championships board, each team at its own rating, ascending. Its axis
+ *  Nations board, each team at its own rating, ascending. Its axis
  *  is its own (900–2,100) and is never drawn on the club axis. */
 export type NationTeam = { team: string; elo: number };
 export const NATIONS = nations as unknown as {
