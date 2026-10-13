@@ -673,8 +673,11 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
       declaredOver: Boolean(cups && ALL_CUPS.find((c) => c.key === s)?.over),
       oneMatch: s === FINALS,
     })
-    /* a cup the backend does not build yet has no column to keep */
-    || (cups && s !== FINALS && !CUP_BOARD_COLUMNS.includes(s))));
+    /* a cup the backend does not build, or one the payload carries no
+       entry for at all, has nothing to draw: a resting chip, not a
+       column (and not "off season" — nobody measured its season) */
+    || (cups && s !== FINALS && (!CUP_BOARD_COLUMNS.includes(s)
+                                 || !leaguesMap[s]))));
   const columnSlugs = offeredSlugs.filter((s) => !offSeasonSet.has(s));
 
   /* ── WHICH LEAGUE THE PHONE IS LOOKING AT (operator, 2026-09-16) ────
@@ -1059,18 +1062,20 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      Cups tab the candidates are the cups the board BUILDS — a cup not
      built yet is not off season, it is "not on the board yet", and says
      so on its chooser chip instead. */
+  const restReason = (s: string) =>
+    cups && s !== FINALS && !CUP_BOARD_COLUMNS.includes(s)
+      ? "not on the board yet"
+    : cups && s !== FINALS && !leaguesMap[s] ? "no board data"
+    : s === FINALS ? "nothing upcoming" : "off season";
   const resting: Record<string, string> = Object.fromEntries(
-    [...offSeasonSet].map((s) => [s,
-      cups && s !== FINALS && !CUP_BOARD_COLUMNS.includes(s)
-        ? "not on the board yet"
-        : s === FINALS ? "nothing upcoming" : "off season"]));
+    [...offSeasonSet].map((s) => [s, restReason(s)]));
   /* The line names COMPETITIONS, so the group is named by its members. */
   const offSeason: OffSeasonEntry[] = !board || only ? [] : [
     ...offeredSlugs.filter((s) => offSeasonSet.has(s)
-      && !(cups && s !== FINALS && !CUP_BOARD_COLUMNS.includes(s))),
+      && (s === FINALS || restReason(s) === "off season")),
   ].flatMap((s) => s === FINALS
     ? FINALS_MEMBERS.filter((m) => CUP_BOARD_COLUMNS.includes(m)
-        && !inWindow.has(m))
+        && !inWindow.has(m) && cupMetas[m])
     : [s]).map((s) => {
     const cup = cups ? ALL_CUPS.find((c) => c.key === s) : undefined;
     const meta = cupMetas[s] ?? leaguesMap[s];
@@ -1088,7 +1093,14 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      dashed rest-day card: when it next plays, or "date TBC". Nations
      columns already carry their own (`national.nextBeyond`). */
   const restCard = (s: string) => {
-    if (champ || only || inWindow.has(s)) return null;
+    if (only || inWindow.has(s)) return null;
+    if (champ) {
+      /* a national column names its own next fixture when it knows one
+         (`national.nextBeyond`); only an unknown one needs this card */
+      if (nationalColumn(board?.competitions?.[s], [])?.nextBeyond) return null;
+      if (!leaguesMap[s] || leaguesMap[s].error) return null;
+      return { title: "rest day", line: restLine(null, false, dayLabel) };
+    }
     const meta = leaguesMap[s];
     /* a failed read or a silent payload keeps its own louder state */
     if (!meta || meta.error) return null;
@@ -1377,6 +1389,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                       <ColumnChooser slugs={offeredSlugs} drawn={drawnSlugs}
                         counts={fixtureCounts} view={view}
                         resting={resting}
+                        members={cups ? { [FINALS]: FINALS_MEMBERS } : {}}
                         onChange={setShown} />
                     </div>
                   )}
