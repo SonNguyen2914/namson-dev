@@ -342,40 +342,25 @@ test("a column with nothing ahead counts what it HOLDS, and an empty one still s
       .toHaveText("2 fixtures");
   });
 
-test("the empty box says what the column DOES have, and an empty column says only that",
+test("an in-season column with nothing ahead draws the rest-day card, never the empty box",
   async ({ page }) => {
     await open(page);
-    /* BOTH KINDS OF COLUMN KEEP THE SENTENCE the empty-window guard pins
-       — "no fixtures in the next N days" — and only one of them adds the
-       second line.
-
-       THE WINDOW IS NOT TYPED HERE. Both the forward and the backward
-       window opened at 8 days on 2026-09-15 and the chips that used to
-       set them are gone, so a spec that named 7 would be pinning a
-       default rather than the sentence. The FORWARD number is the page's
-       own; the BACKWARD one is the review payload's `back`, so that half
-       stays exact — a count over a window nobody measured is the defect
-       this file is named after. */
-    await show(page, "leaguescup");
-    const cup = col(page, "leaguescup").getByTestId("col-empty");
-    await expect(cup).toContainText(/No Leagues Cup fixtures in the next \d+ days\./);
-    await expect(cup).toHaveAttribute("data-holds", "finished");
-    await expect(cup.getByTestId("col-empty-finished"))
-      .toContainText(`3 finished in the last ${DEFAULT_BACK} days`);
-
-    await show(page, "laliga");
-    const empty = col(page, "laliga").getByTestId("col-empty");
-    await expect(empty).toContainText(/No La Liga fixtures in the next \d+ days\./);
-    await expect(empty).toHaveAttribute("data-holds", "nothing");
-    await expect(empty.getByTestId("col-empty-finished")).toHaveCount(0);
-
-    // EPL is a league rather than a cup and reads exactly the same way —
-    // the sentence is about what the column holds, not about what kind
-    // of competition it is
-    await show(page, "epl");
-    const eplEmpty = col(page, "epl").getByTestId("col-empty");
-    await expect(eplEmpty.getByTestId("col-empty-finished"))
-      .toContainText(`2 finished in the last ${DEFAULT_BACK} days`);
+    /* SON, 2026-10-07 AS CORRECTED 2026-10-13 ("EFL cup still on going,
+       keep it there"): a competition between matchdays keeps its column
+       and reads as a league on a rest week — the dashed rest-day card
+       naming when it next plays, or "date TBC" — and the solid "No X
+       fixtures in the next N days" box is gone from the board. Nothing on
+       this payload says any of these seasons has finished, so all three
+       are in season (e2e/off-season-rules.spec.ts pins the rule). The
+       finished count is still the header's (test above). */
+    for (const [slug, name] of [["leaguescup", "Leagues Cup"],
+                                ["laliga", "La Liga"], ["epl", "Premier League"]]) {
+      await show(page, slug);
+      await expect(col(page, slug).getByTestId("col-empty")).toHaveCount(0);
+      await expect(col(page, slug)).not.toContainText(/fixtures in the next \d+ days/);
+      await expect(col(page, slug).locator('[data-testid="rest-day"]:visible').first())
+        .toContainText(`${name} — rest day`);
+    }
 
     /* AND NOT ONE COLUMN ON THIS BOARD IS SPEAKING FOR AN ABSENT
        PAYLOAD. Every column here was DECLARED, so every one of them has
@@ -648,53 +633,29 @@ async function settledBox(
   throw new Error("the layout never settled — 25 consecutive reads disagreed");
 }
 
-test("with nothing ahead the tail is drawn beside the fixtures, not at the foot of the board",
+test("with nothing ahead the rest-day cells fill the bands and the tail sits under them",
   async ({ page }) => {
-    /* THE DEFECT THIS REPLACES. The tail's home is the last subgrid
-       track, under every matchday band — correct while there is a
-       forward story above it, and a screenful of void when there is
-       not: on the operator's 1440 board the Leagues Cup toggle sat
-       roughly a thousand pixels below the empty box that pointed at it.
-       "Last in the column" and "the first content track" are the same
-       place when every track above is empty. */
+    /* SINCE 2026-10-13 a column with nothing ahead is a column on a rest
+       week (Son: in season keeps its column, drawn as the rest-day card),
+       so its matchday bands are NOT empty: each holds a rest-day cell, and
+       the finished tail sits under them exactly as it does under a league's
+       fixtures — one tail, at the foot, never at the foot of a void. */
     await page.setViewportSize({ width: 1440, height: 900 });
     await open(page);
     await expect(page.getByTestId("picker-row").first()).toBeVisible();
-
-    /* THE CUP AND MLS HAVE TO BE ON SCREEN TOGETHER, because the
-       measurement below is the cup tail's position AGAINST the MLS
-       column's fixtures. Pressing the cup's pill puts it leftmost and
-       MLS next to it, which is the four-wide window this board draws. */
     await show(page, "leaguescup");
     await show(page, "mls");
     await expect(col(page, "leaguescup")).toHaveCount(1);
-
     const cupTail = col(page, "leaguescup").getByTestId("review-tail");
-    await expect(col(page, "leaguescup").locator('[data-slot="tail-track"]'))
-      .toHaveAttribute("data-at", "head");
-    // exactly ONE tail in the column — the head placement and the foot
-    // placement are one element in two possible tracks, never both
     await expect(cupTail).toHaveCount(1);
-
-    // a column WITH fixtures keeps its tail at the foot
-    await expect(col(page, "mls").locator('[data-slot="tail-track"]'))
+    await expect(col(page, "leaguescup").locator('[data-slot="tail-track"]'))
       .toHaveAttribute("data-at", "foot");
-
-    /* AND IT REALLY MOVED, measured rather than asserted off the
-       attribute alone: the cup tail's top sits above the bottom of the
-       MLS column's own fixtures, which is the band it has been pulled
-       up into. At the foot of the board it sat far below them. */
+    const cells = col(page, "leaguescup").locator('[data-testid="rest-day"]:visible');
+    expect(await cells.count()).toBeGreaterThan(0);
+    const lastCell = await settledBox(cells.last());
     const cupBox = await settledBox(cupTail);
-    const mlsCards = col(page, "mls").getByTestId("picker-row");
-    await expect(mlsCards).toHaveCount(2);
-    const lastCard = await settledBox(mlsCards.nth(1));
-    expect(cupBox.y, "the tail is still below the board's fixtures")
-      .toBeLessThan(lastCard.y + lastCard.height);
-
-    // and the MLS tail, which did not move, is below them
-    const mlsTail = await settledBox(col(page, "mls")
-      .getByTestId("review-tail"));
-    expect(mlsTail.y).toBeGreaterThan(lastCard.y + lastCard.height);
+    expect(cupBox.y, "the tail is under the rest-day cells")
+      .toBeGreaterThanOrEqual(lastCell.y + lastCell.height - 1);
   });
 
 // ------------------------------------------------- 6: the control itself

@@ -114,11 +114,31 @@ export function cupPlaceholder(slug: string): { title: string; line: string } | 
   if (!CUP_BOARD_COLUMNS.includes(slug)) {
     return { title: "not on the board yet", line: "no board data · nothing was asked" };
   }
-  const over = ALL_CUPS.find((c) => c.key === slug)?.over;
-  return over ? { title: "season over", line: `${over} edition finished` } : null;
+  /* NO "SEASON OVER" COLUMN (Son, 2026-10-07): a finished cup has no
+     column at all — it is named in the off-season line instead. */
+  return null;
 }
 
 /** The cups that already have a page, in tab order — the hero's lights. */
 export const CUPS_WITH_PAGES: readonly string[] = [
   ...CUPS.continental, ...CUPS.domestic,
 ].filter((c) => c.links?.length).map((c) => c.key);
+
+/** THE FINALS & SUPER CUPS GROUP (Son, 2026-10-07): every ONE-MATCH
+ *  competition shares one column, continental-agnostic, drawn ONLY when
+ *  one of its matches is in the window; each card carries its own
+ *  competition badge (the card's badge shows whenever the row's
+ *  competition is not the column). A one-match competition never has a
+ *  column of its own and is never "between rounds". */
+export const FINALS = "finals";
+export const FINALS_LABEL = "Finals & Super Cups";
+export const FINALS_MEMBERS: readonly string[] = ["campeones"];
+
+/** THE CUPS TAB'S COLUMNS, in Son's order: continental, then Finals &
+ *  Super Cups, then domestic. One-match competitions are in the group. */
+export const OWN_COLUMN_CUPS: readonly string[] = [
+  "ucl", "uel", "uecl", "concacafcc", "leaguescup",
+  FINALS,
+  "facup", "eflcup", "copadelrey", "dfbpokal", "coppaitalia",
+  "coupedefrance", "knvbbeker", "usopencup",
+];

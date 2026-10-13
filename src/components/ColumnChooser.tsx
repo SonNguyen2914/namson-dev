@@ -86,7 +86,8 @@ const fixturePhrase = (n: number) =>
   n === 0 ? "no fixtures on the board"
     : `${n} fixture${n === 1 ? "" : "s"} on the board`;
 
-export function ColumnChooser({ slugs, drawn, counts, view, onChange }: {
+export function ColumnChooser({ slugs, drawn, counts, view, onChange,
+  resting = {} }: {
   /** every column the board declares, in the operator's reading order */
   slugs: readonly string[];
   /** …and the ones currently on the track, a subset of it in that order */
@@ -97,6 +98,10 @@ export function ColumnChooser({ slugs, drawn, counts, view, onChange }: {
   view: number;
   /** hands back a filtered `slugs`; never a reordered or widened one */
   onChange: (next: readonly string[]) => void;
+  /** NO EMPTY COLUMNS (Son, 2026-10-07): competitions listed but not
+   *  drawable — nothing in the window ("off season") or not built yet.
+   *  Their chip names the reason and a press does nothing. */
+  resting?: Record<string, string>;
 }) {
   const on = useMemo(() => new Set(drawn), [drawn]);
 
@@ -114,13 +119,14 @@ export function ColumnChooser({ slugs, drawn, counts, view, onChange }: {
     return out;
   }, [drawn, view]);
 
-  const undrawn = slugs.filter((s) => !on.has(s));
+  const undrawn = slugs.filter((s) => !on.has(s) && !resting[s]);
   const only = drawn.length === 1;
 
   /* EVERY ANSWER IS A FILTER OF `slugs`. Not a splice of `drawn`, not a
      push: the output cannot contain a slug the declaration does not, and
      cannot put two of them in an order the operator did not choose. */
   const toggle = (slug: string) => {
+    if (resting[slug]) return;   /* nothing to draw — see `resting` */
     if (!on.has(slug)) {
       onChange(slugs.filter((s) => s === slug || on.has(s)));
       return;
@@ -181,12 +187,14 @@ export function ColumnChooser({ slugs, drawn, counts, view, onChange }: {
              nothing and drop out of the touch-floor audit at the same
              time. This one still takes the press and still declines. */
           const held = drawing && only;
+          const rest = resting[slug];
           return (
             <button key={slug} type="button" data-testid="column-chip"
               data-slug={slug} data-drawn={drawing ? "yes" : "no"}
+              {...(rest ? { "data-resting": rest } : {})}
               {...(shares ? { "data-shares-light": shares } : {})}
               aria-pressed={drawing}
-              {...(held ? { "aria-disabled": true } : {})}
+              {...(held || rest ? { "aria-disabled": true } : {})}
               onClick={() => toggle(slug)}
               /* ONE HUE LOOKUP. `hueOf` answers for every slug the board
                  can declare, including one the palette does not name;
@@ -194,13 +202,20 @@ export function ColumnChooser({ slugs, drawn, counts, view, onChange }: {
                  eight and silently empty for the ninth. */
               style={{ ["--h" as string]: hueOf(slug) }}
               className={`flex flex-none items-center gap-2 rounded-full border px-3 py-1.5 font-mono text-[11px] uppercase leading-none tracking-[0.06em] whitespace-nowrap transition-colors ${
-                drawing
+                rest ? "border-dashed border-line bg-transparent text-ink-faint"
+                : drawing
                   ? "border-[var(--h)] bg-[color-mix(in_srgb,var(--h)_12%,transparent)] text-ink-hi"
                   : "border-line bg-bs-elev2 text-ink-low hover:border-line-strong hover:text-ink-mid"}`}>
               <i aria-hidden
                 className="h-2 w-2 flex-none rounded-full bg-[var(--h)] transition-opacity"
                 style={{ opacity: drawing ? 1 : 0.42 }} />
               <span data-testid="column-chip-name">{leagueLabel(slug)}</span>
+              {rest && (
+                <span data-testid="column-chip-resting"
+                  className="normal-case tracking-normal text-ink-faint">
+                  {rest}
+                </span>
+              )}
               {/* THE SHARED LIGHT, ON THE CHIP THAT CAUSES IT. Visible
                   because a reader choosing columns is the only person
                   who can act on it, and the sighted reader is the one
@@ -215,7 +230,9 @@ export function ColumnChooser({ slugs, drawn, counts, view, onChange }: {
                   the count, the refusal and the shared hue. */}
               <span className="sr-only">
                 {` — ${fixturePhrase(n)}`}
-                {held
+                {rest
+                  ? " — nothing to draw in this window"
+                  : held
                   ? " — the board's last drawn column; it cannot be taken off"
                   : drawing ? " — drawn; press to take it off the board"
                     : " — not drawn; press to put it back on the board"}

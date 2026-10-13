@@ -3520,7 +3520,10 @@ export function LeagueColumn({
       {resting && (
         <div data-testid="rest-day" data-day="next"
           {...(placeholder ? { "data-placeholder": "yes" } : {})}
-          className="mt-3 flex min-h-[52px] flex-col justify-center gap-0.5 rounded-[10px] border border-dashed border-line px-3 py-2.5 xl:hidden">
+          className={`mt-3 flex min-h-[52px] flex-col justify-center gap-0.5 rounded-[10px] border border-dashed border-line px-3 py-2.5 ${
+            /* with no matchday bands on the board at all there is no
+               per-band cell at xl, so this one is the xl cell too */
+            byDay.length > 0 ? "xl:hidden" : "xl:[grid-row:3] xl:self-start"}`}>
           <span className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-ink-faint">
             {leagueLabel(slug)} — {placeholder ? placeholder.title : "rest day"}
           </span>

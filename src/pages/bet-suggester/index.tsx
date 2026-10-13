@@ -77,7 +77,7 @@ import {
   SEASON_BLEND_K, THIN_ASK_SIZE,
   WIDE_SPREAD_C, askHonoured, boardColumns, columnsOf, declarationOf,
   isFoldedCupTie,
-  fetchBoard, fetchChampionships, leagueLabel,
+  LeagueMeta, fetchBoard, fetchChampionships, leagueLabel,
   nationalColumn, venueAdjusted,
 } from "../../lib/pickerApi";
 import {
@@ -96,8 +96,13 @@ import {
   BoardMode, BoardModeSwitch, boardModeFrom,
 } from "../../components/BoardModeSwitch";
 import {
-  CUPS_WITH_PAGES, CUP_BOARD_COLUMNS, CUP_COLUMNS, cupPlaceholder,
+  ALL_CUPS, CUPS_WITH_PAGES, CUP_BOARD_COLUMNS, FINALS, FINALS_MEMBERS,
+  OWN_COLUMN_CUPS,
 } from "../../lib/cupsTab";
+import {
+  OffSeasonEntry, SeasonState, entryText, isOffSeason, offSeasonWhen,
+  restLine, slugsInWindow,
+} from "../../lib/offSeason";
 import { ColumnChooser } from "../../components/ColumnChooser";
 import { CompRail } from "../../components/CompRail";
 import LiveSection from "../../components/LiveCard";
@@ -474,8 +479,13 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      this step the fixture would be on the payload and drawn nowhere. Only
      a row whose own columns are all off this tab is moved. The payload is
      unchanged; this decides which column the page draws the row in. */
+  /* A ONE-MATCH COMPETITION'S TIE IS DRAWN IN THE SHARED "FINALS & SUPER
+     CUPS" COLUMN (Son, 2026-10-07), never in a column of its own and
+     never in a league column; its card carries its competition badge. */
   const homeCupRow = <T extends Parameters<typeof isFoldedCupTie>[0]>(r: T): T =>
-    cups && CUP_BOARD_COLUMNS.includes(r.league)
+    cups && FINALS_MEMBERS.includes(r.league)
+      ? { ...r, column: FINALS, columns: [FINALS] }
+    : cups && CUP_BOARD_COLUMNS.includes(r.league)
       && !columnsOf(r).some((c) => CUP_BOARD_COLUMNS.includes(c))
       ? { ...r, column: r.league, columns: [r.league] } : r;
   const allRows = board?.rows ?? [];
@@ -492,8 +502,16 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      folded into league columns) still has its meta under `folded`. On
      the Cups tab, where every asked cup is a column, that meta is read
      there so the header is the cup's own. */
-  const leaguesMap = cups
-    ? { ...(board?.folded ?? {}), ...(board?.leagues ?? {}) }
+  const cupMetas: Record<string, LeagueMeta> = cups
+    ? { ...(board?.folded ?? {}), ...(board?.leagues ?? {}) } : {};
+  /* The group column's header meta: a cup column rated on its members'
+     tables, like any cup — taken from the first member the payload
+     carries, with no settlement note of its own (each card says its). */
+  const finalsMeta = FINALS_MEMBERS.map((s) => cupMetas[s]).find(Boolean);
+  const leaguesMap: Record<string, LeagueMeta> = cups
+    ? { ...cupMetas,
+        ...(finalsMeta ? { [FINALS]: { ...finalsMeta, reg_time_note: null,
+                                       kind: "cup" as const } } : {}) }
     : board?.leagues ?? {};
 
   const reviewHere = reviewFor === mode ? review : null;
@@ -620,9 +638,44 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      (Son, 2026-10-12: "make everything match perfectly") — the chooser
      offers them all, as the Leagues tab's offers its eight. Which are
      DRAWN by default is `shownSlugs` below. */
-  const columnSlugs = only ? [...only]
-    : cups ? [...CUP_COLUMNS]
+  const offeredSlugs = only ? [...only]
+    : cups ? [...OWN_COLUMN_CUPS]
     : boardColumns(declaredColumns);
+  /* ── NO EMPTY COLUMNS (Son, 2026-10-07) ─────────────────────────────
+
+     A competition gets a column only when it has a fixture in the
+     board's window (upcoming or under way). Every other one is collapsed
+     into the single "Off season · …" line at the end of the tab
+     (`offSeason` below). `offeredSlugs` is still what the chooser lists;
+     `columnSlugs` is what the board can draw. A narrowed route (`only`)
+     is the competition's own page and keeps its column. Before the
+     payload lands nothing is filtered: the skeleton asserts no set. */
+  const inWindow = slugsInWindow([...offeredSlugs, ...FINALS_MEMBERS],
+    [...rows, ...refusals], columnsOf);
+  /* WHICH OFFERED COMPETITIONS ARE OFF SEASON — `isOffSeason`, the one
+     rule (lib/offSeason.ts): in season keeps its column even with
+     nothing in the window (the dashed rest-day card); finished or not
+     started folds into the line; a one-match group only when upcoming.
+     Where the payload sends no season state the declared fallback is
+     the cup's `over`; a Nations column that has a next fixture and no
+     group played yet has not started. */
+  const seasonOf = (s: string): SeasonState | null => {
+    if (champ) {
+      const nc = nationalColumn(board?.competitions?.[s], []);
+      return nc?.stage?.text.startsWith("starts") ? "not_started" : null;
+    }
+    return (leaguesMap[s]?.season?.state as SeasonState | undefined) ?? null;
+  };
+  const offSeasonSet = new Set(!board || only ? [] : offeredSlugs.filter(
+    (s) => isOffSeason({
+      ahead: inWindow.has(s),
+      state: seasonOf(s),
+      declaredOver: Boolean(cups && ALL_CUPS.find((c) => c.key === s)?.over),
+      oneMatch: s === FINALS,
+    })
+    /* a cup the backend does not build yet has no column to keep */
+    || (cups && s !== FINALS && !CUP_BOARD_COLUMNS.includes(s))));
+  const columnSlugs = offeredSlugs.filter((s) => !offSeasonSet.has(s));
 
   /* ── WHICH LEAGUE THE PHONE IS LOOKING AT (operator, 2026-09-16) ────
 
@@ -670,12 +723,10 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      `columnSlugs`, which is why a stale selection can only ever shrink
      — it cannot reorder the board and cannot smuggle a slug back on. */
   const [shownRaw, setShown] = useState<readonly string[] | null>(null);
-  /* ON THE CUPS TAB THE DEFAULT SELECTION IS THE CUPS THE BOARD BUILDS.
-     The rest are undrawn chips in the chooser; choosing one draws its
-     column with a "not on the board yet" rest-day cell and asks for
-     nothing. */
-  const shownDefault = cups
-    ? columnSlugs.filter((s) => CUP_BOARD_COLUMNS.includes(s)) : null;
+  /* Since 2026-10-13 a cup with nothing to draw is not offered as a
+     column at all (`columnSlugs` holds only drawable ones), so the
+     default is simply every one of them. */
+  const shownDefault: readonly string[] | null = null;
   const shownSlugs = (() => {
     const chosen = shownRaw ?? shownDefault;
     if (!chosen) return columnSlugs;
@@ -918,8 +969,8 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      chooser on both; the rule is one rule for any declared board of two
      or more columns, so it holds for both modes rather than for one of
      them. A narrowed page (`only`) still offers none. */
-  const chooseable = columnSlugs.length > VIEW
-    || (!only && columnSlugs.length > 1);
+  const chooseable = offeredSlugs.length > VIEW
+    || (!only && offeredSlugs.length > 1);
   /* THE LOOP IS A NO-OP AT FOUR COLUMNS OR FEWER, which is what keeps
      every narrowed page (`/bet-suggester/ucl`) exactly as it is: nothing
      is built to page through and no ribbon draws.
@@ -999,8 +1050,51 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
    *  column it is drawn in and the strip cannot disagree with the board.
    *  A column with none is NAMED as having none; it never wears a 0. */
   const fixtureCounts: Record<string, number> = Object.fromEntries(
-    columnSlugs.map((sl) =>
+    offeredSlugs.map((sl) =>
       [sl, rows.filter((r) => columnsOf(r).includes(sl)).length]));
+
+  /* ── THE OFF-SEASON LINE AND THE CHOOSER'S RESTING CHIPS ───────────
+     Every offered competition with nothing in the window, named once at
+     the end of the tab with when it returns (lib/offSeason.ts). On the
+     Cups tab the candidates are the cups the board BUILDS — a cup not
+     built yet is not off season, it is "not on the board yet", and says
+     so on its chooser chip instead. */
+  const resting: Record<string, string> = Object.fromEntries(
+    [...offSeasonSet].map((s) => [s,
+      cups && s !== FINALS && !CUP_BOARD_COLUMNS.includes(s)
+        ? "not on the board yet"
+        : s === FINALS ? "nothing upcoming" : "off season"]));
+  /* The line names COMPETITIONS, so the group is named by its members. */
+  const offSeason: OffSeasonEntry[] = !board || only ? [] : [
+    ...offeredSlugs.filter((s) => offSeasonSet.has(s)
+      && !(cups && s !== FINALS && !CUP_BOARD_COLUMNS.includes(s))),
+  ].flatMap((s) => s === FINALS
+    ? FINALS_MEMBERS.filter((m) => CUP_BOARD_COLUMNS.includes(m)
+        && !inWindow.has(m))
+    : [s]).map((s) => {
+    const cup = cups ? ALL_CUPS.find((c) => c.key === s) : undefined;
+    const meta = cupMetas[s] ?? leaguesMap[s];
+    const next = champ
+      ? nationalColumn(board?.competitions?.[s], [])?.nextBeyond ?? null
+      : meta?.season?.next_fixture ?? meta?.next_fixture
+        ?? meta?.season_start ?? null;
+    return {
+      slug: s, name: leagueLabel(s),
+      when: offSeasonWhen(next),
+      href: cup?.links?.[0]?.href,
+    };
+  });
+  /* AN IN-SEASON COLUMN WITH NOTHING IN THE WINDOW draws the league's
+     dashed rest-day card: when it next plays, or "date TBC". Nations
+     columns already carry their own (`national.nextBeyond`). */
+  const restCard = (s: string) => {
+    if (champ || only || inWindow.has(s)) return null;
+    const meta = leaguesMap[s];
+    /* a failed read or a silent payload keeps its own louder state */
+    if (!meta || meta.error) return null;
+    const next = meta?.season?.next_fixture ?? meta?.next_fixture ?? null;
+    return { title: "rest day", line: restLine(next, cups, dayLabel) };
+  };
 
   /* ARROW KEYS, PILL CLICKS, THE ROTATION AND THE RIBBON, all in one
      place (components/LeagueRibbon.tsx). They belong together because
@@ -1280,8 +1374,9 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   {showChooser && (
                     <div className={showRibbon
                       ? "mt-1.5 border-t border-line pt-1.5" : ""}>
-                      <ColumnChooser slugs={columnSlugs} drawn={drawnSlugs}
+                      <ColumnChooser slugs={offeredSlugs} drawn={drawnSlugs}
                         counts={fixtureCounts} view={view}
+                        resting={resting}
                         onChange={setShown} />
                     </div>
                   )}
@@ -2087,7 +2182,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                     tabPanel={showTabs && slug === picked}
                     meta={leaguesMap[slug]}
                     tabParity={cups}
-                    placeholder={cups ? cupPlaceholder(slug) : null}
+                    placeholder={restCard(slug)}
                     noTail={cups && !CUP_BOARD_COLUMNS.includes(slug)}
                     rows={rows.filter((r) => columnsOf(r).includes(slug))}
                     refusals={refusals.filter((r) => columnsOf(r).includes(slug))}
@@ -2209,6 +2304,37 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                 })}
               </div>
               </div>
+              {/* NOTHING IN THE WINDOW AT ALL: said once, not as empty
+                  columns. */}
+              {!only && board && columnSlugs.length === 0 && (
+                <p data-testid="board-nothing-in-window"
+                  className="text-sm text-ink-low">
+                  Nothing on this tab in the next {days} days.
+                </p>
+              )}
+              {/* THE OFF-SEASON LINE (Son, 2026-10-07): every competition
+                  with nothing in the window, collapsed into one quiet line
+                  at the end of the tab. Each name links to its own page
+                  where one exists, so hubs, finished cards and ratings
+                  stay reachable. */}
+              {offSeason.length > 0 && (
+                <p data-testid="off-season-line"
+                  className="mt-6 border-t border-line pt-3 font-mono text-[11px] leading-relaxed text-ink-faint">
+                  <span>Off season</span>
+                  {offSeason.map((e) => (
+                    <span key={e.slug} data-testid="off-season-entry"
+                      data-slug={e.slug}>
+                      {" \u00b7 "}
+                      {e.href
+                        ? <Link href={e.href}
+                            className="underline decoration-line underline-offset-2 hover:text-ink-mid">
+                            {entryText(e)}
+                          </Link>
+                        : entryText(e)}
+                    </span>
+                  ))}
+                </p>
+              )}
             </>
           )}
         </section>
