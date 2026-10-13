@@ -9,6 +9,12 @@
  *  source lists one. Never a month, never "next season". The in-season
  *  rest-day card reads the same answer.
  *
+ *  OPTION B (Son, 2026-10-13): only a match the board can SHOW counts —
+ *  an API-Football fixture only from a round the board's own ESPN source
+ *  carries. The FA Cup's next listed match is a 4th Round Qualifying tie
+ *  (Sat Oct 17) that ESPN never carries, so it reads "date not announced"
+ *  until the first round proper is listed.
+ *
  *  Every board here is e2e/return-dates-recorded.ts: the backend's own
  *  in-process assembly of all 22 cups, the declared Leagues board and the
  *  Nations board on 2026-10-13, untouched apart from trimming. */
@@ -68,7 +74,6 @@ test.describe("return dates on the recorded 2026-10-13 boards", () => {
     const listed: Record<string, [string, string]> = {
       supercopa: ["2027-02-02T19:00Z", "espn_scoreboard_year"],
       supercoppa: ["2026-12-22T20:00Z", "espn_scoreboard_year"],
-      facup: ["2026-10-17T14:00Z", "apifootball_fixtures_next"],
       eflcup: ["2026-10-27T19:45Z", "espn_scoreboard_year"],
       copadelrey: ["2026-10-27T17:30Z", "apifootball_fixtures_next"],
       dfbpokal: ["2026-10-27T17:00Z", "espn_scoreboard_year"],
@@ -83,7 +88,7 @@ test.describe("return dates on the recorded 2026-10-13 boards", () => {
     }
     for (const slug of ["concacafcc", "leaguescup", "campeones", "uefasuper",
       "communityshield", "dflsupercup", "tropheechampions", "johancruijff",
-      "campeondecampeones", "coupedefrance"]) {
+      "campeondecampeones", "coupedefrance", "facup"]) {
       const n = nextMatch(RETURN_CUPS_BOARD, slug);
       expect(n, slug).toBeTruthy();
       expect(n!.kickoff, slug).toBeNull();
@@ -111,17 +116,18 @@ test.describe("return dates on the recorded 2026-10-13 boards", () => {
       "Trophée des Champions — date not announced",
       "Johan Cruijff Schaal — date not announced",
       "Campeón de Campeones — date not announced",
-      // API-Football's FA Cup fixture: the fourth qualifying round
-      "FA Cup returns Sat Oct 17",
+      // option B: API-Football's next FA Cup fixture is a 4th Round
+      // Qualifying tie, a round ESPN (and so the board) never carries
+      "FA Cup — date not announced",
       "Coupe de France — date not announced",
     ].join(" · "));
     await expect(line).not.toContainText(/next season|returns [A-Z][a-z]{2} 20\d\d/);
     // the hover says which match and which source, or why none
     await expect(line.locator('[data-slug="facup"]')).toHaveAttribute("title",
-      "AFC Rushden & Diamonds v Morecambe · 4th Round Qualifying — listed by "
-      + "API-Football's schedule");
+      /^No source lists a next match: .*2026-10-17, 4th Round Qualifying\) is in a round ESPN does not carry, so the board cannot show it/);
+    await expect(line).not.toContainText("FA Cup returns");
     await expect(line.locator('[data-slug="communityshield"]')).toHaveAttribute(
-      "title", /^No source lists a next match: ESPN lists no scheduled match in 2026 or 2027; API-Football league 528 lists no next fixture$/);
+      "title", /^No source lists a next match: ESPN lists no scheduled match in 2026 or 2027; API-Football league 528 not asked: none of its rounds is verified as one ESPN carries$/);
   });
 
   test("Cups: an in-season cup's rest-day card is its real next fixture",

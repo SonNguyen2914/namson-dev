@@ -20,6 +20,7 @@ import type {
   BoardRow, FieldAxisKey, FieldBlockLike, FieldSide, RowField,
   RowFieldPartial,
 } from "./pickerApi";
+import { detailText } from "./httpFailure";
 
 /** One club on one axis. */
 export interface AxisRow {
@@ -550,7 +551,7 @@ export async function fetchRatings(
     let detail = "";
     try {
       const body = await r.json();
-      detail = body?.detail || body?.error || "";
+      detail = detailText(body, r.status);
     } catch { /* non-JSON body; the status is all we have */ }
     throw new Error(detail || `the field read answered ${r.status}`);
   }

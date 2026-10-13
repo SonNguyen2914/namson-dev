@@ -29,6 +29,7 @@ import {
   BlendWeights, DEFAULT_DAYS, KalshiQuote, ModelVsMarket, Shape, Src,
   TierPair,
 } from "./pickerApi";
+import { detailText } from "./httpFailure";
 
 /** The two ways a pre-kickoff read can exist. A third state — neither —
  *  is carried as `state: null` with `unavailable_reason` naming why. */
@@ -561,7 +562,7 @@ async function readReview(url: string, signal?: AbortSignal): Promise<Review> {
     let detail = "";
     try {
       const body = await r.json();
-      detail = body?.detail || body?.error || "";
+      detail = detailText(body, r.status);
     } catch { /* non-JSON body; the status is all we have */ }
     throw new Error(detail || `review request failed (${r.status})`);
   }

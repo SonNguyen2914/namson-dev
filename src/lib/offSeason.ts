@@ -15,6 +15,11 @@
 // prints its day in America/Los_Angeles like the rest of the board, with
 // the year only when it is not this year. When no source lists one the
 // entry says "date not announced" — never a month, never "next season".
+// ONLY A MATCH THE BOARD CAN SHOW (Son, 2026-10-13, option B): the
+// backend takes an API-Football fixture only from a round the board's own
+// ESPN source carries, so the FA Cup's qualifying ties (which the board
+// never draws) leave it "date not announced" until the first round proper
+// is listed. This file prints the backend's answer and adds no source.
 // WHICH
 // competitions are off season is `isOffSeason` below: an edition that has
 // finished or not started, never one that is merely between rounds. Hubs, finished cards and ratings stay reachable: each entry links
