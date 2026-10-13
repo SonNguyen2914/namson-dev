@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { hydrated, view } from "./operator-console";
-import { at, qaBook, qaCandidates, qaLedger, qaStatusWithCareful } from "./console-fixtures";
+import { at, pinFixtureClock, qaBook, qaCandidates, qaLedger, qaStatusWithCareful } from "./console-fixtures";
 import { describeEmergency } from "../src/components/console/Emergency";
 import { OPERATOR_WRITE_PATHS, parseMinutesBody } from "../src/lib/operatorRelay";
 
@@ -25,6 +25,18 @@ const TOKEN = "ops-emergency-token-typed-by-a-person";
 const json = (status: number, body: unknown) => ({ status, contentType: "application/json", body: JSON.stringify(body) });
 type Obj = Record<string, unknown>;
 const HALT_SERVED = { operator_halt: { until: null, set_at: null } };
+
+// THE TIME A KILL OR HALT RUNS TO is printed by whenShort(): "14:55" when it
+// ends on the viewer's today, "Oct 13 00:15" when it ends on another day —
+// a bare "00:15" late at night would read as a time already past. So a
+// test of that text pins the wall clock (page and fixtures alike) and the
+// zone; on the run's own clock it went red every night after 23:05.
+const MIDDAY = Date.parse("2026-10-12T14:00:00Z");
+const NEAR_MIDNIGHT = Date.parse("2026-10-12T23:20:00Z");
+async function pinClock(page: Page, ms: number) {
+  pinFixtureClock(ms);
+  await page.clock.setFixedTime(ms);
+}
 
 async function open(page: Page, status: () => Obj, o: { fakeClock?: boolean; hash?: string } = {}) {
   await page.route("**/api/ops/trading-status", (r) => r.fulfill(json(200, status())));
@@ -60,6 +72,9 @@ async function controls(page: Page) {
 }
 
 test.describe("KILL and HALT", () => {
+  test.use({ timezoneId: "UTC", locale: "en-US" });
+  test.afterEach(() => pinFixtureClock(null));
+
   test("one press sends nothing; a second within 5 s sends {minutes:60} with the token; the answer is said", async ({ page }) => {
     await page.clock.install();
     await open(page, () => qaStatusWithCareful(HALT_SERVED), { fakeClock: true });
@@ -137,12 +152,13 @@ test.describe("KILL and HALT", () => {
   });
 
   test("a halt in force: the rail says HALT ACTIVE in red with its time, Safety unfolds, and its lift lifts", async ({ page }) => {
+    await pinClock(page, MIDDAY);
     let lifted = false;
     await open(page, () => qaStatusWithCareful({ operator_halt: lifted ? { until: null, set_at: null }
       : { until: at(55), set_at: at(-5) } }));
     const lifts = await capture(page, "trading-halt-lift", () => { lifted = true; return { status: 200, body: { lifted: true } }; });
     const pill = page.getByTestId("rail-halt");
-    await expect(pill).toContainText(/ACTIVE · until \d{2}:\d{2}/);
+    await expect(pill).toContainText("ACTIVE · until 14:55");
     await expect(pill).toHaveAttribute("data-state", "bad");
     await expect(page.getByTestId("rail-trading")).toContainText("HALTED");
     const safety = page.getByTestId("ops-safety");
@@ -165,9 +181,10 @@ test.describe("KILL and HALT", () => {
   });
 
   test("a kill in force: KILL ACTIVE in red with its time; one lift for the kill", async ({ page }) => {
+    await pinClock(page, MIDDAY);
     await open(page, () => qaStatusWithCareful({ ...HALT_SERVED, kill: true, kill_until: at(42) }));
     const pill = page.getByTestId("rail-kill");
-    await expect(pill).toContainText(/ACTIVE · until \d{2}:\d{2}/);
+    await expect(pill).toContainText("ACTIVE · until 14:42");
     await expect(pill).toHaveAttribute("data-state", "bad");
     const safety = page.getByTestId("ops-safety");
     await expect(safety.getByTestId("emergency-kill")).toBeVisible();
@@ -179,6 +196,21 @@ test.describe("KILL and HALT", () => {
     // other views: the rail carries the controls
     await view(page, "#trades");
     await expect(page.getByTestId("rail-controls").getByTestId("emergency-kill")).toHaveCount(1);
+  });
+
+  test("a time past midnight carries its date; one before it does not", async ({ page }) => {
+    await pinClock(page, NEAR_MIDNIGHT);                 // 23:20
+    let untilMin = 55;                                   // 00:15, tomorrow
+    await open(page, () => qaStatusWithCareful({ operator_halt: { until: at(untilMin), set_at: at(-5) },
+      kill: true, kill_until: at(untilMin) }));
+    await expect(page.getByTestId("rail-halt")).toContainText("ACTIVE · until Oct 13 00:15");
+    await expect(page.getByTestId("rail-kill")).toContainText("ACTIVE · until Oct 13 00:15");
+    untilMin = 35;                                       // 23:55, today
+    await page.reload();
+    await hydrated(page);
+    await page.locator("#watch-token").fill(TOKEN);
+    await expect(page.getByTestId("rail-halt")).toContainText(/ACTIVE · until 23:55$/);
+    await expect(page.getByTestId("rail-kill")).toContainText(/ACTIVE · until 23:55$/);
   });
 
   test("keyboard: Enter arms, Enter again sends", async ({ page }) => {

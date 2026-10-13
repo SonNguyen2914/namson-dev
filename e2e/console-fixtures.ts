@@ -13,8 +13,14 @@ import { LEDGER_RECORDED } from "./trading-ledger-recorded";
 import { FOCUS_COMPETITIONS } from "../src/lib/tradingConsole";
 
 type Obj = Record<string, unknown>;
+// "Now" for every timestamp below. Normally the test process's own clock;
+// a spec whose claim depends on the wall clock (what the console prints
+// for a time that crosses midnight) pins it with `pinFixtureClock`, the
+// same instant it gives `page.clock.setFixedTime`, and unpins it after.
+let fixtureNow: number | null = null;
+export const pinFixtureClock = (ms: number | null) => { fixtureNow = ms; };
 export const at = (minutesFromNow: number) =>
-  new Date(Date.now() + minutesFromNow * 60_000).toISOString();
+  new Date((fixtureNow ?? Date.now()) + minutesFromNow * 60_000).toISOString();
 
 // --------------------------------------------------------------- status
 
