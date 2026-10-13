@@ -679,6 +679,13 @@ export const LEAGUE_PROXY_WITHHELD: Record<string, Record<string, string>> = {
       + "drift chart is ever built, this record is deleted and the "
       + "route added to COMP_RESOURCES — the two cannot both be true.",
   },
+  site: {
+    beacon: "the build beacon (backend #250, 2026-10-12): a local or CI "
+      + "build of either repo pings it once so Son learns when someone "
+      + "builds the code. Builds call the BACKEND directly; nothing in "
+      + "src/ reads it, and a public proxy in front of it would let any "
+      + "visitor forge build sightings. Withheld by design.",
+  },
 };
 
 /** A concrete value to stand in for one OpenAPI path parameter, by the

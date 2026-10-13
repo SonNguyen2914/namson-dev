@@ -756,19 +756,23 @@ test("a book with no live quote is a real state, and keeps its row",
   async ({ page }) => {
     // tonight's actual case: every Kalshi event matched, every quote null
     await open(page);
-    const top = page.getByTestId("picker-row").filter({ hasText: "Barcelona" });
-    await expect(top.getByText(/listed · no quote/)).toBeVisible();
+    /* A BOARD WITHOUT THE MODEL/MARKET BLOCK draws the league card's
+       table with "—" and the price state on the market reason's hover
+       (AGENTS.md §8.5, 2026-10-13) — every state still named, none
+       collapsed into another. */
+    const why = (club: string) => page.getByTestId("picker-row")
+      .filter({ hasText: club }).getByTestId("mm-why-market");
+    await expect(why("Barcelona")).toHaveAttribute("title", /listed on Kalshi, but there is no live quote/);
     // an unmatched event is a DIFFERENT fact and says so
-    await expect(page.getByTestId("picker-row").filter({ hasText: "Hollow FC" })
-      .getByText("no kalshi event")).toBeVisible();
-    // a priced row shows ask / spread / size and both annotation flags
-    const priced = page.getByTestId("picker-row").filter({ hasText: "Arsenal" });
-    await expect(priced.getByText("ask 64¢")).toBeVisible();
-    await expect(priced.getByText(/bid \d+¢/)).toBeVisible();
-    await expect(priced.getByText("spread 5¢")).toBeVisible();
-    await expect(priced.getByText("size 40")).toBeVisible();
-    await expect(priced.getByText("WIDE", { exact: true })).toBeVisible();
-    await expect(priced.getByText("THIN", { exact: true })).toBeVisible();
+    await expect(why("Hollow FC")).toHaveAttribute("title", /no Kalshi event/);
+    // a priced row keeps ask / bid / spread / size and both flags
+    const t = await why("Arsenal").getAttribute("title");
+    expect(t).toMatch(/ask 64¢/);
+    expect(t).toMatch(/bid \d+¢/);
+    expect(t).toMatch(/spread 5¢/);
+    expect(t).toMatch(/size 40\b/);
+    expect(t).toMatch(/WIDE/);
+    expect(t).toMatch(/THIN/);
   });
 
 test("a league's kalshi failure is named in its column, costing quotes, not rows",

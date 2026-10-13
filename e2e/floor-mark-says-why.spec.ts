@@ -262,6 +262,25 @@ async function openBoard(
       : r.fulfill(json(ratings)));
   await page.goto("/bet-suggester/ucl");
   await expect(page.getByTestId("picker-row").first()).toBeAttached();
+  /* THE DAGGERS ARE IN THE CARD'S `#` PANEL since the one-card rule
+     (AGENTS.md §8.4, 2026-10-13): the face is the league card's compact
+     trio, so the marks — same element, same sentence — are read there. */
+  const open = page.getByTestId("picker-row").first().getByTestId("field-ranks-open");
+  /* clicked until the panel is up: a press that lands before the page
+     hydrates opens nothing, and nothing would say so */
+  /* the `#` exists once the field has been read — on a ratings-fed card
+     that is a second request, so it is waited for, never counted early */
+  await open.waitFor({ state: "attached", timeout: 10_000 }).catch(() => undefined);
+  if (await open.count()) {
+    await expect(open).toHaveAttribute("aria-expanded", "false");
+    await expect(async () => {
+      // a press is sent only while the panel is shut, so a slow open is
+      // never toggled shut again by the retry
+      if ((await open.getAttribute("aria-expanded")) !== "true") await open.click();
+      await expect(open).toHaveAttribute("aria-expanded", "true", { timeout: 2000 });
+    }).toPass({ timeout: 15_000 });
+    await expect(page.getByTestId("field-ranks").first()).toBeVisible();
+  }
 }
 
 const marks = (page: import("@playwright/test").Page) =>

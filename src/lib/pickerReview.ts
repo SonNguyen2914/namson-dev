@@ -381,6 +381,10 @@ export interface Review {
    *  payload. Nothing may read a narrowed key set as the operator's
    *  columns. */
   narrowed_to?: string[] | null;
+  /** Competitions with finished fixtures here and no column of their
+   *  own (`tables.FOLDED_INTO_COLUMNS`), with their meta. Read only by the
+   *  Cups tab. */
+  folded?: Record<string, ReviewLeagueMeta & { folded_into?: string[] }>;
 }
 
 /** DID THIS SWEEP READ THAT COMPETITION AT ALL?

@@ -233,8 +233,12 @@ test.describe("a club card carries the head-to-head, as a national card does", (
     await clubBoard(page, board);
     const item = clubItem(page, none.event_id);
     const since = /^(\d{4})-(\d{2})/.exec(none.h2h.window!.from!)!;
-    await expect(item).toHaveText(`h2h none since ${since[1]}-${since[2]}`);
-    await expect(item).toHaveAttribute("title", none.h2h.reason!);
+    /* "none" in the slot; the window it was measured over and the
+       backend's own sentence on the hover (AGENTS.md §8.3: h2h inline,
+       one line) */
+    await expect(item).toHaveText("h2h none");
+    await expect(item).toHaveAttribute("title",
+      `none since ${since[1]}-${since[2]}. ${none.h2h.reason!}`);
     await expect(clubItem(page, target.event_id)).toHaveCount(0);
     // a board built before the key: no item anywhere, never a blank one
     await page.goto("about:blank");

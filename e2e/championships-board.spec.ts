@@ -176,8 +176,11 @@ test.describe("the Championships board", () => {
       expect(await reason.getAttribute("title")).toContain("no_national_rating");
       // a refused card's price has no favourite to belong to, so it is
       // named — by the book's own code for the side
-      await expect(refused.locator('[data-testid="price-side"]')).toHaveText("GEO");
-      await expect(refused).toContainText("ask 53¢");
+      /* on the market reason's hover since the one-card rule (AGENTS.md
+         §8.5): the same table a ranked card draws */
+      const why = refused.getByTestId("mm-why-market");
+      await expect(why).toHaveAttribute("title", /ask 53¢/);
+      await expect(why).toHaveAttribute("title", /GEO/);
     });
 });
 
@@ -199,16 +202,25 @@ test.describe("a national card is a league card with national facts in its slots
       await expect(page.locator('[data-testid="legend-national"]')).toContainText(/friendly/);
     });
 
-  test("the stats line carries no club stat, and never an n/a", async ({ page }) => {
+  test("the stats line is the league card's: ppg · rank · gp · h2h, never an n/a",
+    async ({ page }) => {
+    /* AGENTS.md §8.3 (Son, 2026-10-13): one line, the league card's fields
+       in its order, read off the group table, "—" where it cannot say. */
     await openChampionships(page);
-    const cards = page.locator('[data-testid="picker-row"]');
-    for (const t of await cards.allInnerTexts()) {
-      expect(t, "no club stat on a national card").not.toMatch(/\bGD\/g\b|\bppg\b|\brank [+−-]/);
-      expect(t).not.toContain("n/a");
+    const rows = page.locator('[data-testid="picker-row"] [data-testid="stats-row"]');
+    for (const ids of await rows.evaluateAll((es) => es.map((e) =>
+      [...e.children].map((c) => c.getAttribute("data-testid"))))) {
+      expect(ids).toEqual(["rank-pair", "stat-ppg", "stat-rank", "stat-gp", "h2h"]);
     }
-    // the group-table slots, drawn once a group has started
-    expect(await page.locator('[data-testid="national-pts"]').count()).toBeGreaterThan(0);
-    expect(await page.locator('[data-testid="national-gp"]').count()).toBeGreaterThan(0);
+    for (const t of await page.locator('[data-testid="picker-row"]').allInnerTexts()) {
+      expect(t).not.toContain("n/a");
+      expect(t, "no club GD/g on a national card").not.toMatch(/\bGD\/g\b/);
+    }
+    // the group-table slots carry figures once a group has started
+    expect(await page.locator('[data-testid="stat-gp"]', { hasText: /gp \d+\/\d+/ }).count())
+      .toBeGreaterThan(0);
+    expect(await page.locator('[data-testid="stat-ppg"]', { hasText: /ppg [+−-]?\d/ }).count())
+      .toBeGreaterThan(0);
   });
 
   test("the headline is the overall Elo gap, not the tier the OVR row already shows",
@@ -255,7 +267,9 @@ test.describe("a national card is a league card with national facts in its slots
       await openChampionships(page, board);
       await expect(page.locator('[data-testid="col-head"][data-league="unl"] [data-testid="col-floor"]'))
         .toHaveAttribute("data-axes", "def");
-      expect(await page.locator('[data-testid="league-col"][data-league="unl"] [data-tier="atk"] [data-testid="field-floor-mark"]').count())
+      /* the per-cell verdict is on the cell's hover now — the face is the
+         league card's compact trio (AGENTS.md §8.4) */
+      expect(await page.locator('[data-testid="league-col"][data-league="unl"] [data-tier="atk"][data-below-floor]').count())
         .toBeGreaterThan(0);
       // the other columns are untouched by one column's evidence
       await expect(page.locator('[data-testid="col-head"][data-league="cnl"] [data-testid="col-floor"]'))
@@ -280,7 +294,9 @@ test.describe("a national card is a league card with national facts in its slots
       await openChampionships(page);
       await expect(page.locator('[data-testid="national-price-side"]')).toHaveCount(0);
       await expect(page.locator('[data-testid="picker-row"] [data-testid="price-side"]')).toHaveCount(0);
-      expect(await page.locator('[data-testid="picker-row"]', { hasText: /ask \d+¢/ }).count())
+      /* a board with no model/market block draws the table with "—" and
+         the book it has on the market reason's hover (AGENTS.md §8.5) */
+      expect(await page.locator('[data-testid="picker-row"] [data-testid="mm-why-market"][title*="ask "]').count())
         .toBeGreaterThan(0);
     });
 
@@ -293,7 +309,14 @@ test.describe("a national card is a league card with national facts in its slots
     if (own === 0) board.rows[0].national.lineups = XI_LINEUPS;
     await openChampionships(page, board);
     const announced = own || 1;
-    await expect(page.locator('[data-testid="xi-chip"]')).toHaveCount(announced);
+    // no chip on the face (AGENTS.md §8.1): the fact is in the card's panel
+    await expect(page.locator('[data-testid="xi-chip"]')).toHaveCount(0);
+    expect(announced).toBeGreaterThan(0);
+    const ev = (board.rows as Array<{ event_id: string; national?: { lineups?: { announced?: boolean } } }>)
+      .find((r) => r.national?.lineups?.announced)!.event_id;
+    const xiCard = page.locator(`[data-testid="picker-row"][data-event="${ev}"]`);
+    await xiCard.locator('[data-testid="field-ranks-open"], [data-testid="tier-read"]').first().click();
+    await expect(page.getByTestId("card-context").first()).toContainText("both starting XIs are named");
     await expect(page.locator('[data-testid="national-lineups"]')).toHaveCount(0);
     for (const t of await page.locator('[data-testid="picker-row"]').allInnerTexts()) {
       expect(t).not.toMatch(/not announced/i);
@@ -325,8 +348,8 @@ test.describe("a national card is a league card with national facts in its slots
         } else {
           // a measured absence over a named window, and the backend's own
           // sentence for it verbatim — which never says "never met"
-          await expect(item).toHaveText("h2h none since 2018");
-          await expect(item).toHaveAttribute("title", h.reason!);
+          await expect(item).toHaveText("h2h none");
+          await expect(item).toHaveAttribute("title", `none since 2018. ${h.reason!}`);
           expect(h.reason).toMatch(/a measured absence over that window, not a claim/i);
         }
       }
@@ -365,8 +388,9 @@ test.describe("the national favourite is venue-adjusted", () => {
       // the venue chip stays: it is why the number moved
       await expect(c.locator('[data-testid="home-badge"]')).toHaveText("H");
       // and the price is the new favourite's leg — the DR's 62¢, not 19¢
-      await expect(c).toContainText("ask 62¢");
-      await expect(c).not.toContainText("ask 19¢");
+      const why = c.getByTestId("mm-why-market");
+      await expect(why).toHaveAttribute("title", /ask 62¢/);
+      await expect(why).not.toHaveAttribute("title", /ask 19¢/);
     });
 
   test("no home term at a neutral venue: the raw gap stands", async ({ page }) => {
@@ -380,7 +404,7 @@ test.describe("the national favourite is venue-adjusted", () => {
       await expect(c.locator('[title="Nicaragua v Dominican Republic"]')).toHaveCount(1);
     await expect(c.locator('[data-testid="row-anchor"]')).toHaveText("+36");
     await expect(c.locator('[data-testid="home-badge"]')).toHaveText("N");
-    await expect(c).toContainText("ask 19¢");
+    await expect(c.getByTestId("mm-why-market")).toHaveAttribute("title", /ask 19¢/);
   });
 
   test("a headline the backend serves is printed as served — value, unit, label",
@@ -425,14 +449,15 @@ test.describe("the corner: a venue line, and a close call drawn faint", () => {
     async ({ page }) => {
       await openInterim(page);
       const k = card(page).locator('[data-testid="anchor-key"]');
-      await expect(k).toContainText(/\u221236 rating · \+65 home/i);
+      // the venue line is the label's hover; the face keeps one line (§8.2)
+      await expect(k).toHaveAttribute("title", /\u221236 rating · \+65 home/i);
       // derived from the recording, never typed: the favourite's rating
       // minus the opponent's, on the row's own overall axis
       const o = (GEO_NIR as unknown as { field: { axes: { ovr: {
         fav: { value: number }; opp: { value: number } } } } }).field.axes.ovr;
       const raw = Math.round(o.fav.value - o.opp.value);
       const g = geo(page).locator('[data-testid="anchor-key"]');
-      await expect(g).toContainText(`+${raw} rating · +65 home`, { ignoreCase: true });
+      await expect(g).toHaveAttribute("title", new RegExp(`\\+${raw} rating · \\+65 home`, "i"));
     });
 
   test("a neutral venue says neutral, and carries no home term", async ({ page }) => {
@@ -441,7 +466,7 @@ test.describe("the corner: a venue line, and a close call drawn faint", () => {
     r.venue_class = { class: "NEUTRAL", home_side: null };
     await openInterim(page, board);
     await expect(card(page).locator('[data-testid="anchor-key"]'))
-      .toContainText(/\+36 rating · neutral/i);
+      .toHaveAttribute("title", /\+36 rating · neutral/i);
   });
 
   test("under 100 Elo the number is drawn faint; from 100 it is not", async ({ page }) => {
@@ -471,7 +496,7 @@ test.describe("the corner: a venue line, and a close call drawn faint", () => {
       await openInterim(page, board);
       await expect(geo(page).locator('[data-testid="row-anchor"]')).toHaveText("+117");
       await expect(geo(page).locator('[data-testid="anchor-key"]'))
-        .toContainText(/\+52 rating · \+65 home/i);
+        .toHaveAttribute("title", /\+52 rating · \+65 home/i);
       const dr = card(page).locator('[data-testid="row-anchor"]');
       await expect(dr).toHaveText("+44");
       await expect(dr).toHaveAttribute("data-close", "1");

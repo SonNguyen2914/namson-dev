@@ -430,7 +430,7 @@ test("every cup row served is drawn, and Wednesday's two semis carry the full ca
     await expect(toluca.getByTestId("tier-cell")).toHaveCount(3);
     await expect(toluca.getByTestId("gap-note")).toHaveCount(0);
     await expect(toluca.getByTestId("rated-in")).toHaveCount(0);
-    await expect(toluca).toContainText("ask 54¢");
+    await expect(toluca.getByTestId("mm-why-market")).toHaveAttribute("title", /ask 54¢/);
   });
 
 // --------------------------------------- cross-league: tiers only ------
@@ -460,9 +460,9 @@ test("a cross-league cup fixture withholds its gaps, says why, and keeps its tie
     await expect(cross.getByTestId("row-anchor"))
       .toHaveAttribute("data-anchor", "tier_ovr");
     await expect(cross.getByTestId("row-anchor")).toHaveText("−1");
-    await expect(cross).toContainText(/GD\/g\s*n\/a/);
-    await expect(cross).toContainText(/ppg\s*n\/a/);
-    await expect(cross).toContainText(/rank\s*n\/a/);
+    // AGENTS.md §8.3: the league line has no GD/g slot; the withheld gaps read "—"
+    await expect(cross.getByTestId("stat-ppg")).toHaveText(/ppg\s*—/);
+    await expect(cross.getByTestId("stat-rank")).toHaveText(/rank\s*—/);
     await expect(cross).not.toContainText("+0.00");
     await expect(cross).not.toContainText("0.00");
     // …and THE BOARD says why, in the backend's own words. From
@@ -474,8 +474,12 @@ test("a cross-league cup fixture withholds its gaps, says why, and keeps its tie
     // and the `n/a` values asserted just above are untouched.
     await expect(cross.getByTestId("gap-note")).toHaveCount(0);
     // which table each club came from, since they differ
-    await expect(cross.getByTestId("rated-in"))
-      .toHaveText("MLS v Liga MX");
+    // (in the card's panel since the one-card rule, AGENTS.md §8.1)
+    await expect(cross.getByTestId("rated-in")).toHaveCount(0);
+    const opener = cross.locator('[data-testid="field-ranks-open"], [data-testid="tier-read"]').first();
+    await opener.click();
+    await expect(cross.getByTestId("card-context")).toContainText("rated on MLS v Liga MX");
+    await opener.click();   // shut again, so the steps below open it fresh
     // the tiers survive — they are within-league quintiles, which is
     // exactly the property that makes the comparison possible
     await expect(cross.getByTestId("tier-cell")).toHaveCount(3);
@@ -535,7 +539,7 @@ test("the Leagues Cup column says ONCE what its market settles on",
     await expect(note).toContainText(/penalties/i);
     // the price is still on every card; only its explanation moved
     const toluca = cup.getByTestId("picker-row").filter({ hasText: "Toluca" });
-    await expect(toluca).toContainText("ask 54¢");
+    await expect(toluca.getByTestId("mm-why-market")).toHaveAttribute("title", /ask 54¢/);
   });
 
 test("the column note opens on hover, on focus and on tap, and Escape shuts it",
@@ -892,7 +896,7 @@ test("the legend defines the share, the withheld gap and regulation time",
     await expect(legend.getByText(/GP \/ \(GP \+ 10\)/).first()).toBeVisible();
     await expect(legend.getByText(/mean of two league positions is not a position/i))
       .toBeVisible();
-    await expect(legend.getByText(/n\/a · cross-league/)).toBeVisible();
+    await expect(legend.getByText(/— · cross-league/)).toBeVisible();
     await expect(legend.getByText(/regulation time/i).first()).toBeVisible();
   });
 
