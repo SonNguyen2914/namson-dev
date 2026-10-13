@@ -105,16 +105,25 @@ async function traffic() {
 const prev = readPrev();
 const now = new Date().toISOString();
 
-const forks = (await paginate(`/repos/${REPO}/forks?sort=newest`)).map((f) => ({
+// Each source is read on its own: one the token may not read (the
+// stargazers list answers 403 to the workflow's GITHUB_TOKEN) must never
+// stop the others. Without the list, the repo's star COUNT still alerts.
+async function safe(label, fn, fallback) {
+  try { return await fn(); }
+  catch (e) { console.log(`${label} unreadable with this token: ${e.message}`); return fallback; }
+}
+const forks = await safe("forks", async () => (await paginate(`/repos/${REPO}/forks?sort=newest`)).map((f) => ({
   full_name: f.full_name,
   html_url: f.html_url,
   created_at: f.created_at,
-}));
-const stars = (await paginate(`/repos/${REPO}/stargazers`, { accept: "application/vnd.github.star+json" })).map((s) => ({
+})), []);
+const stars = await safe("stargazers", async () => (await paginate(`/repos/${REPO}/stargazers`, { accept: "application/vnd.github.star+json" })).map((s) => ({
   login: s.user?.login,
   html_url: s.user?.html_url,
   starred_at: s.starred_at,
-}));
+})), null);
+const repoInfo = await safe("repo", () => gh(`/repos/${REPO}`), {});
+const starCount = repoInfo.stargazers_count ?? null;
 const tr = await traffic();
 
 // Daily unique-clone history: merge the API's 14-day window into what we
@@ -133,9 +142,13 @@ if (prev) {
   for (const f of forks.filter((f) => !oldForks.has(f.full_name)))
     findings.push(`- **New fork:** [${f.full_name}](${f.html_url}) (created ${f.created_at})`);
 
-  const oldStars = new Set((prev.stars ?? []).map((s) => s.login));
-  for (const s of stars.filter((s) => !oldStars.has(s.login)))
-    findings.push(`- **New star:** [${s.login}](${s.html_url}) (${s.starred_at})`);
+  if (stars) {
+    const oldStars = new Set((prev.stars ?? []).map((s) => s.login));
+    for (const s of stars.filter((s) => !oldStars.has(s.login)))
+      findings.push(`- **New star:** [${s.login}](${s.html_url}) (${s.starred_at})`);
+  } else if (starCount != null && prev.star_count != null && starCount > prev.star_count) {
+    findings.push(`- **New star(s):** the count went ${prev.star_count} -> ${starCount} (who is not readable with this token)`);
+  }
 
   if (tr.available) {
     for (const r of tr.referrers ?? [])
@@ -178,6 +191,7 @@ const state = {
   repo: REPO,
   forks,
   stars,
+  star_count: starCount,
   traffic: tr,
   clone_history: cloneHistory,
   known_referrers: [...knownReferrers].sort(),
@@ -188,7 +202,7 @@ fs.writeFileSync(outPath, JSON.stringify(state, null, 2) + "\n");
 // Baseline run: nothing to compare against. Say what is already there,
 // once, if anything is, so existing forks/stars are not invisible.
 if (!prev) {
-  const others = stars.filter((s) => s.login !== OWNER);
+  const others = (stars ?? []).filter((s) => s.login !== OWNER);
   if (forks.length || others.length) {
     findings.push("_First snapshot (baseline). Already present:_");
     for (const f of forks) findings.push(`- Fork: [${f.full_name}](${f.html_url}) (created ${f.created_at})`);
@@ -198,7 +212,7 @@ if (!prev) {
 
 const summary = [
   `### Copy watch — ${now}`,
-  `forks: ${forks.length} · stars: ${stars.length} · traffic: ${
+  `forks: ${forks.length} · stars: ${stars ? stars.length : `${starCount ?? "?"} (count only)`} · traffic: ${
     tr.available
       ? `clones ${tr.clones.count}/${tr.clones.uniques} unique, views ${tr.views.count}/${tr.views.uniques} unique (14 d)`
       : `unavailable (${tr.error})`
