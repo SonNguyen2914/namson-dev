@@ -6,15 +6,19 @@
  *      the old Championships board under its UI name, still read from
  *      /api/championships/* — and a viewer who left on "championships"
  *      comes back to it;
- *    - the Cups tab reads NO board: no /api/picker/*, no /api/championships/*;
- *    - Continental and Domestic each list the cups that have pages, linked,
- *      and the rest as "coming" with no number on them at all;
+ *    - the Cups tab IS the board (Son, 2026-10-12: "the same thing as the
+ *      other competitions"): one read of /api/picker/board and /review
+ *      with `?leagues=` naming the cups the backend builds, one column per
+ *      cup, never /api/championships/*. Continental | Domestic chooses the
+ *      columns, and the cups with no board data are "coming", with no
+ *      number on them at all;
  *    - a cup tie the backend folded into a league column is not drawn there;
  *    - AFCON reads "AFCON Qualifiers" while it is qualifying.
  *  Hermetic: every board is a recorded payload served by page.route. */
 import { test, expect, type Page } from "@playwright/test";
 import { BOARD_EIGHT, routeEight } from "./eight-columns";
 import { CHAMP_BOARD, CHAMP_CLOCK } from "./championships-recorded";
+import { CUPS_ASK, CUPS_CLOCK, routeCups } from "./cups-board";
 
 const json = (body: unknown) => ({
   status: 200, contentType: "application/json", body: JSON.stringify(body),
@@ -71,69 +75,127 @@ test.describe("the board's three tabs", () => {
   });
 });
 
-test.describe("the Cups tab", () => {
-  test("reads no board, either way", async ({ page }) => {
+test.describe("the Cups tab is the board (2026-10-12)", () => {
+  /** Requests the page made, by route, with the `leagues` each one asked. */
+  function watch(page: Page) {
+    const seen = { board: [] as (string | null)[], review: [] as (string | null)[],
+                   champ: 0 };
+    page.on("request", (r) => {
+      const u = new URL(r.url());
+      if (u.pathname.startsWith("/api/picker/board")) seen.board.push(u.searchParams.get("leagues"));
+      if (u.pathname.startsWith("/api/picker/review")) seen.review.push(u.searchParams.get("leagues"));
+      if (u.pathname.startsWith("/api/championships")) seen.champ += 1;
+    });
+    return seen;
+  }
+  async function openCups(page: Page) {
+    await page.clock.install({ time: new Date(CUPS_CLOCK) });
     await remember(page, "cups");
-    const calls = await routeAll(page);
+    const seen = watch(page);
+    await routeCups(page);
+    await page.route("**/api/championships/**", (r) => r.fulfill(json(CHAMP_BOARD)));
     await page.goto("/bet-suggester");
-    await page.waitForSelector('[data-testid="cups-tab"]');
-    await page.waitForTimeout(700);
-    expect(calls).toEqual({ board: 0, review: 0, champ: 0 });
-    await expect(page.getByTestId("board-mode-cups")).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator('[data-testid="league-col"]')).toHaveCount(0);
-  });
+    await page.waitForSelector('[data-testid="league-col"][data-league="ucl"]');
+    return seen;
+  }
+  const colSlugs = (page: Page) => page.locator('[data-testid="league-col"]')
+    .evaluateAll((e) => e.map((x) => x.getAttribute("data-league")));
 
-  test("Continental: the cups with pages link to them; the rest are coming, "
-    + "with no number", async ({ page }) => {
-    await routeAll(page);
-    await page.goto("/bet-suggester");
-    await page.getByTestId("board-mode-cups").click();
-    const tab = page.getByTestId("cups-tab");
-    await expect(tab).toHaveAttribute("data-scope", "continental");
-    const live = tab.getByTestId("cup-live");
-    await expect(live).toHaveCount(3);
-    expect(await live.evaluateAll((e) => e.map((x) => x.getAttribute("data-cup"))))
-      .toEqual(["ucl", "leaguescup", "campeones"]);
-    const hrefs = await tab.getByTestId("cup-link")
-      .evaluateAll((e) => e.map((x) => x.getAttribute("href")));
-    expect(hrefs).toEqual([
-      "/bet-suggester/ucl", "/bet-suggester/comp/ucl",
-      "/bet-suggester/comp/leagues-cup", "/bet-suggester/leagues-cup",
-      "/bet-suggester/ratings?comp=campeones",
-    ]);
-    const coming = tab.getByTestId("cup-coming");
-    expect(await coming.evaluateAll((e) => e.map((x) => x.getAttribute("data-cup"))))
-      .toEqual(["uel", "uecl", "concacafcc"]);
-    for (const t of await coming.allInnerTexts()) {
-      expect(t, "a coming cup carries no number").not.toMatch(/\d/);
-      expect(t.toLowerCase()).toContain("coming");
+  test("asks the club board and its review for the cups BY NAME, and nothing else",
+    async ({ page }) => {
+      const seen = await openCups(page);
+      await page.waitForSelector('[data-testid="review-count"]');
+      await expect(page.getByTestId("board-mode-cups")).toHaveAttribute("aria-pressed", "true");
+      expect(seen.board.length).toBeGreaterThan(0);
+      for (const l of [...seen.board, ...seen.review]) {
+        expect(l).toBe(CUPS_ASK.join(","));
+      }
+      expect(seen.champ).toBe(0);
+    });
+
+  test("Continental draws one board column per cup, with the board's own cards",
+    async ({ page }) => {
+      await openCups(page);
+      const tab = page.getByTestId("cups-tab");
+      await expect(tab).toHaveAttribute("data-scope", "continental");
+      expect(await colSlugs(page)).toEqual(["ucl", "leaguescup", "campeones"]);
+      const ucl = page.locator('[data-testid="league-col"][data-league="ucl"]');
+      await expect(ucl.getByTestId("picker-row").first()).toBeVisible();
+      // THE CAMPEONES TIE IS IN ITS OWN COLUMN, not lost to the league
+      // columns the backend stamps it with (and which this tab does not draw)
+      const camp = page.locator('[data-testid="league-col"][data-league="campeones"]');
+      await expect(camp).toContainText("Inter Miami");
+      await expect(page.locator('[data-testid="league-col"][data-league="mls"]')).toHaveCount(0);
+      // the narrowed-page note is a narrowed PAGE's; on the tab it would
+      // link the reader to the page they are on
+      await expect(page.getByTestId("board-narrowed")).toHaveCount(0);
+      // the cups with no board data are named, with no number on them
+      const coming = page.getByTestId("cup-coming");
+      expect(await coming.evaluateAll((e) => e.map((x) => x.getAttribute("data-cup"))))
+        .toEqual(["uel", "uecl", "concacafcc"]);
+      for (const t of await coming.allInnerTexts()) {
+        expect(t, "a coming cup carries no number").not.toMatch(/\d/);
+        expect(t.toLowerCase()).toContain("coming");
+      }
+    });
+
+  test("Domestic draws the EFL Cup column off the same read; the national cups are coming",
+    async ({ page }) => {
+      const seen = await openCups(page);
+      await page.waitForTimeout(300);
+      const before = seen.board.length;
+      await page.getByTestId("cups-scope-domestic").click();
+      await expect(page.getByTestId("cups-tab")).toHaveAttribute("data-scope", "domestic");
+      await expect.poll(() => colSlugs(page)).toEqual(["eflcup"]);
+      await expect(page.locator('[data-testid="league-col"][data-league="eflcup"]'))
+        .toContainText("Norwich");
+      await expect(page.getByTestId("cup-coming")).toHaveCount(7);
+      for (const t of await page.getByTestId("cup-coming").allInnerTexts()) {
+        expect(t).not.toMatch(/\d/);
+      }
+      expect(seen.board.length, "the switch chooses columns, it asks for nothing")
+        .toBe(before);
+    });
+
+  test("every cup card opens a page that exists, or says it has none", async ({ page }) => {
+    await openCups(page);
+    await page.locator('[data-testid="league-col"][data-league="ucl"]')
+      .getByTestId("review-toggle").click();
+    await page.waitForSelector('[data-testid="review-row"]', { state: "attached" });
+    const cards = page.locator('[data-testid="picker-row"], [data-testid="review-row"]');
+    expect(await cards.count()).toBeGreaterThan(0);
+    const seen = await cards.evaluateAll((els) => els.map((e) => ({
+      href: e.querySelector("a[href]")?.getAttribute("href") ?? null,
+      unlinked: !!e.querySelector('[data-testid="card-unlinked"], [data-testid="review-unlinked"]'),
+    })));
+    for (const s of seen) expect(s.href == null).toBe(s.unlinked);
+    for (const href of new Set(seen.map((s) => s.href).filter(Boolean) as string[])) {
+      const res = await page.request.get(href, { maxRedirects: 0 });
+      expect(res.status(), href).toBe(200);
     }
   });
 
-  test("Domestic: the EFL Cup links to its board; the national cups are coming",
+  test("a backend that answers the cups with a failure names it, it draws no stale board",
     async ({ page }) => {
+      await page.clock.install({ time: new Date(CUPS_CLOCK) });
       await remember(page, "cups");
-      await routeAll(page);
+      await page.route("**/api/picker/**", (r) => r.fulfill({
+        status: 422, contentType: "application/json",
+        body: JSON.stringify({ detail: "not a board competition: ucl" }) }));
       await page.goto("/bet-suggester");
-      await page.getByTestId("cups-scope-domestic").click();
-      const tab = page.getByTestId("cups-tab");
-      await expect(tab).toHaveAttribute("data-scope", "domestic");
-      await expect(tab.getByTestId("cup-live")).toHaveCount(1);
-      await expect(tab.getByTestId("cup-link")).toHaveAttribute("href", "/bet-suggester/efl-cup");
-      const coming = tab.getByTestId("cup-coming");
-      await expect(coming).toHaveCount(7);
-      for (const t of await coming.allInnerTexts()) expect(t).not.toMatch(/\d/);
+      await expect(page.getByTestId("board-error")).toBeVisible();
+      await expect(page.locator('[data-testid="picker-row"]')).toHaveCount(0);
+      // the coming cups are still named: they never depended on a read
+      await expect(page.getByTestId("cup-coming").first()).toBeVisible();
     });
 
-  test("leaving the Cups tab reads the Leagues board again", async ({ page }) => {
-    await remember(page, "cups");
-    const calls = await routeAll(page);
-    await page.goto("/bet-suggester");
-    await page.waitForSelector('[data-testid="cups-tab"]');
+  test("leaving the Cups tab reads the declared Leagues board again", async ({ page }) => {
+    const seen = await openCups(page);
     await page.getByTestId("board-mode-leagues").click();
-    await page.waitForSelector('[data-testid="league-col"]');
-    expect(calls.board).toBeGreaterThan(0);
+    await page.waitForSelector('[data-testid="league-col"][data-league="epl"]');
+    expect(seen.board).toContain(null);
     await expect(page.getByTestId("cups-tab")).toHaveCount(0);
+    await expect(page.getByTestId("cup-coming")).toHaveCount(0);
   });
 });
 
@@ -174,10 +236,11 @@ for (const width of [1440, 390]) {
     test(`the Cups tab has no horizontal scroll at ${width}px, ${scheme}`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.emulateMedia({ colorScheme: scheme });
+      await page.clock.install({ time: new Date(CUPS_CLOCK) });
       await remember(page, "cups");
-      await routeAll(page);
+      await routeCups(page);
       await page.goto("/bet-suggester");
-      await page.waitForSelector('[data-testid="cups-tab"]');
+      await page.waitForSelector('[data-testid="league-col"]');
       for (const s of ["continental", "domestic"]) {
         await page.getByTestId(`cups-scope-${s}`).click();
         const over = await page.evaluate(() =>

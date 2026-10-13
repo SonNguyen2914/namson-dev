@@ -1070,6 +1070,11 @@ export interface Board {
    *  — see `declarationOf`, which is the one place that decision is
    *  made. */
   narrowed_to?: string[] | null;
+  /** CUP COLUMNS THE ASSEMBLY TOOK OFF `leagues`: one with no row of its
+   *  own in the window, or one whose ties fold into league columns (the
+   *  Campeones Cup). Same meta, plus where it went. Read only by the Cups
+   *  tab, which draws each asked cup as its own column anyway. */
+  folded?: Record<string, LeagueMeta & { folded_into?: string[] }>;
   /** WHAT A FIELD BLOCK'S NUMBERS MEAN, keyed by the `unit` each axis
    *  declares (FieldAxis.unit) — the backend's own sentences, to be
    *  printed rather than restated.
@@ -1393,6 +1398,8 @@ export function nationalColumn(
 
 /** One fixture the board removed, in the backend's own words. */
 export interface OffBoard {
+  /** the competition slug the backend wrote on the entry */
+  league?: string;
   event_id: string;
   competition_id: string;
   kickoff: string;

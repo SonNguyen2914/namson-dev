@@ -1,5 +1,11 @@
 // THE CUPS TAB'S LIST (cups plan Phase A, 2026-10-12).
 //
+// SINCE THE SAME DAY THE TAB IS A BOARD, not a list: Son asked for "the
+// same thing as the other competitions". The cups the backend builds
+// (`CUP_BOARD_COLUMNS` below) are columns of the landing page's own
+// board, which is the same component, the same cards and the same hubs.
+// The comment below still describes the COMING half, which is unchanged.
+//
 // Son's naming decision of 2026-10-07 (roadmap 05b): the board's top tabs
 // are Leagues | Cups | Nations, and Cups has a Continental | Domestic
 // switch. Phase A is the FRAME only — the tab, its two halves and the
@@ -70,6 +76,29 @@ export const CUPS: Record<CupScope, readonly CupEntry[]> = {
     { key: "usopencup", name: "US Open Cup", region: "United States" },
   ],
 };
+
+/** THE CUPS THE CLUB BOARD BUILDS BY NAME (2026-10-12, "make the cup
+ *  page the same as the Nation and Leagues page").
+ *
+ *  These are the backend's `tables.CUPS` keys, and each is askable on
+ *  `GET /api/picker/board?leagues=` and `/api/picker/review?leagues=`
+ *  (`api/main.py _picker_asked_columns`: off the board by decision, or
+ *  folded). The Cups tab asks for ALL of them in ONE read, which means one
+ *  backend cache key, and the Continental | Domestic switch chooses which
+ *  of them are drawn as columns. Any cup not listed here is not
+ *  registered on the backend. Asking for it would be a 422, so it is never
+ *  asked for and stays "coming". */
+export const CUP_BOARD_COLUMNS: readonly string[] = [
+  "ucl", "leaguescup", "campeones", "eflcup",
+];
+
+/** The cup columns one half of the tab draws, in tab order. */
+export const cupColumns = (scope: CupScope): string[] =>
+  CUPS[scope].map((c) => c.key).filter((k) => CUP_BOARD_COLUMNS.includes(k));
+
+/** The cups one half of the tab names without a column: no board data yet. */
+export const comingCups = (scope: CupScope): CupEntry[] =>
+  CUPS[scope].filter((c) => !CUP_BOARD_COLUMNS.includes(c.key));
 
 /** The cups that already have a page, in tab order — the hero's lights. */
 export const CUPS_WITH_PAGES: readonly string[] = [
