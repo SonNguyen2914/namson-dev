@@ -54,6 +54,9 @@ const MODEL_WHY: Record<string, string> = {
 const MARKET_WHY: Record<string, string> = {
   no_three_way_book: "Kalshi has not listed all three books (home, draw, away) for this match",
   a_leg_has_no_ask: "one of the three Kalshi books has no ask",
+  no_kalshi_event: "no Kalshi event matched this fixture's date and both names",
+  listed_no_quote: "listed on Kalshi, but there is no live quote",
+  no_market_read: "this card carries no market read — the board did not say whether Kalshi lists this fixture",
 };
 const words = (map: Record<string, string>, code: string | null,
                fallback: string) =>
@@ -92,7 +95,8 @@ function marketTitle(mm: ModelVsMarket, codes: Record<MmOutcome, string>,
                      quote: KalshiQuote | null | undefined): string {
   if (!mm.market || !mm.market_meta) {
     const book = quote && quote.ask_c != null
-      ? ` Book on the quoted side: ${legText("", quote).trim()}.` : "";
+      ? ` Book on the quoted side: ${legText("", quote).trim()}${
+        quote.flags?.length ? ` (${quote.flags.join(", ")})` : ""}.` : "";
     return `No full Kalshi book for this match yet: ${words(MARKET_WHY,
       mm.market_why, "there is no three-way book to read")}.${book}`;
   }
@@ -180,16 +184,25 @@ export function ModelMarketLines({ mm, home, away, quote, kickedOff = false,
               {pct1(p[k])}
             </span>);
         })
-        : (
-          /* the CELL is a value's size (12px), the WORDS are smaller: the
-             line box then matches a line of figures, so a card whose read
-             is missing is the height of one whose read is not */
-          <span data-testid={`mm-${lab}-empty`} title={title}
-            className={`col-span-3 whitespace-nowrap text-[12px] ${
-              stale ? "text-ink-faint" : "text-ink-low"}`}>
-            <span className="text-[10.5px]">{empty}</span>
-          </span>)}
+        /* NO SENTENCE IN PLACE OF THE TABLE (AGENTS.md §8.5, Son
+           2026-10-13). A missing read is three "—" cells in the same
+           three columns a read fills, and the reason is a chip in the
+           row's trailing slot, styled as THIN/WIDE. `mm-${lab}-empty`
+           stays on the first cell as the guard handle and carries the
+           words a sentence used to. */
+        : OUTCOMES.map((k, i) => (
+          <span key={k} data-testid={i === 0 ? `mm-${lab}-empty` : `mm-${lab}-${k}-none`}
+            data-empty-why={i === 0 ? empty : undefined} title={title}
+            className="text-center text-[12px] text-ink-faint">
+            —
+          </span>))}
     </>
+  );
+  const reasonChip = (lab: "model" | "market", word: string, title: string) => (
+    <span data-testid={`mm-why-${lab}`} title={title}
+      className="justify-self-start whitespace-nowrap rounded border border-line-strong px-[5px] py-[2px] text-[8.5px] tracking-[0.14em] text-ink-low">
+      {word}
+    </span>
   );
   return (
     <div data-testid="mm-lines" data-verdict={mm.verdict}
@@ -209,7 +222,8 @@ export function ModelMarketLines({ mm, home, away, quote, kickedOff = false,
         at(kickedOff ? `${PRE_KICKOFF_TITLE[0].toUpperCase()}${
           PRE_KICKOFF_TITLE.slice(1)}. ${modelTitle(mm)}` : modelTitle(mm)),
         "no model read", kickedOff)}
-      <span aria-hidden />
+      {mm.model ? <span aria-hidden data-testid="mm-tail-model" />
+        : reasonChip("model", "NO MODEL", modelTitle(mm))}
       {line("market", mm.market, mm.top?.market ?? [],
         at(marketTitle(mm, codes, quote)
           + (marketNote ? ` · ${marketNote}` : "")), "no full Kalshi book")}
@@ -220,7 +234,9 @@ export function ModelMarketLines({ mm, home, away, quote, kickedOff = false,
             className="justify-self-start rounded border border-warn/40 px-[5px] py-[2px] text-[8.5px] tracking-[0.14em] text-warn">
             {mm.book_flag}
           </span>)
-        : <span aria-hidden />}
+        : mm.market ? <span aria-hidden data-testid="mm-tail-market" />
+          : reasonChip("market", "NO FULL BOOK", at(marketTitle(mm, codes, quote)
+              + (marketNote ? ` · ${marketNote}` : "")))}
     </div>
   );
 }

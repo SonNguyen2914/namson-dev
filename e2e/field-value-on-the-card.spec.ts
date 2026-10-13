@@ -194,6 +194,26 @@ async function openBoard(page: import("@playwright/test").Page,
   await page.route("**/api/comp/*/ratings", (r) => r.fulfill(json(ratings)));
   await page.goto("/bet-suggester/ucl");
   await expect(page.getByTestId("picker-row").first()).toBeAttached();
+  /* THE FIGURES ARE IN THE CARD'S `#` PANEL since the one-card rule
+     (AGENTS.md §8.4, Son 2026-10-13: "± bands … live in the (#)/(i)
+     tooltip, never on the face"). Same elements, same strings, read
+     there; the face is asserted bare in e2e/one-match-card.spec.ts. */
+  const open = page.getByTestId("picker-row").first().getByTestId("field-ranks-open");
+  /* clicked until the panel is up: a press that lands before the page
+     hydrates opens nothing, and nothing would say so */
+  /* the `#` exists once the field has been read — on a ratings-fed card
+     that is a second request, so it is waited for, never counted early */
+  await open.waitFor({ state: "attached", timeout: 10_000 }).catch(() => undefined);
+  if (await open.count()) {
+    await expect(open).toHaveAttribute("aria-expanded", "false");
+    await expect(async () => {
+      // a press is sent only while the panel is shut, so a slow open is
+      // never toggled shut again by the retry
+      if ((await open.getAttribute("aria-expanded")) !== "true") await open.click();
+      await expect(open).toHaveAttribute("aria-expanded", "true", { timeout: 2000 });
+    }).toPass({ timeout: 15_000 });
+    await expect(page.getByTestId("field-ranks").first()).toBeVisible();
+  }
 }
 
 const cell = (page: import("@playwright/test").Page, axis: string) =>
@@ -273,10 +293,12 @@ test("every axis draws the figure its tier was read off", async ({ page }) => {
   for (const k of AXIS_KEYS) {
     const c = cell(page, k);
     await expect(c).toBeVisible();
-    // the trio's own cell for this axis holds BOTH the tier pair and
-    // the figures — "beside its tier" is a DOM fact, not a screenshot
-    const trio = page.locator(`[data-tier="${k}"]`).first();
-    await expect(trio.locator(`[data-measure="${k}"]`)).toHaveCount(1);
+    // the panel's own cell for this axis holds BOTH the rank pair and
+    // the figures — "beside its rank" is a DOM fact, not a screenshot
+    const axis = page.locator(`[data-rank-axis="${k}"]`).first();
+    await expect(axis.locator(`[data-measure="${k}"]`)).toHaveCount(1);
+    // and the card's face carries none of it
+    await expect(page.locator(`[data-tier="${k}"] [data-measure]`)).toHaveCount(0);
     await expect(c.locator('[data-measure-side="fav"]'))
       .toHaveText(expected(k, "fav"));
     await expect(c.locator('[data-measure-side="opp"]'))

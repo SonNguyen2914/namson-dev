@@ -99,12 +99,12 @@ test("it is labelled as a league comparison and shows the two goal figures "
    + "it is the difference of", async ({ page }) => {
     await open(page, [row(1, "Manchester United", "Sabah FK", GAP)]);
     const key = page.getByTestId("picker-row").first().getByTestId("anchor-key");
-    await expect(key).toContainText("league gap");
-    await expect(key).toContainText("goals");
-    /* The second line is the PAIR, not a second label word — "3.09 –
-       0.45", the form the operator settled on. Rounded from the
-       payload's own numbers rather than typed twice. */
-    await expect(key).toContainText(`${GAP.gf.toFixed(2)} – ${GAP.ga.toFixed(2)}`);
+    /* ONE LABEL LINE on the face (AGENTS.md §8.2, Son 2026-10-13); the
+       pair it is the difference of — "3.09 – 0.45" — is on its hover,
+       rounded from the payload's own numbers rather than typed twice. */
+    await expect(key).toHaveText("league gap");
+    await expect(key).toHaveAttribute("title",
+      new RegExp(`^goals ${GAP.gf.toFixed(2)} – ${GAP.ga.toFixed(2)}`));
     // never the old key, which named a different measurement entirely
     await expect(key).not.toContainText("own-league");
   });
@@ -118,7 +118,7 @@ test("a row the level table does not cover keeps the OLD headline rather "
     await open(page, [row(1, "Manchester United", "Sabah FK")]);
     await expect(anchor(page)).toHaveAttribute("data-anchor", "own_gdg");
     await expect(page.getByTestId("picker-row").first()
-      .getByTestId("anchor-key")).toContainText("own-league");
+      .getByTestId("anchor-key")).toHaveAttribute("title", /^own-league GD\/g/);
   });
 
 test("the sign is the LEAGUES', not the row's — a favourite from the "

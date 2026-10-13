@@ -598,6 +598,11 @@ test("a wide interval is MARKED, so one number never reads as a placement "
        there and I will know" (operator). */
     await openBoard(page);
     const c = card(page, "ucl-1");
+    /* THE MARKS ARE IN THE `#` PANEL since the one-card rule (AGENTS.md
+       §8.4): beside the rank of the side they qualify, same glyph, same
+       sentence. The face's trio carries none (one-match-card.spec.ts). */
+    await c.getByTestId("field-ranks-open").click();
+    await expect(c.locator("[data-tier] [data-testid=field-floor-mark]")).toHaveCount(0);
     /* `toHaveCount`, NOT `await locator.count()`. `count()` reports
        whatever is attached the instant it runs and does not retry, so a
        marks-not-drawn-yet read is indistinguishable from a
@@ -609,7 +614,7 @@ test("a wide interval is MARKED, so one number never reads as a placement "
       const row = FIELD_ROW(axis);
       const owed = Number(row.fav.straddles || row.fav.below_floor)
                  + Number(row.opp.straddles || row.opp.below_floor);
-      await expect(c.locator(`[data-tier="${axis}"]`)
+      await expect(c.locator(`[data-rank-axis="${axis}"]`)
         .getByTestId("field-floor-mark"),
         `${axis}: one mark per side whose band is not settled`)
         .toHaveCount(owed);
@@ -710,6 +715,7 @@ test("the mark says THE BAND IS NOT SETTLED — a refused league keeps its "
     // Kairat Almaty is below the floor on every axis, and its reason is
     // the backend's, not one written here.
     const c2 = card(page, "ucl-2");
+    await c2.getByTestId("field-ranks-open").click();
     const marks2 = c2.getByTestId("field-floor-mark");
     await expect(marks2.first()).toBeVisible();
     await expect(marks2.first()).toHaveAttribute("title", FLOOR_NOTE);
@@ -727,6 +733,7 @@ test("the mark says THE BAND IS NOT SETTLED — a refused league keeps its "
     await expect(marks2).toHaveCount(owed("Kairat Almaty", "Feyenoord"));
 
     const c1 = card(page, "ucl-1");
+    await c1.getByTestId("field-ranks-open").click();
     await expect(c1.getByTestId("field-floor-mark"))
       .toHaveCount(owed("Barcelona", "Feyenoord"));
 
@@ -741,7 +748,7 @@ test("the mark says THE BAND IS NOT SETTLED — a refused league keeps its "
     expect(ovr.fav.below_floor).toBeFalsy();
     expect(ovr.opp.tier_set.length, "fixture: Feyenoord straddles")
       .toBeGreaterThan(1);
-    await expect(c1.locator('[data-tier="ovr"]')
+    await expect(c1.locator('[data-rank-axis="ovr"]')
       .getByTestId("field-floor-mark")).toHaveCount(1);
   });
 
@@ -761,10 +768,14 @@ test("an `i` beside the trio opens the field's three RANK pairs — and "
     const panel = c.getByTestId("field-ranks");
     await expect(panel).toBeVisible();
 
+    /* THE PAIR IS THE SECOND SPAN; the figures and the daggers that
+       moved here from the face (AGENTS.md §8.4) are read by their own
+       specs, so this reads the pair alone, daggers stripped. */
     const rows = await panel.locator("[data-rank-axis]")
       .evaluateAll((els) => els.map((e) => ({
         axis: e.getAttribute("data-rank-axis"),
-        text: (e.textContent || "").replace(/\s+/g, " ").trim(),
+        text: ((e.children[0]?.textContent || "") + (e.children[1]?.textContent || ""))
+          .replace(/†/g, "").replace(/\s+/g, " ").trim(),
       })));
     expect(rows.map((x) => x.axis)).toEqual([...AXIS_KEYS]);
     for (const x of rows) {
@@ -776,12 +787,10 @@ test("an `i` beside the trio opens the field's three RANK pairs — and "
          over its own two ranks, read off the fixture. */
       expect(x.text).toBe(`${x.axis}#${fav.rank}v#${opp.rank}`);
     }
-    // ONLY that. No club name, no dagger, no heading anywhere inside.
+    // No club name and no heading anywhere inside.
     const inside = (await panel.textContent()) || "";
     expect(inside).not.toContain(r.favourite);
     expect(inside).not.toContain(r.opponent);
-    expect(inside).not.toContain("†");
-    await expect(panel.getByTestId("field-floor-mark")).toHaveCount(0);
   });
 
 test("it opens on hover and on keyboard focus as well as on click — the "
@@ -1069,8 +1078,11 @@ test("a club the field does not hold leaves its card on the LEAGUE read "
     await expect(c.getByTestId("rank-pair"))
       .toHaveText(`#${r.ranks.fav} v #${r.ranks.opp}`);
     await expect(c.getByTestId("field-ranks-open")).toHaveCount(0);
-    // and the two tables it WAS read on are named, as they always were
-    await expect(c.getByTestId("rated-in")).toBeVisible();
+    // and the two tables it WAS read on are named — in the card's panel
+    // since the one-card rule (AGENTS.md §8.1), not as a chip on its face
+    await expect(c.getByTestId("rated-in")).toHaveCount(0);
+    await c.getByTestId("tier-read").click();
+    await expect(c.getByTestId("card-context")).toContainText("rated on");
   });
 
 test("a competition with no field measured draws no failure and keeps "
@@ -1128,9 +1140,10 @@ test("the Champions League card is the board's own card — every element "
     await expect(c.getByTestId("form-strip")).toHaveCount(2);
     await expect(c.getByTestId("tier-cell")).toHaveCount(3);
     await expect(c.locator("[data-tier]")).toHaveCount(3);
-    // the Kalshi line — this fixture has no event, which is one of its
-    // three named states and never a blank
-    await expect(c).toContainText("no kalshi event");
+    // the market row — this fixture has no event, which is one of its
+    // named states and never a blank: "—" with the reason chip, and the
+    // state in the chip's own words (AGENTS.md §8.5)
+    await expect(c.getByTestId("mm-why-market")).toHaveAttribute("title", /no Kalshi event/);
   });
 
 test("and a card with NO field keeps the `i` — the landing board is not "
@@ -1505,11 +1518,13 @@ test("the straddle dagger still fires on a partial block — the mark says "
     expect(WIDE_PARTIAL.axes.ovr.fav.straddles).toBe(false);
     await openFolded(page, [{ ...P_ROW, field_partial: WIDE_PARTIAL }]);
     const ovr = foldedCard(page).locator('[data-tier="ovr"]');
-    // the POINT tier is printed, and the dagger beside it says that
-    // point is not a placement the evidence will narrow to
+    // the POINT tier is printed on the face, bare (AGENTS.md §8.4) …
     expect((await ovr.textContent())!.replace(/\s+/g, "")).toBe(
-      `ovr${WIDE_PARTIAL.axes.ovr.fav.tier}v${opp.tier}†`);
-    const mark = ovr.getByTestId("field-floor-mark");
+      `ovr${WIDE_PARTIAL.axes.ovr.fav.tier}v${opp.tier}`);
+    // … and the dagger saying that point is not a placement the evidence
+    // will narrow to is beside the side's rank in the card's `#`
+    await foldedCard(page).getByTestId("field-ranks-open").click();
+    const mark = foldedCard(page).locator('[data-rank-axis="ovr"]').getByTestId("field-floor-mark");
     await expect(mark).toHaveCount(1);
     await expect(mark).toHaveAttribute(
       "title", new RegExp(`bands ${opp.tier_set.join("·")}\\b`));
@@ -1530,7 +1545,9 @@ test("the one axis a partial block HAS is drawn with its number, "
        So: the same block, from a backend that carries the pair. */
     const ax = WIDE_PARTIAL_MEASURED.axes.ovr;
     await openFolded(page, [{ ...P_ROW, field_partial: WIDE_PARTIAL_MEASURED }]);
-    const ovr = foldedCard(page).locator('[data-tier="ovr"]');
+    /* in the card's `#` since the one-card rule (AGENTS.md §8.4) */
+    await foldedCard(page).getByTestId("field-ranks-open").click();
+    const ovr = foldedCard(page).locator('[data-rank-axis="ovr"]');
 
     // the figure is drawn, on the scale the AXIS declares it is on
     const m = ovr.locator('[data-measure="ovr"]');
@@ -1546,8 +1563,10 @@ test("the one axis a partial block HAS is drawn with its number, "
        dagger that says the band is not settled, and the figure the band
        was read off are three marks about one axis and the card carries
        all three. */
-    const text = (await ovr.textContent())!.replace(/\s+/g, "");
-    expect(text).toContain(`ovr${ax.fav.tier}v${ax.opp.tier}†`);
+    const face = foldedCard(page).locator('[data-tier="ovr"]');
+    const text = (await face.textContent())!.replace(/\s+/g, "");
+    expect(text).toBe(`ovr${ax.fav.tier}v${ax.opp.tier}`);
+    await expect(ovr.getByTestId("field-floor-mark")).toHaveCount(1);
 
     /* THE ABSENT AXES GAIN NOTHING FROM THE MEASUREMENT EITHER. An axis
        nobody measured has no figure for the same reason it has no band:
