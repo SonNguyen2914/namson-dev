@@ -24,10 +24,19 @@ const MONTH = new Intl.DateTimeFormat("en-US", {
   month: "short", year: "numeric", timeZone: TZ,
 });
 
-/** "Jul 2027" for an ISO kickoff, or null for nothing parseable. */
+/** A DATE-ONLY value ("2026-10-27", a match DAY the backend reads off
+ *  ESPN's calendar) is that calendar day everywhere: pinned to noon UTC so
+ *  the board's own zone (America/Los_Angeles) cannot pull it back a day.
+ *  A full timestamp is returned as it is. */
+export function asInstant(iso: string): string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso}T12:00:00Z` : iso;
+}
+
+/** "Jul 2027" for an ISO kickoff or match day, or null for nothing
+ *  parseable. */
 export function returnMonth(iso: string | null | undefined): string | null {
   if (!iso) return null;
-  const d = new Date(iso);
+  const d = new Date(asInstant(iso));
   if (Number.isNaN(d.getTime())) return null;
   return MONTH.format(d);
 }
@@ -116,8 +125,8 @@ export function isOffSeason(input: {
  *  in the window: the next known fixture, or "date TBC". */
 export function restLine(next: string | null | undefined, cup: boolean,
                          label: (iso: string) => string): string {
-  if (next && !Number.isNaN(new Date(next).getTime())) {
-    return `next · ${label(next).toLowerCase()}`;
+  if (next && !Number.isNaN(new Date(asInstant(next)).getTime())) {
+    return `next · ${label(asInstant(next)).toLowerCase()}`;
   }
   return cup ? "next round · date TBC" : "next fixture · date TBC";
 }

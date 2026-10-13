@@ -133,8 +133,10 @@ test.describe("the Cups tab is the board (2026-10-12)", () => {
       // the finished Leagues Cup is not a column: it is resting, and says why
       await expect(page.locator('[data-testid="column-chip"][data-slug="leaguescup"]'))
         .toHaveAttribute("data-resting", "off season");
+      // a cup this (older, four-cup) recording carries no entry for is a
+      // resting chip, never an empty column
       await expect(page.locator('[data-testid="column-chip"][data-slug="uel"]'))
-        .toHaveAttribute("data-resting", "not on the board yet");
+        .toHaveAttribute("data-resting", "no board data");
       expect(await colSlugs(page)).toEqual(["ucl", "finals", "eflcup"]);
       // THE CAMPEONES TIE IS IN THE SHARED FINALS & SUPER CUPS COLUMN, with
       // its competition badge — never a column of its own, never MLS/Liga MX
@@ -164,7 +166,7 @@ test.describe("the Cups tab is the board (2026-10-12)", () => {
         .toHaveAttribute("href", "/bet-suggester/comp/leagues-cup");
     });
 
-  test("a cup the board does not build cannot be drawn, and asks for nothing",
+  test("a cup with nothing to draw cannot be drawn, and asks for nothing",
     async ({ page }) => {
       await page.setViewportSize({ width: 1440, height: 900 });
       const seen = await openCups(page);

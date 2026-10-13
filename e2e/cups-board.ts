@@ -16,12 +16,16 @@
  *
  * The clock is the recording's morning, so every kickoff is ahead. */
 import type { Page } from "@playwright/test";
+import { CUP_BOARD_COLUMNS } from "../src/lib/cupsTab";
 import { BOARD_EIGHT, REVIEW_EIGHT } from "./eight-columns";
 import { RECORDED as EFL } from "./efl-cup-recorded";
 import { CAMPEONES_BOARD } from "./campeones-board";
 import { CUPS_RECORDED, CUPS_RECORDED_CLOCK } from "./cups-recorded";
 
-export const CUPS_ASK = ["ucl", "leaguescup", "campeones", "eflcup"];
+/* What the Cups tab asks for since the backend registered all 22 cups
+   (lib/cupsTab CUP_BOARD_COLUMNS). This older recording answers four of
+   them; the other eighteen carry no entry and draw as resting chips. */
+export const CUPS_ASK: readonly string[] = [...CUP_BOARD_COLUMNS];
 export const CUPS_CLOCK = CUPS_RECORDED_CLOCK;
 
 type Obj = Record<string, unknown>;

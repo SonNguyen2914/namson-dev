@@ -87,7 +87,7 @@ const fixturePhrase = (n: number) =>
     : `${n} fixture${n === 1 ? "" : "s"} on the board`;
 
 export function ColumnChooser({ slugs, drawn, counts, view, onChange,
-  resting = {} }: {
+  resting = {}, members = {} }: {
   /** every column the board declares, in the operator's reading order */
   slugs: readonly string[];
   /** …and the ones currently on the track, a subset of it in that order */
@@ -102,6 +102,9 @@ export function ColumnChooser({ slugs, drawn, counts, view, onChange,
    *  drawable — nothing in the window ("off season") or not built yet.
    *  Their chip names the reason and a press does nothing. */
   resting?: Record<string, string>;
+  /** A GROUP COLUMN'S COMPETITIONS (the Cups tab's Finals & Super Cups),
+   *  named on its chip so the chooser lists every competition in order. */
+  members?: Record<string, readonly string[]>;
 }) {
   const on = useMemo(() => new Set(drawn), [drawn]);
 
@@ -210,6 +213,12 @@ export function ColumnChooser({ slugs, drawn, counts, view, onChange,
                 className="h-2 w-2 flex-none rounded-full bg-[var(--h)] transition-opacity"
                 style={{ opacity: drawing ? 1 : 0.42 }} />
               <span data-testid="column-chip-name">{leagueLabel(slug)}</span>
+              {members[slug]?.length ? (
+                <span data-testid="column-chip-members"
+                  className="normal-case tracking-normal whitespace-normal text-ink-faint">
+                  {members[slug].map(leagueLabel).join(" · ")}
+                </span>
+              ) : null}
               {rest && (
                 <span data-testid="column-chip-resting"
                   className="normal-case tracking-normal text-ink-faint">
