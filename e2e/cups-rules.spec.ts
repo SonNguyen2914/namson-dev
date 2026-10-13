@@ -4,8 +4,9 @@
  *  Leagues board on 2026-10-13 — or a recorded Campeones Cup / Nations
  *  payload, edited only where a test says so.
  *
- *    1. off season is ONE line at the end of the tab, with ESPN's month or
- *       "returns next season"; an in-season cup keeps its column;
+ *    1. off season is ONE line at the end of the tab, with the exact day of
+ *       the next listed match or "date not announced"; an in-season cup
+ *       keeps its column;
  *    2. no column is drawn empty;
  *    3. Finals & Super Cups appears only with an upcoming match;
  *    4. no cup tie is drawn in a league column;
@@ -71,26 +72,32 @@ test.describe("the Cups tab on the recorded 22-cup board", () => {
     for (const a of asked.filter(Boolean)) expect(a).toBe(CUPS_TAB.join(","));
   });
 
-  test("off season is one line at the end of the tab, with ESPN's month or "
-    + "'returns next season' — never a guessed date", async ({ page }) => {
+  test("off season is one line at the end of the tab; on this recording "
+    + "(from before next_match) only ESPN's listed match days are dated",
+  async ({ page }) => {
     await open(page, "cups");
     const line = page.getByTestId("off-season-line");
     await expect(line).toHaveCount(1);
+    /* A BACKEND FROM BEFORE 2026-10-13 sends no `next_match`. The line
+       degrades to the day ESPN's calendar lists (`season.next_fixture`),
+       and says "date not announced" — never a month, never "next season"
+       — where nothing is listed. The real next matches are pinned on the
+       2026-10-13 recording in e2e/return-dates.spec.ts. */
     await expect(line).toHaveText([
       "Off season",
-      "Concacaf Champions Cup returns next season",
-      "Leagues Cup returns next season",
-      "Campeones Cup returns next season",
-      "UEFA Super Cup returns next season",
-      "FA Community Shield returns next season",
-      "Supercopa de España returns Feb 2027",
-      "DFL-Supercup returns next season",
-      "Supercoppa Italiana returns Dec 2026",
-      "Trophée des Champions returns next season",
-      "Johan Cruijff Schaal returns next season",
-      "Campeón de Campeones returns next season",
-      "FA Cup returns next season",
-      "Coupe de France returns next season",
+      "Concacaf Champions Cup \u2014 date not announced",
+      "Leagues Cup \u2014 date not announced",
+      "Campeones Cup \u2014 date not announced",
+      "UEFA Super Cup \u2014 date not announced",
+      "FA Community Shield \u2014 date not announced",
+      "Supercopa de España returns Tue Feb 2, 2027",
+      "DFL-Supercup \u2014 date not announced",
+      "Supercoppa Italiana returns Tue Dec 22",
+      "Trophée des Champions \u2014 date not announced",
+      "Johan Cruijff Schaal \u2014 date not announced",
+      "Campeón de Campeones \u2014 date not announced",
+      "FA Cup \u2014 date not announced",
+      "Coupe de France \u2014 date not announced",
     ].join(" · "));
     // it is the LAST thing on the board's section
     const after = await line.evaluate((el) => {

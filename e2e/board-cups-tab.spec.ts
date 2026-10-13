@@ -160,9 +160,11 @@ test.describe("the Cups tab is the board (2026-10-12)", () => {
         .toHaveCount(0);
       await expect(page.getByText(/season over/i)).toHaveCount(0);
       const line = page.getByTestId("off-season-line");
-      await expect(line).toHaveText("Off season · Leagues Cup returns next season");
+      // a recording from before next_match (2026-10-13): no source was
+      // asked, so no date is claimed — never a month, never "next season"
+      await expect(line).toHaveText("Off season · Leagues Cup \u2014 date not announced");
       // its pages stay reachable from the line
-      await expect(line.getByRole("link", { name: "Leagues Cup returns next season" }))
+      await expect(line.getByRole("link", { name: "Leagues Cup \u2014 date not announced" }))
         .toHaveAttribute("href", "/bet-suggester/comp/leagues-cup");
     });
 

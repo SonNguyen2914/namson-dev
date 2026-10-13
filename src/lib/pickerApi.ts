@@ -11,6 +11,8 @@
 // It is not a signal surface: no model runs on it, no probability of ours
 // exists for these fixtures, and no number here is an edge.
 
+import type { NextMatch } from "./offSeason";
+
 export type Src = "current" | "prior";
 
 /** How much of a club's rating came from THIS season.
@@ -1039,10 +1041,16 @@ export interface LeagueMeta {
   error?: string;
   /** prices are annotation, so a Kalshi failure costs quotes, not rows */
   kalshi_error?: string;
-  /** THE NEXT KNOWN FIXTURE OUTSIDE THE WINDOW (ISO kickoff), read by the
-   *  off-season line ("returns Jul 2027"). Absent = not known, and the
-   *  line never guesses one (lib/offSeason.ts). */
+  /** THE NEXT KNOWN FIXTURE OUTSIDE THE WINDOW (ISO kickoff) — a fallback
+   *  only; `next_match` is what the off-season line reads. Absent = not
+   *  known, and the line never guesses one (lib/offSeason.ts). */
   next_fixture?: string | null;
+  /** THE NEXT SCHEDULED MATCH (Son, 2026-10-13), sent for a competition
+   *  with nothing in the window: the kickoff of a match ESPN or
+   *  API-Football lists and the source, or kickoff null with the reason
+   *  no source lists one (TRIVELA src/picker/next_match.py). Read by the
+   *  off-season line and the rest-day card. */
+  next_match?: NextMatch | null;
   /** a DECLARED season start (ISO date) where the registry carries one */
   season_start?: string | null;
   /** THE EDITION'S STATE, derived on the backend from the current

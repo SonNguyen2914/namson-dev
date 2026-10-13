@@ -6,10 +6,13 @@
  *    - a competition whose edition is RUNNING keeps its column even with
  *      nothing in the board's window, drawn as the league's dashed
  *      rest-day card: "next · <date>" when the next fixture is known,
- *      "next round · date TBC" when it is not — never a guessed date;
+ *      "next round · date not announced" when no source lists it — never
+ *      a guessed date;
  *    - a competition whose edition has FINISHED or NOT STARTED has no
  *      column and is named in ONE quiet line at the end of its tab:
- *      "Off season · X returns <Mon YYYY>" (or "returns next season");
+ *      "Off season · X returns <Sat Oct 17>" — the exact day of the next
+ *      scheduled match (Son, 2026-10-13), with its year when not this
+ *      year — or "X — date not announced";
  *    - one-match competitions share the "Finals & Super Cups" column,
  *      drawn ONLY when one of their matches is in the window, each card
  *      with its competition badge;
@@ -77,27 +80,38 @@ test.describe("the rule (lib/offSeason.isOffSeason)", () => {
     expect(isOffSeason({ ahead: false, state: "not_started" })).toBe(true);
     expect(isOffSeason({ ahead: false, state: "unknown", declaredOver: true })).toBe(true);
     expect(isOffSeason({ ahead: false, declaredOver: true })).toBe(true);
-    // no evidence at all: IN season (a column with "date TBC" is
+    // no evidence at all: IN season (a column with "date not announced" is
     // recoverable; hiding a running competition is not)
     expect(isOffSeason({ ahead: false })).toBe(false);
     expect(isOffSeason({ ahead: false, state: "unknown" })).toBe(false);
     // a one-match group is never "between rounds"
     expect(isOffSeason({ ahead: false, state: "in_season", oneMatch: true })).toBe(true);
   });
-  test("the words never guess a date", () => {
-    expect(offSeasonWhen(null)).toBe("returns next season");
-    expect(offSeasonWhen("not a date")).toBe("returns next season");
-    expect(offSeasonWhen("2027-07-20T00:00Z")).toBe("returns Jul 2027");
-    expect(restLine(null, true, () => "x")).toBe("next round · date TBC");
-    expect(restLine(null, false, () => "x")).toBe("next fixture · date TBC");
-    expect(restLine("2026-10-28T19:45Z", true, () => "Wednesday, Oct 28"))
+  test("the words never guess a date: the exact day, or 'not announced'", () => {
+    const now = new Date("2026-10-13T15:00:00Z");
+    expect(offSeasonWhen(null, now)).toBe("date not announced");
+    expect(offSeasonWhen("not a date", now)).toBe("date not announced");
+    // THE DAY IN LOS ANGELES: 2026-10-17T14:00Z is Sat Oct 17 07:00 PT
+    expect(offSeasonWhen("2026-10-17T14:00Z", now)).toBe("returns Sat Oct 17");
+    // a late kickoff UTC is the previous day here: 00:00Z Oct 22 is Wed Oct 21
+    expect(offSeasonWhen("2026-10-22T00:00Z", now)).toBe("returns Wed Oct 21");
+    // the year only when it is not this year
+    expect(offSeasonWhen("2027-02-02T19:00Z", now)).toBe("returns Tue Feb 2, 2027");
+    // a date-only match day is that calendar day everywhere
+    expect(offSeasonWhen("2026-12-22", now)).toBe("returns Tue Dec 22");
+    expect(restLine(null, true, () => "x", now)).toBe("next round · date not announced");
+    expect(restLine(null, false, () => "x", now)).toBe("next fixture · date not announced");
+    expect(restLine("2026-10-28T19:45Z", true, () => "Wednesday, Oct 28", now))
       .toBe("next · wednesday, oct 28");
+    expect(restLine("2027-02-03T19:45Z", true, () => "Wednesday, Feb 3", now))
+      .toBe("next · wednesday, feb 3, 2027");
   });
 });
 
 test.describe("the Cups tab under the rule", () => {
   test("an IN-SEASON cup with nothing in the window keeps its column as a "
-    + "rest-day card, date TBC when its next round is not known", async ({ page }) => {
+    + "rest-day card, 'date not announced' when no source lists its next round",
+  async ({ page }) => {
     await openCups(page, cupsBoardWith(without("eflcup")));
     const efl = col(page, "eflcup");
     await expect(efl).toBeAttached();
@@ -105,7 +119,7 @@ test.describe("the Cups tab under the rule", () => {
     await expect(efl).not.toContainText("No EFL Cup fixtures");
     const cell = efl.locator('[data-testid="rest-day"]:visible').first();
     await expect(cell).toContainText("EFL Cup — rest day");
-    await expect(cell).toContainText("next round · date TBC");
+    await expect(cell).toContainText("next round · date not announced");
     await expect(page.getByTestId("off-season-line")).not.toContainText("EFL Cup");
   });
 
@@ -119,14 +133,39 @@ test.describe("the Cups tab under the rule", () => {
   });
 
   test("a cup the payload says has FINISHED folds into the line, with the "
-    + "month of its next known fixture", async ({ page }) => {
+    + "exact day of its next listed fixture", async ({ page }) => {
     await openCups(page, cupsBoardWith((b) => {
       without("eflcup")(b);
       season("eflcup", { state: "finished", next_fixture: "2027-08-11T18:45Z" })(b);
     }));
     await expect(col(page, "eflcup")).toHaveCount(0);
     await expect(page.getByTestId("off-season-line"))
-      .toHaveText("Off season · Leagues Cup returns next season · EFL Cup returns Aug 2027");
+      .toHaveText("Off season · Leagues Cup \u2014 date not announced · "
+        + "EFL Cup returns Wed Aug 11, 2027");
+  });
+
+  test("the backend's next_match decides: its kickoff, or 'not announced' "
+    + "even where ESPN's calendar names a day", async ({ page }) => {
+    await openCups(page, cupsBoardWith((b) => {
+      without("eflcup")(b);
+      season("eflcup", { state: "finished", next_fixture: "2027-08-11T18:45Z" })(b);
+      const metaOf = (slug: string) => ["leagues", "folded"]
+        .map((k) => (b[k] as Record<string, Obj> | undefined)?.[slug])
+        .filter(Boolean) as Obj[];
+      for (const m of metaOf("eflcup")) m.next_match = { kickoff: "2027-08-10T18:45Z",
+        source: "espn_scoreboard_year", name: "A at B", round: "first-round" };
+      for (const m of metaOf("leaguescup")) m.next_match = { kickoff: null, source: null,
+        reason: "ESPN lists no scheduled match in 2026 or 2027" };
+      season("leaguescup", { state: "finished", next_fixture: "2027-07-20" })(b);
+    }));
+    const line = page.getByTestId("off-season-line");
+    await expect(line).toHaveText("Off season · Leagues Cup \u2014 date not announced · "
+      + "EFL Cup returns Tue Aug 10, 2027");
+    // the hover names the match and its source, or why there is none
+    await expect(line.locator('[data-slug="eflcup"]'))
+      .toHaveAttribute("title", "A at B · first-round — listed by ESPN's schedule");
+    await expect(line.locator('[data-slug="leaguescup"]'))
+      .toHaveAttribute("title", /No source lists a next match: ESPN lists no scheduled/);
   });
 
   test("an in-season payload state beats the declared 'finished' fallback",
@@ -144,7 +183,8 @@ test.describe("the Cups tab under the rule", () => {
     await expect(page.locator('[data-testid="column-chip"][data-slug="finals"]'))
       .toHaveAttribute("data-resting", "nothing upcoming");
     await expect(page.getByTestId("off-season-line"))
-      .toHaveText("Off season · Leagues Cup returns next season · Campeones Cup returns next season");
+      .toHaveText("Off season · Leagues Cup \u2014 date not announced · "
+        + "Campeones Cup \u2014 date not announced");
   });
 
   test("no cup column is ever drawn empty", async ({ page }) => {
@@ -171,7 +211,7 @@ test.describe("the same rule on the Leagues tab", () => {
     await page.waitForSelector('[data-testid="league-col"]');
     await expect(col(page, "eredivisie")).toHaveCount(0);
     await expect(page.getByTestId("off-season-line"))
-      .toHaveText("Off season · Eredivisie returns Jan 2027");
+      .toHaveText("Off season · Eredivisie returns Sat Jan 16, 2027");
     await expect(page.locator('[data-testid="column-chip"][data-slug="eredivisie"]'))
       .toHaveAttribute("data-resting", "off season");
     // Serie A sent no season state and has nothing in the window: in season
