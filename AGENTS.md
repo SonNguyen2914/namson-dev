@@ -170,3 +170,45 @@ have it skip with a stated reason rather than fail.
 
 A test that passes both before and after a fix proves nothing. Before
 trusting a new assertion, confirm it fails against the previous build.
+
+## 8. One match card: the Leagues card is the template
+
+Son, 2026-10-13: every match card on the site uses the **Leagues board
+card** format, exactly. That covers the Leagues, Cups and Nations tabs,
+the standalone cup and national pages (`/ucl`, `/efl-cup`, ...), and any
+competition added later. There is one card, not a card per competition.
+
+The face of the card is fixed, line for line:
+
+1. **Top row:** index, kickoff time. No stage, group, "v" (cross-league)
+   or "XI NAMED" chips on the face.
+2. **Teams and headline:** the two sides, form strips, the gap number,
+   and **one** short label line under it (`GD/G GAP`). A competition's
+   own metric (cross-league goals gap, Elo gap) takes the same two-line
+   slot; its sub-detail (`1.29 – 0.79`, `+96 rating · +65 home`) goes in
+   the tooltip.
+3. **Stats: one line**, same fields in the same order:
+   `#a v #b · ppg · rank · gp · h2h`. A field that cannot be computed for
+   this tie shows `—` in its slot. Never `n/a · x v y`, never a second
+   stats line, never h2h on its own line.
+4. **Tiers:** the compact `OVR 1v4  ATK 1v4  DEF 1v3` row with the shape
+   pill. ± bands, pass counts and stage/group details live in the
+   `(#)`/`(i)` tooltip, never on the face.
+5. **Model / market:** always the same table with home/draw/away column
+   heads and a model row and a market row. A missing value is `—` with a
+   reason chip in the THIN/WIDE chip style (`NO MODEL`, `NO FULL BOOK`).
+   Never a sentence in place of the table.
+6. **Footer:** the WATCH chip and the MODEL chip, in the same slots.
+
+How to keep it that way:
+
+- New data sources feed the Leagues card through an adapter. Do not
+  fork the card or add a variant for one competition. If a competition
+  genuinely needs a new field, add it to the shared card for every
+  competition (or to the tooltip). Son decides any change to the face.
+- The structural spec renders one card from each source (league,
+  cross-league cup, nations) and asserts the same ordered structure.
+  Keep it passing, and add the new source to it when you add one.
+- Verify card changes with **real recorded payloads** for each source.
+  Relabelled league rows do not exercise the cross-league path. That is
+  how the Oct 12 "parity" pass shipped two different cards.
