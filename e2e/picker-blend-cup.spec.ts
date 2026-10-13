@@ -1125,11 +1125,11 @@ test("a league's empty matchday says rest day and names its next fixture", async
   // ligamx plays both days: no ghost anywhere in its column
   await expect(col(page, "ligamx").getByTestId("rest-day")).toHaveCount(0);
   // a league with NOTHING in the window is in season on a rest week (Son,
-  // 2026-10-13): rest-day cells, "date TBC" when its next fixture is not
+  // 2026-10-13): rest-day cells, "date not announced" when its next fixture is not
   // on the payload — never the solid empty box
   await expect(col(page, "epl").getByTestId("col-empty")).toHaveCount(0);
   await expect(col(page, "epl").locator('[data-testid="rest-day"]:visible').first())
-    .toContainText(/next fixture · date TBC/);
+    .toContainText(/next fixture · date not announced/);
 });
 
 // -------------------------------------------------- form strips --------

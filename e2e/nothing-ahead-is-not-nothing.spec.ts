@@ -348,7 +348,7 @@ test("an in-season column with nothing ahead draws the rest-day card, never the 
     /* SON, 2026-10-07 AS CORRECTED 2026-10-13 ("EFL cup still on going,
        keep it there"): a competition between matchdays keeps its column
        and reads as a league on a rest week — the dashed rest-day card
-       naming when it next plays, or "date TBC" — and the solid "No X
+       naming when it next plays, or "date not announced" — and the solid "No X
        fixtures in the next N days" box is gone from the board. Nothing on
        this payload says any of these seasons has finished, so all three
        are in season (e2e/off-season-rules.spec.ts pins the rule). The

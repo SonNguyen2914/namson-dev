@@ -100,8 +100,8 @@ import {
   OWN_COLUMN_CUPS,
 } from "../../lib/cupsTab";
 import {
-  OffSeasonEntry, SeasonState, entryText, isOffSeason, offSeasonWhen,
-  restLine, slugsInWindow,
+  OffSeasonEntry, SeasonState, entryText, isOffSeason, nextMatchTitle,
+  offSeasonWhen, restLine, returnKickoff, slugsInWindow,
 } from "../../lib/offSeason";
 import { ColumnChooser } from "../../components/ColumnChooser";
 import { CompRail } from "../../components/CompRail";
@@ -1079,18 +1079,24 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
     : [s]).map((s) => {
     const cup = cups ? ALL_CUPS.find((c) => c.key === s) : undefined;
     const meta = cupMetas[s] ?? leaguesMap[s];
+    /* THE EXACT DAY OF THE NEXT SCHEDULED MATCH (Son, 2026-10-13): the
+       backend's `next_match` (a match ESPN or API-Football lists), or a
+       national column's own next fixture — never a month, never "next
+       season" (lib/offSeason.returnKickoff). */
     const next = champ
-      ? nationalColumn(board?.competitions?.[s], [])?.nextBeyond ?? null
-      : meta?.season?.next_fixture ?? meta?.next_fixture
-        ?? meta?.season_start ?? null;
+      ? nationalColumn(board?.competitions?.[s], [])?.nextBeyond
+        ?? returnKickoff(meta)
+      : returnKickoff(meta);
     return {
       slug: s, name: leagueLabel(s),
       when: offSeasonWhen(next),
       href: cup?.links?.[0]?.href,
+      title: nextMatchTitle(meta?.next_match),
     };
   });
   /* AN IN-SEASON COLUMN WITH NOTHING IN THE WINDOW draws the league's
-     dashed rest-day card: when it next plays, or "date TBC". Nations
+     dashed rest-day card: the day its next scheduled match is on, or
+     "date not announced" when no source lists one. Nations
      columns already carry their own (`national.nextBeyond`). */
   const restCard = (s: string) => {
     if (only || inWindow.has(s)) return null;
@@ -1099,13 +1105,13 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
          (`national.nextBeyond`); only an unknown one needs this card */
       if (nationalColumn(board?.competitions?.[s], [])?.nextBeyond) return null;
       if (!leaguesMap[s] || leaguesMap[s].error) return null;
-      return { title: "rest day", line: restLine(null, false, dayLabel) };
+      return { title: "rest day",
+               line: restLine(returnKickoff(leaguesMap[s]), false, dayLabel) };
     }
     const meta = leaguesMap[s];
     /* a failed read or a silent payload keeps its own louder state */
     if (!meta || meta.error) return null;
-    const next = meta?.season?.next_fixture ?? meta?.next_fixture ?? null;
-    return { title: "rest day", line: restLine(next, cups, dayLabel) };
+    return { title: "rest day", line: restLine(returnKickoff(meta), cups, dayLabel) };
   };
 
   /* ARROW KEYS, PILL CLICKS, THE ROTATION AND THE RIBBON, all in one
@@ -2336,7 +2342,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   <span>Off season</span>
                   {offSeason.map((e) => (
                     <span key={e.slug} data-testid="off-season-entry"
-                      data-slug={e.slug}>
+                      data-slug={e.slug} title={e.title}>
                       {" \u00b7 "}
                       {e.href
                         ? <Link href={e.href}
