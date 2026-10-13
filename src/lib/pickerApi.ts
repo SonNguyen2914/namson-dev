@@ -1554,6 +1554,18 @@ export const LEAGUE_LABEL: Record<string, string> = {
   // The Cups tab's shared column for one-match competitions (lib/cupsTab
   // FINALS, Son 2026-10-07).
   finals: "Finals & Super Cups",
+  // …and its members, the super cups Son added on 2026-10-07 ("I mean yes
+  // to Super Cups"). Names are the backend registry's `display`
+  // (TRIVELA tables.CUPS, cups-rules), pinned equal by
+  // tests/test_frontend_reads_the_declaration.py.
+  uefasuper: "UEFA Super Cup",
+  communityshield: "FA Community Shield",
+  supercopa: "Supercopa de España",
+  dflsupercup: "DFL-Supercup",
+  supercoppa: "Supercoppa Italiana",
+  tropheechampions: "Trophée des Champions",
+  johancruijff: "Johan Cruijff Schaal",
+  campeondecampeones: "Campeón de Campeones",
 };
 
 /** AFCON's name once the finals are being played; see LEAGUE_LABEL.afcon. */
