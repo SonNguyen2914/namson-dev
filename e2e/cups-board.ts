@@ -44,6 +44,14 @@ function build(): Obj {
 
 export const CUPS_BOARD = build();
 
+/** A copy of the recorded cups board with `edit` applied — for the
+ *  season-rule specs, which remove a cup's fixtures or set its meta. */
+export function cupsBoardWith(edit: (b: Obj) => void): Obj {
+  const b = clone(CUPS_BOARD);
+  edit(b);
+  return b;
+}
+
 /** The finished tail: every cup read, nothing finished in the window —
  *  an honest empty read rather than relabelled league results. */
 function buildReview(): Obj {
@@ -69,10 +77,10 @@ const json = (body: unknown) => ({
 
 /** Serve the cups board and review for a `?leagues=` ask, and the
  *  recorded eight-column board for the declared one. */
-export async function routeCups(page: Page) {
+export async function routeCups(page: Page, board: unknown = CUPS_BOARD) {
   await page.route("**/api/picker/board**", (r) => {
     const asked = new URL(r.request().url()).searchParams.get("leagues");
-    return r.fulfill(json(asked ? CUPS_BOARD : BOARD_EIGHT));
+    return r.fulfill(json(asked ? board : BOARD_EIGHT));
   });
   await page.route("**/api/picker/review**", (r) => {
     const asked = new URL(r.request().url()).searchParams.get("leagues");

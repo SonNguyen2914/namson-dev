@@ -10,9 +10,10 @@
  *      other competitions", then "make everything match perfectly"): one
  *      read of /api/picker/board and /review with `?leagues=` naming the
  *      cups the backend builds, never /api/championships/*. Every cup is
- *      a chip in the column chooser, continental then domestic; the built
- *      ones are drawn, the rest undrawn, and a chosen one says "not on
- *      the board yet" on its rest-day cells and asks for nothing;
+ *      a chip in the column chooser (continental, Finals & Super Cups,
+ *      domestic); a cup is drawn only when it has something to draw (Son,
+ *      2026-10-07 — e2e/off-season-rules.spec.ts), and one the backend
+ *      does not build is a resting chip that asks for nothing;
  *    - a cup tie the backend folded into a league column is not drawn there;
  *    - AFCON reads "AFCON Qualifiers" while it is qualifying.
  *  Hermetic: every board is a recorded payload served by page.route. */
@@ -114,27 +115,33 @@ test.describe("the Cups tab is the board (2026-10-12)", () => {
       expect(seen.champ).toBe(0);
     });
 
-  test("every cup is a chip in the column chooser, continental then domestic; "
-    + "the cups the board builds are drawn", async ({ page }) => {
+  test("every cup is a chip in the column chooser in Son's order; only the cups "
+    + "with something to draw are drawn", async ({ page }) => {
       await openCups(page);
       // no sub-switch: the tab is shaped like Leagues and Nations
       await expect(page.locator('[data-testid^="cups-scope-"]')).toHaveCount(0);
       await expect(page.getByTestId("cups-coming")).toHaveCount(0);
       const chips = page.getByTestId("column-chip");
       expect(await chips.evaluateAll((e) => e.map((x) => x.getAttribute("data-slug"))))
-        .toEqual(["ucl", "leaguescup", "campeones", "uel", "uecl", "concacafcc",
-                  "eflcup", "facup", "copadelrey", "dfbpokal", "coppaitalia",
+        .toEqual(["ucl", "uel", "uecl", "concacafcc", "leaguescup", "finals",
+                  "facup", "eflcup", "copadelrey", "dfbpokal", "coppaitalia",
                   "coupedefrance", "knvbbeker", "usopencup"]);
       expect(await chips.evaluateAll((e) => e
         .filter((x) => x.getAttribute("data-drawn") === "yes")
         .map((x) => x.getAttribute("data-slug"))))
-        .toEqual(["ucl", "leaguescup", "campeones", "eflcup"]);
-      await expect(page.getByTestId("column-chooser-summary")).toContainText("4 of 14 drawn");
-      expect(await colSlugs(page)).toEqual(["ucl", "leaguescup", "campeones", "eflcup"]);
-      // THE CAMPEONES TIE IS IN ITS OWN COLUMN, not lost to the league
-      // columns the backend stamps it with (and which this tab does not draw)
-      await expect(page.locator('[data-testid="league-col"][data-league="campeones"]'))
-        .toContainText("Inter Miami");
+        .toEqual(["ucl", "finals", "eflcup"]);
+      // the finished Leagues Cup is not a column: it is resting, and says why
+      await expect(page.locator('[data-testid="column-chip"][data-slug="leaguescup"]'))
+        .toHaveAttribute("data-resting", "off season");
+      await expect(page.locator('[data-testid="column-chip"][data-slug="uel"]'))
+        .toHaveAttribute("data-resting", "not on the board yet");
+      expect(await colSlugs(page)).toEqual(["ucl", "finals", "eflcup"]);
+      // THE CAMPEONES TIE IS IN THE SHARED FINALS & SUPER CUPS COLUMN, with
+      // its competition badge — never a column of its own, never MLS/Liga MX
+      const finals = page.locator('[data-testid="league-col"][data-league="finals"]');
+      await expect(finals).toContainText("Inter Miami");
+      await expect(finals.getByTestId("competition-badge").first()).toContainText("Campeones Cup");
+      await expect(page.locator('[data-testid="league-col"][data-league="campeones"]')).toHaveCount(0);
       await expect(page.locator('[data-testid="league-col"][data-league="eflcup"]'))
         .toContainText("Norwich");
       await expect(page.locator('[data-testid="league-col"][data-league="mls"]')).toHaveCount(0);
@@ -143,45 +150,31 @@ test.describe("the Cups tab is the board (2026-10-12)", () => {
       await expect(page.getByTestId("board-narrowed")).toHaveCount(0);
     });
 
-  test("the columns read like league columns: kickoff order, the same header chips",
-    async ({ page }) => {
-      await openCups(page);
-      await expect(page.getByTestId("board-rank-heading")).toHaveText("Ranked by kickoff");
-      await expect(page.getByTestId("col-own-sort")).toHaveCount(0);
-      await expect(page.getByTestId("col-cup")).toHaveCount(0);
-      // the "rated on" fact is in the (i), not lost
-      const head = page.locator('[data-testid="col-head"][data-league="ucl"]');
-      await expect(head.getByTestId("col-notes-open")).toHaveAttribute("data-notes", /basis/);
-      await head.getByTestId("col-notes-open").click();
-      await expect(head.getByTestId("basis-note")).toContainText("Premier League + La Liga + Bundesliga");
-    });
-
-  test("a finished cup says 'season over' on the rest-day cell, as a league says rest day",
+  test("a finished cup has no column: it is named in the off-season line",
     async ({ page }) => {
       await page.setViewportSize({ width: 1440, height: 900 });
       await openCups(page);
-      const lc = page.locator('[data-testid="league-col"][data-league="leaguescup"]');
-      await expect(lc.getByTestId("col-empty")).toHaveCount(0);
-      const cell = lc.locator('[data-testid="rest-day"][data-placeholder="yes"]:visible').first();
-      await expect(cell).toContainText("Leagues Cup — season over");
-      await expect(cell).toContainText("2026 edition finished");
-      await expect(cell).not.toContainText(/\b0 fixtures\b/i);
+      await expect(page.locator('[data-testid="league-col"][data-league="leaguescup"]'))
+        .toHaveCount(0);
+      await expect(page.getByText(/season over/i)).toHaveCount(0);
+      const line = page.getByTestId("off-season-line");
+      await expect(line).toHaveText("Off season · Leagues Cup returns next season");
+      // its pages stay reachable from the line
+      await expect(line.getByRole("link", { name: "Leagues Cup returns next season" }))
+        .toHaveAttribute("href", "/bet-suggester/comp/leagues-cup");
     });
 
-  test("choosing a cup the board does not build draws its column and asks for nothing",
+  test("a cup the board does not build cannot be drawn, and asks for nothing",
     async ({ page }) => {
       await page.setViewportSize({ width: 1440, height: 900 });
       const seen = await openCups(page);
       await page.waitForTimeout(300);
       const before = seen.board.length + seen.review.length;
       await page.getByTestId("column-chooser-summary").click();
-      await page.locator('[data-testid="column-chip"][data-slug="uel"]').click();
-      const uel = page.locator('[data-testid="league-col"][data-league="uel"]');
-      await expect(uel).toBeAttached();
-      await expect(uel.locator('[data-testid="rest-day"]:visible').first())
-        .toContainText("Europa League — not on the board yet");
-      await expect(uel.getByTestId("col-no-board-entry")).toHaveCount(0);
-      await expect(uel.locator('[data-slot="tail-track"]')).toHaveCount(0);
+      const chip = page.locator('[data-testid="column-chip"][data-slug="uel"]');
+      await expect(chip).toHaveAttribute("aria-disabled", "true");
+      await chip.click({ force: true });
+      await expect(page.locator('[data-testid="league-col"][data-league="uel"]')).toHaveCount(0);
       await page.waitForTimeout(300);
       expect(seen.board.length + seen.review.length, "choosing a column asks for nothing")
         .toBe(before);

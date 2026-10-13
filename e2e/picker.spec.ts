@@ -421,8 +421,12 @@ test("four league columns, fixed order, each header carrying its facts",
     await expect(mls.getByTestId("col-count")).toHaveText("3 finished");
     await expect(mls.getByTestId("col-count"))
       .toHaveAttribute("data-counts", "finished");
-    await expect(mls.getByTestId("col-empty"))
-      .toContainText("No MLS fixtures in the next 8 days");
+    /* IN SEASON WITH NOTHING AHEAD IS A REST WEEK (Son, 2026-10-07 as
+       corrected 2026-10-13): the dashed rest-day card, never the solid
+       "No MLS fixtures in the next 8 days" box. */
+    await expect(mls.getByTestId("col-empty")).toHaveCount(0);
+    await expect(mls.locator('[data-testid="rest-day"]:visible').first())
+      .toContainText("MLS — rest day");
     // La Liga: prior-season badge in the header, and a true count
     const laliga = col(page, "laliga");
     await expect(laliga.getByText("prior szn").first()).toBeVisible();
@@ -819,10 +823,14 @@ test("an empty window says so in every column that IS empty, and keeps the refus
        column with a fixture in it must not print "no fixtures". The
        sentence was true of all four only while a refusal did not count
        as something the column holds. */
-    await expect(page.getByTestId("col-empty")).toHaveCount(3);
-    await expect(col(page, "epl").getByTestId("col-empty")).toHaveCount(0);
-    await expect(page.getByTestId("col-empty").first())
-      .toContainText("in the next 8 days");
+    /* SINCE 2026-10-13 an in-season column with nothing ahead draws the
+       rest-day card (Son: in season keeps its column), so no column
+       prints the solid empty box — the three empty ones are rest weeks. */
+    await expect(page.getByTestId("col-empty")).toHaveCount(0);
+    for (const slug of ["mls", "laliga", "ligamx"]) {
+      await expect(col(page, slug).locator('[data-testid="rest-day"]:visible').first())
+        .toContainText("rest day");
+    }
     // an empty board is not an excuse to drop the thing that was refused
     await expect(page.getByTestId("picker-refusal")).toHaveCount(1);
     await expect(col(page, "epl").getByTestId("picker-refusal"))
@@ -2417,8 +2425,10 @@ test("both windows open at 8 days, asked for once each, with no control to "
     // and the page says the same number where a reader can see it
     await expect(tail(page, "mls").getByTestId("review-count"))
       .toContainText("last 8d");
-    await expect(col(page, "mls").getByTestId("col-empty"))
-      .toContainText("in the next 8 days");
+    // (the forward number used to be read off the empty box's "in the
+    // next 8 days"; that box is gone since 2026-10-13 — an in-season
+    // column with nothing ahead draws the rest-day card — so the forward
+    // window is pinned on the request above)
 
     // NO CONTROL FOR EITHER, which is why the defaults are now the whole
     // contract: the forward chips, the finished chips and the refresh

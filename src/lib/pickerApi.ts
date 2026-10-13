@@ -1039,6 +1039,20 @@ export interface LeagueMeta {
   error?: string;
   /** prices are annotation, so a Kalshi failure costs quotes, not rows */
   kalshi_error?: string;
+  /** THE NEXT KNOWN FIXTURE OUTSIDE THE WINDOW (ISO kickoff), read by the
+   *  off-season line ("returns Jul 2027"). Absent = not known, and the
+   *  line never guesses one (lib/offSeason.ts). */
+  next_fixture?: string | null;
+  /** a DECLARED season start (ISO date) where the registry carries one */
+  season_start?: string | null;
+  /** THE EDITION'S STATE, derived on the backend from the current
+   *  edition's last-played and next-scheduled fixtures — read by the
+   *  in-season / off-season rule (lib/offSeason.isOffSeason). */
+  season?: {
+    state: "in_season" | "finished" | "not_started" | "unknown";
+    last_played?: string | null;
+    next_fixture?: string | null;
+  } | null;
   /** WHAT THE COLUMN'S LIVE READ COST, when it made one. ABSENT — not
    *  an empty block — on a column with nothing under way, so "no match
    *  is on" and "the read found nothing" never read the same. */
@@ -1537,6 +1551,9 @@ export const LEAGUE_LABEL: Record<string, string> = {
   coupedefrance: "Coupe de France",
   knvbbeker: "KNVB Beker",
   usopencup: "US Open Cup",
+  // The Cups tab's shared column for one-match competitions (lib/cupsTab
+  // FINALS, Son 2026-10-07).
+  finals: "Finals & Super Cups",
 };
 
 /** AFCON's name once the finals are being played; see LEAGUE_LABEL.afcon. */
