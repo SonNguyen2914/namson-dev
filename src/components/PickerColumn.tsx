@@ -3517,13 +3517,14 @@ export function LeagueColumn({
       {/* …AND BELOW `xl`, where rest days are not drawn, the same cell
           once, so a phone's column reads as a schedule rather than an
           empty box. */}
-      {resting && (
+      {resting && (() => {
+        const restCell = (
         <div data-testid="rest-day" data-day="next"
           {...(placeholder ? { "data-placeholder": "yes" } : {})}
           className={`mt-3 flex min-h-[52px] flex-col justify-center gap-0.5 rounded-[10px] border border-dashed border-line px-3 py-2.5 ${
             /* with no matchday bands on the board at all there is no
                per-band cell at xl, so this one is the xl cell too */
-            byDay.length > 0 ? "xl:hidden" : "xl:[grid-row:3] xl:self-start"}`}>
+            byDay.length > 0 ? "xl:hidden" : ""}`}>
           <span className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-ink-faint">
             {leagueLabel(slug)} — {placeholder ? placeholder.title : "rest day"}
           </span>
@@ -3532,7 +3533,25 @@ export function LeagueColumn({
               : `next · ${dayLabel(restNext!).toLowerCase()}`}
           </span>
         </div>
-      )}
+        );
+        /* WITH NO MATCHDAY BANDS ON THE BOARD the last track IS row 3, so
+           this cell and the finished tail would both claim it — and two
+           items explicitly placed on one row of a single-column subgrid
+           do not overlap: the second is auto-placed into an IMPLICIT
+           column beside it. That squeezed the cell to two thirds of the
+           column and drew the tail in the leftover third, which read as
+           a gap between the columns (Nations, 2 of 3 drawn, 2026-10-12).
+           So here they are ONE grid item, as the nothing-ahead slot below
+           already is. e2e/board-columns-no-gap.spec.ts. */
+        if (byDay.length > 0) return restCell;
+        return (
+          <div data-slot="tail-track" data-at="head"
+            className="xl:self-start xl:[grid-row:3]">
+            {restCell}
+            {!noTail && tail}
+          </div>
+        );
+      })()}
       {nothingAhead && !resting && (
         <div data-slot="tail-track" data-at="head"
           style={{ ["--r" as string]: "3" }}
@@ -3629,7 +3648,7 @@ export function LeagueColumn({
           complete before the backward one starts. A column with nothing
           ahead of it has already drawn this, up in the first track — see
           above; it is ONE element either way, never two. */}
-      {(!nothingAhead || resting) && !noTail && (
+      {(!nothingAhead || (resting && byDay.length > 0)) && !noTail && (
         <div className="xl:self-start xl:[grid-row:var(--r)]"
           style={{ ["--r" as string]: String(3 + 2 * dayKeys.length) }}
           data-slot="tail-track" data-at="foot">
