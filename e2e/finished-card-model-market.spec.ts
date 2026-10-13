@@ -289,8 +289,9 @@ test.describe("a finished card with a lock", () => {
     // the box on a no-model lock is the board's own NONE box
     await expect(section(page, NO_MODEL).getByTestId("mm-verdict"))
       .toHaveText("MODEL · NONE");
-    await expect(section(page, NO_MODEL).getByTestId("mm-model-empty"))
-      .toHaveText("no model read");
+    // AGENTS.md §8.5: the table, "—" in the cells and the reason as a chip
+    await expect(section(page, NO_MODEL).getByTestId("mm-model-empty")).toHaveText("—");
+    await expect(section(page, NO_MODEL).getByTestId("mm-why-model")).toHaveText("NO MODEL");
   });
 
   test("the result line is neutral ink, and no card says right or wrong",

@@ -556,8 +556,18 @@ function FloorMark({ note }: { note?: string | null }) {
 const rankOf = (n: number | null | undefined, none = "\u2014") =>
   (n == null ? none : `#${n}`);
 
-function FieldRanks({ block, drawn, absent }: {
+function FieldRanks({ block, drawn, absent, measures = false, context = [],
+                      floorNote = null, quietFloor = [] }: {
   block: FieldBlockLike;
+  /** the dagger's sentence, for the per-side marks this panel carries
+   *  when the card's face does not (`measures`) — see TierGaps */
+  floorNote?: string | null;
+  quietFloor?: readonly FieldAxisKey[];
+  /** draw each axis's value ± half-width under its rank pair — the
+   *  match card keeps them here, never on its face (AGENTS.md §8.4) */
+  measures?: boolean;
+  /** the card's context lines (group, tables, XIs …), see RowRead */
+  context?: readonly string[];
   /** the axes this block CARRIES, in reading order — never AXIS_ORDER,
    *  which is the set a three-axis field happens to fill */
   drawn: readonly FieldAxisKey[];
@@ -717,7 +727,7 @@ function FieldRanks({ block, drawn, absent }: {
           top: place?.top ?? 0, visibility: place ? "visible" : "hidden" } : undefined}
         className={`${how === "float" ? "z-[60]"
           : "absolute right-0 top-[calc(100%+7px)] z-20 max-w-full"} rounded-lg border border-line-strong bg-elev2 p-3 shadow-xl ${
-          absent ? "w-64" : "w-max"}`}>
+          absent || context.length > 0 ? "w-64" : "w-max"}`}>
         {/* `flex`, NOT `inline-flex`. An inline-flex is an atomic
             inline and sits on its parent's baseline, so the strut's
             descender pushed this row 12px below the trio's — the
@@ -739,11 +749,48 @@ function FieldRanks({ block, drawn, absent }: {
                   ~171px card six abreast, and it both left the card
                   and covered its own trigger. */}
               <span className="whitespace-nowrap">
-                {rankOf(a.fav.rank)}v{rankOf(a.opp.rank)}
+                {rankOf(a.fav.rank)}{measures && (() => {
+                  /* THE DAGGERS LIVE HERE ON A MATCH CARD (AGENTS.md
+                     §8.4): same mark, same sentence, beside the rank of
+                     the side it qualifies, off the cut the trio draws. */
+                  const lic = licensedRead(a);
+                  const fs = lic ? { ...lic.fav, below_floor: lic.below_floor } : a.fav;
+                  return fs && !quietFloor.includes(k) && (fs.below_floor || fs.straddles)
+                    ? <FloorMark note={fs.below_floor ? floorNote
+                      : `the 95% interval touches bands ${fs.tier_set.join("·")} — ${fs.tier} is where the estimate falls, not a band the evidence will narrow to`} />
+                    : null;
+                })()}v{rankOf(a.opp.rank)}{measures && (() => {
+                  const lic = licensedRead(a);
+                  const os = lic ? { ...lic.opp, below_floor: lic.below_floor } : a.opp;
+                  return os && !quietFloor.includes(k) && (os.below_floor || os.straddles)
+                    ? <FloorMark note={os.below_floor ? floorNote
+                      : `the 95% interval touches bands ${os.tier_set.join("·")} — ${os.tier} is where the estimate falls, not a band the evidence will narrow to`} />
+                    : null;
+                })()}
               </span>
+              {measures && (() => {
+                const m = bothMeasured(a);
+                return m ? (
+                  <span data-measure={k} data-unit={a.unit ?? ""}
+                    title={measureTitle(k, a, m)}
+                    className="mt-[1px] flex flex-col items-center gap-[1px] text-[8.5px] leading-[1.25] text-ink-faint">
+                    <span data-measure-side="fav" className="whitespace-nowrap">
+                      {writeMeasurement(m.fav, a.unit)}
+                    </span>
+                    <span data-measure-side="opp" className="whitespace-nowrap">
+                      {writeMeasurement(m.opp, a.unit)}
+                    </span>
+                  </span>) : null;
+              })()}
             </span>
           ))}
         </span>
+        {context.length > 0 && (
+          <span data-testid="card-context"
+            className="mt-2.5 block border-t border-line pt-2 text-[10px] leading-relaxed text-ink-low">
+            {context.map((c) => <span key={c} className="block">{c}</span>)}
+          </span>
+        )}
         {/* AND WHAT THIS FIELD DOES NOT MEASURE, IN THE BACKEND'S OWN
             WORDS (backend #141, 2026-09-15).
             THE TRIO CANNOT SAY IT, WHICH IS WHY IT IS HERE. An axis
@@ -908,8 +955,16 @@ function measureTitle(
 
 export function TierGaps({ read, dense = false, field, partial,
                           floorNote, values = true, quietFloor = [],
-                          ranksOnly = null, side = "club" }: {
+                          ranksOnly = null, side = "club",
+                          marks = true, context = [] }: {
   read: ReadLike;
+  /** DRAW THE STRADDLE / BELOW-FLOOR DAGGERS ON THE TIER PAIRS. The match
+   *  card passes false: its face is the league card's compact trio
+   *  (AGENTS.md §8.4), and the same fact is on the cell's hover. */
+  marks?: boolean;
+  /** the card's context lines, drawn at the foot of whichever panel the
+   *  trio opens (the `#` or the `i`) — see RowRead */
+  context?: readonly string[];
   /** WHAT ONE SIDE OF THIS FIXTURE IS CALLED in the prose around the
    *  trio — "club", or "team" on a national card. The caller reads it off
    *  the row's kind; the sentences are the same sentences. */
@@ -1115,9 +1170,22 @@ export function TierGaps({ read, dense = false, field, partial,
               data-fav-set={fs ? fs.tier_set.join(",") : undefined}
               data-opp-set={os ? os.tier_set.join(",") : undefined}
               data-bands={lic ? lic.bands : undefined}
-              {...(lic ? { title: `${DIM_LABEL[lbl]} at the ${lic.bands} bands `
-                + "its resolution licenses, not the declared five: "
-                + `favourite ${lic.fav.tier}, opponent ${lic.opp.tier}` } : {})}
+              {...((() => {
+                const parts: string[] = [];
+                if (lic) parts.push(`${DIM_LABEL[lbl]} at the ${lic.bands} bands `
+                  + "its resolution licenses, not the declared five: "
+                  + `favourite ${lic.fav.tier}, opponent ${lic.opp.tier}`);
+                if (!marks && !quiet && fs && (fs.below_floor || fs.straddles))
+                  parts.push(fs.below_floor ? `favourite: ${floorNote ?? "below the placeability floor"}`
+                    : `favourite's 95% interval touches bands ${fs.tier_set.join("·")}`);
+                if (!marks && !quiet && os && (os.below_floor || os.straddles))
+                  parts.push(os.below_floor ? `opponent: ${floorNote ?? "below the placeability floor"}`
+                    : `opponent's 95% interval touches bands ${os.tier_set.join("·")}`);
+                const below = [fs?.below_floor ? "fav" : null, os?.below_floor ? "opp" : null]
+                  .filter(Boolean).join(",");
+                return parts.length ? { title: parts.join(" · "),
+                  ...(!marks && !quiet && below ? { "data-below-floor": below } : {}) } : {};
+              })())}
               className="inline-flex flex-col items-center gap-[2px] leading-none">
               <span className={`text-[7.5px] uppercase tracking-[0.12em] ${
                 gap > 0 ? "text-ink-faint"
@@ -1162,11 +1230,11 @@ export function TierGaps({ read, dense = false, field, partial,
                   is a claim about, so it is addressable rather than
                   inferred from everything the cell happens to contain. */}
               <span data-tier-pair={lbl} className="whitespace-nowrap">
-                {pr[0]}{fs && !quiet && (fs.below_floor || fs.straddles)
+                {pr[0]}{marks && fs && !quiet && (fs.below_floor || fs.straddles)
                   && <FloorMark note={fs.below_floor
                     ? floorNote
                     : `the 95% interval touches bands ${fs.tier_set.join("·")} — ${fs.tier} is where the estimate falls, not a band the evidence will narrow to`} />}v{pr[1]}
-                {os && !quiet && (os.below_floor || os.straddles)
+                {marks && os && !quiet && (os.below_floor || os.straddles)
                   && <FloorMark note={os.below_floor
                     ? floorNote
                     : `the 95% interval touches bands ${os.tier_set.join("·")} — ${os.tier} is where the estimate falls, not a band the evidence will narrow to`} />}
@@ -1220,7 +1288,9 @@ export function TierGaps({ read, dense = false, field, partial,
             when there is a field to open: an `i` over a competition
             nobody has measured would be an empty promise. */}
         {rankBlock && <FieldRanks block={rankBlock}
-          drawn={block ? drawn : axesPresent(rankBlock)} absent={absent} />}
+          drawn={block ? drawn : axesPresent(rankBlock)} absent={absent}
+          measures={!values} context={context}
+          floorNote={floorNote} quietFloor={quietFloor} />}
         </span>
         {/* THE SHAPE POPOVER — ON A LEAGUE COLUMN ONLY (2026-09-10).
             The operator: "keep the #, remove the i since it is
@@ -1310,6 +1380,12 @@ export function TierGaps({ read, dense = false, field, partial,
                 + " annotation, never a veto."
               : "Tiers are within-league quintiles; annotation, never a veto."}
           </p>
+          {context.length > 0 && (
+            <p data-testid="card-context"
+              className="mt-2 border-t border-line pt-2 text-[10px] text-ink-low">
+              {context.map((c) => <span key={c} className="block">{c}</span>)}
+            </p>
+          )}
         </div>
           )}
         </span>

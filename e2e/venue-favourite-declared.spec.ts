@@ -265,8 +265,9 @@ test("an agreeing row, a refused one and an older payload all claim NOTHING",
       .toHaveAttribute("data-fav-source", "rank");
     // and the refused row still renders everything else it should —
     // the refusal costs the annotation, not the card
-    await expect(card(page, "v-refused").getByTestId("rated-in"))
-      .toBeVisible();
+    // (the two tables, in the card's panel since AGENTS.md §8.1)
+    await card(page, "v-refused").locator('[data-testid="field-ranks-open"], [data-testid="tier-read"]').first().click();
+    await expect(card(page, "v-refused").getByTestId("card-context")).toContainText("rated on");
   });
 
 test("a row the VENUE named says so, because every signed number on it changed side",
@@ -278,10 +279,13 @@ test("a row the VENUE named says so, because every signed number on it changed s
     await open(page);
     const c = card(page, "v-flipped");
     await expect(c).toHaveAttribute("data-fav-source", "venue");
-    const chip = c.getByTestId("fav-source-venue");
-    await expect(chip).toBeVisible();
-    await expect(chip).toHaveText(/venue rule/i);
-    const title = (await chip.getAttribute("title")) || "";
+    /* NOT A CHIP ON THE FACE since the one-card rule (AGENTS.md §8.1):
+       the same sentence is a line of the card's own panel */
+    await expect(c.getByTestId("fav-source-venue")).toHaveCount(0);
+    await c.locator('[data-testid="field-ranks-open"], [data-testid="tier-read"]').first().click();
+    const chip = c.getByTestId("card-context");
+    await expect(chip).toContainText(/venue rule/i);
+    const title = (await chip.textContent()) || "";
     expect(title).toContain("Flipped Home");
     // it explains the sign rather than leaving the reader to guess
     expect(title).toMatch(/negative gap/i);

@@ -68,7 +68,10 @@ test("a long fallback still wraps rather than clipping", async ({ page }) => {
   const items = await c.getByTestId("stats-row").evaluate((el) =>
     [...el.children].map((ch) => ch.getBoundingClientRect().right));
   for (const right of items) expect(right).toBeLessThanOrEqual(cb.x + cb.width);
-  await expect(c.getByTestId("stats-row")).toContainText("away not counted");
+  /* the uncounted side is "—" in its slot and named on the hover
+     (AGENTS.md §8.3) */
+  await expect(c.getByTestId("stat-gp")).toHaveText("gp 27/—");
+  await expect(c.getByTestId("stat-gp")).toHaveAttribute("title", "away not counted");
 });
 
 test("every card whose stats fit one line keeps them on one line — league "

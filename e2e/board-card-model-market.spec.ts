@@ -171,12 +171,17 @@ test.describe("the card's model and market lines", () => {
       .toContain("untested");
   });
 
-  test("a missing read is said in words, and never drawn as 0%", async ({ page }) => {
+  test("a missing read is \"—\" in the table with a reason chip, never 0%",
+    async ({ page }) => {
+    /* AGENTS.md §8.5 (Son, 2026-10-13): always the table; a missing value
+       is "—" with the reason in the THIN/WIDE chip style. */
     const nm = card(page, IDS.noModel);
-    await expect(nm.getByTestId("mm-model-empty")).toHaveText("no model read");
+    await expect(nm.getByTestId("mm-model-empty")).toHaveText("—");
+    await expect(nm.getByTestId("mm-why-model")).toHaveText("NO MODEL");
     await expect(nm.getByTestId("mm-model-h")).toHaveCount(0);
     const nk = card(page, IDS.noMarket);
-    await expect(nk.getByTestId("mm-market-empty")).toHaveText("no full Kalshi book");
+    await expect(nk.getByTestId("mm-market-empty")).toHaveText("—");
+    await expect(nk.getByTestId("mm-why-market")).toHaveText("NO FULL BOOK");
     await expect(nk.getByTestId("mm-market-h")).toHaveCount(0);
     for (const c of [nm, nk]) {
       expect(await text(c.getByTestId("mm-lines"))).not.toMatch(/(^|\D)0(\.0)?%/);
