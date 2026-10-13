@@ -95,9 +95,8 @@ import { ArchiveMenu } from "../../components/ArchiveMenu";
 import {
   BoardMode, BoardModeSwitch, boardModeFrom,
 } from "../../components/BoardModeSwitch";
-import { CupsComing, CupsScopeSwitch } from "../../components/CupsTab";
 import {
-  CUPS_WITH_PAGES, CUP_BOARD_COLUMNS, CupScope, cupColumns,
+  CUPS_WITH_PAGES, CUP_BOARD_COLUMNS, CUP_COLUMNS, cupPlaceholder,
 } from "../../lib/cupsTab";
 import { ColumnChooser } from "../../components/ColumnChooser";
 import { CompRail } from "../../components/CompRail";
@@ -204,9 +203,6 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      the other competitions". See components/CupsTab.tsx. */
   const champ = mode === "nations";
   const cups = mode === "cups";
-  /* WHICH HALF OF THE CUPS TAB IS DRAWN. A choice of COLUMNS, never of
-     reads: both halves come off the one narrowed payload. */
-  const [cupScope, setCupScope] = useState<CupScope>("continental");
   /* WHAT THIS PAGE ASKS THE CLUB BOARD FOR BY NAME. A narrowed route's
      own `only`; on the landing page, the cups when the Cups tab is shown;
      otherwise nothing, which is the declaration. */
@@ -620,8 +616,12 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      rendering nothing at all would read as broken, and the blocks below
      say what actually happened instead of letting the column's own empty
      state claim a fixture count nobody measured. */
+  /* THE CUPS TAB'S COLUMN SET IS EVERY CUP, continental then domestic
+     (Son, 2026-10-12: "make everything match perfectly") — the chooser
+     offers them all, as the Leagues tab's offers its eight. Which are
+     DRAWN by default is `shownSlugs` below. */
   const columnSlugs = only ? [...only]
-    : cups ? cupColumns(cupScope)
+    : cups ? [...CUP_COLUMNS]
     : boardColumns(declaredColumns);
 
   /* ── WHICH LEAGUE THE PHONE IS LOOKING AT (operator, 2026-09-16) ────
@@ -670,9 +670,16 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      `columnSlugs`, which is why a stale selection can only ever shrink
      — it cannot reorder the board and cannot smuggle a slug back on. */
   const [shownRaw, setShown] = useState<readonly string[] | null>(null);
+  /* ON THE CUPS TAB THE DEFAULT SELECTION IS THE CUPS THE BOARD BUILDS.
+     The rest are undrawn chips in the chooser; choosing one draws its
+     column with a "not on the board yet" rest-day cell and asks for
+     nothing. */
+  const shownDefault = cups
+    ? columnSlugs.filter((s) => CUP_BOARD_COLUMNS.includes(s)) : null;
   const shownSlugs = (() => {
-    if (!shownRaw) return columnSlugs;
-    const want = new Set(shownRaw);
+    const chosen = shownRaw ?? shownDefault;
+    if (!chosen) return columnSlugs;
+    const want = new Set(chosen);
     const kept = columnSlugs.filter((s) => want.has(s));
     /* A SELECTION THAT NO LONGER NAMES A LIVE COLUMN IS NOT AN EMPTY
        BOARD. Every league it held could have left the declaration since
@@ -724,14 +731,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      into "nothing left the board" would be asserting a measurement off
      a payload that was never asked. Absent stays absent: the strip is
      drawn only when there is something in it to draw. */
-  /* On the Cups tab one read serves both halves, so a departure is named
-     on the half whose column it belongs to and not on the other one. */
-  /* The provenance count, for the half of the Cups tab on screen. */
-  const shownCount = cups
-    ? rows.filter((r) => columnsOf(r).some((c) => columnSlugs.includes(c))).length
-    : rows.length;
-  const offBoard = (board?.off_board ?? [])
-    .filter((o) => !cups || !o.league || columnSlugs.includes(o.league));
+  const offBoard = board?.off_board ?? [];
   /* ONE SENTENCE PER CODE, IN THE BACKEND'S OWN WORDS. Two ties that
      kicked off share a reason; printing it against each row would read
      as two separate findings about two separate matches. */
@@ -990,7 +990,9 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      describing the sort of a column nobody is drawing would be the
      heading naming a board other than the one on screen. Identical on
      the default board, where the two lists are the same. */
-  const runningSorts = drawnSlugs.map((sl) => columnSort(sl, boardSort));
+  /* The Cups tab's columns run the board's sort like league columns. */
+  const runningSorts = drawnSlugs.map((sl) =>
+    cups ? boardSort : columnSort(sl, boardSort));
   /** How many fixtures each declared column holds — the tab strip's
    *  accessible names, off the same `columnsOf` reader the columns
    *  themselves claim a row with, so a folded fixture counts for every
@@ -1412,7 +1414,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             {champ
               ? "Ranked by how far apart the two national teams sit on their competition's own field, home ground counted."
               : cups
-              ? "One column per cup. A tie between clubs from two different domestic tables shows tiers only, and the gap between them is withheld."
+              ? "Ranked within each cup; a tie across two leagues shows tiers only."
               : soleOwnSort
               ? `Ranked by ${soleOwnSort.mode} — nearly every tie here pairs two different domestic tables, and the gap between them is withheld.`
               : "Ranked by how far apart the two clubs sit in their own league's table."}
@@ -1440,16 +1442,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
 
         {/* THE CUPS TAB (2026-10-12) IS THIS BOARD. Everything below is
             the same for all three tabs: provenance, live strip, columns,
-            finished tails and legend. The tab adds only its Continental |
-            Domestic switch here, which chooses columns and not reads, and
-            the cups with no board data yet, under the columns. */}
-        {cups && (
-          <CupsScopeSwitch scope={cupScope} onChange={(s2) => {
-            setPicked(null);
-            setShown(null);
-            setCupScope(s2);
-          }} />
-        )}
+            finished tails and legend. */}
         {cupTiesLeft > 0 && (
           <p data-testid="cup-ties-left"
             className="mt-3 text-center font-mono text-[10px] uppercase tracking-wide text-ink-faint">
@@ -1512,7 +1505,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                 timeZone: TZ, month: "short", day: "numeric",
                 hour: "numeric", minute: "2-digit", second: "2-digit",
               })}
-              {" · slate "}{etDate(board.date)} ET · {shownCount} fixture{shownCount === 1 ? "" : "s"}
+              {" · slate "}{etDate(board.date)} ET · {rows.length} fixture{rows.length === 1 ? "" : "s"}
             </span>
           )}
         </div>
@@ -2093,6 +2086,9 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                        about the page. */
                     tabPanel={showTabs && slug === picked}
                     meta={leaguesMap[slug]}
+                    tabParity={cups}
+                    placeholder={cups ? cupPlaceholder(slug) : null}
+                    noTail={cups && !CUP_BOARD_COLUMNS.includes(slug)}
                     rows={rows.filter((r) => columnsOf(r).includes(slug))}
                     refusals={refusals.filter((r) => columnsOf(r).includes(slug))}
                     review={{
@@ -2216,8 +2212,6 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             </>
           )}
         </section>
-
-        {cups && <CupsComing scope={cupScope} />}
 
         {/* ------------------------- how to read it -------------------------
             Deliberately NOT wrapped in <Reveal>: it is a reference block at

@@ -1398,8 +1398,6 @@ export function nationalColumn(
 
 /** One fixture the board removed, in the backend's own words. */
 export interface OffBoard {
-  /** the competition slug the backend wrote on the entry */
-  league?: string;
   event_id: string;
   competition_id: string;
   kickoff: string;
@@ -1526,6 +1524,19 @@ export const LEAGUE_LABEL: Record<string, string> = {
   // Static rather than clock-derived, so the server and the first client
   // render agree (AGENTS.md section 5).
   afcon: "AFCON Qualifiers",
+  // THE CUPS TAB'S "COMING" CUPS (2026-10-12). Not built by the board
+  // yet; named so a chip or a placeholder column reads as the cup and
+  // not as its slug. lib/cupsTab.ts is the list they come from.
+  uel: "Europa League",
+  uecl: "Conference League",
+  concacafcc: "Concacaf Champions Cup",
+  facup: "FA Cup",
+  copadelrey: "Copa del Rey",
+  dfbpokal: "DFB-Pokal",
+  coppaitalia: "Coppa Italia",
+  coupedefrance: "Coupe de France",
+  knvbbeker: "KNVB Beker",
+  usopencup: "US Open Cup",
 };
 
 /** AFCON's name once the finals are being played; see LEAGUE_LABEL.afcon. */

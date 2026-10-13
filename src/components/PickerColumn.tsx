@@ -2348,6 +2348,10 @@ export interface ColumnNoteSet {
    *  folded: one explains a read every card in the column performs, the
    *  other says why no card in it performs one. */
   fieldError: string | null;
+  /** HOW A CUP'S CLUBS ARE RATED, on the Cups tab only, where the
+   *  "cup · rated on" chip is said here instead so every column header
+   *  carries the same chips as a league's. Absent everywhere else. */
+  basis?: string | null;
 }
 
 /** WHAT A TIER SET IS AND WHAT THE DAGGER MEANS, SAID ONCE PER COLUMN.
@@ -2610,6 +2614,10 @@ function ColumnNotes({ notes }: { notes: ColumnNoteSet }) {
       head: "how to read the field on each card",
       says: "how to read the field on each card",
       andSays: null },
+    { id: "basis-note", body: notes.basis ?? null, tone: "text-ink-low",
+      head: "cup · how its clubs are rated",
+      says: "how this cup's clubs are rated",
+      andSays: "how its clubs are rated" },
   ] as const).filter(
     (s): s is typeof s & { body: string } => Boolean(s.body));
   if (sections.length === 0) return null;
@@ -2770,8 +2778,23 @@ export function LeagueColumn({
   slug, meta, rows, refusals, days, dayKeys, sortFor, dayLabels, colIndex,
   review, dense = false, field, boardFloorNote, headSlot = null,
   sideways = false, tabPanel = false, national = null,
+  placeholder = null, tabParity = false, noTail = false,
 }: {
   slug: string;
+  /** THE CUPS TAB'S EMPTY COLUMN, said the way a league's rest day is
+   *  said: a dashed cell per matchday band, `<name> — <title>` over
+   *  `line`. Used when the column has nothing in the window and the tab
+   *  knows why (a finished edition, or a cup the board does not build
+   *  yet). Null everywhere else. */
+  placeholder?: { title: string; line: string } | null;
+  /** THE CUPS TAB (2026-10-12, "make everything match perfectly"): the
+   *  column runs the board's sort like a league column (no
+   *  `COLUMN_DEFAULT_SORT`), and its "cup · rated on" fact moves into
+   *  the (i) notes so the header carries the same chips as a league's.
+   *  False everywhere else, where nothing changes. */
+  tabParity?: boolean;
+  /** No finished tail: a cup the board does not build was never read. */
+  noTail?: boolean;
   /** A NATIONAL COLUMN'S OWN FACTS (the Championships board): its group
    *  tables, its stage chip and when it next plays. Null on every club
    *  column, which then renders exactly as it did. */
@@ -2903,7 +2926,13 @@ export function LeagueColumn({
      how to read a tier set is true of every card in this column, and a
      field that failed to load is true of the column rather than of any
      fixture in it. */
-  const notes = columnNotes(slug, rows, field, meta?.reg_time_note);
+  const baseNotes = columnNotes(slug, rows, field, meta?.reg_time_note);
+  const notes: ColumnNoteSet = tabParity && meta?.kind === "cup"
+    ? { ...baseNotes,
+        basis: "A knockout tournament with no table of its own. Every club is"
+          + " rated on its domestic league's table instead: "
+          + (meta.rated_on ?? []).map(leagueLabel).join(" + ") + "." }
+    : baseNotes;
   /* A BELOW-FLOOR VERDICT THAT HOLDS FOR EVERY SIDE IN THE COLUMN IS SAID
      ONCE (operator, 2026-09-24). Per axis, over every field-read row in
      this column: an axis where every side is below the floor carries no
@@ -2931,7 +2960,7 @@ export function LeagueColumn({
   // day's override — ranks WITHIN the day. Rank badges restart per day,
   // so 01 always means "this day's best under its sort".
   const byDay = dayKeys.map((k) => {
-    const sort = columnSort(slug, sortFor(k));
+    const sort = tabParity ? sortFor(k) : columnSort(slug, sortFor(k));
     return {
       key: k,
       sort,
@@ -2957,7 +2986,7 @@ export function LeagueColumn({
      differently from its neighbours reads as a defect to anyone who
      does not know why. */
   const ownSort = COLUMN_DEFAULT_SORT[slug];
-  const runsOwnSort = Boolean(ownSort)
+  const runsOwnSort = Boolean(ownSort) && !tabParity
     && dayKeys.some((k) => isDefaultSort(sortFor(k)));
 
   /* ── THE FINISHED-ONLY COLUMN (operator, 2026-09-08) ──────────────
@@ -2986,6 +3015,7 @@ export function LeagueColumn({
      rest-day cell per band naming when it next plays, not one box
      saying it has nothing. */
   const restNext = nothingAhead ? national?.nextBeyond ?? null : null;
+  const resting = nothingAhead && (restNext !== null || placeholder !== null);
   /* `review.read` IS PART OF "KNOWN" (2026-09-10). Without it a
      competition the sweep never covered reported a KNOWN zero here —
      the header speaking, in the operator's own words, for a read that
@@ -3253,7 +3283,7 @@ export function LeagueColumn({
               competition left BOARD_COLUMNS, the board ranks none of its
               fixtures, and the page says so instead of printing a zero
               nobody measured. */}
-          {boardSilent && (
+          {boardSilent && !placeholder && (
             <span data-testid="col-no-board-entry"
               title="The board payload carried no entry for this competition at all — no season basis, no rating table, and so no ranking of its fixtures. That is the board saying NOTHING about it, which is not the same as the board measuring none."
               className="rounded border border-line-strong px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-low">
@@ -3323,7 +3353,7 @@ export function LeagueColumn({
               {quietFloor.join("/")} †
             </span>
           )}
-          {meta?.kind === "cup" && (
+          {meta?.kind === "cup" && !tabParity && (
             <span data-testid="col-cup"
               title="a knockout tournament with no table of its own — every club is rated on its domestic league's table instead"
               className="rounded border border-line-strong px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-low">
@@ -3448,18 +3478,19 @@ export function LeagueColumn({
           // Only when the league plays elsewhere in the window — a fully
           // empty column keeps its own louder empty-state below — and
           // only at xl, where the aligned matrix exists.
-          if (rows.length === 0 && refusals.length === 0 && !restNext) return null;
+          if (rows.length === 0 && refusals.length === 0 && !resting) return null;
           const next = byDay.slice(di + 1)
             .find((d) => d.rows.length > 0 || d.refused.length > 0);
           return (
             <div key={key} data-testid="rest-day" data-day={key}
+              {...(placeholder && nothingAhead ? { "data-placeholder": "yes" } : {})}
               style={{ ["--r" as string]: String(3 + 2 * di) }}
               className="hidden min-h-[52px] flex-col justify-center gap-0.5 rounded-[10px] border border-dashed border-line px-3 py-2.5 xl:flex xl:self-start xl:[grid-row:var(--r)]">
               <span className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-ink-faint">
-                {leagueLabel(slug)} — rest day
+                {leagueLabel(slug)} — {placeholder && nothingAhead ? placeholder.title : "rest day"}
               </span>
               <span className="font-mono text-[9.5px] text-ink-low">
-                {next
+                {placeholder && nothingAhead ? placeholder.line : next
                   ? `next · ${(dayLabels[next.key] ?? next.key).toLowerCase()}`
                   : restNext
                     ? `next · ${dayLabel(restNext).toLowerCase()}`
@@ -3528,18 +3559,20 @@ export function LeagueColumn({
       {/* …AND BELOW `xl`, where rest days are not drawn, the same cell
           once, so a phone's column reads as a schedule rather than an
           empty box. */}
-      {restNext && (
+      {resting && (
         <div data-testid="rest-day" data-day="next"
+          {...(placeholder ? { "data-placeholder": "yes" } : {})}
           className="mt-3 flex min-h-[52px] flex-col justify-center gap-0.5 rounded-[10px] border border-dashed border-line px-3 py-2.5 xl:hidden">
           <span className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-ink-faint">
-            {leagueLabel(slug)} — rest day
+            {leagueLabel(slug)} — {placeholder ? placeholder.title : "rest day"}
           </span>
           <span className="font-mono text-[9.5px] text-ink-low">
-            next · {dayLabel(restNext).toLowerCase()}
+            {placeholder ? placeholder.line
+              : `next · ${dayLabel(restNext!).toLowerCase()}`}
           </span>
         </div>
       )}
-      {nothingAhead && !restNext && (
+      {nothingAhead && !resting && (
         <div data-slot="tail-track" data-at="head"
           style={{ ["--r" as string]: "3" }}
           className="mt-3 xl:mt-0 xl:self-start xl:[grid-row:var(--r)]">
@@ -3635,7 +3668,7 @@ export function LeagueColumn({
           complete before the backward one starts. A column with nothing
           ahead of it has already drawn this, up in the first track — see
           above; it is ONE element either way, never two. */}
-      {(!nothingAhead || restNext) && (
+      {(!nothingAhead || resting) && !noTail && (
         <div className="xl:self-start xl:[grid-row:var(--r)]"
           style={{ ["--r" as string]: String(3 + 2 * dayKeys.length) }}
           data-slot="tail-track" data-at="foot">
