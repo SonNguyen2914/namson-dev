@@ -40,8 +40,78 @@
 // board` is NOT here and must never be: a board GET is an assembly, and
 // an assembly freezes a permanent pre-kickoff snapshot. See
 // e2e/board-holdout.mjs. That is asserted rather than remembered.
+//
+// AND THE APP'S OWN IMAGES ARE OPTIMISED, TO THE END, BEFORE ANY TEST
+// CAN HANG UP ON ONE (2026-10-13). `next start`'s image optimiser
+// dedupes work per (url, width, quality, format): every request for a
+// key waits on the first one's promise. If the first request's client
+// disconnects before the optimiser has read the source file (it reads
+// it through a mock request on the CLIENT'S socket), that promise never
+// settles, and the key hangs for the life of the server. The 4h cache
+// TTL means only a key's first, cold request is exposed. Measured
+// against a cold cache: 5 of 30 keys wedged by a hang-up 0–2ms in.
+//
+// A test hangs up whenever it finishes with an image still in flight,
+// and many do: openSection scrolls the lazy board images in and a quick
+// assertion ends the test. The next test that WAITS for that image
+// (img.complete, or networkidle) then waits for ever. That was the set
+// that went red in CI on 2026-10-13: the-board-has-both-halves at 1440
+// and 768, every networkidle in the-record-reads-live-with-a-fallback,
+// picker.spec.ts's site-root test. Each passed alone and on re-run, and
+// failed ONLY on the same keys a test earlier in the run had abandoned.
+// Their waits are right. What was wrong was the first visitor to a cold
+// key being whichever test happened to leave first. Vercel's optimiser
+// is not this code, so production is not affected.
+//
+// Unlike the backend warm-up below, THIS ONE FAILS THE RUN: it reads the
+// local app, so an image that will not finish is this branch's defect.
+import type { FullConfig } from "@playwright/test";
 import { LIVE, UPSTREAM_URL } from "./backend";
 import { PICKER_COLUMN_ORDER } from "../src/lib/pickerApi";
+
+/** The pages that draw through next/image (today, only the home page's
+ *  BoardShot). A page that gains one belongs here. */
+const IMAGE_PAGES = ["/"];
+/** What Chromium sends for an <img>. The cache key includes the format
+ *  negotiated from it, so asking the way curl does would warm the JPEG
+ *  entry and leave the WebP one the browser asks for cold. */
+const IMG_ACCEPT = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8";
+/** Per image. A local optimiser past this is the finding. */
+const IMAGE_MS = 30_000;
+
+/** Every /_next/image URL the pages' own HTML can ask for, src and every
+ *  srcset width, requested ONE AT A TIME and read to the end. */
+async function warmImages(appUrl: string): Promise<void> {
+  const urls = new Set<string>();
+  for (const page of IMAGE_PAGES) {
+    const html = await (await fetch(`${appUrl}${page}`,
+      { signal: AbortSignal.timeout(IMAGE_MS) })).text();
+    for (const [, attr] of html.matchAll(/\s(?:src|srcSet|srcset)="([^"]+)"/g)) {
+      for (const candidate of attr.split(",")) {
+        const u = candidate.trim().split(/\s+/)[0].replaceAll("&amp;", "&");
+        if (u.startsWith("/_next/image?")) urls.add(u);
+      }
+    }
+  }
+  if (!urls.size) {
+    console.log(`[e2e] no /_next/image on ${IMAGE_PAGES.join(", ")}; no images to warm`);
+    return;
+  }
+  const started = Date.now();
+  for (const u of urls) {
+    const r = await fetch(`${appUrl}${u}`, { headers: { accept: IMG_ACCEPT },
+      signal: AbortSignal.timeout(IMAGE_MS) }).catch((e: unknown) => {
+      throw new Error(`[e2e] the image optimiser did not answer ${u} `
+        + `in ${IMAGE_MS}ms (${String(e).slice(0, 60)}). Every test that `
+        + "waits for this image would hang on it.");
+    });
+    // the body is read to the end: the entry is cached once it is written
+    await r.arrayBuffer();
+    if (!r.ok) throw new Error(`[e2e] the image optimiser answered ${r.status} for ${u}`);
+  }
+  console.log(`[e2e] optimised ${urls.size} images the pages ask for, `
+    + `in ${Date.now() - started}ms, before any worker starts`);
+}
 
 /** How long to wait for the backend to say it is up at all. */
 const READY_MS = 60_000;
@@ -76,7 +146,12 @@ function warmPaths(): string[] {
   ];
 }
 
-export default async function globalSetup(): Promise<void> {
+export default async function globalSetup(config: FullConfig): Promise<void> {
+  // both modes: the app is local in both, and so is its image optimiser
+  // (Playwright has the webServer up and answering before this runs)
+  await warmImages(String(config.projects[0].use.baseURL));
+
+
   // THE HERMETIC RUN WARMS NOTHING AND REACHES NOTHING (2026-09-25). Its
   // upstream is the local stand-in, so there is no cache to fill — and a
   // default run that could be pointed at a real backend is the thing this
