@@ -17,7 +17,17 @@
  * per cup (3 / 1 per league, 3 / 2 per Nations column) and the first 4
  * `off_board` entries; reviews the first 2 finished per competition and the
  * first 2 refusals. `narrowed_to` is the route's, added as `picker_board`
- * adds it. */
+ * adds it.
+ *
+ * OPTION B, 2026-10-13 (Son: a return date counts only a match the board can
+ * show). The `next_match` of the FA Cup and of the ten cups whose
+ * API-Football league is no longer asked (concacafcc, leaguescup, campeones,
+ * uefasuper, communityshield, dflsupercup, tropheechampions, johancruijff,
+ * campeondecampeones, coupedefrance) is replaced by the backend's own
+ * answer after TRIVELA return-dates-board-only: `next_match.resolve(slug,
+ * espn, "20261013", 8)` IN PROCESS, live ESPN and API-Football
+ * (research_archive/return_dates_board_only_2026-10-13/
+ * resolution_option_b.json). Nothing else in the recording changed. */
 export const RETURN_CLOCK = "2026-10-13T15:39:18Z";
 export const RETURN_CUPS_BOARD = {
  "date": "20261013",
@@ -3307,8 +3317,8 @@ export const RETURN_CUPS_BOARD = {
    "next_match": {
     "kickoff": null,
     "source": null,
-    "checked_at": "2026-10-13T15:39Z",
-    "reason": "ESPN lists no scheduled match in 2026 or 2027; API-Football league 16 lists no next fixture"
+    "checked_at": "2026-10-13T17:06Z",
+    "reason": "ESPN lists no scheduled match in 2026 or 2027; API-Football league 16 not asked: none of its rounds is verified as one ESPN carries"
    },
    "folded_into": [],
    "fixtures": 0,
@@ -3354,8 +3364,8 @@ export const RETURN_CUPS_BOARD = {
    "next_match": {
     "kickoff": null,
     "source": null,
-    "checked_at": "2026-10-13T15:39Z",
-    "reason": "ESPN lists no scheduled match in 2026 or 2027; API-Football league 772 lists no next fixture"
+    "checked_at": "2026-10-13T17:06Z",
+    "reason": "ESPN lists no scheduled match in 2026 or 2027; API-Football league 772 not asked: none of its rounds is verified as one ESPN carries"
    },
    "folded_into": [],
    "fixtures": 0,
@@ -3401,8 +3411,8 @@ export const RETURN_CUPS_BOARD = {
    "next_match": {
     "kickoff": null,
     "source": null,
-    "checked_at": "2026-10-13T15:39Z",
-    "reason": "ESPN lists no scheduled match in 2026 or 2027; API-Football league 885 lists no next fixture"
+    "checked_at": "2026-10-13T17:06Z",
+    "reason": "ESPN lists no scheduled match in 2026 or 2027; API-Football league 885 not asked: none of its rounds is verified as one ESPN carries"
    },
    "folded_into": [],
    "fixtures": 0,
@@ -3461,8 +3471,8 @@ export const RETURN_CUPS_BOARD = {
    "next_match": {
     "kickoff": null,
     "source": null,
-    "checked_at": "2026-10-13T15:39Z",
-    "reason": "ESPN lists no scheduled match in 2026 or 2027; API-Football league 531 lists no next fixture"
+    "checked_at": "2026-10-13T17:06Z",
+    "reason": "ESPN lists no scheduled match in 2026 or 2027; API-Football league 531 not asked: none of its rounds is verified as one ESPN carries"
    },
    "folded_into": [],
    "fixtures": 0,
@@ -3498,8 +3508,8 @@ export const RETURN_CUPS_BOARD = {
    "next_match": {
     "kickoff": null,
     "source": null,
-    "checked_at": "2026-10-13T15:39Z",
-    "reason": "ESPN lists no scheduled match in 2026 or 2027; API-Football league 528 lists no next fixture"
+    "checked_at": "2026-10-13T17:06Z",
+    "reason": "ESPN lists no scheduled match in 2026 or 2027; API-Football league 528 not asked: none of its rounds is verified as one ESPN carries"
    },
    "folded_into": [],
    "fixtures": 0,
@@ -3573,8 +3583,8 @@ export const RETURN_CUPS_BOARD = {
    "next_match": {
     "kickoff": null,
     "source": null,
-    "checked_at": "2026-10-13T15:39Z",
-    "reason": "ESPN lists no scheduled match in 2026 or 2027; API-Football league 529 lists no next fixture"
+    "checked_at": "2026-10-13T17:06Z",
+    "reason": "ESPN lists no scheduled match in 2026 or 2027; API-Football league 529 not asked: none of its rounds is verified as one ESPN carries"
    },
    "folded_into": [],
    "fixtures": 0,
@@ -3648,8 +3658,8 @@ export const RETURN_CUPS_BOARD = {
    "next_match": {
     "kickoff": null,
     "source": null,
-    "checked_at": "2026-10-13T15:39Z",
-    "reason": "ESPN lists no scheduled match in 2026 or 2027; API-Football league 526 lists no next fixture"
+    "checked_at": "2026-10-13T17:06Z",
+    "reason": "ESPN lists no scheduled match in 2026 or 2027; API-Football league 526 not asked: none of its rounds is verified as one ESPN carries"
    },
    "folded_into": [],
    "fixtures": 0,
@@ -3684,8 +3694,8 @@ export const RETURN_CUPS_BOARD = {
    "next_match": {
     "kickoff": null,
     "source": null,
-    "checked_at": "2026-10-13T15:39Z",
-    "reason": "ESPN lists no scheduled match in 2026 or 2027; API-Football league 543 lists no next fixture"
+    "checked_at": "2026-10-13T17:06Z",
+    "reason": "ESPN lists no scheduled match in 2026 or 2027; API-Football league 543 not asked: none of its rounds is verified as one ESPN carries"
    },
    "folded_into": [],
    "fixtures": 0,
@@ -3718,8 +3728,8 @@ export const RETURN_CUPS_BOARD = {
    "next_match": {
     "kickoff": null,
     "source": null,
-    "checked_at": "2026-10-13T15:39Z",
-    "reason": "ESPN lists no scheduled match in 2026 or 2027; API-Football league 857 lists no next fixture"
+    "checked_at": "2026-10-13T17:06Z",
+    "reason": "ESPN lists no scheduled match in 2026 or 2027; API-Football league 857 not asked: none of its rounds is verified as one ESPN carries"
    },
    "folded_into": [],
    "fixtures": 0,
@@ -3755,12 +3765,10 @@ export const RETURN_CUPS_BOARD = {
     "next_fixture": null
    },
    "next_match": {
-    "kickoff": "2026-10-17T14:00Z",
-    "source": "apifootball_fixtures_next",
-    "round": "4th Round Qualifying",
-    "name": "AFC Rushden & Diamonds v Morecambe",
-    "league_id": 45,
-    "checked_at": "2026-10-13T15:39Z"
+    "kickoff": null,
+    "source": null,
+    "checked_at": "2026-10-13T17:06Z",
+    "reason": "ESPN lists no scheduled match in 2026 or 2027; API-Football league 45's next listed fixture (2026-10-17, 4th Round Qualifying) is in a round ESPN does not carry, so the board cannot show it; no fixture of a round ESPN carries is listed yet"
    },
    "folded_into": [],
    "fixtures": 0,
@@ -3965,8 +3973,8 @@ export const RETURN_CUPS_BOARD = {
    "next_match": {
     "kickoff": null,
     "source": null,
-    "checked_at": "2026-10-13T15:39Z",
-    "reason": "ESPN lists no scheduled match in 2026 or 2027; API-Football league 66 lists no next fixture"
+    "checked_at": "2026-10-13T17:07Z",
+    "reason": "ESPN lists no scheduled match in 2026 or 2027; API-Football league 66 not asked: none of its rounds is verified as one ESPN carries"
    },
    "folded_into": [],
    "fixtures": 0,

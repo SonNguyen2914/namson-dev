@@ -12,6 +12,7 @@
 // exists for these fixtures, and no number here is an edge.
 
 import type { NextMatch } from "./offSeason";
+import { detailText } from "./httpFailure";
 
 export type Src = "current" | "prior";
 
@@ -1934,7 +1935,7 @@ async function readBoard(path: string, signal?: AbortSignal): Promise<Board> {
     let timedOut = false;
     try {
       const body = await r.json();
-      detail = body?.detail || body?.error || "";
+      detail = detailText(body, r.status);
       timedOut = r.status === 504 && body?.reason === "backend_timeout";
     } catch { /* non-JSON body; the status is all we have */ }
     const message = detail || `board request failed (${r.status})`;
