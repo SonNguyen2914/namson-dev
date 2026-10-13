@@ -95,8 +95,9 @@ import { ArchiveMenu } from "../../components/ArchiveMenu";
 import {
   BoardMode, BoardModeSwitch, boardModeFrom,
 } from "../../components/BoardModeSwitch";
-import { CupsTab } from "../../components/CupsTab";
-import { CUPS_WITH_PAGES } from "../../lib/cupsTab";
+import {
+  CUPS_WITH_PAGES, CUP_BOARD_COLUMNS, CUP_COLUMNS, cupPlaceholder,
+} from "../../lib/cupsTab";
 import { ColumnChooser } from "../../components/ColumnChooser";
 import { CompRail } from "../../components/CompRail";
 import LiveSection from "../../components/LiveCard";
@@ -196,10 +197,17 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      starts there without waiting on storage. */
   const [mode, setMode] = useState<BoardMode | null>(only ? "leagues" : null);
   /* `champ` is the NATIONS board (UI name since 2026-10-12; its data is
-     still GET /api/championships/*). `cups` is the Cups tab, which reads
-     no board at all — see components/CupsTab.tsx. */
+     still GET /api/championships/*). `cups` is the Cups tab: since
+     2026-10-12 it is THIS board, narrowed by the page itself to the cups
+     the club board builds (`CUP_BOARD_COLUMNS`) — Son: "the same thing as
+     the other competitions". See components/CupsTab.tsx. */
   const champ = mode === "nations";
   const cups = mode === "cups";
+  /* WHAT THIS PAGE ASKS THE CLUB BOARD FOR BY NAME. A narrowed route's
+     own `only`; on the landing page, the cups when the Cups tab is shown;
+     otherwise nothing, which is the declaration. */
+  const asked: readonly string[] | undefined = only
+    ?? (cups ? CUP_BOARD_COLUMNS : undefined);
   useEffect(() => {
     if (only) return;
     let remembered: string | null = null;
@@ -322,12 +330,9 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
 
      Joined to a stable string so the callback's identity — and with it
      the fetch — does not change on every render. */
-  const ask = only ? [...only].join(",") : "";
+  const ask = asked ? [...asked].join(",") : "";
   const load = useCallback(async (signal: AbortSignal) => {
-    /* THE CUPS TAB ASKS FOR NO BOARD. It is a list of the cup pages that
-       already exist; reading either board behind it would be a request
-       whose answer nothing draws. */
-    if (mode === null || mode === "cups") return;
+    if (mode === null) return;
     setLoading(true);
     setBuilding(false);
     /* ONE ROUTE PER MODE, NEVER BOTH. The Leagues read is the string it
@@ -379,7 +384,6 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   useEffect(() => {
     if (deepLink !== null) return;        // redirecting; do not fetch
     if (mode === null) return;            // the remembered board is not read yet
-    if (mode === "cups") return;          // the Cups tab reads no board
     const ac = new AbortController();
     // async, not called sync in the effect body, so every setState inside
     // load() lands in a callback rather than cascading a render
@@ -433,7 +437,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
        the Championships board asked for none and every national tail
        said it was never asked; GET /api/championships/review now serves
        the national one, off the match archive. */
-    if (mode === null || mode === "cups") return;
+    if (mode === null) return;
     const ac = new AbortController();
     const t = setTimeout(() => { void loadReview(ac.signal); }, 0);
     return () => { clearTimeout(t); ac.abort(); };
@@ -451,7 +455,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      folded it there: an EFL Cup tie between two Premier League clubs in
      the EPL column, the Campeones Cup in both MLS and Liga MX
      (`tables.FOLDED_INTO_COLUMNS`). The Leagues board is LEAGUE fixtures
-     now; cup ties are reached from the Cups tab, on the cup's own page.
+     now; cup ties are drawn on the Cups tab, in the cup's own column.
 
      The test is structural, not a slug list: a row is a cup tie in a
      league column when the competition it IS (`league`) is none of the
@@ -460,24 +464,47 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      drops them — a narrowed cup route (`/ucl`, `/efl-cup`) is the cup's
      own page and keeps every row it was served. The backend payload is
      unchanged; this is which rows the page draws. */
-  const dropCupTies = !champ && !only;
+  const dropCupTies = !champ && !asked;
   const keepRow = (r: Parameters<typeof isFoldedCupTie>[0]) =>
     !dropCupTies || !isFoldedCupTie(r);
+  /* ON THE CUPS TAB A CUP TIE IS DRAWN IN ITS OWN CUP'S COLUMN. The
+     backend stamps a FOLDED cup's ties with the league columns it was
+     declared into, even when it is asked for by name: the Campeones Cup
+     rides in `mls` and `ligamx`. Neither column is on this tab, so without
+     this step the fixture would be on the payload and drawn nowhere. Only
+     a row whose own columns are all off this tab is moved. The payload is
+     unchanged; this decides which column the page draws the row in. */
+  const homeCupRow = <T extends Parameters<typeof isFoldedCupTie>[0]>(r: T): T =>
+    cups && CUP_BOARD_COLUMNS.includes(r.league)
+      && !columnsOf(r).some((c) => CUP_BOARD_COLUMNS.includes(c))
+      ? { ...r, column: r.league, columns: [r.league] } : r;
   const allRows = board?.rows ?? [];
-  const rows = champ ? allRows.map(venueAdjusted) : allRows.filter(keepRow);
+  const rows = champ ? allRows.map(venueAdjusted)
+    : allRows.filter(keepRow).map(homeCupRow);
   const cupTiesLeft = allRows.length - rows.length
     + (board?.refusals ?? []).filter((r) => !keepRow(r)).length;
   /* the menu's own case: every other option is lower-case words, and the
      backend serves the label as the card prints it ("ELO GAP") */
   const headlineLabel = (rows.find((r) => r.headline)?.headline?.label
     ?? "headline gap").toLowerCase();
-  const refusals = (board?.refusals ?? []).filter(keepRow);
-  const leaguesMap = board?.leagues ?? {};
+  const refusals = (board?.refusals ?? []).filter(keepRow).map(homeCupRow);
+  /* A CUP THE ASSEMBLY TOOK OFF `leagues` (no row in the window, or
+     folded into league columns) still has its meta under `folded`. On
+     the Cups tab, where every asked cup is a column, that meta is read
+     there so the header is the cup's own. */
+  const leaguesMap = cups
+    ? { ...(board?.folded ?? {}), ...(board?.leagues ?? {}) }
+    : board?.leagues ?? {};
 
   const reviewHere = reviewFor === mode ? review : null;
-  const finished = (reviewHere?.finished ?? []).filter(keepRow);
-  const finishedRefusals = (reviewHere?.refusals ?? []).filter(keepRow);
-  const reviewLeagues = reviewHere?.leagues ?? {};
+  const finished = (reviewHere?.finished ?? []).filter(keepRow).map(homeCupRow);
+  const finishedRefusals = (reviewHere?.refusals ?? []).filter(keepRow)
+    .map(homeCupRow);
+  /* The review's FOLDED cups were read (their meta is written before the
+     fetch), so on the Cups tab they count as read, under their own key. */
+  const reviewLeagues = cups
+    ? { ...(reviewHere?.folded ?? {}), ...(reviewHere?.leagues ?? {}) }
+    : reviewHere?.leagues ?? {};
   /* THE WHOLE-BOARD FAILURE, SCREENED. `restructure.spec.ts` already
      keeps the browser's raw vocabulary off this box ("a dead network
      renders a sentence, not the browser's raw string"); the backend's
@@ -589,7 +616,13 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      rendering nothing at all would read as broken, and the blocks below
      say what actually happened instead of letting the column's own empty
      state claim a fixture count nobody measured. */
-  const columnSlugs = only ? [...only] : boardColumns(declaredColumns);
+  /* THE CUPS TAB'S COLUMN SET IS EVERY CUP, continental then domestic
+     (Son, 2026-10-12: "make everything match perfectly") — the chooser
+     offers them all, as the Leagues tab's offers its eight. Which are
+     DRAWN by default is `shownSlugs` below. */
+  const columnSlugs = only ? [...only]
+    : cups ? [...CUP_COLUMNS]
+    : boardColumns(declaredColumns);
 
   /* ── WHICH LEAGUE THE PHONE IS LOOKING AT (operator, 2026-09-16) ────
 
@@ -637,9 +670,16 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      `columnSlugs`, which is why a stale selection can only ever shrink
      — it cannot reorder the board and cannot smuggle a slug back on. */
   const [shownRaw, setShown] = useState<readonly string[] | null>(null);
+  /* ON THE CUPS TAB THE DEFAULT SELECTION IS THE CUPS THE BOARD BUILDS.
+     The rest are undrawn chips in the chooser; choosing one draws its
+     column with a "not on the board yet" rest-day cell and asks for
+     nothing. */
+  const shownDefault = cups
+    ? columnSlugs.filter((s) => CUP_BOARD_COLUMNS.includes(s)) : null;
   const shownSlugs = (() => {
-    if (!shownRaw) return columnSlugs;
-    const want = new Set(shownRaw);
+    const chosen = shownRaw ?? shownDefault;
+    if (!chosen) return columnSlugs;
+    const want = new Set(chosen);
     const kept = columnSlugs.filter((s) => want.has(s));
     /* A SELECTION THAT NO LONGER NAMES A LIVE COLUMN IS NOT AN EMPTY
        BOARD. Every league it held could have left the declaration since
@@ -670,7 +710,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   /* DID THE BOARD ANSWER THE QUESTION THIS ROUTE ASKED IT? null while
      nothing has landed — an unanswered ask and an unmade one are not the
      same fact, and only a payload can tell them apart. */
-  const answered = board && only ? askHonoured(board, only) : null;
+  const answered = board && asked ? askHonoured(board, asked) : null;
   /* A NARROWED BOARD WHOSE ASK WENT UNANSWERED, over a competition the
      board does not declare. Not hypothetical twice over: the Champions
      League left `BOARD_COLUMNS` on 2026-09-09, and a backend deployed
@@ -681,8 +721,8 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      is the reading this tree exists to refuse.
      Empty while the board is still loading or after it failed: nothing
      is undeclared by a payload that never landed. */
-  const undeclared = board && only && answered === false
-    ? only.filter((s) => !declaredColumns.includes(s))
+  const undeclared = board && asked && answered === false
+    ? columnSlugs.filter((s) => !declaredColumns.includes(s))
     : [];
 
   /* WHAT LEFT THE BOARD, AND THE REASONS IT LEFT, DERIVED ONCE.
@@ -709,7 +749,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      than; `only` is the one signal that says otherwise, and it is a SET
      rather than a slug so the next narrowed board inherits this for
      free. */
-  const narrowedTo = only ? columnSlugs : null;
+  const narrowedTo = asked ? columnSlugs : null;
 
   /* ── THE FINISHED TAIL'S THREE STATES, DERIVED ONCE ────────────────
 
@@ -738,8 +778,8 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      blank, and an unexplained blank is what this surface refuses to
      leave. null while nothing has landed: an unanswered ask and an
      unmade one are not the same fact. */
-  const reviewAnswered = reviewHere && only && !champ
-    ? reviewAskHonoured(reviewHere, only) : null;
+  const reviewAnswered = reviewHere && asked && !champ
+    ? reviewAskHonoured(reviewHere, asked) : null;
 
   /* ── THE CROSS-LEAGUE FIELD, PER COLUMN THAT HAS ONE ────────────────
 
@@ -950,7 +990,9 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      describing the sort of a column nobody is drawing would be the
      heading naming a board other than the one on screen. Identical on
      the default board, where the two lists are the same. */
-  const runningSorts = drawnSlugs.map((sl) => columnSort(sl, boardSort));
+  /* The Cups tab's columns run the board's sort like league columns. */
+  const runningSorts = drawnSlugs.map((sl) =>
+    cups ? boardSort : columnSort(sl, boardSort));
   /** How many fixtures each declared column holds — the tab strip's
    *  accessible names, off the same `columnsOf` reader the columns
    *  themselves claim a row with, so a folded fixture counts for every
@@ -1372,7 +1414,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             {champ
               ? "Ranked by how far apart the two national teams sit on their competition's own field, home ground counted."
               : cups
-              ? "The cup competitions, each on its own page. A cup tie is read there, not in a league column."
+              ? "Ranked within each cup; a tie across two leagues shows tiers only."
               : soleOwnSort
               ? `Ranked by ${soleOwnSort.mode} — nearly every tie here pairs two different domestic tables, and the gap between them is withheld.`
               : "Ranked by how far apart the two clubs sit in their own league's table."}
@@ -1398,11 +1440,9 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
           )}
         </div>
 
-        {/* THE CUPS TAB (2026-10-12) replaces everything from here to the
-            legend: it is a list of cup pages, not a board, so the board's
-            provenance, watch panel, columns and legend have nothing to say
-            about it. Nothing below is fetched while it is shown. */}
-        {cups ? <CupsTab /> : (<>
+        {/* THE CUPS TAB (2026-10-12) IS THIS BOARD. Everything below is
+            the same for all three tabs: provenance, live strip, columns,
+            finished tails and legend. */}
         {cupTiesLeft > 0 && (
           <p data-testid="cup-ties-left"
             className="mt-3 text-center font-mono text-[10px] uppercase tracking-wide text-ink-faint">
@@ -1655,7 +1695,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   NAMED rather than silently empty — if a proxy, a cache
                   or a future caller ever puts a narrowed payload here,
                   the page says what it got instead of looking broken. */}
-              {!only && board && declaration === null && (
+              {!asked && board && declaration === null && (
                 <div data-testid="board-not-a-declaration"
                   className="mb-5 rounded-xl border border-live/30 bg-live/5 p-4">
                   <Eyebrow tone="live">this payload is an answer, not the board</Eyebrow>
@@ -1800,7 +1840,9 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   Derived from `narrowed_to`, so the sentence is the
                   BACKEND's answer rather than this page's assumption:
                   it appears only where the ask was actually honoured. */}
-              {answered === true && (
+              {/* NOT ON THE CUPS TAB: there the ask is the tab's own and
+                  its link would point at the page the reader is on. */}
+              {answered === true && !cups && (
                 <p data-testid="board-narrowed"
                   data-narrowed-to={(board?.narrowed_to ?? []).join(",")}
                   className="mb-5 border-l-2 border-line-strong pl-3.5 text-[12.5px] leading-relaxed text-ink-low">
@@ -2044,6 +2086,9 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                        about the page. */
                     tabPanel={showTabs && slug === picked}
                     meta={leaguesMap[slug]}
+                    tabParity={cups}
+                    placeholder={cups ? cupPlaceholder(slug) : null}
+                    noTail={cups && !CUP_BOARD_COLUMNS.includes(slug)}
                     rows={rows.filter((r) => columnsOf(r).includes(slug))}
                     refusals={refusals.filter((r) => columnsOf(r).includes(slug))}
                     review={{
@@ -2054,7 +2099,8 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                       /* WAS THIS COMPETITION READ AT ALL? Off the
                          payload's own record, never inferred from an
                          empty row list. */
-                      read: readHere(reviewHere, slug),
+                      read: readHere(reviewHere, slug)
+                        || (cups && !!reviewHere?.folded?.[slug]),
                       /* …and when it was not, why — if the page knows.
                          It knows exactly one reason: it asked and the
                          server did not answer the question. */
@@ -2388,8 +2434,6 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             </div>
           </dl>
         </Collapse>
-        </>
-        )}
 
         <footer className="mt-16 border-t border-line pt-6 font-mono text-[11px] leading-relaxed text-ink-faint">
           Research surface. The picker ranks and annotates; it sets no
