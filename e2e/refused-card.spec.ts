@@ -757,9 +757,9 @@ test("the measured cells are FILLED: kickoff, both clubs, both form strips, "
     await expect(gp).toHaveAttribute("data-away-gp", "6");
 
     // the market line, in the same cell a ranked card uses
-    await expect(c).toContainText("ask 71¢");
-    await expect(c).toContainText("spread 5¢");
-    await expect(c).toContainText("size 90");
+    await expect(c.getByTestId("mm-why-market")).toHaveAttribute("title", /ask 71¢/);
+    await expect(c.getByTestId("mm-why-market")).toHaveAttribute("title", /spread 5¢/);
+    await expect(c.getByTestId("mm-why-market")).toHaveAttribute("title", /size 90\b/);
 
     // and the watch control, which the stub never had
     await expect(c.getByTestId("watch-toggle")).toHaveCount(1);
@@ -874,8 +874,10 @@ test("a board that predates the contract names every absence, and renders "
     await expect(c.getByTestId("refused-admission")).toHaveCount(0);
     expect(await c.innerText(), "a card with no admission block must not "
       + "print a countdown it was never sent").not.toMatch(/to go|rated at/i);
-    await expect(c.getByTestId("refused-no-market"))
-      .toContainText(/did not say whether Kalshi lists/i);
+    // the market row says so on its reason's hover — the same table a
+    // ranked card draws (AGENTS.md §8.5), never a sentence in its place
+    await expect(c.getByTestId("mm-why-market"))
+      .toHaveAttribute("title", /did not say whether Kalshi lists/i);
     // an absent form strip is simply not drawn — a strip of five empty
     // slots would be a club with five unplayed games
     await expect(c.getByTestId("form-strip")).toHaveCount(0);
@@ -1023,9 +1025,9 @@ test("a null kalshi block is a DIFFERENT silence from an absent one",
        market at all. Printing the first over the second would be this
        card making a claim on the backend's behalf. */
     await open(page, [{ ...FULL, kalshi: null }]);
-    await expect(refused(page)).toContainText("no kalshi event");
-    await expect(refused(page).getByTestId("refused-no-market"))
-      .toHaveCount(0);
+    const why = refused(page).getByTestId("mm-why-market");
+    await expect(why).toHaveAttribute("title", /no Kalshi event/);
+    await expect(why).not.toHaveAttribute("title", /did not say whether Kalshi lists/i);
   });
 
 // ──────────────────────────────── 5. the placement does not change ────

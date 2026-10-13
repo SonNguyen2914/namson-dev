@@ -282,29 +282,18 @@ test("the four tiers it is rated on are NAMED, never printed as slugs",
 
 // ══ 4. A WITHHELD FIGURE IS NAMED, NEVER A ZERO AND NEVER A BLANK ════
 
-test("the gaps a field does not make subtractable are NAMED, never zero "
-  + "and never a bare dash", async ({ page }) => {
-    /* RESTATED 2026-09-16, AND THE RULE IS UNCHANGED. This ran over the
-       column's REFUSED cards, asserting `refused-cell` prints the word
-       and nothing renders as a dash. The EFL Cup serves no refusal today
-       — the field landed and its cross-tier ties rate — so the same rule
-       is asserted where it is now live: on a RATED cross-tier card,
-       whose comparison gaps are still withheld because a shared scale
-       for a FAVOURITE is not a shared scale for a SUBTRACTION. 2.0 ppg
-       in League Two is not 2.0 ppg in the Premier League, `gap_note`
-       says so on the wire, and `ppg_gap`/`gdg_gap`/`rank_gap` are null.
-
-       The refused CARD itself is proven against its own recorded
-       payloads in refused-card.spec.ts and one-fixture-two-columns
-       .spec.ts, which is where that component's guard belongs — a second
-       copy of it here was a second copy of a guard.
-
-       AND NEVER A ZERO-SHAPED TEST EITHER. An earlier version of this
-       banned "0.00" anywhere on the card and failed against the real
-       payload, because Coventry City genuinely have 0.00 ppg: four
-       games, no points. A measured zero and a withheld figure are
-       exactly the two things this rule exists to keep apart, so a guard
-       that cannot tell them apart is the rule's own mistake. */
+test("the gaps a field does not make subtractable are withheld as \"—\" with "
+  + "the reason on hover, never a zero", async ({ page }) => {
+    /* RESTATED 2026-10-13 FOR THE ONE-CARD RULE (AGENTS.md §8.3, Son):
+       the league card's stats line is `#a v #b · ppg · rank · gp · h2h`,
+       and "a field that cannot be computed for this tie shows — in its
+       slot" — never "n/a · x v y". Before that this test banned the dash
+       and required "ppg n/a"; Son reversed it. What it still guards is
+       the half that did not change: a withheld gap is NAMED (its hover
+       says it was withheld, with each club's own figure), and it is never
+       drawn as a zero, which would read as two clubs measured level.
+       Coventry City genuinely have 0.00 ppg, so the zero ban is on the
+       withheld SLOT, not on the card. */
     const rows = RECORDED.rows as readonly Record<string, unknown>[];
     const withheld = rows.filter((r) =>
       r.ppg_gap === null && r.gdg_gap === null && r.rank_gap === null);
@@ -314,35 +303,15 @@ test("the gaps a field does not make subtractable are NAMED, never zero "
 
     await open(page);
     const c = col(page);
-    const cards = c.getByTestId("picker-row");
-    await expect(cards.first()).toBeVisible();
-    for (let i = 0; i < await cards.count(); i += 1) {
-      const text = await cards.nth(i).innerText();
-      /* THE EM DASH IS HOW AN ABSENCE HIDES — it occupies the slot a
-         number would and claims nothing, which is how a reader comes to
-         think something was measured. */
-      expect(text, "an absence rendered as a bare dash").not.toContain("—");
+    const card = c.locator(`[data-testid="picker-row"][data-event="${withheld[0].event_id}"]`);
+    await expect(card).toBeVisible();
+    for (const slot of ["stat-ppg", "stat-rank"]) {
+      const el = card.getByTestId(slot);
+      await expect(el).toHaveText(/—$/);
+      await expect(el).toHaveAttribute("title", /withheld/);
+      await expect(el).not.toHaveText(/0\.00|[+−-]0\b/);
     }
-    /* NON-VACUOUS: the named-absence path has to be LIVE on this
-       payload, or the assertion above is satisfied by a card that simply
-       has every figure. `n/a` is the card's own word for a gap that was
-       REFUSED rather than missed — it is the vocabulary a cross-league
-       UCL row already uses, it sits beside each club's OWN figure
-       ("ppg n/a · 2.32 v 1.36"), and `gap_note` in the i says why. Read
-       off the rendering rather than guessed at: three gaps, three
-       named absences. */
-    const colText = await c.innerText();
-    expect(colText).toMatch(/n\/a|withheld|not stated|no rank/i);
-    for (const axis of ["ppg", "GD/g", "rank"]) {
-      expect(colText, `the withheld ${axis} gap is not NAMED`)
-        .toContain(`${axis} n/a`);
-    }
-    /* AND NOT AS A ZERO. A withheld gap rendered 0.00 reads as two
-       clubs that measured level, which is a claim nobody made. */
-    for (const axis of ["ppg", "GD/g", "rank"]) {
-      expect(colText).not.toContain(`${axis} 0.00`);
-      expect(colText).not.toContain(`${axis} +0.00`);
-    }
+    await expect(card).not.toContainText("n/a");
   });
 
 test("the column carries the FIELD its favourites are read off",

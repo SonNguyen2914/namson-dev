@@ -73,7 +73,11 @@ async function geometry(page: Page, card: Locator) {
       labels: [lab(trio.querySelector("[data-tier] > span")),
                lab(box?.querySelector("[data-rank-axis] > span") ?? null)],
       place: box?.getAttribute("data-place") ?? null,
-      prose: !!box?.querySelector('[data-testid="field-axes-absent"]'),
+      /* the box is taller than the row BY DESIGN when it carries more
+         than the ranks: the absent-axes sentence, or — since the one-card
+         rule (AGENTS.md §8.4) — the ± figures and the card's context
+         lines the face no longer draws. Its label row still lines up. */
+      prose: !!box?.querySelector('[data-testid="field-axes-absent"], [data-measure], [data-testid="card-context"]'),
       btn: r(btn), trio: r(trio), chip: r(chip), box: r(box), row: r(row),
       price: r(price), card: r(el),
       hitIsButton: hit === btn || btn.contains(hit),

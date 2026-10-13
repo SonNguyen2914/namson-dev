@@ -153,7 +153,7 @@ test.describe("the Cups tab is the board (2026-10-12)", () => {
       const head = page.locator('[data-testid="col-head"][data-league="ucl"]');
       await expect(head.getByTestId("col-notes-open")).toHaveAttribute("data-notes", /basis/);
       await head.getByTestId("col-notes-open").click();
-      await expect(head.getByTestId("basis-note")).toContainText("Premier League + La Liga");
+      await expect(head.getByTestId("basis-note")).toContainText("Premier League + La Liga + Bundesliga");
     });
 
   test("a finished cup says 'season over' on the rest-day cell, as a league says rest day",
@@ -189,10 +189,7 @@ test.describe("the Cups tab is the board (2026-10-12)", () => {
 
   test("every cup card opens a page that exists, or says it has none", async ({ page }) => {
     await openCups(page);
-    await page.locator('[data-testid="league-col"][data-league="ucl"]')
-      .getByTestId("review-toggle").click();
-    await page.waitForSelector('[data-testid="review-row"]', { state: "attached" });
-    const cards = page.locator('[data-testid="picker-row"], [data-testid="review-row"]');
+    const cards = page.locator('[data-testid="picker-row"]');
     expect(await cards.count()).toBeGreaterThan(0);
     const seen = await cards.evaluateAll((els) => els.map((e) => ({
       href: e.querySelector("a[href]")?.getAttribute("href") ?? null,

@@ -2327,7 +2327,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
               </dd>
             </div>
             <div>
-              <dt className="text-ink-hi">n/a · cross-league</dt>
+              <dt className="text-ink-hi">— · cross-league</dt>
               <dd className="mt-1">
                 The Leagues Cup has no table of its own, so each club is
                 rated on its own domestic league&apos;s. When the two clubs

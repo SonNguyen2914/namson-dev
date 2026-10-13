@@ -1,101 +1,61 @@
-/* THE CUPS TAB'S BOARD, COMPOSED FROM RECORDINGS. Nothing here was
- * fetched for this file, and no production route was called.
+/* THE CUPS TAB'S BOARD — RECORDINGS ONLY, no relabelled league rows
+ * (AGENTS.md §8; the Oct 12 version of this file relabelled EPL rows as
+ * UCL and so never exercised the cross-league card).
  *
- * The Cups tab asks `GET /api/picker/board?leagues=ucl,leaguescup,
- * campeones,eflcup` (and the same on /api/picker/review). No recording of
- * that exact ask exists, and taking one would freeze snapshot rows in
- * production (e2e/board-holdout.mjs). So the payload is assembled from
- * the recordings this repo already holds, each used for what it really is:
+ *   - ucl: e2e/cups-recorded.ts, the real in-process assembly of the
+ *     Cups tab's own ask — cross-league ties (Lens v Sporting CP, Sabah FK
+ *     v Slavia Prague, …) with their field, league gap, h2h and book.
+ *     Its `folded` (eflcup, leaguescup, campeones) is the wire's.
+ *   - eflcup: the one row of e2e/efl-cup-recorded.ts, verbatim except its
+ *     kickoff, moved from 2026-09-17T18:30Z to 2026-10-14T18:30Z so it
+ *     sits in the same window.
+ *   - campeones: the refusal of e2e/campeones-board.ts, verbatim except
+ *     its kickoff, moved to 2026-10-15T00:00Z for the same reason. It
+ *     keeps the wire's `columns: ["mls","ligamx"]` — the stamp the Cups
+ *     tab has to undo.
  *
- *   - eflcup: e2e/efl-cup-recorded.ts, verbatim (rows, meta, field notes).
- *     A real cross-tier cup card.
- *   - campeones: e2e/campeones-board.ts. Its one refusal and its `folded`
- *     meta are verbatim, with the wire's `columns: ["mls","ligamx"]`. That
- *     stamp is the fold the Cups tab has to undo. The kickoff is put back
- *     to the real 2026-09-17T00:00Z, which that file moved to December.
- *   - leaguescup: the competition is finished, so it is under `folded`
- *     with no fixture. That is how the backend answers a cup with no row
- *     in the window ("drop a cup column nobody lands in").
- *   - ucl: STAND-IN ROWS. These are the recorded EPL and La Liga rows of
- *     e2e/eight-columns.ts relabelled `league: "ucl"`, so the column draws
- *     full cards (model and market lines, tiers, form). The club names
- *     are therefore league fixtures. Assertions here must never read a
- *     club name as a Champions League tie.
- *
- * The clock is BOARD_EIGHT's own `generated_at` (CUPS_CLOCK), which puts
- * every kickoff inside the 8-day window. */
+ * The clock is the recording's morning, so every kickoff is ahead. */
 import type { Page } from "@playwright/test";
 import { BOARD_EIGHT, REVIEW_EIGHT } from "./eight-columns";
 import { RECORDED as EFL } from "./efl-cup-recorded";
 import { CAMPEONES_BOARD } from "./campeones-board";
+import { CUPS_RECORDED, CUPS_RECORDED_CLOCK } from "./cups-recorded";
 
 export const CUPS_ASK = ["ucl", "leaguescup", "campeones", "eflcup"];
-export const CUPS_CLOCK = "2026-09-15T12:00:00Z";
+export const CUPS_CLOCK = CUPS_RECORDED_CLOCK;
 
 type Obj = Record<string, unknown>;
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x)) as T;
 
-const asUcl = (r: Obj): Obj => ({
-  ...r, league: "ucl", column: "ucl", columns: ["ucl"],
-  event_id: `ucl-${String(r.event_id)}`,
-});
-
 function build(): Obj {
-  const eight = clone(BOARD_EIGHT) as unknown as Obj;
+  const b = clone(CUPS_RECORDED) as unknown as Obj;
   const efl = clone(EFL) as unknown as Obj;
   const camp = clone(CAMPEONES_BOARD) as unknown as Obj;
-  const eightRows = eight.rows as Obj[];
-  const uclRows = eightRows
-    .filter((r) => r.league === "epl" || r.league === "laliga")
-    .map(asUcl);
+  const eflRows = (efl.rows as Obj[]).map((r) => ({ ...r, kickoff: "2026-10-14T18:30Z" }));
   const campRefusals = (camp.refusals as Obj[])
     .filter((r) => r.league === "campeones")
-    .map((r) => ({ ...r, kickoff: "2026-09-17T00:00Z" }));
-  const campFolded = (camp.folded as Obj).campeones as Obj;
-  const eflMeta = (efl.leagues as Obj).eflcup as Obj;
+    .map((r) => ({ ...r, kickoff: "2026-10-15T00:00Z" }));
   return {
-    generated_at: "2026-09-15T11:32:12.122555+00:00",
-    date: "20260915",
-    days: 8,
-    leagues: {
-      ucl: { src: "prior", min_current_gp: 4, clubs: 36, kind: "cup",
-             rated_on: ["epl", "laliga"] },
-      eflcup: eflMeta,
-    },
-    rows: [...uclRows, ...(efl.rows as Obj[])],
-    refusals: [...campRefusals, ...((efl.refusals as Obj[]) ?? [])],
-    off_board: efl.off_board ?? [],
-    off_board_counts: efl.off_board_counts ?? {},
-    folded: {
-      campeones: { ...campFolded, fixtures: 0, refusals: 1, off_board: 0 },
-      leaguescup: { src: "current", min_current_gp: 20, clubs: 36,
-                    kind: "cup", rated_on: ["mls", "ligamx"],
-                    folded_into: [], fixtures: 0, refusals: 0,
-                    off_board: 0 },
-    },
-    field_unit_notes: efl.field_unit_notes,
-    field_floor_note: efl.field_floor_note,
-    narrowed_to: CUPS_ASK,
+    ...b,
+    rows: [...(b.rows as Obj[]), ...eflRows],
+    refusals: [...(b.refusals as Obj[]), ...campRefusals],
   };
 }
 
 export const CUPS_BOARD = build();
 
-/** The finished tail: two recorded EPL/La Liga finished rows as UCL
- *  stand-ins, the other cups read with nothing finished. */
+/** The finished tail: every cup read, nothing finished in the window —
+ *  an honest empty read rather than relabelled league results. */
 function buildReview(): Obj {
   const rv = clone(REVIEW_EIGHT) as unknown as Obj;
-  const fin = (rv.finished as Obj[])
-    .filter((r) => r.league === "epl" || r.league === "laliga")
-    .map(asUcl);
-  const read = (n: number) => ({ finished: n, captured: 0, reconstructed: 0,
-    unavailable: n, error: null, captured_by_lead_band: {}, corrected: 0,
+  const read = () => ({ finished: 0, captured: 0, reconstructed: 0,
+    unavailable: 0, error: null, captured_by_lead_band: {}, corrected: 0,
     kind: "cup" });
   return {
     ...rv,
-    leagues: { ucl: read(fin.length), leaguescup: read(0), eflcup: read(0) },
-    folded: { campeones: { ...read(0), folded_into: ["ligamx", "mls"] } },
-    finished: fin,
+    leagues: { ucl: read(), leaguescup: read(), eflcup: read() },
+    folded: { campeones: { ...read(), folded_into: ["ligamx", "mls"] } },
+    finished: [],
     refusals: [],
     narrowed_to: CUPS_ASK,
   };

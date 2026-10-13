@@ -511,12 +511,12 @@ test("a cross-league UCL row anchors on the two clubs' own-league GD/g, "
     // the label names both halves — what the two numbers are, and the
     // one thing done to them — and it never says "gap"
     const key = clean.getByTestId("anchor-key");
-    await expect(key).toContainText("own-league GD/g");
-    await expect(key).toContainText("differenced");
+    /* ONE SHORT LABEL LINE (AGENTS.md §8.2); the long name and the
+       backend's own basis ride its hover */
+    await expect(key).toHaveText("own GD/g");
     expect(await key.textContent()).not.toContain("gap");
-    // and the backend's own basis rides it, so a reader who wonders
-    // what this is gets told what it is NOT
-    await expect(key).toHaveAttribute("title", OWN_GDG_BASIS);
+    await expect(key).toHaveAttribute("title",
+      `own-league GD/g, differenced — ${OWN_GDG_BASIS}`);
 
     // the tier gap it replaced is still on the card, in the Stage-2 row
     // where it belongs — replaced as the ANCHOR, not deleted
@@ -559,23 +559,20 @@ test("the withheld gaps keep saying so, and each club's OWN rate is drawn "
     await openWide(page);
     const clean = col(page, "ucl").getByTestId("picker-row")
       .filter({ hasText: "Real Madrid" });
-    await expect(clean).toContainText(/GD\/g\s*n\/a/);
-    await expect(clean).toContainText(/ppg\s*n\/a/);
-    await expect(clean).toContainText(/rank\s*n\/a/);
-    for (const [metric, [fav, opp]] of
-         [["gdg", RATES.gdg], ["ppg", RATES.ppg]] as const) {
-      const own = clean.locator(`[data-metric="${metric}"]`);
-      await expect(own).toHaveCount(1);
-      // favourite first, opponent second — the order the ranks pair
-      // beside it already uses
-      await expect(own).toHaveText(
-        new RegExp(`${fav.toFixed(2)}\\s*v\\s*${opp.toFixed(2)}`));
-    }
-    // a MEASURED gap is not decorated with the pair: on a same-league
-    // row the gap is the content, and repeating its inputs is noise
+    // AGENTS.md §8.3: the league line has no GD/g slot; the withheld gaps read "—"
+    await expect(clean.getByTestId("stat-ppg")).toHaveText(/ppg\s*—/);
+    await expect(clean.getByTestId("stat-rank")).toHaveText(/rank\s*—/);
+    /* EACH CLUB'S OWN RATE, on the withheld slot's hover since the
+       one-card rule (AGENTS.md §8.3: "per-side values go into the
+       tooltip"), favourite first — the ranks pair's order. */
+    const [fav, opp] = RATES.ppg;
+    await expect(clean.getByTestId("stat-ppg")).toHaveAttribute("title",
+      new RegExp(`Real Madrid ${fav.toFixed(2)}, .+ ${opp.toFixed(2)}`));
+    // a MEASURED gap carries no such hover: on a same-league row the gap
+    // is the content, and repeating its inputs is noise
     const same = col(page, "ucl").getByTestId("picker-row")
       .filter({ hasText: "Arsenal" });
-    await expect(same.locator("[data-metric]")).toHaveCount(0);
+    await expect(same.getByTestId("stat-ppg")).not.toHaveAttribute("title", /.+/);
   });
 
 test("a same-league row's own-GD/g difference IS its GD/g gap",
@@ -847,9 +844,9 @@ test("the Champions League column states its withheld gaps ONCE, in the "
     await expect(ucl.getByTestId("gap-note")).toHaveCount(0);
     // the refusal itself is untouched — this is the whole point
     const first = ucl.getByTestId("picker-row").first();
-    await expect(first).toContainText(/GD\/g\s*n\/a/);
-    await expect(first).toContainText(/ppg\s*n\/a/);
-    await expect(first).toContainText(/rank\s*n\/a/);
+    // AGENTS.md §8.3: the league line has no GD/g slot; the withheld gaps read "—"
+    await expect(first.getByTestId("stat-ppg")).toHaveText(/ppg\s*—/);
+    await expect(first.getByTestId("stat-rank")).toHaveText(/rank\s*—/);
 
     // ONE circle, in the header's chip row beside the season basis
     const trigger = colHead(page, "ucl").getByTestId("col-notes-open");
