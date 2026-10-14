@@ -239,9 +239,28 @@ export const PROXY_TIMEOUT_BY_ROUTE: Readonly<Record<string, number>> = {
   "championships/review": 45_000,
 };
 
+/** THE SAME BUDGET FOR EVERY COMPETITION'S FIXTURE LIST (2026-10-14).
+ *  `comp/{key}/fixtures` is an open set of keys, so it cannot be spelled
+ *  in the table above and is matched by COMP_KEY instead.
+ *
+ *  Production's HTTP log shows `/api/comp/ucl/fixtures` closed by this
+ *  proxy at 15.0s on 2026-10-14 04:08Z — the Champions League page and
+ *  its rail chip, failed on a cold load. That list rebuilds on the
+ *  request path past its own cache (300s near a kickoff) and, before
+ *  TRIVELA's fix that day, took 48s cold in-process with live providers
+ *  (the ClubElo table read waited out a host that accepted no
+ *  connection; open-meteo was read one fixture at a time); 6-8s after
+ *  it. Still a provider-bound rebuild, so it gets the boards' 45s under
+ *  the same 60s `maxDuration` (set in pages/api/comp/[...path].ts).
+ *  Every other comp resource measured under 1s cold and keeps 15s. */
+export const COMP_FIXTURES_TIMEOUT_MS = 45_000;
+
 /** How long the proxy waits on `route` (`<prefix>/<sub-path>`). */
 export const proxyTimeoutMs = (route: string): number =>
-  PROXY_TIMEOUT_BY_ROUTE[route] ?? PROXY_TIMEOUT_MS;
+  PROXY_TIMEOUT_BY_ROUTE[route]
+  // built here, not at module load: COMP_KEY is declared further down
+  ?? (new RegExp(`^comp/${COMP_KEY}/fixtures$`).test(route)
+    ? COMP_FIXTURES_TIMEOUT_MS : PROXY_TIMEOUT_MS);
 
 const isTimeout = (err: unknown) =>
   err instanceof Error

@@ -4,6 +4,11 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { proxyLeague } from "../../../lib/suggesterProxy";
 
+/** Room for the fixture list's 45s proxy clock (COMP_FIXTURES_TIMEOUT_MS
+ *  in lib/suggesterProxy.ts). 60s is the most every Vercel plan allows
+ *  without Fluid compute, so this cannot be refused on any of them. */
+export const config = { maxDuration: 60 };
+
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   // THE PATTERN MOVED to lib/suggesterProxy.ts (COMP_RESOURCES and
   // LEAGUE_PROXY_ID_ROUTES.comp) on 2026-09-07, and the move IS the

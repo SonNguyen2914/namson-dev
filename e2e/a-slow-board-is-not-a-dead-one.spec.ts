@@ -71,6 +71,19 @@ test.describe("the proxy's clock, per route", () => {
       expect(took).toBeGreaterThanOrEqual(19_000);
     });
 
+  test("a competition fixture list that takes 20s is answered, not timed out",
+    async ({ request }) => {
+      test.setTimeout(60_000);
+      const started = Date.now();
+      const r = await request.get(
+        "/api/comp/ucl/fixtures?days=3&__standin_delay_ms=20000",
+        { timeout: 50_000 });
+      const took = Date.now() - started;
+      expect(r.status(), await r.text()).toBe(200);
+      expect((await r.json()).delayed_ms).toBe(20_000);
+      expect(took).toBeGreaterThanOrEqual(19_000);
+    });
+
   test("every other route still stops waiting at 15s", async ({ request }) => {
     test.setTimeout(60_000);
     const started = Date.now();
@@ -85,7 +98,7 @@ test.describe("the proxy's clock, per route", () => {
     expect(took).toBeLessThan(19_000);
   });
 
-  test("the table gives 45s to the two boards and their finished tails, 15s to everything else",
+  test("the table gives 45s to the two boards, their finished tails and every comp fixture list, 15s to everything else",
     () => {
       // Read through the namespace so this file still loads — and this
       // test fails by name — on a tree that has no table.
@@ -97,8 +110,15 @@ test.describe("the proxy's clock, per route", () => {
       expect(at("picker/board")).toBe(45_000);
       expect(at("picker/review")).toBe(45_000);
       expect(at("championships/review")).toBe(45_000);
+      // every competition's fixture list, by key (2026-10-14: prod cut
+      // comp/ucl/fixtures at 15s on a cold load)
+      for (const key of ["ucl", "leagues-cup", "asean", "eflcup"]) {
+        expect(at(`comp/${key}/fixtures`), key).toBe(45_000);
+      }
       for (const other of ["mls/scoreboard", "epl/schedule",
-                           "comp/ucl/fixtures", "hunter/findings"]) {
+                           "comp/ucl/markets", "comp/ucl/match/401915417",
+                           "comp/ucl/fixtures/x", "comp/UCL/fixtures",
+                           "hunter/findings"]) {
         expect(at(other), other).toBe(proxyLib.PROXY_TIMEOUT_MS);
       }
       expect(proxyLib.PROXY_TIMEOUT_MS).toBe(15_000);
