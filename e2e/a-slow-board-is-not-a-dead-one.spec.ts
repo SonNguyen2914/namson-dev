@@ -85,7 +85,7 @@ test.describe("the proxy's clock, per route", () => {
     expect(took).toBeLessThan(19_000);
   });
 
-  test("the table gives 45s to the two boards and 15s to everything else",
+  test("the table gives 45s to the two boards and their finished tails, 15s to everything else",
     () => {
       // Read through the namespace so this file still loads — and this
       // test fails by name — on a tree that has no table.
@@ -95,7 +95,9 @@ test.describe("the proxy's clock, per route", () => {
       if (!at) return;
       expect(at("championships/board")).toBe(45_000);
       expect(at("picker/board")).toBe(45_000);
-      for (const other of ["picker/review", "mls/scoreboard", "epl/schedule",
+      expect(at("picker/review")).toBe(45_000);
+      expect(at("championships/review")).toBe(45_000);
+      for (const other of ["mls/scoreboard", "epl/schedule",
                            "comp/ucl/fixtures", "hunter/findings"]) {
         expect(at(other), other).toBe(proxyLib.PROXY_TIMEOUT_MS);
       }
