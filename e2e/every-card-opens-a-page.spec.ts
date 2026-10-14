@@ -122,7 +122,12 @@ test("every card on every recorded board opens a page that exists, or says it ha
       if (res.status() !== 200) dead.push(`${res.status()} ${href} (from ${from})`);
     }
     expect(dead, "links into pages that do not exist").toEqual([]);
-    // non-vacuity: the recordings hold hub leagues, hub-less ones and nations
+    // non-vacuity: the recordings hold leagues, cups and nations
     expect(leagues.size).toBeGreaterThan(8);
-    expect(unlinked).toBeGreaterThan(0);
+    // EVERY COMPETITION HAS A HUB SINCE 2026-10-13 (Son: "all matches
+    // should have a match hub"): the Campeones Cup board, the last one
+    // whose cards had no page, now links too — e2e/every-card-opens-a-hub
+    // .spec.ts holds every card on all three tabs to a hub. An unlinked
+    // card here is a regression.
+    expect(unlinked).toBe(0);
   });

@@ -22,6 +22,7 @@
 // price against.
 import type { HubCfg } from "../components/MatchHub";
 import { LEAGUE_LABEL } from "./pickerApi";
+import { ALL_CUPS } from "./cupsTab";
 
 /** Each slug's hue is the board's own (styles/globals.css `--lg-<slug>`),
  *  copied as hex because the hub derives rgba tints from it. */
@@ -91,6 +92,91 @@ export function noModelHubCfg(slug: NoModelHub): HubCfg {
     ...(board === "nations"
       ? { scoutingNote: "display only — never measured for national teams" }
       : {}),
+    footer:
+      "live data + real exchange prices · no shadow model · trader's " +
+      "model where served · a read, not a signal · shadow · not advice",
+  };
+}
+
+// ---------------------------------------------------------------- the cups
+//
+// EVERY CUP MATCH HAS A HUB (Son, 2026-10-13: "all matches should have a
+// match hub, currently cups matches don't have it"). The 22 cups of the Cups
+// tab (lib/cupsTab.ts, the backend's `tables.CUPS_TAB`) read the SAME
+// generic per-match route as the seven above, keyed by the registry slug
+// the card carries, and render through the SAME MatchHub — one hub
+// template, as one card template (AGENTS.md §8). Only words and the hue
+// differ; no section is added or removed for a cup.
+//
+// The backend names each cup's model position in `model_refusal`: the
+// continental cups carry the trader's PAPER-ONLY cup model on the trader's
+// model line (labelled untested, "cups: paper only"); the MLS–Liga MX cups'
+// pool failed its test; the super cups and domestic cups have no model, and
+// the refusal says why.
+/** A cup's hue as hex, for the hub's rgba tints: the board's own
+ *  `--lg-<slug>` where the cup has one (styles/globals.css), else
+ *  `--lg-cup`, which is what `hueOf` answers for it. */
+const CUP_HEX: Record<string, string> = {
+  ucl: "#f174cc", uel: "#2eac1e", eflcup: "#0e9cfb",
+};
+const LG_CUP_HEX = "#f5c542";
+
+export const CUP_HUB_KEYS: readonly string[] = ALL_CUPS.map((c) => c.key);
+
+export function cupHubCfg(key: string): HubCfg {
+  const cup = ALL_CUPS.find((c) => c.key === key);
+  if (!cup) throw new Error(`no cup ${key}`);
+  const hex = CUP_HEX[key] ?? LG_CUP_HEX;
+  const tag = cup.name;
+  return {
+    ...noModelBase(tag, hex),
+    boardQuery: key,
+    api: `/api/comp/${key}`,
+    tag,
+    boardLabel: "cups board",
+    back: { href: "/bet-suggester", label: "cups board" },
+    version: "no shadow model",
+    howTheyPlayNote:
+      `no fitted ratings exist for ${tag} itself; each side is rated on ` +
+      "its own league's table, and the board card's tiers say how",
+  };
+}
+
+/** The shared no-model words, parameterised by the competition's name. */
+function noModelBase(tag: string, hex: string) {
+  const empty =
+    "no shadow model for this competition, and no trader's read of this match";
+  return {
+    accentVars: {
+      "--accent": hex,
+      "--accent-dim": rgba(hex, 0.35),
+      "--accent-faint": rgba(hex, 0.10),
+      "--accent-ambient": rgba(hex, 0.07),
+    } as React.CSSProperties,
+    accentHex: hex,
+    chip: () => "no shadow model · shadow · not advice",
+    temporal: false,
+    marketFootnote:
+      `raw exchange prices · no shadow model is fitted for ${tag}; the ` +
+      `trader's model, where shown, is the trading agent's own ` +
+      `experimental pre-match read · a read, not a signal · shadow · ` +
+      `not advice`,
+    modelEmptyText: empty,
+    likelihoodTooltip: `empty — no model is fitted for ${tag}`,
+    netEdgeTooltip:
+      "empty — there is no model probability to set against a price",
+    tableFootnote:
+      `likelihood is “—” on every row: no model is fitted for ${tag}, ` +
+      "so only the exchange's own prices render · a read, not a signal " +
+      "· shadow · not advice",
+    lineups: {
+      title: "lineups",
+      rich: false,
+      fetchedLine: "not an input to any model",
+      darkRunText: "no model exists for this competition",
+      footnote: () =>
+        "xi from espn · context only — no model reads lineups here",
+    },
     footer:
       "live data + real exchange prices · no shadow model · trader's " +
       "model where served · a read, not a signal · shadow · not advice",

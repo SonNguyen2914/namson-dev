@@ -41,6 +41,7 @@ import SuggestionCard from "./SuggestionCard";
 import RatingsBlock from "./RatingsBlock";
 import ErrorBoundary from "./ErrorBoundary";
 import HubTeamNews from "./HubTeamNews";
+import { sofascoreIdFor, sofascoreMomentumUrl } from "../lib/sofascore";
 import {
   ARCHIVE_READ_UNKNOWN, ARCHIVE_READ_WORDS, FAMILY_REASON_ORDER,
   FAMILY_REASON_WORDS, VENUE_BASIS_WORDS, VENUE_CLASSES, VENUE_GAP_WORDS,
@@ -146,7 +147,10 @@ type BookMeta = { status?: string | null; means?: string | null;
   families_not_read_because?: string | null;
   /** the competition's listed series that are NOT a market on one match
    *  (season and stage outrights), named in the backend's words */
-  other_series?: unknown };
+  other_series?: unknown;
+  /** WHAT THE GAME LEGS SETTLE ON, in the backend's words (a cup's legs
+   *  settle on regulation time — `tables.CUPS[...].reg_time_note`) */
+  settles_on?: string | null };
 /** The backend's prose names a payload key in backticks; the reader gets
  *  words, never the key. */
 const plainWords = (t: string) =>
@@ -676,6 +680,11 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
             <Guard name="live ratings" k={fetchedAt}>
             {live && eventId && <RatingsBlock eventId={eventId} />}
             </Guard>
+            {/* Sofascore's own momentum widget — only for a fixture whose
+                Sofascore id was supplied by hand (lib/sofascore.ts) */}
+            <Guard name="sofascore momentum" k={fetchedAt}>
+            {eventId && <SofascoreMomentum hubKey={cfg.boardQuery} eventId={eventId} />}
+            </Guard>
 
             {/* ===== the suggestion card — every layer present or
                 refusing by name (card-v1) ===== */}
@@ -821,6 +830,23 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                     </p>
                   )}
                   <OtherSeries list={bookMeta?.other_series} />
+                  {/* WHAT THE WINNER LEGS SETTLE ON, when the backend
+                      states it — every hub, any competition. A cup's legs
+                      settle on 90 minutes plus stoppage, so a level score
+                      after ninety is the Tie leg and says nothing about
+                      who goes through. */}
+                  {typeof bookMeta?.settles_on === "string" && bookMeta.settles_on && (
+                    <details data-testid="settles-on" className="mt-2">
+                      <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.12em] text-ink-low">
+                        settlement · {/^REGULATION TIME/i.test(bookMeta.settles_on)
+                          ? "regulation time only (90 + stoppage)"
+                          : "what these legs settle on"}
+                      </summary>
+                      <p className="mt-1 text-[12px] leading-relaxed text-ink-faint">
+                        {plainWords(bookMeta.settles_on)}
+                      </p>
+                    </details>
+                  )}
                   <div className="mt-5 border-t border-line pt-4">
                     {/* NO SHADOW RUN, BUT THE TRADER HAS A READ: draw the
                         trader's own 1X2 here, under its own name, rather
@@ -2205,5 +2231,26 @@ function TradersModelLine({ t, home, away }: {
         </p>
       )}
     </div>
+  );
+}
+
+
+/** SOFASCORE'S ATTACK MOMENTUM, as Sofascore's own embed (lib/sofascore.ts).
+ *  Drawn ONLY when a Sofascore match id was supplied for this fixture;
+ *  otherwise nothing renders. Labelled as Sofascore's, never as ours. */
+function SofascoreMomentum({ hubKey, eventId }: { hubKey: string; eventId: string }) {
+  const id = sofascoreIdFor(hubKey, eventId);
+  if (id == null) return null;
+  return (
+    <section data-testid="sofascore-momentum" className="mt-8">
+      <Eyebrow className="mb-2">attack momentum · sofascore&apos;s widget, not ours</Eyebrow>
+      <iframe title="Sofascore attack momentum" src={sofascoreMomentumUrl(id)}
+        className="h-[286px] w-full rounded-2xl border border-line"
+        loading="lazy" referrerPolicy="no-referrer"
+        sandbox="allow-scripts allow-same-origin" />
+      <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-faint">
+        embedded from sofascore · their data and their drawing · display only
+      </p>
+    </section>
   );
 }

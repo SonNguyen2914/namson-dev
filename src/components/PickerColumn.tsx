@@ -1487,6 +1487,28 @@ function formText(f: string | string[] | null | undefined): string | null {
  *  not there at all, and a distinction between a Kalshi key that is null
  *  (no event matched) and one that was never sent (the board said
  *  nothing about the market either way). */
+
+/** A REFUSED FIXTURE STILL HAS A MATCH HUB (Son, 2026-10-13: "all matches
+ *  should have a match hub"). The board refused to RANK it, not to show it:
+ *  the matchup opens the fixture's hub where the build found one
+ *  (`rowHref`), exactly as a ranked card's does. Nothing on the face moves —
+ *  the block keeps its classes; only the names become the way in. With no
+ *  hub page (or no event id) it stays plain content, as before. */
+function RefusalMatchup({ r, children }: {
+  r: { league: string; event_id?: string | null; home?: string; away?: string };
+  children: ReactNode;
+}) {
+  const href = r.event_id ? rowHref({ league: r.league, event_id: r.event_id }) : null;
+  if (!href) return <span className="min-w-0 flex-1">{children}</span>;
+  return (
+    <Link href={href} data-testid="refusal-hub-link"
+      aria-label={`open ${r.home} versus ${r.away}`}
+      className="block min-w-0 flex-1 hover:text-accent">
+      {children}
+    </Link>
+  );
+}
+
 /** THE REFUSAL'S REASON, WRITTEN FOR A READER (Son, 2026-10-07). The
  *  backend's code (`no_prior_row`, `no_shared_scale`, …) stays in the
  *  hover; the card prints these words, in its own chip style. A code this
@@ -1825,7 +1847,7 @@ function RefusalCard({ r, col, dated = true, dense = false, rank }: {
           the board declined to make. */}
       <div className={`mt-2.5 flex items-start gap-3${
         dense ? " md:flex-col md:items-stretch md:gap-1" : ""}`}>
-        <span className="min-w-0 flex-1">
+        <RefusalMatchup r={r}>
           <span className={`flex min-w-0 items-center gap-2${
             dense ? " md:flex-wrap" : ""}`}>
             <span aria-hidden
@@ -1870,7 +1892,7 @@ function RefusalCard({ r, col, dated = true, dense = false, rank }: {
               friendly={friendlyMarks(r.national, "away")}
               className="ml-auto pl-2" />
           </span>
-        </span>
+        </RefusalMatchup>
         {/* THE ANCHOR'S SLOT, REFUSED. The figure is the one number the
             whole board is ordered by, so its absence is the loudest
             thing on this card — and it is drawn at 13px rather than the
