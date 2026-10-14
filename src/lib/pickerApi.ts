@@ -11,6 +11,7 @@
 // It is not a signal surface: no model runs on it, no probability of ours
 // exists for these fixtures, and no number here is an edge.
 
+import type { RatingsAsOf } from "./ratingsAsOf";
 import type { NextMatch } from "./offSeason";
 import { detailText } from "./httpFailure";
 
@@ -1020,6 +1021,12 @@ export const isFoldedCupTie = (
 
 export interface LeagueMeta {
   src: Src | null;
+  /** THE RATINGS' "AS OF" (lib/ratingsAsOf): for a league column, the
+   *  league field the (#) ranks are read off; for a cup, `field` below */
+  ratings_as_of?: RatingsAsOf | null;
+  /** a cup column's measured field, once per column (backend
+   *  `league_meta[slug].field`); only its as-of is read here */
+  field?: { ratings_as_of?: RatingsAsOf | null } & Record<string, unknown>;
   min_current_gp: number | null;
   clubs: number;
   /** "league" — has a table of its own; "cup" — a tournament that has

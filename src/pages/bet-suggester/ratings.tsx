@@ -45,6 +45,7 @@ import {
   CupsView, FLIP, FieldMode, LeaguesView, ModeSwitch, NationsView,
   sameClubTwoFields,
 } from "../../components/PinnedPassField";
+import { RatingsAsOfLine } from "../../components/RatingsAsOf";
 import { Eyebrow } from "../../components/ui";
 import {
   Collapse, NavChip, RouteProgress, SkeletonRows, TopBar,
@@ -421,6 +422,17 @@ export default function FieldPage() {
               </p>
             </>
           )}
+          {/* AS OF THE LAST FINISHED MATCH (Son, 2026-10-14): the ratings
+              are rebuilt after finished matches; this says which match
+              they reach and whether this view is live or frozen.
+              Nothing is drawn when the payload sent no block. */}
+          {(() => {
+            const a = mode === "leagues" ? L?.ratings_as_of
+              : mode === "nations" ? N?.ratings_as_of : C?.ratings_as_of;
+            return a ? (
+              <p className="mt-2.5"><RatingsAsOfLine asOf={a} /></p>
+            ) : null;
+          })()}
         </div>
 
         {mode === "leagues" && (

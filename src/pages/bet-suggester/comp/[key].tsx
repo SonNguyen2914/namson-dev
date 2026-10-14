@@ -25,6 +25,7 @@ import { usePoll } from "../../../lib/usePoll";
 import { failureOf, NEVER_ANSWERED } from "../../../lib/httpFailure";
 import FieldAxes, { Ratings } from "../../../components/FieldAxes";
 import { fetchRatings } from "../../../lib/fieldApi";
+import { RatingsAsOfLine } from "../../../components/RatingsAsOf";
 
 import { ARCHIVE, ArchiveMenu } from "../../../components/ArchiveMenu";
 import { RouteProgress, TopBar } from "../../../components/chrome";
@@ -361,6 +362,12 @@ export default function CompViewer() {
             strength read used in its place. Above the fixtures, so a
             reader meets the field before the individual ties. */}
         <FieldAxes data={rat} error={ratErr} />
+        {/* AS OF THE LAST FINISHED MATCH the field includes, live or
+            frozen (Son, 2026-10-14). Nothing when the read sent no
+            block — never a guessed date. */}
+        {rat?.axes && rat.ratings_as_of && (
+          <p className="mt-2"><RatingsAsOfLine asOf={rat.ratings_as_of} /></p>
+        )}
 
         {/* WC26-style tournament surface — groups, bracket, champion
             forecast. Mounts unconditionally; the backend's 404 is the

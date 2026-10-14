@@ -21,6 +21,7 @@ import type {
   RowFieldPartial,
 } from "./pickerApi";
 import { detailText } from "./httpFailure";
+import type { RatingsAsOf } from "./ratingsAsOf";
 
 /** One club on one axis. */
 export interface AxisRow {
@@ -178,6 +179,8 @@ export interface Ratings {
   axes_disagree_note?: string;
   why_not?: string;
   display?: string;
+  /** AS OF THE LAST FINISHED MATCH, live or frozen (lib/ratingsAsOf) */
+  ratings_as_of?: RatingsAsOf | null;
 }
 
 /** The reading order of the axes. Overall first because it is the one
