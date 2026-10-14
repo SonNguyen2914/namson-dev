@@ -1185,13 +1185,17 @@ test("form strips draw last results per side; absent form draws nothing", async 
 const wayIn = (row: import("@playwright/test").Locator) =>
   row.getByRole("link", { name: /^open / });
 
-test("a Leagues Cup card opens the competition page, not a hub that does not exist",
+// SINCE 2026-10-13 THE CUP HAS ITS HUB (Son: "all matches should have a
+// match hub"): bet-suggester/leaguescup/[eventId], the league hub template
+// over the generic /api/comp/leaguescup/match route. The card opens it —
+// a page that exists (e2e/every-card-opens-a-hub.spec.ts walks them all).
+test("a Leagues Cup card opens its match hub, the same template as a league's",
   async ({ page }) => {
     await open(page);
     await show(page, "leaguescup");
     const cup = col(page, "leaguescup").getByTestId("picker-row").first();
     await expect(wayIn(cup)).toHaveAttribute(
-      "href", "/bet-suggester/comp/leagues-cup");
+      "href", /^\/bet-suggester\/leaguescup\/[^/]+$/);
   });
 
 test("a league column claims no cup's settlement note — the cup ties it "
