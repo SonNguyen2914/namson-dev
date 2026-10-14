@@ -225,6 +225,18 @@ export const PROXY_TIMEOUT_MS = 15_000;
 export const PROXY_TIMEOUT_BY_ROUTE: Readonly<Record<string, number>> = {
   "championships/board": 45_000,
   "picker/board": 45_000,
+  /* THE TWO FINISHED TAILS TOO (2026-10-13). They are asked beside their
+     board on every load and rebuild on the request path past their own
+     cache (300s), and the 15s clock was cutting them off: production's
+     HTTP log shows `/api/picker/review` closed by this proxy at 15.0s on
+     every cold load from 2026-10-12 to 2026-10-13 (eight of them), and
+     `/api/championships/review` twice — each a review the backend was
+     still building. The backend's cold review is faster since TRIVELA
+     #260, but it still reads every competition's scoreboard, so it gets
+     the board's budget, under the same 60s `maxDuration` both route
+     files already set. */
+  "picker/review": 45_000,
+  "championships/review": 45_000,
 };
 
 /** How long the proxy waits on `route` (`<prefix>/<sub-path>`). */
