@@ -70,4 +70,6 @@ export function pageRoutes(): PageRoute[] {
  *  this, and the count is what makes a walk that silently shrinks — a
  *  directory renamed, a filter too eager — fail instead of covering
  *  less. A page added or removed moves this number on purpose. */
-export const PAGE_COUNT = 27;
+// 27 -> 49 on 2026-10-13: the 22 cup match hubs (bet-suggester/<cup>/
+// [eventId], Son: "all matches should have a match hub").
+export const PAGE_COUNT = 49;

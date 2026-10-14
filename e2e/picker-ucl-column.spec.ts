@@ -1051,9 +1051,14 @@ test("every cup column the board serves opens somewhere that exists",
       const hrefs = await rows.locator("a[href]").evaluateAll(
         (els) => els.map((e) => e.getAttribute("href")));
       expect(hrefs.length).toBeGreaterThan(0);
+      // SINCE 2026-10-13 EVERY CUP HAS A MATCH HUB (Son: "all matches
+      // should have a match hub"), so a cup card opens its hub — and the
+      // hub page must exist, which is the 404 this test was written for.
       for (const href of hrefs) {
-        expect(href, `${slug} card must not use the per-league hub pattern`)
-          .toMatch(/^\/bet-suggester\/comp\//);
+        expect(href, `${slug} card opens its match hub`)
+          .toMatch(new RegExp(`^/bet-suggester/${slug}/[^/]+$`));
+        const res = await page.request.get(href!, { maxRedirects: 0 });
+        expect(res.status(), `${href} exists`).toBe(200);
       }
     }
   });

@@ -45,7 +45,7 @@ import { readdirSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect, type Page } from "@playwright/test";
 import { openDetails } from "./review-details";
-import { NO_MODEL_HUBS } from "../src/lib/compHub";
+import { CUP_HUB_KEYS, NO_MODEL_HUBS } from "../src/lib/compHub";
 import {
   ARCHIVE_READ_UNKNOWN, EXTRA_FAMILIES, FAMILY_REASON_WORDS,
   KALSHI_FAMILIES, LINEUP_STATE_UNKNOWN, NATION_HUBS, PLANE_HUBS,
@@ -67,7 +67,11 @@ const HUBS = readdirSync(PAGES, { withFileTypes: true })
   .filter((e) => e.isDirectory()
     && existsSync(join(PAGES, e.name, "[eventId].tsx")))
   .map((e) => e.name).sort();
-const GENERIC = new Set(Object.keys(NO_MODEL_HUBS));
+/** The cups' hubs (2026-10-13, "all matches should have a match hub") are
+ *  generic hubs too: /api/comp/<cup>/match, the same template. */
+const CUPS = new Set<string>(CUP_HUB_KEYS);
+const ELEVEN = HUBS.filter((h) => !CUPS.has(h));
+const GENERIC = new Set([...Object.keys(NO_MODEL_HUBS), ...CUP_HUB_KEYS]);
 
 const EVENT = "990001";
 /** Synthetic, and on or before 2026-09-27. */
@@ -374,9 +378,12 @@ const bodyText = async (page: Page) =>
 
 // ── the eleven ──────────────────────────────────────────────────────
 
-test("the hub set is the eleven, and every register covers exactly them", () => {
-  expect(HUBS.length, `hubs on disk: ${HUBS.join(", ")}`).toBe(11);
-  expect([...PLANE_HUBS, ...Object.keys(NO_MODEL_HUBS)].sort()).toEqual(HUBS);
+test("the hub set is the eleven plus the 22 cups, and every register covers exactly them", () => {
+  expect(ELEVEN.length, `hubs on disk: ${HUBS.join(", ")}`).toBe(11);
+  expect([...PLANE_HUBS, ...Object.keys(NO_MODEL_HUBS)].sort()).toEqual(ELEVEN);
+  // and every one of the 22 cups has its hub on disk, nothing else
+  expect(HUBS.filter((h) => CUPS.has(h))).toEqual([...CUP_HUB_KEYS].sort());
+  expect(HUBS.length).toBe(11 + 22);
   expect([...NATION_HUBS].sort()).toEqual(["afcon", "cnl", "unl"]);
   // the family register is the planes' twelve: the winner plus eleven
   expect(KALSHI_FAMILIES.length).toBe(12);
