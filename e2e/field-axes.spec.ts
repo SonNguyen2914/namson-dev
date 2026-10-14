@@ -494,3 +494,27 @@ test("a 404 from the field read carries its status into the words",
     await page.goto("/bet-suggester/comp/ucl");
     await expect(page.getByTestId("field-axes-error")).toContainText("404");
   });
+
+// AS OF WHICH FINISHED MATCH (Son, 2026-10-14: "rebuild and make the stats
+// up to date constantly whenever they finish a match"). The hub draws the
+// backend's `ratings_as_of` under the field, and nothing without it.
+test("the hub says which finished match the field reaches, and nothing "
+     + "when the read sent no block", async ({ page }) => {
+  await open(page, {
+    ...RATINGS,
+    ratings_as_of: {
+      as_of: "2026-10-12", source: "live",
+      parts: [{ source: "live", as_of: "2026-10-12", build_id: 3,
+                as_of_match: "Arsenal 2-1 Tottenham Hotspur (epl)" }],
+    },
+  });
+  const line = page.getByTestId("ratings-as-of");
+  await expect(line).toHaveText("as of 12 Oct 2026 · live");
+  await expect(line).toHaveAttribute("title", /Arsenal 2-1 Tottenham/);
+});
+
+test("a hub read without the block draws no as-of label", async ({ page }) => {
+  await open(page);
+  await expect(page.getByTestId("axis-table")).toBeVisible();
+  await expect(page.getByTestId("ratings-as-of")).toHaveCount(0);
+});

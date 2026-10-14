@@ -27,6 +27,8 @@
 // NOTHING HERE DECIDES. These functions sort, group and scale what the
 // backend measured; they add no number of their own.
 
+import type { RatingsAsOf } from "./ratingsAsOf";
+
 /** The exponentiated convenience on a goal axis. `point` is goals
  *  SCORED on attack and goals CONCEDED on defence, where lower is
  *  better — which is why a row is SORTED on `value` (signed so higher
@@ -140,6 +142,8 @@ export interface LeagueField {
     passes?: number | string | null;
     same_fit?: boolean;
   };
+  /** AS OF THE LAST FINISHED MATCH, live or frozen (lib/ratingsAsOf) */
+  ratings_as_of?: RatingsAsOf | null;
   not_a_trading_signal?: boolean;
 }
 
@@ -188,10 +192,13 @@ export interface CupField {
   /** false: per-club bridge counts are not part of read_axes' output, so
    *  the cups view draws no bridges column rather than an empty one */
   carries_bridge_counts?: boolean;
+  /** AS OF THE LAST FINISHED MATCH, live or frozen (lib/ratingsAsOf) */
+  ratings_as_of?: RatingsAsOf | null;
 }
 
 export interface CupFields {
   cups: CupField[];
+  ratings_as_of?: RatingsAsOf | null;
   not_a_trading_signal?: boolean;
 }
 
@@ -301,6 +308,8 @@ export interface NationCompetition {
 
 export interface NationFields {
   source?: string;
+  /** AS OF THE LAST FINISHED MATCH, live or frozen (lib/ratingsAsOf) */
+  ratings_as_of?: RatingsAsOf | null;
   bundle?: string;
   served_because?: string;
   field_sha256?: string;

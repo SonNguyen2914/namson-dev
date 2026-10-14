@@ -26,6 +26,7 @@
 // The read primitives (gap chips, shape sentence, the Kalshi cell) moved
 // to components/PickerRead.tsx so the tail renders THE SAME READ this
 // column does, rather than a hand-copied one free to drift from it.
+import { asOfLabel, type RatingsAsOf } from "../lib/ratingsAsOf";
 import { hueOf } from "../lib/leagueHue";
 import Link from "next/link";
 import {
@@ -1166,8 +1167,13 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
 }
 
 function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
-                  hoisted, field, boardFloorNote }: {
+                  hoisted, field, boardFloorNote, asOf = null }: {
   row: BoardRow; rank: number; modeId: SortModeId; clubCount: number;
+  /** THE COLUMN'S RATINGS "AS OF" (lib/ratingsAsOf): the last finished
+   *  match the OVR/ATK/DEF behind this card include, live or frozen. One
+   *  per column, said in the (#) panel's context — never on the face
+   *  (AGENTS.md §8.4). */
+  asOf?: RatingsAsOf | null;
   colSrc?: string | null;
   /** in a narrow dense-grid track — see RowRead's own `dense` note */
   dense?: boolean;
@@ -1235,6 +1241,8 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
       ? [`rated on ${leagueLabel(row.rated_in.home)} v ${leagueLabel(row.rated_in.away)} — each club on its own domestic table`] : []),
     ...(row.national?.group ? [`group · ${row.national.group}`] : []),
     ...(row.national?.lineups?.announced ? ["both starting XIs are named"] : []),
+    ...((blk || row.field_rank) && asOfLabel(asOf)
+      ? [`ratings ${asOfLabel(asOf)} · ${asOf?.source === "live" ? "rebuilt live after finished matches" : asOf?.source === "mixed" ? "partly rebuilt live" : "frozen measurement"}`] : []),
     ...(flipped ? [`fav · venue rule — the venue-aware rule named the favourite on this card, not the league table: ${row.favourite} is at home and the table gap between these two is under that rule's bar. Every signed figure is read from ${row.favourite}'s side, so a negative gap here means the favourite is the lower-rated club. The rule is annotation the board has been switched to act on; it is not a measured edge.`] : []),
   ];
   return (
@@ -3491,7 +3499,8 @@ export function LeagueColumn({
                   row={it.row} rank={it.rank}
                   modeId={modeId} clubCount={meta?.clubs ?? 0}
                   colSrc={meta?.src} dense={dense} hoisted={notes}
-                  field={field} boardFloorNote={boardFloorNote} />)
+                  field={field} boardFloorNote={boardFloorNote}
+                  asOf={meta?.ratings_as_of ?? meta?.field?.ratings_as_of ?? null} />)
               : (
                 <RefusalCard key={`ref-${it.r.event_id ?? it.r.club}-${i}`}
                   r={it.r} col={slug} dense={dense} rank={it.rank} />))}
