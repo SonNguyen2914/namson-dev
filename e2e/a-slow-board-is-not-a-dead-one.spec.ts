@@ -84,6 +84,21 @@ test.describe("the proxy's clock, per route", () => {
       expect(took).toBeGreaterThanOrEqual(19_000);
     });
 
+  test("a match hub that takes 20s is answered, not timed out",
+    async ({ request }) => {
+      // 2026-10-14: prod cut /api/comp/ucl/match/401915416 at 14.9s on its
+      // first (cold) build; the same hub answered in 1.4s 30s later
+      test.setTimeout(60_000);
+      const started = Date.now();
+      const r = await request.get(
+        "/api/comp/ucl/match/401915416?__standin_delay_ms=20000",
+        { timeout: 50_000 });
+      const took = Date.now() - started;
+      expect(r.status(), await r.text()).toBe(200);
+      expect((await r.json()).delayed_ms).toBe(20_000);
+      expect(took).toBeGreaterThanOrEqual(19_000);
+    });
+
   test("every other route still stops waiting at 15s", async ({ request }) => {
     test.setTimeout(60_000);
     const started = Date.now();
@@ -98,7 +113,7 @@ test.describe("the proxy's clock, per route", () => {
     expect(took).toBeLessThan(19_000);
   });
 
-  test("the table gives 45s to the two boards, their finished tails and every comp fixture list, 15s to everything else",
+  test("the table gives 45s to the two boards, their finished tails, every comp fixture list and every comp match hub, 15s to everything else",
     () => {
       // Read through the namespace so this file still loads — and this
       // test fails by name — on a tree that has no table.
@@ -115,10 +130,19 @@ test.describe("the proxy's clock, per route", () => {
       for (const key of ["ucl", "leagues-cup", "asean", "eflcup"]) {
         expect(at(`comp/${key}/fixtures`), key).toBe(45_000);
       }
+      // every match hub on the comp route, COMP_KEY or a board-column
+      // hub key COMP_KEY does not admit (2026-10-14: prod cut
+      // comp/ucl/match/401915416 at 14.9s on its first build)
+      for (const hub of ["comp/ucl/match/401915417", "comp/eflcup/match/1",
+                         "comp/ligue1/match/401915417",
+                         "comp/bundesliga/match/12"]) {
+        expect(at(hub), hub).toBe(45_000);
+      }
       for (const other of ["mls/scoreboard", "epl/schedule",
-                           "comp/ucl/markets", "comp/ucl/match/401915417",
+                           "comp/ucl/markets", "comp/ucl/match/x1",
+                           "comp/ucl/match/401915417/x",
                            "comp/ucl/fixtures/x", "comp/UCL/fixtures",
-                           "hunter/findings"]) {
+                           "mls/match/761864", "hunter/findings"]) {
         expect(at(other), other).toBe(proxyLib.PROXY_TIMEOUT_MS);
       }
       expect(proxyLib.PROXY_TIMEOUT_MS).toBe(15_000);

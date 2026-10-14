@@ -255,12 +255,30 @@ export const PROXY_TIMEOUT_BY_ROUTE: Readonly<Record<string, number>> = {
  *  Every other comp resource measured under 1s cold and keeps 15s. */
 export const COMP_FIXTURES_TIMEOUT_MS = 45_000;
 
+/** AND EVERY MATCH HUB ON THE COMP ROUTE (2026-10-14). The first hub of a
+ *  match is built on the request path: ESPN's summary, the Kalshi winner
+ *  and every family Kalshi lists for the competition (21 for the UCL),
+ *  and the board's frozen read from the live plane. Production's HTTP log
+ *  shows `/api/comp/ucl/match/401915416` closed by this proxy at 14.9s on
+ *  2026-10-14 09:06Z — Son saw "the backend did not answer within 15s" —
+ *  and the same hub answered in 1.4s thirty seconds later. TRIVELA's fix
+ *  that day made that first build cheaper (one small Kalshi read per
+ *  family instead of a 200-event series page, books and frozen read side
+ *  by side); it is still provider-bound, so it gets the fixture lists'
+ *  45s under the same 60s `maxDuration` (pages/api/comp/[...path].ts).
+ *  Matched for COMP_KEY and for the board-column hub keys COMP_KEY does
+ *  not admit (`ligue1`), exactly as the allowlist below matches them. */
+export const COMP_HUB_TIMEOUT_MS = 45_000;
+
 /** How long the proxy waits on `route` (`<prefix>/<sub-path>`). */
 export const proxyTimeoutMs = (route: string): number =>
   PROXY_TIMEOUT_BY_ROUTE[route]
   // built here, not at module load: COMP_KEY is declared further down
   ?? (new RegExp(`^comp/${COMP_KEY}/fixtures$`).test(route)
-    ? COMP_FIXTURES_TIMEOUT_MS : PROXY_TIMEOUT_MS);
+    ? COMP_FIXTURES_TIMEOUT_MS
+    : new RegExp(`^comp/(${COMP_KEY}|${HUB_MATCH_KEYS.join("|")})`
+                 + `/match/\\d{1,12}$`).test(route)
+      ? COMP_HUB_TIMEOUT_MS : PROXY_TIMEOUT_MS);
 
 const isTimeout = (err: unknown) =>
   err instanceof Error
