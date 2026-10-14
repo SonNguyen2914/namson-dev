@@ -1517,6 +1517,7 @@ function RefusalMatchup({ r, children }: {
 export const REFUSAL_WORDS: Record<string, string> = {
   no_prior_row: "new to the league",
   no_shared_scale: "no shared ladder",
+  unlinked_league: "no shared ladder",
   no_national_rating: "no rating yet",
   unresolved: "club not matched",
   ambiguous: "club not matched",
@@ -1653,6 +1654,11 @@ function RefusalCard({ r, col, dated = true, dense = false, rank }: {
            orderings — which is the fact the gap cell then refuses. `of`
            is drawn only when the payload sent it. */
         : `#${v}${side(s)?.of != null ? ` of ${side(s)!.of}` : ""}`;
+
+  /* both sides' own-league tiers, or none — half a pair is not drawn */
+  const ownTiers = side("home")?.league_tiers && side("away")?.league_tiers
+    ? { home: side("home")!.league_tiers!, away: side("away")!.league_tiers! }
+    : null;
 
   const homeForm = formText(r.form?.home);
   const awayForm = formText(r.form?.away);
@@ -1969,9 +1975,9 @@ function RefusalCard({ r, col, dated = true, dense = false, rank }: {
           data-away-rank={awayRank ?? undefined}
           title={sides
             ? `${r.home} is ${rankText("home", homeRank)} in the `
-              + `${leagueLabel(side("home")?.rated_in ?? r.league)} table and `
+              + `${(side("home")?.rated_in_name ?? leagueLabel(side("home")?.rated_in ?? r.league))} table and `
               + `${r.away} is ${rankText("away", awayRank)} in the `
-              + `${leagueLabel(side("away")?.rated_in ?? r.league)} table. Two `
+              + `${(side("away")?.rated_in_name ?? leagueLabel(side("away")?.rated_in ?? r.league))} table. Two `
               + "positions in two different orderings, shown side by side and "
               + "NOT differenced: the distance between them is the figure "
               + "this fixture was refused for."
@@ -2064,6 +2070,30 @@ function RefusalCard({ r, col, dated = true, dense = false, rank }: {
             a reader has to know WHICH figures are gone — but the fact is
             one fact and now says itself once, which is what gets this row
             onto the single line a ranked card uses. */}
+        {/* EACH CLUB'S OWN-LEAGUE TIERS, WHEN BOTH SIDES CARRY THEM (backend
+            `unlinked_league`, Son 2026-10-14: "fill in the fields"). The
+            ranked card's `OVR 1v4` pair, home v away: each number is a
+            quintile of that club's OWN league, so they sit side by side
+            and are never differenced — the shape, which IS a reading of
+            the difference, stays refused in its own slot. */}
+        {ownTiers ? (
+          <span data-testid="refused-tiers" data-tiers="own-league"
+            data-shape-refused="1"
+            title={`${r.home} and ${r.away}, each tiered within its own `
+              + "league's table (1 = best fifth). Two positions in two "
+              + "different leagues, shown side by side and not compared; "
+              + `the shape is withheld. ${withheld}`}
+            className="inline-flex items-baseline gap-2 overflow-hidden whitespace-nowrap font-mono text-[10px] leading-none">
+            {AXIS_ORDER.map((k) => (
+              <span key={k} data-tier-pair={k} className="inline-flex items-baseline gap-1">
+                <span className="text-[7.5px] uppercase tracking-[0.12em] text-ink-faint">{k}</span>
+                <span className="text-ink-mid">{ownTiers.home[k]}v{ownTiers.away[k]}</span>
+              </span>
+            ))}
+            <span className="text-[7.5px] uppercase tracking-[0.12em] text-ink-faint">shape</span>
+            <span className="text-ink-faint">refused</span>
+          </span>
+        ) : (
         <span data-testid="refused-tiers" data-refused="tiers"
           data-shape-refused="1"
           title={withheld}
@@ -2073,6 +2103,7 @@ function RefusalCard({ r, col, dated = true, dense = false, rank }: {
           </span>
           <span className="text-ink-faint">refused</span>
         </span>
+        )}
         {adm && (
           <span data-testid="refused-admission"
             data-k={adm.k} data-gp={adm.gp ?? undefined}

@@ -802,6 +802,16 @@ export interface RefusedSide {
   of?: number | null;
   weight?: number | null;
   basis?: BlendBasis | string | null;
+  /** THE LEAGUE'S NAME when `rated_in` is a league the board does not
+   *  register (backend `unlinked_league`, 2026-10-14: LASK on the
+   *  Austrian table) — so no raw ESPN slug reaches a reader. */
+  rated_in_name?: string | null;
+  table_source?: string | null;
+  /** this club's WITHIN-LEAGUE quintile tiers on its own table (1 = best
+   *  fifth), the league cards' rule. A position in ONE league, never
+   *  compared with the other side's — so no gap and no shape ride it. */
+  league_tiers?: { ovr: number; atk: number; def: number; of?: number;
+    rule?: string } | null;
 }
 
 /** A fixture the picker would not rate, named with the reason. Refusals
