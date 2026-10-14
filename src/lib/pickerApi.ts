@@ -425,11 +425,19 @@ export interface ModelVsMarket {
     read_at: string | null;
     source?: string | null;
     test_verdict?: string | null;
+    /** the hub's label, word for word (a cup line: "experimental,
+     *  unproven — cups: paper only") */
+    label?: string | null;
+    /** true only for the cup model's line: no cup risks real money */
+    paper_only?: boolean;
   } | null;
   book_flag: "WIDE" | "THIN" | null;
   top: { model: MmOutcome[]; market: MmOutcome[] };
   codes: { h: string | null; a: string | null };
   model_why: string | null;
+  /** the hub's own sentence for a missing model, when it has one (a cup's:
+   *  a failed pool, a cup in no pool); null on a read and on league rows */
+  model_why_detail?: string | null;
   market_why: string | null;
   market_meta: {
     basis: string;

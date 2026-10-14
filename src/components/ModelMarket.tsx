@@ -50,6 +50,7 @@ const MODEL_WHY: Record<string, string> = {
   model_run_absent: "the trader's model has not priced this match yet",
   model_fixture_not_live: "the trader does not key this match",
   read_failed: "the model read failed",
+  cup_line_warming: "the cup model's read for this tie is still running; the next refresh shows it",
 };
 const MARKET_WHY: Record<string, string> = {
   no_three_way_book: "Kalshi has not listed all three books (home, draw, away) for this match",
@@ -73,13 +74,19 @@ function readTime(iso: string | null | undefined): string {
 
 function modelTitle(mm: ModelVsMarket): string {
   if (!mm.model || !mm.model_meta) {
-    return `No model read for this match: ${words(MODEL_WHY, mm.model_why,
-      "the trader's model has no read for it")}.`
+    // a cup's reason is the hub's own sentence (`model_why_detail`), said
+    // as the cup hub says it; every other code is worded here
+    const why = mm.model_why_detail
+      ?? words(MODEL_WHY, mm.model_why, "the trader's model has no read for it");
+    return `No model read for this match: ${why.replace(/\.\s*$/, "")}.`
       + (mm.model_why ? ` (${mm.model_why})` : "");
   }
   const m = mm.model_meta;
+  // a cup model's line is PAPER ONLY (backend `unified_cups.LABEL`): the
+  // hover carries the hub's label word for word
   return [m.name ?? "the trader's model",
     m.status === "tested" ? "tested, not worse" : "untested",
+    ...(m.paper_only ? [m.label ?? "paper only"] : []),
     readTime(m.read_at), "shadow, not advice"].join(" · ");
 }
 
