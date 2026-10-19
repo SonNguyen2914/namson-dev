@@ -767,12 +767,17 @@ function mmOrEmpty(row: { model_vs_market?: ModelVsMarket | null;
  *  folded into a league column can be rated on a different basis than
  *  the column it is drawn in.
  *
- *  NOTHING DRAWS ANY OF IT ANY MORE. The operator called it twice,
- *  after seeing both renderings on the real board: no season chip on a
- *  row, at all — the reasoning sits at the chip's old site in RowCard.
- *  The derivation outlives the ink: the reason is returned and carried
- *  as `data-season-departure`, so a guard reads it and an ordinary row
- *  carries no such attribute. */
+ *  NOTHING DRAWS ANY OF IT — WITH ONE EXCEPTION. The operator called it
+ *  twice, after seeing both renderings on the real board: no season chip
+ *  on a row, at all — the reasoning sits at the chip's old site in
+ *  RowCard. The derivation outlives the ink: the reason is returned and
+ *  carried as `data-season-departure`, so a guard reads it and an
+ *  ordinary row carries no such attribute.
+ *  The exception (Son, 2026-10-19) is not this function's: when this
+ *  season alone REVERSES the order — `seasonDisagreement(...).flips`,
+ *  the two cuts naming different clubs as the better side — RowRead
+ *  draws one quiet `season-flip` chip under the anchor. A difference of
+ *  degree, and every other departure above, stays data only. */
 export function seasonDeparture(
   row: BoardRow, colSrc?: string | null,
   alt?: { blended: number; current: number; delta: number } | null,
@@ -900,6 +905,11 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
   const nat = useContext(NationalCtx);
   const natSides = row.national ? favSides(row) : null;
   const alt = seasonDisagreement(row);
+  /* one sentence for the anchor's hover and the flip chip's, so the
+     two can never give different accounts of one counterfactual */
+  const altTitle = alt
+    ? `ON THIS SEASON ALONE the ${anchor.k} is ${dec(alt.current)}, not ${dec(alt.blended)} — the board ranks on the blend, and this says what the other cut would have concluded`
+    : undefined;
   const ranks = rankPair(row, field ?? partial, clubCount);
   /* THE VENUE RULE'S DISAGREEMENT, ON THE BADGE THAT IS ABOUT THE VENUE
      (2026-09-08). The backend has carried `venue_favourite` on every
@@ -1049,7 +1059,7 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
             {...(alt ? {
               "data-season-alt": dec(alt.current),
               "data-season-blend": dec(alt.blended),
-              title: `ON THIS SEASON ALONE the ${anchor.k} is ${dec(alt.current)}, not ${dec(alt.blended)} — the board ranks on the blend, and this says what the other cut would have concluded`,
+              title: altTitle,
             } : {})}
             className={`block font-mono text-[20px] font-semibold leading-none tabular-nums ${
               anchor.v === WITHHELD ? "font-normal text-ink-faint"
@@ -1078,6 +1088,29 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
           </span>
         </span>
       </CardLink>
+
+      {/* THIS SEASON ALONE REVERSES THE ORDER (Son, 2026-10-19). The
+          counterfactual is otherwise carried without ink (see the anchor
+          above and seasonDeparture): a mark on the figure reads as a
+          qualifier on the figure, and a difference of DEGREE is not one.
+          A sign flip is a different kind of fact — the blend and this
+          season name different clubs as the better side — so that one
+          case, and only that one, is drawn: a quiet chip in the THIN/WIDE
+          reason-chip style, under the anchor's right edge, OUTSIDE the
+          link, with the anchor's own sentence on hover. A row without a
+          flip draws nothing here, so the card's slot list is unchanged
+          for every ordinary row (e2e/one-match-card.spec.ts). */}
+      {alt?.flips && (
+        <div className="mt-1 flex justify-end">
+          <span data-testid="season-flip"
+            data-season-alt={dec(alt.current)}
+            data-season-blend={dec(alt.blended)}
+            title={altTitle}
+            className="whitespace-nowrap rounded border border-line-strong px-[5px] py-[2px] font-mono text-[8.5px] uppercase tracking-[0.14em] text-ink-low">
+            this season: reversed
+          </span>
+        </div>
+      )}
 
       <RankDumbbell ranks={ranks} />
 
@@ -1302,7 +1335,9 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
             is what it looked like on the board and is not what it means.
             The departure is still DERIVED and still carried, as data on
             the row rather than as ink on it (see data-season-departure),
-            so nothing about it is lost and a guard can still read it. */}
+            so nothing about it is lost and a guard can still read it.
+            (A sign flip — an order reversal — is drawn, but under the
+            anchor in RowRead, not on this row: see `season-flip`.) */}
         {/* THE COMPETITION, when it is not the column. A Leagues Cup tie
             between two Liga MX clubs is drawn in the Liga MX column
             because that table describes it completely — but it is still
