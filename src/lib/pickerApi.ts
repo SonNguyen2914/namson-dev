@@ -1648,13 +1648,17 @@ export function homeBadge(row: BoardRow):
 export const CURRENT_ONLY_MATERIAL = 0.25;
 
 export function seasonDisagreement(row: BoardRow):
-    { blended: number; current: number; delta: number } | null {
+    { blended: number; current: number; delta: number; flips: boolean } | null {
   const b = row.gdg_gap, c = row.current_only?.gdg_gap;
   if (typeof b !== "number" || typeof c !== "number") return null;
   const delta = c - b;
+  /* `flips` IS RETURNED, not just used, because it is the one case the
+     card draws (Son, 2026-10-19): the two cuts naming DIFFERENT clubs as
+     the better side is an order reversal, not a difference of degree. A
+     material-but-same-sign row stays as data on the anchor only. */
   const flips = (b >= 0) !== (c >= 0);
   if (!flips && Math.abs(delta) < CURRENT_ONLY_MATERIAL) return null;
-  return { blended: b, current: c, delta };
+  return { blended: b, current: c, delta, flips };
 }
 
 export const leagueLabel = (slug: string) => LEAGUE_LABEL[slug] ?? slug;
