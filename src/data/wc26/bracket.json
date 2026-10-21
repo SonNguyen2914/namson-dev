@@ -1,0 +1,326 @@
+{
+ "frozen_at": "2026-10-21T10:45:41.171633+00:00",
+ "payload": {
+  "champion": "Spain",
+  "champion_forecast": null,
+  "final": [
+   {
+    "away": "Argentina",
+    "away_resolved": true,
+    "forecast": null,
+    "fully_resolved": true,
+    "home": "Spain",
+    "home_resolved": true,
+    "kickoff": "2026-07-19T19:00:00+00:00",
+    "match_id": "FINAL",
+    "probs": null,
+    "result": {
+     "away_goals": 0,
+     "home_goals": 1,
+     "status_short": "AET",
+     "winner": "home"
+    },
+    "stage": "F",
+    "venue": "MetLife Stadium, East Rutherford"
+   }
+  ],
+  "generated_at": "2026-10-21T10:45:41.171633+00:00",
+  "provisional_teams": [
+   "Canada"
+  ],
+  "quarterfinals": [
+   {
+    "away": "France",
+    "away_resolved": true,
+    "forecast": null,
+    "fully_resolved": true,
+    "home": "Morocco",
+    "home_resolved": true,
+    "kickoff": "2026-07-09T20:00:00+00:00",
+    "match_id": "MAR_FRA",
+    "probs": null,
+    "result": {
+     "away_goals": 2,
+     "home_goals": 0,
+     "status_short": "FT",
+     "winner": "away"
+    },
+    "stage": "QF",
+    "venue": "Gillette Stadium, Boston"
+   },
+   {
+    "away": "Belgium",
+    "away_resolved": true,
+    "forecast": null,
+    "fully_resolved": true,
+    "home": "Spain",
+    "home_resolved": true,
+    "kickoff": "2026-07-10T19:00:00+00:00",
+    "match_id": "ESP_BEL",
+    "probs": null,
+    "result": {
+     "away_goals": 1,
+     "home_goals": 2,
+     "status_short": "FT",
+     "winner": "home"
+    },
+    "stage": "QF",
+    "venue": "SoFi Stadium, Inglewood"
+   },
+   {
+    "away": "England",
+    "away_resolved": true,
+    "forecast": null,
+    "fully_resolved": true,
+    "home": "Norway",
+    "home_resolved": true,
+    "kickoff": "2026-07-11T21:00:00+00:00",
+    "match_id": "NOR_ENG",
+    "probs": null,
+    "result": {
+     "away_goals": 2,
+     "home_goals": 1,
+     "status_short": "AET",
+     "winner": "away"
+    },
+    "stage": "QF",
+    "venue": "Hard Rock Stadium, Miami"
+   },
+   {
+    "away": "Switzerland",
+    "away_resolved": true,
+    "forecast": null,
+    "fully_resolved": true,
+    "home": "Argentina",
+    "home_resolved": true,
+    "kickoff": "2026-07-12T01:00:00+00:00",
+    "match_id": "ARG_SUI",
+    "probs": null,
+    "result": {
+     "away_goals": 1,
+     "home_goals": 3,
+     "status_short": "AET",
+     "winner": "home"
+    },
+    "stage": "QF",
+    "venue": "Arrowhead Stadium, Kansas City"
+   }
+  ],
+  "round_of_16": [
+   {
+    "away": "Morocco",
+    "away_resolved": true,
+    "forecast": null,
+    "fully_resolved": true,
+    "home": "Canada",
+    "home_resolved": true,
+    "kickoff": "2026-07-04T17:00:00+00:00",
+    "match_id": "CAN_MAR",
+    "probs": null,
+    "result": {
+     "away_goals": 3,
+     "home_goals": 0,
+     "status_short": "FT",
+     "winner": "away"
+    },
+    "stage": "R16",
+    "venue": "NRG Stadium, Houston"
+   },
+   {
+    "away": "France",
+    "away_resolved": true,
+    "forecast": null,
+    "fully_resolved": true,
+    "home": "Paraguay",
+    "home_resolved": true,
+    "kickoff": "2026-07-04T21:00:00+00:00",
+    "match_id": "PAR_FRA",
+    "probs": null,
+    "result": {
+     "away_goals": 1,
+     "home_goals": 0,
+     "status_short": "FT",
+     "winner": "away"
+    },
+    "stage": "R16",
+    "venue": "Lincoln Financial Field, Philadelphia"
+   },
+   {
+    "away": "Spain",
+    "away_resolved": true,
+    "forecast": null,
+    "fully_resolved": true,
+    "home": "Portugal",
+    "home_resolved": true,
+    "kickoff": "2026-07-06T19:00:00+00:00",
+    "match_id": "POR_ESP",
+    "probs": null,
+    "result": {
+     "away_goals": 1,
+     "home_goals": 0,
+     "status_short": "FT",
+     "winner": "away"
+    },
+    "stage": "R16",
+    "venue": "AT&T Stadium, Arlington"
+   },
+   {
+    "away": "Belgium",
+    "away_resolved": true,
+    "forecast": null,
+    "fully_resolved": true,
+    "home": "United States",
+    "home_resolved": true,
+    "kickoff": "2026-07-07T00:00:00+00:00",
+    "match_id": "USA_BEL",
+    "probs": null,
+    "result": {
+     "away_goals": 4,
+     "home_goals": 1,
+     "status_short": "FT",
+     "winner": "away"
+    },
+    "stage": "R16",
+    "venue": "Lumen Field, Seattle"
+   },
+   {
+    "away": "Norway",
+    "away_resolved": true,
+    "forecast": null,
+    "fully_resolved": true,
+    "home": "Brazil",
+    "home_resolved": true,
+    "kickoff": "2026-07-05T20:00:00+00:00",
+    "match_id": "BRA_NOR",
+    "probs": null,
+    "result": {
+     "away_goals": 2,
+     "home_goals": 1,
+     "status_short": "FT",
+     "winner": "away"
+    },
+    "stage": "R16",
+    "venue": "MetLife Stadium, NJ"
+   },
+   {
+    "away": "England",
+    "away_resolved": true,
+    "forecast": null,
+    "fully_resolved": true,
+    "home": "Mexico",
+    "home_resolved": true,
+    "kickoff": "2026-07-06T00:00:00+00:00",
+    "match_id": "MEX_ENG",
+    "probs": null,
+    "result": {
+     "away_goals": 3,
+     "home_goals": 2,
+     "status_short": "FT",
+     "winner": "away"
+    },
+    "stage": "R16",
+    "venue": "Estadio Azteca, Mexico City"
+   },
+   {
+    "away": "Egypt",
+    "away_resolved": true,
+    "forecast": null,
+    "fully_resolved": true,
+    "home": "Argentina",
+    "home_resolved": true,
+    "kickoff": "2026-07-07T16:00:00+00:00",
+    "match_id": "ARG_EGY",
+    "probs": null,
+    "result": {
+     "away_goals": 2,
+     "home_goals": 3,
+     "status_short": "FT",
+     "winner": "home"
+    },
+    "stage": "R16",
+    "venue": "Mercedes-Benz Stadium, Atlanta"
+   },
+   {
+    "away": "Colombia",
+    "away_resolved": true,
+    "forecast": null,
+    "fully_resolved": true,
+    "home": "Switzerland",
+    "home_resolved": true,
+    "kickoff": "2026-07-07T20:00:00+00:00",
+    "match_id": "SUI_COL",
+    "probs": null,
+    "result": {
+     "away_goals": 0,
+     "home_goals": 0,
+     "status_short": "PEN",
+     "winner": null
+    },
+    "stage": "R16",
+    "venue": "BC Place, Vancouver"
+   }
+  ],
+  "semifinals": [
+   {
+    "away": "Spain",
+    "away_resolved": true,
+    "forecast": null,
+    "fully_resolved": true,
+    "home": "France",
+    "home_resolved": true,
+    "kickoff": "2026-07-14T19:00:00+00:00",
+    "match_id": "SF1",
+    "probs": null,
+    "result": {
+     "away_goals": 2,
+     "home_goals": 0,
+     "status_short": "FT",
+     "winner": "away"
+    },
+    "stage": "SF",
+    "venue": "AT&T Stadium, Arlington"
+   },
+   {
+    "away": "Argentina",
+    "away_resolved": true,
+    "forecast": null,
+    "fully_resolved": true,
+    "home": "England",
+    "home_resolved": true,
+    "kickoff": "2026-07-15T19:00:00+00:00",
+    "match_id": "SF2",
+    "probs": null,
+    "result": {
+     "away_goals": 2,
+     "home_goals": 1,
+     "status_short": "FT",
+     "winner": "away"
+    },
+    "stage": "SF",
+    "venue": "Mercedes-Benz Stadium, Atlanta"
+   }
+  ],
+  "third_place": [
+   {
+    "away": "England",
+    "away_resolved": true,
+    "forecast": null,
+    "fully_resolved": true,
+    "home": "France",
+    "home_resolved": true,
+    "kickoff": "2026-07-18T21:00:00+00:00",
+    "match_id": "THIRD",
+    "probs": null,
+    "result": {
+     "away_goals": 6,
+     "home_goals": 4,
+     "status_short": "FT",
+     "winner": "away"
+    },
+    "stage": "3P",
+    "venue": "Hard Rock Stadium, Miami"
+   }
+  ]
+ },
+ "source": "GET /api/bracket"
+}

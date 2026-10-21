@@ -1,0 +1,76 @@
+{
+ "away": "Spain",
+ "home": "Portugal",
+ "kickoff": "2026-07-06T19:00:00+00:00",
+ "match_id": "POR_ESP",
+ "prediction": {
+  "age_seconds": 0,
+  "archive_note": "no frozen pre-match record survives for this match — its T-10 lock predates the archive discipline; retrospective re-simulation is deliberately not shown on review pages",
+  "confidence": null,
+  "freshness": "archive-incomplete",
+  "generated_at": "2026-10-21T10:46:43.712086+00:00",
+  "is_final": false,
+  "is_stale": false,
+  "markets": [],
+  "match_id": "POR_ESP",
+  "scorelines": [],
+  "source": "archive_incomplete",
+  "suggestions": [],
+  "summary": null,
+  "xg": null
+ },
+ "research": {
+  "away_team": "Spain",
+  "closing": [],
+  "final_lock": [],
+  "final_lock_source": "absent",
+  "generated_at": "2026-10-21T10:46:45.487868+00:00",
+  "home_team": "Portugal",
+  "last_readings": [],
+  "match_id": "POR_ESP",
+  "result": {
+   "away_goals": 1,
+   "finished_at": "2026-07-06T21:30:00",
+   "goals": [
+    {
+     "detail": "Goal",
+     "minute": 91,
+     "player": "Mikel Merino",
+     "team": "away"
+    }
+   ],
+   "home_goals": 0,
+   "status_short": "FT"
+  }
+ },
+ "sources": {
+  "prediction": "GET /api/prediction/POR_ESP",
+  "research": "GET /api/research/POR_ESP",
+  "team_info": "GET /api/team-info/POR_ESP"
+ },
+ "stage": "R16",
+ "team_info": {
+  "away": {
+   "attack": 1.45,
+   "defence": 0.65,
+   "fatigue": 0.2,
+   "form": 0.9,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "CAMPEONES DEL MUNDO. The final was the thesis made flesh: 120 minutes, 2.52 xG created, 0.07 conceded — Argentina never truly touched the ball — settled by Ferran Torres in the 106th. Rodri's midfield strangled every opponent behind the tournament's best line-breaking passing; ONE goal conceded in eight matches (De Ketelaere's quarterfinal counter — nothing else, all month), 0.29 opponent-adjusted xGA per game, unbeaten: a goalless opening draw with Cabo Verde, then seven straight wins. The most complete champion of the modern era: total control, total ruthlessness, and when the game demanded patience against ten men, total calm. Second star earned — 2010's heirs delivered.",
+   "team": "Spain"
+  },
+  "home": {
+   "attack": 1.17,
+   "defence": 1.06,
+   "fatigue": 0.24,
+   "form": 0.8,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Eliminated by Spain in the R16.",
+   "team": "Portugal"
+  },
+  "match_id": "POR_ESP"
+ },
+ "venue": "AT&T Stadium, Arlington"
+}

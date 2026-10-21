@@ -1,0 +1,88 @@
+{
+ "away": "Norway",
+ "home": "Brazil",
+ "kickoff": "2026-07-05T20:00:00+00:00",
+ "match_id": "BRA_NOR",
+ "prediction": {
+  "age_seconds": 0,
+  "archive_note": "no frozen pre-match record survives for this match — its T-10 lock predates the archive discipline; retrospective re-simulation is deliberately not shown on review pages",
+  "confidence": null,
+  "freshness": "archive-incomplete",
+  "generated_at": "2026-10-21T10:46:53.496785+00:00",
+  "is_final": false,
+  "is_stale": false,
+  "markets": [],
+  "match_id": "BRA_NOR",
+  "scorelines": [],
+  "source": "archive_incomplete",
+  "suggestions": [],
+  "summary": null,
+  "xg": null
+ },
+ "research": {
+  "away_team": "Norway",
+  "closing": [],
+  "final_lock": [],
+  "final_lock_source": "absent",
+  "generated_at": "2026-10-21T10:46:55.096467+00:00",
+  "home_team": "Brazil",
+  "last_readings": [],
+  "match_id": "BRA_NOR",
+  "result": {
+   "away_goals": 2,
+   "finished_at": "2026-07-05T22:30:00",
+   "goals": [
+    {
+     "detail": "Goal - Header",
+     "minute": 79,
+     "player": "Erling Haaland",
+     "team": "away"
+    },
+    {
+     "detail": "Goal",
+     "minute": 90,
+     "player": "Erling Haaland",
+     "team": "away"
+    },
+    {
+     "detail": "Penalty - Scored",
+     "minute": 100,
+     "player": "Neymar",
+     "team": "home"
+    }
+   ],
+   "home_goals": 1,
+   "status_short": "FT"
+  }
+ },
+ "sources": {
+  "prediction": "GET /api/prediction/BRA_NOR",
+  "research": "GET /api/research/BRA_NOR",
+  "team_info": "GET /api/team-info/BRA_NOR"
+ },
+ "stage": "R16",
+ "team_info": {
+  "away": {
+   "attack": 1.3,
+   "defence": 1.06,
+   "fatigue": 0.2,
+   "form": 0.8,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Haaland is the whole plan — and it works. Beat Brazil and Senegal despite being out-created in both; the finishing is clinical, the defence genuinely leaky (conceded 2.05 xG to Senegal, 2.57 to Brazil). Direct, vertical and transition-hungry, with real set-piece height from Østigård and Haaland. Rides its keeper and its striker. Underrated by the rating after beating Brazil, but the back line can be got at.",
+   "team": "Norway"
+  },
+  "home": {
+   "attack": 1.45,
+   "defence": 0.8,
+   "fatigue": 0.24,
+   "form": 0.7,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Eliminated by Norway in the R16.",
+   "team": "Brazil"
+  },
+  "match_id": "BRA_NOR"
+ },
+ "venue": "MetLife Stadium, NJ"
+}

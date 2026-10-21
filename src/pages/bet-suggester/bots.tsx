@@ -1,15 +1,19 @@
 // The Bot Arena — the paper-trading bots, each a betting philosophy,
 // scored against the same real Kalshi books the model prices. Hypothetical
 // money by design: this page is a strategy laboratory, not a broker.
-// Ledger polls every 60s (the backend bot tick's cadence).
+//
+// FROZEN 2026-10-21 (cleanup C1). The bot tick and GET /api/bots are being
+// removed with the rest of the WC26 backend. The ledger below is that
+// route's last answer, verbatim, in src/data/wc26/bots.json — every
+// position was already closed, so nothing on it could still move.
 import Head from "next/head";
-import { useState } from "react";
-import { usePoll } from "../../lib/usePoll";
-import { api, pct, BotLedger, BotPositionRow, BotsResponse } from "../../lib/suggesterApi";
+import { pct, BotLedger, BotPositionRow, BotsResponse } from "../../lib/suggesterApi";
 import { Eyebrow, Reveal } from "../../components/ui";
 import { RouteProgress, TopBar } from "../../components/chrome";
+import frozen from "../../data/wc26/bots.json";
 
-const POLL_MS = 60 * 1000;
+// Narrowed once, where the file enters. JSON imports widen literal unions.
+const LEDGER = frozen as unknown as { frozen_at: string; payload: BotsResponse };
 
 function money(v: number): string {
   const sign = v < 0 ? "−" : "";
@@ -142,23 +146,8 @@ function BotCard({ b, start }: { b: BotLedger; start: number }) {
 }
 
 export default function BotArena() {
-  const [data, setData] = useState<BotsResponse | null>(null);
-  const [err, setErr] = useState("");
-
-  // Every POLL_MS through lib/usePoll (audit F5): no overlap, paused in a
-  // hidden tab, backing off while it fails.
-  usePoll(async (signal) => {
-    try {
-      const d = await api.bots();
-      if (!signal.aborted) { setData(d); setErr(""); }
-      return "ok";
-    } catch {
-      if (!signal.aborted && !data) setErr("Couldn't reach the bot ledger.");
-      return "failed";
-    }
-  }, POLL_MS, []);
-
-  const bots = data?.bots ?? [];
+  const data = LEDGER.payload;
+  const bots = data.bots;
   const ranked = [...bots].sort((a, b) => b.net_pnl - a.net_pnl);
 
   return (
@@ -179,16 +168,20 @@ export default function BotArena() {
           control group: a coin-flip placebo, a model-blind price follower,
           a last-15-minutes sniper, a martingale cautionary tale, and a
           scholar that copies whatever the winning ledgers hold. Same fee
-          model as the strategy page; every bot starts from a ${data?.start_bankroll ?? 1000}
+          model as the strategy page; every bot starts from a ${data.start_bankroll ?? 1000}
           {" "}bankroll. Nothing here is real money or advice; it&apos;s a
           scoreboard for instincts.
         </p>
 
-        {err && <p className="mt-8 text-sm text-neg">{err}</p>}
+        <p className="mt-4 font-mono text-[11px] tracking-wide text-ink-faint"
+           data-testid="bots-frozen">
+          Archived ledger, frozen {LEDGER.frozen_at.slice(0, 10)} after the
+          tournament ended. It no longer updates.
+        </p>
 
         <div className="mt-10 grid gap-5 md:grid-cols-2">
           {ranked.map((b) => (
-            <BotCard key={b.bot} b={b} start={data?.start_bankroll ?? 1000} />
+            <BotCard key={b.bot} b={b} start={data.start_bankroll ?? 1000} />
           ))}
         </div>
       </main>

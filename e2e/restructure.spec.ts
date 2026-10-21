@@ -295,7 +295,7 @@ for (const path of [
   "/bet-suggester/leagues",
   "/bet-suggester/wc26",
   "/bet-suggester/comp/asean",
-  "/bet-suggester/market/104",
+  "/bet-suggester/market/FINAL",
   "/bet-suggester/friendlies/12345",
 ]) {
   test(`SSR HTML carries a real <title> for ${path}`, async ({ request }) => {
@@ -317,7 +317,7 @@ test("bots and market pages both point back to the wc26 archive page",
     await page.goto("/bet-suggester/bots");
     await expect(page.getByRole("link", { name: "wc26" }))
       .toHaveAttribute("href", "/bet-suggester/wc26");
-    await page.goto("/bet-suggester/market/104");
+    await page.goto("/bet-suggester/market/FINAL");
     await expect(page.getByRole("link", { name: "wc26" }))
       .toHaveAttribute("href", "/bet-suggester/wc26");
   });

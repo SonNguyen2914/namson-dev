@@ -30,8 +30,13 @@ import { expect, test } from "@playwright/test";
 //      `tot > 0 ? h/tot : 50`: a value the feed never sent drew a
 //      perfect half-and-half bar, a measured dead heat off nothing.
 //
-// Plus the stale type behind the red-card marker, and the source-derived
-// registry guard at the foot of the file.
+// Plus the source-derived registry guard at the foot of the file.
+//
+// 2026-10-21 (cleanup C1): shapes 1 and 3, the red-card marker and the
+// LivePanel field guards were retired with the surfaces they pinned. The
+// WC26 bracket now renders a frozen file (src/data/wc26/bracket.json)
+// and makes no read that could fail; LiveScoreboard and LivePanel were
+// deleted with the WC26 live routes. Their registry records went too.
 
 const json = (body: unknown, status = 200) => ({
   status, contentType: "application/json", body: JSON.stringify(body),
@@ -40,165 +45,6 @@ type Page = import("@playwright/test").Page;
 
 const words = async (page: Page): Promise<string> =>
   (await page.locator("body").innerText()).replace(/\s+/g, " ");
-
-// --------------------------------------------------------- the bracket
-
-const BRACKET_URL = "**/api/bet-suggester/bracket";
-
-/** A bracket whose quarter-finals exist — the state in which the
- *  component draws a road. Minimal, and every field it reads is here. */
-const A_DRAWN_BRACKET = {
-  champion: null,
-  champion_forecast: null,
-  round_of_16: [],
-  quarterfinals: [{
-    match_id: "QF1", home: "Spain", away: "France",
-    home_resolved: true, away_resolved: true, fully_resolved: true,
-    kickoff: "2030-07-01T18:00:00+00:00", venue: "MetLife", stage: "QF",
-    probs: { home_win: 0.52, draw: 0.24, away_win: 0.24 },
-    result: null, forecast: null,
-  }],
-  semifinals: [], third_place: [], final: [],
-};
-
-test("the bracket says a failed read failed — a vanished section is read "
-   + "as 'there is no bracket' and this one had no evidence for that",
-  async ({ page }) => {
-    await page.route(BRACKET_URL,
-      (r) => r.fulfill(json({ error: "bracket build failed" }, 503)));
-    await page.goto("/bet-suggester/wc26");
-    const notice = page.getByTestId("bracket-read-failed");
-    await expect(notice).toBeVisible();
-    await expect(notice).toContainText("could not ask");
-  });
-
-test("a bracket that ANSWERED with no quarter-finals renders nothing — the "
-   + "draw is not made, and that is a fact the backend supplied",
-  async ({ page }) => {
-    // The non-vacuity half. If the failure notice fired here too it
-    // would be the same collapse pointing the other way.
-    // HERMETIC (2026-09-25). This mocked the bracket and nothing else,
-    // then asserted the WHOLE PAGE never said "could not ask" — so the
-    // unmocked live-scores read decided the result: against a backend
-    // that answered it passed, against none it failed, and in CI that
-    // backend was production. The catch-all goes on first, the scoreboard
-    // answers "nothing live", and the claim is read off the bracket's own
-    // section, which is the only thing it is about.
-    await page.route("**/api/**", (r) => r.fulfill(json({}, 503)));
-    await page.route("**/api/bet-suggester/live-scores",
-      (r) => r.fulfill(json({ live: [] })));
-    const answered = page.waitForResponse((r) => r.url().includes("/bracket"));
-    await page.route(BRACKET_URL, (r) => r.fulfill(json({
-      ...A_DRAWN_BRACKET, quarterfinals: [],
-    })));
-    await page.goto("/bet-suggester/wc26");
-    await answered;
-    await page.waitForTimeout(500);
-    await expect(page.getByTestId("bracket-read-failed")).toHaveCount(0);
-    expect(await page.locator("#bracket").innerText())
-      .not.toContain("could not ask");
-  });
-
-test("a decided tournament is read once: the archive stops polling when the "
-   + "bracket names a champion", async ({ page }) => {
-    // AUDIT F6 (2026-09-25): the WC26 archive polled ~9 reads a minute
-    // per tab — live scores every 15s, the bracket, suggestions, upcoming,
-    // watchlist and alerts every 60s — for a final Spain had already won.
-    let reads = 0;
-    await page.route("**/api/**", (r) => {
-      reads += 1;
-      return r.fulfill(json({}, 503));
-    });
-    await page.route("**/api/bet-suggester/live-scores", (r) => {
-      reads += 1;
-      return r.fulfill(json({ live: [] }));
-    });
-    await page.route(BRACKET_URL, (r) => {
-      reads += 1;
-      return r.fulfill(json({ ...A_DRAWN_BRACKET, champion: "Spain" }));
-    });
-    await page.clock.install();
-    await page.goto("/bet-suggester/wc26");
-    await expect(page.locator("body")).toContainText("Road to the final");
-    await expect(page.locator("body")).toContainText(/Archived — Spain won/);
-    await page.clock.runFor(5_000);
-    const settled = reads;
-    await page.clock.runFor(300_000);
-    expect(reads, "a finished tournament kept being polled").toBe(settled);
-  });
-
-test("a bracket that answered and then stopped answering keeps the road and "
-   + "says the read behind it is the earlier one", async ({ page }) => {
-    // THE POLL IS SIXTY SECONDS AND THIS TEST HAS TO SEE THE SECOND ONE.
-    // A version of this that fired a `focus` event and asserted nothing
-    // afterwards would pass against a component that dropped the road
-    // entirely — a test that cannot fail, which is one of the shapes
-    // this round is hunting. The clock is driven instead.
-    await page.clock.install();
-    let calls = 0;
-    await page.route(BRACKET_URL, (r) => {
-      calls += 1;
-      return calls === 1
-        ? r.fulfill(json(A_DRAWN_BRACKET))
-        : r.fulfill(json({ error: "the bracket build fell over" }, 503));
-    });
-    await page.goto("/bet-suggester/wc26");
-    // the first read landed and the road is drawn
-    await expect(page.locator("body")).toContainText("Road to the final");
-    await expect(page.getByTestId("bracket-read-failed")).toHaveCount(0);
-    // …and when the next poll fails the road STAYS, labelled as the
-    // earlier read rather than vanishing
-    await page.clock.fastForward(61_000);
-    const notice = page.getByTestId("bracket-read-failed");
-    await expect(notice).toBeVisible();
-    await expect(notice).toContainText("has not been refreshed");
-    await expect(page.locator("body")).toContainText("Road to the final");
-    expect(calls).toBeGreaterThan(1);
-  });
-
-// A LEADER IS A COMPARISON AND A COMPARISON NEEDS TWO NUMBERS.
-//
-// The bracket card tints one side in the accent ink it uses to mean
-// "the model's pick". That verdict was computed from
-// `const hp = m.probs?.home_win ?? 0; const ap = m.probs?.away_win ?? 0`
-// — so a card carrying one side's probability and not the other still
-// produced a winner, off a zero nobody measured, and drew it in the
-// colour that says the model chose it. The tint is read here through
-// `data-leader`, which is derived from the same value the class is: a
-// colour is not something a test can assert on honestly, so the claim
-// rides where it can be read.
-
-const oneSided = {
-  ...A_DRAWN_BRACKET,
-  quarterfinals: [{
-    ...A_DRAWN_BRACKET.quarterfinals[0],
-    probs: { home_win: 0.52 } as Record<string, number>,
-  }],
-};
-
-test("a bracket card missing one side's probability picks NEITHER side — "
-   + "the accent ink is a verdict and a zero-fill is not evidence",
-  async ({ page }) => {
-    await page.route(BRACKET_URL, (r) => r.fulfill(json(oneSided)));
-    await page.goto("/bet-suggester/wc26");
-    await expect(page.locator("body")).toContainText("Road to the final");
-    const leaders = page.locator('[data-testid="bracket-team"][data-leader="true"]');
-    await expect(leaders).toHaveCount(0);
-    // …and the side that WAS sent still prints its number, so this is a
-    // withheld verdict and not a withheld read
-    await expect(page.locator("body")).toContainText("52.0%");
-  });
-
-test("a bracket card with BOTH probabilities does pick a side", async ({ page }) => {
-    // THE NON-VACUITY HALF. A card that tinted nobody, ever, would pass
-    // the test above and mean nothing.
-    await page.route(BRACKET_URL, (r) => r.fulfill(json(A_DRAWN_BRACKET)));
-    await page.goto("/bet-suggester/wc26");
-    await expect(page.locator("body")).toContainText("Road to the final");
-    const leaders = page.locator('[data-testid="bracket-team"][data-leader="true"]');
-    await expect(leaders).toHaveCount(1);
-    await expect(leaders).toHaveText(/Spain/);
-  });
 
 // ------------------------------------------------------ the tournament
 
@@ -240,192 +86,6 @@ test("a 404 tournament read stays silent — the feature switch still "
     await expect(page.getByTestId("tournament-read-failed")).toHaveCount(0);
     await expect(page.getByTestId("tournament-read-stale")).toHaveCount(0);
     expect(await words(page)).not.toContain("could not ask");
-  });
-
-// -------------------------------------------- the live scoreboard rows
-
-const SB = "**/api/bet-suggester/live-scores";
-
-const liveMatch = (over: Record<string, unknown> = {}) => ({
-  match_id: "m1", home: "Spain", away: "France",
-  home_goals: 2, away_goals: 1, minutes_elapsed: 65,
-  status_short: "2H",
-  // the provider's vocabulary: `Column(Integer, default=0)`
-  red_home: 0, red_away: 0,
-  goals_list: [], is_finished: false, ...over,
-});
-
-/** The three side reads the live card makes, answered with "nothing for
- *  this match", so a test about ONE of them is not measuring the
- *  others' failure lines. */
-async function quietExtras(page: Page) {
-  await page.route("**/api/bet-suggester/live-auto/**", (r) => r.fulfill(
-    json({ match_id: "m1", available: false, reason: "no run" })));
-  await page.route("**/api/bet-suggester/live-signals**",
-    (r) => r.fulfill(json({ signals: [] })));
-  await page.route("**/api/bet-suggester/team-news/**", (r) => r.fulfill(
-    json({ home_team: "Spain", away_team: "France", kickoff:
-           "2030-07-01T18:00:00+00:00", available: false })));
-}
-
-const statsPayload = (rows: { key: string; label: string;
-                              home: string; away: string }[]) => ({
-  match_id: "m1", home_team: "Spain", away_team: "France",
-  available: true, rows,
-});
-
-test("a stat the feed did not send draws NO share bar — `|| 0` made an "
-   + "unread pair a measured 50/50", async ({ page }) => {
-    await page.route(SB, (r) => r.fulfill(json({ live: [liveMatch()] })));
-    await quietExtras(page);
-    await page.route("**/api/bet-suggester/live-stats/**", (r) => r.fulfill(
-      json(statsPayload([
-        { key: "possession", label: "Possession", home: "—", away: "—" },
-        { key: "shots", label: "Shots", home: "9", away: "4" },
-      ]))));
-    await page.goto("/bet-suggester/wc26");
-    const undrawn = page.getByTestId("stat-share-undrawn");
-    await expect(undrawn).toHaveCount(1);
-    await expect(undrawn).toHaveAttribute("data-key", "possession");
-    await expect(undrawn).toContainText("not a number");
-  });
-
-test("a stat both sides genuinely scored 0 on says THAT, and not the same "
-   + "sentence as one that was never sent", async ({ page }) => {
-    // The non-vacuity half. A measured 0-0 and an unread pair both fail
-    // `tot > 0`; they are different facts and must not share a sentence.
-    await page.route(SB, (r) => r.fulfill(json({ live: [liveMatch()] })));
-    await quietExtras(page);
-    await page.route("**/api/bet-suggester/live-stats/**", (r) => r.fulfill(
-      json(statsPayload([
-        { key: "corners", label: "Corners", home: "0", away: "0" },
-      ]))));
-    await page.goto("/bet-suggester/wc26");
-    const undrawn = page.getByTestId("stat-share-undrawn");
-    await expect(undrawn).toContainText("both sides zero");
-    await expect(undrawn).not.toContainText("not a number");
-  });
-
-test("a stat with a real split still draws its bar", async ({ page }) => {
-    await page.route(SB, (r) => r.fulfill(json({ live: [liveMatch()] })));
-    await quietExtras(page);
-    await page.route("**/api/bet-suggester/live-stats/**", (r) => r.fulfill(
-      json(statsPayload([
-        { key: "shots", label: "Shots", home: "9", away: "4" },
-      ]))));
-    await page.goto("/bet-suggester/wc26");
-    await expect(page.locator("body")).toContainText("Shots");
-    await expect(page.getByTestId("stat-share-undrawn")).toHaveCount(0);
-  });
-
-test("an available stats read with no rows says so — it fell between the "
-   + "unavailable line and the block and drew nothing at all",
-  async ({ page }) => {
-    await page.route(SB, (r) => r.fulfill(json({ live: [liveMatch()] })));
-    await quietExtras(page);
-    await page.route("**/api/bet-suggester/live-stats/**",
-      (r) => r.fulfill(json(statsPayload([]))));
-    await page.goto("/bet-suggester/wc26");
-    await expect(page.getByTestId("live-stats-empty")).toBeVisible();
-    // and it is NOT the sentence a read that never landed gets
-    await expect(page.getByTestId("live-stats-failed")).toHaveCount(0);
-  });
-
-// ------------------------------------------------------ the red cards
-
-test("no red card renders no marker — and never the literal 0 that "
-   + "`{m.red_home && …}` draws over an integer", async ({ page }) => {
-    await page.route(SB, (r) => r.fulfill(json({ live: [liveMatch()] })));
-    await quietExtras(page);
-    await page.route("**/api/bet-suggester/live-stats/**",
-      (r) => r.fulfill(json({ match_id: "m1", available: false, rows: [] })));
-    await page.goto("/bet-suggester/wc26");
-    await expect(page.locator("body")).toContainText("Spain");
-    await expect(page.getByTestId("red-cards")).toHaveCount(0);
-    await expect(page.getByTestId("red-unreadable")).toHaveCount(0);
-    // the defect this pins: React draws `0` as a text node, so the name
-    // rendered as "Spain 0" on every card without a dismissal
-    expect(await words(page)).not.toContain("Spain 0");
-  });
-
-test("TWO red cards are two, not one — the count the feed carried was "
-   + "thrown away at the render", async ({ page }) => {
-    await page.route(SB, (r) => r.fulfill(json({
-      live: [liveMatch({ red_home: 2, red_away: 1 })] })));
-    await quietExtras(page);
-    await page.route("**/api/bet-suggester/live-stats/**",
-      (r) => r.fulfill(json({ match_id: "m1", available: false, rows: [] })));
-    await page.goto("/bet-suggester/wc26");
-    const marks = page.getByTestId("red-cards");
-    await expect(marks).toHaveCount(2);
-    // and the count is REAL TEXT, not a colour and not a `title=`
-    await expect(page.locator("body")).toContainText("Spain: 2 red cards");
-    await expect(page.locator("body")).toContainText("France: 1 red card");
-  });
-
-test("a red-card field in a shape neither vocabulary uses REFUSES — it "
-   + "does not fold into a clean sheet", async ({ page }) => {
-    await page.route(SB, (r) => r.fulfill(json({
-      live: [liveMatch({ red_home: "two", red_away: null })] })));
-    await quietExtras(page);
-    await page.route("**/api/bet-suggester/live-stats/**",
-      (r) => r.fulfill(json({ match_id: "m1", available: false, rows: [] })));
-    await page.goto("/bet-suggester/wc26");
-    await expect(page.getByTestId("red-unreadable")).toHaveCount(2);
-  });
-
-test("the legacy boolean shape still reads as one card", async ({ page }) => {
-    // `LiveStateFetch` documents "count (legacy: boolean)"; the coercion
-    // keeps that door open rather than refusing a shape the feed has
-    // demonstrably sent before.
-    await page.route(SB, (r) => r.fulfill(json({
-      live: [liveMatch({ red_home: true, red_away: false })] })));
-    await quietExtras(page);
-    await page.route("**/api/bet-suggester/live-stats/**",
-      (r) => r.fulfill(json({ match_id: "m1", available: false, rows: [] })));
-    await page.goto("/bet-suggester/wc26");
-    await expect(page.getByTestId("red-cards")).toHaveCount(1);
-    await expect(page.locator("body")).toContainText("Spain: 1 red card");
-  });
-
-// --------------------------------- the caveats that rode on a tooltip
-
-test("the auto levers' derivation is real text, not a hover", async ({ page }) => {
-    await page.route(SB, (r) => r.fulfill(json({ live: [liveMatch()] })));
-    await page.route("**/api/bet-suggester/live-signals**",
-      (r) => r.fulfill(json({ signals: [] })));
-    await page.route("**/api/bet-suggester/team-news/**", (r) => r.fulfill(
-      json({ home_team: "Spain", away_team: "France",
-             kickoff: "2030-07-01T18:00:00+00:00", available: false })));
-    await page.route("**/api/bet-suggester/live-stats/**",
-      (r) => r.fulfill(json({ match_id: "m1", available: false, rows: [] })));
-    await page.route("**/api/bet-suggester/live-auto/**", (r) => r.fulfill(json({
-      match_id: "m1", available: true,
-      teams: { home: "Spain", away: "France" },
-      markets: [],
-      levers: {
-        home: 1.08, away: 0.94, source: "shots",
-        basis: { sot_home: 5, sot_away: 2, shots_home: 12, shots_away: 6,
-                 actual_share_home: 0.67, expected_share_home: 0.55,
-                 volume_actual: 18, volume_expected: 15,
-                 minutes: 65, weight: 0.4, cap: [0.85, 1.15] },
-        momentum: { recent_share_home: 0.71, pressure_home: 3.1,
-                    pressure_away: 1.2, window_min: 10, as_of_minute: 65,
-                    mult_home: 1.06, mult_away: 0.95 },
-      },
-    })));
-    await page.goto("/bet-suggester/wc26");
-    // the block is behind a <details>, which IS in the accessible tree
-    // and IS reachable by keyboard — unlike the `title=` it replaced
-    const basis = page.getByTestId("lever-basis");
-    await expect(basis).toBeVisible();
-    await basis.getByRole("group").or(basis).first().click();
-    await expect(basis).toContainText("against an expected");
-    const mom = page.getByTestId("momentum-basis");
-    await mom.click();
-    await expect(mom).toContainText("not a forecast of the next few");
-    // and the instruction to hover is gone
-    expect(await words(page)).not.toContain("Hover the levers");
   });
 
 // ================================================================
@@ -517,18 +177,6 @@ export const REGISTERED_SWALLOWS: Record<string, Swallow> = {
     closes_when:
       "the result line stops printing the failure, or the status re-read "
       + "after a failed POST is removed.",
-  },
-  "livepanel:saved-read-parse": {
-    finding:
-      "LivePanel.loadSaved() folds a corrupt or unreadable localStorage "
-      + "entry to null. The value is this browser's own cached copy of a "
-      + "past state, not a read of anything: losing it restores the "
-      + "component's initial inputs, which are visibly the initial "
-      + "inputs, and no sentence anywhere claims the cache was consulted.",
-    closes_when:
-      "the saved read is ever presented as evidence of a past state "
-      + "rather than as a form's remembered inputs — then a parse "
-      + "failure must be named the way a fetch failure is.",
   },
   "field:mode-read": {
     finding:
@@ -650,30 +298,6 @@ export const REGISTERED_SWALLOWS: Record<string, Swallow> = {
       "the page tells the reader their choice was remembered, which would "
       + "then have to be derived from the write succeeding.",
   },
-  "livepanel:storage-write": {
-    finding:
-      "LivePanel's persist effect swallows a localStorage write failure "
-      + "(quota, private mode). Nothing on the surface promises the "
-      + "state was saved except the 'saved locally' line, which is "
-      + "printed from savedAt on the render path, not from the write.",
-    closes_when:
-      "the 'saved locally' line is derived from the write succeeding "
-      + "rather than from the fetch that produced the value.",
-  },
-  "market:live-chip": {
-    finding:
-      "The match page's top-bar live chip polls /live-scores every 45s "
-      + "and swallows a rejection. The chip's absence reads as 'nothing "
-      + "is in play', which is the same shape LiveScoreboard closed — "
-      + "but this page draws no scoreboard, so there is nowhere on it "
-      + "for a failure line to sit that is not the top bar itself, and "
-      + "a warn strip in the nav on every backend blip is a worse "
-      + "surface than a missing convenience link.",
-    closes_when:
-      "the chip stops being the only live indicator on this page (a "
-      + "watched strip or a live block lands here), or the top bar "
-      + "gains a place to state a coverage fact; then name it there.",
-  },
   "comp:kalshi-market-counts": {
     finding:
       "The competition page's /markets read adds a ' · N tradeable on "
@@ -684,16 +308,6 @@ export const REGISTERED_SWALLOWS: Record<string, Swallow> = {
     closes_when:
       "any number derived from this read is drawn with a default, or "
       + "the read starts backing a sentence about what Kalshi lists.",
-  },
-  "market:team-name-resolution": {
-    finding:
-      "The match page's display-name read falls back to the match id's "
-      + "own codes. The fallback is VISIBLE and TRUE ('BRA vs SRB'), so "
-      + "the failure does not render as a lookalike absence — there is "
-      + "no claim to correct.",
-    closes_when:
-      "anything on that page reads the resolved names as evidence "
-      + "(a scouting join, a market match) rather than as a heading.",
   },
 };
 
@@ -1116,48 +730,4 @@ test("la liga: two healthy model-state reads print no failure line, and the "
     await expect(page.getByTestId("model-state-read-failed")).toHaveCount(0);
     await expect(page.locator("body")).toContainText("needs-results");
     await expect(page.locator("body")).toContainText("xg join is thin");
-  });
-
-// ======================================================================
-// THE FEED'S ABSENT FIELDS ARE NOT ZEROS (2026-09-06 audit, fixed
-// 2026-09-07)
-//
-// LivePanel.autoFill filled the operator's live-state form with
-// `s.current_home ?? 0`, `s.current_away ?? 0` and
-// `Math.min(3, Number(s.red_home) || 0)`. Every one of those fields is
-// OPTIONAL on LiveStateFetch, so a feed response that carried no score
-// produced a measured 0-0 with no red cards — and the panel then ran a
-// real live prediction against it. This is the plane's oldest trap on
-// the one surface where the operator cannot see the payload behind the
-// number.
-// ======================================================================
-
-const LIVE_PANEL = readFileSync(
-  join(SRC, "components", "LivePanel.tsx"), "utf8");
-
-test("LivePanel never coerces an absent feed field into a number",
-  async () => {
-    // The three literals that shipped the defect. A source guard rather
-    // than a DOM one because the defect is the DEFAULT — a rendered 0 is
-    // indistinguishable from a real 0, which is the whole problem, so
-    // the only place it can be caught is where the 0 is invented.
-    for (const bad of ["current_home ?? 0", "current_away ?? 0",
-                       "Number(s.red_home) || 0",
-                       "Number(s.red_away) || 0"]) {
-      expect(LIVE_PANEL, `LivePanel invents a zero: ${bad}`)
-        .not.toContain(bad);
-    }
-    // NON-VACUITY: the fields are still read, so the guard is watching
-    // live code and not a deleted block.
-    expect(LIVE_PANEL).toContain("s.current_home");
-    expect(LIVE_PANEL).toContain("s.red_home");
-  });
-
-test("LivePanel says which fields the feed did not carry", async () => {
-    // A field left alone silently is the same blank as a field zeroed
-    // silently: the operator cannot tell the panel skipped it. The
-    // absence is named on the message the fill writes.
-    expect(LIVE_PANEL).toContain("notCarried");
-    expect(LIVE_PANEL).toContain("did not carry");
-    expect(LIVE_PANEL).toContain("not zeroed");
   });

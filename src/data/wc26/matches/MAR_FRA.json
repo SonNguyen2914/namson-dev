@@ -1,0 +1,82 @@
+{
+ "away": "France",
+ "home": "Morocco",
+ "kickoff": "2026-07-09T20:00:00+00:00",
+ "match_id": "MAR_FRA",
+ "prediction": {
+  "age_seconds": 0,
+  "archive_note": "no frozen pre-match record survives for this match — its T-10 lock predates the archive discipline; retrospective re-simulation is deliberately not shown on review pages",
+  "confidence": null,
+  "freshness": "archive-incomplete",
+  "generated_at": "2026-10-21T10:47:13.171230+00:00",
+  "is_final": false,
+  "is_stale": false,
+  "markets": [],
+  "match_id": "MAR_FRA",
+  "scorelines": [],
+  "source": "archive_incomplete",
+  "suggestions": [],
+  "summary": null,
+  "xg": null
+ },
+ "research": {
+  "away_team": "France",
+  "closing": [],
+  "final_lock": [],
+  "final_lock_source": "absent",
+  "generated_at": "2026-10-21T10:47:14.771488+00:00",
+  "home_team": "Morocco",
+  "last_readings": [],
+  "match_id": "MAR_FRA",
+  "result": {
+   "away_goals": 2,
+   "finished_at": "2026-07-09T22:30:00",
+   "goals": [
+    {
+     "detail": "Goal",
+     "minute": 60,
+     "player": "Kylian Mbappé",
+     "team": "away"
+    },
+    {
+     "detail": "Goal",
+     "minute": 66,
+     "player": "Ousmane Dembélé",
+     "team": "away"
+    }
+   ],
+   "home_goals": 0,
+   "status_short": "FT"
+  }
+ },
+ "sources": {
+  "prediction": "GET /api/prediction/MAR_FRA",
+  "research": "GET /api/research/MAR_FRA",
+  "team_info": "GET /api/team-info/MAR_FRA"
+ },
+ "stage": "QF",
+ "team_info": {
+  "away": {
+   "attack": 1.45,
+   "defence": 0.86,
+   "fatigue": 0.18,
+   "form": 0.95,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Fourth, in the strangest way possible: out-created England 2.99 to 2.34 in the third-place game and still lost it 4-6 — Mbappé twice and Barcola scored, but every French mistake was punished at maximum price. The tournament read stands: the most dangerous transition attack in the field (Mbappé finished with 10 goals across the month, the tournament's top scorer), elite defensive numbers until the last two matches, and an ending — 0.48 xG managed against Spain, then carnival defending against England — that says the legs and the focus emptied together. The talent travels to 2030 intact; the question is everything around it.",
+   "team": "France"
+  },
+  "home": {
+   "attack": 1.05,
+   "defence": 0.8,
+   "fatigue": 0.22,
+   "form": 0.85,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Out at the quarterfinal, and the ceiling was always creation: 0-2 to France with 0.16 xG generated against 3.52 conceded — Morocco out-passed France and never threatened. Still a historic run built on a disciplined mid-block, Bounou's goalkeeping and Hakimi/Saïbari counters; they leave having allowed the fewest clear chances of any eliminated side.",
+   "team": "Morocco"
+  },
+  "match_id": "MAR_FRA"
+ },
+ "venue": "Gillette Stadium, Boston"
+}

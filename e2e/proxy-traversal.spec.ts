@@ -131,15 +131,18 @@ test.describe("proxy traversal", () => {
       const all = routes();
       // NON-VACUITY: the enumeration found the routes the audit named
       const templates = all.map((r) => r.template);
-      expect(all.length).toBeGreaterThan(35);
-      for (const t of ["/api/bet-suggester/prediction",
-                       "/api/bet-suggester/team-info/{seg}",
-                       "/api/mls/{...}",
+      // (the WC26 proxies — prediction, team-info and eighteen more —
+      // were deleted 2026-10-21 in cleanup C1; the card route is the
+      // remaining two-segment template)
+      expect(all.length).toBeGreaterThan(20);
+      for (const t of ["/api/card/{seg}/{seg}",
+                       "/api/ops/trading-ledger", "/api/mls/{...}",
                        "/api/{seg}/{...}"]) {
         expect(templates).toContain(t);
       }
-      expect(all.find((r) => r.template === "/api/bet-suggester/prediction")!
-        .params).toEqual(["force_refresh", "match_id"]);
+      expect(all.find((r) => r.template === "/api/ops/trading-ledger")!
+        .params).toEqual(["competition", "limit", "offset", "phase", "since",
+                          "until"]);
 
       const run = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
       const shots: { method: string; url: string }[] = [];
@@ -147,8 +150,7 @@ test.describe("proxy traversal", () => {
       const canary = () => `__cnry${run}x${(n += 1)}`;
       const enc = encodeURIComponent;
       for (const r of all) {
-        const methods = /watchlist\.ts$/.test(r.file) ? ["GET", "DELETE"]
-          : /\/live\.ts$/.test(r.file) ? ["POST"] : ["GET"];
+        const methods = ["GET"];
         for (const raw of PAYLOADS) {
           // every slot gets the payload, each with its own canary; the
           // generic prefix slot is held at a real prefix here and walked
@@ -188,10 +190,9 @@ test.describe("proxy traversal", () => {
 
       // POSITIVE CONTROL: an ordinary value still arrives where it should,
       // so an empty log cannot pass this test by being empty
-      const ok = `M${run}`;
-      shots.push({ method: "GET",
-        url: `/api/bet-suggester/prediction?match_id=${ok}` });
-      shots.push({ method: "GET", url: `/api/bet-suggester/team-info/${ok}` });
+      // the card route admits digits only, so its control id is numeric
+      const okId = String(Date.now()).slice(-9);
+      shots.push({ method: "GET", url: `/api/card/mls-2026/${okId}` });
 
       const started = new Date().toISOString();
       const statuses = new Map<number, number>();
@@ -235,8 +236,7 @@ test.describe("proxy traversal", () => {
 
       // …and the ordinary value did arrive, verbatim, where it belongs
       const urls = seen.map((e) => e.url);
-      expect(urls).toContain(`/api/prediction/${ok}?force_refresh=false`);
-      expect(urls).toContain(`/api/team-info/${ok}`);
+      expect(urls).toContain(`/api/news/fixture/${okId}`);
     });
 
   test("out-of-range numeric parameters are refused before any backend is "
@@ -247,7 +247,6 @@ test.describe("proxy traversal", () => {
         [`/api/picker/review?back=99999&r${run}=1`, 400],
         [`/api/comp/ucl/fixtures?days=9999&r${run}=1`, 400],
         [`/api/championships/board?days=400&r${run}=1`, 400],
-        [`/api/bet-suggester/upcoming?hours_ahead=99999&r${run}=1`, 400],
         // and an in-range one is forwarded (the stand-in answers 503)
         [`/api/mls/schedule?days=7&r${run}=1`, 503],
       ] as const;

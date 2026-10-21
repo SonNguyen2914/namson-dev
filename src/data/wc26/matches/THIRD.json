@@ -1,0 +1,1201 @@
+{
+ "away": "England",
+ "home": "France",
+ "kickoff": "2026-07-18T21:00:00+00:00",
+ "match_id": "THIRD",
+ "prediction": {
+  "age_seconds": 0,
+  "confidence": 0.4679,
+  "freshness": "locked",
+  "generated_at": "2026-07-18T20:50:03.792410",
+  "is_final": true,
+  "is_stale": false,
+  "markets": [
+   {
+    "edge": 0.0123,
+    "expected_value": 1.23,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA0ENG3",
+    "market_title": "Exact score: England 3-0 France",
+    "model_probability": 0.0223,
+    "outcome_key": "score_0_3"
+   },
+   {
+    "edge": 0.03294,
+    "expected_value": 1.0978,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "market_id": "KXWCSPREAD-26JUL18FRAENG-ENG3",
+    "market_title": "England to win by 3+ goals",
+    "model_probability": 0.06294,
+    "outcome_key": "away_margin_3"
+   },
+   {
+    "edge": 0.05856,
+    "expected_value": 0.6505,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "market_id": "KXWCSPREAD-26JUL18FRAENG-ENG2",
+    "market_title": "England to win by 2+ goals",
+    "model_probability": 0.14856,
+    "outcome_key": "away_margin_2"
+   },
+   {
+    "edge": 0.013259999999999994,
+    "expected_value": 0.4419,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA0ENG2",
+    "market_title": "Exact score: England 2-0 France",
+    "model_probability": 0.04325999999999999,
+    "outcome_key": "score_0_2"
+   },
+   {
+    "edge": 0.01655999999999999,
+    "expected_value": 0.414,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA0ENG1",
+    "market_title": "Exact score: England 1-0 France",
+    "model_probability": 0.05655999999999999,
+    "outcome_key": "score_0_1"
+   },
+   {
+    "edge": 0.004139999999999998,
+    "expected_value": 0.414,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA1ENG4",
+    "market_title": "Exact score: England 4-1 France",
+    "model_probability": 0.014139999999999998,
+    "outcome_key": "score_1_4"
+   },
+   {
+    "edge": 0.08592000000000002,
+    "expected_value": 0.3919,
+    "implied_probability": 0.22,
+    "kalshi_odds": 4.55,
+    "market_id": "KXWCGAME-26JUL18FRAENG-ENG",
+    "market_title": "England to win (90 min)",
+    "model_probability": 0.30592,
+    "outcome_key": "away_win"
+   },
+   {
+    "edge": 0.09683999999999998,
+    "expected_value": 0.3141,
+    "implied_probability": 0.31,
+    "kalshi_odds": 3.23,
+    "market_id": "KXWCADVANCE-26JUL18FRAENG-ENG",
+    "market_title": "England to advance",
+    "model_probability": 0.40684,
+    "outcome_key": "away_advance"
+   },
+   {
+    "edge": 0.006900000000000003,
+    "expected_value": 0.2299,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "market_id": "KXWCFTTS-26JUL18FRAENG-NONE",
+    "market_title": "No goal in the match",
+    "model_probability": 0.0369,
+    "outcome_key": "no_goal"
+   },
+   {
+    "edge": 0.00132,
+    "expected_value": 0.132,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA2ENG4",
+    "market_title": "Exact score: England 4-2 France",
+    "model_probability": 0.01132,
+    "outcome_key": "score_2_4"
+   },
+   {
+    "edge": 0.04902000000000001,
+    "expected_value": 0.1283,
+    "implied_probability": 0.38,
+    "kalshi_odds": 2.63,
+    "market_id": "KXWCFTTS-26JUL18FRAENG-ENG",
+    "market_title": "England to score first",
+    "model_probability": 0.42902,
+    "outcome_key": "away_first_goal"
+   },
+   {
+    "edge": 0.003599999999999999,
+    "expected_value": 0.1199,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA1ENG3",
+    "market_title": "Exact score: England 3-1 France",
+    "model_probability": 0.0336,
+    "outcome_key": "score_1_3"
+   },
+   {
+    "edge": 0.0011400000000000004,
+    "expected_value": 0.114,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA0ENG4",
+    "market_title": "Exact score: England 4-0 France",
+    "model_probability": 0.01114,
+    "outcome_key": "score_0_4"
+   },
+   {
+    "edge": 0.0011400000000000021,
+    "expected_value": 0.0166,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA1ENG0",
+    "market_title": "Exact score: France 1-0 England",
+    "model_probability": 0.07114000000000001,
+    "outcome_key": "score_1_0"
+   },
+   {
+    "edge": 0.0003599999999999992,
+    "expected_value": 0.0054,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA1ENG2",
+    "market_title": "Exact score: England 2-1 France",
+    "model_probability": 0.07036,
+    "outcome_key": "score_1_2"
+   },
+   {
+    "edge": -0.005279999999999951,
+    "expected_value": -0.0071,
+    "implied_probability": 0.96,
+    "kalshi_odds": 1.04,
+    "market_id": "KXWCTOTAL-26JUL18FRAENG-1",
+    "market_title": "Over 0.5 total goals",
+    "model_probability": 0.95472,
+    "outcome_key": "over_0_5"
+   },
+   {
+    "edge": -0.0007199999999999984,
+    "expected_value": -0.0144,
+    "implied_probability": 0.05,
+    "kalshi_odds": 20.0,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA0ENG0",
+    "market_title": "Exact score: 0-0 draw",
+    "model_probability": 0.049280000000000004,
+    "outcome_key": "score_0_0"
+   },
+   {
+    "edge": -0.00204,
+    "expected_value": -0.0204,
+    "implied_probability": 0.1,
+    "kalshi_odds": 10.0,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA1ENG1",
+    "market_title": "Exact score: 1-1 draw",
+    "model_probability": 0.09796,
+    "outcome_key": "score_1_1"
+   },
+   {
+    "edge": -0.001799999999999996,
+    "expected_value": -0.0298,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "market_id": "KXWCMOV-26JUL18FRAENG-ENGET",
+    "market_title": "England to win in extra time",
+    "model_probability": 0.0582,
+    "outcome_key": "away_win_et"
+   },
+   {
+    "edge": -0.028980000000000006,
+    "expected_value": -0.036,
+    "implied_probability": 0.86,
+    "kalshi_odds": 1.16,
+    "market_id": "KXWCTOTAL-26JUL18FRAENG-2",
+    "market_title": "Over 1.5 total goals",
+    "model_probability": 0.83102,
+    "outcome_key": "over_1_5"
+   },
+   {
+    "edge": -0.011520000000000002,
+    "expected_value": -0.0472,
+    "implied_probability": 0.24,
+    "kalshi_odds": 4.17,
+    "market_id": "KXWCGAME-26JUL18FRAENG-TIE",
+    "market_title": "Draw after 90 min",
+    "model_probability": 0.22848,
+    "outcome_key": "draw"
+   },
+   {
+    "edge": -0.04164000000000001,
+    "expected_value": -0.0637,
+    "implied_probability": 0.67,
+    "kalshi_odds": 1.49,
+    "market_id": "KXWCTOTAL-26JUL18FRAENG-3",
+    "market_title": "Over 2.5 total goals",
+    "model_probability": 0.62836,
+    "outcome_key": "over_2_5"
+   },
+   {
+    "edge": -0.0045600000000000085,
+    "expected_value": -0.0649,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA2ENG0",
+    "market_title": "Exact score: France 2-0 England",
+    "model_probability": 0.06544,
+    "outcome_key": "score_2_0"
+   },
+   {
+    "edge": -0.008459999999999995,
+    "expected_value": -0.0654,
+    "implied_probability": 0.13,
+    "kalshi_odds": 7.69,
+    "market_id": "KXWCTOTAL-26JUL18FRAENG-6",
+    "market_title": "Over 5.5 total goals",
+    "model_probability": 0.12154000000000001,
+    "outcome_key": "over_5_5"
+   },
+   {
+    "edge": -0.031019999999999992,
+    "expected_value": -0.0716,
+    "implied_probability": 0.44,
+    "kalshi_odds": 2.27,
+    "market_id": "KXWCTOTAL-26JUL18FRAENG-4",
+    "market_title": "Over 3.5 total goals",
+    "model_probability": 0.40898,
+    "outcome_key": "over_3_5"
+   },
+   {
+    "edge": -0.05280000000000007,
+    "expected_value": -0.078,
+    "implied_probability": 0.68,
+    "kalshi_odds": 1.47,
+    "market_id": "KXWCBTTS-26JUL18FRAENG-BTTS",
+    "market_title": "Both teams to score",
+    "model_probability": 0.6272,
+    "outcome_key": "btts"
+   },
+   {
+    "edge": -0.02052000000000001,
+    "expected_value": -0.078,
+    "implied_probability": 0.26,
+    "kalshi_odds": 3.85,
+    "market_id": "KXWCTOTAL-26JUL18FRAENG-5",
+    "market_title": "Over 4.5 total goals",
+    "model_probability": 0.23948,
+    "outcome_key": "over_4_5"
+   },
+   {
+    "edge": -0.001680000000000001,
+    "expected_value": -0.084,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA3ENG3",
+    "market_title": "Exact score: 3-3 draw",
+    "model_probability": 0.01832,
+    "outcome_key": "score_3_3"
+   },
+   {
+    "edge": -0.005279999999999993,
+    "expected_value": -0.0878,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "market_id": "KXWCMOV-26JUL18FRAENG-ENGPEN",
+    "market_title": "England to win on penalties",
+    "model_probability": 0.054720000000000005,
+    "outcome_key": "away_win_pens"
+   },
+   {
+    "edge": -0.07991999999999999,
+    "expected_value": -0.1254,
+    "implied_probability": 0.63,
+    "kalshi_odds": 1.59,
+    "market_id": "KXWCFTTS-26JUL18FRAENG-FRA",
+    "market_title": "France to score first",
+    "model_probability": 0.55008,
+    "outcome_key": "home_first_goal"
+   },
+   {
+    "edge": -0.009360000000000007,
+    "expected_value": -0.1335,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA2ENG2",
+    "market_title": "Exact score: 2-2 draw",
+    "model_probability": 0.06064,
+    "outcome_key": "score_2_2"
+   },
+   {
+    "edge": -0.10284000000000004,
+    "expected_value": -0.1461,
+    "implied_probability": 0.7,
+    "kalshi_odds": 1.43,
+    "market_id": "KXWCADVANCE-26JUL18FRAENG-FRA",
+    "market_title": "France to advance",
+    "model_probability": 0.5971599999999999,
+    "outcome_key": "home_advance"
+   },
+   {
+    "edge": -0.006420000000000002,
+    "expected_value": -0.1605,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA2ENG3",
+    "market_title": "Exact score: England 3-2 France",
+    "model_probability": 0.03358,
+    "outcome_key": "score_2_3"
+   },
+   {
+    "edge": -0.09239999999999998,
+    "expected_value": -0.1642,
+    "implied_probability": 0.57,
+    "kalshi_odds": 1.75,
+    "market_id": "KXWCGAME-26JUL18FRAENG-FRA",
+    "market_title": "France to win (90 min)",
+    "model_probability": 0.47759999999999997,
+    "outcome_key": "home_win"
+   },
+   {
+    "edge": -0.015839999999999993,
+    "expected_value": -0.1761,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "market_id": "KXWCMOV-26JUL18FRAENG-FRAET",
+    "market_title": "France to win in extra time",
+    "model_probability": 0.07416,
+    "outcome_key": "home_win_et"
+   },
+   {
+    "edge": -0.0126,
+    "expected_value": -0.1798,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "market_id": "KXWCMOV-26JUL18FRAENG-FRAPEN",
+    "market_title": "France to win on penalties",
+    "model_probability": 0.05740000000000001,
+    "outcome_key": "home_win_pens"
+   },
+   {
+    "edge": -0.009779999999999997,
+    "expected_value": -0.1956,
+    "implied_probability": 0.05,
+    "kalshi_odds": 20.0,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA3ENG0",
+    "market_title": "Exact score: France 3-0 England",
+    "model_probability": 0.040220000000000006,
+    "outcome_key": "score_3_0"
+   },
+   {
+    "edge": -0.001980000000000001,
+    "expected_value": -0.198,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA3ENG4",
+    "market_title": "Exact score: England 4-3 France",
+    "model_probability": 0.00802,
+    "outcome_key": "score_3_4"
+   },
+   {
+    "edge": -0.07230000000000003,
+    "expected_value": -0.2058,
+    "implied_probability": 0.35,
+    "kalshi_odds": 2.86,
+    "market_id": "KXWCSPREAD-26JUL18FRAENG-FRA2",
+    "market_title": "France to win by 2+ goals",
+    "model_probability": 0.27769999999999995,
+    "outcome_key": "home_margin_2"
+   },
+   {
+    "edge": -0.025499999999999995,
+    "expected_value": -0.2128,
+    "implied_probability": 0.12,
+    "kalshi_odds": 8.33,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA2ENG1",
+    "market_title": "Exact score: France 2-1 England",
+    "model_probability": 0.0945,
+    "outcome_key": "score_2_1"
+   },
+   {
+    "edge": -0.00234,
+    "expected_value": -0.234,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA5ENG0",
+    "market_title": "Exact score: France 5-0 England",
+    "model_probability": 0.00766,
+    "outcome_key": "score_5_0"
+   },
+   {
+    "edge": -0.00954,
+    "expected_value": -0.2385,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA4ENG1",
+    "market_title": "Exact score: France 4-1 England",
+    "model_probability": 0.03046,
+    "outcome_key": "score_4_1"
+   },
+   {
+    "edge": -0.0048000000000000004,
+    "expected_value": -0.24,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA4ENG0",
+    "market_title": "Exact score: France 4-0 England",
+    "model_probability": 0.0152,
+    "outcome_key": "score_4_0"
+   },
+   {
+    "edge": -0.041340000000000016,
+    "expected_value": -0.2435,
+    "implied_probability": 0.17,
+    "kalshi_odds": 5.88,
+    "market_id": "KXWCSPREAD-26JUL18FRAENG-FRA3",
+    "market_title": "France to win by 3+ goals",
+    "model_probability": 0.12866,
+    "outcome_key": "home_margin_3"
+   },
+   {
+    "edge": -0.025080000000000005,
+    "expected_value": -0.2787,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA3ENG1",
+    "market_title": "Exact score: France 3-1 England",
+    "model_probability": 0.06491999999999999,
+    "outcome_key": "score_3_1"
+   },
+   {
+    "edge": -0.0028199999999999996,
+    "expected_value": -0.282,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA2ENG5",
+    "market_title": "Exact score: England 5-2 France",
+    "model_probability": 0.007180000000000001,
+    "outcome_key": "score_2_5"
+   },
+   {
+    "edge": -0.018659999999999996,
+    "expected_value": -0.3109,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA3ENG2",
+    "market_title": "Exact score: France 3-2 England",
+    "model_probability": 0.04134,
+    "outcome_key": "score_3_2"
+   },
+   {
+    "edge": -0.007800000000000001,
+    "expected_value": -0.39,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA5ENG1",
+    "market_title": "Exact score: France 5-1 England",
+    "model_probability": 0.012199999999999999,
+    "outcome_key": "score_5_1"
+   },
+   {
+    "edge": -0.01566,
+    "expected_value": -0.3915,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA4ENG2",
+    "market_title": "Exact score: France 4-2 England",
+    "model_probability": 0.02434,
+    "outcome_key": "score_4_2"
+   },
+   {
+    "edge": -0.00786,
+    "expected_value": -0.393,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA4ENG3",
+    "market_title": "Exact score: France 4-3 England",
+    "model_probability": 0.01214,
+    "outcome_key": "score_4_3"
+   },
+   {
+    "edge": -0.00864,
+    "expected_value": -0.432,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA5ENG2",
+    "market_title": "Exact score: France 5-2 England",
+    "model_probability": 0.01136,
+    "outcome_key": "score_5_2"
+   }
+  ],
+  "match_id": "THIRD",
+  "scorelines": [],
+  "source": "canonical_archive",
+  "summary": null,
+  "xg": null
+ },
+ "research": {
+  "away_team": "England",
+  "closing": [],
+  "final_lock": [
+   {
+    "confidence": 0.4679,
+    "edge": 0.09683999999999998,
+    "implied_probability": 0.31,
+    "kalshi_odds": 3.23,
+    "locked_at": "2026-07-18T20:50:03.792442",
+    "market_id": "KXWCADVANCE-26JUL18FRAENG-ENG",
+    "market_title": "England to advance",
+    "model_probability": 0.40684,
+    "outcome_key": "away_advance"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.10284000000000004,
+    "implied_probability": 0.7,
+    "kalshi_odds": 1.43,
+    "locked_at": "2026-07-18T20:50:03.792441",
+    "market_id": "KXWCADVANCE-26JUL18FRAENG-FRA",
+    "market_title": "France to advance",
+    "model_probability": 0.5971599999999999,
+    "outcome_key": "home_advance"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": 0.04902000000000001,
+    "implied_probability": 0.38,
+    "kalshi_odds": 2.63,
+    "locked_at": "2026-07-18T20:50:03.792441",
+    "market_id": "KXWCFTTS-26JUL18FRAENG-ENG",
+    "market_title": "England to score first",
+    "model_probability": 0.42902,
+    "outcome_key": "away_first_goal"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.07991999999999999,
+    "implied_probability": 0.63,
+    "kalshi_odds": 1.59,
+    "locked_at": "2026-07-18T20:50:03.792441",
+    "market_id": "KXWCFTTS-26JUL18FRAENG-FRA",
+    "market_title": "France to score first",
+    "model_probability": 0.55008,
+    "outcome_key": "home_first_goal"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": 0.006900000000000003,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "locked_at": "2026-07-18T20:50:03.792440",
+    "market_id": "KXWCFTTS-26JUL18FRAENG-NONE",
+    "market_title": "No goal in the match",
+    "model_probability": 0.0369,
+    "outcome_key": "no_goal"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.0007199999999999984,
+    "implied_probability": 0.05,
+    "kalshi_odds": 20.0,
+    "locked_at": "2026-07-18T20:50:03.792440",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA0ENG0",
+    "market_title": "Exact score: 0-0 draw",
+    "model_probability": 0.049280000000000004,
+    "outcome_key": "score_0_0"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": 0.01655999999999999,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "locked_at": "2026-07-18T20:50:03.792440",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA0ENG1",
+    "market_title": "Exact score: England 1-0 France",
+    "model_probability": 0.05655999999999999,
+    "outcome_key": "score_0_1"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": 0.013259999999999994,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "locked_at": "2026-07-18T20:50:03.792439",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA0ENG2",
+    "market_title": "Exact score: England 2-0 France",
+    "model_probability": 0.04325999999999999,
+    "outcome_key": "score_0_2"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": 0.0123,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-18T20:50:03.792439",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA0ENG3",
+    "market_title": "Exact score: England 3-0 France",
+    "model_probability": 0.0223,
+    "outcome_key": "score_0_3"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": 0.0011400000000000004,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-18T20:50:03.792439",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA0ENG4",
+    "market_title": "Exact score: England 4-0 France",
+    "model_probability": 0.01114,
+    "outcome_key": "score_0_4"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": 0.0011400000000000021,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "locked_at": "2026-07-18T20:50:03.792438",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA1ENG0",
+    "market_title": "Exact score: France 1-0 England",
+    "model_probability": 0.07114000000000001,
+    "outcome_key": "score_1_0"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.00204,
+    "implied_probability": 0.1,
+    "kalshi_odds": 10.0,
+    "locked_at": "2026-07-18T20:50:03.792438",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA1ENG1",
+    "market_title": "Exact score: 1-1 draw",
+    "model_probability": 0.09796,
+    "outcome_key": "score_1_1"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": 0.0003599999999999992,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "locked_at": "2026-07-18T20:50:03.792437",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA1ENG2",
+    "market_title": "Exact score: England 2-1 France",
+    "model_probability": 0.07036,
+    "outcome_key": "score_1_2"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": 0.003599999999999999,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "locked_at": "2026-07-18T20:50:03.792437",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA1ENG3",
+    "market_title": "Exact score: England 3-1 France",
+    "model_probability": 0.0336,
+    "outcome_key": "score_1_3"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": 0.004139999999999998,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-18T20:50:03.792436",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA1ENG4",
+    "market_title": "Exact score: England 4-1 France",
+    "model_probability": 0.014139999999999998,
+    "outcome_key": "score_1_4"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.0045600000000000085,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "locked_at": "2026-07-18T20:50:03.792435",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA2ENG0",
+    "market_title": "Exact score: France 2-0 England",
+    "model_probability": 0.06544,
+    "outcome_key": "score_2_0"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.025499999999999995,
+    "implied_probability": 0.12,
+    "kalshi_odds": 8.33,
+    "locked_at": "2026-07-18T20:50:03.792435",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA2ENG1",
+    "market_title": "Exact score: France 2-1 England",
+    "model_probability": 0.0945,
+    "outcome_key": "score_2_1"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.009360000000000007,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "locked_at": "2026-07-18T20:50:03.792434",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA2ENG2",
+    "market_title": "Exact score: 2-2 draw",
+    "model_probability": 0.06064,
+    "outcome_key": "score_2_2"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.006420000000000002,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "locked_at": "2026-07-18T20:50:03.792434",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA2ENG3",
+    "market_title": "Exact score: England 3-2 France",
+    "model_probability": 0.03358,
+    "outcome_key": "score_2_3"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": 0.00132,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-18T20:50:03.792433",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA2ENG4",
+    "market_title": "Exact score: England 4-2 France",
+    "model_probability": 0.01132,
+    "outcome_key": "score_2_4"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.0028199999999999996,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-18T20:50:03.792433",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA2ENG5",
+    "market_title": "Exact score: England 5-2 France",
+    "model_probability": 0.007180000000000001,
+    "outcome_key": "score_2_5"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.009779999999999997,
+    "implied_probability": 0.05,
+    "kalshi_odds": 20.0,
+    "locked_at": "2026-07-18T20:50:03.792432",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA3ENG0",
+    "market_title": "Exact score: France 3-0 England",
+    "model_probability": 0.040220000000000006,
+    "outcome_key": "score_3_0"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.025080000000000005,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "locked_at": "2026-07-18T20:50:03.792432",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA3ENG1",
+    "market_title": "Exact score: France 3-1 England",
+    "model_probability": 0.06491999999999999,
+    "outcome_key": "score_3_1"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.018659999999999996,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "locked_at": "2026-07-18T20:50:03.792431",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA3ENG2",
+    "market_title": "Exact score: France 3-2 England",
+    "model_probability": 0.04134,
+    "outcome_key": "score_3_2"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.001680000000000001,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "locked_at": "2026-07-18T20:50:03.792431",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA3ENG3",
+    "market_title": "Exact score: 3-3 draw",
+    "model_probability": 0.01832,
+    "outcome_key": "score_3_3"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.001980000000000001,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-18T20:50:03.792430",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA3ENG4",
+    "market_title": "Exact score: England 4-3 France",
+    "model_probability": 0.00802,
+    "outcome_key": "score_3_4"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.0048000000000000004,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "locked_at": "2026-07-18T20:50:03.792429",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA4ENG0",
+    "market_title": "Exact score: France 4-0 England",
+    "model_probability": 0.0152,
+    "outcome_key": "score_4_0"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.00954,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "locked_at": "2026-07-18T20:50:03.792429",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA4ENG1",
+    "market_title": "Exact score: France 4-1 England",
+    "model_probability": 0.03046,
+    "outcome_key": "score_4_1"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.01566,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "locked_at": "2026-07-18T20:50:03.792428",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA4ENG2",
+    "market_title": "Exact score: France 4-2 England",
+    "model_probability": 0.02434,
+    "outcome_key": "score_4_2"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.00786,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "locked_at": "2026-07-18T20:50:03.792428",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA4ENG3",
+    "market_title": "Exact score: France 4-3 England",
+    "model_probability": 0.01214,
+    "outcome_key": "score_4_3"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.00234,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-18T20:50:03.792427",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA5ENG0",
+    "market_title": "Exact score: France 5-0 England",
+    "model_probability": 0.00766,
+    "outcome_key": "score_5_0"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.007800000000000001,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "locked_at": "2026-07-18T20:50:03.792426",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA5ENG1",
+    "market_title": "Exact score: France 5-1 England",
+    "model_probability": 0.012199999999999999,
+    "outcome_key": "score_5_1"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.00864,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "locked_at": "2026-07-18T20:50:03.792426",
+    "market_id": "KXWCSCORE-26JUL18FRAENG-FRA5ENG2",
+    "market_title": "Exact score: France 5-2 England",
+    "model_probability": 0.01136,
+    "outcome_key": "score_5_2"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.05280000000000007,
+    "implied_probability": 0.68,
+    "kalshi_odds": 1.47,
+    "locked_at": "2026-07-18T20:50:03.792425",
+    "market_id": "KXWCBTTS-26JUL18FRAENG-BTTS",
+    "market_title": "Both teams to score",
+    "model_probability": 0.6272,
+    "outcome_key": "btts"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": 0.05856,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "locked_at": "2026-07-18T20:50:03.792425",
+    "market_id": "KXWCSPREAD-26JUL18FRAENG-ENG2",
+    "market_title": "England to win by 2+ goals",
+    "model_probability": 0.14856,
+    "outcome_key": "away_margin_2"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": 0.03294,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "locked_at": "2026-07-18T20:50:03.792424",
+    "market_id": "KXWCSPREAD-26JUL18FRAENG-ENG3",
+    "market_title": "England to win by 3+ goals",
+    "model_probability": 0.06294,
+    "outcome_key": "away_margin_3"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.07230000000000003,
+    "implied_probability": 0.35,
+    "kalshi_odds": 2.86,
+    "locked_at": "2026-07-18T20:50:03.792424",
+    "market_id": "KXWCSPREAD-26JUL18FRAENG-FRA2",
+    "market_title": "France to win by 2+ goals",
+    "model_probability": 0.27769999999999995,
+    "outcome_key": "home_margin_2"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.041340000000000016,
+    "implied_probability": 0.17,
+    "kalshi_odds": 5.88,
+    "locked_at": "2026-07-18T20:50:03.792423",
+    "market_id": "KXWCSPREAD-26JUL18FRAENG-FRA3",
+    "market_title": "France to win by 3+ goals",
+    "model_probability": 0.12866,
+    "outcome_key": "home_margin_3"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.005279999999999951,
+    "implied_probability": 0.96,
+    "kalshi_odds": 1.04,
+    "locked_at": "2026-07-18T20:50:03.792422",
+    "market_id": "KXWCTOTAL-26JUL18FRAENG-1",
+    "market_title": "Over 0.5 total goals",
+    "model_probability": 0.95472,
+    "outcome_key": "over_0_5"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.028980000000000006,
+    "implied_probability": 0.86,
+    "kalshi_odds": 1.16,
+    "locked_at": "2026-07-18T20:50:03.792422",
+    "market_id": "KXWCTOTAL-26JUL18FRAENG-2",
+    "market_title": "Over 1.5 total goals",
+    "model_probability": 0.83102,
+    "outcome_key": "over_1_5"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.04164000000000001,
+    "implied_probability": 0.67,
+    "kalshi_odds": 1.49,
+    "locked_at": "2026-07-18T20:50:03.792421",
+    "market_id": "KXWCTOTAL-26JUL18FRAENG-3",
+    "market_title": "Over 2.5 total goals",
+    "model_probability": 0.62836,
+    "outcome_key": "over_2_5"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.031019999999999992,
+    "implied_probability": 0.44,
+    "kalshi_odds": 2.27,
+    "locked_at": "2026-07-18T20:50:03.792421",
+    "market_id": "KXWCTOTAL-26JUL18FRAENG-4",
+    "market_title": "Over 3.5 total goals",
+    "model_probability": 0.40898,
+    "outcome_key": "over_3_5"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.02052000000000001,
+    "implied_probability": 0.26,
+    "kalshi_odds": 3.85,
+    "locked_at": "2026-07-18T20:50:03.792420",
+    "market_id": "KXWCTOTAL-26JUL18FRAENG-5",
+    "market_title": "Over 4.5 total goals",
+    "model_probability": 0.23948,
+    "outcome_key": "over_4_5"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.008459999999999995,
+    "implied_probability": 0.13,
+    "kalshi_odds": 7.69,
+    "locked_at": "2026-07-18T20:50:03.792420",
+    "market_id": "KXWCTOTAL-26JUL18FRAENG-6",
+    "market_title": "Over 5.5 total goals",
+    "model_probability": 0.12154000000000001,
+    "outcome_key": "over_5_5"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.011520000000000002,
+    "implied_probability": 0.24,
+    "kalshi_odds": 4.17,
+    "locked_at": "2026-07-18T20:50:03.792419",
+    "market_id": "KXWCGAME-26JUL18FRAENG-TIE",
+    "market_title": "Draw after 90 min",
+    "model_probability": 0.22848,
+    "outcome_key": "draw"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.001799999999999996,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "locked_at": "2026-07-18T20:50:03.792419",
+    "market_id": "KXWCMOV-26JUL18FRAENG-ENGET",
+    "market_title": "England to win in extra time",
+    "model_probability": 0.0582,
+    "outcome_key": "away_win_et"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.005279999999999993,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "locked_at": "2026-07-18T20:50:03.792418",
+    "market_id": "KXWCMOV-26JUL18FRAENG-ENGPEN",
+    "market_title": "England to win on penalties",
+    "model_probability": 0.054720000000000005,
+    "outcome_key": "away_win_pens"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": 0.08592000000000002,
+    "implied_probability": 0.22,
+    "kalshi_odds": 4.55,
+    "locked_at": "2026-07-18T20:50:03.792417",
+    "market_id": "KXWCGAME-26JUL18FRAENG-ENG",
+    "market_title": "England to win (90 min)",
+    "model_probability": 0.30592,
+    "outcome_key": "away_win"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.015839999999999993,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "locked_at": "2026-07-18T20:50:03.792417",
+    "market_id": "KXWCMOV-26JUL18FRAENG-FRAET",
+    "market_title": "France to win in extra time",
+    "model_probability": 0.07416,
+    "outcome_key": "home_win_et"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.0126,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "locked_at": "2026-07-18T20:50:03.792416",
+    "market_id": "KXWCMOV-26JUL18FRAENG-FRAPEN",
+    "market_title": "France to win on penalties",
+    "model_probability": 0.05740000000000001,
+    "outcome_key": "home_win_pens"
+   },
+   {
+    "confidence": 0.4679,
+    "edge": -0.09239999999999998,
+    "implied_probability": 0.57,
+    "kalshi_odds": 1.75,
+    "locked_at": "2026-07-18T20:50:03.792410",
+    "market_id": "KXWCGAME-26JUL18FRAENG-FRA",
+    "market_title": "France to win (90 min)",
+    "model_probability": 0.47759999999999997,
+    "outcome_key": "home_win"
+   }
+  ],
+  "final_lock_source": "canonical_archive",
+  "generated_at": "2026-10-21T10:47:43.846162+00:00",
+  "home_team": "France",
+  "last_readings": [],
+  "match_id": "THIRD",
+  "result": {
+   "away_goals": 6,
+   "finished_at": "2026-07-18T23:30:00",
+   "goals": [
+    {
+     "detail": "Goal",
+     "minute": 3,
+     "player": "Declan Rice",
+     "team": "away"
+    },
+    {
+     "detail": "Goal - Header",
+     "minute": 18,
+     "player": "Ezri Konsa",
+     "team": "away"
+    },
+    {
+     "detail": "Goal",
+     "minute": 37,
+     "player": "Bukayo Saka",
+     "team": "away"
+    },
+    {
+     "detail": "Goal",
+     "minute": 46,
+     "player": "Bukayo Saka",
+     "team": "away"
+    },
+    {
+     "detail": "Goal",
+     "minute": 48,
+     "player": "Kylian Mbappé",
+     "team": "home"
+    },
+    {
+     "detail": "Goal",
+     "minute": 54,
+     "player": "Bradley Barcola",
+     "team": "home"
+    },
+    {
+     "detail": "Goal",
+     "minute": 66,
+     "player": "Kylian Mbappé",
+     "team": "home"
+    },
+    {
+     "detail": "Penalty - Scored",
+     "minute": 87,
+     "player": "Bukayo Saka",
+     "team": "away"
+    },
+    {
+     "detail": "Goal",
+     "minute": 96,
+     "player": "Ousmane Dembélé",
+     "team": "home"
+    },
+    {
+     "detail": "Goal",
+     "minute": 98,
+     "player": "Jude Bellingham",
+     "team": "away"
+    }
+   ],
+   "home_goals": 4,
+   "status_short": "FT"
+  }
+ },
+ "sources": {
+  "prediction": "GET /api/prediction/THIRD",
+  "research": "GET /api/research/THIRD",
+  "team_info": "GET /api/team-info/THIRD"
+ },
+ "stage": "3P",
+ "team_info": {
+  "away": {
+   "attack": 1.45,
+   "defence": 0.95,
+   "fatigue": 0.22,
+   "form": 0.9,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Third place, won by winning the maddest match of the tournament 6-4 — a ten-goal shootout with France where Saka finished with a hat-trick (37', 46', 87') after Rice and Konsa struck early. The tournament pattern completed itself: transition brilliance through Bellingham, Kane and Saka whenever space existed, defensive abandon whenever it didn't matter — 2.99 xG conceded in an exhibition tells you about the party, not the project. The honest ledger: elite attack (back at the model's cap through eight), a defence that had exactly one truly bad competitive night, and the SF exit to a 90+2 header as the only wound that counts.",
+   "team": "England"
+  },
+  "home": {
+   "attack": 1.45,
+   "defence": 0.86,
+   "fatigue": 0.18,
+   "form": 0.95,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Fourth, in the strangest way possible: out-created England 2.99 to 2.34 in the third-place game and still lost it 4-6 — Mbappé twice and Barcola scored, but every French mistake was punished at maximum price. The tournament read stands: the most dangerous transition attack in the field (Mbappé finished with 10 goals across the month, the tournament's top scorer), elite defensive numbers until the last two matches, and an ending — 0.48 xG managed against Spain, then carnival defending against England — that says the legs and the focus emptied together. The talent travels to 2030 intact; the question is everything around it.",
+   "team": "France"
+  },
+  "match_id": "THIRD"
+ },
+ "venue": "Hard Rock Stadium, Miami"
+}

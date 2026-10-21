@@ -1,0 +1,1075 @@
+{
+ "away": "Argentina",
+ "home": "England",
+ "kickoff": "2026-07-15T19:00:00+00:00",
+ "match_id": "SF2",
+ "prediction": {
+  "age_seconds": 0,
+  "confidence": 0.4641,
+  "freshness": "locked",
+  "generated_at": "2026-07-15T18:50:03.964835",
+  "is_final": true,
+  "is_stale": false,
+  "markets": [
+   {
+    "edge": 0.030899999999999997,
+    "expected_value": 1.0298,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "market_id": "KXWCSPREAD-26JUL15ENGARG-ARG3",
+    "market_title": "Argentina to win by 3+ goals",
+    "model_probability": 0.060899999999999996,
+    "outcome_key": "away_margin_3"
+   },
+   {
+    "edge": 0.032819999999999995,
+    "expected_value": 0.8205,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "market_id": "KXWCTOTAL-26JUL15ENGARG-6",
+    "market_title": "Over 5.5 total goals",
+    "model_probability": 0.07282,
+    "outcome_key": "over_5_5"
+   },
+   {
+    "edge": 0.06720000000000001,
+    "expected_value": 0.7465,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "market_id": "KXWCTOTAL-26JUL15ENGARG-5",
+    "market_title": "Over 4.5 total goals",
+    "model_probability": 0.1572,
+    "outcome_key": "over_4_5"
+   },
+   {
+    "edge": 0.0058200000000000005,
+    "expected_value": 0.582,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG1ARG4",
+    "market_title": "Exact score: Argentina 4-1 England",
+    "model_probability": 0.01582,
+    "outcome_key": "score_1_4"
+   },
+   {
+    "edge": 0.09864000000000003,
+    "expected_value": 0.4691,
+    "implied_probability": 0.21,
+    "kalshi_odds": 4.76,
+    "market_id": "KXWCTOTAL-26JUL15ENGARG-4",
+    "market_title": "Over 3.5 total goals",
+    "model_probability": 0.30864,
+    "outcome_key": "over_3_5"
+   },
+   {
+    "edge": 0.018659999999999996,
+    "expected_value": 0.4665,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "market_id": "KXWCSPREAD-26JUL15ENGARG-ENG3",
+    "market_title": "England to win by 3+ goals",
+    "model_probability": 0.05866,
+    "outcome_key": "home_margin_3"
+   },
+   {
+    "edge": 0.04805999999999999,
+    "expected_value": 0.3999,
+    "implied_probability": 0.12,
+    "kalshi_odds": 8.33,
+    "market_id": "KXWCSPREAD-26JUL15ENGARG-ARG2",
+    "market_title": "Argentina to win by 2+ goals",
+    "model_probability": 0.16806,
+    "outcome_key": "away_margin_2"
+   },
+   {
+    "edge": 0.11663999999999997,
+    "expected_value": 0.2916,
+    "implied_probability": 0.4,
+    "kalshi_odds": 2.5,
+    "market_id": "KXWCTOTAL-26JUL15ENGARG-3",
+    "market_title": "Over 2.5 total goals",
+    "model_probability": 0.51664,
+    "outcome_key": "over_2_5"
+   },
+   {
+    "edge": 0.005760000000000001,
+    "expected_value": 0.288,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG0ARG3",
+    "market_title": "Exact score: Argentina 3-0 England",
+    "model_probability": 0.02576,
+    "outcome_key": "score_0_3"
+   },
+   {
+    "edge": 0.00204,
+    "expected_value": 0.204,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG4ARG2",
+    "market_title": "Exact score: England 4-2 Argentina",
+    "model_probability": 0.01204,
+    "outcome_key": "score_4_2"
+   },
+   {
+    "edge": 0.003959999999999998,
+    "expected_value": 0.198,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG3ARG0",
+    "market_title": "Exact score: England 3-0 Argentina",
+    "model_probability": 0.02396,
+    "outcome_key": "score_3_0"
+   },
+   {
+    "edge": 0.008039999999999999,
+    "expected_value": 0.1608,
+    "implied_probability": 0.05,
+    "kalshi_odds": 20.0,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG2ARG2",
+    "market_title": "Exact score: 2-2 draw",
+    "model_probability": 0.05804,
+    "outcome_key": "score_2_2"
+   },
+   {
+    "edge": 0.0015600000000000006,
+    "expected_value": 0.156,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG0ARG4",
+    "market_title": "Exact score: Argentina 4-0 England",
+    "model_probability": 0.01156,
+    "outcome_key": "score_0_4"
+   },
+   {
+    "edge": 0.04626000000000002,
+    "expected_value": 0.1427,
+    "implied_probability": 0.32,
+    "kalshi_odds": 3.12,
+    "market_id": "KXWCGAME-26JUL15ENGARG-ARG",
+    "market_title": "Argentina to win (90 min)",
+    "model_probability": 0.36626000000000003,
+    "outcome_key": "away_win"
+   },
+   {
+    "edge": 0.08184000000000002,
+    "expected_value": 0.1199,
+    "implied_probability": 0.68,
+    "kalshi_odds": 1.47,
+    "market_id": "KXWCTOTAL-26JUL15ENGARG-2",
+    "market_title": "Over 1.5 total goals",
+    "model_probability": 0.7618400000000001,
+    "outcome_key": "over_1_5"
+   },
+   {
+    "edge": 0.05015999999999998,
+    "expected_value": 0.0965,
+    "implied_probability": 0.53,
+    "kalshi_odds": 1.89,
+    "market_id": "KXWCBTTS-26JUL15ENGARG-BTTS",
+    "market_title": "Both teams to score",
+    "model_probability": 0.58016,
+    "outcome_key": "btts"
+   },
+   {
+    "edge": 0.0008999999999999998,
+    "expected_value": 0.09,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG4ARG0",
+    "market_title": "Exact score: England 4-0 Argentina",
+    "model_probability": 0.0109,
+    "outcome_key": "score_4_0"
+   },
+   {
+    "edge": 0.011939999999999978,
+    "expected_value": 0.0746,
+    "implied_probability": 0.16,
+    "kalshi_odds": 6.25,
+    "market_id": "KXWCSPREAD-26JUL15ENGARG-ENG2",
+    "market_title": "England to win by 2+ goals",
+    "model_probability": 0.17193999999999998,
+    "outcome_key": "home_margin_2"
+   },
+   {
+    "edge": 0.030299999999999994,
+    "expected_value": 0.0656,
+    "implied_probability": 0.47,
+    "kalshi_odds": 2.13,
+    "market_id": "KXWCADVANCE-26JUL15ENGARG-ARG",
+    "market_title": "Argentina to advance",
+    "model_probability": 0.5003,
+    "outcome_key": "away_advance"
+   },
+   {
+    "edge": 0.001680000000000001,
+    "expected_value": 0.0559,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG2ARG3",
+    "market_title": "Exact score: Argentina 3-2 England",
+    "model_probability": 0.03168,
+    "outcome_key": "score_2_3"
+   },
+   {
+    "edge": 0.023160000000000014,
+    "expected_value": 0.0504,
+    "implied_probability": 0.45,
+    "kalshi_odds": 2.22,
+    "market_id": "KXWCFTTS-26JUL15ENGARG-ARG",
+    "market_title": "Argentina to score first",
+    "model_probability": 0.47316,
+    "outcome_key": "away_first_goal"
+   },
+   {
+    "edge": 0.0015000000000000013,
+    "expected_value": 0.0499,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG3ARG2",
+    "market_title": "Exact score: England 3-2 Argentina",
+    "model_probability": 0.0315,
+    "outcome_key": "score_3_2"
+   },
+   {
+    "edge": 0.0019800000000000026,
+    "expected_value": 0.0495,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG1ARG3",
+    "market_title": "Exact score: Argentina 3-1 England",
+    "model_probability": 0.04198,
+    "outcome_key": "score_1_3"
+   },
+   {
+    "edge": 0.0004199999999999985,
+    "expected_value": 0.042,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG2ARG4",
+    "market_title": "Exact score: Argentina 4-2 England",
+    "model_probability": 0.010419999999999999,
+    "outcome_key": "score_2_4"
+   },
+   {
+    "edge": 0.0401999999999999,
+    "expected_value": 0.0418,
+    "implied_probability": 0.89,
+    "kalshi_odds": 1.12,
+    "market_id": "KXWCTOTAL-26JUL15ENGARG-1",
+    "market_title": "Over 0.5 total goals",
+    "model_probability": 0.9301999999999999,
+    "outcome_key": "over_0_5"
+   },
+   {
+    "edge": 0.010079999999999978,
+    "expected_value": 0.0298,
+    "implied_probability": 0.35,
+    "kalshi_odds": 2.86,
+    "market_id": "KXWCGAME-26JUL15ENGARG-ENG",
+    "market_title": "England to win (90 min)",
+    "model_probability": 0.36007999999999996,
+    "outcome_key": "home_win"
+   },
+   {
+    "edge": 0.0021599999999999953,
+    "expected_value": 0.027,
+    "implied_probability": 0.08,
+    "kalshi_odds": 12.5,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG1ARG2",
+    "market_title": "Exact score: Argentina 2-1 England",
+    "model_probability": 0.08216,
+    "outcome_key": "score_1_2"
+   },
+   {
+    "edge": 0.0009599999999999956,
+    "expected_value": 0.024,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG3ARG1",
+    "market_title": "Exact score: England 3-1 Argentina",
+    "model_probability": 0.040959999999999996,
+    "outcome_key": "score_3_1"
+   },
+   {
+    "edge": 0.000899999999999998,
+    "expected_value": 0.0152,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG0ARG2",
+    "market_title": "Exact score: Argentina 2-0 England",
+    "model_probability": 0.060899999999999996,
+    "outcome_key": "score_0_2"
+   },
+   {
+    "edge": -0.0007200000000000019,
+    "expected_value": -0.036,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG3ARG3",
+    "market_title": "Exact score: 3-3 draw",
+    "model_probability": 0.01928,
+    "outcome_key": "score_3_3"
+   },
+   {
+    "edge": -0.021120000000000028,
+    "expected_value": -0.0422,
+    "implied_probability": 0.5,
+    "kalshi_odds": 2.0,
+    "market_id": "KXWCFTTS-26JUL15ENGARG-ENG",
+    "market_title": "England to score first",
+    "model_probability": 0.47888,
+    "outcome_key": "home_first_goal"
+   },
+   {
+    "edge": -0.005879999999999996,
+    "expected_value": -0.0654,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG2ARG1",
+    "market_title": "Exact score: England 2-1 Argentina",
+    "model_probability": 0.08412,
+    "outcome_key": "score_2_1"
+   },
+   {
+    "edge": -0.0363,
+    "expected_value": -0.0682,
+    "implied_probability": 0.54,
+    "kalshi_odds": 1.85,
+    "market_id": "KXWCADVANCE-26JUL15ENGARG-ENG",
+    "market_title": "England to advance",
+    "model_probability": 0.5037,
+    "outcome_key": "home_advance"
+   },
+   {
+    "edge": -0.007080000000000003,
+    "expected_value": -0.0885,
+    "implied_probability": 0.08,
+    "kalshi_odds": 12.5,
+    "market_id": "KXWCMOV-26JUL15ENGARG-ARGET",
+    "market_title": "Argentina to win in extra time",
+    "model_probability": 0.07292,
+    "outcome_key": "away_win_et"
+   },
+   {
+    "edge": -0.0022800000000000008,
+    "expected_value": -0.114,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG4ARG1",
+    "market_title": "Exact score: England 4-1 Argentina",
+    "model_probability": 0.01772,
+    "outcome_key": "score_4_1"
+   },
+   {
+    "edge": -0.011939999999999992,
+    "expected_value": -0.1492,
+    "implied_probability": 0.08,
+    "kalshi_odds": 12.5,
+    "market_id": "KXWCMOV-26JUL15ENGARG-ENGET",
+    "market_title": "England to win in extra time",
+    "model_probability": 0.06806000000000001,
+    "outcome_key": "home_win_et"
+   },
+   {
+    "edge": -0.010800000000000004,
+    "expected_value": -0.154,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG2ARG0",
+    "market_title": "Exact score: England 2-0 Argentina",
+    "model_probability": 0.0592,
+    "outcome_key": "score_2_0"
+   },
+   {
+    "edge": -0.01541999999999999,
+    "expected_value": -0.1542,
+    "implied_probability": 0.1,
+    "kalshi_odds": 10.0,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG0ARG1",
+    "market_title": "Exact score: Argentina 1-0 England",
+    "model_probability": 0.08458000000000002,
+    "outcome_key": "score_0_1"
+   },
+   {
+    "edge": -0.00162,
+    "expected_value": -0.162,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG4ARG3",
+    "market_title": "Exact score: England 4-3 Argentina",
+    "model_probability": 0.00838,
+    "outcome_key": "score_4_3"
+   },
+   {
+    "edge": -0.03090000000000001,
+    "expected_value": -0.1931,
+    "implied_probability": 0.16,
+    "kalshi_odds": 6.25,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG1ARG1",
+    "market_title": "Exact score: 1-1 draw",
+    "model_probability": 0.1291,
+    "outcome_key": "score_1_1"
+   },
+   {
+    "edge": -0.06833999999999996,
+    "expected_value": -0.1945,
+    "implied_probability": 0.35,
+    "kalshi_odds": 2.86,
+    "market_id": "KXWCGAME-26JUL15ENGARG-TIE",
+    "market_title": "Draw after 90 min",
+    "model_probability": 0.28166,
+    "outcome_key": "draw"
+   },
+   {
+    "edge": -0.014100000000000001,
+    "expected_value": -0.2012,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "market_id": "KXWCFTTS-26JUL15ENGARG-NONE",
+    "market_title": "No goal in the match",
+    "model_probability": 0.055900000000000005,
+    "outcome_key": "no_goal"
+   },
+   {
+    "edge": -0.026220000000000007,
+    "expected_value": -0.2384,
+    "implied_probability": 0.11,
+    "kalshi_odds": 9.09,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG1ARG0",
+    "market_title": "Exact score: England 1-0 Argentina",
+    "model_probability": 0.08378,
+    "outcome_key": "score_1_0"
+   },
+   {
+    "edge": -0.0025200000000000005,
+    "expected_value": -0.252,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG3ARG4",
+    "market_title": "Exact score: Argentina 4-3 England",
+    "model_probability": 0.00748,
+    "outcome_key": "score_3_4"
+   },
+   {
+    "edge": -0.02688,
+    "expected_value": -0.2688,
+    "implied_probability": 0.1,
+    "kalshi_odds": 10.0,
+    "market_id": "KXWCMOV-26JUL15ENGARG-ARGPEN",
+    "market_title": "Argentina to win on penalties",
+    "model_probability": 0.07312,
+    "outcome_key": "away_win_pens"
+   },
+   {
+    "edge": -0.028439999999999993,
+    "expected_value": -0.2844,
+    "implied_probability": 0.1,
+    "kalshi_odds": 10.0,
+    "market_id": "KXWCMOV-26JUL15ENGARG-ENGPEN",
+    "market_title": "England to win on penalties",
+    "model_probability": 0.07156000000000001,
+    "outcome_key": "home_win_pens"
+   },
+   {
+    "edge": -0.0402,
+    "expected_value": -0.3655,
+    "implied_probability": 0.11,
+    "kalshi_odds": 9.09,
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG0ARG0",
+    "market_title": "Exact score: 0-0 draw",
+    "model_probability": 0.0698,
+    "outcome_key": "score_0_0"
+   }
+  ],
+  "match_id": "SF2",
+  "scorelines": [],
+  "source": "canonical_archive",
+  "summary": null,
+  "xg": null
+ },
+ "research": {
+  "away_team": "Argentina",
+  "closing": [],
+  "final_lock": [
+   {
+    "confidence": 0.4641,
+    "edge": 0.030299999999999994,
+    "implied_probability": 0.47,
+    "kalshi_odds": 2.13,
+    "locked_at": "2026-07-15T18:50:03.964862",
+    "market_id": "KXWCADVANCE-26JUL15ENGARG-ARG",
+    "market_title": "Argentina to advance",
+    "model_probability": 0.5003,
+    "outcome_key": "away_advance"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": -0.0363,
+    "implied_probability": 0.54,
+    "kalshi_odds": 1.85,
+    "locked_at": "2026-07-15T18:50:03.964862",
+    "market_id": "KXWCADVANCE-26JUL15ENGARG-ENG",
+    "market_title": "England to advance",
+    "model_probability": 0.5037,
+    "outcome_key": "home_advance"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.023160000000000014,
+    "implied_probability": 0.45,
+    "kalshi_odds": 2.22,
+    "locked_at": "2026-07-15T18:50:03.964861",
+    "market_id": "KXWCFTTS-26JUL15ENGARG-ARG",
+    "market_title": "Argentina to score first",
+    "model_probability": 0.47316,
+    "outcome_key": "away_first_goal"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": -0.021120000000000028,
+    "implied_probability": 0.5,
+    "kalshi_odds": 2.0,
+    "locked_at": "2026-07-15T18:50:03.964860",
+    "market_id": "KXWCFTTS-26JUL15ENGARG-ENG",
+    "market_title": "England to score first",
+    "model_probability": 0.47888,
+    "outcome_key": "home_first_goal"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": -0.014100000000000001,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "locked_at": "2026-07-15T18:50:03.964860",
+    "market_id": "KXWCFTTS-26JUL15ENGARG-NONE",
+    "market_title": "No goal in the match",
+    "model_probability": 0.055900000000000005,
+    "outcome_key": "no_goal"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": -0.0402,
+    "implied_probability": 0.11,
+    "kalshi_odds": 9.09,
+    "locked_at": "2026-07-15T18:50:03.964859",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG0ARG0",
+    "market_title": "Exact score: 0-0 draw",
+    "model_probability": 0.0698,
+    "outcome_key": "score_0_0"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": -0.01541999999999999,
+    "implied_probability": 0.1,
+    "kalshi_odds": 10.0,
+    "locked_at": "2026-07-15T18:50:03.964859",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG0ARG1",
+    "market_title": "Exact score: Argentina 1-0 England",
+    "model_probability": 0.08458000000000002,
+    "outcome_key": "score_0_1"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.000899999999999998,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "locked_at": "2026-07-15T18:50:03.964858",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG0ARG2",
+    "market_title": "Exact score: Argentina 2-0 England",
+    "model_probability": 0.060899999999999996,
+    "outcome_key": "score_0_2"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.005760000000000001,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "locked_at": "2026-07-15T18:50:03.964858",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG0ARG3",
+    "market_title": "Exact score: Argentina 3-0 England",
+    "model_probability": 0.02576,
+    "outcome_key": "score_0_3"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.0015600000000000006,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-15T18:50:03.964857",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG0ARG4",
+    "market_title": "Exact score: Argentina 4-0 England",
+    "model_probability": 0.01156,
+    "outcome_key": "score_0_4"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": -0.026220000000000007,
+    "implied_probability": 0.11,
+    "kalshi_odds": 9.09,
+    "locked_at": "2026-07-15T18:50:03.964857",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG1ARG0",
+    "market_title": "Exact score: England 1-0 Argentina",
+    "model_probability": 0.08378,
+    "outcome_key": "score_1_0"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": -0.03090000000000001,
+    "implied_probability": 0.16,
+    "kalshi_odds": 6.25,
+    "locked_at": "2026-07-15T18:50:03.964856",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG1ARG1",
+    "market_title": "Exact score: 1-1 draw",
+    "model_probability": 0.1291,
+    "outcome_key": "score_1_1"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.0021599999999999953,
+    "implied_probability": 0.08,
+    "kalshi_odds": 12.5,
+    "locked_at": "2026-07-15T18:50:03.964856",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG1ARG2",
+    "market_title": "Exact score: Argentina 2-1 England",
+    "model_probability": 0.08216,
+    "outcome_key": "score_1_2"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.0019800000000000026,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "locked_at": "2026-07-15T18:50:03.964855",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG1ARG3",
+    "market_title": "Exact score: Argentina 3-1 England",
+    "model_probability": 0.04198,
+    "outcome_key": "score_1_3"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.0058200000000000005,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-15T18:50:03.964855",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG1ARG4",
+    "market_title": "Exact score: Argentina 4-1 England",
+    "model_probability": 0.01582,
+    "outcome_key": "score_1_4"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": -0.010800000000000004,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "locked_at": "2026-07-15T18:50:03.964854",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG2ARG0",
+    "market_title": "Exact score: England 2-0 Argentina",
+    "model_probability": 0.0592,
+    "outcome_key": "score_2_0"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": -0.005879999999999996,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "locked_at": "2026-07-15T18:50:03.964854",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG2ARG1",
+    "market_title": "Exact score: England 2-1 Argentina",
+    "model_probability": 0.08412,
+    "outcome_key": "score_2_1"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.008039999999999999,
+    "implied_probability": 0.05,
+    "kalshi_odds": 20.0,
+    "locked_at": "2026-07-15T18:50:03.964853",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG2ARG2",
+    "market_title": "Exact score: 2-2 draw",
+    "model_probability": 0.05804,
+    "outcome_key": "score_2_2"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.001680000000000001,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "locked_at": "2026-07-15T18:50:03.964853",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG2ARG3",
+    "market_title": "Exact score: Argentina 3-2 England",
+    "model_probability": 0.03168,
+    "outcome_key": "score_2_3"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.0004199999999999985,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-15T18:50:03.964852",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG2ARG4",
+    "market_title": "Exact score: Argentina 4-2 England",
+    "model_probability": 0.010419999999999999,
+    "outcome_key": "score_2_4"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.003959999999999998,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "locked_at": "2026-07-15T18:50:03.964852",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG3ARG0",
+    "market_title": "Exact score: England 3-0 Argentina",
+    "model_probability": 0.02396,
+    "outcome_key": "score_3_0"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.0009599999999999956,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "locked_at": "2026-07-15T18:50:03.964851",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG3ARG1",
+    "market_title": "Exact score: England 3-1 Argentina",
+    "model_probability": 0.040959999999999996,
+    "outcome_key": "score_3_1"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.0015000000000000013,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "locked_at": "2026-07-15T18:50:03.964851",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG3ARG2",
+    "market_title": "Exact score: England 3-2 Argentina",
+    "model_probability": 0.0315,
+    "outcome_key": "score_3_2"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": -0.0007200000000000019,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "locked_at": "2026-07-15T18:50:03.964851",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG3ARG3",
+    "market_title": "Exact score: 3-3 draw",
+    "model_probability": 0.01928,
+    "outcome_key": "score_3_3"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": -0.0025200000000000005,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-15T18:50:03.964850",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG3ARG4",
+    "market_title": "Exact score: Argentina 4-3 England",
+    "model_probability": 0.00748,
+    "outcome_key": "score_3_4"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.0008999999999999998,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-15T18:50:03.964850",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG4ARG0",
+    "market_title": "Exact score: England 4-0 Argentina",
+    "model_probability": 0.0109,
+    "outcome_key": "score_4_0"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": -0.0022800000000000008,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "locked_at": "2026-07-15T18:50:03.964849",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG4ARG1",
+    "market_title": "Exact score: England 4-1 Argentina",
+    "model_probability": 0.01772,
+    "outcome_key": "score_4_1"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.00204,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-15T18:50:03.964849",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG4ARG2",
+    "market_title": "Exact score: England 4-2 Argentina",
+    "model_probability": 0.01204,
+    "outcome_key": "score_4_2"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": -0.00162,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-15T18:50:03.964848",
+    "market_id": "KXWCSCORE-26JUL15ENGARG-ENG4ARG3",
+    "market_title": "Exact score: England 4-3 Argentina",
+    "model_probability": 0.00838,
+    "outcome_key": "score_4_3"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.05015999999999998,
+    "implied_probability": 0.53,
+    "kalshi_odds": 1.89,
+    "locked_at": "2026-07-15T18:50:03.964848",
+    "market_id": "KXWCBTTS-26JUL15ENGARG-BTTS",
+    "market_title": "Both teams to score",
+    "model_probability": 0.58016,
+    "outcome_key": "btts"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.04805999999999999,
+    "implied_probability": 0.12,
+    "kalshi_odds": 8.33,
+    "locked_at": "2026-07-15T18:50:03.964847",
+    "market_id": "KXWCSPREAD-26JUL15ENGARG-ARG2",
+    "market_title": "Argentina to win by 2+ goals",
+    "model_probability": 0.16806,
+    "outcome_key": "away_margin_2"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.030899999999999997,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "locked_at": "2026-07-15T18:50:03.964847",
+    "market_id": "KXWCSPREAD-26JUL15ENGARG-ARG3",
+    "market_title": "Argentina to win by 3+ goals",
+    "model_probability": 0.060899999999999996,
+    "outcome_key": "away_margin_3"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.011939999999999978,
+    "implied_probability": 0.16,
+    "kalshi_odds": 6.25,
+    "locked_at": "2026-07-15T18:50:03.964846",
+    "market_id": "KXWCSPREAD-26JUL15ENGARG-ENG2",
+    "market_title": "England to win by 2+ goals",
+    "model_probability": 0.17193999999999998,
+    "outcome_key": "home_margin_2"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.018659999999999996,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "locked_at": "2026-07-15T18:50:03.964846",
+    "market_id": "KXWCSPREAD-26JUL15ENGARG-ENG3",
+    "market_title": "England to win by 3+ goals",
+    "model_probability": 0.05866,
+    "outcome_key": "home_margin_3"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.0401999999999999,
+    "implied_probability": 0.89,
+    "kalshi_odds": 1.12,
+    "locked_at": "2026-07-15T18:50:03.964846",
+    "market_id": "KXWCTOTAL-26JUL15ENGARG-1",
+    "market_title": "Over 0.5 total goals",
+    "model_probability": 0.9301999999999999,
+    "outcome_key": "over_0_5"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.08184000000000002,
+    "implied_probability": 0.68,
+    "kalshi_odds": 1.47,
+    "locked_at": "2026-07-15T18:50:03.964845",
+    "market_id": "KXWCTOTAL-26JUL15ENGARG-2",
+    "market_title": "Over 1.5 total goals",
+    "model_probability": 0.7618400000000001,
+    "outcome_key": "over_1_5"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.11663999999999997,
+    "implied_probability": 0.4,
+    "kalshi_odds": 2.5,
+    "locked_at": "2026-07-15T18:50:03.964845",
+    "market_id": "KXWCTOTAL-26JUL15ENGARG-3",
+    "market_title": "Over 2.5 total goals",
+    "model_probability": 0.51664,
+    "outcome_key": "over_2_5"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.09864000000000003,
+    "implied_probability": 0.21,
+    "kalshi_odds": 4.76,
+    "locked_at": "2026-07-15T18:50:03.964844",
+    "market_id": "KXWCTOTAL-26JUL15ENGARG-4",
+    "market_title": "Over 3.5 total goals",
+    "model_probability": 0.30864,
+    "outcome_key": "over_3_5"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.06720000000000001,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "locked_at": "2026-07-15T18:50:03.964844",
+    "market_id": "KXWCTOTAL-26JUL15ENGARG-5",
+    "market_title": "Over 4.5 total goals",
+    "model_probability": 0.1572,
+    "outcome_key": "over_4_5"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.032819999999999995,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "locked_at": "2026-07-15T18:50:03.964843",
+    "market_id": "KXWCTOTAL-26JUL15ENGARG-6",
+    "market_title": "Over 5.5 total goals",
+    "model_probability": 0.07282,
+    "outcome_key": "over_5_5"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": -0.06833999999999996,
+    "implied_probability": 0.35,
+    "kalshi_odds": 2.86,
+    "locked_at": "2026-07-15T18:50:03.964843",
+    "market_id": "KXWCGAME-26JUL15ENGARG-TIE",
+    "market_title": "Draw after 90 min",
+    "model_probability": 0.28166,
+    "outcome_key": "draw"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": -0.007080000000000003,
+    "implied_probability": 0.08,
+    "kalshi_odds": 12.5,
+    "locked_at": "2026-07-15T18:50:03.964842",
+    "market_id": "KXWCMOV-26JUL15ENGARG-ARGET",
+    "market_title": "Argentina to win in extra time",
+    "model_probability": 0.07292,
+    "outcome_key": "away_win_et"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": -0.02688,
+    "implied_probability": 0.1,
+    "kalshi_odds": 10.0,
+    "locked_at": "2026-07-15T18:50:03.964842",
+    "market_id": "KXWCMOV-26JUL15ENGARG-ARGPEN",
+    "market_title": "Argentina to win on penalties",
+    "model_probability": 0.07312,
+    "outcome_key": "away_win_pens"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.04626000000000002,
+    "implied_probability": 0.32,
+    "kalshi_odds": 3.12,
+    "locked_at": "2026-07-15T18:50:03.964841",
+    "market_id": "KXWCGAME-26JUL15ENGARG-ARG",
+    "market_title": "Argentina to win (90 min)",
+    "model_probability": 0.36626000000000003,
+    "outcome_key": "away_win"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": -0.011939999999999992,
+    "implied_probability": 0.08,
+    "kalshi_odds": 12.5,
+    "locked_at": "2026-07-15T18:50:03.964841",
+    "market_id": "KXWCMOV-26JUL15ENGARG-ENGET",
+    "market_title": "England to win in extra time",
+    "model_probability": 0.06806000000000001,
+    "outcome_key": "home_win_et"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": -0.028439999999999993,
+    "implied_probability": 0.1,
+    "kalshi_odds": 10.0,
+    "locked_at": "2026-07-15T18:50:03.964840",
+    "market_id": "KXWCMOV-26JUL15ENGARG-ENGPEN",
+    "market_title": "England to win on penalties",
+    "model_probability": 0.07156000000000001,
+    "outcome_key": "home_win_pens"
+   },
+   {
+    "confidence": 0.4641,
+    "edge": 0.010079999999999978,
+    "implied_probability": 0.35,
+    "kalshi_odds": 2.86,
+    "locked_at": "2026-07-15T18:50:03.964835",
+    "market_id": "KXWCGAME-26JUL15ENGARG-ENG",
+    "market_title": "England to win (90 min)",
+    "model_probability": 0.36007999999999996,
+    "outcome_key": "home_win"
+   }
+  ],
+  "final_lock_source": "canonical_archive",
+  "generated_at": "2026-10-21T10:47:38.970389+00:00",
+  "home_team": "England",
+  "last_readings": [],
+  "match_id": "SF2",
+  "result": {
+   "away_goals": 2,
+   "finished_at": "2026-07-15T21:30:00",
+   "goals": [
+    {
+     "detail": "Goal",
+     "minute": 55,
+     "player": "Anthony Gordon",
+     "team": "home"
+    },
+    {
+     "detail": "Goal",
+     "minute": 85,
+     "player": "Enzo Fernández",
+     "team": "away"
+    },
+    {
+     "detail": "Goal - Header",
+     "minute": 92,
+     "player": "Lautaro Martínez",
+     "team": "away"
+    }
+   ],
+   "home_goals": 1,
+   "status_short": "FT"
+  }
+ },
+ "sources": {
+  "prediction": "GET /api/prediction/SF2",
+  "research": "GET /api/research/SF2",
+  "team_info": "GET /api/team-info/SF2"
+ },
+ "stage": "SF",
+ "team_info": {
+  "away": {
+   "attack": 1.45,
+   "defence": 0.83,
+   "fatigue": 0.28,
+   "form": 0.85,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Runners-up, and the final was the one night the late-goal magic had no fuel: 0.07 xG in 120 minutes against Spain's press, a red card in extra time, and no 84th-minute miracle left in the tank — the three-match pattern of decisive late blows (Egypt, Switzerland, England) died where it mattered most. Through the tournament the machine was still elite: Messi's 8 goals, the attack at the model's cap through eight matches, set pieces and crosses the signature weapon. But the closing read is honest — the deep-tournament defence leaked (0.81 adj xGA/game after the final's 2.52) and the title went to the side that never needed rescuing.",
+   "team": "Argentina"
+  },
+  "home": {
+   "attack": 1.45,
+   "defence": 0.95,
+   "fatigue": 0.22,
+   "form": 0.9,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Third place, won by winning the maddest match of the tournament 6-4 — a ten-goal shootout with France where Saka finished with a hat-trick (37', 46', 87') after Rice and Konsa struck early. The tournament pattern completed itself: transition brilliance through Bellingham, Kane and Saka whenever space existed, defensive abandon whenever it didn't matter — 2.99 xG conceded in an exhibition tells you about the party, not the project. The honest ledger: elite attack (back at the model's cap through eight), a defence that had exactly one truly bad competitive night, and the SF exit to a 90+2 header as the only wound that counts.",
+   "team": "England"
+  },
+  "match_id": "SF2"
+ },
+ "venue": "Mercedes-Benz Stadium, Atlanta"
+}

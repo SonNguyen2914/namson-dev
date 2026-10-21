@@ -9,126 +9,39 @@
 //                                       + edge vs market + local kickoff time
 //   finished                        -> final score, winner white / loser grey
 //   placeholder (feeders unknown)   -> "TBD"
-import { useEffect, useState } from "react";
-import { usePoll } from "../lib/usePoll";
+//
+// FROZEN 2026-10-21 (cleanup C1). The tournament ended on 2026-07-19 and
+// the backend's WC26 jobs and routes are being removed, so the bracket is
+// no longer read from GET /api/bracket: it is that route's last answer,
+// verbatim, in src/data/wc26/bracket.json (see manifest.json beside it).
+// A decided bracket cannot change, so there is no poll, no loading state
+// and no failed-read state for something already in the bundle.
 import Link from "next/link";
 import {
-  api, flag, pct, signedPct, countdown, kickoffLocal,
+  flag, pct, signedPct, countdown, kickoffLocal,
   BracketMatch, BracketResponse,
 } from "../lib/suggesterApi";
 import { Eyebrow, Reveal } from "./ui";
+import frozen from "../data/wc26/bracket.json";
 
-// A FAILED READ IS NOT AN EMPTY ONE — and on a bracket the empty one is
-// a claim about the tournament. This component's read used to end in
-// `.catch(() => {})` over a state initialised to `null`, and the very
-// next line was `if (!b || b.quarterfinals.length === 0) return null`.
-// A 503 and "the knockout draw has not been made" were therefore the
-// identical nothing: the section vanished, and a reader concluded there
-// was no bracket when the truth was that we could not ask.
-//
-// Three states — asking / failed / ok — the type LaligaDashboard.tsx's
-// `settle()` established and LiveScoreboard.tsx redeclared. Redeclared
-// again here for the same stated reason (src/lib is not this change's to
-// add to), and the duplication is named so a later extraction knows what
-// it is collecting.
-type Read<T> =
-  | { s: "asking" }
-  | { s: "failed"; why: string }
-  | { s: "ok"; d: T };
+// Narrowed once, where the file enters. JSON imports widen literal unions.
+const BRACKET = (frozen as unknown as { frozen_at: string; payload: BracketResponse });
 
-/** The failure's own words, never a shrug. */
-const why = (e: unknown): string =>
-  e instanceof Error ? e.message : String(e);
-
-export default function BracketView({ onChampion }: {
-  /** Told once the bracket names a champion — the tournament is over, so
-   *  the page around it can stop refreshing too (audit F6). */
-  onChampion?: (champion: string) => void;
-} = {}) {
-  const [read, setRead] = useState<Read<BracketResponse>>({ s: "asking" });
-  // A bracket that arrived once is KEPT when a later poll fails, and is
-  // drawn beside a line saying the read behind it is the earlier one. A
-  // 60-second-old bracket is still the bracket; a vanished section is a
-  // different claim. STATE, NOT A REF: it is read during render, and a
-  // ref read during render is an error under this repo's lint.
-  const [lastOk, setLastOk] = useState<BracketResponse | null>(null);
-  const [, setTick] = useState(0); // ticking clock for per-card countdowns
-  const decided = Boolean((read.s === "ok" ? read.d : lastOk)?.champion);
-
-  // ONE bracket call carries probs + edges — no per-match prediction
-  // fetches (those triggered fresh backend sims every cache expiry,
-  // multiplied per viewer). Every 60s through lib/usePoll (audit F5) —
-  // and NOT AT ALL once a champion is named: a decided bracket cannot
-  // change, and the WC26 archive asked it every minute from every tab
-  // for a tournament Spain had already won (audit F6).
-  usePoll(async (signal) => {
-    try {
-      const r = await api.bracket();
-      if (signal.aborted) return "stop";
-      setLastOk(r);
-      setRead({ s: "ok", d: r });
-      if (r.champion) {
-        onChampion?.(r.champion);
-        return "stop";
-      }
-      return "ok";
-    } catch (e) {
-      if (signal.aborted) return "stop";
-      setRead({ s: "failed", why: why(e) });
-      return "failed";
-    }
-  }, 60000, []);
-
-  // the per-card countdowns tick only while a match can still be ahead
-  useEffect(() => {
-    if (decided) return;
-    const tick = setInterval(() => setTick((t) => t + 1), 1000);
-    return () => clearInterval(tick);
-  }, [decided]);
-
-  // NOTHING HAS BEEN ASKED YET. Absence with a reason, not a claim about
-  // whether a knockout draw exists.
-  if (read.s === "asking") return null;
-
-  // ASKED, AND THE READ DID NOT LAND, with nothing earlier to fall back
-  // on. Small and plain, in the `warn` refusal family — never the up/neg
-  // traffic light, which on this surface reads as a verdict on a match.
-  if (read.s === "failed" && !lastOk) {
-    return (
-      <section>
-        <Eyebrow className="mb-2">bracket</Eyebrow>
-        <p data-testid="bracket-read-failed" role="status"
-          className="rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-[12px] leading-relaxed text-warn">
-          The bracket read failed: {read.why}. That is not the knockout
-          draw being unmade — it is that we could not ask.
-        </p>
-      </section>
-    );
-  }
-
-  const b = read.s === "ok" ? read.d : lastOk!;
-
-  // ASKED, ANSWERED, AND THE ANSWER WAS "THE DRAW IS NOT MADE". The one
-  // branch that may render nothing at all: the group stage is still
-  // running and there is no road to draw. That is a fact the backend
-  // supplied, not a silence.
-  if (read.s === "ok" && b.quarterfinals.length === 0) return null;
-
+export default function BracketView() {
+  const b = BRACKET.payload;
   return (
     <Reveal>
       <section>
         <Eyebrow className="mb-2">bracket</Eyebrow>
-        {read.s === "failed" && (
-          <p data-testid="bracket-read-failed" role="status"
-            className="mb-3 rounded-lg border border-warn/40 bg-warn/5 px-3 py-2 text-[12px] leading-relaxed text-warn">
-            The bracket read failed: {read.why}. The road below is from the
-            last read that answered and has not been refreshed — the
-            probabilities, edges and results on it may have moved since.
-          </p>
-        )}
-        <h3 className="mb-8 text-lg font-medium text-ink-hi">
-          Road to the final <span className="text-sm font-normal text-ink-low">· model win probabilities + edge</span>
+        <h3 className="mb-2 text-lg font-medium text-ink-hi">
+          Road to the final <span className="text-sm font-normal text-ink-low">· final scores</span>
         </h3>
+        <p className="mb-8 font-mono text-[11px] tracking-wide text-ink-faint"
+           data-testid="bracket-frozen">
+          Archived: the backend&apos;s last bracket read, frozen{" "}
+          {BRACKET.frozen_at.slice(0, 10)}. Every match on it had been
+          played and its win-probability field was empty, so none is drawn.
+        </p>
 
         <div className="mx-auto max-w-4xl">
           {/* flipped pyramid: the champion crowns the page, the road
@@ -197,6 +110,9 @@ export default function BracketView({ onChampion }: {
     </Reveal>
   );
 }
+
+/** The champion the frozen bracket names. */
+export const WC26_CHAMPION: string | null = BRACKET.payload.champion ?? null;
 
 function RoundLabel({ children }: { children: React.ReactNode }) {
   return (

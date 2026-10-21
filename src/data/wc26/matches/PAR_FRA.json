@@ -1,0 +1,76 @@
+{
+ "away": "France",
+ "home": "Paraguay",
+ "kickoff": "2026-07-04T21:00:00+00:00",
+ "match_id": "PAR_FRA",
+ "prediction": {
+  "age_seconds": 0,
+  "archive_note": "no frozen pre-match record survives for this match — its T-10 lock predates the archive discipline; retrospective re-simulation is deliberately not shown on review pages",
+  "confidence": null,
+  "freshness": "archive-incomplete",
+  "generated_at": "2026-10-21T10:46:38.871863+00:00",
+  "is_final": false,
+  "is_stale": false,
+  "markets": [],
+  "match_id": "PAR_FRA",
+  "scorelines": [],
+  "source": "archive_incomplete",
+  "suggestions": [],
+  "summary": null,
+  "xg": null
+ },
+ "research": {
+  "away_team": "France",
+  "closing": [],
+  "final_lock": [],
+  "final_lock_source": "absent",
+  "generated_at": "2026-10-21T10:46:40.469874+00:00",
+  "home_team": "Paraguay",
+  "last_readings": [],
+  "match_id": "PAR_FRA",
+  "result": {
+   "away_goals": 1,
+   "finished_at": "2026-07-04T23:30:00",
+   "goals": [
+    {
+     "detail": "Penalty - Scored",
+     "minute": 70,
+     "player": "Kylian Mbappé",
+     "team": "away"
+    }
+   ],
+   "home_goals": 0,
+   "status_short": "FT"
+  }
+ },
+ "sources": {
+  "prediction": "GET /api/prediction/PAR_FRA",
+  "research": "GET /api/research/PAR_FRA",
+  "team_info": "GET /api/team-info/PAR_FRA"
+ },
+ "stage": "R16",
+ "team_info": {
+  "away": {
+   "attack": 1.45,
+   "defence": 0.86,
+   "fatigue": 0.18,
+   "form": 0.95,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Fourth, in the strangest way possible: out-created England 2.99 to 2.34 in the third-place game and still lost it 4-6 — Mbappé twice and Barcola scored, but every French mistake was punished at maximum price. The tournament read stands: the most dangerous transition attack in the field (Mbappé finished with 10 goals across the month, the tournament's top scorer), elite defensive numbers until the last two matches, and an ending — 0.48 xG managed against Spain, then carnival defending against England — that says the legs and the focus emptied together. The talent travels to 2030 intact; the question is everything around it.",
+   "team": "France"
+  },
+  "home": {
+   "attack": 0.78,
+   "defence": 0.85,
+   "fatigue": 0.34,
+   "form": 0.6,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Eliminated by France in the R16.",
+   "team": "Paraguay"
+  },
+  "match_id": "PAR_FRA"
+ },
+ "venue": "Lincoln Financial Field, Philadelphia"
+}
