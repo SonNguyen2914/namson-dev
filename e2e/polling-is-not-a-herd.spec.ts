@@ -98,15 +98,27 @@ test("with the operator token the strip is read — and not while the tab is "
 
 // ---------------------------------------------- F5: every other poller
 
+/** The friendlies hub's other reads, answered empty, so the one being
+ *  counted is the only variable. (These two claims were made against the
+ *  market-hunter page until it was deleted on 2026-10-21; the friendlies
+ *  hub polls through the same lib/usePoll at the same 60s cadence.) */
+async function quietFriendlies(page: Page) {
+  for (const path of ["**/api/friendlies/markets", "**/api/friendlies/schedule**",
+                      "**/api/xg/friendlies**"]) {
+    await page.route(path, (r) => r.fulfill(json({ fixtures: [], listed: null })));
+  }
+}
+
 test("a failing read backs off instead of retrying at full cadence",
   async ({ page }) => {
     let asked = 0;
-    await page.route("**/api/hunter/findings**", (r) => {
+    await quietFriendlies(page);
+    await page.route("**/api/friendlies/scoreboard", (r) => {
       asked += 1;
-      return r.fulfill(json({ detail: "the scanner is down" }, 503));
+      return r.fulfill(json({ detail: "the scoreboard is down" }, 503));
     });
     await page.clock.install();
-    await page.goto("/bet-suggester/hunter");
+    await page.goto("/bet-suggester/friendlies");
     await expect.poll(() => asked).toBe(1);
     // ten minutes at a 60s cadence was eleven reads; with the backoff
     // (60s, 60s, 60-120s, 120-240s, 240-300s…) it is at most six
@@ -120,16 +132,17 @@ test("a read still in flight is never stacked on, and a hidden tab does "
     let asked = 0;
     // the first answer is withheld: the backend has hung
     const hung: Array<() => void> = [];
-    await page.route("**/api/hunter/findings**", (r) => {
+    await quietFriendlies(page);
+    await page.route("**/api/friendlies/scoreboard", (r) => {
       asked += 1;
       if (asked === 1) {
-        hung.push(() => { void r.fulfill(json({ ready: false, reason: "x" })); });
+        hung.push(() => { void r.fulfill(json({ fixtures: [] })); });
         return;
       }
-      return r.fulfill(json({ ready: false, reason: "dormant" }));
+      return r.fulfill(json({ fixtures: [] }));
     });
     await page.clock.install();
-    await page.goto("/bet-suggester/hunter");
+    await page.goto("/bet-suggester/friendlies");
     await expect.poll(() => asked).toBe(1);
     // five cadences while the first read hangs: the old setInterval asked
     // five more times on top of it

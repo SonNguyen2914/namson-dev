@@ -17,13 +17,13 @@
 // fact of WHICH prefixes exist and WHICH routes each forwards already
 // lives in one place, LEAGUE_PROXY_ALLOWED, so this file adds no list:
 // it hands the URL's own prefix to the same `leagueRouteAllowed` the
-// nine hand-written proxies call and forwards only what that says yes
+// hand-written proxies call and forwards only what that says yes
 // to. A league added to that table is reachable the moment it is
 // added, with no file to remember.
 //
 // Next resolves a static segment ahead of a dynamic one, so every
 // existing directory — bet-suggester, card, comp, epl, friendlies,
-// hunter, laliga, ligamx, mls, picker, xg — still answers for itself
+// laliga, ligamx, mls, picker, xg — still answers for itself
 // and this file is reached only by a prefix none of them claims.
 //
 // IT IS NOT AN OPEN PROXY, and the reason is that it admits nothing on

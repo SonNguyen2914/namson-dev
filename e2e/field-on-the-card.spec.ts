@@ -1239,7 +1239,6 @@ test("the link to it sits in the TOP-LEFT of every page that carries the "
       "/bet-suggester/ratings",
       "/bet-suggester/leagues",
       "/bet-suggester/bots",
-      "/bet-suggester/hunter",
       "/bet-suggester/friendlies",
       "/bet-suggester/wc26",
       "/bet-suggester/leagues-cup",

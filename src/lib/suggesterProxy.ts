@@ -455,12 +455,11 @@ export const LEAGUE_PROXY_ALLOWED: Record<string, readonly string[]> = {
   ligue1: ["standings"],
   eredivisie: ["standings"],
   // Deliberately tiny: no standings (none exist for friendlies), no
-  // odds, no admin. "coverage" was MISSING here once, so the backend
-  // census route was unreachable from the deployed frontend.
-  friendlies: ["scoreboard", "schedule", "markets", "coverage",
-               "fixtures"],
-  hunter: ["findings", "live-coverage"],
-  xg: ["summary", "friendlies"],
+  // odds, no admin. "coverage" (the backend census) and the hunter's
+  // two reads left with their backend routes on 2026-10-21 (backend
+  // cleanup C2/C3), as did xg `summary`.
+  friendlies: ["scoreboard", "schedule", "markets", "fixtures"],
+  xg: ["friendlies"],
   picker: ["board", "review"],
   // THE FIELD PAGE'S TWO READS (2026-09-23), both committed measurements
   // re-served by the backend: the league field off the union-corpus
@@ -584,9 +583,8 @@ export const LEAGUE_PROXY_ID_ROUTES: Record<string, readonly RegExp[]> = {
   ligamx: [/^match\/\d{1,12}$/],
   epl: [/^match\/\d{1,12}$/],
   laliga: [/^match\/\d{1,12}$/],
-  friendlies: [/^match\/\d{1,12}$/, /^fixtures\/\d{1,12}$/],
-  hunter: [],
-  xg: [/^league\/\d{1,8}$/],
+  friendlies: [/^fixtures\/\d{1,12}$/],
+  xg: [],
   picker: [],
   field: [],
   championships: [],
@@ -838,7 +836,7 @@ export type LeagueRouteRefusal = {
   reason: "route_not_forwarded" | "competition_not_proxied";
   competition: string;
   /** Only when a name is actually known. A prefix like `comp` or
-   *  `hunter` has none, and inventing one from the slug would put a
+   *  `picker` has none, and inventing one from the slug would put a
    *  machine key where a reader expects a competition. */
   competition_name?: string;
   route: string;
@@ -1034,7 +1032,6 @@ export const QUERY_BOUNDS: ReadonlyArray<
   // board's own ceiling is the sane one for its national twin
   [/^championships\/board$/, { days: [1, 14] }],
   [/^championships\/review$/, { back: [1, 30] }],
-  [/^hunter\/findings$/, { limit: [1, 500] }],
   [/^xg\/friendlies$/, { days: [1, 8] }],
 ];
 
