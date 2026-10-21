@@ -134,12 +134,12 @@ test.describe("proxy traversal", () => {
       expect(all.length).toBeGreaterThan(35);
       for (const t of ["/api/bet-suggester/prediction",
                        "/api/bet-suggester/team-info/{seg}",
-                       "/api/bet-suggester/timing", "/api/mls/{...}",
+                       "/api/mls/{...}",
                        "/api/{seg}/{...}"]) {
         expect(templates).toContain(t);
       }
-      expect(all.find((r) => r.template === "/api/bet-suggester/timing")!
-        .params).toEqual(["market_id", "match_id"]);
+      expect(all.find((r) => r.template === "/api/bet-suggester/prediction")!
+        .params).toEqual(["force_refresh", "match_id"]);
 
       const run = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
       const shots: { method: string; url: string }[] = [];
