@@ -1,7 +1,12 @@
 name: Prod watchdog
 
-# Pings the TRIVELA backend's readiness every 10 minutes and opens ONE GitHub
-# issue when it is down, so Son is notified on his phone. Added 2026-10-12
+# Pings the TRIVELA backend's readiness and opens ONE GitHub issue when it
+# is down, so Son is notified on his phone. The cron below ASKS for every
+# 10 minutes, but GitHub throttles scheduled runs on this repo: measured
+# 2026-10-18..21 from `gh run list --workflow prod-watchdog.yml`, scheduled
+# runs actually started every 2 to 7.5 hours (median about 4.6 h). So this is
+# a slow backstop, not a 10-minute alarm: an outage can go that long
+# before the issue opens. Added 2026-10-12
 # after a 10-hour outage (Railway usage-limit stop) went unnoticed. Lives in
 # this public repo because its Actions minutes are free. No secrets: it uses
 # only the workflow's own GITHUB_TOKEN to open, comment on and close issues.
