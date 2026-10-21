@@ -5,6 +5,17 @@ import { routeEight } from "./eight-columns";
 // Conference League (ecl), Europa League (uel), Brasileirão, Liga
 // Profesional Argentina, USL Championship.
 //
+// UEL / UECL: VIEWER RETIRED, HUB LIVE (cleanup D8, 2026-10-21). Their
+// VIEWERS stay retired, but both competitions came back as CUPS on the
+// Cups tab (backend `tables.CUPS`, Son 2026-10-07), and every fixture has
+// a match hub (`/bet-suggester/uel/<event>`, `/bet-suggester/uecl/<event>`;
+// backend `/api/comp/{cup}/match/{event_id}`). The backend names the
+// pairing in `competitions.RETIRED_VIEWER_HUBS` (`uel` -> `uel`, `ecl` ->
+// `uecl`). So "retired" below means the VIEWER at `/bet-suggester/comp/
+// <key>`, never the competition: `uel` is also a cup key and its
+// `/api/comp/uel/*` routes answer as that cup, and the bookmarked page
+// this spec reads is `ecl`'s, whose refusal now says where the hub went.
+//
 // Two things must hold, and they are different claims:
 //
 //  - they are GONE FROM NAVIGATION. Nothing on the board offers them.
@@ -62,10 +73,15 @@ const KEPT_IN_ARCHIVE: [string, string][] = [
   ["leagues-cup", "/bet-suggester/leagues-cup"],
 ];
 
+// The backend's `_comp_404` refusal for `ecl`, verbatim (TRIVELA
+// api/main.py, cleanup D8): viewer retired, hub live.
 const GONE_DETAIL =
-  "UEFA Europa League was retired on 2026-08-24 by operator decision — " +
-  "nothing is collected for it any more. Nothing recorded was deleted: " +
-  "journal entries stay readable at /api/comp/uel/journal, and the " +
+  "UEFA Europa Conference League: the viewer was retired on 2026-08-24 " +
+  "by operator decision and collects nothing. Viewer retired, hub live: " +
+  "the competition is a registered cup again as `uecl`, with its " +
+  "fixtures at /api/comp/uecl/fixtures and a match hub for each fixture " +
+  "at /api/comp/uecl/match/{event_id}. Nothing recorded was deleted: " +
+  "journal entries stay readable at /api/comp/ecl/journal, and the " +
   "research corpus is unchanged";
 
 test("the board offers none of the five, and still offers the three",
@@ -161,10 +177,10 @@ test("a competition read that FAILED names the failure — not 'Loading' for "
     expect(body).not.toContain("no model · by design");
   });
 
-test("a bookmarked retired competition says it was retired, and stops asking",
-  async ({ page }) => {
+test("a bookmarked retired viewer says it was retired, that its hub is live, "
+  + "and stops asking", async ({ page }) => {
     let asked = 0;
-    await page.route("**/api/comp/uel/fixtures**", (r) => {
+    await page.route("**/api/comp/ecl/fixtures**", (r) => {
       asked += 1;
       return r.fulfill({
         status: 404,
@@ -172,17 +188,20 @@ test("a bookmarked retired competition says it was retired, and stops asking",
         body: JSON.stringify({ detail: GONE_DETAIL }),
       });
     });
-    await page.route("**/api/comp/uel/markets**", (r) =>
+    await page.route("**/api/comp/ecl/markets**", (r) =>
       r.fulfill({
         status: 404,
         contentType: "application/json",
         body: JSON.stringify({ detail: GONE_DETAIL }),
       }));
 
-    await page.goto("/bet-suggester/comp/uel");
+    await page.goto("/bet-suggester/comp/ecl");
 
     // the reason, in the backend's own words — not a spinner
     await expect(page.getByText(/retired on 2026-08-24/).first())
+      .toBeVisible();
+    // and that only the VIEWER went: the competition's hub is live
+    await expect(page.getByText(/Viewer retired, hub live/).first())
       .toBeVisible();
     // and the reassurance that the evidence is still there
     await expect(page.getByText(/Nothing recorded was deleted/).first())
