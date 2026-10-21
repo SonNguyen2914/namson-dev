@@ -1,4 +1,3 @@
-import { TZ } from "../../../lib/matchday";
 // Match detail — namson.dev/bet-suggester/market/BRA_SRB
 // Apple-Sports treatment: the matchup is the hero, outcome probabilities as
 // thin horizontal stat bars, everything else glanceable and subordinate.
@@ -24,20 +23,57 @@ import { TZ } from "../../../lib/matchday";
 //     Those tooltips are gone and the sentence is real text below the
 //     table. `warn` is the refusal ink family on this stage and no longer
 //     colours the watching state.
+//
+// 2026-10-21 — FROZEN (cleanup C1). The WC26 backend routes this page read
+// (prediction, research, team-info, timeline, team-news, player-props,
+// reference-odds, live-scores, watchlist) are being removed. The page is
+// now statically generated for the sixteen knockout matches the archived
+// bracket links to, each from src/data/wc26/matches/<id>.json — the
+// prediction, research and team-info answers taken verbatim from
+// production on the freeze date. Nothing is fetched and nothing is
+// written: Refresh, Watch and the live chip are gone. The player-props
+// and sportsbook tabs are gone too: those routes re-asked ESPN /
+// API-Football on every read rather than serving a stored July record,
+// so there is nothing honest to freeze for them. The timeline was empty
+// for every match (its rows lived in a container database every deploy
+// wiped). See src/data/wc26/manifest.json.
 import Head from "next/head";
-import { useRouter } from "next/router";
-import { useCallback, useEffect, useState } from "react";
-import { usePoll } from "../../../lib/usePoll";
+import type { GetStaticPaths, GetStaticProps } from "next";
+import { useState } from "react";
 import {
-  api, flag, pct, signedPct, countdown, kickoffLocal,
+  flag, pct, signedPct, kickoffLocal,
   PredictionResponse, PredictionSummary, HalfDist, MarketPrediction,
-  PlayerPropsResponse, TeamNewsResponse, LiveScoreEntry,
-  ReferenceOddsResponse, ResearchResponse,
-  TimelinePoint, TeamInfoResponse, TeamBlurb,
+  ResearchResponse, TeamInfoResponse, TeamBlurb,
 } from "../../../lib/suggesterApi";
 import { Eyebrow, Reveal } from "../../../components/ui";
-import { Collapse, NavChip, RouteProgress, SkeletonRows, Toaster, TopBar, toast, useScrollSpy } from "../../../components/chrome";
+import { Collapse, NavChip, RouteProgress, Toaster, TopBar, toast, useScrollSpy } from "../../../components/chrome";
 import { MARKET_GROUPS } from "../../../lib/marketGroups";
+import manifest from "../../../data/wc26/manifest.json";
+
+/** One archived match, as src/data/wc26/matches/<id>.json holds it. */
+interface FrozenMatch {
+  match_id: string;
+  home: string;
+  away: string;
+  kickoff: string;
+  venue: string;
+  stage: string;
+  prediction: PredictionResponse;
+  research: ResearchResponse;
+  team_info: TeamInfoResponse;
+}
+
+export const getStaticPaths: GetStaticPaths = async () => ({
+  paths: manifest.match_pages.map((matchId) => ({ params: { matchId } })),
+  fallback: false,
+});
+
+export const getStaticProps: GetStaticProps<{ m: FrozenMatch }> = async ({ params }) => {
+  const id = String(params?.matchId ?? "");
+  if (!manifest.match_pages.includes(id)) return { notFound: true };
+  const m = (await import(`../../../data/wc26/matches/${id}.json`)).default as FrozenMatch;
+  return { props: { m } };
+};
 
 // Same floors as the backend board — the pick is just row #1 of this
 // match's slice of the same likelihood-first ranking.
@@ -52,213 +88,31 @@ type MktSortKey = "likelihood" | "edge" | "multiplier";
 // decided the 90 minutes end level. The strategy engine therefore allows
 // them only in candidates made ENTIRELY of ET/pens legs (main bet = the
 // draw, next step = who wins it), never mixed with 90-minute winners.
-/** The failure's own words, never a shrug. Same helper, same sentence,
- *  as LiveScoreboard.tsx and BracketView.tsx; redeclared per file for the
- *  stated reason that src/lib is not this change's to add to. */
-const why = (e: unknown): string =>
-  e instanceof Error ? e.message : String(e);
-
 const ET_REFINEMENT_KEYS = new Set([
   "home_win_et", "away_win_et", "home_win_pens", "away_win_pens",
 ]);
 
 
-export default function MatchDetail() {
-  const router = useRouter();
-  const matchId = router.query.matchId as string | undefined;
-
-  const [pred, setPred] = useState<PredictionResponse | null>(null);
-  const [timeline, setTimeline] = useState<TimelinePoint[]>([]);
-  const [watched, setWatched] = useState<Set<string>>(new Set());
-  const [teams, setTeams] = useState<{ home: string; away: string } | null>(null);
-  const [teamInfo, setTeamInfo] = useState<TeamInfoResponse | null>(null);
-  const [pProps, setPProps] = useState<PlayerPropsResponse | null>(null);
-  const [news, setNews] = useState<TeamNewsResponse | null>(null);
-  const [research, setResearch] = useState<ResearchResponse | null>(null);
-  const [nowMs, setNowMs] = useState(() => Date.now()); // 1s countdown tick
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+export default function MatchDetail({ m }: { m: FrozenMatch }) {
+  const matchId = m.match_id;
+  const pred = m.prediction;
+  const teamInfo = m.team_info;
+  const result = m.research.result;
   // grouped markets table: sort + collapsed groups
   const [mktSortKey, setMktSortKey] = useState<MktSortKey>("likelihood");
   const [mktSortDir, setMktSortDir] = useState<"asc" | "desc">("desc");
   const [mktCollapsed, setMktCollapsed] = useState<Set<string>>(new Set());
-  const [mktTab, setMktTab] = useState<"lines" | "players" | "reference">("lines");
-  const [refOdds, setRefOdds] = useState<ReferenceOddsResponse | null>(null);
-  // A FAILED READ IS NOT AN EMPTY ONE — FOUR MORE OF THEM, ON THIS PAGE.
-  //
-  // Four side reads on this page ended in a bare `catch {}` whose comment
-  // said the section "just won't render": the scouting blurbs, the player
-  // props, the post-match settlement record and the team news. Each of
-  // those sections ALSO legitimately renders nothing when the backend has
-  // nothing for this match, so the failure and the absence were the same
-  // pixels — the shape LiveScoreboard closed for five reads and the
-  // league hubs closed for six, standing untouched one page over. On the
-  // props section it is worse than a blank: `if (pp.available)` means a
-  // read that failed and a read that answered "no props for this fixture"
-  // are indistinguishable, and the reader concludes the model has no
-  // player estimates here.
-  //
-  // Named now, in the failure's own words, in one block above the
-  // sections they are missing from. `warn` is the refusal ink family on
-  // this stage; nothing here is coloured up or neg, because a read that
-  // did not land is a coverage fact and not a verdict on a bet.
-  const [failedReads, setFailedReads] = useState<Record<string, string>>({});
 
-  const load = useCallback(async (force: boolean) => {
-    if (!matchId) return;
-    try {
-      const [p, t, wl] = await Promise.all([
-        api.prediction(matchId, force),
-        api.timeline(matchId),
-        api.watchlist(),
-      ]);
-      setPred(p);
-      setTimeline(t.points);
-      setWatched(new Set(wl.watchlist.map((w) => w.market_id)));
-      setError("");
-      if (force) toast("Fresh simulation done — board repriced.");
-    } catch {
-      setError("Could not reach the prediction backend.");
-    } finally {
-      setLoading(false);
-    }
-  }, [matchId]);
-
-  // Resolve full team names for the hero (best-effort — the id codes are
-  // the honest fallback). Pre-kickoff matches come from /upcoming; in-play
-  // ones from /live-scores (served from the backend's shared 20s cache).
-  useEffect(() => {
-    if (!matchId) return;
-    let alive = true;
-    (async () => {
-      try {
-        const u = await api.upcoming(72);
-        const m = u.matches.find((x) => x.match_id === matchId);
-        if (m && alive) { setTeams({ home: m.home, away: m.away }); }
-        else {
-          const ls = await api.liveScores();
-          const l = ls.live.find((x) => x.match_id === matchId);
-          if (l && alive) setTeams({ home: l.home, away: l.away });
-        }
-      } catch {
-        /* SWALLOWED(market:team-name-resolution) */
-        // JUDGED AND LEFT, EXPLICITLY. This read resolves the DISPLAY
-        // NAMES only, and its failure is already visible without a
-        // sentence: the hero falls back to the match id's own codes
-        // ("BRA vs SRB"), which are shown, are true, and are not a
-        // claim that anything is missing. Nothing is folded into a
-        // lookalike absence here, so there is nothing to name.
-      }
-      // Scouting blurbs — independent of the name resolution above.
-      try {
-        const ti = await api.teamInfo(matchId);
-        if (alive) setTeamInfo(ti);
-      } catch (e) {
-        if (alive) setFailedReads((p) => ({ ...p, "scouting blurbs": why(e) }));
-      }
-      // Player props — model estimates. `available` false is the
-      // backend's own answer; a rejection is not.
-      try {
-        const pp = await api.playerProps(matchId);
-        if (alive && pp.available) setPProps(pp);
-      } catch (e) {
-        if (alive) setFailedReads((p) => ({ ...p, "player props": why(e) }));
-      }
-      // Post-match research record (result + settlement); renders only
-      // once the match is over and a closing snapshot exists.
-      try {
-        const rs = await api.research(matchId);
-        if (alive && rs.result && rs.closing.length) setResearch(rs);
-      } catch (e) {
-        if (alive) setFailedReads((p) => ({ ...p, "settlement record": why(e) }));
-      }
-    })();
-    const tick = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => { alive = false; clearInterval(tick); };
-  }, [matchId]);
-
-  // Team news: kickoff/venue for the hero + official lineups once posted
-  // (~1h before kickoff). Polled so a viewer parked on the page catches the
-  // lineup drop; ESPN is keyless and the backend caches it for 60s. Every
-  // 120s through lib/usePoll (audit F5): no overlap, paused in a hidden
-  // tab, backing off while it fails.
-  usePoll(async (signal) => {
-    if (!matchId) return "stop";
-    try {
-      const tn = await api.teamNews(matchId);
-      if (signal.aborted) return "stop";
-      setNews(tn);
-      setTeams((t) => t ?? { home: tn.home_team, away: tn.away_team });
-      // this read polls; an answer RETIRES the failure line rather
-      // than leaving a stale one over live content
-      setFailedReads((p) => {
-        if (!("team news" in p)) return p;
-        const n = { ...p }; delete n["team news"]; return n;
-      });
-      return "ok";
-    } catch (e) {
-      if (!signal.aborted) {
-        setFailedReads((p) => ({ ...p, "team news": why(e) }));
-      }
-      return "failed";
-    }
-  }, 120000, [matchId]);
-
-  async function toggleWatch(marketId: string, marketTitle: string) {
-    if (!matchId) return;
-    if (watched.has(marketId)) {
-      await api.unwatch(marketId);
-      setWatched((prev) => { const n = new Set(prev); n.delete(marketId); return n; });
-      toast(`Stopped watching: ${marketTitle}`);
-    } else {
-      await api.watch(matchId, marketId, marketTitle);
-      setWatched((prev) => new Set(prev).add(marketId));
-      // No notification is sent and none is promised. Watching records that
-      // this market's tape should be read back on the archive page.
-      toast(`Watching: ${marketTitle} — its readings are listed on the WC26 `
-            + `page. Nothing is dispatched.`);
-    }
-  }
-
-  useEffect(() => {
-    // Scheduled so load()'s setState runs in an async callback, not sync
-    // inside the effect body (react-hooks/set-state-in-effect).
-    const t = setTimeout(() => load(false), 0);
-    return () => clearTimeout(t);
-  }, [load]);
-
-  // Sportsbook reference odds — fetched ONLY when the tab is first opened
-  // (each uncached fetch spends the shared API-Football budget).
-  useEffect(() => {
-    if (mktTab !== "reference" || refOdds || !matchId) return;
-    let alive = true;
-    api.referenceOdds(matchId)
-      .then((r) => { if (alive) setRefOdds(r); })
-      .catch(() => {
-        if (alive) setRefOdds({
-          match_id: matchId, source: "api-football", home_team: "",
-          away_team: "", available: false, reason: "backend unreachable",
-        });
-      });
-    return () => { alive = false; };
-  }, [mktTab, refOdds, matchId]);
-
-  const [codeH, codeA] = (matchId ?? "_").split("_");
-  const home = teams?.home ?? codeH ?? "Home";
-  const away = teams?.away ?? codeA ?? "Away";
-  const secsToKick = news && nowMs > 0
-    ? Math.floor((new Date(news.kickoff).getTime() - nowMs) / 1000)
-    : null;
+  const home = m.home;
+  const away = m.away;
 
   // Likelihood ↓ then edge ↓ — same ordering as the landing board
-  const sortedMarkets = pred
-    ? [...pred.markets].sort(
-        (a, b) => b.model_probability - a.model_probability || b.edge - a.edge)
-    : [];
-  let pick = sortedMarkets.find((m) => m.model_probability >= PRIMARY_FLOOR) ?? null;
+  const sortedMarkets = [...pred.markets].sort(
+    (a, b) => b.model_probability - a.model_probability || b.edge - a.edge);
+  let pick = sortedMarkets.find((x) => x.model_probability >= PRIMARY_FLOOR) ?? null;
   let pickTier: 49 | 40 | null = pick ? 49 : null;
   if (!pick) {
-    pick = sortedMarkets.find((m) => m.model_probability >= FALLBACK_FLOOR) ?? null;
+    pick = sortedMarkets.find((x) => x.model_probability >= FALLBACK_FLOOR) ?? null;
     pickTier = pick ? 40 : null;
   }
 
@@ -267,17 +121,17 @@ export default function MatchDetail() {
     const used = new Set<string>();
     const out: { group: { id: string; label: string }; rows: MarketPrediction[] }[] = [];
     for (const g of MARKET_GROUPS) {
-      const rows = sortedMarkets.filter((m) => g.test(m.outcome_key));
-      rows.forEach((m) => used.add(m.market_id));
+      const rows = sortedMarkets.filter((x) => g.test(x.outcome_key));
+      rows.forEach((x) => used.add(x.market_id));
       if (rows.length) out.push({ group: g, rows });
     }
-    const rest = sortedMarkets.filter((m) => !used.has(m.market_id));
+    const rest = sortedMarkets.filter((x) => !used.has(x.market_id));
     if (rest.length) out.push({ group: { id: "other", label: "Other" }, rows: rest });
     return out;
   })();
-  const mktVal = (m: MarketPrediction) =>
-    mktSortKey === "likelihood" ? m.model_probability
-    : mktSortKey === "edge" ? m.edge : m.kalshi_odds;
+  const mktVal = (x: MarketPrediction) =>
+    mktSortKey === "likelihood" ? x.model_probability
+    : mktSortKey === "edge" ? x.edge : x.kalshi_odds;
   const sortMkts = (rows: MarketPrediction[]) => {
     const dir = mktSortDir === "asc" ? 1 : -1;
     return [...rows].sort((a, b) => (mktVal(a) - mktVal(b)) * dir);
@@ -300,61 +154,34 @@ export default function MatchDetail() {
   // Three separate bars, NOT one segmented bar: these are independent
   // market-anchored numbers and don't necessarily sum to 100%.
   const outcomeProb = (key: string) =>
-    sortedMarkets.find((m) => m.outcome_key === key)?.model_probability;
+    sortedMarkets.find((x) => x.outcome_key === key)?.model_probability;
   const pHome = outcomeProb("home_win");
   const pDraw = outcomeProb("draw");
   const pAway = outcomeProb("away_win");
   const hasOutcomes = [pHome, pDraw, pAway].some((v) => v != null);
 
-  const freshnessBadge = pred && (
+  const freshnessBadge = (
     <span className={`rounded-md border px-2.5 py-1 font-mono text-[11px] tracking-wide ${
-      pred.freshness === "locked"
-        ? "border-live/40 text-live"
-        : pred.freshness === "fresh"
-        ? "border-accent/40 text-accent"
-        : pred.is_stale
-        ? "border-warn/40 text-warn"
-        : "border-line text-ink-low"
+      pred.freshness === "locked" ? "border-live/40 text-live" : "border-line text-ink-low"
     }`}>
       {pred.freshness === "locked"
         ? "🔒 T-10 locked view · settled"
-        : pred.freshness === "fresh"
-        ? `fresh · ${pred.inference_time_ms ?? "?"}ms inference`
-        : pred.is_stale
-        ? `stale · ${Math.round(pred.age_seconds / 60)}min old`
-        : `cached · ${pred.age_seconds}s old`}
+        : "no frozen pre-match record"}
     </span>
   );
 
   // Post-settlement review: which side each market actually settled,
-  // matched into the Markets table by ticker (replaces the Alert column).
-  const settledMap = research?.result
-    ? new Map(research.closing.map((c) => [c.market_id, c.result]))
+  // matched into the Markets table by ticker. Present only where the
+  // research record carried closing rows.
+  const settledMap = result && m.research.closing.length
+    ? new Map(m.research.closing.map((c) => [c.market_id, c.result]))
     : null;
-
-  // Site-wide live awareness: a small score chip in the top bar whenever
-  // ANY match is in play (links home to the live box).
-  const [liveNow, setLiveNow] = useState<LiveScoreEntry | null>(null);
-  // Every 45s through lib/usePoll (audit F5): no overlap, paused in a
-  // hidden tab, backing off while it fails.
-  usePoll(async (signal) => {
-    let failed = false;
-    try {
-      const r = await api.liveScores();
-      if (!signal.aborted) {
-        setLiveNow(r.live.find((l) => !l.is_finished) ?? null);
-      }
-    } catch {
-      /* SWALLOWED(market:live-chip) — registered in
-         e2e/missing-is-not-zero.spec.ts with its closes_when. */
-      failed = true;
-    }
-    return failed ? "failed" : "ok";
-  }, 45000, []);
+  const cols = settledMap
+    ? "grid-cols-[minmax(0,1fr)_5.5rem_5rem_5.5rem_4.5rem]"
+    : "grid-cols-[minmax(0,1fr)_5.5rem_5rem_5.5rem]";
 
   // the chip for the section you're reading lights up
-  const activeSection = useScrollSpy(
-    ["prediction", "strategy", "markets"], [pred != null]);
+  const activeSection = useScrollSpy(["prediction", "strategy", "markets"], [true]);
 
   return (
     <div className="min-h-screen bg-bs font-sans text-ink-mid">
@@ -366,41 +193,12 @@ export default function MatchDetail() {
       <Toaster />
       <TopBar back={{ href: "/bet-suggester/wc26", label: "wc26" }}
         title={`${home} vs ${away}`}>
-        {liveNow && (
-          <NavChip href="/bet-suggester/wc26">
-            <span className="pulse-dot mr-1 inline-block h-1 w-1 rounded-full bg-live align-middle" />
-            <span className="text-live">
-              {liveNow.home.slice(0, 3)} {liveNow.home_goals}–{liveNow.away_goals} {liveNow.away.slice(0, 3)}
-            </span>
-          </NavChip>
-        )}
         <NavChip href="#prediction" active={activeSection === "prediction"}>Prediction</NavChip>
         <NavChip href="#strategy" active={activeSection === "strategy"}>Strategy</NavChip>
-        <NavChip onClick={() => {
-          setMktTab("players");
-          document.getElementById("markets")?.scrollIntoView();
-        }}>Players</NavChip>
         <NavChip href="#markets" active={activeSection === "markets"}>Markets</NavChip>
       </TopBar>
 
       <div className="mx-auto max-w-4xl px-5 py-10">
-
-        {/* EVERY READ THAT DID NOT HAPPEN, NAMED — above the sections
-            they are missing from, so the reader meets the reason before
-            the gap. Each of these sections can also be legitimately
-            empty, which is exactly why the two must not look alike. */}
-        {Object.keys(failedReads).length > 0 && (
-          <div data-testid="match-read-failures" className="mb-8 space-y-1.5">
-            {Object.entries(failedReads).map(([what, w]) => (
-              <p key={what} data-testid={`read-failed-${what.replace(/\s+/g, "-")}`}
-                role="status"
-                className="rounded-md border border-warn/40 bg-warn/5 px-2.5 py-1.5 text-[11px] leading-relaxed text-warn">
-                The {what} read failed: {w}. That is not this match having
-                no {what} — it is that we could not ask.
-              </p>
-            ))}
-          </div>
-        )}
 
         {/* ============ HERO — the matchup ============ */}
         <header className="hero-ambient mt-8 mb-12 rounded-3xl pb-2 text-center">
@@ -409,49 +207,40 @@ export default function MatchDetail() {
               between teams — never orphaning a flag onto its own line */}
           <h1 className="text-4xl font-semibold tracking-tight text-ink-hi sm:text-5xl">
             <span className="whitespace-nowrap">
-              {teams && <span className="mr-3">{flag(home)}</span>}
+              <span className="mr-3">{flag(home)}</span>
               {home}
             </span>
             <span className="mx-3 text-xl font-normal text-ink-faint sm:text-2xl">vs</span>
             <span className="whitespace-nowrap">
               {away}
-              {teams && <span className="ml-3">{flag(away)}</span>}
+              <span className="ml-3">{flag(away)}</span>
             </span>
           </h1>
 
-          {/* Match details — local kickoff, stadium, ticking countdown */}
-          {news && (
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 font-mono text-xs tracking-wide text-ink-low">
-              <span>{kickoffLocal(news.kickoff)}</span>
-              {news.venue && (
-                <>
-                  <span className="text-ink-faint">·</span>
-                  <span>{news.venue}</span>
-                </>
-              )}
-              {secsToKick != null && secsToKick > 0 ? (
-                <>
-                  <span className="text-ink-faint">·</span>
-                  <span className="tabular-nums text-accent">
-                    kickoff in {countdown(secsToKick)}
-                  </span>
-                </>
-              ) : secsToKick != null && secsToKick > -3 * 3600 ? (
-                <>
-                  <span className="text-ink-faint">·</span>
-                  <span className="text-live">kicked off</span>
-                </>
-              ) : null}
-            </div>
+          {/* The result, DERIVED from the two goal counts shown — never a
+              provider's composite string (AGENTS.md §3). */}
+          {result && (
+            <p className="mt-4 font-mono text-2xl tabular-nums text-ink-hi"
+               data-testid="match-result">
+              {result.home_goals}–{result.away_goals}
+              <span className="ml-2 text-xs uppercase tracking-[0.14em] text-ink-low">
+                {result.status_short}
+              </span>
+            </p>
           )}
+
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 font-mono text-xs tracking-wide text-ink-low">
+            <span>{kickoffLocal(m.kickoff)}</span>
+            {m.venue && (
+              <>
+                <span className="text-ink-faint">·</span>
+                <span>{m.venue}</span>
+              </>
+            )}
+          </div>
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             {freshnessBadge}
-            {pred?.is_final && (
-              <span className="rounded-md border border-live/40 px-2.5 py-1 font-mono text-[11px] tracking-wide text-live">
-                🔒 final decision locked
-              </span>
-            )}
             <button
               onClick={() => {
                 navigator.clipboard?.writeText(window.location.href)
@@ -462,39 +251,24 @@ export default function MatchDetail() {
             >
               Share
             </button>
-            <button
-              onClick={() => { setLoading(true); load(true); }}
-              disabled={loading}
-              className={`rounded-lg border px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] transition-colors ${
-                loading
-                  ? "cursor-not-allowed border-line text-ink-faint"
-                  : "border-accent/40 text-accent hover:border-accent hover:bg-accent/5"
-              }`}
-            >
-              {loading ? "Simulating…" : "↻ Refresh (fresh simulation)"}
-            </button>
           </div>
+          <p className="mx-auto mt-4 max-w-md font-mono text-[11px] leading-relaxed text-ink-faint"
+             data-testid="match-frozen">
+            Archived {manifest.frozen_on} from the backend&apos;s last answer.
+            Nothing on this page is fetched or refreshed.
+          </p>
+          {pred.archive_note && (
+            <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed text-ink-low">
+              {pred.archive_note}.
+            </p>
+          )}
         </header>
-
-        {error && <p className="mb-8 text-center text-sm text-live">{error}</p>}
-
-        {loading && !pred && !error && (
-          <div className="mb-10 space-y-6">
-            <SkeletonRows rows={1} height="h-24" />
-            <div className="grid grid-cols-3 gap-3">
-              <SkeletonRows rows={1} height="h-20" />
-              <SkeletonRows rows={1} height="h-20" />
-              <SkeletonRows rows={1} height="h-20" />
-            </div>
-            <SkeletonRows rows={4} />
-          </div>
-        )}
 
         {/* Headline stats — xG + confidence, right under the hero.
             Canonical-archive payloads carry xg: null (the frozen lock
             rows never archived xG and the backend refuses to invent it
             — V7 evaluation F1), so this whole block is provenance-aware. */}
-        {pred && pred.xg && (
+        {pred.xg && (
           <Reveal>
             <section className="mb-10">
               <div className="grid grid-cols-3 gap-3">
@@ -503,27 +277,13 @@ export default function MatchDetail() {
                 <Stat label="model confidence" value={pct(pred.confidence)}
                   bar={pred.confidence} />
               </div>
-              {/* the xG duel at a glance — one bar, two shares */}
-              {pred.xg.home + pred.xg.away > 0 && (
-                <div className="mt-3">
-                  <div className="flex h-1.5 gap-0.5 overflow-hidden rounded-full">
-                    <div className="rounded-full bg-accent/75"
-                      style={{ width: `${(pred.xg.home / (pred.xg.home + pred.xg.away)) * 100}%` }} />
-                    <div className="flex-1 rounded-full bg-elev2" />
-                  </div>
-                  <div className="mt-1 flex justify-between font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
-                    <span>{home} {pct(pred.xg.home / (pred.xg.home + pred.xg.away))} of expected goals</span>
-                    <span>{away}</span>
-                  </div>
-                </div>
-              )}
             </section>
           </Reveal>
         )}
 
         {/* How they play — scouting blurbs, a read aid (not a model input).
             Collapsed by default: read-once background, not match-day signal. */}
-        {teamInfo && (teamInfo.home.scouting || teamInfo.away.scouting) && (
+        {(teamInfo.home.scouting || teamInfo.away.scouting) && (
           <Reveal>
             <Collapse eyebrow="scouting" title="How they play" defaultOpen={false}>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -534,35 +294,31 @@ export default function MatchDetail() {
           </Reveal>
         )}
 
-        {/* Team news moved to the landing page's live match box. The
-            team-news fetch stays: the hero reads venue/kickoff/countdown
-            from it, and Player props keep their squad tags. */}
+        {/* Model prediction — halves, full time, ET/pens, top scores.
+            Only DB batches carry a summary AND xg; canonical-archive
+            payloads have neither, so the panel simply doesn't render. */}
+        {pred.summary && pred.xg && (
+          <Reveal>
+            <Collapse id="prediction" eyebrow="pure model" title="Model prediction">
+              <ModelPrediction
+                summary={pred.summary}
+                scorelines={pred.scorelines}
+                xg={pred.xg}
+                home={home}
+                away={away}
+              />
+            </Collapse>
+          </Reveal>
+        )}
 
-        {pred && (
+        {sortedMarkets.length > 0 && (
           <>
-            {/* Model prediction — halves, full time, ET/pens, top scores.
-                Only DB batches carry a summary AND xg; canonical-archive
-                payloads have neither, so the panel simply doesn't render. */}
-            {pred.summary && pred.xg && (
-              <Reveal>
-                <Collapse id="prediction" eyebrow="pure model" title="Model prediction">
-                  <ModelPrediction
-                    summary={pred.summary}
-                    scorelines={pred.scorelines}
-                    xg={pred.xg}
-                    home={home}
-                    away={away}
-                  />
-                </Collapse>
-              </Reveal>
-            )}
-
             {/* Outcome probabilities — thin stat bars, Apple-Sports style */}
             {hasOutcomes && (
               <Reveal>
               <section className="mb-10 rounded-2xl border border-line bg-elev p-5 sm:p-6">
                 <Eyebrow className="mb-4">
-                  model outcome probabilities · market-anchored
+                  model outcome probabilities · market-anchored · T-10 lock
                 </Eyebrow>
                 <div className="space-y-3">
                   {pHome != null && <OutcomeBar label={`${home} win`} value={pHome} />}
@@ -570,19 +326,14 @@ export default function MatchDetail() {
                   {pAway != null && <OutcomeBar label={`${away} win`} value={pAway} />}
                 </div>
                 <p className="mt-4 text-[11px] leading-relaxed text-ink-faint">
-                  The pure-model numbers above, shrunk 40% toward Kalshi&apos;s live
-                  price (60% model + 40% market) — liquid markets are usually
-                  right, so this is the humbler number the board runs on. That
-                  blend is why it differs from Full time above. Read straight
-                  off the priced markets below — independent numbers, so they
-                  won&apos;t sum to exactly 100%.
+                  The model&apos;s numbers shrunk 40% toward Kalshi&apos;s price
+                  (60% model + 40% market), as locked ten minutes before
+                  kickoff. Read straight off the priced markets below —
+                  independent numbers, so they won&apos;t sum to exactly 100%.
                 </p>
               </section>
               </Reveal>
             )}
-
-            {/* Live read moved to the landing page — it lives beside the
-                live score card now, where an in-progress match is watched */}
 
             {/* Model's Pick — row #1 of this match's likelihood board */}
             <Reveal>
@@ -591,7 +342,7 @@ export default function MatchDetail() {
                    : "border-line"
             }`}>
               <Eyebrow>
-                Model&apos;s pick — most likely bet on this match
+                Model&apos;s pick at the T-10 lock — most likely bet on this match
               </Eyebrow>
               {pick ? (
                 <>
@@ -608,22 +359,11 @@ export default function MatchDetail() {
                       Expanded to 40%+ likely — nothing on this match cleared 49%+.
                     </p>
                   )}
-                  {!settledMap && (
-                    <button
-                      onClick={() => toggleWatch(pick!.market_id, pick!.market_title)}
-                      className={`mt-4 rounded-lg border px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] transition-colors ${
-                        watched.has(pick.market_id)
-                          ? "border-line-strong text-ink-mid hover:text-ink-hi"
-                          : "border-accent/40 text-accent hover:border-accent hover:bg-accent/5"}`}
-                    >
-                      {watched.has(pick.market_id) ? "Watching this pick" : "Watch this pick"}
-                    </button>
-                  )}
                 </>
               ) : (
                 <p className="mt-3 text-sm text-ink-low">
-                  Nothing on this match is 40%+ likely right now — no honest
-                  pick to make.
+                  Nothing on this match was 40%+ likely at the lock — there
+                  was no honest pick to make.
                 </p>
               )}
             </section>
@@ -636,215 +376,99 @@ export default function MatchDetail() {
                   scorelines={pred.scorelines} home={home} away={away} />
               </Collapse>
             </Reveal>
-
-            {/* Every market priced — grouped by type, sortable, collapsible */}
-            <Reveal>
-            <section id="markets" className="mb-14">
-              <Eyebrow className="mb-2">markets</Eyebrow>
-              <h3 className="mb-3 text-lg font-medium text-ink-hi">
-                Every Kalshi market on this match
-              </h3>
-              <div className="mb-4 flex gap-1.5">
-                {([["lines", "Game lines"], ["players", "Player props"], ["reference", "Sportsbook ref"]] as const).map(([id, label]) => (
-                  <button
-                    key={id}
-                    onClick={() => setMktTab(id)}
-                    className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors ${
-                      mktTab === id
-                        ? "border-accent/60 bg-accent/10 text-accent"
-                        : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              {mktTab === "reference" ? (
-                <ReferenceOddsTab ro={refOdds} />
-              ) : mktTab === "players" ? (
-                pProps ? <PlayerPropsTab pp={pProps} onWatch={toggleWatch} watched={watched} />
-                       : <p className="rounded-xl border border-line p-4 text-sm text-ink-low">Player data unavailable for this match.</p>
-              ) : (<>
-              <p className="mb-4 text-xs text-ink-low">
-                Click a column to sort · click a group to collapse
-              </p>
-              {settledMap && research && research.final_lock.length > 0 && sortedMarkets.length > 0 && (() => {
-                const rows = research.final_lock
-                  .map((l) => ({ l, res: settledMap.get(l.market_id) }))
-                  .filter((x) => x.res === "yes" || x.res === "no");
-                if (!rows.length) return null;
-                const modelRight = rows.filter(
-                  (x) => (x.l.model_probability >= 0.5) === (x.res === "yes")).length;
-                const mktRight = rows.filter(
-                  (x) => ((x.l.implied_probability ?? 0.5) >= 0.5) === (x.res === "yes")).length;
-                const brier = rows.reduce((s2, x) =>
-                  s2 + Math.pow(x.l.model_probability - (x.res === "yes" ? 1 : 0), 2), 0) / rows.length;
-                return (
-                  <div className="mb-4 rounded-xl border border-accent/25 bg-accent/5 px-4 py-3">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent">T-10 scorecard</p>
-                    <p className="mt-1 text-sm text-ink-mid">
-                      The locked model called <span className="font-mono text-ink-hi">{modelRight}/{rows.length}</span> settled
-                      markets right (market favourite: <span className="font-mono">{mktRight}/{rows.length}</span>) ·
-                      Brier <span className="font-mono text-ink-hi">{brier.toFixed(3)}</span>
-                      <span className="text-ink-faint"> (lower is better; 0.25 = coin flips)</span>
-                    </p>
-                  </div>
-                );
-              })()}
-              {!settledMap && sortedMarkets.length === 0 && (
-                <p className="mb-4 rounded-xl border border-line p-4 text-sm text-ink-low">
-                  No Kalshi books priced yet for this match — hit Refresh for
-                  a fresh simulation, or check back once Kalshi lists the
-                  markets.
-                </p>
-              )}
-              {settledMap && sortedMarkets.length === 0 && (
-                <p className="mb-4 rounded-xl border border-line p-4 text-sm text-ink-low">
-                  The pre-match model view for this match was lost in a
-                  deploy before persistent storage existed — nothing honest
-                  to review here. Matches from here on keep their T-10
-                  locked numbers for exactly this table.
-                </p>
-              )}
-              <div className="overflow-x-auto rounded-xl border border-line">
-                <div className="min-w-[560px]">
-                  {/* sortable header */}
-                  <div className="grid grid-cols-[minmax(0,1fr)_5.5rem_5rem_5.5rem_4.5rem] items-center gap-x-3 border-b border-line bg-elev px-4 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-low">
-                    <span>Market</span>
-                    <button onClick={() => onMktSort("likelihood")} className="text-right transition-colors hover:text-ink-hi">
-                      Likelihood{mktArrow("likelihood")}
-                    </button>
-                    <button onClick={() => onMktSort("edge")}
-                      title="Model probability minus the market's implied probability — positive means the model sees value"
-                      className="text-right transition-colors hover:text-ink-hi">
-                      Edge{mktArrow("edge")}
-                    </button>
-                    <button onClick={() => onMktSort("multiplier")}
-                      title="Payout multiple at the buyable ask price (not the midpoint)"
-                      className="text-right transition-colors hover:text-ink-hi">
-                      Mult{mktArrow("multiplier")}
-                    </button>
-                    <span className="text-right">{settledMap ? "Settled" : "Watch"}</span>
-                  </div>
-
-                  {marketGroups.map(({ group, rows }) => {
-                    const closed = mktCollapsed.has(group.id);
-                    return (
-                      <div key={group.id}>
-                        <button
-                          onClick={() => toggleMktGroup(group.id)}
-                          className="flex w-full items-center gap-2.5 border-b border-line bg-elev/40 px-4 py-2.5 text-left transition-colors hover:bg-elev"
-                        >
-                          <span className={`text-ink-faint transition-transform ${closed ? "" : "rotate-90"}`}>▸</span>
-                          <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-mid">{group.label}</span>
-                          <span className="ml-auto shrink-0 font-mono text-[11px] text-ink-faint">
-                            {rows.length} market{rows.length === 1 ? "" : "s"}
-                          </span>
-                        </button>
-                        {!closed && sortMkts(rows).map((m) => (
-                          <div
-                            key={m.market_id}
-                            className="grid grid-cols-[minmax(0,1fr)_5.5rem_5rem_5.5rem_4.5rem] items-center gap-x-3 border-b border-line px-4 py-3 text-sm transition-colors hover:bg-elev"
-                          >
-                            <span className="min-w-0 truncate pr-2 text-ink-hi" title={m.market_title}>{m.market_title}</span>
-                            <span className="text-right font-mono tabular-nums text-ink-hi">{pct(m.model_probability)}</span>
-                            <span className={`text-right font-mono tabular-nums ${m.edge >= 0 ? "text-accent" : "text-neg"}`}>
-                              {signedPct(m.edge)}
-                            </span>
-                            <span className="text-right font-mono tabular-nums text-ink-mid">{m.kalshi_odds?.toFixed(2)}x</span>
-                            <span className="text-right">
-                              {settledMap ? (
-                                (() => {
-                                  const res = settledMap.get(m.market_id);
-                                  return (
-                                    <span className={`font-mono text-[11px] uppercase tracking-wider ${
-                                      res === "yes" ? "text-accent"
-                                        : res === "no" ? "text-ink-faint" : "text-warn"}`}>
-                                      {res === "yes" ? "✓ yes" : res === "no" ? "✗ no" : "—"}
-                                    </span>
-                                  );
-                                })()
-                              ) : (
-                              <button
-                                onClick={() => toggleWatch(m.market_id, m.market_title)}
-                                className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors ${
-                                  watched.has(m.market_id)
-                                    ? "border-line-strong text-ink-mid hover:text-ink-hi"
-                                    : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"
-                                }`}
-                              >
-                                {watched.has(m.market_id) ? "Watching" : "Watch"}
-                              </button>
-                              )}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              <p className="mt-3 text-xs leading-relaxed text-ink-faint"
-                 data-testid="watch-means-what">
-                Watch adds a market to the list on the WC26 page, where its
-                stored readings are shown as five separate observations —
-                each in its own unit, each with its n, each naming what it
-                could not be computed from. Nothing is dispatched and no
-                moment is named to act: the 0-100 composite that used to
-                fire a notification at 75 was never measured and is
-                withdrawn. Multipliers are the buyable ask price, not the
-                midpoint.
-              </p>
-              </>)}
-            </section>
-            </Reveal>
-
-            {/* Prediction timeline — collapsed: audit trail, not match-day
-                signal */}
-            {timeline.length > 1 && (
-              <Reveal>
-              <Collapse eyebrow="history" title="How the home-win prediction evolved today" defaultOpen={false}>
-                <div className="overflow-x-auto rounded-xl border border-line">
-                  <table className="w-full text-sm">
-                    <thead className="bg-elev text-left font-mono text-[11px] uppercase tracking-[0.14em] text-ink-low">
-                      <tr>
-                        <th className="px-4 py-2.5 font-normal">Time</th>
-                        <th className="px-3 py-2.5 text-right font-normal">Model</th>
-                        <th className="px-3 py-2.5 text-right font-normal">Market</th>
-                        <th className="px-3 py-2.5 text-right font-normal">Edge</th>
-                        <th className="px-3 py-2.5 text-right font-normal">Conf</th>
-                        <th className="px-4 py-2.5 font-normal">Run</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {timeline.map((p, i) => (
-                        <tr key={i} className={`border-t border-line ${p.is_final ? "bg-live/5" : ""}`}>
-                          <td className="px-4 py-2.5 font-mono text-xs tabular-nums text-ink-low">
-                            {new Date(p.timestamp).toLocaleTimeString("en-US", { timeZone: TZ })}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink-hi">{pct(p.model_probability)}</td>
-                          <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink-low">
-                            {pct(p.implied_probability)}
-                          </td>
-                          <td className={`px-3 py-2.5 text-right font-mono tabular-nums ${
-                            p.edge >= 0 ? "text-accent" : "text-neg"
-                          }`}>
-                            {signedPct(p.edge)}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-mono tabular-nums text-ink-low">{pct(p.confidence)}</td>
-                          <td className="px-4 py-2.5 font-mono text-[11px] text-ink-low">
-                            {p.is_final ? "🔒 FINAL" : p.source.replace("_", " ")}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </Collapse>
-              </Reveal>
-            )}
           </>
         )}
+
+        {/* Every market priced — grouped by type, sortable, collapsible */}
+        <Reveal>
+        <section id="markets" className="mb-14">
+          <Eyebrow className="mb-2">markets</Eyebrow>
+          <h3 className="mb-3 text-lg font-medium text-ink-hi">
+            Every Kalshi market on this match, as locked
+          </h3>
+          {sortedMarkets.length === 0 ? (
+            <p className="mb-4 rounded-xl border border-line p-4 text-sm text-ink-low"
+               data-testid="no-frozen-markets">
+              The pre-match model view for this match was lost in a deploy
+              before persistent storage existed — nothing honest to review
+              here. The archive keeps T-10 locked numbers for six matches:
+              the two later quarter-finals, both semi-finals, the third-place
+              match and the final.
+            </p>
+          ) : (<>
+          <p className="mb-4 text-xs text-ink-low">
+            Click a column to sort · click a group to collapse
+          </p>
+          <div className="overflow-x-auto rounded-xl border border-line">
+            <div className="min-w-[560px]">
+              {/* sortable header */}
+              <div className={`grid ${cols} items-center gap-x-3 border-b border-line bg-elev px-4 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-low`}>
+                <span>Market</span>
+                <button onClick={() => onMktSort("likelihood")} className="text-right transition-colors hover:text-ink-hi">
+                  Likelihood{mktArrow("likelihood")}
+                </button>
+                <button onClick={() => onMktSort("edge")}
+                  title="Model probability minus the market's implied probability — positive means the model sees value"
+                  className="text-right transition-colors hover:text-ink-hi">
+                  Edge{mktArrow("edge")}
+                </button>
+                <button onClick={() => onMktSort("multiplier")}
+                  title="Payout multiple at the buyable ask price (not the midpoint)"
+                  className="text-right transition-colors hover:text-ink-hi">
+                  Mult{mktArrow("multiplier")}
+                </button>
+                {settledMap && <span className="text-right">Settled</span>}
+              </div>
+
+              {marketGroups.map(({ group, rows }) => {
+                const closed = mktCollapsed.has(group.id);
+                return (
+                  <div key={group.id}>
+                    <button
+                      onClick={() => toggleMktGroup(group.id)}
+                      className="flex w-full items-center gap-2.5 border-b border-line bg-elev/40 px-4 py-2.5 text-left transition-colors hover:bg-elev"
+                    >
+                      <span className={`text-ink-faint transition-transform ${closed ? "" : "rotate-90"}`}>▸</span>
+                      <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-mid">{group.label}</span>
+                      <span className="ml-auto shrink-0 font-mono text-[11px] text-ink-faint">
+                        {rows.length} market{rows.length === 1 ? "" : "s"}
+                      </span>
+                    </button>
+                    {!closed && sortMkts(rows).map((x) => (
+                      <div
+                        key={x.market_id}
+                        className={`grid ${cols} items-center gap-x-3 border-b border-line px-4 py-3 text-sm transition-colors hover:bg-elev`}
+                      >
+                        <span className="min-w-0 truncate pr-2 text-ink-hi" title={x.market_title}>{x.market_title}</span>
+                        <span className="text-right font-mono tabular-nums text-ink-hi">{pct(x.model_probability)}</span>
+                        <span className={`text-right font-mono tabular-nums ${x.edge >= 0 ? "text-accent" : "text-neg"}`}>
+                          {signedPct(x.edge)}
+                        </span>
+                        <span className="text-right font-mono tabular-nums text-ink-mid">{x.kalshi_odds?.toFixed(2)}x</span>
+                        {settledMap && (() => {
+                          const res = settledMap.get(x.market_id);
+                          return (
+                            <span className={`text-right font-mono text-[11px] uppercase tracking-wider ${
+                              res === "yes" ? "text-accent"
+                                : res === "no" ? "text-ink-faint" : "text-warn"}`}>
+                              {res === "yes" ? "✓ yes" : res === "no" ? "✗ no" : "—"}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <p className="mt-3 text-xs leading-relaxed text-ink-faint">
+            Multipliers are the buyable ask price at the lock, not the
+            midpoint. Shown for the record; nothing here is advice.
+          </p>
+          </>)}
+        </section>
+        </Reveal>
       </div>
     </div>
   );
@@ -887,86 +511,6 @@ function ScoutCard({ blurb, fallbackName }: {
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-// Sportsbook reference tab — what the wider betting market prices, via
-// API-Football's bookmaker aggregation (median odd across quoting books).
-// DISPLAY-ONLY: none of these are Kalshi contracts; they never touch the
-// board, the pick, or the strategy engine. Exists because Kalshi lists
-// some families (notably exact score) only 1-2 days before kickoff.
-function ReferenceOddsTab({ ro }: { ro: ReferenceOddsResponse | null }) {
-  if (!ro) {
-    return <SkeletonRows rows={5} />;
-  }
-  if (!ro.available) {
-    return (
-      <p className="rounded-xl border border-line p-4 text-sm text-ink-low">
-        No sportsbook reference odds right now — {ro.reason ?? "unavailable"}.
-      </p>
-    );
-  }
-  return (
-    <div>
-      <p className="mb-4 rounded-lg border border-warn/25 bg-warn/5 px-3 py-2 text-xs leading-relaxed text-warn">
-        Reference only — these are sportsbook odds, not Kalshi contracts.
-        Nothing here is buyable through this app, and none of it feeds the
-        board or the strategy engine.
-      </p>
-      {ro.note && (
-        <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
-          fallback source: {ro.source} · {ro.note}
-        </p>
-      )}
-      {ro.groups?.map((g) => (
-        <div key={g.name} className="mb-5">
-          <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">
-            {g.name}
-          </p>
-          <div className="overflow-x-auto rounded-xl border border-line">
-            <div className="min-w-[480px]">
-              <div className="grid grid-cols-[minmax(0,1fr)_5.5rem_5.5rem_7.5rem] items-center gap-x-3 border-b border-line bg-bs px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
-                <span>Outcome</span>
-                <span className="text-right">Odds</span>
-                <span className="text-right">Implied</span>
-                <span className="text-right">Model</span>
-              </div>
-              {g.rows.map((r) => (
-                <div key={r.label} className="grid grid-cols-[minmax(0,1fr)_5.5rem_5.5rem_7.5rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0">
-                  <span className="min-w-0 truncate pr-2 text-ink-hi">
-                    {r.label}
-                    <span className="ml-2 font-mono text-[9px] uppercase tracking-wider text-ink-faint">
-                      {r.books} book{r.books === 1 ? "" : "s"}
-                    </span>
-                  </span>
-                  <span className="text-right font-mono tabular-nums text-ink-mid">{r.odd.toFixed(2)}x</span>
-                  <span className="text-right font-mono tabular-nums text-ink-hi">{pct(r.implied)}</span>
-                  <span className="text-right font-mono tabular-nums">
-                    {r.model != null ? (
-                      <>
-                        <span className="text-ink-hi">{pct(r.model)}</span>
-                        <span className={`ml-1.5 text-[10px] ${r.model - r.implied >= 0 ? "text-accent" : "text-neg"}`}>
-                          {signedPct(r.model - r.implied)}
-                        </span>
-                      </>
-                    ) : (
-                      <span className="text-ink-faint">—</span>
-                    )}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      ))}
-      <p className="text-[11px] leading-relaxed text-ink-faint">
-        {ro.disclaimer} Aggregated from {ro.bookmaker_count} bookmaker
-        {(ro.bookmaker_count ?? 0) === 1 ? "" : "s"}. The model column joins
-        only where the simulation states that exact number (win/draw/win,
-        exact scorelines) — the difference includes the books&apos; vig, so it
-        is not a tradeable edge.
-      </p>
     </div>
   );
 }
@@ -2037,177 +1581,5 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
       )}
 
     </section>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Player props tab. TOP: Kalshi's real tournament-anytime scorer markets
-// ("Will X score a goal in the 2026 World Cup?") priced like every other
-// market — anchored likelihood, edge vs the buyable ask, multiplier; players
-// who already scored settle Yes and are labelled, not priced. BOTTOM: this
-// match's model estimates (1+/2+/3+ goals, first goal) — Kalshi lists no
-// per-match scorer or assist markets, and FIFA publishes no assist data, so
-// those cannot be priced without inventing numbers.
-function PlayerPropsTab({ pp, onWatch, watched }: {
-  pp: PlayerPropsResponse;
-  onWatch: (marketId: string, title: string) => void;
-  watched: Set<string>;
-}) {
-  const [tab, setTab] = useState<"home" | "away">("home");
-  const rows = (tab === "home" ? pp.home : pp.away) ?? [];
-  const priced = rows.filter((r) => r.market_id && !r.already_scored && r.likelihood != null);
-  const settled = rows.filter((r) => r.already_scored);
-  const dead = rows.filter((r) => r.market_id && !r.already_scored && r.tradeable === false);
-  return (
-    <div>
-      <div className="mb-4 flex gap-1.5">
-        {(["home", "away"] as const).map((side) => (
-          <button key={side} onClick={() => setTab(side)}
-            className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors ${
-              tab === side ? "border-accent/60 bg-accent/10 text-accent"
-                           : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"}`}>
-            {flag((side === "home" ? pp.home_team : pp.away_team) ?? "")}{" "}
-            {side === "home" ? pp.home_team : pp.away_team}
-          </button>
-        ))}
-      </div>
-
-      <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">
-        Kalshi market · scores a goal in the tournament
-      </p>
-      {priced.length === 0 && settled.length === 0 && dead.length === 0 ? (
-        <p className="mb-5 rounded-xl border border-line p-4 text-sm text-ink-low">
-          No open Kalshi player markets matched for this team right now.
-        </p>
-      ) : (
-        <div className="mb-2 overflow-x-auto rounded-xl border border-line">
-          <div className="min-w-[560px]">
-            <div className="grid grid-cols-[minmax(0,1fr)_6rem_5rem_5.5rem_4.5rem] items-center gap-x-3 border-b border-line bg-bs px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
-              <span>Player</span><span className="text-right">Likelihood</span>
-              <span className="text-right">Edge</span><span className="text-right">Multiplier</span>
-              <span className="text-right">Alert</span>
-            </div>
-            {priced.map((r) => (
-              <div key={r.shirt} className="grid grid-cols-[minmax(0,1fr)_6rem_5rem_5.5rem_4.5rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm">
-                <span className="min-w-0 truncate pr-2 text-ink-hi">{r.player}</span>
-                <span className="text-right">
-                  <span className="font-mono tabular-nums text-ink-hi">{pct(r.likelihood!)}</span>
-                  {r.tournament_anytime != null && (
-                    <span className="block font-mono text-[10px] tabular-nums text-ink-faint">
-                      model {pct(r.tournament_anytime)}
-                    </span>
-                  )}
-                </span>
-                <span className={`text-right font-mono tabular-nums ${r.edge! >= 0 ? "text-accent" : "text-neg"}`}>{signedPct(r.edge!)}</span>
-                <span className="text-right font-mono tabular-nums text-ink-mid">{r.multiplier != null ? `${r.multiplier.toFixed(2)}x` : "—"}</span>
-                <span className="text-right">
-                  <button onClick={() => onWatch(r.market_id!, `${r.player} to score (tournament)`)}
-                    className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors ${
-                      watched.has(r.market_id!) ? "border-line-strong text-ink-mid hover:text-ink-hi"
-                        : "border-line text-ink-low hover:border-line-strong hover:text-ink-mid"}`}>
-                    {watched.has(r.market_id!) ? "Watching" : "Watch"}
-                  </button>
-                </span>
-              </div>
-            ))}
-            {dead.map((r) => (
-              <div key={"d" + r.shirt} className="grid grid-cols-[minmax(0,1fr)_6rem_5rem_5.5rem_4.5rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm opacity-70">
-                <span className="min-w-0 truncate pr-2 text-ink-mid">{r.player}</span>
-                <span className="text-right">
-                  <span className="font-mono tabular-nums text-ink-mid">
-                    {r.tournament_anytime != null ? pct(r.tournament_anytime) : "—"}
-                  </span>
-                  <span className="block font-mono text-[9px] uppercase tracking-wider text-ink-faint">model</span>
-                </span>
-                <span className="col-span-3 text-right font-mono text-[11px] text-ink-faint">
-                  no real market — book {r.bid != null ? Math.round(r.bid * 100) + "¢" : "—"} / {r.implied != null ? Math.round(r.implied * 100) + "¢" : "—"}
-                </span>
-              </div>
-            ))}
-            {settled.map((r) => (
-              <div key={r.shirt} className="grid grid-cols-[minmax(0,1fr)_6rem_5rem_5.5rem_4.5rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0 opacity-70">
-                <span className="min-w-0 truncate pr-2 text-ink-mid">{r.player}</span>
-                <span className="col-span-4 text-right font-mono text-[11px] uppercase tracking-wider text-accent">✓ already scored — settles yes</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      <p className="mb-6 text-[11px] leading-relaxed text-ink-faint">
-        Likelihood is anchored (60% model · 40% market); the model is
-        P(scores in the team&apos;s remaining tournament run) from bracket-path
-        enumeration. Books with a giant bid/ask spread are DEAD — nobody is
-        really offering that price — so they show the model and the raw book
-        instead of a fictional likelihood and edge.
-      </p>
-
-      <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">
-        This match · goals 1+/2+/3+ (model, priced when Kalshi lists it) · assists (market only)
-      </p>
-      <div className="overflow-x-auto rounded-xl border border-line">
-        <div className="min-w-[640px]">
-          <div className="grid grid-cols-[minmax(0,1fr)_6rem_6rem_6rem_5rem_5.5rem] items-center gap-x-3 border-b border-line bg-bs px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low">
-            <span>Player</span><span className="text-right">1+ goal</span>
-            <span className="text-right">2+ goals</span><span className="text-right">3+ goals</span>
-            <span className="text-right">First goal</span><span className="text-right">Assist 1+</span>
-          </div>
-          {rows.map((r) => {
-            const gm = (n: number) => r.match_goal_markets?.find((g) => g.n === n);
-            const cell = (model: number | undefined, n: number) => {
-              const m = gm(n);
-              return (
-                <span className="text-right">
-                  <span className="font-mono tabular-nums text-ink-hi">{model != null ? pct(model) : "—"}</span>
-                  {m && m.multiplier != null && (
-                    <span className={`block font-mono text-[10px] tabular-nums ${
-                      (m.edge ?? -1) >= 0 ? "text-accent" : "text-neg"}`}>
-                      @{m.multiplier.toFixed(2)}x{m.edge != null ? ` ${signedPct(m.edge)}` : ""}
-                    </span>
-                  )}
-                </span>
-              );
-            };
-            const ast = r.assist_markets?.find((a) => a.n === 1);
-            return (
-              <div key={r.shirt} className={`grid grid-cols-[minmax(0,1fr)_6rem_6rem_6rem_5rem_5.5rem] items-center gap-x-3 border-b border-line px-4 py-2.5 text-sm last:border-b-0 ${
-                r.squad === "out" ? "opacity-50" : ""}`}>
-                <span className="min-w-0 truncate pr-2 text-ink-hi">
-                  <span className="mr-2 font-mono text-[11px] text-ink-faint">#{r.shirt}</span>{r.player}
-                  {r.squad === "starter" && <span className="ml-2 rounded border border-accent/40 px-1 font-mono text-[9px] uppercase tracking-wider text-accent">XI</span>}
-                  {r.squad === "bench" && <span className="ml-2 rounded border border-line px-1 font-mono text-[9px] uppercase tracking-wider text-ink-low">bench</span>}
-                  {r.squad === "out" && <span className="ml-2 rounded border border-neg/40 px-1 font-mono text-[9px] uppercase tracking-wider text-neg">out</span>}
-                  {r.squad == null && r.starts < r.matches && <span className="ml-2 font-mono text-[9px] uppercase tracking-wider text-ink-faint">rotation</span>}
-                </span>
-                {cell(r.anytime, 1)}
-                {cell(r.p2, 2)}
-                {cell(r.p3, 3)}
-                <span className="text-right">
-                  <span className="font-mono tabular-nums text-ink-mid">{pct(r.first_goal)}</span>
-                  {r.first_goal_market?.multiplier != null && (
-                    <span className={`block font-mono text-[10px] tabular-nums ${
-                      (r.first_goal_market.edge ?? -1) >= 0 ? "text-accent" : "text-neg"}`}>
-                      @{r.first_goal_market.multiplier.toFixed(2)}x
-                      {r.first_goal_market.edge != null ? ` ${signedPct(r.first_goal_market.edge)}` : ""}
-                    </span>
-                  )}
-                </span>
-                <span className="text-right font-mono tabular-nums text-ink-mid">
-                  {ast && ast.multiplier != null ? `@${ast.multiplier.toFixed(2)}x` : "—"}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      <p className="mt-3 text-xs leading-relaxed text-ink-faint">
-        {pp.disclaimer} Goal thresholds and First goal show the Kalshi price
-        + anchored edge when a market is listed (First goal prices Kalshi&apos;s
-        First Goalscorer books against the model&apos;s first-goal race).
-        Assists show the market price only — FIFA publishes no assist data,
-        so there is no honest assist model. Once
-        official lineups post (~1h before kickoff), XI / bench / out tags
-        appear; out-of-squad players&apos; per-match chances drop to zero.
-      </p>
-    </div>
   );
 }

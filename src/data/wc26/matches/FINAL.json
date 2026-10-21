@@ -1,0 +1,1105 @@
+{
+ "away": "Argentina",
+ "home": "Spain",
+ "kickoff": "2026-07-19T19:00:00+00:00",
+ "match_id": "FINAL",
+ "prediction": {
+  "age_seconds": 0,
+  "confidence": 0.4643,
+  "freshness": "locked",
+  "generated_at": "2026-07-19T18:50:04.288222",
+  "is_final": true,
+  "is_stale": false,
+  "markets": [
+   {
+    "edge": 0.008280000000000001,
+    "expected_value": 0.828,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP0ARG3",
+    "market_title": "Exact score: Argentina 3-0 Spain",
+    "model_probability": 0.01828,
+    "outcome_key": "score_0_3"
+   },
+   {
+    "edge": 0.017159999999999995,
+    "expected_value": 0.5718,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "market_id": "KXWCSPREAD-26JUL19ESPARG-ARG3",
+    "market_title": "Argentina to win by 3+ goals",
+    "model_probability": 0.047159999999999994,
+    "outcome_key": "away_margin_3"
+   },
+   {
+    "edge": 0.038099999999999995,
+    "expected_value": 0.4232,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "market_id": "KXWCSPREAD-26JUL19ESPARG-ARG2",
+    "market_title": "Argentina to win by 2+ goals",
+    "model_probability": 0.1281,
+    "outcome_key": "away_margin_2"
+   },
+   {
+    "edge": 0.0017400000000000002,
+    "expected_value": 0.174,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP4ARG0",
+    "market_title": "Exact score: Spain 4-0 Argentina",
+    "model_probability": 0.01174,
+    "outcome_key": "score_4_0"
+   },
+   {
+    "edge": 0.03966000000000003,
+    "expected_value": 0.1457,
+    "implied_probability": 0.27,
+    "kalshi_odds": 3.7,
+    "market_id": "KXWCGAME-26JUL19ESPARG-ARG",
+    "market_title": "Argentina to win (90 min)",
+    "model_probability": 0.30966000000000005,
+    "outcome_key": "away_win"
+   },
+   {
+    "edge": 0.0014399999999999986,
+    "expected_value": 0.144,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP1ARG4",
+    "market_title": "Exact score: Argentina 4-1 Spain",
+    "model_probability": 0.011439999999999999,
+    "outcome_key": "score_1_4"
+   },
+   {
+    "edge": 0.011880000000000002,
+    "expected_value": 0.0986,
+    "implied_probability": 0.12,
+    "kalshi_odds": 8.33,
+    "market_id": "KXWCTOTAL-26JUL19ESPARG-5",
+    "market_title": "Over 4.5 total goals",
+    "model_probability": 0.13188,
+    "outcome_key": "over_4_5"
+   },
+   {
+    "edge": 0.02178000000000002,
+    "expected_value": 0.0916,
+    "implied_probability": 0.24,
+    "kalshi_odds": 4.17,
+    "market_id": "KXWCTOTAL-26JUL19ESPARG-4",
+    "market_title": "Over 3.5 total goals",
+    "model_probability": 0.26178,
+    "outcome_key": "over_3_5"
+   },
+   {
+    "edge": 0.006000000000000005,
+    "expected_value": 0.086,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "market_id": "KXWCSPREAD-26JUL19ESPARG-ESP3",
+    "market_title": "Spain to win by 3+ goals",
+    "model_probability": 0.07600000000000001,
+    "outcome_key": "home_margin_3"
+   },
+   {
+    "edge": 0.03552000000000005,
+    "expected_value": 0.0841,
+    "implied_probability": 0.42,
+    "kalshi_odds": 2.38,
+    "market_id": "KXWCTOTAL-26JUL19ESPARG-3",
+    "market_title": "Over 2.5 total goals",
+    "model_probability": 0.45552000000000004,
+    "outcome_key": "over_2_5"
+   },
+   {
+    "edge": 0.002460000000000004,
+    "expected_value": 0.0819,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP3ARG0",
+    "market_title": "Exact score: Spain 3-0 Argentina",
+    "model_probability": 0.03246,
+    "outcome_key": "score_3_0"
+   },
+   {
+    "edge": 0.003839999999999996,
+    "expected_value": 0.0768,
+    "implied_probability": 0.05,
+    "kalshi_odds": 20.0,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP0ARG2",
+    "market_title": "Exact score: Argentina 2-0 Spain",
+    "model_probability": 0.05384,
+    "outcome_key": "score_0_2"
+   },
+   {
+    "edge": 0.02429999999999999,
+    "expected_value": 0.0607,
+    "implied_probability": 0.4,
+    "kalshi_odds": 2.5,
+    "market_id": "KXWCFTTS-26JUL19ESPARG-ARG",
+    "market_title": "Argentina to score first",
+    "model_probability": 0.4243,
+    "outcome_key": "away_first_goal"
+   },
+   {
+    "edge": 0.010440000000000005,
+    "expected_value": 0.0223,
+    "implied_probability": 0.436,
+    "kalshi_odds": 2.29,
+    "market_id": "KXMENWORLDCUP-26-AR",
+    "market_title": "Argentina to advance",
+    "model_probability": 0.44644,
+    "outcome_key": "away_advance"
+   },
+   {
+    "edge": 0.0044399999999999995,
+    "expected_value": 0.0222,
+    "implied_probability": 0.2,
+    "kalshi_odds": 5.0,
+    "market_id": "KXWCSPREAD-26JUL19ESPARG-ESP2",
+    "market_title": "Spain to win by 2+ goals",
+    "model_probability": 0.20444,
+    "outcome_key": "home_margin_2"
+   },
+   {
+    "edge": 0.020279999999999965,
+    "expected_value": 0.0195,
+    "implied_probability": 0.89,
+    "kalshi_odds": 1.12,
+    "market_id": "KXWCTOTAL-26JUL19ESPARG-1",
+    "market_title": "Over 0.5 total goals",
+    "model_probability": 0.91028,
+    "outcome_key": "over_0_5"
+   },
+   {
+    "edge": 0.0009600000000000025,
+    "expected_value": 0.0162,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "market_id": "KXWCTOTAL-26JUL19ESPARG-6",
+    "market_title": "Over 5.5 total goals",
+    "model_probability": 0.06096,
+    "outcome_key": "over_5_5"
+   },
+   {
+    "edge": 0.009240000000000026,
+    "expected_value": 0.0141,
+    "implied_probability": 0.71,
+    "kalshi_odds": 1.41,
+    "market_id": "KXWCTOTAL-26JUL19ESPARG-2",
+    "market_title": "Over 1.5 total goals",
+    "model_probability": 0.71924,
+    "outcome_key": "over_1_5"
+   },
+   {
+    "edge": 0.0003599999999999992,
+    "expected_value": 0.0039,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP0ARG1",
+    "market_title": "Exact score: Argentina 1-0 Spain",
+    "model_probability": 0.09036,
+    "outcome_key": "score_0_1"
+   },
+   {
+    "edge": 0.0,
+    "expected_value": -0.0001,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP1ARG3",
+    "market_title": "Exact score: Argentina 3-1 Spain",
+    "model_probability": 0.03,
+    "outcome_key": "score_1_3"
+   },
+   {
+    "edge": -6.0000000000004494e-05,
+    "expected_value": -0.0005,
+    "implied_probability": 0.42,
+    "kalshi_odds": 2.38,
+    "market_id": "KXWCMOV-26JUL19ESPARG-ESPREG",
+    "market_title": "Spain to win (90 min)",
+    "model_probability": 0.41994,
+    "outcome_key": "home_win"
+   },
+   {
+    "edge": -0.0013200000000000017,
+    "expected_value": -0.0121,
+    "implied_probability": 0.11,
+    "kalshi_odds": 9.09,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP1ARG0",
+    "market_title": "Exact score: Spain 1-0 Argentina",
+    "model_probability": 0.10868,
+    "outcome_key": "score_1_0"
+   },
+   {
+    "edge": -0.000899999999999998,
+    "expected_value": -0.0126,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "market_id": "KXWCFTTS-26JUL19ESPARG-NONE",
+    "market_title": "No goal in the match",
+    "model_probability": 0.06910000000000001,
+    "outcome_key": "no_goal"
+   },
+   {
+    "edge": -0.00018000000000000134,
+    "expected_value": -0.018,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP0ARG4",
+    "market_title": "Exact score: Argentina 4-0 Spain",
+    "model_probability": 0.009819999999999999,
+    "outcome_key": "score_0_4"
+   },
+   {
+    "edge": -0.013440000000000007,
+    "expected_value": -0.0222,
+    "implied_probability": 0.569,
+    "kalshi_odds": 1.76,
+    "market_id": "KXMENWORLDCUP-26-ES",
+    "market_title": "Spain to advance",
+    "model_probability": 0.5555599999999999,
+    "outcome_key": "home_advance"
+   },
+   {
+    "edge": -0.0018600000000000144,
+    "expected_value": -0.0233,
+    "implied_probability": 0.08,
+    "kalshi_odds": 12.5,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP2ARG0",
+    "market_title": "Exact score: Spain 2-0 Argentina",
+    "model_probability": 0.07813999999999999,
+    "outcome_key": "score_2_0"
+   },
+   {
+    "edge": -0.034500000000000086,
+    "expected_value": -0.0594,
+    "implied_probability": 0.56,
+    "kalshi_odds": 1.79,
+    "market_id": "KXWCBTTS-26JUL19ESPARG-BTTS",
+    "market_title": "Both teams to score",
+    "model_probability": 0.5255,
+    "outcome_key": "btts"
+   },
+   {
+    "edge": -0.0354000000000001,
+    "expected_value": -0.0634,
+    "implied_probability": 0.55,
+    "kalshi_odds": 1.82,
+    "market_id": "KXWCFTTS-26JUL19ESPARG-ESP",
+    "market_title": "Spain to score first",
+    "model_probability": 0.5146,
+    "outcome_key": "home_first_goal"
+   },
+   {
+    "edge": -0.007620000000000002,
+    "expected_value": -0.0952,
+    "implied_probability": 0.08,
+    "kalshi_odds": 12.5,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP1ARG2",
+    "market_title": "Exact score: Argentina 2-1 Spain",
+    "model_probability": 0.07238,
+    "outcome_key": "score_1_2"
+   },
+   {
+    "edge": -0.006419999999999995,
+    "expected_value": -0.1284,
+    "implied_probability": 0.05,
+    "kalshi_odds": 20.0,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP3ARG1",
+    "market_title": "Exact score: Spain 3-1 Argentina",
+    "model_probability": 0.04358000000000001,
+    "outcome_key": "score_3_1"
+   },
+   {
+    "edge": -0.013380000000000003,
+    "expected_value": -0.1338,
+    "implied_probability": 0.1,
+    "kalshi_odds": 10.0,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP2ARG1",
+    "market_title": "Exact score: Spain 2-1 Argentina",
+    "model_probability": 0.08662,
+    "outcome_key": "score_2_1"
+   },
+   {
+    "edge": -0.002700000000000001,
+    "expected_value": -0.135,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP4ARG1",
+    "market_title": "Exact score: Spain 4-1 Argentina",
+    "model_probability": 0.0173,
+    "outcome_key": "score_4_1"
+   },
+   {
+    "edge": -0.022260000000000002,
+    "expected_value": -0.148,
+    "implied_probability": 0.15,
+    "kalshi_odds": 6.67,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP1ARG1",
+    "market_title": "Exact score: 1-1 draw",
+    "model_probability": 0.12774,
+    "outcome_key": "score_1_1"
+   },
+   {
+    "edge": -0.009239999999999998,
+    "expected_value": -0.1538,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP2ARG2",
+    "market_title": "Exact score: 2-2 draw",
+    "model_probability": 0.05076,
+    "outcome_key": "score_2_2"
+   },
+   {
+    "edge": -0.051600000000000035,
+    "expected_value": -0.1564,
+    "implied_probability": 0.33,
+    "kalshi_odds": 3.03,
+    "market_id": "KXWCGAME-26JUL19ESPARG-TIE",
+    "market_title": "Draw after 90 min",
+    "model_probability": 0.2784,
+    "outcome_key": "draw"
+   },
+   {
+    "edge": -0.015660000000000007,
+    "expected_value": -0.1741,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "market_id": "KXWCMOV-26JUL19ESPARG-ESPET",
+    "market_title": "Spain to win in extra time",
+    "model_probability": 0.07433999999999999,
+    "outcome_key": "home_win_et"
+   },
+   {
+    "edge": -0.0018000000000000013,
+    "expected_value": -0.18,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP2ARG4",
+    "market_title": "Exact score: Argentina 4-2 Spain",
+    "model_probability": 0.008199999999999999,
+    "outcome_key": "score_2_4"
+   },
+   {
+    "edge": -0.01632,
+    "expected_value": -0.1814,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "market_id": "KXWCMOV-26JUL19ESPARG-ESPPEN",
+    "market_title": "Spain to win on penalties",
+    "model_probability": 0.07368,
+    "outcome_key": "home_win_pens"
+   },
+   {
+    "edge": -0.020279999999999992,
+    "expected_value": -0.1844,
+    "implied_probability": 0.11,
+    "kalshi_odds": 9.09,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP0ARG0",
+    "market_title": "Exact score: 0-0 draw",
+    "model_probability": 0.08972000000000001,
+    "outcome_key": "score_0_0"
+   },
+   {
+    "edge": -0.021900000000000003,
+    "expected_value": -0.219,
+    "implied_probability": 0.1,
+    "kalshi_odds": 10.0,
+    "market_id": "KXWCMOV-26JUL19ESPARG-ARGPEN",
+    "market_title": "Argentina to win on penalties",
+    "model_probability": 0.0781,
+    "outcome_key": "away_win_pens"
+   },
+   {
+    "edge": -0.021720000000000003,
+    "expected_value": -0.2414,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "market_id": "KXWCMOV-26JUL19ESPARG-ARGET",
+    "market_title": "Argentina to win in extra time",
+    "model_probability": 0.06828,
+    "outcome_key": "away_win_et"
+   },
+   {
+    "edge": -0.0102,
+    "expected_value": -0.255,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP3ARG2",
+    "market_title": "Exact score: Spain 3-2 Argentina",
+    "model_probability": 0.0298,
+    "outcome_key": "score_3_2"
+   },
+   {
+    "edge": -0.011520000000000002,
+    "expected_value": -0.288,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP2ARG3",
+    "market_title": "Exact score: Argentina 3-2 Spain",
+    "model_probability": 0.02848,
+    "outcome_key": "score_2_3"
+   },
+   {
+    "edge": -0.006360000000000001,
+    "expected_value": -0.318,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP4ARG2",
+    "market_title": "Exact score: Spain 4-2 Argentina",
+    "model_probability": 0.01364,
+    "outcome_key": "score_4_2"
+   },
+   {
+    "edge": -0.00324,
+    "expected_value": -0.324,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP5ARG1",
+    "market_title": "Exact score: Spain 5-1 Argentina",
+    "model_probability": 0.00676,
+    "outcome_key": "score_5_1"
+   },
+   {
+    "edge": -0.0072000000000000015,
+    "expected_value": -0.36,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP3ARG3",
+    "market_title": "Exact score: 3-3 draw",
+    "model_probability": 0.012799999999999999,
+    "outcome_key": "score_3_3"
+   },
+   {
+    "edge": -0.0038399999999999997,
+    "expected_value": -0.384,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP5ARG0",
+    "market_title": "Exact score: Spain 5-0 Argentina",
+    "model_probability": 0.0061600000000000005,
+    "outcome_key": "score_5_0"
+   },
+   {
+    "edge": -0.0039000000000000007,
+    "expected_value": -0.39,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP3ARG4",
+    "market_title": "Exact score: Argentina 4-3 Spain",
+    "model_probability": 0.0060999999999999995,
+    "outcome_key": "score_3_4"
+   },
+   {
+    "edge": -0.00402,
+    "expected_value": -0.402,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP4ARG3",
+    "market_title": "Exact score: Spain 4-3 Argentina",
+    "model_probability": 0.00598,
+    "outcome_key": "score_4_3"
+   }
+  ],
+  "match_id": "FINAL",
+  "scorelines": [],
+  "source": "canonical_archive",
+  "summary": null,
+  "xg": null
+ },
+ "research": {
+  "away_team": "Argentina",
+  "closing": [],
+  "final_lock": [
+   {
+    "confidence": 0.4643,
+    "edge": -0.013440000000000007,
+    "implied_probability": 0.569,
+    "kalshi_odds": 1.76,
+    "locked_at": "2026-07-19T18:50:04.288249",
+    "market_id": "KXMENWORLDCUP-26-ES",
+    "market_title": "Spain to advance",
+    "model_probability": 0.5555599999999999,
+    "outcome_key": "home_advance"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": 0.010440000000000005,
+    "implied_probability": 0.436,
+    "kalshi_odds": 2.29,
+    "locked_at": "2026-07-19T18:50:04.288249",
+    "market_id": "KXMENWORLDCUP-26-AR",
+    "market_title": "Argentina to advance",
+    "model_probability": 0.44644,
+    "outcome_key": "away_advance"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": 0.02429999999999999,
+    "implied_probability": 0.4,
+    "kalshi_odds": 2.5,
+    "locked_at": "2026-07-19T18:50:04.288248",
+    "market_id": "KXWCFTTS-26JUL19ESPARG-ARG",
+    "market_title": "Argentina to score first",
+    "model_probability": 0.4243,
+    "outcome_key": "away_first_goal"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.0354000000000001,
+    "implied_probability": 0.55,
+    "kalshi_odds": 1.82,
+    "locked_at": "2026-07-19T18:50:04.288248",
+    "market_id": "KXWCFTTS-26JUL19ESPARG-ESP",
+    "market_title": "Spain to score first",
+    "model_probability": 0.5146,
+    "outcome_key": "home_first_goal"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.000899999999999998,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "locked_at": "2026-07-19T18:50:04.288247",
+    "market_id": "KXWCFTTS-26JUL19ESPARG-NONE",
+    "market_title": "No goal in the match",
+    "model_probability": 0.06910000000000001,
+    "outcome_key": "no_goal"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.020279999999999992,
+    "implied_probability": 0.11,
+    "kalshi_odds": 9.09,
+    "locked_at": "2026-07-19T18:50:04.288247",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP0ARG0",
+    "market_title": "Exact score: 0-0 draw",
+    "model_probability": 0.08972000000000001,
+    "outcome_key": "score_0_0"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": 0.0003599999999999992,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "locked_at": "2026-07-19T18:50:04.288246",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP0ARG1",
+    "market_title": "Exact score: Argentina 1-0 Spain",
+    "model_probability": 0.09036,
+    "outcome_key": "score_0_1"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": 0.003839999999999996,
+    "implied_probability": 0.05,
+    "kalshi_odds": 20.0,
+    "locked_at": "2026-07-19T18:50:04.288246",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP0ARG2",
+    "market_title": "Exact score: Argentina 2-0 Spain",
+    "model_probability": 0.05384,
+    "outcome_key": "score_0_2"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": 0.008280000000000001,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-19T18:50:04.288246",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP0ARG3",
+    "market_title": "Exact score: Argentina 3-0 Spain",
+    "model_probability": 0.01828,
+    "outcome_key": "score_0_3"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.00018000000000000134,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-19T18:50:04.288245",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP0ARG4",
+    "market_title": "Exact score: Argentina 4-0 Spain",
+    "model_probability": 0.009819999999999999,
+    "outcome_key": "score_0_4"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.0013200000000000017,
+    "implied_probability": 0.11,
+    "kalshi_odds": 9.09,
+    "locked_at": "2026-07-19T18:50:04.288244",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP1ARG0",
+    "market_title": "Exact score: Spain 1-0 Argentina",
+    "model_probability": 0.10868,
+    "outcome_key": "score_1_0"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.022260000000000002,
+    "implied_probability": 0.15,
+    "kalshi_odds": 6.67,
+    "locked_at": "2026-07-19T18:50:04.288244",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP1ARG1",
+    "market_title": "Exact score: 1-1 draw",
+    "model_probability": 0.12774,
+    "outcome_key": "score_1_1"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.007620000000000002,
+    "implied_probability": 0.08,
+    "kalshi_odds": 12.5,
+    "locked_at": "2026-07-19T18:50:04.288243",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP1ARG2",
+    "market_title": "Exact score: Argentina 2-1 Spain",
+    "model_probability": 0.07238,
+    "outcome_key": "score_1_2"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": 0.0,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "locked_at": "2026-07-19T18:50:04.288243",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP1ARG3",
+    "market_title": "Exact score: Argentina 3-1 Spain",
+    "model_probability": 0.03,
+    "outcome_key": "score_1_3"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": 0.0014399999999999986,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-19T18:50:04.288242",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP1ARG4",
+    "market_title": "Exact score: Argentina 4-1 Spain",
+    "model_probability": 0.011439999999999999,
+    "outcome_key": "score_1_4"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.0018600000000000144,
+    "implied_probability": 0.08,
+    "kalshi_odds": 12.5,
+    "locked_at": "2026-07-19T18:50:04.288242",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP2ARG0",
+    "market_title": "Exact score: Spain 2-0 Argentina",
+    "model_probability": 0.07813999999999999,
+    "outcome_key": "score_2_0"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.013380000000000003,
+    "implied_probability": 0.1,
+    "kalshi_odds": 10.0,
+    "locked_at": "2026-07-19T18:50:04.288242",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP2ARG1",
+    "market_title": "Exact score: Spain 2-1 Argentina",
+    "model_probability": 0.08662,
+    "outcome_key": "score_2_1"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.009239999999999998,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "locked_at": "2026-07-19T18:50:04.288241",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP2ARG2",
+    "market_title": "Exact score: 2-2 draw",
+    "model_probability": 0.05076,
+    "outcome_key": "score_2_2"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.011520000000000002,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "locked_at": "2026-07-19T18:50:04.288241",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP2ARG3",
+    "market_title": "Exact score: Argentina 3-2 Spain",
+    "model_probability": 0.02848,
+    "outcome_key": "score_2_3"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.0018000000000000013,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-19T18:50:04.288240",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP2ARG4",
+    "market_title": "Exact score: Argentina 4-2 Spain",
+    "model_probability": 0.008199999999999999,
+    "outcome_key": "score_2_4"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": 0.002460000000000004,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "locked_at": "2026-07-19T18:50:04.288240",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP3ARG0",
+    "market_title": "Exact score: Spain 3-0 Argentina",
+    "model_probability": 0.03246,
+    "outcome_key": "score_3_0"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.006419999999999995,
+    "implied_probability": 0.05,
+    "kalshi_odds": 20.0,
+    "locked_at": "2026-07-19T18:50:04.288239",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP3ARG1",
+    "market_title": "Exact score: Spain 3-1 Argentina",
+    "model_probability": 0.04358000000000001,
+    "outcome_key": "score_3_1"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.0102,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "locked_at": "2026-07-19T18:50:04.288238",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP3ARG2",
+    "market_title": "Exact score: Spain 3-2 Argentina",
+    "model_probability": 0.0298,
+    "outcome_key": "score_3_2"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.0072000000000000015,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "locked_at": "2026-07-19T18:50:04.288238",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP3ARG3",
+    "market_title": "Exact score: 3-3 draw",
+    "model_probability": 0.012799999999999999,
+    "outcome_key": "score_3_3"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.0039000000000000007,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-19T18:50:04.288237",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP3ARG4",
+    "market_title": "Exact score: Argentina 4-3 Spain",
+    "model_probability": 0.0060999999999999995,
+    "outcome_key": "score_3_4"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": 0.0017400000000000002,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-19T18:50:04.288237",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP4ARG0",
+    "market_title": "Exact score: Spain 4-0 Argentina",
+    "model_probability": 0.01174,
+    "outcome_key": "score_4_0"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.002700000000000001,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "locked_at": "2026-07-19T18:50:04.288236",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP4ARG1",
+    "market_title": "Exact score: Spain 4-1 Argentina",
+    "model_probability": 0.0173,
+    "outcome_key": "score_4_1"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.006360000000000001,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "locked_at": "2026-07-19T18:50:04.288236",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP4ARG2",
+    "market_title": "Exact score: Spain 4-2 Argentina",
+    "model_probability": 0.01364,
+    "outcome_key": "score_4_2"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.00402,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-19T18:50:04.288235",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP4ARG3",
+    "market_title": "Exact score: Spain 4-3 Argentina",
+    "model_probability": 0.00598,
+    "outcome_key": "score_4_3"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.0038399999999999997,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-19T18:50:04.288235",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP5ARG0",
+    "market_title": "Exact score: Spain 5-0 Argentina",
+    "model_probability": 0.0061600000000000005,
+    "outcome_key": "score_5_0"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.00324,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-19T18:50:04.288234",
+    "market_id": "KXWCSCORE-26JUL19ESPARG-ESP5ARG1",
+    "market_title": "Exact score: Spain 5-1 Argentina",
+    "model_probability": 0.00676,
+    "outcome_key": "score_5_1"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.034500000000000086,
+    "implied_probability": 0.56,
+    "kalshi_odds": 1.79,
+    "locked_at": "2026-07-19T18:50:04.288234",
+    "market_id": "KXWCBTTS-26JUL19ESPARG-BTTS",
+    "market_title": "Both teams to score",
+    "model_probability": 0.5255,
+    "outcome_key": "btts"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": 0.038099999999999995,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "locked_at": "2026-07-19T18:50:04.288233",
+    "market_id": "KXWCSPREAD-26JUL19ESPARG-ARG2",
+    "market_title": "Argentina to win by 2+ goals",
+    "model_probability": 0.1281,
+    "outcome_key": "away_margin_2"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": 0.017159999999999995,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "locked_at": "2026-07-19T18:50:04.288232",
+    "market_id": "KXWCSPREAD-26JUL19ESPARG-ARG3",
+    "market_title": "Argentina to win by 3+ goals",
+    "model_probability": 0.047159999999999994,
+    "outcome_key": "away_margin_3"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": 0.0044399999999999995,
+    "implied_probability": 0.2,
+    "kalshi_odds": 5.0,
+    "locked_at": "2026-07-19T18:50:04.288232",
+    "market_id": "KXWCSPREAD-26JUL19ESPARG-ESP2",
+    "market_title": "Spain to win by 2+ goals",
+    "model_probability": 0.20444,
+    "outcome_key": "home_margin_2"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": 0.006000000000000005,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "locked_at": "2026-07-19T18:50:04.288232",
+    "market_id": "KXWCSPREAD-26JUL19ESPARG-ESP3",
+    "market_title": "Spain to win by 3+ goals",
+    "model_probability": 0.07600000000000001,
+    "outcome_key": "home_margin_3"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": 0.020279999999999965,
+    "implied_probability": 0.89,
+    "kalshi_odds": 1.12,
+    "locked_at": "2026-07-19T18:50:04.288231",
+    "market_id": "KXWCTOTAL-26JUL19ESPARG-1",
+    "market_title": "Over 0.5 total goals",
+    "model_probability": 0.91028,
+    "outcome_key": "over_0_5"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": 0.009240000000000026,
+    "implied_probability": 0.71,
+    "kalshi_odds": 1.41,
+    "locked_at": "2026-07-19T18:50:04.288231",
+    "market_id": "KXWCTOTAL-26JUL19ESPARG-2",
+    "market_title": "Over 1.5 total goals",
+    "model_probability": 0.71924,
+    "outcome_key": "over_1_5"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": 0.03552000000000005,
+    "implied_probability": 0.42,
+    "kalshi_odds": 2.38,
+    "locked_at": "2026-07-19T18:50:04.288230",
+    "market_id": "KXWCTOTAL-26JUL19ESPARG-3",
+    "market_title": "Over 2.5 total goals",
+    "model_probability": 0.45552000000000004,
+    "outcome_key": "over_2_5"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": 0.02178000000000002,
+    "implied_probability": 0.24,
+    "kalshi_odds": 4.17,
+    "locked_at": "2026-07-19T18:50:04.288229",
+    "market_id": "KXWCTOTAL-26JUL19ESPARG-4",
+    "market_title": "Over 3.5 total goals",
+    "model_probability": 0.26178,
+    "outcome_key": "over_3_5"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": 0.011880000000000002,
+    "implied_probability": 0.12,
+    "kalshi_odds": 8.33,
+    "locked_at": "2026-07-19T18:50:04.288229",
+    "market_id": "KXWCTOTAL-26JUL19ESPARG-5",
+    "market_title": "Over 4.5 total goals",
+    "model_probability": 0.13188,
+    "outcome_key": "over_4_5"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": 0.0009600000000000025,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "locked_at": "2026-07-19T18:50:04.288228",
+    "market_id": "KXWCTOTAL-26JUL19ESPARG-6",
+    "market_title": "Over 5.5 total goals",
+    "model_probability": 0.06096,
+    "outcome_key": "over_5_5"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.051600000000000035,
+    "implied_probability": 0.33,
+    "kalshi_odds": 3.03,
+    "locked_at": "2026-07-19T18:50:04.288228",
+    "market_id": "KXWCGAME-26JUL19ESPARG-TIE",
+    "market_title": "Draw after 90 min",
+    "model_probability": 0.2784,
+    "outcome_key": "draw"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.021720000000000003,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "locked_at": "2026-07-19T18:50:04.288227",
+    "market_id": "KXWCMOV-26JUL19ESPARG-ARGET",
+    "market_title": "Argentina to win in extra time",
+    "model_probability": 0.06828,
+    "outcome_key": "away_win_et"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.021900000000000003,
+    "implied_probability": 0.1,
+    "kalshi_odds": 10.0,
+    "locked_at": "2026-07-19T18:50:04.288227",
+    "market_id": "KXWCMOV-26JUL19ESPARG-ARGPEN",
+    "market_title": "Argentina to win on penalties",
+    "model_probability": 0.0781,
+    "outcome_key": "away_win_pens"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": 0.03966000000000003,
+    "implied_probability": 0.27,
+    "kalshi_odds": 3.7,
+    "locked_at": "2026-07-19T18:50:04.288226",
+    "market_id": "KXWCGAME-26JUL19ESPARG-ARG",
+    "market_title": "Argentina to win (90 min)",
+    "model_probability": 0.30966000000000005,
+    "outcome_key": "away_win"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.015660000000000007,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "locked_at": "2026-07-19T18:50:04.288226",
+    "market_id": "KXWCMOV-26JUL19ESPARG-ESPET",
+    "market_title": "Spain to win in extra time",
+    "model_probability": 0.07433999999999999,
+    "outcome_key": "home_win_et"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -0.01632,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "locked_at": "2026-07-19T18:50:04.288225",
+    "market_id": "KXWCMOV-26JUL19ESPARG-ESPPEN",
+    "market_title": "Spain to win on penalties",
+    "model_probability": 0.07368,
+    "outcome_key": "home_win_pens"
+   },
+   {
+    "confidence": 0.4643,
+    "edge": -6.0000000000004494e-05,
+    "implied_probability": 0.42,
+    "kalshi_odds": 2.38,
+    "locked_at": "2026-07-19T18:50:04.288222",
+    "market_id": "KXWCMOV-26JUL19ESPARG-ESPREG",
+    "market_title": "Spain to win (90 min)",
+    "model_probability": 0.41994,
+    "outcome_key": "home_win"
+   }
+  ],
+  "final_lock_source": "canonical_archive",
+  "generated_at": "2026-10-21T10:46:18.455663+00:00",
+  "home_team": "Spain",
+  "last_readings": [],
+  "match_id": "FINAL",
+  "result": {
+   "away_goals": 0,
+   "finished_at": "2026-07-19T21:30:00",
+   "goals": [
+    {
+     "detail": "Goal",
+     "minute": 106,
+     "player": "Ferran Torres",
+     "team": "home"
+    }
+   ],
+   "home_goals": 1,
+   "status_short": "AET"
+  }
+ },
+ "sources": {
+  "prediction": "GET /api/prediction/FINAL",
+  "research": "GET /api/research/FINAL",
+  "team_info": "GET /api/team-info/FINAL"
+ },
+ "stage": "F",
+ "team_info": {
+  "away": {
+   "attack": 1.45,
+   "defence": 0.83,
+   "fatigue": 0.28,
+   "form": 0.85,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Runners-up, and the final was the one night the late-goal magic had no fuel: 0.07 xG in 120 minutes against Spain's press, a red card in extra time, and no 84th-minute miracle left in the tank — the three-match pattern of decisive late blows (Egypt, Switzerland, England) died where it mattered most. Through the tournament the machine was still elite: Messi's 8 goals, the attack at the model's cap through eight matches, set pieces and crosses the signature weapon. But the closing read is honest — the deep-tournament defence leaked (0.81 adj xGA/game after the final's 2.52) and the title went to the side that never needed rescuing.",
+   "team": "Argentina"
+  },
+  "home": {
+   "attack": 1.45,
+   "defence": 0.65,
+   "fatigue": 0.2,
+   "form": 0.9,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "CAMPEONES DEL MUNDO. The final was the thesis made flesh: 120 minutes, 2.52 xG created, 0.07 conceded — Argentina never truly touched the ball — settled by Ferran Torres in the 106th. Rodri's midfield strangled every opponent behind the tournament's best line-breaking passing; ONE goal conceded in eight matches (De Ketelaere's quarterfinal counter — nothing else, all month), 0.29 opponent-adjusted xGA per game, unbeaten: a goalless opening draw with Cabo Verde, then seven straight wins. The most complete champion of the modern era: total control, total ruthlessness, and when the game demanded patience against ten men, total calm. Second star earned — 2010's heirs delivered.",
+   "team": "Spain"
+  },
+  "match_id": "FINAL"
+ },
+ "venue": "MetLife Stadium, East Rutherford"
+}

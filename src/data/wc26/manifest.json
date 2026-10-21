@@ -1,0 +1,69 @@
+{
+ "frozen_from": "https://wc26-bet-suggester-production.up.railway.app",
+ "frozen_on": "2026-10-21",
+ "match_pages": [
+  "CAN_MAR",
+  "PAR_FRA",
+  "POR_ESP",
+  "USA_BEL",
+  "BRA_NOR",
+  "MEX_ENG",
+  "ARG_EGY",
+  "SUI_COL",
+  "MAR_FRA",
+  "ESP_BEL",
+  "NOR_ENG",
+  "ARG_SUI",
+  "SF1",
+  "SF2",
+  "THIRD",
+  "FINAL"
+ ],
+ "not_frozen": {
+  "GET /api/player-props/{id}, /api/team-news/{id}, /api/live-stats/{id}, /api/prediction/{id}/live-auto, /api/reference-odds/{id}": "these re-ask ESPN / API-Football or re-run the simulator on every read; they are not a stored record of July, so they were not re-asked",
+  "GET /api/prediction/{id}/timeline": "fetched for FINAL and CAN_MAR: 0 points each. The prediction rows behind it live in the container SQLite, which every deploy wipes, so no timeline survives for any match"
+ },
+ "read_and_empty": {
+  "GET /api/alerts/recent?limit=20": {
+   "generated_at": null,
+   "rows": 0
+  },
+  "GET /api/live-scores": {
+   "generated_at": "2026-10-21T10:45:43.296279+00:00",
+   "rows": 0
+  },
+  "GET /api/matches/upcoming?hours_ahead=72": {
+   "generated_at": "2026-10-21T10:45:34.810158+00:00",
+   "rows": 0
+  },
+  "GET /api/suggestions?limit=100": {
+   "generated_at": "2026-10-21T10:45:32.666639+00:00",
+   "rows": 0
+  },
+  "GET /api/watchlist": {
+   "generated_at": null,
+   "rows": 0
+  }
+ },
+ "sha256": {
+  "bots.json": "1b38bc14b412ccc0de5653c6fe2fdabdb82bcafdf90a03efdf353c15a8d81bbb",
+  "bracket.json": "4a2a7e05cf268750b59e381b429fb555d5d1a03b2256328375e0a9dcbb1bd0a4",
+  "matches/ARG_EGY.json": "8450ef7e0b216b92a712fae6723974e51e165245383e6e4f1381434276c3bb37",
+  "matches/ARG_SUI.json": "dfc8b44a32f69282e34df2551ceb4ab9f879ced6cd0d586e669b3a2ced5c009a",
+  "matches/BRA_NOR.json": "51e0d50117dfe13d69a66e9cf20839d1d720f534a72ed106316ec62504f628ee",
+  "matches/CAN_MAR.json": "0a11a0f37cf50cd54e5693a5e9de1e516593c9858b2579e598e1960a7e9ca103",
+  "matches/ESP_BEL.json": "21ceabf87e8e24425a2b9b1e60a57dbe19644488142d185e6cb68b7815d625d2",
+  "matches/FINAL.json": "29f072c5b5b1a69542180a869f4fd65350be14ef5217f4e1a07fc3be58ab8286",
+  "matches/MAR_FRA.json": "30ea3e5a8966f301f0dacf45f0964e398064a1a40e094fdddd43435a00c6ed62",
+  "matches/MEX_ENG.json": "f2f0f9e8fb2b70bcea4cc19080b56df27b60d4d8a2da4b85ebd5d834d2d526b2",
+  "matches/NOR_ENG.json": "0f5b8f3bcfdb373622770df4866228bd1c66dd16e7ffa72dc26886acf98ad7dd",
+  "matches/PAR_FRA.json": "67dc647d6949d3f2295165bf7a1d47121426710ed2795e2fc3c68f102d461224",
+  "matches/POR_ESP.json": "40f183c8dfa16819c325f1896a297e4f5e02153d79bf95538b8345c1ee216458",
+  "matches/SF1.json": "f3f30acc2070519689c6c36661b73fff254ecd439272ef14e3e138b59f2abb8f",
+  "matches/SF2.json": "5963ab336ac79a29fcddad6f3a71efd1518a3e3d9867844b411d5980bc538da3",
+  "matches/SUI_COL.json": "fcce7cd071d6e60fa1e62c2ccaa4fd66590bed7da9763e51ff5248cf8da40880",
+  "matches/THIRD.json": "c1a57e73be36a853db6148ef465b30c5eebbaacc3778bd83513620141b118b9f",
+  "matches/USA_BEL.json": "bf0770aab6b216e7e09be36759fff5f5f9de5a33d3b4558a301b97b768c8df32"
+ },
+ "what": "World Cup 2026 archive, frozen from the production backend's public read routes before those routes and their jobs were removed (cleanup C1, 2026-10-21). Every payload is verbatim; nothing was recomputed."
+}

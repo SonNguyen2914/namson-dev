@@ -1,0 +1,88 @@
+{
+ "away": "Belgium",
+ "home": "Spain",
+ "kickoff": "2026-07-10T19:00:00+00:00",
+ "match_id": "ESP_BEL",
+ "prediction": {
+  "age_seconds": 0,
+  "archive_note": "no frozen pre-match record survives for this match — its T-10 lock predates the archive discipline; retrospective re-simulation is deliberately not shown on review pages",
+  "confidence": null,
+  "freshness": "archive-incomplete",
+  "generated_at": "2026-10-21T10:47:17.991501+00:00",
+  "is_final": false,
+  "is_stale": false,
+  "markets": [],
+  "match_id": "ESP_BEL",
+  "scorelines": [],
+  "source": "archive_incomplete",
+  "suggestions": [],
+  "summary": null,
+  "xg": null
+ },
+ "research": {
+  "away_team": "Belgium",
+  "closing": [],
+  "final_lock": [],
+  "final_lock_source": "absent",
+  "generated_at": "2026-10-21T10:47:19.731851+00:00",
+  "home_team": "Spain",
+  "last_readings": [],
+  "match_id": "ESP_BEL",
+  "result": {
+   "away_goals": 1,
+   "finished_at": "2026-07-10T21:30:00",
+   "goals": [
+    {
+     "detail": "Goal",
+     "minute": 30,
+     "player": "Fabián Ruiz",
+     "team": "home"
+    },
+    {
+     "detail": "Goal - Header",
+     "minute": 41,
+     "player": "Charles De Ketelaere",
+     "team": "away"
+    },
+    {
+     "detail": "Goal",
+     "minute": 88,
+     "player": "Mikel Merino",
+     "team": "home"
+    }
+   ],
+   "home_goals": 2,
+   "status_short": "FT"
+  }
+ },
+ "sources": {
+  "prediction": "GET /api/prediction/ESP_BEL",
+  "research": "GET /api/research/ESP_BEL",
+  "team_info": "GET /api/team-info/ESP_BEL"
+ },
+ "stage": "QF",
+ "team_info": {
+  "away": {
+   "attack": 0.99,
+   "defence": 0.77,
+   "fatigue": 0.32,
+   "form": 0.8,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Out at the quarterfinal — 2-1 to Spain, and the whole tournament in one night: genuinely dangerous in transition (De Ketelaere's counter was the only goal Spain conceded all tournament) but unable to live with elite possession, and undone by an 88th-minute winner. Star names, streaky output; Courtois kept them in games; the old-guard legs finally ran out against the best passing side left.",
+   "team": "Belgium"
+  },
+  "home": {
+   "attack": 1.45,
+   "defence": 0.65,
+   "fatigue": 0.2,
+   "form": 0.9,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "CAMPEONES DEL MUNDO. The final was the thesis made flesh: 120 minutes, 2.52 xG created, 0.07 conceded — Argentina never truly touched the ball — settled by Ferran Torres in the 106th. Rodri's midfield strangled every opponent behind the tournament's best line-breaking passing; ONE goal conceded in eight matches (De Ketelaere's quarterfinal counter — nothing else, all month), 0.29 opponent-adjusted xGA per game, unbeaten: a goalless opening draw with Cabo Verde, then seven straight wins. The most complete champion of the modern era: total control, total ruthlessness, and when the game demanded patience against ten men, total calm. Second star earned — 2010's heirs delivered.",
+   "team": "Spain"
+  },
+  "match_id": "ESP_BEL"
+ },
+ "venue": "SoFi Stadium, Inglewood"
+}

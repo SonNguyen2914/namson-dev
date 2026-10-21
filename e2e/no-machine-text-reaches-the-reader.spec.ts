@@ -38,9 +38,10 @@ import { openDetails } from "./review-details";
 // Python exception class or a traceback is anywhere in it.
 
 // The shapes live in e2e/machine-text.ts since 2026-10-07, so a second
-// surface (the live panel's refusal, e2e/a-refusal-says-which-feed-ran
-// .spec.ts) screens with THIS list rather than a hand-typed copy of it —
-// Playwright will not let one spec file import another.
+// surface could screen with THIS list rather than a hand-typed copy of
+// it — Playwright will not let one spec file import another. (That
+// second surface, the WC26 live panel's refusal, was deleted with the
+// panel on 2026-10-21, cleanup C1.)
 
 // ── what the providers really send, verbatim ────────────────────────
 //

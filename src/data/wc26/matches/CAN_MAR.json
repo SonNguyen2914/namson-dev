@@ -1,0 +1,88 @@
+{
+ "away": "Morocco",
+ "home": "Canada",
+ "kickoff": "2026-07-04T17:00:00+00:00",
+ "match_id": "CAN_MAR",
+ "prediction": {
+  "age_seconds": 0,
+  "archive_note": "no frozen pre-match record survives for this match — its T-10 lock predates the archive discipline; retrospective re-simulation is deliberately not shown on review pages",
+  "confidence": null,
+  "freshness": "archive-incomplete",
+  "generated_at": "2026-10-21T10:46:22.691794+00:00",
+  "is_final": false,
+  "is_stale": false,
+  "markets": [],
+  "match_id": "CAN_MAR",
+  "scorelines": [],
+  "source": "archive_incomplete",
+  "suggestions": [],
+  "summary": null,
+  "xg": null
+ },
+ "research": {
+  "away_team": "Morocco",
+  "closing": [],
+  "final_lock": [],
+  "final_lock_source": "absent",
+  "generated_at": "2026-10-21T10:46:26.956193+00:00",
+  "home_team": "Canada",
+  "last_readings": [],
+  "match_id": "CAN_MAR",
+  "result": {
+   "away_goals": 3,
+   "finished_at": "2026-07-04T19:30:00",
+   "goals": [
+    {
+     "detail": "Goal",
+     "minute": 50,
+     "player": "Azzedine Ounahi",
+     "team": "away"
+    },
+    {
+     "detail": "Goal",
+     "minute": 82,
+     "player": "Azzedine Ounahi",
+     "team": "away"
+    },
+    {
+     "detail": "Goal",
+     "minute": 98,
+     "player": "Soufiane Rahimi",
+     "team": "away"
+    }
+   ],
+   "home_goals": 0,
+   "status_short": "FT"
+  }
+ },
+ "sources": {
+  "prediction": "GET /api/prediction/CAN_MAR",
+  "research": "GET /api/research/CAN_MAR",
+  "team_info": "GET /api/team-info/CAN_MAR"
+ },
+ "stage": "R16",
+ "team_info": {
+  "away": {
+   "attack": 1.05,
+   "defence": 0.8,
+   "fatigue": 0.22,
+   "form": 0.85,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Out at the quarterfinal, and the ceiling was always creation: 0-2 to France with 0.16 xG generated against 3.52 conceded — Morocco out-passed France and never threatened. Still a historic run built on a disciplined mid-block, Bounou's goalkeeping and Hakimi/Saïbari counters; they leave having allowed the fewest clear chances of any eliminated side.",
+   "team": "Morocco"
+  },
+  "home": {
+   "attack": 1.0,
+   "defence": 0.95,
+   "fatigue": 0.2,
+   "form": 0.5,
+   "provisional": true,
+   "resolved": true,
+   "scouting": "",
+   "team": "Canada"
+  },
+  "match_id": "CAN_MAR"
+ },
+ "venue": "NRG Stadium, Houston"
+}

@@ -1,0 +1,1132 @@
+{
+ "away": "Spain",
+ "home": "France",
+ "kickoff": "2026-07-14T19:00:00+00:00",
+ "match_id": "SF1",
+ "prediction": {
+  "age_seconds": 0,
+  "confidence": 0.4589,
+  "freshness": "locked",
+  "generated_at": "2026-07-14T18:50:04.474315",
+  "is_final": true,
+  "is_stale": false,
+  "markets": [
+   {
+    "edge": 0.0189,
+    "expected_value": 0.378,
+    "implied_probability": 0.05,
+    "kalshi_odds": 20.0,
+    "market_id": "KXWCFTTS-26JUL14FRAESP-NONE",
+    "market_title": "No goal in the match",
+    "model_probability": 0.0689,
+    "outcome_key": "no_goal"
+   },
+   {
+    "edge": 0.0189,
+    "expected_value": 0.2704,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA0ESP1",
+    "market_title": "Exact score: Spain 1-0 France",
+    "model_probability": 0.0889,
+    "outcome_key": "score_0_1"
+   },
+   {
+    "edge": 0.018479999999999996,
+    "expected_value": 0.231,
+    "implied_probability": 0.08,
+    "kalshi_odds": 12.5,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA1ESP0",
+    "market_title": "Exact score: France 1-0 Spain",
+    "model_probability": 0.09848,
+    "outcome_key": "score_1_0"
+   },
+   {
+    "edge": 0.0045600000000000016,
+    "expected_value": 0.114,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "market_id": "KXWCSPREAD-26JUL14FRAESP-ESP3",
+    "market_title": "Spain to win by 3+ goals",
+    "model_probability": 0.04456,
+    "outcome_key": "away_margin_3"
+   },
+   {
+    "edge": 0.00204,
+    "expected_value": 0.102,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA0ESP3",
+    "market_title": "Exact score: Spain 3-0 France",
+    "model_probability": 0.02204,
+    "outcome_key": "score_0_3"
+   },
+   {
+    "edge": 0.00408,
+    "expected_value": 0.0816,
+    "implied_probability": 0.05,
+    "kalshi_odds": 20.0,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA0ESP2",
+    "market_title": "Exact score: Spain 2-0 France",
+    "model_probability": 0.05408,
+    "outcome_key": "score_0_2"
+   },
+   {
+    "edge": 0.017579999999999985,
+    "expected_value": 0.0581,
+    "implied_probability": 0.31,
+    "kalshi_odds": 3.23,
+    "market_id": "KXWCGAME-26JUL14FRAESP-ESP",
+    "market_title": "Spain to win (90 min)",
+    "model_probability": 0.32758,
+    "outcome_key": "away_win"
+   },
+   {
+    "edge": 0.005940000000000001,
+    "expected_value": 0.0454,
+    "implied_probability": 0.13,
+    "kalshi_odds": 7.69,
+    "market_id": "KXWCSPREAD-26JUL14FRAESP-ESP2",
+    "market_title": "Spain to win by 2+ goals",
+    "model_probability": 0.13594,
+    "outcome_key": "away_margin_2"
+   },
+   {
+    "edge": 0.014640000000000042,
+    "expected_value": 0.0315,
+    "implied_probability": 0.45,
+    "kalshi_odds": 2.22,
+    "market_id": "KXWCADVANCE-26JUL14FRAESP-ESP",
+    "market_title": "Spain to advance",
+    "model_probability": 0.46464000000000005,
+    "outcome_key": "away_advance"
+   },
+   {
+    "edge": 0.0023999999999999994,
+    "expected_value": 0.03,
+    "implied_probability": 0.08,
+    "kalshi_odds": 12.5,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA0ESP0",
+    "market_title": "Exact score: 0-0 draw",
+    "model_probability": 0.0824,
+    "outcome_key": "score_0_0"
+   },
+   {
+    "edge": 0.011399999999999966,
+    "expected_value": 0.0298,
+    "implied_probability": 0.37,
+    "kalshi_odds": 2.7,
+    "market_id": "KXWCGAME-26JUL14FRAESP-FRA",
+    "market_title": "France to win (90 min)",
+    "model_probability": 0.38139999999999996,
+    "outcome_key": "home_win"
+   },
+   {
+    "edge": 0.005459999999999965,
+    "expected_value": 0.0146,
+    "implied_probability": 0.43,
+    "kalshi_odds": 2.33,
+    "market_id": "KXWCFTTS-26JUL14FRAESP-ESP",
+    "market_title": "Spain to score first",
+    "model_probability": 0.43545999999999996,
+    "outcome_key": "away_first_goal"
+   },
+   {
+    "edge": 0.00012000000000000031,
+    "expected_value": 0.012,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA4ESP0",
+    "market_title": "Exact score: France 4-0 Spain",
+    "model_probability": 0.01012,
+    "outcome_key": "score_4_0"
+   },
+   {
+    "edge": 0.0001799999999999996,
+    "expected_value": 0.0029,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA2ESP0",
+    "market_title": "Exact score: France 2-0 Spain",
+    "model_probability": 0.07018,
+    "outcome_key": "score_2_0"
+   },
+   {
+    "edge": -0.0024000000000000687,
+    "expected_value": 0.0002,
+    "implied_probability": 0.92,
+    "kalshi_odds": 1.09,
+    "market_id": "KXWCTOTAL-26JUL14FRAESP-1",
+    "market_title": "Over 0.5 total goals",
+    "model_probability": 0.9176,
+    "outcome_key": "over_0_5"
+   },
+   {
+    "edge": -0.0008400000000000005,
+    "expected_value": -0.0138,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "market_id": "KXWCSPREAD-26JUL14FRAESP-FRA3",
+    "market_title": "France to win by 3+ goals",
+    "model_probability": 0.05916,
+    "outcome_key": "home_margin_3"
+   },
+   {
+    "edge": -0.005039999999999989,
+    "expected_value": -0.0272,
+    "implied_probability": 0.18,
+    "kalshi_odds": 5.56,
+    "market_id": "KXWCSPREAD-26JUL14FRAESP-FRA2",
+    "market_title": "France to win by 2+ goals",
+    "model_probability": 0.17496,
+    "outcome_key": "home_margin_2"
+   },
+   {
+    "edge": -0.0013200000000000017,
+    "expected_value": -0.0441,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA1ESP3",
+    "market_title": "Exact score: Spain 3-1 France",
+    "model_probability": 0.028679999999999997,
+    "outcome_key": "score_1_3"
+   },
+   {
+    "edge": -0.026639999999999997,
+    "expected_value": -0.0491,
+    "implied_probability": 0.57,
+    "kalshi_odds": 1.75,
+    "market_id": "KXWCADVANCE-26JUL14FRAESP-FRA",
+    "market_title": "France to advance",
+    "model_probability": 0.54336,
+    "outcome_key": "home_advance"
+   },
+   {
+    "edge": -0.0014999999999999979,
+    "expected_value": -0.0501,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA3ESP0",
+    "market_title": "Exact score: France 3-0 Spain",
+    "model_probability": 0.0285,
+    "outcome_key": "score_3_0"
+   },
+   {
+    "edge": -0.039779999999999927,
+    "expected_value": -0.0507,
+    "implied_probability": 0.77,
+    "kalshi_odds": 1.3,
+    "market_id": "KXWCTOTAL-26JUL14FRAESP-2",
+    "market_title": "Over 1.5 total goals",
+    "model_probability": 0.7302200000000001,
+    "outcome_key": "over_1_5"
+   },
+   {
+    "edge": -0.004199999999999995,
+    "expected_value": -0.0525,
+    "implied_probability": 0.08,
+    "kalshi_odds": 12.5,
+    "market_id": "KXWCMOV-26JUL14FRAESP-ESPPEN",
+    "market_title": "Spain to win on penalties",
+    "model_probability": 0.0758,
+    "outcome_key": "away_win_pens"
+   },
+   {
+    "edge": -0.0006599999999999991,
+    "expected_value": -0.066,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA1ESP4",
+    "market_title": "Exact score: Spain 4-1 France",
+    "model_probability": 0.009340000000000001,
+    "outcome_key": "score_1_4"
+   },
+   {
+    "edge": -0.004739999999999994,
+    "expected_value": -0.0674,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "market_id": "KXWCMOV-26JUL14FRAESP-ESPET",
+    "market_title": "Spain to win in extra time",
+    "model_probability": 0.06526000000000001,
+    "outcome_key": "away_win_et"
+   },
+   {
+    "edge": -0.03672000000000003,
+    "expected_value": -0.0724,
+    "implied_probability": 0.51,
+    "kalshi_odds": 1.96,
+    "market_id": "KXWCTOTAL-26JUL14FRAESP-3",
+    "market_title": "Over 2.5 total goals",
+    "model_probability": 0.47328,
+    "outcome_key": "over_2_5"
+   },
+   {
+    "edge": -0.04235999999999995,
+    "expected_value": -0.0761,
+    "implied_probability": 0.55,
+    "kalshi_odds": 1.82,
+    "market_id": "KXWCFTTS-26JUL14FRAESP-FRA",
+    "market_title": "France to score first",
+    "model_probability": 0.5076400000000001,
+    "outcome_key": "home_first_goal"
+   },
+   {
+    "edge": -0.03498000000000001,
+    "expected_value": -0.1061,
+    "implied_probability": 0.33,
+    "kalshi_odds": 3.03,
+    "market_id": "KXWCGAME-26JUL14FRAESP-TIE",
+    "market_title": "Draw after 90 min",
+    "model_probability": 0.29502,
+    "outcome_key": "draw"
+   },
+   {
+    "edge": -0.01038,
+    "expected_value": -0.1154,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA1ESP2",
+    "market_title": "Exact score: Spain 2-1 France",
+    "model_probability": 0.07962,
+    "outcome_key": "score_1_2"
+   },
+   {
+    "edge": -0.07110000000000005,
+    "expected_value": -0.1163,
+    "implied_probability": 0.62,
+    "kalshi_odds": 1.61,
+    "market_id": "KXWCBTTS-26JUL14FRAESP-BTTS",
+    "market_title": "Both teams to score",
+    "model_probability": 0.5488999999999999,
+    "outcome_key": "btts"
+   },
+   {
+    "edge": -0.03498000000000001,
+    "expected_value": -0.1175,
+    "implied_probability": 0.3,
+    "kalshi_odds": 3.33,
+    "market_id": "KXWCTOTAL-26JUL14FRAESP-4",
+    "market_title": "Over 3.5 total goals",
+    "model_probability": 0.26502,
+    "outcome_key": "over_3_5"
+   },
+   {
+    "edge": -0.019320000000000004,
+    "expected_value": -0.1208,
+    "implied_probability": 0.16,
+    "kalshi_odds": 6.25,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA1ESP1",
+    "market_title": "Exact score: 1-1 draw",
+    "model_probability": 0.14068,
+    "outcome_key": "score_1_1"
+   },
+   {
+    "edge": -0.01866000000000001,
+    "expected_value": -0.1336,
+    "implied_probability": 0.14,
+    "kalshi_odds": 7.14,
+    "market_id": "KXWCTOTAL-26JUL14FRAESP-5",
+    "market_title": "Over 4.5 total goals",
+    "model_probability": 0.12134,
+    "outcome_key": "over_4_5"
+   },
+   {
+    "edge": -0.0014400000000000003,
+    "expected_value": -0.144,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA0ESP4",
+    "market_title": "Exact score: Spain 4-0 France",
+    "model_probability": 0.00856,
+    "outcome_key": "score_0_4"
+   },
+   {
+    "edge": -0.015899999999999997,
+    "expected_value": -0.1446,
+    "implied_probability": 0.11,
+    "kalshi_odds": 9.09,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA2ESP1",
+    "market_title": "Exact score: France 2-1 Spain",
+    "model_probability": 0.0941,
+    "outcome_key": "score_2_1"
+   },
+   {
+    "edge": -0.004499999999999997,
+    "expected_value": -0.1501,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA2ESP3",
+    "market_title": "Exact score: Spain 3-2 France",
+    "model_probability": 0.025500000000000002,
+    "outcome_key": "score_2_3"
+   },
+   {
+    "edge": -0.011100000000000006,
+    "expected_value": -0.1583,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA2ESP2",
+    "market_title": "Exact score: 2-2 draw",
+    "model_probability": 0.0589,
+    "outcome_key": "score_2_2"
+   },
+   {
+    "edge": -0.0017400000000000002,
+    "expected_value": -0.174,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA2ESP4",
+    "market_title": "Exact score: Spain 4-2 France",
+    "model_probability": 0.00826,
+    "outcome_key": "score_2_4"
+   },
+   {
+    "edge": -0.020279999999999992,
+    "expected_value": -0.2028,
+    "implied_probability": 0.1,
+    "kalshi_odds": 10.0,
+    "market_id": "KXWCMOV-26JUL14FRAESP-FRAPEN",
+    "market_title": "France to win on penalties",
+    "model_probability": 0.07972000000000001,
+    "outcome_key": "home_win_pens"
+   },
+   {
+    "edge": -0.012359999999999996,
+    "expected_value": -0.2058,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "market_id": "KXWCTOTAL-26JUL14FRAESP-6",
+    "market_title": "Over 5.5 total goals",
+    "model_probability": 0.04764,
+    "outcome_key": "over_5_5"
+   },
+   {
+    "edge": -0.02375999999999999,
+    "expected_value": -0.2161,
+    "implied_probability": 0.11,
+    "kalshi_odds": 9.09,
+    "market_id": "KXWCMOV-26JUL14FRAESP-FRAET",
+    "market_title": "France to win in extra time",
+    "model_probability": 0.08624000000000001,
+    "outcome_key": "home_win_et"
+   },
+   {
+    "edge": -0.014579999999999996,
+    "expected_value": -0.2428,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA3ESP1",
+    "market_title": "Exact score: France 3-1 Spain",
+    "model_probability": 0.04542,
+    "outcome_key": "score_3_1"
+   },
+   {
+    "edge": -0.00498,
+    "expected_value": -0.249,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA4ESP1",
+    "market_title": "Exact score: France 4-1 Spain",
+    "model_probability": 0.01502,
+    "outcome_key": "score_4_1"
+   },
+   {
+    "edge": -0.011279999999999998,
+    "expected_value": -0.282,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA3ESP2",
+    "market_title": "Exact score: France 3-2 Spain",
+    "model_probability": 0.028720000000000002,
+    "outcome_key": "score_3_2"
+   },
+   {
+    "edge": -0.00732,
+    "expected_value": -0.366,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA3ESP3",
+    "market_title": "Exact score: 3-3 draw",
+    "model_probability": 0.01268,
+    "outcome_key": "score_3_3"
+   },
+   {
+    "edge": -0.008280000000000001,
+    "expected_value": -0.414,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA4ESP2",
+    "market_title": "Exact score: France 4-2 Spain",
+    "model_probability": 0.01172,
+    "outcome_key": "score_4_2"
+   },
+   {
+    "edge": -0.00426,
+    "expected_value": -0.426,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA5ESP0",
+    "market_title": "Exact score: France 5-0 Spain",
+    "model_probability": 0.00574,
+    "outcome_key": "score_5_0"
+   },
+   {
+    "edge": -0.00444,
+    "expected_value": -0.444,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA3ESP4",
+    "market_title": "Exact score: Spain 4-3 France",
+    "model_probability": 0.00556,
+    "outcome_key": "score_3_4"
+   },
+   {
+    "edge": -0.00444,
+    "expected_value": -0.444,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA5ESP1",
+    "market_title": "Exact score: France 5-1 Spain",
+    "model_probability": 0.00556,
+    "outcome_key": "score_5_1"
+   },
+   {
+    "edge": -0.00498,
+    "expected_value": -0.498,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA4ESP3",
+    "market_title": "Exact score: France 4-3 Spain",
+    "model_probability": 0.00502,
+    "outcome_key": "score_4_3"
+   },
+   {
+    "edge": -0.00498,
+    "expected_value": -0.498,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA5ESP2",
+    "market_title": "Exact score: France 5-2 Spain",
+    "model_probability": 0.00502,
+    "outcome_key": "score_5_2"
+   }
+  ],
+  "match_id": "SF1",
+  "scorelines": [],
+  "source": "canonical_archive",
+  "summary": null,
+  "xg": null
+ },
+ "research": {
+  "away_team": "Spain",
+  "closing": [],
+  "final_lock": [
+   {
+    "confidence": 0.4589,
+    "edge": 0.014640000000000042,
+    "implied_probability": 0.45,
+    "kalshi_odds": 2.22,
+    "locked_at": "2026-07-14T18:50:04.474343",
+    "market_id": "KXWCADVANCE-26JUL14FRAESP-ESP",
+    "market_title": "Spain to advance",
+    "model_probability": 0.46464000000000005,
+    "outcome_key": "away_advance"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.026639999999999997,
+    "implied_probability": 0.57,
+    "kalshi_odds": 1.75,
+    "locked_at": "2026-07-14T18:50:04.474343",
+    "market_id": "KXWCADVANCE-26JUL14FRAESP-FRA",
+    "market_title": "France to advance",
+    "model_probability": 0.54336,
+    "outcome_key": "home_advance"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": 0.005459999999999965,
+    "implied_probability": 0.43,
+    "kalshi_odds": 2.33,
+    "locked_at": "2026-07-14T18:50:04.474342",
+    "market_id": "KXWCFTTS-26JUL14FRAESP-ESP",
+    "market_title": "Spain to score first",
+    "model_probability": 0.43545999999999996,
+    "outcome_key": "away_first_goal"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.04235999999999995,
+    "implied_probability": 0.55,
+    "kalshi_odds": 1.82,
+    "locked_at": "2026-07-14T18:50:04.474342",
+    "market_id": "KXWCFTTS-26JUL14FRAESP-FRA",
+    "market_title": "France to score first",
+    "model_probability": 0.5076400000000001,
+    "outcome_key": "home_first_goal"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": 0.0189,
+    "implied_probability": 0.05,
+    "kalshi_odds": 20.0,
+    "locked_at": "2026-07-14T18:50:04.474341",
+    "market_id": "KXWCFTTS-26JUL14FRAESP-NONE",
+    "market_title": "No goal in the match",
+    "model_probability": 0.0689,
+    "outcome_key": "no_goal"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": 0.0023999999999999994,
+    "implied_probability": 0.08,
+    "kalshi_odds": 12.5,
+    "locked_at": "2026-07-14T18:50:04.474341",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA0ESP0",
+    "market_title": "Exact score: 0-0 draw",
+    "model_probability": 0.0824,
+    "outcome_key": "score_0_0"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": 0.0189,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "locked_at": "2026-07-14T18:50:04.474340",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA0ESP1",
+    "market_title": "Exact score: Spain 1-0 France",
+    "model_probability": 0.0889,
+    "outcome_key": "score_0_1"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": 0.00408,
+    "implied_probability": 0.05,
+    "kalshi_odds": 20.0,
+    "locked_at": "2026-07-14T18:50:04.474340",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA0ESP2",
+    "market_title": "Exact score: Spain 2-0 France",
+    "model_probability": 0.05408,
+    "outcome_key": "score_0_2"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": 0.00204,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "locked_at": "2026-07-14T18:50:04.474339",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA0ESP3",
+    "market_title": "Exact score: Spain 3-0 France",
+    "model_probability": 0.02204,
+    "outcome_key": "score_0_3"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.0014400000000000003,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-14T18:50:04.474339",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA0ESP4",
+    "market_title": "Exact score: Spain 4-0 France",
+    "model_probability": 0.00856,
+    "outcome_key": "score_0_4"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": 0.018479999999999996,
+    "implied_probability": 0.08,
+    "kalshi_odds": 12.5,
+    "locked_at": "2026-07-14T18:50:04.474338",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA1ESP0",
+    "market_title": "Exact score: France 1-0 Spain",
+    "model_probability": 0.09848,
+    "outcome_key": "score_1_0"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.019320000000000004,
+    "implied_probability": 0.16,
+    "kalshi_odds": 6.25,
+    "locked_at": "2026-07-14T18:50:04.474338",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA1ESP1",
+    "market_title": "Exact score: 1-1 draw",
+    "model_probability": 0.14068,
+    "outcome_key": "score_1_1"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.01038,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "locked_at": "2026-07-14T18:50:04.474338",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA1ESP2",
+    "market_title": "Exact score: Spain 2-1 France",
+    "model_probability": 0.07962,
+    "outcome_key": "score_1_2"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.0013200000000000017,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "locked_at": "2026-07-14T18:50:04.474337",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA1ESP3",
+    "market_title": "Exact score: Spain 3-1 France",
+    "model_probability": 0.028679999999999997,
+    "outcome_key": "score_1_3"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.0006599999999999991,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-14T18:50:04.474337",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA1ESP4",
+    "market_title": "Exact score: Spain 4-1 France",
+    "model_probability": 0.009340000000000001,
+    "outcome_key": "score_1_4"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": 0.0001799999999999996,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "locked_at": "2026-07-14T18:50:04.474336",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA2ESP0",
+    "market_title": "Exact score: France 2-0 Spain",
+    "model_probability": 0.07018,
+    "outcome_key": "score_2_0"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.015899999999999997,
+    "implied_probability": 0.11,
+    "kalshi_odds": 9.09,
+    "locked_at": "2026-07-14T18:50:04.474336",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA2ESP1",
+    "market_title": "Exact score: France 2-1 Spain",
+    "model_probability": 0.0941,
+    "outcome_key": "score_2_1"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.011100000000000006,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "locked_at": "2026-07-14T18:50:04.474335",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA2ESP2",
+    "market_title": "Exact score: 2-2 draw",
+    "model_probability": 0.0589,
+    "outcome_key": "score_2_2"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.004499999999999997,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "locked_at": "2026-07-14T18:50:04.474335",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA2ESP3",
+    "market_title": "Exact score: Spain 3-2 France",
+    "model_probability": 0.025500000000000002,
+    "outcome_key": "score_2_3"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.0017400000000000002,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-14T18:50:04.474334",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA2ESP4",
+    "market_title": "Exact score: Spain 4-2 France",
+    "model_probability": 0.00826,
+    "outcome_key": "score_2_4"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.0014999999999999979,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "locked_at": "2026-07-14T18:50:04.474334",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA3ESP0",
+    "market_title": "Exact score: France 3-0 Spain",
+    "model_probability": 0.0285,
+    "outcome_key": "score_3_0"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.014579999999999996,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "locked_at": "2026-07-14T18:50:04.474333",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA3ESP1",
+    "market_title": "Exact score: France 3-1 Spain",
+    "model_probability": 0.04542,
+    "outcome_key": "score_3_1"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.011279999999999998,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "locked_at": "2026-07-14T18:50:04.474333",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA3ESP2",
+    "market_title": "Exact score: France 3-2 Spain",
+    "model_probability": 0.028720000000000002,
+    "outcome_key": "score_3_2"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.00732,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "locked_at": "2026-07-14T18:50:04.474333",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA3ESP3",
+    "market_title": "Exact score: 3-3 draw",
+    "model_probability": 0.01268,
+    "outcome_key": "score_3_3"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.00444,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-14T18:50:04.474332",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA3ESP4",
+    "market_title": "Exact score: Spain 4-3 France",
+    "model_probability": 0.00556,
+    "outcome_key": "score_3_4"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": 0.00012000000000000031,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-14T18:50:04.474331",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA4ESP0",
+    "market_title": "Exact score: France 4-0 Spain",
+    "model_probability": 0.01012,
+    "outcome_key": "score_4_0"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.00498,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "locked_at": "2026-07-14T18:50:04.474331",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA4ESP1",
+    "market_title": "Exact score: France 4-1 Spain",
+    "model_probability": 0.01502,
+    "outcome_key": "score_4_1"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.008280000000000001,
+    "implied_probability": 0.02,
+    "kalshi_odds": 50.0,
+    "locked_at": "2026-07-14T18:50:04.474330",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA4ESP2",
+    "market_title": "Exact score: France 4-2 Spain",
+    "model_probability": 0.01172,
+    "outcome_key": "score_4_2"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.00498,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-14T18:50:04.474330",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA4ESP3",
+    "market_title": "Exact score: France 4-3 Spain",
+    "model_probability": 0.00502,
+    "outcome_key": "score_4_3"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.00426,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-14T18:50:04.474329",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA5ESP0",
+    "market_title": "Exact score: France 5-0 Spain",
+    "model_probability": 0.00574,
+    "outcome_key": "score_5_0"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.00444,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-14T18:50:04.474329",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA5ESP1",
+    "market_title": "Exact score: France 5-1 Spain",
+    "model_probability": 0.00556,
+    "outcome_key": "score_5_1"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.00498,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-14T18:50:04.474329",
+    "market_id": "KXWCSCORE-26JUL14FRAESP-FRA5ESP2",
+    "market_title": "Exact score: France 5-2 Spain",
+    "model_probability": 0.00502,
+    "outcome_key": "score_5_2"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.07110000000000005,
+    "implied_probability": 0.62,
+    "kalshi_odds": 1.61,
+    "locked_at": "2026-07-14T18:50:04.474328",
+    "market_id": "KXWCBTTS-26JUL14FRAESP-BTTS",
+    "market_title": "Both teams to score",
+    "model_probability": 0.5488999999999999,
+    "outcome_key": "btts"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": 0.005940000000000001,
+    "implied_probability": 0.13,
+    "kalshi_odds": 7.69,
+    "locked_at": "2026-07-14T18:50:04.474328",
+    "market_id": "KXWCSPREAD-26JUL14FRAESP-ESP2",
+    "market_title": "Spain to win by 2+ goals",
+    "model_probability": 0.13594,
+    "outcome_key": "away_margin_2"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": 0.0045600000000000016,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "locked_at": "2026-07-14T18:50:04.474327",
+    "market_id": "KXWCSPREAD-26JUL14FRAESP-ESP3",
+    "market_title": "Spain to win by 3+ goals",
+    "model_probability": 0.04456,
+    "outcome_key": "away_margin_3"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.005039999999999989,
+    "implied_probability": 0.18,
+    "kalshi_odds": 5.56,
+    "locked_at": "2026-07-14T18:50:04.474327",
+    "market_id": "KXWCSPREAD-26JUL14FRAESP-FRA2",
+    "market_title": "France to win by 2+ goals",
+    "model_probability": 0.17496,
+    "outcome_key": "home_margin_2"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.0008400000000000005,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "locked_at": "2026-07-14T18:50:04.474327",
+    "market_id": "KXWCSPREAD-26JUL14FRAESP-FRA3",
+    "market_title": "France to win by 3+ goals",
+    "model_probability": 0.05916,
+    "outcome_key": "home_margin_3"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.0024000000000000687,
+    "implied_probability": 0.92,
+    "kalshi_odds": 1.09,
+    "locked_at": "2026-07-14T18:50:04.474326",
+    "market_id": "KXWCTOTAL-26JUL14FRAESP-1",
+    "market_title": "Over 0.5 total goals",
+    "model_probability": 0.9176,
+    "outcome_key": "over_0_5"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.039779999999999927,
+    "implied_probability": 0.77,
+    "kalshi_odds": 1.3,
+    "locked_at": "2026-07-14T18:50:04.474326",
+    "market_id": "KXWCTOTAL-26JUL14FRAESP-2",
+    "market_title": "Over 1.5 total goals",
+    "model_probability": 0.7302200000000001,
+    "outcome_key": "over_1_5"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.03672000000000003,
+    "implied_probability": 0.51,
+    "kalshi_odds": 1.96,
+    "locked_at": "2026-07-14T18:50:04.474325",
+    "market_id": "KXWCTOTAL-26JUL14FRAESP-3",
+    "market_title": "Over 2.5 total goals",
+    "model_probability": 0.47328,
+    "outcome_key": "over_2_5"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.03498000000000001,
+    "implied_probability": 0.3,
+    "kalshi_odds": 3.33,
+    "locked_at": "2026-07-14T18:50:04.474324",
+    "market_id": "KXWCTOTAL-26JUL14FRAESP-4",
+    "market_title": "Over 3.5 total goals",
+    "model_probability": 0.26502,
+    "outcome_key": "over_3_5"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.01866000000000001,
+    "implied_probability": 0.14,
+    "kalshi_odds": 7.14,
+    "locked_at": "2026-07-14T18:50:04.474324",
+    "market_id": "KXWCTOTAL-26JUL14FRAESP-5",
+    "market_title": "Over 4.5 total goals",
+    "model_probability": 0.12134,
+    "outcome_key": "over_4_5"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.012359999999999996,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "locked_at": "2026-07-14T18:50:04.474324",
+    "market_id": "KXWCTOTAL-26JUL14FRAESP-6",
+    "market_title": "Over 5.5 total goals",
+    "model_probability": 0.04764,
+    "outcome_key": "over_5_5"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.03498000000000001,
+    "implied_probability": 0.33,
+    "kalshi_odds": 3.03,
+    "locked_at": "2026-07-14T18:50:04.474323",
+    "market_id": "KXWCGAME-26JUL14FRAESP-TIE",
+    "market_title": "Draw after 90 min",
+    "model_probability": 0.29502,
+    "outcome_key": "draw"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.004739999999999994,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "locked_at": "2026-07-14T18:50:04.474322",
+    "market_id": "KXWCMOV-26JUL14FRAESP-ESPET",
+    "market_title": "Spain to win in extra time",
+    "model_probability": 0.06526000000000001,
+    "outcome_key": "away_win_et"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.004199999999999995,
+    "implied_probability": 0.08,
+    "kalshi_odds": 12.5,
+    "locked_at": "2026-07-14T18:50:04.474322",
+    "market_id": "KXWCMOV-26JUL14FRAESP-ESPPEN",
+    "market_title": "Spain to win on penalties",
+    "model_probability": 0.0758,
+    "outcome_key": "away_win_pens"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": 0.017579999999999985,
+    "implied_probability": 0.31,
+    "kalshi_odds": 3.23,
+    "locked_at": "2026-07-14T18:50:04.474321",
+    "market_id": "KXWCGAME-26JUL14FRAESP-ESP",
+    "market_title": "Spain to win (90 min)",
+    "model_probability": 0.32758,
+    "outcome_key": "away_win"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.02375999999999999,
+    "implied_probability": 0.11,
+    "kalshi_odds": 9.09,
+    "locked_at": "2026-07-14T18:50:04.474321",
+    "market_id": "KXWCMOV-26JUL14FRAESP-FRAET",
+    "market_title": "France to win in extra time",
+    "model_probability": 0.08624000000000001,
+    "outcome_key": "home_win_et"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": -0.020279999999999992,
+    "implied_probability": 0.1,
+    "kalshi_odds": 10.0,
+    "locked_at": "2026-07-14T18:50:04.474320",
+    "market_id": "KXWCMOV-26JUL14FRAESP-FRAPEN",
+    "market_title": "France to win on penalties",
+    "model_probability": 0.07972000000000001,
+    "outcome_key": "home_win_pens"
+   },
+   {
+    "confidence": 0.4589,
+    "edge": 0.011399999999999966,
+    "implied_probability": 0.37,
+    "kalshi_odds": 2.7,
+    "locked_at": "2026-07-14T18:50:04.474315",
+    "market_id": "KXWCGAME-26JUL14FRAESP-FRA",
+    "market_title": "France to win (90 min)",
+    "model_probability": 0.38139999999999996,
+    "outcome_key": "home_win"
+   }
+  ],
+  "final_lock_source": "canonical_archive",
+  "generated_at": "2026-10-21T10:47:34.173342+00:00",
+  "home_team": "France",
+  "last_readings": [],
+  "match_id": "SF1",
+  "result": {
+   "away_goals": 2,
+   "finished_at": "2026-07-14T21:30:00",
+   "goals": [
+    {
+     "detail": "Penalty - Scored",
+     "minute": 22,
+     "player": "Mikel Oyarzabal",
+     "team": "away"
+    },
+    {
+     "detail": "Goal",
+     "minute": 58,
+     "player": "Pedro Porro",
+     "team": "away"
+    }
+   ],
+   "home_goals": 0,
+   "status_short": "FT"
+  }
+ },
+ "sources": {
+  "prediction": "GET /api/prediction/SF1",
+  "research": "GET /api/research/SF1",
+  "team_info": "GET /api/team-info/SF1"
+ },
+ "stage": "SF",
+ "team_info": {
+  "away": {
+   "attack": 1.45,
+   "defence": 0.65,
+   "fatigue": 0.2,
+   "form": 0.9,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "CAMPEONES DEL MUNDO. The final was the thesis made flesh: 120 minutes, 2.52 xG created, 0.07 conceded — Argentina never truly touched the ball — settled by Ferran Torres in the 106th. Rodri's midfield strangled every opponent behind the tournament's best line-breaking passing; ONE goal conceded in eight matches (De Ketelaere's quarterfinal counter — nothing else, all month), 0.29 opponent-adjusted xGA per game, unbeaten: a goalless opening draw with Cabo Verde, then seven straight wins. The most complete champion of the modern era: total control, total ruthlessness, and when the game demanded patience against ten men, total calm. Second star earned — 2010's heirs delivered.",
+   "team": "Spain"
+  },
+  "home": {
+   "attack": 1.45,
+   "defence": 0.86,
+   "fatigue": 0.18,
+   "form": 0.95,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Fourth, in the strangest way possible: out-created England 2.99 to 2.34 in the third-place game and still lost it 4-6 — Mbappé twice and Barcola scored, but every French mistake was punished at maximum price. The tournament read stands: the most dangerous transition attack in the field (Mbappé finished with 10 goals across the month, the tournament's top scorer), elite defensive numbers until the last two matches, and an ending — 0.48 xG managed against Spain, then carnival defending against England — that says the legs and the focus emptied together. The talent travels to 2030 intact; the question is everything around it.",
+   "team": "France"
+  },
+  "match_id": "SF1"
+ },
+ "venue": "AT&T Stadium, Arlington"
+}

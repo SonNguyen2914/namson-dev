@@ -1,0 +1,100 @@
+{
+ "away": "Egypt",
+ "home": "Argentina",
+ "kickoff": "2026-07-07T16:00:00+00:00",
+ "match_id": "ARG_EGY",
+ "prediction": {
+  "age_seconds": 0,
+  "archive_note": "no frozen pre-match record survives for this match — its T-10 lock predates the archive discipline; retrospective re-simulation is deliberately not shown on review pages",
+  "confidence": null,
+  "freshness": "archive-incomplete",
+  "generated_at": "2026-10-21T10:47:03.388456+00:00",
+  "is_final": false,
+  "is_stale": false,
+  "markets": [],
+  "match_id": "ARG_EGY",
+  "scorelines": [],
+  "source": "archive_incomplete",
+  "suggestions": [],
+  "summary": null,
+  "xg": null
+ },
+ "research": {
+  "away_team": "Egypt",
+  "closing": [],
+  "final_lock": [],
+  "final_lock_source": "absent",
+  "generated_at": "2026-10-21T10:47:05.153627+00:00",
+  "home_team": "Argentina",
+  "last_readings": [],
+  "match_id": "ARG_EGY",
+  "result": {
+   "away_goals": 2,
+   "finished_at": "2026-07-07T18:30:00",
+   "goals": [
+    {
+     "detail": "Goal - Header",
+     "minute": 15,
+     "player": "Yasser Ibrahim",
+     "team": "away"
+    },
+    {
+     "detail": "Goal",
+     "minute": 67,
+     "player": "Mostafa Zico",
+     "team": "away"
+    },
+    {
+     "detail": "Goal - Header",
+     "minute": 79,
+     "player": "Cristian Romero",
+     "team": "home"
+    },
+    {
+     "detail": "Goal",
+     "minute": 83,
+     "player": "Lionel Messi",
+     "team": "home"
+    },
+    {
+     "detail": "Goal - Header",
+     "minute": 92,
+     "player": "Enzo Fernández",
+     "team": "home"
+    }
+   ],
+   "home_goals": 3,
+   "status_short": "FT"
+  }
+ },
+ "sources": {
+  "prediction": "GET /api/prediction/ARG_EGY",
+  "research": "GET /api/research/ARG_EGY",
+  "team_info": "GET /api/team-info/ARG_EGY"
+ },
+ "stage": "R16",
+ "team_info": {
+  "away": {
+   "attack": 0.88,
+   "defence": 0.97,
+   "fatigue": 0.3,
+   "form": 0.6,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Eliminated by Argentina in the R16 (lost 3-2).",
+   "team": "Egypt"
+  },
+  "home": {
+   "attack": 1.45,
+   "defence": 0.83,
+   "fatigue": 0.28,
+   "form": 0.85,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Runners-up, and the final was the one night the late-goal magic had no fuel: 0.07 xG in 120 minutes against Spain's press, a red card in extra time, and no 84th-minute miracle left in the tank — the three-match pattern of decisive late blows (Egypt, Switzerland, England) died where it mattered most. Through the tournament the machine was still elite: Messi's 8 goals, the attack at the model's cap through eight matches, set pieces and crosses the signature weapon. But the closing read is honest — the deep-tournament defence leaked (0.81 adj xGA/game after the final's 2.52) and the title went to the side that never needed rescuing.",
+   "team": "Argentina"
+  },
+  "match_id": "ARG_EGY"
+ },
+ "venue": "Mercedes-Benz Stadium, Atlanta"
+}

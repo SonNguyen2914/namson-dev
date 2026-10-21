@@ -1,0 +1,1060 @@
+{
+ "away": "Switzerland",
+ "home": "Argentina",
+ "kickoff": "2026-07-12T01:00:00+00:00",
+ "match_id": "ARG_SUI",
+ "prediction": {
+  "age_seconds": 0,
+  "confidence": 0.4656,
+  "freshness": "locked",
+  "generated_at": "2026-07-12T00:50:30.063561",
+  "is_final": true,
+  "is_stale": false,
+  "markets": [
+   {
+    "edge": 0.030540000000000005,
+    "expected_value": 3.054,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSPREAD-26JUL11ARGSUI-SUI3",
+    "market_title": "Switzerland to win by 3+ goals",
+    "model_probability": 0.04054000000000001,
+    "outcome_key": "away_margin_3"
+   },
+   {
+    "edge": 0.01668,
+    "expected_value": 1.668,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG1SUI3",
+    "market_title": "Exact score: Switzerland 3-1 Argentina",
+    "model_probability": 0.02668,
+    "outcome_key": "score_1_3"
+   },
+   {
+    "edge": 0.0672,
+    "expected_value": 1.344,
+    "implied_probability": 0.05,
+    "kalshi_odds": 20.0,
+    "market_id": "KXWCSPREAD-26JUL11ARGSUI-SUI2",
+    "market_title": "Switzerland to win by 2+ goals",
+    "model_probability": 0.1172,
+    "outcome_key": "away_margin_2"
+   },
+   {
+    "edge": 0.01002,
+    "expected_value": 1.002,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG0SUI3",
+    "market_title": "Exact score: Switzerland 3-0 Argentina",
+    "model_probability": 0.02002,
+    "outcome_key": "score_0_3"
+   },
+   {
+    "edge": 0.00984,
+    "expected_value": 0.984,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG2SUI3",
+    "market_title": "Exact score: Switzerland 3-2 Argentina",
+    "model_probability": 0.01984,
+    "outcome_key": "score_2_3"
+   },
+   {
+    "edge": 0.11610000000000001,
+    "expected_value": 0.7749,
+    "implied_probability": 0.15,
+    "kalshi_odds": 6.67,
+    "market_id": "KXWCGAME-26JUL11ARGSUI-SUI",
+    "market_title": "Switzerland to win (90 min)",
+    "model_probability": 0.2661,
+    "outcome_key": "away_win"
+   },
+   {
+    "edge": 0.02364,
+    "expected_value": 0.591,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "market_id": "KXWCTOTAL-26JUL11ARGSUI-6",
+    "market_title": "Over 5.5 total goals",
+    "model_probability": 0.06364,
+    "outcome_key": "over_5_5"
+   },
+   {
+    "edge": 0.04554,
+    "expected_value": 0.4554,
+    "implied_probability": 0.1,
+    "kalshi_odds": 10.0,
+    "market_id": "KXWCTOTAL-26JUL11ARGSUI-5",
+    "market_title": "Over 4.5 total goals",
+    "model_probability": 0.14554,
+    "outcome_key": "over_4_5"
+   },
+   {
+    "edge": 0.11694000000000004,
+    "expected_value": 0.4512,
+    "implied_probability": 0.26,
+    "kalshi_odds": 3.85,
+    "market_id": "KXWCADVANCE-26JUL11ARGSUI-SUI",
+    "market_title": "Switzerland to advance",
+    "model_probability": 0.37694000000000005,
+    "outcome_key": "away_advance"
+   },
+   {
+    "edge": 0.013079999999999994,
+    "expected_value": 0.4359,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG0SUI2",
+    "market_title": "Exact score: Switzerland 2-0 Argentina",
+    "model_probability": 0.04307999999999999,
+    "outcome_key": "score_0_2"
+   },
+   {
+    "edge": 0.07686000000000001,
+    "expected_value": 0.3507,
+    "implied_probability": 0.22,
+    "kalshi_odds": 4.55,
+    "market_id": "KXWCTOTAL-26JUL11ARGSUI-4",
+    "market_title": "Over 3.5 total goals",
+    "model_probability": 0.29686,
+    "outcome_key": "over_3_5"
+   },
+   {
+    "edge": 0.013439999999999994,
+    "expected_value": 0.336,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG2SUI2",
+    "market_title": "Exact score: 2-2 draw",
+    "model_probability": 0.053439999999999994,
+    "outcome_key": "score_2_2"
+   },
+   {
+    "edge": 0.0927,
+    "expected_value": 0.3203,
+    "implied_probability": 0.29,
+    "kalshi_odds": 3.45,
+    "market_id": "KXWCFTTS-26JUL11ARGSUI-SUI",
+    "market_title": "Switzerland to score first",
+    "model_probability": 0.3827,
+    "outcome_key": "away_first_goal"
+   },
+   {
+    "edge": 0.015719999999999998,
+    "expected_value": 0.3144,
+    "implied_probability": 0.05,
+    "kalshi_odds": 20.0,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG1SUI2",
+    "market_title": "Exact score: Switzerland 2-1 Argentina",
+    "model_probability": 0.06572,
+    "outcome_key": "score_1_2"
+   },
+   {
+    "edge": 0.010319999999999996,
+    "expected_value": 0.258,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "market_id": "KXWCMOV-26JUL11ARGSUI-SUIET",
+    "market_title": "Switzerland to win in extra time",
+    "model_probability": 0.05032,
+    "outcome_key": "away_win_et"
+   },
+   {
+    "edge": 0.002279999999999999,
+    "expected_value": 0.228,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG3SUI3",
+    "market_title": "Exact score: 3-3 draw",
+    "model_probability": 0.01228,
+    "outcome_key": "score_3_3"
+   },
+   {
+    "edge": 0.08861999999999998,
+    "expected_value": 0.2105,
+    "implied_probability": 0.42,
+    "kalshi_odds": 2.38,
+    "market_id": "KXWCTOTAL-26JUL11ARGSUI-3",
+    "market_title": "Over 2.5 total goals",
+    "model_probability": 0.50862,
+    "outcome_key": "over_2_5"
+   },
+   {
+    "edge": 0.06834000000000007,
+    "expected_value": 0.1467,
+    "implied_probability": 0.47,
+    "kalshi_odds": 2.13,
+    "market_id": "KXWCBTTS-26JUL11ARGSUI-BTTS",
+    "market_title": "Both teams to score",
+    "model_probability": 0.53834,
+    "outcome_key": "btts"
+   },
+   {
+    "edge": 0.001259999999999999,
+    "expected_value": 0.126,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG4SUI2",
+    "market_title": "Exact score: Argentina 4-2 Switzerland",
+    "model_probability": 0.01126,
+    "outcome_key": "score_4_2"
+   },
+   {
+    "edge": 0.007319999999999993,
+    "expected_value": 0.1222,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG0SUI1",
+    "market_title": "Exact score: Switzerland 1-0 Argentina",
+    "model_probability": 0.06731999999999999,
+    "outcome_key": "score_0_1"
+   },
+   {
+    "edge": 0.04962,
+    "expected_value": 0.0711,
+    "implied_probability": 0.71,
+    "kalshi_odds": 1.41,
+    "market_id": "KXWCTOTAL-26JUL11ARGSUI-2",
+    "market_title": "Over 1.5 total goals",
+    "model_probability": 0.75962,
+    "outcome_key": "over_1_5"
+   },
+   {
+    "edge": 0.0009000000000000015,
+    "expected_value": 0.0299,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG3SUI2",
+    "market_title": "Exact score: Argentina 3-2 Switzerland",
+    "model_probability": 0.0309,
+    "outcome_key": "score_3_2"
+   },
+   {
+    "edge": 0.02412000000000003,
+    "expected_value": 0.0275,
+    "implied_probability": 0.91,
+    "kalshi_odds": 1.1,
+    "market_id": "KXWCTOTAL-26JUL11ARGSUI-1",
+    "market_title": "Over 0.5 total goals",
+    "model_probability": 0.9341200000000001,
+    "outcome_key": "over_0_5"
+   },
+   {
+    "edge": -0.0043199999999999975,
+    "expected_value": -0.0718,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "market_id": "KXWCFTTS-26JUL11ARGSUI-NONE",
+    "market_title": "No goal in the match",
+    "model_probability": 0.05568,
+    "outcome_key": "no_goal"
+   },
+   {
+    "edge": -0.013200000000000003,
+    "expected_value": -0.1018,
+    "implied_probability": 0.13,
+    "kalshi_odds": 7.69,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG1SUI1",
+    "market_title": "Exact score: 1-1 draw",
+    "model_probability": 0.1168,
+    "outcome_key": "score_1_1"
+   },
+   {
+    "edge": -0.03852,
+    "expected_value": -0.1293,
+    "implied_probability": 0.3,
+    "kalshi_odds": 3.33,
+    "market_id": "KXWCGAME-26JUL11ARGSUI-TIE",
+    "market_title": "Draw after 90 min",
+    "model_probability": 0.26148,
+    "outcome_key": "draw"
+   },
+   {
+    "edge": -0.08957999999999999,
+    "expected_value": -0.1593,
+    "implied_probability": 0.57,
+    "kalshi_odds": 1.75,
+    "market_id": "KXWCGAME-26JUL11ARGSUI-ARG",
+    "market_title": "Argentina to win (90 min)",
+    "model_probability": 0.48041999999999996,
+    "outcome_key": "home_win"
+   },
+   {
+    "edge": -0.11243999999999998,
+    "expected_value": -0.1625,
+    "implied_probability": 0.69,
+    "kalshi_odds": 1.45,
+    "market_id": "KXWCFTTS-26JUL11ARGSUI-ARG",
+    "market_title": "Argentina to score first",
+    "model_probability": 0.57756,
+    "outcome_key": "home_first_goal"
+   },
+   {
+    "edge": -0.019919999999999993,
+    "expected_value": -0.1663,
+    "implied_probability": 0.12,
+    "kalshi_odds": 8.33,
+    "market_id": "KXWCSPREAD-26JUL11ARGSUI-ARG3",
+    "market_title": "Argentina to win by 3+ goals",
+    "model_probability": 0.10008,
+    "outcome_key": "home_margin_3"
+   },
+   {
+    "edge": -0.12893999999999994,
+    "expected_value": -0.167,
+    "implied_probability": 0.76,
+    "kalshi_odds": 1.32,
+    "market_id": "KXWCADVANCE-26JUL11ARGSUI-ARG",
+    "market_title": "Argentina to advance",
+    "model_probability": 0.6310600000000001,
+    "outcome_key": "home_advance"
+   },
+   {
+    "edge": -0.020579999999999987,
+    "expected_value": -0.1718,
+    "implied_probability": 0.12,
+    "kalshi_odds": 8.33,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG2SUI1",
+    "market_title": "Exact score: Argentina 2-1 Switzerland",
+    "model_probability": 0.09942000000000001,
+    "outcome_key": "score_2_1"
+   },
+   {
+    "edge": -0.017820000000000003,
+    "expected_value": -0.1782,
+    "implied_probability": 0.1,
+    "kalshi_odds": 10.0,
+    "market_id": "KXWCMOV-26JUL11ARGSUI-ARGET",
+    "market_title": "Argentina to win in extra time",
+    "model_probability": 0.08218,
+    "outcome_key": "home_win_et"
+   },
+   {
+    "edge": -0.05831999999999998,
+    "expected_value": -0.1871,
+    "implied_probability": 0.31,
+    "kalshi_odds": 3.23,
+    "market_id": "KXWCSPREAD-26JUL11ARGSUI-ARG2",
+    "market_title": "Argentina to win by 2+ goals",
+    "model_probability": 0.25168,
+    "outcome_key": "home_margin_2"
+   },
+   {
+    "edge": -0.015480000000000008,
+    "expected_value": -0.1935,
+    "implied_probability": 0.08,
+    "kalshi_odds": 12.5,
+    "market_id": "KXWCMOV-26JUL11ARGSUI-SUIPEN",
+    "market_title": "Switzerland to win on penalties",
+    "model_probability": 0.06452,
+    "outcome_key": "away_win_pens"
+   },
+   {
+    "edge": -0.014039999999999997,
+    "expected_value": -0.2003,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG3SUI1",
+    "market_title": "Exact score: Argentina 3-1 Switzerland",
+    "model_probability": 0.05596000000000001,
+    "outcome_key": "score_3_1"
+   },
+   {
+    "edge": -0.006719999999999997,
+    "expected_value": -0.2241,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG4SUI1",
+    "market_title": "Exact score: Argentina 4-1 Switzerland",
+    "model_probability": 0.023280000000000002,
+    "outcome_key": "score_4_1"
+   },
+   {
+    "edge": -0.021540000000000004,
+    "expected_value": -0.2394,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "market_id": "KXWCMOV-26JUL11ARGSUI-ARGPEN",
+    "market_title": "Argentina to win on penalties",
+    "model_probability": 0.06846,
+    "outcome_key": "home_win_pens"
+   },
+   {
+    "edge": -0.0025800000000000007,
+    "expected_value": -0.258,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG5SUI1",
+    "market_title": "Exact score: Argentina 5-1 Switzerland",
+    "model_probability": 0.0074199999999999995,
+    "outcome_key": "score_5_1"
+   },
+   {
+    "edge": -0.00792,
+    "expected_value": -0.2641,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG4SUI0",
+    "market_title": "Exact score: Argentina 4-0 Switzerland",
+    "model_probability": 0.02208,
+    "outcome_key": "score_4_0"
+   },
+   {
+    "edge": -0.04482,
+    "expected_value": -0.2801,
+    "implied_probability": 0.16,
+    "kalshi_odds": 6.25,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG1SUI0",
+    "market_title": "Exact score: Argentina 1-0 Switzerland",
+    "model_probability": 0.11518,
+    "outcome_key": "score_1_0"
+   },
+   {
+    "edge": -0.0174,
+    "expected_value": -0.2899,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG3SUI0",
+    "market_title": "Exact score: Argentina 3-0 Switzerland",
+    "model_probability": 0.0426,
+    "outcome_key": "score_3_0"
+   },
+   {
+    "edge": -0.030120000000000008,
+    "expected_value": -0.3012,
+    "implied_probability": 0.1,
+    "kalshi_odds": 10.0,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG0SUI0",
+    "market_title": "Exact score: 0-0 draw",
+    "model_probability": 0.06988,
+    "outcome_key": "score_0_0"
+   },
+   {
+    "edge": -0.04488,
+    "expected_value": -0.3208,
+    "implied_probability": 0.14,
+    "kalshi_odds": 7.14,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG2SUI0",
+    "market_title": "Exact score: Argentina 2-0 Switzerland",
+    "model_probability": 0.09512000000000001,
+    "outcome_key": "score_2_0"
+   },
+   {
+    "edge": -0.00324,
+    "expected_value": -0.324,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG4SUI3",
+    "market_title": "Exact score: Argentina 4-3 Switzerland",
+    "model_probability": 0.00676,
+    "outcome_key": "score_4_3"
+   },
+   {
+    "edge": -0.0036000000000000008,
+    "expected_value": -0.36,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG5SUI0",
+    "market_title": "Exact score: Argentina 5-0 Switzerland",
+    "model_probability": 0.0063999999999999994,
+    "outcome_key": "score_5_0"
+   },
+   {
+    "edge": -0.0036000000000000008,
+    "expected_value": -0.36,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG5SUI2",
+    "market_title": "Exact score: Argentina 5-2 Switzerland",
+    "model_probability": 0.0063999999999999994,
+    "outcome_key": "score_5_2"
+   }
+  ],
+  "match_id": "ARG_SUI",
+  "scorelines": [],
+  "source": "canonical_archive",
+  "summary": null,
+  "xg": null
+ },
+ "research": {
+  "away_team": "Switzerland",
+  "closing": [],
+  "final_lock": [
+   {
+    "confidence": 0.4656,
+    "edge": -0.12893999999999994,
+    "implied_probability": 0.76,
+    "kalshi_odds": 1.32,
+    "locked_at": "2026-07-12T00:50:30.063599",
+    "market_id": "KXWCADVANCE-26JUL11ARGSUI-ARG",
+    "market_title": "Argentina to advance",
+    "model_probability": 0.6310600000000001,
+    "outcome_key": "home_advance"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.11694000000000004,
+    "implied_probability": 0.26,
+    "kalshi_odds": 3.85,
+    "locked_at": "2026-07-12T00:50:30.063598",
+    "market_id": "KXWCADVANCE-26JUL11ARGSUI-SUI",
+    "market_title": "Switzerland to advance",
+    "model_probability": 0.37694000000000005,
+    "outcome_key": "away_advance"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.11243999999999998,
+    "implied_probability": 0.69,
+    "kalshi_odds": 1.45,
+    "locked_at": "2026-07-12T00:50:30.063598",
+    "market_id": "KXWCFTTS-26JUL11ARGSUI-ARG",
+    "market_title": "Argentina to score first",
+    "model_probability": 0.57756,
+    "outcome_key": "home_first_goal"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.0043199999999999975,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "locked_at": "2026-07-12T00:50:30.063597",
+    "market_id": "KXWCFTTS-26JUL11ARGSUI-NONE",
+    "market_title": "No goal in the match",
+    "model_probability": 0.05568,
+    "outcome_key": "no_goal"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.0927,
+    "implied_probability": 0.29,
+    "kalshi_odds": 3.45,
+    "locked_at": "2026-07-12T00:50:30.063597",
+    "market_id": "KXWCFTTS-26JUL11ARGSUI-SUI",
+    "market_title": "Switzerland to score first",
+    "model_probability": 0.3827,
+    "outcome_key": "away_first_goal"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.030120000000000008,
+    "implied_probability": 0.1,
+    "kalshi_odds": 10.0,
+    "locked_at": "2026-07-12T00:50:30.063597",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG0SUI0",
+    "market_title": "Exact score: 0-0 draw",
+    "model_probability": 0.06988,
+    "outcome_key": "score_0_0"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.007319999999999993,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "locked_at": "2026-07-12T00:50:30.063596",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG0SUI1",
+    "market_title": "Exact score: Switzerland 1-0 Argentina",
+    "model_probability": 0.06731999999999999,
+    "outcome_key": "score_0_1"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.013079999999999994,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "locked_at": "2026-07-12T00:50:30.063596",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG0SUI2",
+    "market_title": "Exact score: Switzerland 2-0 Argentina",
+    "model_probability": 0.04307999999999999,
+    "outcome_key": "score_0_2"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.01002,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-12T00:50:30.063596",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG0SUI3",
+    "market_title": "Exact score: Switzerland 3-0 Argentina",
+    "model_probability": 0.02002,
+    "outcome_key": "score_0_3"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.04482,
+    "implied_probability": 0.16,
+    "kalshi_odds": 6.25,
+    "locked_at": "2026-07-12T00:50:30.063595",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG1SUI0",
+    "market_title": "Exact score: Argentina 1-0 Switzerland",
+    "model_probability": 0.11518,
+    "outcome_key": "score_1_0"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.013200000000000003,
+    "implied_probability": 0.13,
+    "kalshi_odds": 7.69,
+    "locked_at": "2026-07-12T00:50:30.063595",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG1SUI1",
+    "market_title": "Exact score: 1-1 draw",
+    "model_probability": 0.1168,
+    "outcome_key": "score_1_1"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.015719999999999998,
+    "implied_probability": 0.05,
+    "kalshi_odds": 20.0,
+    "locked_at": "2026-07-12T00:50:30.063594",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG1SUI2",
+    "market_title": "Exact score: Switzerland 2-1 Argentina",
+    "model_probability": 0.06572,
+    "outcome_key": "score_1_2"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.01668,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-12T00:50:30.063594",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG1SUI3",
+    "market_title": "Exact score: Switzerland 3-1 Argentina",
+    "model_probability": 0.02668,
+    "outcome_key": "score_1_3"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.04488,
+    "implied_probability": 0.14,
+    "kalshi_odds": 7.14,
+    "locked_at": "2026-07-12T00:50:30.063580",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG2SUI0",
+    "market_title": "Exact score: Argentina 2-0 Switzerland",
+    "model_probability": 0.09512000000000001,
+    "outcome_key": "score_2_0"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.020579999999999987,
+    "implied_probability": 0.12,
+    "kalshi_odds": 8.33,
+    "locked_at": "2026-07-12T00:50:30.063580",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG2SUI1",
+    "market_title": "Exact score: Argentina 2-1 Switzerland",
+    "model_probability": 0.09942000000000001,
+    "outcome_key": "score_2_1"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.013439999999999994,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "locked_at": "2026-07-12T00:50:30.063579",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG2SUI2",
+    "market_title": "Exact score: 2-2 draw",
+    "model_probability": 0.053439999999999994,
+    "outcome_key": "score_2_2"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.00984,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-12T00:50:30.063578",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG2SUI3",
+    "market_title": "Exact score: Switzerland 3-2 Argentina",
+    "model_probability": 0.01984,
+    "outcome_key": "score_2_3"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.0174,
+    "implied_probability": 0.06,
+    "kalshi_odds": 16.67,
+    "locked_at": "2026-07-12T00:50:30.063578",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG3SUI0",
+    "market_title": "Exact score: Argentina 3-0 Switzerland",
+    "model_probability": 0.0426,
+    "outcome_key": "score_3_0"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.014039999999999997,
+    "implied_probability": 0.07,
+    "kalshi_odds": 14.29,
+    "locked_at": "2026-07-12T00:50:30.063578",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG3SUI1",
+    "market_title": "Exact score: Argentina 3-1 Switzerland",
+    "model_probability": 0.05596000000000001,
+    "outcome_key": "score_3_1"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.0009000000000000015,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "locked_at": "2026-07-12T00:50:30.063577",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG3SUI2",
+    "market_title": "Exact score: Argentina 3-2 Switzerland",
+    "model_probability": 0.0309,
+    "outcome_key": "score_3_2"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.002279999999999999,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-12T00:50:30.063577",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG3SUI3",
+    "market_title": "Exact score: 3-3 draw",
+    "model_probability": 0.01228,
+    "outcome_key": "score_3_3"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.00792,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "locked_at": "2026-07-12T00:50:30.063576",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG4SUI0",
+    "market_title": "Exact score: Argentina 4-0 Switzerland",
+    "model_probability": 0.02208,
+    "outcome_key": "score_4_0"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.006719999999999997,
+    "implied_probability": 0.03,
+    "kalshi_odds": 33.33,
+    "locked_at": "2026-07-12T00:50:30.063576",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG4SUI1",
+    "market_title": "Exact score: Argentina 4-1 Switzerland",
+    "model_probability": 0.023280000000000002,
+    "outcome_key": "score_4_1"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.001259999999999999,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-12T00:50:30.063576",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG4SUI2",
+    "market_title": "Exact score: Argentina 4-2 Switzerland",
+    "model_probability": 0.01126,
+    "outcome_key": "score_4_2"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.00324,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-12T00:50:30.063575",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG4SUI3",
+    "market_title": "Exact score: Argentina 4-3 Switzerland",
+    "model_probability": 0.00676,
+    "outcome_key": "score_4_3"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.0036000000000000008,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-12T00:50:30.063575",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG5SUI0",
+    "market_title": "Exact score: Argentina 5-0 Switzerland",
+    "model_probability": 0.0063999999999999994,
+    "outcome_key": "score_5_0"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.0025800000000000007,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-12T00:50:30.063575",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG5SUI1",
+    "market_title": "Exact score: Argentina 5-1 Switzerland",
+    "model_probability": 0.0074199999999999995,
+    "outcome_key": "score_5_1"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.0036000000000000008,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-12T00:50:30.063574",
+    "market_id": "KXWCSCORE-26JUL11ARGSUI-ARG5SUI2",
+    "market_title": "Exact score: Argentina 5-2 Switzerland",
+    "model_probability": 0.0063999999999999994,
+    "outcome_key": "score_5_2"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.06834000000000007,
+    "implied_probability": 0.47,
+    "kalshi_odds": 2.13,
+    "locked_at": "2026-07-12T00:50:30.063574",
+    "market_id": "KXWCBTTS-26JUL11ARGSUI-BTTS",
+    "market_title": "Both teams to score",
+    "model_probability": 0.53834,
+    "outcome_key": "btts"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.05831999999999998,
+    "implied_probability": 0.31,
+    "kalshi_odds": 3.23,
+    "locked_at": "2026-07-12T00:50:30.063573",
+    "market_id": "KXWCSPREAD-26JUL11ARGSUI-ARG2",
+    "market_title": "Argentina to win by 2+ goals",
+    "model_probability": 0.25168,
+    "outcome_key": "home_margin_2"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.019919999999999993,
+    "implied_probability": 0.12,
+    "kalshi_odds": 8.33,
+    "locked_at": "2026-07-12T00:50:30.063573",
+    "market_id": "KXWCSPREAD-26JUL11ARGSUI-ARG3",
+    "market_title": "Argentina to win by 3+ goals",
+    "model_probability": 0.10008,
+    "outcome_key": "home_margin_3"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.0672,
+    "implied_probability": 0.05,
+    "kalshi_odds": 20.0,
+    "locked_at": "2026-07-12T00:50:30.063573",
+    "market_id": "KXWCSPREAD-26JUL11ARGSUI-SUI2",
+    "market_title": "Switzerland to win by 2+ goals",
+    "model_probability": 0.1172,
+    "outcome_key": "away_margin_2"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.030540000000000005,
+    "implied_probability": 0.01,
+    "kalshi_odds": 100.0,
+    "locked_at": "2026-07-12T00:50:30.063572",
+    "market_id": "KXWCSPREAD-26JUL11ARGSUI-SUI3",
+    "market_title": "Switzerland to win by 3+ goals",
+    "model_probability": 0.04054000000000001,
+    "outcome_key": "away_margin_3"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.02412000000000003,
+    "implied_probability": 0.91,
+    "kalshi_odds": 1.1,
+    "locked_at": "2026-07-12T00:50:30.063572",
+    "market_id": "KXWCTOTAL-26JUL11ARGSUI-1",
+    "market_title": "Over 0.5 total goals",
+    "model_probability": 0.9341200000000001,
+    "outcome_key": "over_0_5"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.04962,
+    "implied_probability": 0.71,
+    "kalshi_odds": 1.41,
+    "locked_at": "2026-07-12T00:50:30.063571",
+    "market_id": "KXWCTOTAL-26JUL11ARGSUI-2",
+    "market_title": "Over 1.5 total goals",
+    "model_probability": 0.75962,
+    "outcome_key": "over_1_5"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.08861999999999998,
+    "implied_probability": 0.42,
+    "kalshi_odds": 2.38,
+    "locked_at": "2026-07-12T00:50:30.063571",
+    "market_id": "KXWCTOTAL-26JUL11ARGSUI-3",
+    "market_title": "Over 2.5 total goals",
+    "model_probability": 0.50862,
+    "outcome_key": "over_2_5"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.07686000000000001,
+    "implied_probability": 0.22,
+    "kalshi_odds": 4.55,
+    "locked_at": "2026-07-12T00:50:30.063571",
+    "market_id": "KXWCTOTAL-26JUL11ARGSUI-4",
+    "market_title": "Over 3.5 total goals",
+    "model_probability": 0.29686,
+    "outcome_key": "over_3_5"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.04554,
+    "implied_probability": 0.1,
+    "kalshi_odds": 10.0,
+    "locked_at": "2026-07-12T00:50:30.063570",
+    "market_id": "KXWCTOTAL-26JUL11ARGSUI-5",
+    "market_title": "Over 4.5 total goals",
+    "model_probability": 0.14554,
+    "outcome_key": "over_4_5"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.02364,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "locked_at": "2026-07-12T00:50:30.063570",
+    "market_id": "KXWCTOTAL-26JUL11ARGSUI-6",
+    "market_title": "Over 5.5 total goals",
+    "model_probability": 0.06364,
+    "outcome_key": "over_5_5"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.03852,
+    "implied_probability": 0.3,
+    "kalshi_odds": 3.33,
+    "locked_at": "2026-07-12T00:50:30.063569",
+    "market_id": "KXWCGAME-26JUL11ARGSUI-TIE",
+    "market_title": "Draw after 90 min",
+    "model_probability": 0.26148,
+    "outcome_key": "draw"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.017820000000000003,
+    "implied_probability": 0.1,
+    "kalshi_odds": 10.0,
+    "locked_at": "2026-07-12T00:50:30.063569",
+    "market_id": "KXWCMOV-26JUL11ARGSUI-ARGET",
+    "market_title": "Argentina to win in extra time",
+    "model_probability": 0.08218,
+    "outcome_key": "home_win_et"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.021540000000000004,
+    "implied_probability": 0.09,
+    "kalshi_odds": 11.11,
+    "locked_at": "2026-07-12T00:50:30.063569",
+    "market_id": "KXWCMOV-26JUL11ARGSUI-ARGPEN",
+    "market_title": "Argentina to win on penalties",
+    "model_probability": 0.06846,
+    "outcome_key": "home_win_pens"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.08957999999999999,
+    "implied_probability": 0.57,
+    "kalshi_odds": 1.75,
+    "locked_at": "2026-07-12T00:50:30.063568",
+    "market_id": "KXWCGAME-26JUL11ARGSUI-ARG",
+    "market_title": "Argentina to win (90 min)",
+    "model_probability": 0.48041999999999996,
+    "outcome_key": "home_win"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.010319999999999996,
+    "implied_probability": 0.04,
+    "kalshi_odds": 25.0,
+    "locked_at": "2026-07-12T00:50:30.063568",
+    "market_id": "KXWCMOV-26JUL11ARGSUI-SUIET",
+    "market_title": "Switzerland to win in extra time",
+    "model_probability": 0.05032,
+    "outcome_key": "away_win_et"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": -0.015480000000000008,
+    "implied_probability": 0.08,
+    "kalshi_odds": 12.5,
+    "locked_at": "2026-07-12T00:50:30.063567",
+    "market_id": "KXWCMOV-26JUL11ARGSUI-SUIPEN",
+    "market_title": "Switzerland to win on penalties",
+    "model_probability": 0.06452,
+    "outcome_key": "away_win_pens"
+   },
+   {
+    "confidence": 0.4656,
+    "edge": 0.11610000000000001,
+    "implied_probability": 0.15,
+    "kalshi_odds": 6.67,
+    "locked_at": "2026-07-12T00:50:30.063561",
+    "market_id": "KXWCGAME-26JUL11ARGSUI-SUI",
+    "market_title": "Switzerland to win (90 min)",
+    "model_probability": 0.2661,
+    "outcome_key": "away_win"
+   }
+  ],
+  "final_lock_source": "canonical_archive",
+  "generated_at": "2026-10-21T10:47:29.369296+00:00",
+  "home_team": "Argentina",
+  "last_readings": [],
+  "match_id": "ARG_SUI",
+  "result": {
+   "away_goals": 1,
+   "finished_at": "2026-07-12T03:30:00",
+   "goals": [
+    {
+     "detail": "Goal - Header",
+     "minute": 10,
+     "player": "Alexis Mac Allister",
+     "team": "home"
+    },
+    {
+     "detail": "Goal",
+     "minute": 67,
+     "player": "Dan Ndoye",
+     "team": "away"
+    },
+    {
+     "detail": "Goal",
+     "minute": 112,
+     "player": "Julián Álvarez",
+     "team": "home"
+    },
+    {
+     "detail": "Goal",
+     "minute": 121,
+     "player": "Lautaro Martínez",
+     "team": "home"
+    }
+   ],
+   "home_goals": 3,
+   "status_short": "AET"
+  }
+ },
+ "sources": {
+  "prediction": "GET /api/prediction/ARG_SUI",
+  "research": "GET /api/research/ARG_SUI",
+  "team_info": "GET /api/team-info/ARG_SUI"
+ },
+ "stage": "QF",
+ "team_info": {
+  "away": {
+   "attack": 1.38,
+   "defence": 0.85,
+   "fatigue": 0.3,
+   "form": 0.8,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Process-strong but finish-wasteful — piled up 3.14 xG against Qatar and only drew, a theme the R16 hammered home: just 0.58 xG and out-shot 15-7 by Colombia in a 0-0, then through on penalties. Xhaka and Akanji anchor a possession game that drops into a deep, resilient low block against better teams (40% of the ball against Algeria), with Kobel reliable in goal. Hard to break down; the question is always whether the chances go in. No longer fresh — 120 minutes plus a shootout in the R16 put real miles in the legs.",
+   "team": "Switzerland"
+  },
+  "home": {
+   "attack": 1.45,
+   "defence": 0.83,
+   "fatigue": 0.28,
+   "form": 0.85,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Runners-up, and the final was the one night the late-goal magic had no fuel: 0.07 xG in 120 minutes against Spain's press, a red card in extra time, and no 84th-minute miracle left in the tank — the three-match pattern of decisive late blows (Egypt, Switzerland, England) died where it mattered most. Through the tournament the machine was still elite: Messi's 8 goals, the attack at the model's cap through eight matches, set pieces and crosses the signature weapon. But the closing read is honest — the deep-tournament defence leaked (0.81 adj xGA/game after the final's 2.52) and the title went to the side that never needed rescuing.",
+   "team": "Argentina"
+  },
+  "match_id": "ARG_SUI"
+ },
+ "venue": "Arrowhead Stadium, Kansas City"
+}

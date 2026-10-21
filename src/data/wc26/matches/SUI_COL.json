@@ -1,0 +1,112 @@
+{
+ "away": "Colombia",
+ "home": "Switzerland",
+ "kickoff": "2026-07-07T20:00:00+00:00",
+ "match_id": "SUI_COL",
+ "prediction": {
+  "age_seconds": 0,
+  "archive_note": "no frozen pre-match record survives for this match — its T-10 lock predates the archive discipline; retrospective re-simulation is deliberately not shown on review pages",
+  "confidence": null,
+  "freshness": "archive-incomplete",
+  "generated_at": "2026-10-21T10:47:08.372603+00:00",
+  "is_final": false,
+  "is_stale": false,
+  "markets": [],
+  "match_id": "SUI_COL",
+  "scorelines": [],
+  "source": "archive_incomplete",
+  "suggestions": [],
+  "summary": null,
+  "xg": null
+ },
+ "research": {
+  "away_team": "Colombia",
+  "closing": [],
+  "final_lock": [],
+  "final_lock_source": "absent",
+  "generated_at": "2026-10-21T10:47:09.965959+00:00",
+  "home_team": "Switzerland",
+  "last_readings": [],
+  "match_id": "SUI_COL",
+  "result": {
+   "away_goals": 0,
+   "finished_at": "2026-07-07T22:30:00",
+   "goals": [
+    {
+     "detail": "Penalty - Scored",
+     "minute": 120,
+     "player": "Juan Fernando Quintero",
+     "team": "away"
+    },
+    {
+     "detail": "Penalty - Scored",
+     "minute": 120,
+     "player": "Granit Xhaka",
+     "team": "home"
+    },
+    {
+     "detail": "Penalty - Scored",
+     "minute": 120,
+     "player": "Zeki Amdouni",
+     "team": "home"
+    },
+    {
+     "detail": "Penalty - Scored",
+     "minute": 120,
+     "player": "Jáminton Campaz",
+     "team": "away"
+    },
+    {
+     "detail": "Penalty - Scored",
+     "minute": 120,
+     "player": "Cedric Itten",
+     "team": "home"
+    },
+    {
+     "detail": "Penalty - Scored",
+     "minute": 120,
+     "player": "Luis Díaz",
+     "team": "away"
+    },
+    {
+     "detail": "Penalty - Scored",
+     "minute": 120,
+     "player": "Rubén Vargas",
+     "team": "home"
+    }
+   ],
+   "home_goals": 0,
+   "status_short": "PEN"
+  }
+ },
+ "sources": {
+  "prediction": "GET /api/prediction/SUI_COL",
+  "research": "GET /api/research/SUI_COL",
+  "team_info": "GET /api/team-info/SUI_COL"
+ },
+ "stage": "R16",
+ "team_info": {
+  "away": {
+   "attack": 1.17,
+   "defence": 0.8,
+   "fatigue": 0.18,
+   "form": 0.9,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Eliminated by Switzerland in the R16 (0-0, lost on penalties).",
+   "team": "Colombia"
+  },
+  "home": {
+   "attack": 1.38,
+   "defence": 0.85,
+   "fatigue": 0.3,
+   "form": 0.8,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Process-strong but finish-wasteful — piled up 3.14 xG against Qatar and only drew, a theme the R16 hammered home: just 0.58 xG and out-shot 15-7 by Colombia in a 0-0, then through on penalties. Xhaka and Akanji anchor a possession game that drops into a deep, resilient low block against better teams (40% of the ball against Algeria), with Kobel reliable in goal. Hard to break down; the question is always whether the chances go in. No longer fresh — 120 minutes plus a shootout in the R16 put real miles in the legs.",
+   "team": "Switzerland"
+  },
+  "match_id": "SUI_COL"
+ },
+ "venue": "BC Place, Vancouver"
+}

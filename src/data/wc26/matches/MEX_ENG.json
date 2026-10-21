@@ -1,0 +1,100 @@
+{
+ "away": "England",
+ "home": "Mexico",
+ "kickoff": "2026-07-06T00:00:00+00:00",
+ "match_id": "MEX_ENG",
+ "prediction": {
+  "age_seconds": 0,
+  "archive_note": "no frozen pre-match record survives for this match — its T-10 lock predates the archive discipline; retrospective re-simulation is deliberately not shown on review pages",
+  "confidence": null,
+  "freshness": "archive-incomplete",
+  "generated_at": "2026-10-21T10:46:58.510036+00:00",
+  "is_final": false,
+  "is_stale": false,
+  "markets": [],
+  "match_id": "MEX_ENG",
+  "scorelines": [],
+  "source": "archive_incomplete",
+  "suggestions": [],
+  "summary": null,
+  "xg": null
+ },
+ "research": {
+  "away_team": "England",
+  "closing": [],
+  "final_lock": [],
+  "final_lock_source": "absent",
+  "generated_at": "2026-10-21T10:47:00.188190+00:00",
+  "home_team": "Mexico",
+  "last_readings": [],
+  "match_id": "MEX_ENG",
+  "result": {
+   "away_goals": 3,
+   "finished_at": "2026-07-06T02:30:00",
+   "goals": [
+    {
+     "detail": "Goal - Header",
+     "minute": 36,
+     "player": "Jude Bellingham",
+     "team": "away"
+    },
+    {
+     "detail": "Goal",
+     "minute": 38,
+     "player": "Jude Bellingham",
+     "team": "away"
+    },
+    {
+     "detail": "Goal",
+     "minute": 42,
+     "player": "Julián Quiñones",
+     "team": "home"
+    },
+    {
+     "detail": "Penalty - Scored",
+     "minute": 60,
+     "player": "Harry Kane",
+     "team": "away"
+    },
+    {
+     "detail": "Penalty - Scored",
+     "minute": 69,
+     "player": "Raúl Jiménez",
+     "team": "home"
+    }
+   ],
+   "home_goals": 2,
+   "status_short": "FT"
+  }
+ },
+ "sources": {
+  "prediction": "GET /api/prediction/MEX_ENG",
+  "research": "GET /api/research/MEX_ENG",
+  "team_info": "GET /api/team-info/MEX_ENG"
+ },
+ "stage": "R16",
+ "team_info": {
+  "away": {
+   "attack": 1.45,
+   "defence": 0.95,
+   "fatigue": 0.22,
+   "form": 0.9,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Third place, won by winning the maddest match of the tournament 6-4 — a ten-goal shootout with France where Saka finished with a hat-trick (37', 46', 87') after Rice and Konsa struck early. The tournament pattern completed itself: transition brilliance through Bellingham, Kane and Saka whenever space existed, defensive abandon whenever it didn't matter — 2.99 xG conceded in an exhibition tells you about the party, not the project. The honest ledger: elite attack (back at the model's cap through eight), a defence that had exactly one truly bad competitive night, and the SF exit to a 90+2 header as the only wound that counts.",
+   "team": "England"
+  },
+  "home": {
+   "attack": 1.0,
+   "defence": 0.72,
+   "fatigue": 0.18,
+   "form": 0.95,
+   "provisional": false,
+   "resolved": true,
+   "scouting": "Eliminated by England in the R16.",
+   "team": "Mexico"
+  },
+  "match_id": "MEX_ENG"
+ },
+ "venue": "Estadio Azteca, Mexico City"
+}
