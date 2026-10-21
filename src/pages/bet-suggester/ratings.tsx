@@ -52,7 +52,7 @@ import {
 } from "../../components/chrome";
 import {
   CupFields, LeagueField, NationFields, countWord, fetchCupFields,
-  fetchLeagueField, fetchNationFields, shortSha,
+  fetchLeagueField, fetchNationFields, nationsSnapshot, shortSha,
 } from "../../lib/fieldPageApi";
 
 /** Where the last view is remembered. Browser storage is a per-viewer
@@ -77,6 +77,57 @@ function ReadFailed({ what, error, testId }: {
         measured as missing, it was not received.
       </p>
     </div>
+  );
+}
+
+/** THE BAKED NATIONAL FIELD, DRAWN ONLY UNDER A FAILED LIVE READ
+ *  (cleanup D7). `nationsSnapshot()` is the home page's dated copy of
+ *  GET /api/field/nations, trimmed to team and overall rating: no band,
+ *  tier or floor. So it is a dated LIST under the failure, never the
+ *  field, and it says so before a single number. Highest rating first,
+ *  the field's own order; each competition folded, so the failure above
+ *  stays the first thing read. */
+function NationsSnapshotList() {
+  const snap = nationsSnapshot();
+  return (
+    <section data-testid="nations-snapshot"
+      className="mt-6 rounded-2xl border border-line p-5">
+      <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
+        not live · the snapshot of {snap.route} taken {snap.fetched}
+      </p>
+      <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-ink-low">
+        The live read above failed, so this is the copy the home page
+        carries: each team&apos;s overall rating as the route served it
+        on {snap.fetched} ({snap.passes} passes, corpus{" "}
+        {shortSha(snap.corpus_sha256)}). It has no bands, tiers or
+        floors. Read it as a dated list, not as today&apos;s field.
+      </p>
+      <div className="mt-4 space-y-2">
+        {snap.competitions.map((c) => {
+          const teams = [...c.teams].sort((a, b) =>
+            b.elo - a.elo || a.team.localeCompare(b.team));
+          return (
+            <details key={c.key} data-testid="nations-snapshot-comp"
+              data-comp={c.key} className="group">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-[13px] text-ink-mid hover:text-ink-hi [&::-webkit-details-marker]:hidden">
+                <span>{c.display}</span>
+                <span className="font-mono text-[11px] text-ink-faint">
+                  {countWord(teams.length)} teams
+                </span>
+              </summary>
+              <ol className="mb-3 mt-1 max-w-md space-y-0.5 font-mono text-[12px] text-ink-mid">
+                {teams.map((t, i) => (
+                  <li key={t.team} className="flex justify-between gap-3">
+                    <span><span className="text-ink-faint">{i + 1}.</span> {t.team}</span>
+                    <span className="tabular-nums">{Math.round(t.elo)}</span>
+                  </li>
+                ))}
+              </ol>
+            </details>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -475,7 +526,8 @@ export default function FieldPage() {
           nations.error ? (
             <div className="mt-6">{modeSwitch}
               <ReadFailed what="national-team field" error={nations.error}
-                testId="nations-read-error" /></div>
+                testId="nations-read-error" />
+              <NationsSnapshotList /></div>
           ) : N ? (
             nComps.length ? (
               <div key={`view-${flip}`} className={flipClass}>

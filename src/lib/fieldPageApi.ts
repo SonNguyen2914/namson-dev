@@ -12,11 +12,12 @@
 //
 // Served by backend src/picker/field_page.py from committed bytes: no
 // board, no capture, no write. The page at /bet-suggester/ratings reads
-// both; nothing else does. `fieldApi.ts` stays what it was — the board
-// card and the competition viewer still read `/api/comp/{key}/ratings`
-// through it — so this file shares no type with that one on purpose: two
-// payloads with two shapes, and a change to one must not type-check the
-// other into a lie.
+// both; nothing else does. The national field also has a BAKED fallback
+// (`nationsSnapshot`, below), shown only when its live read fails.
+// `fieldApi.ts` stays what it was — the board card and the competition
+// viewer still read `/api/comp/{key}/ratings` through it — so this file
+// shares no type with that one on purpose: two payloads with two shapes,
+// and a change to one must not type-check the other into a lie.
 //
 // A FIELD ABSENT FROM AN INTERFACE IS DROPPED SILENTLY. Every caveat key
 // the page reads is declared below, optional where the backend may not
@@ -27,6 +28,7 @@
 // NOTHING HERE DECIDES. These functions sort, group and scale what the
 // backend measured; they add no number of their own.
 
+import nationsBaked from "../data/landing/nations.json";
 import type { RatingsAsOf } from "./ratingsAsOf";
 
 /** The exponentiated convenience on a goal axis. `point` is goals
@@ -397,6 +399,30 @@ export function fetchCupFields(signal?: AbortSignal): Promise<CupFields> {
 export function fetchNationFields(signal?: AbortSignal): Promise<NationFields> {
   return readField<NationFields>("/api/field/nations", "national-team field",
     signal);
+}
+
+/** THE BAKED NATIONAL FIELD: A FALLBACK ONLY (cleanup D7, 2026-10-21).
+ *  The page reads the LIVE route above, every time. Only when that read
+ *  FAILS may it show this: the home page's dated copy of the same route
+ *  (`data/landing/nations.json`, lib/landingData.ts), trimmed to the
+ *  competition, the team and the overall rating. It carries no band, no
+ *  tier and no floor, so it is never handed to the field's renderer as
+ *  if it were the field: the page draws it as a dated list under the
+ *  failure, with the date and the route it came from. */
+export interface NationsSnapshot {
+  route: string;
+  fetched: string;
+  passes: number;
+  corpus_sha256: string;
+  competitions: {
+    key: string;
+    display: string;
+    teams: { team: string; elo: number }[];
+  }[];
+}
+
+export function nationsSnapshot(): NationsSnapshot {
+  return nationsBaked as unknown as NationsSnapshot;
 }
 
 // ─────────────────────────── the page's arithmetic ─────────────────────
