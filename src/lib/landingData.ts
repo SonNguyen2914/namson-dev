@@ -9,7 +9,10 @@
 //                            board, no capture, no write")
 //   data/landing/nations.json GET /api/field/nations — the national
 //                            plane's 139 teams (v2.1 bundle, same rules
-//                            as the league field)
+//                            as the league field). ALSO the ratings
+//                            page's fallback, drawn only when its live
+//                            read of the same route fails
+//                            (lib/fieldPageApi.nationsSnapshot)
 //   data/landing/derby.json  GET /api/minutes/laliga/401882865 — stored
 //                            rows only (backend src/live/minutes.py)
 //

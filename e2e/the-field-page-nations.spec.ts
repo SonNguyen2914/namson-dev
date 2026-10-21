@@ -400,6 +400,8 @@ test("the floor chip is on every below-floor row, and the goal axes say so "
 test("rows are ranked by value; a search FINDS a team without renumbering it",
   async ({ page }) => {
     await openNations(page);
+    // the live read landed: the baked fallback is not drawn (cleanup D7)
+    await expect(page.getByTestId("nations-snapshot")).toHaveCount(0);
     const rows = [...byKey("unl").axes.overall.rows]
       .sort((a, b) => (b.value as number) - (a.value as number));
     expect(await section(page, "unl").getByTestId("nation-row")
@@ -423,6 +425,13 @@ test("a failed national read is NAMED, and the other two views still draw",
     await expect(page.getByTestId("nations-read-error"))
       .toContainText("national-team field unavailable: bytes refused");
     await expect(page.getByTestId("nation-table")).toHaveCount(0);
+    // THE BAKED FALLBACK (cleanup D7): under the failure, never instead
+    // of it — dated, named as not live, one fold per competition
+    const snap = page.getByTestId("nations-snapshot");
+    await expect(snap).toContainText("not live");
+    await expect(snap).toContainText("2026-10-07");
+    await expect(snap).toContainText("no bands, tiers or floors");
+    await expect(snap.getByTestId("nations-snapshot-comp")).toHaveCount(3);
     await page.getByTestId("mode-leagues").click();
     await expect(page.getByTestId("field-table").first()).toBeVisible();
   });
