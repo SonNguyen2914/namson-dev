@@ -108,7 +108,7 @@ export function statusForUnreadableAnswer(upstream: number): number {
 //       -> GET /api/picker/board?days=30
 //
 // So every route in LEAGUE_PROXY_WITHHELD — the journal, the paper
-// ledger, open exposure, the quota-spending `drift` — was one `../`
+// ledger (since retired from the backend), open exposure, the quota-spending `drift` — was one `../`
 // away, and so was the board, the one GET that WRITES. The allowlists
 // were presented as a control and could be walked straight past.
 //
@@ -410,19 +410,24 @@ export async function proxy(
 // ways"); until then the function was written and uncalled, and this
 // list was still only ever compared to a copy of itself.
 export const LEAGUE_PROXY_ALLOWED: Record<string, readonly string[]> = {
-  mls: ["scoreboard", "schedule", "standings", "markets", "odds",
-        "approval"],
+  // No `approval` on mls, epl or ligamx, and no `status` on ligamx,
+  // since backend PR #299 (2026-10-22): those four routes merged into
+  // /api/comp/{key}/status (keys mls|epl|ligamx and the registry
+  // slugs), which carries the plane's approval read whole and is
+  // forwarded by the comp proxy (COMP_RESOURCES). Read it there.
+  mls: ["scoreboard", "schedule", "standings", "markets", "odds"],
   // `markets/discovery` added 2026-09-07: the backend has served
   // /api/ligamx/markets/discovery all along (config.py names it as the
   // Liga MX discovery probe) and this list, copied from the MLS one
   // rather than from the route surface, never carried it.
   ligamx: ["scoreboard", "schedule", "standings", "markets",
-           "markets/discovery", "odds", "status", "approval"],
+           "markets/discovery", "odds"],
   epl: ["scoreboard", "schedule", "standings", "markets",
-        "markets/discovery", "odds", "approval"],
+        "markets/discovery", "odds"],
   // No `approval`: the backend has never served /api/laliga/approval
-  // (mls, epl and ligamx have one; La Liga's approval state is read
-  // from /status). The entry was copied from the EPL list and
+  // (La Liga's approval state is read from its own /status, which it
+  // still serves; mls, epl and ligamx read theirs from
+  // /api/comp/{key}/status). The entry was copied from the EPL list and
   // forwarded to a backend 404 — e2e/proxy-allowlists.spec.ts pins the
   // refusal.
   laliga: ["scoreboard", "schedule", "standings", "markets", "odds",
@@ -664,25 +669,22 @@ export const LEAGUE_PROXY_WITHHELD: Record<string, Record<string, string>> = {
     // URL and nothing else.
     journal: "the personal journal: considered, taken and passed, with "
       + "the denominator. Positions, on a public frontend.",
-    paper: "the paper-trading ledger's P&L — signals, fills, rejections "
-      + "and settled economics. Positions, on a public frontend.",
     risk: "the risk engine's live state and CURRENT OPEN EXPOSURE. The "
       + "route calls itself public read-only; this proxy still does not "
       + "forward it, because exposure is a position figure and the "
       + "decision to publish one is not this file's to take.",
     // THE ANALYSIS SURFACE. Expensive by construction — the backend's
-    // own comments put corpus / audit / model-eval in one cost class
-    // (a rolling-origin ladder and a bootstrap over 300-510 fixtures) —
-    // and none of it is read by a browser. A public proxy in front of
+    // own comments put audit / model-eval in one cost class (a
+    // rolling-origin ladder and a bootstrap over 300-510 fixtures) —
+    // and none of it is read by a browser. `corpus`, `replay/{run_id}`,
+    // `paper` and `decision-sheet/{event_id}` were recorded here until
+    // 2026-10-22: the backend no longer serves them, so their records
+    // were retired (the drift guard fails on a record that outlives
+    // its route). A public proxy in front of
     // them is an unauthenticated way to spend the backend's CPU.
-    corpus: "full-corpus assembly and download. The backend files it in "
-      + "the same cost class as model-eval.",
     audit: "per-lock replay and hash recomputation. Same cost class.",
     "model-eval": "the rolling-origin ladder with a bootstrap over "
       + "300-510 fixtures. Same cost class.",
-    "replay/{run_id}": "an independent reproducibility check that "
-      + "replays a run from its stored input artifact. Operator "
-      + "evidence, and expensive.",
     scorer: "settled journal rows scored — CLV, then calibration "
       + "against the market's Brier. Reads the journal.",
     slate: "the slate scorecard: every fixture on a matchday "
@@ -694,8 +696,6 @@ export const LEAGUE_PROXY_WITHHELD: Record<string, Record<string, string>> = {
     "briefing/{event_id}": "everything needed to reason about one "
       + "fixture right now, in one call. Built for a live session; the "
       + "public per-fixture surface is the card route.",
-    "decision-sheet/{event_id}": "the same, at one instant. Built for a "
-      + "live session, and no browser surface reads it.",
     "stats-coverage": "how many completed matches hold team, provider-xG "
       + "and player stats. An ingest verification read.",
   },
