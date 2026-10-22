@@ -142,7 +142,7 @@ test.describe("the proxy's clock, per route", () => {
                            "comp/ucl/markets", "comp/ucl/match/x1",
                            "comp/ucl/match/401915417/x",
                            "comp/ucl/fixtures/x", "comp/UCL/fixtures",
-                           "mls/match/761864", "hunter/findings"]) {
+                           "mls/match/761864", "friendlies/markets"]) {
         expect(at(other), other).toBe(proxyLib.PROXY_TIMEOUT_MS);
       }
       expect(proxyLib.PROXY_TIMEOUT_MS).toBe(15_000);

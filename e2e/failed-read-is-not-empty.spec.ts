@@ -209,8 +209,6 @@ async function friendlies(page: Page, dead: string[] = []) {
     (r) => r.fulfill(json({ fixtures: [], listed: null })));
   await page.route("**/api/xg/friendlies**",
     (r) => r.fulfill(json({ fixtures: [] })));
-  await page.route("**/api/hunter/findings",
-    (r) => r.fulfill(json({ findings: [] })));
   for (const path of dead) {
     await page.route(`**${path}`,
       (r) => r.fulfill(json({ error: "upstream is down" }, 503)));

@@ -24,15 +24,15 @@ import {
  * since 2026-08-30 and had never been walked at any width.
  *
  * THE REST ARE STILL DECLARED, because they are not competitions and
- * nothing derives them: the landing page, the carousel, the bots and
- * hunter panels, the friendlies hub. A page added there joins this
+ * nothing derives them: the landing page, the carousel, the bots
+ * panel, the friendlies hub. A page added there joins this
  * sweep the honest way, by somebody adding it.
  *
  * The count is asserted below, so a competition joining either registry
  * changes what this walks and says so. */
 const STATIC_ROUTES = [
   "/", "/bet-suggester", "/bet-suggester/leagues", "/bet-suggester/bots",
-  "/bet-suggester/hunter", "/bet-suggester/friendlies",
+  "/bet-suggester/friendlies",
   "/bet-suggester/ratings", "/ops/trading",
 ];
 

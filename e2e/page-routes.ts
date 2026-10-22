@@ -72,4 +72,5 @@ export function pageRoutes(): PageRoute[] {
  *  less. A page added or removed moves this number on purpose. */
 // 27 -> 49 on 2026-10-13: the 22 cup match hubs (bet-suggester/<cup>/
 // [eventId], Son: "all matches should have a match hub").
-export const PAGE_COUNT = 49;
+// 49 -> 48 on 2026-10-22: the hunter page removed (backend cleanup C2/C3).
+export const PAGE_COUNT = 48;

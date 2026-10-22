@@ -3,9 +3,9 @@
 // No model runs here and none is planned — not dark, not pending: never.
 // Rotation, arbitrary substitutions and low motivation make friendlies
 // structurally worthless as forecast evidence, so this page shows live
-// scores and raw Kalshi books, states that plainly, and stops. The
-// market hunter owns structural findings across KXCLUBFGAME; this page
-// links there rather than re-detecting anything.
+// scores and raw Kalshi books, states that plainly, and stops. It
+// detects nothing structural across KXCLUBFGAME (the market hunter that
+// once did was deleted on 2026-10-21, and its link with it).
 //
 // MARKET-IMPLIED PROBABILITIES (2026-07-29) do not soften that line.
 // Son asked for predictions on friendlies; the platform cannot produce
@@ -31,7 +31,6 @@
 //   - a stale book's numbers are visibly stale; an incomplete book shows
 //     no probabilities at all, and a below-$1 book shows the anomaly in
 //     words with nothing normalized.
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { pollReads, usePoll } from "../lib/usePoll";
 import { TZ, dayKeyOf, dayLabel, fmtDate, groupByDay, localDay } from "../lib/matchday";
@@ -139,19 +138,6 @@ export default function FriendliesDashboard() {
   // of skeleton-loading forever.
   const [notDeployed, setNotDeployed] = useState(false);
   const [unreachable, setUnreachable] = useState(false);
-  // The market hunter is a separate surface that may not be deployed on
-  // this build: link to it only when its API actually answers, so the
-  // page never points at a 404 (probed once, client-side).
-  const [hunterUp, setHunterUp] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/hunter/findings")
-      .then((r) => { if (alive) setHunterUp(r.ok); })
-      .catch(() => { if (alive) setHunterUp(false); });
-    return () => { alive = false; };
-  }, []);
-
   // THE ONE-OFF READ: the week — fetched once per mount.
   useEffect(() => {
     let alive = true;
@@ -283,19 +269,7 @@ export default function FriendliesDashboard() {
           </p>
           <p className="mt-3 max-w-2xl text-xs leading-relaxed text-ink-low">
             Prices are the exchange&apos;s own, shown ask / bid —
-            observational, not advice.{" "}
-            {hunterUp ? (
-              <>
-                <Link href="/bet-suggester/hunter"
-                  className="text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent">
-                  Structural findings across these markets live in the
-                  market hunter
-                </Link>, not here.
-              </>
-            ) : (
-              <>Structural findings across these markets belong to the
-              market hunter, not here.</>
-            )}
+            observational, not advice.
           </p>
         </section>
       </Reveal>
@@ -358,16 +332,7 @@ export default function FriendliesDashboard() {
                 {" "}— far more than ESPN&apos;s bucket carries. </>
               )}
               Books shown above are only those matched to an ESPN fixture
-              by date and both team names
-              {hunterUp ? (
-                <>; the rest are visible from the{" "}
-                <Link href="/bet-suggester/hunter"
-                  className="text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent">
-                  market hunter
-                </Link>.</>
-              ) : (
-                <>.</>
-              )}
+              by date and both team names.
             </p>
           )}
         </section>
@@ -599,8 +564,7 @@ function BookState({ m }: { m?: MappedRow }) {
 //                  A 2-way is never renormalized — that would invent a
 //                  draw price.
 //   sum_below_one  asks summing under $1 are a structural anomaly, not
-//                  a probability set. Nothing is normalized, and the
-//                  finding itself belongs to the market hunter.
+//                  a probability set. Nothing is normalized.
 function MarketImplied({ imp }: { imp?: Implied }) {
   if (!imp) return null;
   if (imp.state === "incomplete") {
