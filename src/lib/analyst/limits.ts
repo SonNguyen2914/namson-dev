@@ -8,8 +8,8 @@ const perIp = new Map<string, number[]>();
 let day = "";
 let calls = 0;
 
-export const ASK_CAP_MESSAGE = "You've asked the Analyst a lot this hour. Try again in a little while.";
-export const BUDGET_MESSAGE = "Today's Analyst budget is used up. Trivela's own numbers are still on the page.";
+export const ASK_CAP_MESSAGE = "You've asked VAR a lot this hour. Try again in a little while.";
+export const BUDGET_MESSAGE = "Today's VAR budget is used up. Trivela's own numbers are still on the page.";
 
 export const DEFAULT_ASK_PER_IP_PER_HOUR = 5;
 export const DEFAULT_LLM_DAILY_CALLS = 300;

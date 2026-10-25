@@ -72,7 +72,7 @@ export async function loadMatch(league: string, eventId: string, demo?: string):
     if (!d) throw new LoadError("unknown demo match", 400);
     return { sheet: buildFactSheet(d._demo.league, d._demo.event_id, d), runId: runIdOf(d) };
   }
-  if (!isAnalystLeague(league)) throw new LoadError("Analyst not available for this competition", 400);
+  if (!isAnalystLeague(league)) throw new LoadError("VAR is not available for this competition", 400);
   if (!/^\d{1,12}$/.test(eventId)) throw new LoadError("bad match id", 400);
   const sub = `match/${eventId}`;
   const path = `/api/${league}/${sub}`;

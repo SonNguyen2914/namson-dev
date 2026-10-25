@@ -1326,7 +1326,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
         title={pageTitle ? pageTitle.toLowerCase() : "picker board"}>
         <NavChip href="/bet-suggester/leagues" active={false}>Leagues</NavChip>
         <NavChip href="/bet-suggester/friendlies" active={false}>Friendlies</NavChip>
-        {/* the Trivela Analyst's own page; only while it is switched on */}
+        {/* Trivela VAR's own page; only while it is switched on */}
         <AnalystNavChip />
         {/* Live viewer competitions, and — since 2026-09-09 — WHEN each
             of them next plays: the chip glows for a fixture today or

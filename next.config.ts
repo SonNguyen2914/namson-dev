@@ -30,7 +30,7 @@ const nextConfig: NextConfig = {
   env: {
     TRIVELA_MATCH_HUBS: MATCH_HUBS.join(","),
     TRIVELA_COMP_PAGES: COMP_PAGES.join(","),
-    // the landing page's Analyst line, by the same switch as the Analyst
+    // the landing page's Trivela VAR line, by the same switch as VAR
     // itself (ANALYST_ENABLED; the routes read it at request time)
     TRIVELA_ANALYST: process.env.ANALYST_ENABLED === "true" ? "on" : "off",
   },
@@ -74,6 +74,18 @@ const nextConfig: NextConfig = {
         has: [{ type: "query", key: "league" }],
         destination: "/bet-suggester/leagues",
         permanent: false,
+      },
+      // The Trivela Analyst was renamed Trivela VAR (Verified Analyst Read)
+      // on 2026-10-25 and its page moved to /bet-suggester/var. The old
+      // address may already be bookmarked or shared, so it stays a
+      // PERMANENT redirect (308), not a page. Next carries the query string
+      // through on its own, so a match hub's deep link
+      // (?league=epl&id=…) still opens that match. The API stays at
+      // /api/analyst/*. e2e/var-redirect.spec.ts holds it.
+      {
+        source: "/bet-suggester/analyst",
+        destination: "/bet-suggester/var",
+        permanent: true,
       },
     ];
   },

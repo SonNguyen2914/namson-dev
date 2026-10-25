@@ -1,5 +1,6 @@
-// THE ANALYST PANEL: an AI-written read of one match, under the model's
-// win/draw/loss on the match hub and at the centre of /bet-suggester/analyst.
+// THE TRIVELA VAR PANEL (Verified Analyst Read; the code keeps its
+// Analyst names): an AI-written read of one match, under the model's
+// win/draw/loss on the match hub and at the centre of /bet-suggester/var.
 //
 // IT NEVER HOLDS THE PAGE UP. Nothing is fetched until the page has drawn
 // (an effect, after an idle tick), the switch is read first and the panel
@@ -36,7 +37,7 @@ export default function AnalystPanel({ league, eventId, demo, defaultOpen = fals
   eventId?: string | null;
   demo?: string;
   defaultOpen?: boolean;
-  /** show "ask about this match →" (the match hub; /analyst has Ask inline) */
+  /** show "ask about this match →" (the match hub; /var has Ask inline) */
   askLink?: boolean;
   onPreview?: (out: PreviewOut | null) => void;
 }) {
@@ -60,7 +61,7 @@ export default function AnalystPanel({ league, eventId, demo, defaultOpen = fals
         const d = await r.json().catch(() => null);
         if (cancelled) return;
         if (!r.ok || !d || !d.sheet) {
-          setLoad({ qs, s: "failed", why: r.status === 404 ? "the Analyst is switched off"
+          setLoad({ qs, s: "failed", why: r.status === 404 ? "VAR is switched off"
             : typeof d?.error === "string" ? d.error.slice(0, 140) : `it answered ${r.status}` });
           return;
         }
@@ -84,19 +85,19 @@ export default function AnalystPanel({ league, eventId, demo, defaultOpen = fals
 
   return (
     <section data-testid="analyst-panel" data-state={load.s === "loading" ? "loading" : p ? "preview" : fallback ? "fallback" : "failed"}
-      aria-label="Trivela Analyst" className="mt-5 rounded-xl border border-line bg-elev2">
+      aria-label="Trivela VAR" className="mt-5 rounded-xl border border-line bg-elev2">
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
         data-testid="analyst-toggle"
         className="group flex w-full items-start gap-3 px-4 py-3 text-left">
         <span aria-hidden className={`mt-0.5 text-ink-faint transition-transform ${open ? "rotate-90" : ""}`}>▸</span>
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent">Trivela analyst</span>
-            <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">ai read · shadow · not advice</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent">Trivela VAR</span>
+            <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">· verified analyst read · shadow · not advice</span>
           </span>
           <span data-testid="analyst-headline" className="mt-1.5 block text-[15px] leading-snug text-ink-hi">
-            {load.s === "loading" && <span className="text-ink-low">The Analyst is reading Trivela&apos;s numbers…</span>}
-            {load.s === "failed" && <span className="text-ink-low">The Analyst could not read this match just now ({load.why}). The model&apos;s numbers above are unaffected.</span>}
+            {load.s === "loading" && <span className="text-ink-low">VAR is checking Trivela&apos;s numbers…</span>}
+            {load.s === "failed" && <span className="text-ink-low">VAR could not read this match just now ({load.why}). The model&apos;s numbers above are unaffected.</span>}
             {fallback && <span className="text-ink-low">The written read is unavailable ({out.fallbackReason ?? "no reply"}). Here are Trivela&apos;s own numbers.</span>}
             {p && <Verified r={p.headline} />}
           </span>
@@ -149,10 +150,10 @@ export default function AnalystPanel({ league, eventId, demo, defaultOpen = fals
             <p className="text-[13px] text-ink-low">Nothing here is a claim about the match. Try again later.</p>
           )}
           <p className="mt-4 flex flex-wrap items-center justify-between gap-2 font-mono text-[9px] uppercase leading-relaxed tracking-[0.12em] text-ink-faint">
-            <span data-testid="analyst-footer">{ANALYST_FOOTER} · ✓ = checked against Trivela&apos;s data{out?.cached ? " · cached" : ""}</span>
+            <span data-testid="analyst-footer">{ANALYST_FOOTER} · ✓ = VAR-checked against Trivela&apos;s data{out?.cached ? " · cached" : ""}</span>
             {askLink && !demo && eventId && (
-              <Link href={`/bet-suggester/analyst?league=${encodeURIComponent(league)}&id=${encodeURIComponent(eventId)}`}
-                className="text-ink-low transition-colors hover:text-accent">ask the analyst about this match →</Link>
+              <Link href={`/bet-suggester/var?league=${encodeURIComponent(league)}&id=${encodeURIComponent(eventId)}`}
+                className="text-ink-low transition-colors hover:text-accent">ask VAR about this match →</Link>
             )}
           </p>
         </div>

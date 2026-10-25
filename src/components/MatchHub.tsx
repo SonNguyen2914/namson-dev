@@ -873,7 +873,7 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                       </>
                     )}
                   </div>
-                  {/* THE TRIVELA ANALYST (2026-10-24): an AI read of this
+                  {/* TRIVELA VAR, formerly the Trivela Analyst (2026-10-24): an AI read of this
                       match, collapsed, under the model's win/draw/loss.
                       The four league planes only, and only while
                       ANALYST_ENABLED is on (the panel reads the switch
