@@ -103,6 +103,10 @@ async function open(page: import("@playwright/test").Page,
   await page.route("**/api/comp/**", (r) => r.fulfill(json({ fixtures: [] })));
   await page.route("**/api/bet-suggester/watched-strip**", (r) =>
     r.fulfill(json(STRIP)));
+  // the top bar's "Analyst" chip reads its switch (a site route, no
+  // backend); answered off, so the bar is the one this spec recorded
+  await page.route("**/api/analyst/status", (r) =>
+    r.fulfill(json({ enabled: false })));
   await page.goto(landing ? "/bet-suggester" : "/bet-suggester/ucl");
   // the board has rendered before anything is asserted about it
   await expect(page.getByTestId("picker-row").first()).toBeVisible();

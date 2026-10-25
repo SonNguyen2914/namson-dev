@@ -30,6 +30,9 @@ const nextConfig: NextConfig = {
   env: {
     TRIVELA_MATCH_HUBS: MATCH_HUBS.join(","),
     TRIVELA_COMP_PAGES: COMP_PAGES.join(","),
+    // the landing page's Analyst line, by the same switch as the Analyst
+    // itself (ANALYST_ENABLED; the routes read it at request time)
+    TRIVELA_ANALYST: process.env.ANALYST_ENABLED === "true" ? "on" : "off",
   },
 
   // /bet-suggester was the league carousel until 2026-08-30; it is the

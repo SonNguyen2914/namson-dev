@@ -73,4 +73,7 @@ export function pageRoutes(): PageRoute[] {
 // 27 -> 49 on 2026-10-13: the 22 cup match hubs (bet-suggester/<cup>/
 // [eventId], Son: "all matches should have a match hub").
 // 49 -> 48 on 2026-10-22: the hunter page removed (backend cleanup C2/C3).
-export const PAGE_COUNT = 48;
+// 48 -> 49 on 2026-10-24: /bet-suggester/analyst, the Trivela Analyst's
+// own page (src/pages/bet-suggester/analyst.tsx; derived above, so the
+// route list needs no hand edit).
+export const PAGE_COUNT = 49;

@@ -300,6 +300,10 @@ async function open(page: import("@playwright/test").Page,
     r.fulfill(json({ fixtures: [] })));
   await page.route("**/api/bet-suggester/watched-strip**", (r) =>
     r.fulfill(json(asV2(STRIP))));
+  // the top bar's "Analyst" chip reads its switch (a site route, no
+  // backend); answered off, so the bar is the one this spec recorded
+  await page.route("**/api/analyst/status", (r) =>
+    r.fulfill(json({ enabled: false })));
   await page.goto("/bet-suggester");
   await expect(page.getByTestId("picker-refusal")).toHaveCount(1);
   return () => stray;

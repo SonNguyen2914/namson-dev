@@ -29,6 +29,8 @@ import { TZ } from "../lib/matchday";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
+import AnalystPanel from "./analyst/AnalystPanel";
+import { isAnalystLeague } from "../lib/analyst/demos";
 import { countdown, pct, signedPct } from "../lib/suggesterApi";
 import { failureOf, NEVER_ANSWERED } from "../lib/httpFailure";
 import { usePoll } from "../lib/usePoll";
@@ -871,6 +873,18 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                       </>
                     )}
                   </div>
+                  {/* THE TRIVELA ANALYST (2026-10-24): an AI read of this
+                      match, collapsed, under the model's win/draw/loss.
+                      The four league planes only, and only while
+                      ANALYST_ENABLED is on (the panel reads the switch
+                      itself and draws nothing when it is off). It loads
+                      after the page and has its own boundary, so it can
+                      neither hold up nor break anything above it. */}
+                  {isAnalystLeague(cfg.boardQuery) && eventId && (
+                    <Guard name="analyst" k={eventId}>
+                      <AnalystPanel league={cfg.boardQuery} eventId={eventId} askLink />
+                    </Guard>
+                  )}
                   <InputQuality run={run} />
                   <p className="mt-4 font-mono text-[9px] uppercase leading-relaxed tracking-[0.12em] text-ink-faint">
                     {cfg.marketFootnote}

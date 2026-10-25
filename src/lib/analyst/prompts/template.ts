@@ -1,0 +1,3 @@
+// Bundled copy of trivela-analyst prompts/3-template.md (ccb8f07). The .md stays
+// in trivela-analyst for class; this string is what Vercel ships.
+export const TEMPLATE = "# Pattern 3: Template (strict JSON output)\n\nReply with ONE JSON object and nothing else, no code fence:\n\n{\n  \"headline\": \"one sentence, at most 20 words, the single most important read\",\n  \"why\": [\"2 to 3 short reasons, each citing at least one {{F#}}\"],\n  \"risks\": [\"1 to 2 things that could make the headline wrong\"],\n  \"market_view\": \"one sentence comparing Trivela's model with the market prices, using placeholders\",\n  \"confidence\": \"low | medium | high\"\n}";
