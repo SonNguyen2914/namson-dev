@@ -586,14 +586,21 @@ export const HUB_MATCH_KEYS = ["bundesliga", "seriea", "ligue1", "eredivisie",
 export const COMP_RESOURCES = ["fixtures", "markets", "ratings", "status",
                                "tournament", "drift"] as const;
 
+/** The saved pre-kickoff rung of one match (VAR v2). */
+export const SAVED_RUNG = /^match\/\d{1,12}\/saved-rung$/;
+
 /** Per prefix, the id-bearing routes the allowlist cannot spell out.
  *  Kept beside the list rather than typed into eight handlers, so a
  *  prefix that gains an id route gains it in one place. */
 export const LEAGUE_PROXY_ID_ROUTES: Record<string, readonly RegExp[]> = {
-  mls: [/^match\/\d{1,12}$/],
-  ligamx: [/^match\/\d{1,12}$/],
-  epl: [/^match\/\d{1,12}$/],
-  laliga: [/^match\/\d{1,12}$/],
+  // `match/{id}/saved-rung` (2026-10-25, backend C8): the archive's
+  // frozen pre-kickoff read of one match, which Trivela VAR reads after
+  // kickoff. Public, read-only, no outcome field; served for these four
+  // leagues only.
+  mls: [/^match\/\d{1,12}$/, SAVED_RUNG],
+  ligamx: [/^match\/\d{1,12}$/, SAVED_RUNG],
+  epl: [/^match\/\d{1,12}$/, SAVED_RUNG],
+  laliga: [/^match\/\d{1,12}$/, SAVED_RUNG],
   friendlies: [/^fixtures\/\d{1,12}$/],
   xg: [],
   picker: [],

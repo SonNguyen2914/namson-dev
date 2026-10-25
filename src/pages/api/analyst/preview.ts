@@ -8,8 +8,10 @@
 // sheet, and the panel draws Trivela's raw numbers from it.
 //
 // 404 unless ANALYST_ENABLED=true (the kill switch). A site route, not a
-// backend proxy: the one backend read is the match route the match page
-// already loads, made server-side in lib/analyst/analyst.ts.
+// backend proxy: the backend reads are the match route the match page
+// already loads and, after kickoff or when that read is gone, the saved
+// pre-kickoff rung (VAR v2), both made server-side in
+// lib/analyst/analyst.ts through the league proxy's allowlist.
 import type { NextApiRequest, NextApiResponse } from "next";
 import {
   analystEnabled, isLoadError, loadMatch, runPreview, type PreviewOut,

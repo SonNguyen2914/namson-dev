@@ -13,9 +13,17 @@
 //     request time, so the serverless bundle carries them.
 //   - the demo payloads are imported, so they are bundled too.
 //   - the model run id travels with the sheet, for the preview cache key.
+//
+// VAR v2 (2026-10-25): after kickoff, or when the live read is gone, the
+// sheet is built from the backend's SAVED pre-kickoff rung
+// (/api/<league>/match/<id>/saved-rung, forwarded by the same allowlist),
+// labelled "frozen pre-kickoff read (captured HH:MM UTC)"; without one it
+// falls back to the live read, and an LLM failure still falls back to the
+// raw numbers. The verifier is unchanged: it checks against whichever
+// sheet was built.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { buildFactSheet, sheetForPrompt, type FactSheet } from "./factSheet";
+import { buildFactSheet, buildRungSheet, rungUsable, sheetForPrompt, type FactSheet } from "./factSheet";
 import { checkText, type Segment, type Violation } from "./verify";
 import { getClient, PREVIEW_REQUEST, type ChatMessage, type LlmClient } from "./llm";
 import { ASK, FEW_SHOT, PERSONA, TEMPLATE, VERIFICATION_LADDER } from "./prompts";
@@ -34,6 +42,7 @@ export const analystEnabled = () => process.env.ANALYST_ENABLED === "true";
 
 const BACKEND = process.env.SUGGESTER_BACKEND_URL || "http://localhost:8000";
 const MATCH_TIMEOUT_MS = 45_000;
+const RUNG_TIMEOUT_MS = 10_000;
 
 export function systemPrompt(kind: "preview" | "ask", sheet: FactSheet): string {
   const parts = [PERSONA, VERIFICATION_LADDER];
@@ -66,6 +75,57 @@ export const isLoadError = (e: unknown): e is LoadError => e instanceof LoadErro
 
 export type Loaded = { sheet: FactSheet; runId: string };
 
+/** A backend read made through the same two walls the league proxy puts
+ *  in front of the backend: the prefix's own allowlist and confinement. */
+async function readBackend(league: string, sub: string, timeoutMs: number):
+    Promise<{ ok: true; body: any } | { ok: false; error: LoadError }> {
+  const path = `/api/${league}/${sub}`;
+  if (!leagueRouteAllowed(league, sub) || confinementBreach(path, `/api/${league}/`)) {
+    return { ok: false, error: new LoadError("bad match id", 400) };
+  }
+  const got = await reach(`${BACKEND}${path}`, { signal: AbortSignal.timeout(timeoutMs) });
+  if (!got.reached) {
+    return { ok: false, error: new LoadError(got.timedOut ? "the backend did not answer in time" : "the backend could not be reached", got.timedOut ? 504 : 502) };
+  }
+  if (!got.res.ok) return { ok: false, error: new LoadError(`the backend answered ${got.res.status}`, 502) };
+  const parsed = await readJson(got.res);
+  if (!parsed.ok) return { ok: false, error: new LoadError(parsed.why, 502) };
+  return { ok: true, body: parsed.body };
+}
+
+/** VAR v2: the saved pre-kickoff rung is read when the live read has
+ *  moved past it (the match has kicked off) or is gone (failed, or no
+ *  priced read left in it). Before kickoff the live read is the fresher
+ *  one and the rung is not asked for. */
+export function wantsSavedRung(live: { ok: boolean; body?: any }): boolean {
+  if (!live.ok) return true;
+  const d = live.body;
+  const state = String(d?.match?.state ?? "").toLowerCase();
+  if (state === "in" || state === "post") return true;
+  const priced = !!(d?.model?.primary ?? d?.model?.latest)?.outcomes
+    || !!d?.traders_model?.available || (d?.book?.markets ?? []).length > 0;
+  return !priced;
+}
+
+/** Which sheet VAR reads, in order: the saved rung (when wanted and it
+ *  holds a number), else the live read, else the live read's own error.
+ *  Pure, so the order is tested without a backend. */
+export function chooseSheet(
+  league: string, eventId: string,
+  live: { ok: true; body: any } | { ok: false; error: LoadError },
+  rung: { ok: true; body: any } | { ok: false; error?: LoadError } | null,
+): Loaded {
+  if (rung?.ok && rungUsable(rung.body)) {
+    const r = rung.body;
+    return {
+      sheet: buildRungSheet(league, eventId, r, live.ok ? live.body : undefined),
+      runId: `saved-${r.rung ?? "rung"}-${r.model?.run_id ?? "no-run"}`,
+    };
+  }
+  if (live.ok) return { sheet: buildFactSheet(league, eventId, live.body), runId: runIdOf(live.body) };
+  throw live.error;
+}
+
 export async function loadMatch(league: string, eventId: string, demo?: string): Promise<Loaded> {
   if (demo) {
     const d = demoPayload(demo);
@@ -74,20 +134,14 @@ export async function loadMatch(league: string, eventId: string, demo?: string):
   }
   if (!isAnalystLeague(league)) throw new LoadError("VAR is not available for this competition", 400);
   if (!/^\d{1,12}$/.test(eventId)) throw new LoadError("bad match id", 400);
-  const sub = `match/${eventId}`;
-  const path = `/api/${league}/${sub}`;
-  // the same two walls the league proxy puts in front of the backend
-  if (!leagueRouteAllowed(league, sub) || confinementBreach(path, `/api/${league}/`)) {
-    throw new LoadError("bad match id", 400);
-  }
-  const got = await reach(`${BACKEND}${path}`, { signal: AbortSignal.timeout(MATCH_TIMEOUT_MS) });
-  if (!got.reached) {
-    throw new LoadError(got.timedOut ? "the backend did not answer in time" : "the backend could not be reached", got.timedOut ? 504 : 502);
-  }
-  if (!got.res.ok) throw new LoadError(`the backend answered ${got.res.status}`, 502);
-  const parsed = await readJson(got.res);
-  if (!parsed.ok) throw new LoadError(parsed.why, 502);
-  return { sheet: buildFactSheet(league, eventId, parsed.body), runId: runIdOf(parsed.body) };
+  const live = await readBackend(league, `match/${eventId}`, MATCH_TIMEOUT_MS);
+  if (!live.ok && live.error.status === 400) throw live.error;
+  // the rung is a small cached archive read; a failure here only means
+  // VAR falls back to the live read
+  const rung = wantsSavedRung(live)
+    ? await readBackend(league, `match/${eventId}/saved-rung`, RUNG_TIMEOUT_MS)
+    : null;
+  return chooseSheet(league, eventId, live, rung);
 }
 
 export async function loadSheet(league: string, eventId: string, demo?: string): Promise<FactSheet> {
