@@ -1,4 +1,4 @@
-// Ported unchanged from trivela-analyst lib/factSheet.ts (ccb8f07).
+// Ported from trivela-analyst lib/factSheet.ts (ccb8f07); buildRungSheet (VAR v2) added 2026-10-25.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Turns one Trivela match payload into a fact sheet: every number the
 // Analyst may say, each with a stable id. The LLM only ever sees this sheet,
@@ -29,6 +29,17 @@ export type FactSheet = {
   facts: Fact[];
   notes: string[]; // non-numeric context: form strings, data-quality flags
   generatedAt: string | null;
+  /** Where the priced numbers came from, when it is not the live match
+   *  read: the archive's frozen pre-kickoff rung (VAR v2). Absent on a
+   *  live or demo sheet. */
+  basis?: SheetBasis;
+};
+
+export type SheetBasis = {
+  kind: "saved_rung";
+  rung: string;            // "t10" | "t60"
+  capturedAt: string;      // ISO, the rung's own clock
+  label: string;           // "frozen pre-kickoff read (captured HH:MM UTC)"
 };
 
 type Json = any; // the Trivela payload is wide and versioned; read it defensively
@@ -138,6 +149,97 @@ export function buildFactSheet(league: string, eventId: string, d: Json): FactSh
   };
 }
 
+// --- VAR v2: the saved pre-kickoff rung ------------------------------------
+// The backend's /api/<league>/match/<id>/saved-rung (var-saved-rung-v1):
+// the archive's frozen t10/t60 board rung, cut to the shadow model 3-way,
+// the trading model 3-way and the Kalshi legs, with the rung's capture
+// time. It holds no outcome field, so a sheet built from it says nothing
+// about how the match went.
+
+/** "HH:MM" of an ISO instant, UTC (the server has no viewer zone). */
+export function hhmmUtc(iso: string): string | null {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return null;
+  return new Date(t).toISOString().slice(11, 16);
+}
+
+export const rungLabel = (capturedAt: string): string =>
+  `frozen pre-kickoff read (captured ${hhmmUtc(capturedAt) ?? "time unknown"} UTC)`;
+
+/** True when a saved-rung answer carries at least one number to read. */
+export function rungUsable(r: Json): boolean {
+  return !!r && r.available === true && typeof r.captured_at === "string"
+    && (!!r.model || !!r.trader_model || !!r.market);
+}
+
+/** A live payload with every PRICED read taken out: what is left (the
+ *  match identity, form and head-to-head) is pre-match context that the
+ *  live read still owns after kickoff. */
+const unpriced = (d: Json): Json => {
+  if (!d || typeof d !== "object") return {};
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { model, traders_model, book, model_refusal, ...rest } = d;
+  return rest;
+};
+
+/** The fact sheet from the saved rung, with the live read's unpriced
+ *  context (names, venue, form, head-to-head) when the live read is still
+ *  there. Every priced fact names the rung and its capture time in its
+ *  source, so a ✓ tooltip says which read the number is. */
+export function buildRungSheet(league: string, eventId: string, r: Json, live?: Json): FactSheet {
+  const base = live ? buildFactSheet(league, eventId, unpriced(live)) : null;
+  const home = base?.match.home && base.match.home !== "Home" ? base.match.home : (r.home ?? "Home");
+  const away = base?.match.away && base.match.away !== "Away" ? base.match.away : (r.away ?? "Away");
+  const label = rungLabel(r.captured_at);
+  const facts: Fact[] = [];
+  const add = (lab: string, value: unknown, kind: Fact["kind"], source: string) => {
+    const v = num(value);
+    if (v === null) return;
+    facts.push({ id: "", label: lab, value: v, kind, source });
+  };
+  const m = r.model;
+  if (m) {
+    const src = `Trivela model ${m.model_version ?? ""} (${m.n_simulations ?? "?"} simulations), ${label}`.replace("  ", " ");
+    add(`${home} win probability`, m.home_win, "prob", src);
+    add("Draw probability", m.draw, "prob", src);
+    add(`${away} win probability`, m.away_win, "prob", src);
+  }
+  const t = r.trader_model;
+  if (t) {
+    const src = `Trivela trading model ${t.name ?? ""}, ${label}`.replace("  ", " ");
+    add(`${home} win probability (trading model)`, t.h, "prob", src);
+    add("Draw probability (trading model)", t.d, "prob", src);
+    add(`${away} win probability (trading model)`, t.a, "prob", src);
+  }
+  const legs = r.market?.legs;
+  if (legs) {
+    const src = `Kalshi order book, ${label}`;
+    const cents = (c: unknown) => { const v = num(c); return v === null ? null : v / 100; };
+    add(`Market price for ${home} (cents, ask)`, cents(legs.h?.ask_c), "price", src);
+    add("Market price for Draw (cents, ask)", cents(legs.d?.ask_c), "price", src);
+    add(`Market price for ${away} (cents, ask)`, cents(legs.a?.ask_c), "price", src);
+  }
+  const all = [...facts, ...(base?.facts ?? [])].map((f, i) => ({ ...f, id: `F${i + 1}` }));
+  const notes = [
+    `Trivela's numbers here are its ${label}, saved before kickoff; they are not a live read.`,
+    ...(r.model ? [] : [`The model's frozen read is missing (${String(r.model_missing_reason ?? "not saved").slice(0, 60)}).`]),
+    ...(r.market ? [] : [`The market's frozen read is missing (${String(r.market_missing_reason ?? "not saved").slice(0, 60)}).`]),
+    ...(base?.notes ?? []),
+  ];
+  return {
+    league,
+    eventId,
+    match: base ? { ...base.match, home, away } : {
+      home, away, homeAbbrev: "", awayAbbrev: "",
+      kickoff: typeof r.kickoff === "string" ? r.kickoff : "", venue: null, state: "",
+    },
+    facts: all,
+    notes,
+    generatedAt: r.captured_at,
+    basis: { kind: "saved_rung", rung: String(r.rung ?? ""), capturedAt: r.captured_at, label },
+  };
+}
+
 // How a fact is shown to people (and how {{F#}} placeholders render).
 export function displayValue(f: Fact): string {
   switch (f.kind) {
@@ -157,6 +259,7 @@ export function displayValue(f: Fact): string {
 export function sheetForPrompt(s: FactSheet): string {
   const lines = [
     `MATCH: ${s.match.home} vs ${s.match.away} (${s.league.toUpperCase()}), kickoff ${s.match.kickoff}, ${s.match.venue ?? "venue unknown"}`,
+    ...(s.basis ? [`DATA: Trivela's ${s.basis.label}. Speak of these numbers as the pre-kickoff read, never as live.`] : []),
     "FACTS (id | label | value as you must say it | source):",
     ...s.facts.map((f) => `${f.id} | ${f.label} | ${displayValue(f)} | ${f.source}`),
   ];

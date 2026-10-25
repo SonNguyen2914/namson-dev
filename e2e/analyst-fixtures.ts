@@ -6,7 +6,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Page, Route } from "@playwright/test";
-import { buildFactSheet } from "../src/lib/analyst/factSheet";
+import { buildFactSheet, buildRungSheet } from "../src/lib/analyst/factSheet";
 import { runAsk, runPreview, type AskOut, type PreviewOut } from "../src/lib/analyst/analyst";
 import { MockClient, type LlmClient } from "../src/lib/analyst/llm";
 
@@ -34,6 +34,34 @@ export const failedPreviewFor = (slug: string): Promise<PreviewOut> => {
 };
 export const askFor = (slug: string): Promise<AskOut> =>
   runAsk(sheetOf(slug), "How likely is a draw?", new MockClient(["The draw lands in {{F2}} of Trivela's simulations, roughly one game in four. Confidence: medium"]));
+
+/** VAR v2: the backend's saved pre-kickoff rung for the same match, in
+ *  the shape /api/epl/match/<id>/saved-rung serves (var-saved-rung-v1).
+ *  Typed from the backend's own test row (TRIVELA
+ *  tests/test_var_saved_rung.py), numbers chosen to differ from the live
+ *  demo payload so a test can tell which read a fact came from. */
+export const EPL_SAVED_RUNG = {
+  schema: "var-saved-rung-v1", competition: "epl", event_id: EPL_EVENT,
+  available: true, home: "Arsenal", away: "Everton",
+  kickoff: "2026-10-24T14:00:00Z", rungs_held: ["t60", "t10"],
+  rung: "t10", captured_at: "2026-10-24T13:51:00Z",
+  seconds_before_kickoff: 540, kickoff_at_capture: "2026-10-24T14:00:00Z",
+  model: { home_win: 0.538, draw: 0.241, away_win: 0.221, model_version: "epl-dc-v2",
+           run_id: 4242, run_captured_at: "run-clock", n_simulations: 10000, is_t10_lock: true },
+  model_missing_reason: null,
+  trader_model: { h: 0.55, d: 0.25, a: 0.2, name: "unified-nb-v1", status: "tested" },
+  trader_model_missing_reason: null,
+  market: { legs: { h: { ask_c: 66, bid_c: 65 }, d: { ask_c: 24, bid_c: 23 }, a: { ask_c: 13, bid_c: 12 } },
+            devig: { h: 0.6408, d: 0.233, a: 0.1262 }, overround: 1.03, stale: false },
+  market_missing_reason: null,
+  basis: "the archive's frozen pre-kickoff board rung", display_only: true,
+};
+
+/** The live payload after kickoff: the same match, in play. */
+export const EPL_PAYLOAD_IN_PLAY = { ...EPL_PAYLOAD, match: { ...EPL_PAYLOAD.match, state: "in" } };
+
+export const rungPreviewFor = (): Promise<PreviewOut> =>
+  runPreview(buildRungSheet("epl", EPL_EVENT, EPL_SAVED_RUNG, EPL_PAYLOAD_IN_PLAY), new MockClient());
 
 /** The switch, as /api/analyst/status answers it. */
 export const analystOn = (page: Page, on = true) =>

@@ -94,6 +94,11 @@ export default function AnalystPanel({ league, eventId, demo, defaultOpen = fals
           <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent">Trivela VAR</span>
             <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">· verified analyst read · shadow · not advice</span>
+            {/* VAR v2: after kickoff the read is the saved pre-kickoff rung, and says so */}
+            {out?.sheet?.basis && (
+              <span data-testid="analyst-basis" title={`The ${out.sheet.basis.rung} rung Trivela's archive saved before kickoff`}
+                className="font-mono text-[9px] uppercase tracking-[0.14em] text-warn">· {out.sheet.basis.label}</span>
+            )}
           </span>
           <span data-testid="analyst-headline" className="mt-1.5 block text-[15px] leading-snug text-ink-hi">
             {load.s === "loading" && <span className="text-ink-low">VAR is checking Trivela&apos;s numbers…</span>}
