@@ -1,7 +1,7 @@
 // GET /api/analyst/status — whether the Analyst is switched on, for the
 // client. Always 200 and always JSON, so a page that asks never logs a
 // failed request: the match-page panel, the "Analyst" chip on the board
-// and /bet-suggester/analyst read this before anything else and draw
+// and /bet-suggester/var read this before anything else and draw
 // nothing when `enabled` is false. Same shape of switch as the trading
 // console's `enabled` (TRADING_ENABLED), read off one env flag.
 //

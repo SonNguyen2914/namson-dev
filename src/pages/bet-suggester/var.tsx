@@ -1,7 +1,9 @@
-// /bet-suggester/analyst — THE TRIVELA ANALYST'S OWN PAGE (2026-10-24).
+// /bet-suggester/var — TRIVELA VAR'S OWN PAGE (2026-10-24; renamed from
+// the Trivela Analyst and /bet-suggester/analyst on 2026-10-25. The old
+// address is a permanent redirect in next.config.ts, query string kept).
 //
 // The page used in class: a league picker with the three saved demo
-// matches, the Analyst's panel opened, Ask, and the full "How it works"
+// matches, VAR's panel opened, Ask, and the full "How it works"
 // view (the fact sheet, each attempt and the prompt). The same panel sits
 // collapsed under the model's win/draw/loss on the four league match hubs.
 //
@@ -53,7 +55,7 @@ function upcoming(d: any): Fx[] | null {
     .map((x) => ({ id: String(x.id), date: String(x.date ?? ""), home: String(x.home?.name ?? "Home"), away: String(x.away?.name ?? "Away") }));
 }
 
-export default function AnalystPage() {
+export default function VarPage() {
   const router = useRouter();
   const status = useAnalystStatus();
   const [picked, setTab] = useState<Tab | null>(null);
@@ -100,17 +102,23 @@ export default function AnalystPage() {
   return (
     <div className="min-h-screen bg-bs font-sans text-ink-mid">
       <Head>
-        <title>Trivela Analyst · namson.dev</title>
-        <meta name="description" content="An AI soccer analyst that explains Trivela's match predictions in plain English, and checks every number it says against Trivela's data." />
+        <title>Trivela VAR · namson.dev</title>
+        <meta name="description" content="Trivela VAR (Verified Analyst Read): an AI soccer analyst that explains Trivela's match predictions in plain English. Every number goes to VAR: each one is checked against Trivela's data." />
       </Head>
-      <TopBar back={{ href: "/bet-suggester", label: "board" }} title="analyst" />
+      <TopBar back={{ href: "/bet-suggester", label: "board" }} title="var" />
 
       <main className="mx-auto max-w-5xl px-5 pb-24 pt-10">
         <Eyebrow tone="accent">AI · shadow · not advice</Eyebrow>
         <h1 className="mt-3 text-3xl font-semibold uppercase tracking-tight text-ink-hi [font-family:var(--font-archivo)] [font-stretch:80%] sm:text-4xl">
-          Trivela Analyst
+          Trivela VAR
         </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-low">
+        <p data-testid="var-expansion" className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">
+          Verified Analyst Read
+        </p>
+        <p data-testid="var-tagline" className="mt-3 text-base font-medium text-ink-hi">
+          Every number goes to VAR.
+        </p>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-low">
           An AI analyst that explains Trivela&apos;s match predictions in plain
           English, and proves every number it says: each one is checked
           against Trivela&apos;s own data and carries a ✓ with its source.
@@ -120,7 +128,7 @@ export default function AnalystPage() {
 
         {status === "off" && (
           <div data-testid="analyst-off" className="mt-8 rounded-xl border border-dashed border-line px-4 py-4">
-            <p className="text-sm text-ink-mid">The Analyst is switched off right now.</p>
+            <p className="text-sm text-ink-mid">VAR is switched off right now.</p>
             <p className="mt-3">
               <Link href="/bet-suggester" className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">
                 go to the picker board →

@@ -6,7 +6,7 @@ import type { Fact } from "../../lib/analyst/factSheet";
 import { displayValue } from "../../lib/analyst/factSheet";
 
 export const sourceTip = (label: string, source: string, id: string) =>
-  `Verified ✓ ${label} · source: ${source} (${id})`;
+  `VAR-checked: ${label} · ${source} (${id})`;
 
 export function Checked({ text, tip }: { text: string; tip: string }) {
   return (

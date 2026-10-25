@@ -47,13 +47,20 @@ test("the panel renders on an EPL match, collapsed, under the model's 3-way", as
   await expect(body).toContainText(/model vs market/i);
   await expect(panel.getByTestId("analyst-confidence")).toHaveText("medium");
   await expect(panel.getByTestId("analyst-footer")).toContainText("Match prediction and analysis, not betting advice");
+  // Trivela VAR (2026-10-25): the name, its expansion and the labels
+  await expect(panel).toHaveAttribute("aria-label", "Trivela VAR");
+  await expect(panel.getByTestId("analyst-toggle")).toContainText(
+    /Trivela VAR\s*· verified analyst read · shadow · not advice/i);
+  await expect(panel.getByTestId("analyst-footer")).toContainText("✓ = VAR-checked against Trivela's data");
+  const ask = body.getByRole("link", { name: "ask VAR about this match →" });
+  await expect(ask).toHaveAttribute("href", `/bet-suggester/var?league=epl&id=${EPL_EVENT}`);
 });
 
 test("✓ badges carry their source in a tooltip", async ({ page }) => {
   await openEpl(page, await previewFor("arsenal-everton"));
   const first = page.getByTestId("analyst-panel").getByTestId("analyst-fact").first();
   await expect(first).toHaveText("51%✓");
-  await expect(first).toHaveAttribute("title", /^Verified ✓ Arsenal win probability · source: Trivela model .*\(F1\)$/);
+  await expect(first).toHaveAttribute("title", /^VAR-checked: Arsenal win probability · Trivela model .*\(F1\)$/);
 });
 
 test("when the model fails, the panel falls back to Trivela's raw numbers", async ({ page }) => {
@@ -66,7 +73,7 @@ test("when the model fails, the panel falls back to Trivela's raw numbers", asyn
   await panel.getByTestId("analyst-toggle").click();
   const raw = panel.getByTestId("analyst-raw");
   await expect(raw.locator("li")).toHaveCount(8);
-  await expect(raw.getByTestId("analyst-fact").first()).toHaveAttribute("title", /source: Trivela model/);
+  await expect(raw.getByTestId("analyst-fact").first()).toHaveAttribute("title", /^VAR-checked: .* · Trivela model/);
   await expect(raw).toContainText("Arsenal win probability");
 });
 
@@ -79,7 +86,7 @@ test("a preview that never answers does not hold the page up", async ({ page }) 
   await page.goto(`/bet-suggester/epl/${EPL_EVENT}`);
   await expect(page.locator("#markets")).toContainText(/model outcome probabilities/i);
   await expect(page.getByTestId("analyst-panel")).toHaveAttribute("data-state", "loading");
-  await expect(page.getByTestId("analyst-headline")).toContainText("reading Trivela");
+  await expect(page.getByTestId("analyst-headline")).toContainText("VAR is checking Trivela");
 });
 
 test("the panel is hidden on a cup match", async ({ page }) => {

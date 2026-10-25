@@ -1,7 +1,7 @@
 // The three saved demo matches (pre-match facts only), as the client lists
 // them. The payloads themselves are public/analyst-demo/<slug>.json and are
 // read only on the server (analyst.ts); this file carries no numbers, so
-// the /bet-suggester/analyst page does not ship 75 KB of JSON to draw a
+// the /bet-suggester/var page does not ship 75 KB of JSON to draw a
 // picker. e2e/analyst-verify.spec.ts checks it against the payloads.
 
 export const ANALYST_LEAGUES = ["epl", "laliga", "mls", "ligamx"] as const;

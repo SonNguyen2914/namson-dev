@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { analystOn, askFor, hermetic, json, previewFor } from "./analyst-fixtures";
 
-// /bet-suggester/analyst: the league picker, the three saved demo matches,
+// /bet-suggester/var (Trivela VAR): the league picker, the three saved demo matches,
 // the panel, Ask and "How it works". Hermetic: previews and answers are the
 // Analyst pipeline's own output with the mock model; the live fixture
 // lists are refused by name (the demo matches never need them).
@@ -24,7 +24,7 @@ async function open(page: Page, ask?: (body: Record<string, unknown>) => { statu
       return r.fulfill(json(a.body, a.status));
     });
   }
-  await page.goto("/bet-suggester/analyst");
+  await page.goto("/bet-suggester/var");
   return asked;
 }
 
@@ -36,6 +36,14 @@ test("picker, demo match, panel and Ask", async ({ page }) => {
   await expect(page.getByTestId("analyst-match")).toHaveText("Arsenal vs Everton");
   await expect(page.getByTestId("analyst-panel")).toHaveAttribute("data-state", "preview");
   await expect(page.getByTestId("analyst-body")).toBeVisible();
+  // the name (Trivela VAR, 2026-10-25): title, heading, expansion, tagline
+  await expect(page).toHaveTitle("Trivela VAR · namson.dev");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Trivela VAR");
+  await expect(page.getByTestId("var-expansion")).toHaveText("Verified Analyst Read");
+  await expect(page.getByTestId("var-tagline")).toHaveText("Every number goes to VAR.");
+  const askBox = page.getByTestId("ask-analyst");
+  await expect(askBox).toContainText("Ask VAR");
+  await expect(askBox.getByLabel("Your question about this match")).toHaveAttribute("placeholder", "Ask VAR about this match…");
   // the picker: four leagues and the demo set
   for (const t of ["Demo", "Premier League", "La Liga", "MLS", "Liga MX"]) {
     await expect(page.getByRole("group", { name: "League" }).getByRole("button", { name: t })).toBeVisible();
@@ -49,7 +57,7 @@ test("picker, demo match, panel and Ask", async ({ page }) => {
   await page.getByLabel("Your question about this match").fill("How likely is a draw?");
   await page.getByRole("button", { name: "Ask", exact: true }).click();
   await expect(page.getByTestId("ask-answer")).toContainText("roughly one game in four");
-  await expect(page.getByTestId("ask-answer").getByTestId("analyst-fact")).toHaveAttribute("title", /Draw probability · source: Trivela model/);
+  await expect(page.getByTestId("ask-answer").getByTestId("analyst-fact")).toHaveAttribute("title", /^VAR-checked: Draw probability · Trivela model/);
   expect(sent).toMatchObject({ demo: "rayo-elche", question: "How likely is a draw?" });
   // a league with no reachable schedule says so, and the demos still work
   await page.getByRole("group", { name: "League" }).getByRole("button", { name: "MLS" }).click();
@@ -57,10 +65,10 @@ test("picker, demo match, panel and Ask", async ({ page }) => {
 });
 
 test("at the cap, Ask shows the friendly message from the 429", async ({ page }) => {
-  await open(page, () => ({ status: 429, body: { error: "You've asked the Analyst a lot this hour. Try again in a little while." } }));
+  await open(page, () => ({ status: 429, body: { error: "You've asked VAR a lot this hour. Try again in a little while." } }));
   await expect(page.getByTestId("analyst-panel")).toHaveAttribute("data-state", "preview");
   await page.getByRole("button", { name: "How likely is a draw?" }).click();
-  await expect(page.getByTestId("ask-cap")).toHaveText("You've asked the Analyst a lot this hour. Try again in a little while.");
+  await expect(page.getByTestId("ask-cap")).toHaveText("You've asked VAR a lot this hour. Try again in a little while.");
   await expect(page.getByTestId("ask-answer")).toHaveCount(0);
 });
 
@@ -81,8 +89,17 @@ test("switched off, the page says so and reads nothing else", async ({ page }) =
   await hermetic(page);
   await analystOn(page, false);
   await page.route("**/api/analyst/preview**", (r) => { asked.push(r.request().url()); return r.fulfill(json({})); });
-  await page.goto("/bet-suggester/analyst");
+  await page.goto("/bet-suggester/var");
   await expect(page.getByTestId("analyst-off")).toContainText("switched off");
   await expect(page.getByTestId("analyst-panel")).toHaveCount(0);
   expect(asked).toEqual([]);
+});
+
+test("the board's top bar links to VAR while it is switched on", async ({ page }) => {
+  await hermetic(page);
+  await analystOn(page);
+  await page.goto("/bet-suggester");
+  const chip = page.getByRole("link", { name: "VAR", exact: true });
+  await expect(chip).toHaveAttribute("href", "/bet-suggester/var");
+  await expect(page.getByRole("link", { name: "Analyst", exact: true })).toHaveCount(0);
 });

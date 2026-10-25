@@ -108,7 +108,7 @@ export default function Home() {
 
   const analystLine = ANALYST_ON ? (
     <span className={s.heroAside}>
-      <Link href="/bet-suggester/analyst" data-testid="landing-analyst">Now with an AI analyst →</Link>
+      <Link href="/bet-suggester/var" data-testid="landing-analyst">Now with Trivela VAR →</Link>
     </span>
   ) : null;
 

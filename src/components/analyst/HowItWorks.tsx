@@ -1,5 +1,5 @@
 // HOW THE ANALYST WORKS — the prompt-engineering view, on
-// /bet-suggester/analyst only: the five steps, the fact sheet the model was
+// /bet-suggester/var only: the five steps, the fact sheet the model was
 // given (Source A), each attempt it made and what the verifier said about
 // it, and the system prompt exactly as it was sent.
 import type { PreviewOut } from "../../lib/analyst/analyst";
@@ -21,7 +21,7 @@ export default function HowItWorks({ preview }: { preview: PreviewOut | null }) 
     <details data-testid="how-it-works" className="mt-5 rounded-xl border border-line bg-elev2">
       <summary className="cursor-pointer px-4 py-3 text-[15px] font-medium text-ink-hi transition-colors hover:text-accent">
         <span className="mr-3 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-low">prompt engineering</span>
-        How the Analyst works
+        How VAR works
       </summary>
       <div className="border-t border-line px-4 pb-4 pt-3">
         <ol className="grid gap-2 sm:grid-cols-5">

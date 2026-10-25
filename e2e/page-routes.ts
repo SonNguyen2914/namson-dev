@@ -76,4 +76,7 @@ export function pageRoutes(): PageRoute[] {
 // 48 -> 49 on 2026-10-24: /bet-suggester/analyst, the Trivela Analyst's
 // own page (src/pages/bet-suggester/analyst.tsx; derived above, so the
 // route list needs no hand edit).
+// 49 -> 49 on 2026-10-25: renamed to Trivela VAR — analyst.tsx became
+// src/pages/bet-suggester/var.tsx. /bet-suggester/analyst is now a
+// next.config.ts redirect, not a page, so the count does not move.
 export const PAGE_COUNT = 49;

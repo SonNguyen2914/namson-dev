@@ -32,25 +32,25 @@ export default function AskAnalyst({ league, eventId, demo }: {
       });
       const d = await r.json().catch(() => null);
       if (r.status === 429) {
-        setNote({ text: typeof d?.error === "string" ? d.error : "The Analyst has answered a lot this hour. Try again later.", cap: true });
+        setNote({ text: typeof d?.error === "string" ? d.error : "VAR has answered a lot this hour. Try again later.", cap: true });
       } else if (!r.ok || !d) {
-        setNote({ text: typeof d?.error === "string" ? d.error.slice(0, 160) : "The Analyst could not answer just now.", cap: false });
+        setNote({ text: typeof d?.error === "string" ? d.error.slice(0, 160) : "VAR could not answer just now.", cap: false });
       } else {
         setAnswer({ q: text, out: d as AskOut }); setQ("");
       }
     } catch {
-      setNote({ text: "The Analyst could not be reached just now.", cap: false });
+      setNote({ text: "VAR could not be reached just now.", cap: false });
     } finally {
       setAsking(false);
     }
   }
 
   return (
-    <section data-testid="ask-analyst" aria-label="Ask the Analyst" className="mt-5 rounded-xl border border-line bg-elev2 p-4">
-      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent">Ask the analyst</p>
+    <section data-testid="ask-analyst" aria-label="Ask VAR" className="mt-5 rounded-xl border border-line bg-elev2 p-4">
+      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent">Ask VAR</p>
       <form className="mt-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); ask(q); }}>
         <input value={q} onChange={(e) => setQ(e.target.value)} maxLength={300}
-          aria-label="Your question about this match" placeholder="Ask about this match…"
+          aria-label="Your question about this match" placeholder="Ask VAR about this match…"
           className="min-w-0 flex-1 rounded-lg border border-line bg-bs px-3 py-2 text-[14px] text-ink-hi placeholder:text-ink-faint focus:border-accent/50 focus:outline-none" />
         <button type="submit" disabled={asking || !q.trim()}
           className="shrink-0 rounded-md border border-accent/50 bg-accent/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-accent transition-colors hover:bg-accent/20 disabled:opacity-50">
