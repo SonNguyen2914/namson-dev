@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { pollReads, usePoll } from "../lib/usePoll";
 import { Eyebrow, Reveal } from "./ui";
+import { BookGrid, unavailableOf, type GameBook, type UnavailableBook } from "./BookCard";
 
 type Side = { name?: string; short?: string; abbrev?: string; logo?: string;
   score?: string; record?: string };
@@ -23,9 +24,6 @@ type StandingEntry = { team: string; abbrev?: string; rank?: number;
   points?: number; goal_diff?: number };
 type TournamentTable = { table: string; tournament: string;
   entries: StandingEntry[] };
-type BookRow = { ticker: string; label?: string; yes_ask?: string;
-  yes_bid?: string; status?: string };
-type GameBook = { event_ticker: string; title?: string; markets: BookRow[] };
 type OddsRow = { espn_event_id: string; run_type?: string; locked?: boolean;
   outcomes?: Record<string, number> };
 type Tournament = { name?: string; label?: string;
@@ -48,6 +46,7 @@ export default function LigamxDashboard() {
   const [week, setWeek] = useState<Load<Fixture[]>>({ s: "loading" });
   const [tables, setTables] = useState<Load<TournamentTable[]>>({ s: "loading" });
   const [books, setBooks] = useState<Load<GameBook[]>>({ s: "loading" });
+  const [unavail, setUnavail] = useState<UnavailableBook[]>([]);
   // THE ODDS MAP IS A READ, NOT A DEFAULT: `{}` reads as "no shadow
   // number for this fixture", which a failed read produced for every
   // fixture at once.
@@ -80,7 +79,7 @@ export default function LigamxDashboard() {
         if (d.tournament) setTournament(d.tournament);
       }).catch(() => alive && setToday({ s: "error" }));
     get("/api/ligamx/markets").then(j)
-      .then((d) => alive && setBooks(settle<GameBook[]>(d?.games ?? [])))
+      .then((d) => { if (!alive) return; setBooks(settle<GameBook[]>(d?.games ?? [])); setUnavail(unavailableOf(d)); })
       .catch(() => alive && setBooks({ s: "error" }));
     get("/api/ligamx/odds").then(j)
       .then((d) => {
@@ -176,12 +175,10 @@ export default function LigamxDashboard() {
             <Empty>loading books…</Empty>
           ) : books.s === "error" ? (
             <Empty>kalshi book feed unavailable — retrying every 60s</Empty>
-          ) : books.d.length === 0 ? (
+          ) : books.d.length === 0 && unavail.length === 0 ? (
             <Empty>no open Liga MX books right now</Empty>
           ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {books.d.map((g) => <BookCard key={g.event_ticker} g={g} />)}
-            </div>
+            <BookGrid games={books.d} unavailable={unavail} />
           )}
         </section>
       </Reveal>
@@ -406,31 +403,6 @@ function FixtureCard({ f, o }: { f: Fixture; o?: OddsRow }) {
       <OddsChip o={o} />
     </Link>
   );
-}
-
-function BookCard({ g }: { g: GameBook }) {
-  return (
-    <div className="rounded-xl border border-line p-3">
-      <p className="mb-2 truncate text-sm text-ink-hi">{g.title}</p>
-      <div className="space-y-1">
-        {g.markets.map((m) => (
-          <div key={m.ticker}
-            className="flex items-center justify-between font-mono text-[11px]">
-            <span className="truncate text-ink-low">{m.label}</span>
-            <span className="tabular-nums">
-              <span className="text-ink-hi">{cents(m.yes_ask)}</span>
-              <span className="text-ink-faint"> / {cents(m.yes_bid)}</span>
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function cents(v?: string) {
-  const n = v ? Math.round(parseFloat(v) * 100) : NaN;
-  return Number.isFinite(n) ? `${n}¢` : "—";
 }
 
 function TournamentStandings({ t }: { t: TournamentTable }) {

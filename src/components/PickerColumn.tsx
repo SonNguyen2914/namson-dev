@@ -909,7 +909,7 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
   /* one sentence for the anchor's hover and the flip chip's, so the
      two can never give different accounts of one counterfactual */
   const altTitle = alt
-    ? `ON THIS SEASON ALONE the ${anchor.k} is ${dec(alt.current)}, not ${dec(alt.blended)} — the board ranks on the blend, and this says what the other cut would have concluded`
+    ? `ON THIS SEASON ALONE the GD/g gap is ${dec(alt.current)}, not ${dec(alt.blended)} — the board ranks on the blend, and this says what the other cut would have concluded`
     : undefined;
   const ranks = rankPair(row, field ?? partial, clubCount);
   /* THE VENUE RULE'S DISAGREEMENT, ON THE BADGE THAT IS ABOUT THE VENUE

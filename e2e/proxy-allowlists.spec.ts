@@ -303,3 +303,17 @@ test("the drift guard is wired, and the record that said it was not is gone",
       expect(rec.closes_when.length, name).toBeGreaterThan(30);
     }
   });
+
+test("the comp proxy forwards {key}/drift with its event query (C26, backend #282) — and still only GETs a slug key",
+  async ({ request }) => {
+    // Withheld until 2026-10-25; the withheld record said the day a drift
+    // reader was wanted, it is deleted and the route joins COMP_RESOURCES.
+    expect(COMP_RESOURCES).toContain("drift");
+    expect(leagueRouteAllowed("comp", "unl/drift")).toBe(true);
+    expect(leagueRouteAllowed("comp", "leagues-cup/drift")).toBe(true);
+    // a digit-bearing or nested key is still refused before the backend
+    expect(leagueRouteAllowed("comp", "u1/drift")).toBe(false);
+    expect(leagueRouteAllowed("comp", "unl/drift/x")).toBe(false);
+    // the query string travels verbatim to the backend socket
+    await expectForwarded(request, "comp", "unl/drift?event=KXUNLGAME-26OCT10ESPFRA&hours=48");
+  });

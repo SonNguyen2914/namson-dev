@@ -21,6 +21,7 @@ import { Eyebrow, Reveal } from "../../../components/ui";
 import MarketVsRead, { type MarketVsReadData }
   from "../../../components/MarketVsRead";
 import { unitFeeDollars } from "../../../lib/fee";
+import { FLAG_TAG, ThinTag, thinTitle } from "../../../components/BookCard";
 
 type Side = { name?: string; crest?: string | null };
 type Calibrated = {
@@ -64,10 +65,15 @@ type SideRating = {
 type BookRow = {
   ticker?: string; label?: string; status?: string;
   yes_ask?: string | null; yes_bid?: string | null;
+  spread?: number | null;
 };
 type Books = {
   status?: string; means?: string; event_ticker?: string;
-  book?: { event_ticker?: string; title?: string; markets?: BookRow[] };
+  book?: {
+    event_ticker?: string; title?: string; markets?: BookRow[];
+    // backend #277 (A7): the book is too thin to read as a probability
+    ask_sum?: number | null; thin_book?: boolean; thin_reasons?: string[];
+  };
   freshness?: { state?: string; age_seconds?: number | null };
 };
 type Detail = {
@@ -134,6 +140,12 @@ function MarketVsStrength({ books, strength }: {
 }) {
   const rows = books?.book?.markets || [];
   const e = strength?.expected_points_share;
+  // backend #277: a thin book's asks are still drawn as the exchange's own
+  // cents, but never converted into an implied probability
+  const thin = books?.book?.thin_book === true;
+  // `unavailable` is the backend's word for a book it could not read —
+  // named here as such, never folded into "no book exists"
+  const unavailable = books?.status === "unavailable";
   return (
     <section className="mt-10">
       <Eyebrow tone="accent">market · kalshi</Eyebrow>
@@ -142,7 +154,15 @@ function MarketVsStrength({ books, strength }: {
       </h2>
 
       {(!rows.length) && (
-        <p className="mt-4 rounded-xl border border-line bg-elev px-4 py-4 font-mono text-[11px] uppercase leading-relaxed tracking-wide text-ink-faint">
+        <p data-testid="friendly-book-empty" data-status={books?.status}
+          className="mt-4 rounded-xl border border-line bg-elev px-4 py-4 font-mono text-[11px] uppercase leading-relaxed tracking-wide text-ink-faint">
+          {unavailable && (
+            <span data-testid="friendly-book-unavailable"
+              title="The exchange's markets for this fixture could not be read; asked again on the next poll. This is not “no book exists”."
+              className={`${FLAG_TAG} mr-2 align-[1px]`}>
+              unavailable
+            </span>
+          )}
           {books?.means
             || (books?.status === "no_event_bridged"
               ? "no tradeable kalshi event bridges to this fixture"
@@ -152,6 +172,12 @@ function MarketVsStrength({ books, strength }: {
 
       {!!rows.length && (
         <div className="mt-4 overflow-x-auto">
+          {thin && (
+            <p data-testid="friendly-book-thin" className="mb-2 flex items-center gap-2 font-mono text-[10px] leading-relaxed text-ink-low">
+              <ThinTag reasons={books?.book?.thin_reasons} askSum={books?.book?.ask_sum} />
+              <span>too thin to read as a probability — the cents are the exchange&apos;s own; implied % is withheld</span>
+            </p>
+          )}
           <table className="w-full min-w-[30rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-line font-mono text-[10px] uppercase tracking-wide text-ink-faint">
@@ -165,6 +191,7 @@ function MarketVsStrength({ books, strength }: {
             <tbody>
               {rows.map((m, i) => {
                 const p = impliedFromAsk(m.yes_ask);
+                const shown = thin ? null : p;
                 return (
                   <tr key={m.ticker ?? i} className="border-b border-line/60">
                     <td className="py-2 text-ink-mid">
@@ -176,8 +203,10 @@ function MarketVsStrength({ books, strength }: {
                     <td className="py-2 text-right font-mono text-ink-low">
                       {cents(m.yes_bid)}
                     </td>
-                    <td className="py-2 text-right font-mono text-ink-mid">
-                      {p === null ? "—" : `${(p * 100).toFixed(1)}%`}
+                    <td className="py-2 text-right font-mono text-ink-mid"
+                      data-testid="friendly-implied"
+                      title={thin ? thinTitle(books?.book?.thin_reasons, books?.book?.ask_sum) : undefined}>
+                      {shown === null ? "—" : `${(shown * 100).toFixed(1)}%`}
                     </td>
                     <td className="py-2 text-right font-mono text-ink-faint">
                       {p === null ? "—"
