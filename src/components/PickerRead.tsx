@@ -354,6 +354,26 @@ function plateClass(read: ReadLike): string {
  *  — and once inside each piece through `data-w` + `::after`, which never
  *  enters textContent and so can never be matched a second time. The
  *  geometry lives in globals.css under THE SHAPE CHIP. */
+/** WHAT THE CHIP IS, ON ITS HOVER (D31, Son 2026-10-25: "add the
+ *  display-only shape label"). The shape is an annotation read off the
+ *  three tier gaps (backend src/picker/stages.py shape()), and nothing acts
+ *  on it: no model, no trader gate, no figure on the card. Whether the
+ *  trader should ever use it waits on the tier-shape study (Nov 8), so the
+ *  hover says it is display-only rather than leaving a coloured verdict to
+ *  read as a signal. */
+export const SHAPE_DISPLAY_ONLY = "Display only: the shape annotates the three "
+  + "tier gaps (CLEAN = the favourite is the better tier overall, in attack "
+  + "and in defence; HOLLOW = neither attack nor defence backs it; SPLIT = "
+  + "anything between). It changes no number on this card, and neither the "
+  + "model nor the trader acts on it. It is not a tested edge.";
+
+export function shapeTitle(read: ReadLike): string {
+  // the card's own sentence needs every axis's tier pair; a read missing
+  // one (an axis nobody measured) gets the legend alone, never a crash
+  const whole = (["ovr", "atk", "def"] as const).every((k) => Array.isArray(read.tiers?.[k]));
+  return whole ? `${shapeRead(read)} ${SHAPE_DISPLAY_ONLY}` : SHAPE_DISPLAY_ONLY;
+}
+
 export function ShapeChip({ read }: { read: ReadLike }) {
   /* ONE CHIP FOR EVERY CARD (operator, 2026-09-25: "I told you to copy
      everything and some of them are still behind like the
@@ -371,7 +391,8 @@ export function ShapeChip({ read }: { read: ReadLike }) {
 
   if (!cut) {
     return (
-      <span data-testid="shape-chip" data-cut="none"
+      <span data-testid="shape-chip" data-cut="none" data-display-only="1"
+        title={shapeTitle(read)}
         className={`sc sc-intact ${plate} ${ink} font-mono text-[10px] uppercase tracking-[0.16em]`}>
         <span className="sc-w">{shape}</span>
       </span>
@@ -382,7 +403,8 @@ export function ShapeChip({ read }: { read: ReadLike }) {
     <i key={k} className={`sc-half sc-${k}`} data-w={shape} aria-hidden />
   );
   return (
-    <span data-testid="shape-chip" data-cut={cut.axis}
+    <span data-testid="shape-chip" data-cut={cut.axis} data-display-only="1"
+      title={shapeTitle(read)}
       data-cut-tone={cut.level ? "level" : "behind"}
       className={`sc sc-cut sc-${cut.axis} ${cut.level ? "sc-level" : ""} ${plate} text-ink-hi font-mono text-[10px] uppercase tracking-[0.16em]`}>
       {piece("a")}{piece("b")}
