@@ -5,7 +5,7 @@
 // eligible), why markets were refused, unmapped or unpriced, the journal's
 // retention, every block's own clock, and the versions. Human description
 // first; the raw code is always beside it.
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { GROUP_LABEL, codeWords, reasonGroup, reasonTag } from "../../lib/consoleModel";
 import { type Candidates, isObj, num, str } from "../../lib/tradingConsole";
 import { items as line, plain, warn } from "./summaries";
@@ -341,6 +341,71 @@ function FeedGaps({ d }: { d: Obj }) {
   );
 }
 
+// ------------------------------------------------------------ VAR health
+
+type VarRead = { s: "loading" } | { s: "failed"; why: string } | { s: "ok"; d: Obj };
+
+/** TRIVELA VAR'S HEALTH (C7, 2026-10-25), off the site's own
+ *  /api/analyst/status — a site route, no backend and no token. Read once
+ *  when this view opens, never polled. Budget, cache and errors are the
+ *  answering serverless instance's own in-memory counters, so a cold start
+ *  reads as zero; the Anthropic Console spend limit is the hard backstop. */
+export function VarHealth() {
+  const [r, setR] = useState<VarRead>({ s: "loading" });
+  useEffect(() => {
+    let live = true;
+    fetch("/api/analyst/status", { cache: "no-store" })
+      .then(async (res) => {
+        const d = res.ok ? await res.json().catch(() => null) : null;
+        if (!live) return;
+        setR(obj(d) ? { s: "ok", d: d as Obj } : { s: "failed", why: res.ok ? "not JSON" : `HTTP ${res.status}` });
+      })
+      .catch((e) => { if (live) setR({ s: "failed", why: String(e?.message ?? e) }); });
+    return () => { live = false; };
+  }, []);
+  const d = r.s === "ok" ? r.d : null;
+  const on = d?.enabled === true;
+  const budget = obj(d?.budget), cache = obj(d?.cache), errors = obj(d?.errors);
+  const last = obj(errors?.last);
+  const calls = num(budget?.calls), cap = num(budget?.cap);
+  const hits = num(cache?.hits), misses = num(cache?.misses);
+  const asked = (hits ?? 0) + (misses ?? 0);
+  const errN = num(errors?.total);
+  const spent = calls !== null && cap !== null && cap > 0 && calls >= cap;
+  return (
+    <Panel testid="ops-var" title="VAR health" cid="var-health"
+      summary={r.s === "loading" ? [plain("reading")] : r.s === "failed" ? [warn("status read failed")]
+        : !on ? [plain("switched off")]
+        : line(plain(`budget ${count(calls)} / ${count(cap)}`), plain(`cache ${count(hits)} hit · ${count(misses)} miss`),
+          spent ? warn("budget used up") : null, (errN ?? 0) > 0 ? warn(`${count(errN)} errors today`, "var errors") : plain("no errors"))}
+      meta={on && str(budget?.day) ? `${str(budget?.day)} (UTC) · this instance` : undefined}
+      info="Trivela VAR's own counters, from /api/analyst/status: LLM calls against the daily cap, the 6 h preview cache, and failed reads. In memory on the answering instance, so a cold start reads zero.">
+      {r.s === "loading" ? <InfoNote>reading /api/analyst/status…</InfoNote>
+        : r.s === "failed" ? <InfoNote testid="var-health-failed" tone="warn">◆ status read failed: {r.why}</InfoNote>
+        : !on ? <InfoNote testid="var-health-off">VAR is switched off (ANALYST_ENABLED is not &quot;true&quot;), so there is nothing to count.</InfoNote>
+        : (
+          <>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
+              <Metric size="md" testid="var-budget" label="budget used" tone={spent ? "text-warn" : "text-ink-hi"}
+                value={`${count(calls)} / ${count(cap)}`} sub="LLM calls today against LLM_DAILY_CALLS" />
+              <Metric size="md" testid="var-cache-hits" label="cache hits" value={count(hits)}
+                sub={`previews served from the cache${asked ? ` · ${Math.round(((hits ?? 0) / asked) * 100)}% of ${asked.toLocaleString("en-US")} reads` : ""}`} />
+              <Metric size="md" testid="var-cache-misses" label="cache misses" value={count(misses)}
+                sub={`previews that needed an LLM read · ${count(cache?.size)} cached now`} />
+              <Metric size="md" testid="var-errors" label="errors today" tone={(errN ?? 0) > 0 ? "text-warn" : "text-ink-hi"}
+                value={count(errN)} sub={`load ${count(errors?.load)} · preview ${count(errors?.preview)} · ask ${count(errors?.ask)}`} />
+            </div>
+            {last && (
+              <p data-testid="var-last-error" className="mt-2 text-[12px] text-ink-low">
+                last error <Tech>{text(last.kind)}</Tech> {when(last.at, true)}: {text(last.why)}
+              </p>
+            )}
+          </>
+        )}
+    </Panel>
+  );
+}
+
 export function SystemView({ d, now, candidates, go }: {
   d: Obj; now: number; candidates: Candidates | null; go: (v: string, p?: Record<string, string>) => void;
 }) {
@@ -353,6 +418,7 @@ export function SystemView({ d, now, candidates, go }: {
       <div className="col-span-12 xl:col-span-5"><Clocks d={d} now={now} candidates={candidates} /></div>
       <div className="col-span-12 xl:col-span-6"><FeedGaps d={d} /></div>
       <div className="col-span-12 xl:col-span-6"><Retention d={d} /></div>
+      <div className="col-span-12"><VarHealth /></div>
       <div className="col-span-12">
         <Panel title="Versions" summary={[plain(`status ${text(d.version)}`), plain(`strategy ${text(d.strategy)}`), plain(`env ${text(d.env)}`)]}>
           <p className="font-mono text-[11px] leading-relaxed text-ink-low">

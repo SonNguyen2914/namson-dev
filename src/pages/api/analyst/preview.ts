@@ -16,6 +16,7 @@ import {
 } from "../../../lib/analyst/analyst";
 import { cacheGet, cacheKey, cacheSet } from "../../../lib/analyst/cache";
 import { takeDailyCall } from "../../../lib/analyst/limits";
+import { noteError } from "../../../lib/analyst/health";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
@@ -28,7 +29,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try { loaded = await loadMatch(league, id, demo); }
   catch (e) {
     const status = isLoadError(e) ? e.status : 502;
-    return res.status(status).json({ error: `Could not load this match: ${e instanceof Error ? e.message : String(e)}` });
+    const why = e instanceof Error ? e.message : String(e);
+    // a bad request (400) is the caller's, not VAR's; only a failed read counts
+    if (status >= 500) noteError("load", why);
+    return res.status(status).json({ error: `Could not load this match: ${why}` });
   }
   const { sheet, runId } = loaded;
   const key = cacheKey(demo ? `demo-${sheet.league}` : sheet.league, sheet.eventId, runId);
@@ -39,5 +43,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   const out = await runPreview(sheet);
   if (out.ok) cacheSet(key, out);
+  else noteError("preview", out.fallbackReason ?? "the reply could not be used");
   return res.status(200).json(out);
 }

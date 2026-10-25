@@ -63,6 +63,7 @@ import {
 } from "./PickerRead";
 import { ReviewTail } from "./ReviewCard";
 import { WatchToggle } from "./WatchDeclaration";
+import AskVarChip from "./analyst/AskVarChip";
 import { ModelMarketLines, VerdictBox, mmOf } from "./ModelMarket";
 import { Eyebrow } from "./ui";
 
@@ -1388,8 +1389,13 @@ function RowCard({ row, rank, modeId, clubCount, colSrc, dense = false,
             all: there is no provider, so there is no control. */}
         <WatchToggle eventId={row.event_id}
           label={`${row.favourite} v ${row.opponent}`}
-          beside={<VerdictBox mm={mmOrEmpty(row)} kickedOff={rowHasKickedOff(row)}
-                ended={rowHasEnded(row)} />} />
+          beside={<>
+            <VerdictBox mm={mmOrEmpty(row)} kickedOff={rowHasKickedOff(row)}
+                ended={rowHasEnded(row)} />
+            {/* ASK VAR (C7): the four VAR leagues only, while VAR is on */}
+            <AskVarChip league={row.league} eventId={String(row.event_id)}
+              label={`${row.favourite} v ${row.opponent}`} ended={rowHasEnded(row)} />
+          </>} />
       </div>
     </article>
   );

@@ -12,13 +12,16 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { analystEnabled, LEAGUES } from "../../../lib/analyst/analyst";
 import { budgetUsed } from "../../../lib/analyst/limits";
 import { cacheStats } from "../../../lib/analyst/cache";
+import { errorStats } from "../../../lib/analyst/health";
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "GET") return res.status(405).json({ error: "GET only" });
   if (!analystEnabled()) return res.status(200).json({ enabled: false });
-  // health for the ops view: this instance's budget and cache, nothing else
+  // health for the ops view (/ops/trading → System → VAR health): this
+  // instance's budget, cache and errors, nothing else
   return res.status(200).json({
     enabled: true, leagues: LEAGUES, budget: budgetUsed(), cache: cacheStats(),
+    errors: errorStats(),
   });
 }
