@@ -52,6 +52,12 @@ import { useRise } from "../components/landing/useRise";
 import { useSiteStats } from "../lib/siteStats";
 import { useMediaQuery, useMotionGate, useReducedMotion } from "../lib/useScrollScene";
 
+/** THE ANALYST LINE, by the build's own switch (next.config.ts, from
+ *  ANALYST_ENABLED). Read at build time rather than from
+ *  /api/analyst/status because this page makes exactly one read
+ *  (/api/site/stats) and e2e/picker.spec.ts holds it to that. */
+const ANALYST_ON = process.env.TRIVELA_ANALYST === "on";
+
 /** HOW TO REACH SON. One object, and a value left as "TODO" is simply
  *  not rendered — the row never shows a placeholder, and disappears
  *  entirely when nothing in it is filled. */
@@ -100,6 +106,12 @@ export default function Home() {
     filled(CONTACT.linkedin) && { k: "linkedin", label: "LinkedIn", href: CONTACT.linkedin },
   ].filter(Boolean) as { k: string; label: string; href: string }[];
 
+  const analystLine = ANALYST_ON ? (
+    <span className={s.heroAside}>
+      <Link href="/bet-suggester/analyst" data-testid="landing-analyst">Now with an AI analyst →</Link>
+    </span>
+  ) : null;
+
   return (
     <div className={s.root} data-testid="landing" data-motion={moving ? "on" : "off"}>
       <Head>
@@ -122,9 +134,9 @@ export default function Home() {
 
       <main>
         {moving
-          ? <FieldStage mode="scroll" enabled />
+          ? <FieldStage mode="scroll" enabled heroAside={analystLine} />
           : <>
-              <FieldStage mode="hero" enabled={false} />
+              <FieldStage mode="hero" enabled={false} heroAside={analystLine} />
               <FieldStage mode="match" enabled={false} />
             </>}
 

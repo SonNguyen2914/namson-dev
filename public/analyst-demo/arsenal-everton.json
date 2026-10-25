@@ -1,0 +1,1091 @@
+{
+ "match": {
+  "id": "401878768",
+  "date": "2026-10-24T14:00Z",
+  "state": "pre",
+  "detail": "10/24 - 10:00 AM EDT",
+  "minute": null,
+  "venue": "Emirates Stadium",
+  "home": {
+   "name": "Arsenal",
+   "abbrev": "ARS",
+   "logo": "https://a.espncdn.com/i/teamlogos/soccer/500/359.png",
+   "score": null,
+   "color": "e20520",
+   "alt_color": "003399"
+  },
+  "away": {
+   "name": "Everton",
+   "abbrev": "EVE",
+   "logo": "https://a.espncdn.com/i/teamlogos/soccer/500/368.png",
+   "score": null,
+   "color": "0606fa",
+   "alt_color": "ffffff"
+  },
+  "stats": [],
+  "events": [],
+  "scouting": {
+   "last_five": [
+    {
+     "team": "Arsenal",
+     "abbrev": "ARS",
+     "form": "L W W W D",
+     "games": [
+      {
+       "result": "L",
+       "provider_result": "L",
+       "team_score": 0,
+       "opponent_score": 3,
+       "score": "3-0",
+       "at_vs": "@",
+       "opponent": "BHA",
+       "date": "2026-09-19T14:00Z"
+      },
+      {
+       "result": "W",
+       "provider_result": "W",
+       "team_score": 2,
+       "opponent_score": 1,
+       "score": "2-1",
+       "at_vs": "vs",
+       "opponent": "LEE",
+       "date": "2026-10-10T11:30Z"
+      },
+      {
+       "result": "W",
+       "provider_result": "W",
+       "team_score": 3,
+       "opponent_score": 0,
+       "score": "3-0",
+       "at_vs": "vs",
+       "opponent": "LILL",
+       "date": "2026-10-13T19:00Z"
+      },
+      {
+       "result": "W",
+       "provider_result": "W",
+       "team_score": 1,
+       "opponent_score": 0,
+       "score": "1-0",
+       "at_vs": "@",
+       "opponent": "NFO",
+       "date": "2026-10-18T15:30Z"
+      },
+      {
+       "result": "D",
+       "provider_result": "D",
+       "team_score": 2,
+       "opponent_score": 2,
+       "score": "2-2",
+       "at_vs": "@",
+       "opponent": "MUN",
+       "date": "2026-10-21T19:00Z"
+      }
+     ]
+    },
+    {
+     "team": "Everton",
+     "abbrev": "EVE",
+     "form": "D W W D L",
+     "games": [
+      {
+       "result": "D",
+       "provider_result": "D",
+       "team_score": 0,
+       "opponent_score": 0,
+       "score": "0-0",
+       "at_vs": "@",
+       "opponent": "TOT",
+       "date": "2026-09-12T16:30Z"
+      },
+      {
+       "result": "W",
+       "provider_result": "W",
+       "team_score": 1,
+       "opponent_score": 0,
+       "score": "1-0",
+       "at_vs": "vs",
+       "opponent": "WOL",
+       "date": "2026-09-16T18:45Z"
+      },
+      {
+       "result": "W",
+       "provider_result": "W",
+       "team_score": 1,
+       "opponent_score": 0,
+       "score": "1-0",
+       "at_vs": "vs",
+       "opponent": "IPS",
+       "date": "2026-09-19T14:00Z"
+      },
+      {
+       "result": "D",
+       "provider_result": "D",
+       "team_score": 2,
+       "opponent_score": 2,
+       "score": "2-2",
+       "at_vs": "@",
+       "opponent": "HUL",
+       "date": "2026-10-11T13:00Z"
+      },
+      {
+       "result": "L",
+       "provider_result": "L",
+       "team_score": 0,
+       "opponent_score": 2,
+       "score": "2-0",
+       "at_vs": "vs",
+       "opponent": "CHE",
+       "date": "2026-10-17T11:30Z"
+      }
+     ]
+    }
+   ],
+   "head_to_head": [
+    {
+     "perspective": "ARS",
+     "result": "W",
+     "home_score": "2",
+     "away_score": "0",
+     "at_vs": "vs",
+     "opponent": "EVE",
+     "date": "2026-03-14T17:30:00Z"
+    },
+    {
+     "perspective": "ARS",
+     "result": "W",
+     "home_score": "0",
+     "away_score": "1",
+     "at_vs": "@",
+     "opponent": "EVE",
+     "date": "2025-12-20T20:00:00Z"
+    },
+    {
+     "perspective": "ARS",
+     "result": "D",
+     "home_score": "1",
+     "away_score": "1",
+     "at_vs": "@",
+     "opponent": "EVE",
+     "date": "2025-04-05T11:30:00Z"
+    },
+    {
+     "perspective": "ARS",
+     "result": "D",
+     "home_score": "0",
+     "away_score": "0",
+     "at_vs": "vs",
+     "opponent": "EVE",
+     "date": "2024-12-14T15:00:00Z"
+    },
+    {
+     "perspective": "ARS",
+     "result": "W",
+     "home_score": "2",
+     "away_score": "1",
+     "at_vs": "vs",
+     "opponent": "EVE",
+     "date": "2024-05-19T15:00:00Z"
+    }
+   ]
+  }
+ },
+ "book": {
+  "key": "winner",
+  "label": "Winner \u00b7 3-way",
+  "event_ticker": "KXEPLGAME-26OCT24ARSEVE",
+  "markets": [
+   {
+    "ticker": "KXEPLGAME-26OCT24ARSEVE-TIE",
+    "label": "Tie",
+    "yes_ask": "0.2300",
+    "yes_bid": "0.2200",
+    "spread": 0.01,
+    "status": "active",
+    "model_key": null
+   },
+   {
+    "ticker": "KXEPLGAME-26OCT24ARSEVE-EVE",
+    "label": "Everton",
+    "yes_ask": "0.1200",
+    "yes_bid": "0.1100",
+    "spread": 0.01,
+    "status": "active",
+    "model_key": null
+   },
+   {
+    "ticker": "KXEPLGAME-26OCT24ARSEVE-ARS",
+    "label": "Arsenal",
+    "yes_ask": "0.6700",
+    "yes_bid": "0.6600",
+    "spread": 0.01,
+    "status": "active",
+    "model_key": null
+   }
+  ]
+ },
+ "books": [
+  {
+   "key": "winner",
+   "label": "Winner \u00b7 3-way",
+   "event_ticker": "KXEPLGAME-26OCT24ARSEVE",
+   "markets": [
+    {
+     "ticker": "KXEPLGAME-26OCT24ARSEVE-TIE",
+     "label": "Tie",
+     "yes_ask": "0.2300",
+     "yes_bid": "0.2200",
+     "spread": 0.01,
+     "status": "active",
+     "model_key": null
+    },
+    {
+     "ticker": "KXEPLGAME-26OCT24ARSEVE-EVE",
+     "label": "Everton",
+     "yes_ask": "0.1200",
+     "yes_bid": "0.1100",
+     "spread": 0.01,
+     "status": "active",
+     "model_key": null
+    },
+    {
+     "ticker": "KXEPLGAME-26OCT24ARSEVE-ARS",
+     "label": "Arsenal",
+     "yes_ask": "0.6700",
+     "yes_bid": "0.6600",
+     "spread": 0.01,
+     "status": "active",
+     "model_key": null
+    }
+   ]
+  },
+  {
+   "key": "total",
+   "label": "Total goals",
+   "event_ticker": "KXEPLTOTAL-26OCT24ARSEVE",
+   "markets": [
+    {
+     "ticker": "KXEPLTOTAL-26OCT24ARSEVE-5",
+     "label": "Over 4.5 goals scored",
+     "yes_ask": "0.1400",
+     "yes_bid": "0.1300",
+     "status": "active",
+     "model_key": "over_4_5"
+    },
+    {
+     "ticker": "KXEPLTOTAL-26OCT24ARSEVE-6",
+     "label": "Over 5.5 goals scored",
+     "yes_ask": "0.0600",
+     "yes_bid": "0.0500",
+     "status": "active",
+     "model_key": "over_5_5"
+    },
+    {
+     "ticker": "KXEPLTOTAL-26OCT24ARSEVE-1",
+     "label": "Over 0.5 goals scored",
+     "yes_ask": "0.9400",
+     "yes_bid": "0.9300",
+     "status": "active",
+     "model_key": "over_0_5"
+    },
+    {
+     "ticker": "KXEPLTOTAL-26OCT24ARSEVE-4",
+     "label": "Over 3.5 goals scored",
+     "yes_ask": "0.2900",
+     "yes_bid": "0.2800",
+     "status": "active",
+     "model_key": "over_3_5"
+    },
+    {
+     "ticker": "KXEPLTOTAL-26OCT24ARSEVE-3",
+     "label": "Over 2.5 goals scored",
+     "yes_ask": "0.5100",
+     "yes_bid": "0.5000",
+     "status": "active",
+     "model_key": "over_2_5"
+    },
+    {
+     "ticker": "KXEPLTOTAL-26OCT24ARSEVE-2",
+     "label": "Over 1.5 goals scored",
+     "yes_ask": "0.7500",
+     "yes_bid": "0.7400",
+     "status": "active",
+     "model_key": "over_1_5"
+    }
+   ]
+  },
+  {
+   "key": "btts",
+   "label": "Both teams to score",
+   "event_ticker": "KXEPLBTTS-26OCT24ARSEVE",
+   "markets": [
+    {
+     "ticker": "KXEPLBTTS-26OCT24ARSEVE-BTTS",
+     "label": "Both Teams To Score",
+     "yes_ask": "0.4700",
+     "yes_bid": "0.4600",
+     "status": "active",
+     "model_key": "btts"
+    }
+   ]
+  },
+  {
+   "key": "spread",
+   "label": "Spread",
+   "event_ticker": "KXEPLSPREAD-26OCT24ARSEVE",
+   "markets": [
+    {
+     "ticker": "KXEPLSPREAD-26OCT24ARSEVE-ARS2",
+     "label": "Arsenal wins by more than 1.5 goals",
+     "yes_ask": "0.4000",
+     "yes_bid": "0.3900",
+     "status": "active",
+     "model_key": "home_margin_2"
+    },
+    {
+     "ticker": "KXEPLSPREAD-26OCT24ARSEVE-EVE3",
+     "label": "Everton wins by more than 2.5 goals",
+     "yes_ask": "0.0200",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "away_margin_3"
+    },
+    {
+     "ticker": "KXEPLSPREAD-26OCT24ARSEVE-ARS3",
+     "label": "Arsenal wins by more than 2.5 goals",
+     "yes_ask": "0.2000",
+     "yes_bid": "0.1900",
+     "status": "active",
+     "model_key": "home_margin_3"
+    },
+    {
+     "ticker": "KXEPLSPREAD-26OCT24ARSEVE-EVE2",
+     "label": "Everton wins by more than 1.5 goals",
+     "yes_ask": "0.0300",
+     "yes_bid": "0.0200",
+     "status": "active",
+     "model_key": "away_margin_2"
+    }
+   ]
+  },
+  {
+   "key": "team_total",
+   "label": "Team totals",
+   "event_ticker": "KXEPLTEAMTOTAL-26OCT24ARSEVE",
+   "markets": [
+    {
+     "ticker": "KXEPLTEAMTOTAL-26OCT24ARSEVE-ARS3",
+     "label": "Arsenal over 2.5 goals",
+     "yes_ask": "0.3100",
+     "yes_bid": "0.3000",
+     "status": "active",
+     "model_key": "home_team_over_2_5"
+    },
+    {
+     "ticker": "KXEPLTEAMTOTAL-26OCT24ARSEVE-EVE3",
+     "label": "Everton over 2.5 goals",
+     "yes_ask": "0.0500",
+     "yes_bid": "0.0300",
+     "status": "active",
+     "model_key": "away_team_over_2_5"
+    },
+    {
+     "ticker": "KXEPLTEAMTOTAL-26OCT24ARSEVE-ARS1",
+     "label": "Arsenal over 0.5 goals",
+     "yes_ask": "0.8800",
+     "yes_bid": "0.8600",
+     "status": "active",
+     "model_key": "home_team_over_0_5"
+    },
+    {
+     "ticker": "KXEPLTEAMTOTAL-26OCT24ARSEVE-EVE1",
+     "label": "Everton over 0.5 goals",
+     "yes_ask": "0.5200",
+     "yes_bid": "0.5100",
+     "status": "active",
+     "model_key": "away_team_over_0_5"
+    },
+    {
+     "ticker": "KXEPLTEAMTOTAL-26OCT24ARSEVE-EVE2",
+     "label": "Everton over 1.5 goals",
+     "yes_ask": "0.1800",
+     "yes_bid": "0.1600",
+     "status": "active",
+     "model_key": "away_team_over_1_5"
+    },
+    {
+     "ticker": "KXEPLTEAMTOTAL-26OCT24ARSEVE-ARS2",
+     "label": "Arsenal over 1.5 goals",
+     "yes_ask": "0.6000",
+     "yes_bid": "0.5900",
+     "status": "active",
+     "model_key": "home_team_over_1_5"
+    }
+   ]
+  },
+  {
+   "key": "score",
+   "label": "Correct score",
+   "event_ticker": "KXEPLSCORE-26OCT24ARSEVE",
+   "markets": [
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS1EVE3",
+     "label": "Everton FC wins 3-1",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_1_3"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS3EVE0",
+     "label": "Arsenal FC wins 3-0",
+     "yes_ask": "0.0900",
+     "yes_bid": "0.0700",
+     "status": "active",
+     "model_key": "score_3_0"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS3EVE3",
+     "label": "Draw 3-3",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_3_3"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS3EVE2",
+     "label": "Arsenal FC wins 3-2",
+     "yes_ask": "0.0300",
+     "yes_bid": "0.0200",
+     "status": "active",
+     "model_key": "score_3_2"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS2EVE0",
+     "label": "Arsenal FC wins 2-0",
+     "yes_ask": "0.1300",
+     "yes_bid": "0.1200",
+     "status": "active",
+     "model_key": "score_2_0"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS4EVE2",
+     "label": "Arsenal FC wins 4-2",
+     "yes_ask": "0.0200",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_4_2"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS7EVE0",
+     "label": "Arsenal FC wins 7-0",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_7_0"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS6EVE2",
+     "label": "Arsenal FC wins 6-2",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_6_2"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS4EVE3",
+     "label": "Arsenal FC wins 4-3",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_4_3"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS0EVE3",
+     "label": "Everton FC wins 3-0",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_0_3"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS1EVE2",
+     "label": "Everton FC wins 2-1",
+     "yes_ask": "0.0400",
+     "yes_bid": "0.0300",
+     "status": "active",
+     "model_key": "score_1_2"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS5EVE0",
+     "label": "Arsenal FC wins 5-0",
+     "yes_ask": "0.0200",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_5_0"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS5EVE1",
+     "label": "Arsenal FC wins 5-1",
+     "yes_ask": "0.0200",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_5_1"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS2EVE4",
+     "label": "Everton FC wins 4-2",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_2_4"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS1EVE0",
+     "label": "Arsenal FC wins 1-0",
+     "yes_ask": "0.1400",
+     "yes_bid": "0.1300",
+     "status": "active",
+     "model_key": "score_1_0"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS2EVE1",
+     "label": "Arsenal FC wins 2-1",
+     "yes_ask": "0.1100",
+     "yes_bid": "0.1000",
+     "status": "active",
+     "model_key": "score_2_1"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS6EVE1",
+     "label": "Arsenal FC wins 6-1",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_6_1"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS5EVE2",
+     "label": "Arsenal FC wins 5-2",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_5_2"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS4EVE1",
+     "label": "Arsenal FC wins 4-1",
+     "yes_ask": "0.0300",
+     "yes_bid": "0.0200",
+     "status": "active",
+     "model_key": "score_4_1"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS5EVE3",
+     "label": "Arsenal FC wins 5-3",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_5_3"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS7EVE1",
+     "label": "Arsenal FC wins 7-1",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_7_1"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS2EVE3",
+     "label": "Everton FC wins 3-2",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_2_3"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS0EVE2",
+     "label": "Everton FC wins 2-0",
+     "yes_ask": "0.0200",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_0_2"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS6EVE0",
+     "label": "Arsenal FC wins 6-0",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_6_0"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS4EVE0",
+     "label": "Arsenal FC wins 4-0",
+     "yes_ask": "0.0500",
+     "yes_bid": "0.0300",
+     "status": "active",
+     "model_key": "score_4_0"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS1EVE4",
+     "label": "Everton FC wins 4-1",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_1_4"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS0EVE0",
+     "label": "Draw 0-0",
+     "yes_ask": "0.0700",
+     "yes_bid": "0.0600",
+     "status": "active",
+     "model_key": "score_0_0"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS0EVE1",
+     "label": "Everton FC wins 1-0",
+     "yes_ask": "0.0500",
+     "yes_bid": "0.0300",
+     "status": "active",
+     "model_key": "score_0_1"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS3EVE1",
+     "label": "Arsenal FC wins 3-1",
+     "yes_ask": "0.0700",
+     "yes_bid": "0.0600",
+     "status": "active",
+     "model_key": "score_3_1"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS2EVE2",
+     "label": "Draw 2-2",
+     "yes_ask": "0.0400",
+     "yes_bid": "0.0300",
+     "status": "active",
+     "model_key": "score_2_2"
+    },
+    {
+     "ticker": "KXEPLSCORE-26OCT24ARSEVE-ARS1EVE1",
+     "label": "Draw 1-1",
+     "yes_ask": "0.1100",
+     "yes_bid": "0.0900",
+     "status": "active",
+     "model_key": "score_1_1"
+    }
+   ]
+  },
+  {
+   "key": "h1",
+   "label": "1st half \u00b7 winner",
+   "event_ticker": "KXEPL1H-26OCT24ARSEVE",
+   "markets": [
+    {
+     "ticker": "KXEPL1H-26OCT24ARSEVE-EVE",
+     "label": "Everton wins 1st Half",
+     "yes_ask": "0.1300",
+     "yes_bid": "0.1200",
+     "status": "active",
+     "model_key": null
+    },
+    {
+     "ticker": "KXEPL1H-26OCT24ARSEVE-TIE",
+     "label": "Tie 1st Half",
+     "yes_ask": "0.4000",
+     "yes_bid": "0.3900",
+     "status": "active",
+     "model_key": null
+    },
+    {
+     "ticker": "KXEPL1H-26OCT24ARSEVE-ARS",
+     "label": "Arsenal wins 1st Half",
+     "yes_ask": "0.4900",
+     "yes_bid": "0.4800",
+     "status": "active",
+     "model_key": null
+    }
+   ]
+  },
+  {
+   "key": "h1_total",
+   "label": "1st half \u00b7 total",
+   "event_ticker": "KXEPL1HTOTAL-26OCT24ARSEVE",
+   "markets": [
+    {
+     "ticker": "KXEPL1HTOTAL-26OCT24ARSEVE-1",
+     "label": "Over 0.5 1H goals scored",
+     "yes_ask": "0.7100",
+     "yes_bid": "0.7000",
+     "status": "active",
+     "model_key": null
+    },
+    {
+     "ticker": "KXEPL1HTOTAL-26OCT24ARSEVE-3",
+     "label": "Over 2.5 1H goals scored",
+     "yes_ask": "0.1200",
+     "yes_bid": "0.1100",
+     "status": "active",
+     "model_key": null
+    },
+    {
+     "ticker": "KXEPL1HTOTAL-26OCT24ARSEVE-2",
+     "label": "Over 1.5 1H goals scored",
+     "yes_ask": "0.3400",
+     "yes_bid": "0.3300",
+     "status": "active",
+     "model_key": null
+    }
+   ]
+  },
+  {
+   "key": "h1_spread",
+   "label": "1st half \u00b7 spread",
+   "event_ticker": "KXEPL1HSPREAD-26OCT24ARSEVE",
+   "markets": [
+    {
+     "ticker": "KXEPL1HSPREAD-26OCT24ARSEVE-EVE2",
+     "label": "Everton wins the 1H by more than 1.5 goals",
+     "yes_ask": "0.0300",
+     "yes_bid": "0.0100",
+     "status": "active",
+     "model_key": null
+    },
+    {
+     "ticker": "KXEPL1HSPREAD-26OCT24ARSEVE-ARS2",
+     "label": "Arsenal wins the 1H by more than 1.5 goals",
+     "yes_ask": "0.1800",
+     "yes_bid": "0.1600",
+     "status": "active",
+     "model_key": null
+    }
+   ]
+  },
+  {
+   "key": "h1_btts",
+   "label": "1st half \u00b7 BTTS",
+   "event_ticker": "KXEPL1HBTTS-26OCT24ARSEVE",
+   "markets": [
+    {
+     "ticker": "KXEPL1HBTTS-26OCT24ARSEVE-BTTS",
+     "label": "1st Half: Both Teams To Score",
+     "yes_ask": "0.1600",
+     "yes_bid": "0.1500",
+     "status": "active",
+     "model_key": null
+    }
+   ]
+  }
+ ],
+ "book_match": {
+  "status": "mapped",
+  "candidates": [
+   "KXEPLGAME-26OCT24ARSEVE"
+  ],
+  "loose_candidates": []
+ },
+ "model": {
+  "model_version": "epl-2026-v0",
+  "shadow": true,
+  "real_money_signals": false,
+  "primary": {
+   "run_id": "bd8ddd15-0453-4f39-b528-ccabeee23dce",
+   "run_type": "scheduled",
+   "captured_at": "2026-10-24T02:22:00.965404+00:00",
+   "seed": 742895315,
+   "n_simulations": 10000,
+   "outcomes": {
+    "home_win": 0.5076,
+    "draw": 0.2435,
+    "away_win": 0.2489
+   },
+   "tickers": {
+    "home_win": "KXEPLGAME-26OCT24ARSEVE-ARS",
+    "draw": "KXEPLGAME-26OCT24ARSEVE-TIE",
+    "away_win": "KXEPLGAME-26OCT24ARSEVE-EVE"
+   },
+   "input_quality": {
+    "TEAM_DATA_FRESH": true,
+    "PLAYER_DATA_FRESH": false,
+    "AVAILABILITY_COMPLETE": false,
+    "LINEUP_CONFIRMED": false,
+    "GOALKEEPER_CONFIRMED": false
+   },
+   "xg": {
+    "home": 1.63,
+    "away": 1.045
+   },
+   "scorelines": [
+    {
+     "score": "1-1",
+     "prob": 0.1178
+    },
+    {
+     "score": "1-0",
+     "prob": 0.1162
+    },
+    {
+     "score": "2-1",
+     "prob": 0.0933
+    },
+    {
+     "score": "2-0",
+     "prob": 0.0897
+    },
+    {
+     "score": "0-1",
+     "prob": 0.0753
+    },
+    {
+     "score": "0-0",
+     "prob": 0.0663
+    },
+    {
+     "score": "1-2",
+     "prob": 0.0628
+    },
+    {
+     "score": "3-1",
+     "prob": 0.0501
+    },
+    {
+     "score": "3-0",
+     "prob": 0.0496
+    },
+    {
+     "score": "2-2",
+     "prob": 0.049
+    },
+    {
+     "score": "0-2",
+     "prob": 0.0379
+    },
+    {
+     "score": "3-2",
+     "prob": 0.0242
+    }
+   ],
+   "props": {
+    "btts": 0.5144,
+    "over_0_5": 0.9337,
+    "over_1_5": 0.7422,
+    "over_2_5": 0.4968,
+    "over_3_5": 0.2781,
+    "over_4_5": 0.1315,
+    "over_5_5": 0.0533,
+    "home_margin_2": 0.2709,
+    "home_margin_3": 0.12,
+    "away_margin_2": 0.0905,
+    "away_margin_3": 0.0263,
+    "home_first_goal": 0.5658,
+    "away_first_goal": 0.3642,
+    "no_goal": 0.0701,
+    "home_team_over_0_5": 0.8024,
+    "home_team_over_1_5": 0.4765,
+    "home_team_over_2_5": 0.223,
+    "away_team_over_0_5": 0.6457,
+    "away_team_over_1_5": 0.2773,
+    "away_team_over_2_5": 0.0886
+   },
+   "basis": {
+    "home_games": 39,
+    "away_games": 39,
+    "league_gpg": 1.423,
+    "venue_home": 1.119,
+    "home_attack": 1.049,
+    "home_defence": 0.871,
+    "away_attack": 0.956,
+    "away_defence": 0.976
+   }
+  },
+  "latest": {
+   "run_id": "bd8ddd15-0453-4f39-b528-ccabeee23dce",
+   "run_type": "scheduled",
+   "captured_at": "2026-10-24T02:22:00.965404+00:00",
+   "seed": 742895315,
+   "n_simulations": 10000,
+   "outcomes": {
+    "home_win": 0.5076,
+    "draw": 0.2435,
+    "away_win": 0.2489
+   },
+   "tickers": {
+    "home_win": "KXEPLGAME-26OCT24ARSEVE-ARS",
+    "draw": "KXEPLGAME-26OCT24ARSEVE-TIE",
+    "away_win": "KXEPLGAME-26OCT24ARSEVE-EVE"
+   },
+   "input_quality": {
+    "TEAM_DATA_FRESH": true,
+    "PLAYER_DATA_FRESH": false,
+    "AVAILABILITY_COMPLETE": false,
+    "LINEUP_CONFIRMED": false,
+    "GOALKEEPER_CONFIRMED": false
+   },
+   "xg": {
+    "home": 1.63,
+    "away": 1.045
+   },
+   "scorelines": [
+    {
+     "score": "1-1",
+     "prob": 0.1178
+    },
+    {
+     "score": "1-0",
+     "prob": 0.1162
+    },
+    {
+     "score": "2-1",
+     "prob": 0.0933
+    },
+    {
+     "score": "2-0",
+     "prob": 0.0897
+    },
+    {
+     "score": "0-1",
+     "prob": 0.0753
+    },
+    {
+     "score": "0-0",
+     "prob": 0.0663
+    },
+    {
+     "score": "1-2",
+     "prob": 0.0628
+    },
+    {
+     "score": "3-1",
+     "prob": 0.0501
+    },
+    {
+     "score": "3-0",
+     "prob": 0.0496
+    },
+    {
+     "score": "2-2",
+     "prob": 0.049
+    },
+    {
+     "score": "0-2",
+     "prob": 0.0379
+    },
+    {
+     "score": "3-2",
+     "prob": 0.0242
+    }
+   ],
+   "props": {
+    "btts": 0.5144,
+    "over_0_5": 0.9337,
+    "over_1_5": 0.7422,
+    "over_2_5": 0.4968,
+    "over_3_5": 0.2781,
+    "over_4_5": 0.1315,
+    "over_5_5": 0.0533,
+    "home_margin_2": 0.2709,
+    "home_margin_3": 0.12,
+    "away_margin_2": 0.0905,
+    "away_margin_3": 0.0263,
+    "home_first_goal": 0.5658,
+    "away_first_goal": 0.3642,
+    "no_goal": 0.0701,
+    "home_team_over_0_5": 0.8024,
+    "home_team_over_1_5": 0.4765,
+    "home_team_over_2_5": 0.223,
+    "away_team_over_0_5": 0.6457,
+    "away_team_over_1_5": 0.2773,
+    "away_team_over_2_5": 0.0886
+   },
+   "basis": {
+    "home_games": 39,
+    "away_games": 39,
+    "league_gpg": 1.423,
+    "venue_home": 1.119,
+    "home_attack": 1.049,
+    "home_defence": 0.871,
+    "away_attack": 0.956,
+    "away_defence": 0.976
+   }
+  },
+  "t10_lock": null
+ },
+ "model_refusal": null,
+ "lineups": {
+  "home": {
+   "formation": null,
+   "confirmed": false,
+   "released": false,
+   "lineup_flag": {
+    "released": null,
+    "confirmed": false,
+    "named": 0,
+    "named_starters": 0,
+    "rule": "live.lineup_flag \u2014 per side, over NAMED entries: released = at least 11 named starters (None when the provider carries no named roster for the side), confirmed = released with exactly 11"
+   },
+   "starters": [],
+   "bench": [],
+   "goalkeeper": null,
+   "key_absences": null,
+   "key_absences_reason": "no player-strength feed for epl-2026 \u2014 absences are computed only for mls-2026"
+  },
+  "away": {
+   "formation": null,
+   "confirmed": false,
+   "released": false,
+   "lineup_flag": {
+    "released": null,
+    "confirmed": false,
+    "named": 0,
+    "named_starters": 0,
+    "rule": "live.lineup_flag \u2014 per side, over NAMED entries: released = at least 11 named starters (None when the provider carries no named roster for the side), confirmed = released with exactly 11"
+   },
+   "starters": [],
+   "bench": [],
+   "goalkeeper": null,
+   "key_absences": null,
+   "key_absences_reason": "no player-strength feed for epl-2026 \u2014 absences are computed only for mls-2026"
+  },
+  "strength_available": true
+ },
+ "venue_class": {
+  "class": "DOMESTIC",
+  "home_side": "home",
+  "basis": "league_countries",
+  "venue": {
+   "name": "Emirates Stadium",
+   "city": "London",
+   "country": "England"
+  },
+  "rule": "picker.board.venue_class \u2014 the club board's own rule: the venue's country against the countries the league plays in (both sides' league here -> DOMESTIC, the label trusted)",
+  "neutral_site_flag_read": false,
+  "venue_country_canonical": "England",
+  "side_basis": "league_countries"
+ },
+ "traders_model": {
+  "title": "trader's model (tested)",
+  "tested": true,
+  "available": true,
+  "means": "What the trading agent prices this match from, read through the same interface it uses. EXPERIMENTAL, UNPROVEN: 'tested' means only that it passed a pre-registered replay of pre-seal history against the model it replaced \u2014 not a forecast of profit.",
+  "label": "experimental, unproven",
+  "fixture_key": "live:557",
+  "source": "unified_model",
+  "model": "unified-nb-v1",
+  "verdict": "NOT_WORSE",
+  "read_at": "2026-10-24T04:31:36.780741+00:00",
+  "p_home": 0.611498557,
+  "p_draw": 0.2331073087,
+  "p_away": 0.1553941343,
+  "lam_home": 1.7267074085495504,
+  "lam_away": 0.7344628699930295,
+  "inputs_as_of": "2026-10-23T19:00:00+00:00"
+ },
+ "generated_at": "2026-10-24T04:31:36.808048+00:00",
+ "_demo": {
+  "league": "epl",
+  "event_id": "401878768",
+  "saved_at": "2026-10-24"
+ }
+}

@@ -108,6 +108,10 @@
 .matchText { position: absolute; z-index: 1; left: var(--gutter); right: var(--gutter); max-width: 1240px; margin-inline: auto; will-change: transform, opacity; }
 .heroText { position: relative; transform-origin: 0 0; will-change: transform, opacity; }
 .heroText .h1 { margin-top: 12px; will-change: filter; }
+/* the hero's one secondary link (the Analyst): the eyebrow's mono voice */
+.heroAside { display: block; margin-top: 0.9em; font: 400 11px/1.4 var(--f-mono); text-transform: uppercase; letter-spacing: 0.16em; }
+.heroAside a { color: var(--ink-low); text-decoration: none; transition: color 0.15s; }
+.heroAside a:hover, .heroAside a:focus-visible { color: var(--accent); }
 .heroLine { margin: clamp(14px, 2.4vh, 26px) 0 0; max-width: 34rem; font-size: clamp(16px, 1.45vw, 22px); line-height: 1.45; color: var(--ink-hi); }
 .matchText { top: clamp(28px, 6vh, 72px); }
 .matchText h2[tabindex="-1"]:focus { outline: none; }

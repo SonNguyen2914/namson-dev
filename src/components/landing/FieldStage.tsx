@@ -31,7 +31,7 @@
 // asked for reduced motion (or has a screen too short to pin) gets — the
 // same content, nothing withheld.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, KeyboardEvent } from "react";
+import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { hueOf } from "../../lib/leagueHue";
 import { FIELD, FOCUS, GAP } from "../../lib/landingData";
 import {
@@ -105,7 +105,11 @@ function Marks({ marks, shown }: { marks: StripMark[]; shown: number }) {
   );
 }
 
-export default function FieldStage({ mode, enabled }: { mode: Mode; enabled: boolean }) {
+export default function FieldStage({ mode, enabled, heroAside }: {
+  mode: Mode; enabled: boolean;
+  /** one optional line under the hero's sentence (the Analyst link) */
+  heroAside?: ReactNode;
+}) {
   const hasHero = mode !== "match";
   const hasStory = mode !== "hero";
   const pinned = mode === "scroll" && enabled;
@@ -611,6 +615,7 @@ export default function FieldStage({ mode, enabled }: { mode: Mode; enabled: boo
                   <p className={s.heroLine}>
                     Read against the real market before kickoff, recorded in
                     play, reviewed after the whistle.
+                    {heroAside}
                   </p>
                 </div>
               </div>

@@ -1,0 +1,1052 @@
+{
+ "match": {
+  "id": "401882830",
+  "date": "2026-10-24T12:00Z",
+  "state": "pre",
+  "detail": "10/24 - 8:00 AM EDT",
+  "minute": null,
+  "venue": "Estadio de Vallecas",
+  "home": {
+   "name": "Rayo Vallecano",
+   "abbrev": "RAY",
+   "logo": "https://a.espncdn.com/i/teamlogos/soccer/500/101.png",
+   "score": null,
+   "color": "ffffff",
+   "alt_color": "cd0000"
+  },
+  "away": {
+   "name": "Elche",
+   "abbrev": "ELC",
+   "logo": "https://a.espncdn.com/i/teamlogos/soccer/500/3751.png",
+   "score": null,
+   "color": "288A00",
+   "alt_color": "4B2B67"
+  },
+  "stats": [],
+  "events": [],
+  "scouting": {
+   "last_five": [
+    {
+     "team": "Rayo Vallecano",
+     "abbrev": "RAY",
+     "form": "W L W D D",
+     "games": [
+      {
+       "result": "W",
+       "provider_result": "W",
+       "team_score": 3,
+       "opponent_score": 2,
+       "score": "3-2",
+       "at_vs": "vs",
+       "opponent": "RAC",
+       "date": "2026-09-05T16:30Z"
+      },
+      {
+       "result": "L",
+       "provider_result": "L",
+       "team_score": 1,
+       "opponent_score": 4,
+       "score": "4-1",
+       "at_vs": "@",
+       "opponent": "RMA",
+       "date": "2026-09-12T19:00Z"
+      },
+      {
+       "result": "W",
+       "provider_result": "W",
+       "team_score": 2,
+       "opponent_score": 1,
+       "score": "2-1",
+       "at_vs": "vs",
+       "opponent": "ESP",
+       "date": "2026-09-15T17:00Z"
+      },
+      {
+       "result": "D",
+       "provider_result": "D",
+       "team_score": 1,
+       "opponent_score": 1,
+       "score": "1-1",
+       "at_vs": "@",
+       "opponent": "OSA",
+       "date": "2026-09-19T12:00Z"
+      },
+      {
+       "result": "D",
+       "provider_result": "D",
+       "team_score": 1,
+       "opponent_score": 1,
+       "score": "1-1",
+       "at_vs": "@",
+       "opponent": "GET",
+       "date": "2026-10-19T19:00Z"
+      }
+     ]
+    },
+    {
+     "team": "Elche",
+     "abbrev": "ELC",
+     "form": "D L W D D",
+     "games": [
+      {
+       "result": "D",
+       "provider_result": "D",
+       "team_score": 1,
+       "opponent_score": 1,
+       "score": "1-1",
+       "at_vs": "@",
+       "opponent": "ATH",
+       "date": "2026-09-12T16:30Z"
+      },
+      {
+       "result": "L",
+       "provider_result": "L",
+       "team_score": 2,
+       "opponent_score": 3,
+       "score": "3-2",
+       "at_vs": "vs",
+       "opponent": "RMA",
+       "date": "2026-09-15T19:30Z"
+      },
+      {
+       "result": "W",
+       "provider_result": "W",
+       "team_score": 3,
+       "opponent_score": 1,
+       "score": "3-1",
+       "at_vs": "@",
+       "opponent": "ESP",
+       "date": "2026-09-18T19:00Z"
+      },
+      {
+       "result": "D",
+       "provider_result": "D",
+       "team_score": 0,
+       "opponent_score": 0,
+       "score": "0-0",
+       "at_vs": "vs",
+       "opponent": "CEL",
+       "date": "2026-10-11T12:00Z"
+      },
+      {
+       "result": "D",
+       "provider_result": "D",
+       "team_score": 0,
+       "opponent_score": 0,
+       "score": "0-0",
+       "at_vs": "@",
+       "opponent": "VIL",
+       "date": "2026-10-17T14:15Z"
+      }
+     ]
+    }
+   ],
+   "head_to_head": [
+    {
+     "perspective": "RAY",
+     "result": "W",
+     "home_score": "1",
+     "away_score": "0",
+     "at_vs": "vs",
+     "opponent": "ELC",
+     "date": "2026-04-03T19:00:00Z"
+    },
+    {
+     "perspective": "RAY",
+     "result": "L",
+     "home_score": "4",
+     "away_score": "0",
+     "at_vs": "@",
+     "opponent": "ELC",
+     "date": "2025-12-21T17:30:00Z"
+    },
+    {
+     "perspective": "RAY",
+     "result": "L",
+     "home_score": "4",
+     "away_score": "0",
+     "at_vs": "@",
+     "opponent": "ELC",
+     "date": "2023-04-29T14:15:00Z"
+    },
+    {
+     "perspective": "RAY",
+     "result": "W",
+     "home_score": "2",
+     "away_score": "1",
+     "at_vs": "vs",
+     "opponent": "ELC",
+     "date": "2022-10-03T19:00:00Z"
+    },
+    {
+     "perspective": "RAY",
+     "result": "L",
+     "home_score": "2",
+     "away_score": "1",
+     "at_vs": "@",
+     "opponent": "ELC",
+     "date": "2022-02-18T20:00:00Z"
+    }
+   ]
+  }
+ },
+ "book": {
+  "key": "winner",
+  "label": "Winner \u00b7 3-way",
+  "event_ticker": "KXLALIGAGAME-26OCT24RVCELC",
+  "markets": [
+   {
+    "ticker": "KXLALIGAGAME-26OCT24RVCELC-TIE",
+    "label": "Tie",
+    "yes_ask": "0.2500",
+    "yes_bid": "0.2400",
+    "spread": 0.01,
+    "status": "active",
+    "model_key": null
+   },
+   {
+    "ticker": "KXLALIGAGAME-26OCT24RVCELC-RVC",
+    "label": "Vallecano",
+    "yes_ask": "0.5500",
+    "yes_bid": "0.5400",
+    "spread": 0.01,
+    "status": "active",
+    "model_key": null
+   },
+   {
+    "ticker": "KXLALIGAGAME-26OCT24RVCELC-ELC",
+    "label": "Elche",
+    "yes_ask": "0.2100",
+    "yes_bid": "0.2000",
+    "spread": 0.01,
+    "status": "active",
+    "model_key": null
+   }
+  ]
+ },
+ "books": [
+  {
+   "key": "winner",
+   "label": "Winner \u00b7 3-way",
+   "event_ticker": "KXLALIGAGAME-26OCT24RVCELC",
+   "markets": [
+    {
+     "ticker": "KXLALIGAGAME-26OCT24RVCELC-TIE",
+     "label": "Tie",
+     "yes_ask": "0.2500",
+     "yes_bid": "0.2400",
+     "spread": 0.01,
+     "status": "active",
+     "model_key": null
+    },
+    {
+     "ticker": "KXLALIGAGAME-26OCT24RVCELC-RVC",
+     "label": "Vallecano",
+     "yes_ask": "0.5500",
+     "yes_bid": "0.5400",
+     "spread": 0.01,
+     "status": "active",
+     "model_key": null
+    },
+    {
+     "ticker": "KXLALIGAGAME-26OCT24RVCELC-ELC",
+     "label": "Elche",
+     "yes_ask": "0.2100",
+     "yes_bid": "0.2000",
+     "spread": 0.01,
+     "status": "active",
+     "model_key": null
+    }
+   ]
+  },
+  {
+   "key": "total",
+   "label": "Total goals",
+   "event_ticker": "KXLALIGATOTAL-26OCT24RVCELC",
+   "markets": [
+    {
+     "ticker": "KXLALIGATOTAL-26OCT24RVCELC-2",
+     "label": "Over 1.5 goals scored",
+     "yes_ask": "0.7600",
+     "yes_bid": "0.7500",
+     "status": "active",
+     "model_key": "over_1_5"
+    },
+    {
+     "ticker": "KXLALIGATOTAL-26OCT24RVCELC-4",
+     "label": "Over 3.5 goals scored",
+     "yes_ask": "0.3000",
+     "yes_bid": "0.2900",
+     "status": "active",
+     "model_key": "over_3_5"
+    },
+    {
+     "ticker": "KXLALIGATOTAL-26OCT24RVCELC-3",
+     "label": "Over 2.5 goals scored",
+     "yes_ask": "0.5200",
+     "yes_bid": "0.5100",
+     "status": "active",
+     "model_key": "over_2_5"
+    },
+    {
+     "ticker": "KXLALIGATOTAL-26OCT24RVCELC-6",
+     "label": "Over 5.5 goals scored",
+     "yes_ask": "0.0600",
+     "yes_bid": "0.0500",
+     "status": "active",
+     "model_key": "over_5_5"
+    },
+    {
+     "ticker": "KXLALIGATOTAL-26OCT24RVCELC-1",
+     "label": "Over 0.5 goals scored",
+     "yes_ask": "0.9400",
+     "yes_bid": "0.9300",
+     "status": "active",
+     "model_key": "over_0_5"
+    },
+    {
+     "ticker": "KXLALIGATOTAL-26OCT24RVCELC-5",
+     "label": "Over 4.5 goals scored",
+     "yes_ask": "0.1500",
+     "yes_bid": "0.1400",
+     "status": "active",
+     "model_key": "over_4_5"
+    }
+   ]
+  },
+  {
+   "key": "btts",
+   "label": "Both teams to score",
+   "event_ticker": "KXLALIGABTTS-26OCT24RVCELC",
+   "markets": [
+    {
+     "ticker": "KXLALIGABTTS-26OCT24RVCELC-BTTS",
+     "label": "Both Teams To Score",
+     "yes_ask": "0.5400",
+     "yes_bid": "0.5300",
+     "status": "active",
+     "model_key": "btts"
+    }
+   ]
+  },
+  {
+   "key": "spread",
+   "label": "Spread",
+   "event_ticker": "KXLALIGASPREAD-26OCT24RVCELC",
+   "markets": [
+    {
+     "ticker": "KXLALIGASPREAD-26OCT24RVCELC-RVC3",
+     "label": "Vallecano wins by more than 2.5 goals",
+     "yes_ask": "0.1300",
+     "yes_bid": "0.1200",
+     "status": "active",
+     "model_key": "home_margin_3"
+    },
+    {
+     "ticker": "KXLALIGASPREAD-26OCT24RVCELC-RVC2",
+     "label": "Vallecano wins by more than 1.5 goals",
+     "yes_ask": "0.3000",
+     "yes_bid": "0.2900",
+     "status": "active",
+     "model_key": "home_margin_2"
+    },
+    {
+     "ticker": "KXLALIGASPREAD-26OCT24RVCELC-ELC2",
+     "label": "Elche wins by more than 1.5 goals",
+     "yes_ask": "0.0800",
+     "yes_bid": "0.0700",
+     "status": "active",
+     "model_key": "away_margin_2"
+    },
+    {
+     "ticker": "KXLALIGASPREAD-26OCT24RVCELC-ELC3",
+     "label": "Elche wins by more than 2.5 goals",
+     "yes_ask": "0.0300",
+     "yes_bid": "0.0100",
+     "status": "active",
+     "model_key": "away_margin_3"
+    }
+   ]
+  },
+  {
+   "key": "team_total",
+   "label": "Team totals",
+   "event_ticker": "KXLALIGATEAMTOTAL-26OCT24RVCELC",
+   "markets": [
+    {
+     "ticker": "KXLALIGATEAMTOTAL-26OCT24RVCELC-RVC2",
+     "label": "Vallecano over 1.5 goals",
+     "yes_ask": "0.5300",
+     "yes_bid": "0.5100",
+     "status": "active",
+     "model_key": "home_team_over_1_5"
+    },
+    {
+     "ticker": "KXLALIGATEAMTOTAL-26OCT24RVCELC-RVC1",
+     "label": "Vallecano over 0.5 goals",
+     "yes_ask": "0.8500",
+     "yes_bid": "0.8200",
+     "status": "active",
+     "model_key": "home_team_over_0_5"
+    },
+    {
+     "ticker": "KXLALIGATEAMTOTAL-26OCT24RVCELC-ELC3",
+     "label": "Elche over 2.5 goals",
+     "yes_ask": "0.0900",
+     "yes_bid": "0.0600",
+     "status": "active",
+     "model_key": "away_team_over_2_5"
+    },
+    {
+     "ticker": "KXLALIGATEAMTOTAL-26OCT24RVCELC-ELC2",
+     "label": "Elche over 1.5 goals",
+     "yes_ask": "0.2600",
+     "yes_bid": "0.2500",
+     "status": "active",
+     "model_key": "away_team_over_1_5"
+    },
+    {
+     "ticker": "KXLALIGATEAMTOTAL-26OCT24RVCELC-RVC3",
+     "label": "Vallecano over 2.5 goals",
+     "yes_ask": "0.2500",
+     "yes_bid": "0.2300",
+     "status": "active",
+     "model_key": "home_team_over_2_5"
+    },
+    {
+     "ticker": "KXLALIGATEAMTOTAL-26OCT24RVCELC-ELC1",
+     "label": "Elche over 0.5 goals",
+     "yes_ask": "0.6500",
+     "yes_bid": "0.6300",
+     "status": "active",
+     "model_key": "away_team_over_0_5"
+    }
+   ]
+  },
+  {
+   "key": "score",
+   "label": "Correct score",
+   "event_ticker": "KXLALIGASCORE-26OCT24RVCELC",
+   "markets": [
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC0ELC2",
+     "label": "Elche CF wins 2-0",
+     "yes_ask": "0.0300",
+     "yes_bid": "0.0100",
+     "status": "active",
+     "model_key": "score_0_2"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC1ELC0",
+     "label": "Rayo Vallecano wins 1-0",
+     "yes_ask": "0.1200",
+     "yes_bid": "0.1000",
+     "status": "active",
+     "model_key": "score_1_0"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC1ELC3",
+     "label": "Elche CF wins 3-1",
+     "yes_ask": "0.0200",
+     "yes_bid": "0.0100",
+     "status": "active",
+     "model_key": "score_1_3"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC5ELC2",
+     "label": "Rayo Vallecano wins 5-2",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_5_2"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC1ELC1",
+     "label": "Draw 1-1",
+     "yes_ask": "0.1200",
+     "yes_bid": "0.1100",
+     "status": "active",
+     "model_key": "score_1_1"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC2ELC2",
+     "label": "Draw 2-2",
+     "yes_ask": "0.0500",
+     "yes_bid": "0.0400",
+     "status": "active",
+     "model_key": "score_2_2"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC4ELC3",
+     "label": "Rayo Vallecano wins 4-3",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_4_3"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC2ELC4",
+     "label": "Elche CF wins 4-2",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_2_4"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC4ELC2",
+     "label": "Rayo Vallecano wins 4-2",
+     "yes_ask": "0.0200",
+     "yes_bid": "0.0100",
+     "status": "active",
+     "model_key": "score_4_2"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC1ELC4",
+     "label": "Elche CF wins 4-1",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_1_4"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC0ELC1",
+     "label": "Elche CF wins 1-0",
+     "yes_ask": "0.0600",
+     "yes_bid": "0.0400",
+     "status": "active",
+     "model_key": "score_0_1"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC3ELC0",
+     "label": "Rayo Vallecano wins 3-0",
+     "yes_ask": "0.0600",
+     "yes_bid": "0.0400",
+     "status": "active",
+     "model_key": "score_3_0"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC0ELC4",
+     "label": "Elche CF wins 4-0",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_0_4"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC3ELC4",
+     "label": "Elche CF wins 4-3",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_3_4"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC1ELC2",
+     "label": "Elche CF wins 2-1",
+     "yes_ask": "0.0600",
+     "yes_bid": "0.0400",
+     "status": "active",
+     "model_key": "score_1_2"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC4ELC0",
+     "label": "Rayo Vallecano wins 4-0",
+     "yes_ask": "0.0300",
+     "yes_bid": "0.0100",
+     "status": "active",
+     "model_key": "score_4_0"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC5ELC0",
+     "label": "Rayo Vallecano wins 5-0",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_5_0"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC3ELC3",
+     "label": "Draw 3-3",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_3_3"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC2ELC3",
+     "label": "Elche CF wins 3-2",
+     "yes_ask": "0.0200",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_2_3"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC0ELC0",
+     "label": "Draw 0-0",
+     "yes_ask": "0.0700",
+     "yes_bid": "0.0600",
+     "status": "active",
+     "model_key": "score_0_0"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC2ELC1",
+     "label": "Rayo Vallecano wins 2-1",
+     "yes_ask": "0.1000",
+     "yes_bid": "0.0700",
+     "status": "active",
+     "model_key": "score_2_1"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC0ELC3",
+     "label": "Elche CF wins 3-0",
+     "yes_ask": "0.0100",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_0_3"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC2ELC0",
+     "label": "Rayo Vallecano wins 2-0",
+     "yes_ask": "0.1000",
+     "yes_bid": "0.0800",
+     "status": "active",
+     "model_key": "score_2_0"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC3ELC1",
+     "label": "Rayo Vallecano wins 3-1",
+     "yes_ask": "0.0600",
+     "yes_bid": "0.0400",
+     "status": "active",
+     "model_key": "score_3_1"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC3ELC2",
+     "label": "Rayo Vallecano wins 3-2",
+     "yes_ask": "0.0300",
+     "yes_bid": "0.0200",
+     "status": "active",
+     "model_key": "score_3_2"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC4ELC1",
+     "label": "Rayo Vallecano wins 4-1",
+     "yes_ask": "0.0300",
+     "yes_bid": "0.0100",
+     "status": "active",
+     "model_key": "score_4_1"
+    },
+    {
+     "ticker": "KXLALIGASCORE-26OCT24RVCELC-RVC5ELC1",
+     "label": "Rayo Vallecano wins 5-1",
+     "yes_ask": "0.0200",
+     "yes_bid": "0.0000",
+     "status": "active",
+     "model_key": "score_5_1"
+    }
+   ]
+  },
+  {
+   "key": "h1",
+   "label": "1st half \u00b7 winner",
+   "event_ticker": "KXLALIGA1H-26OCT24RVCELC",
+   "markets": [
+    {
+     "ticker": "KXLALIGA1H-26OCT24RVCELC-ELC",
+     "label": "Elche wins 1st Half",
+     "yes_ask": "0.1900",
+     "yes_bid": "0.1800",
+     "status": "active",
+     "model_key": null
+    },
+    {
+     "ticker": "KXLALIGA1H-26OCT24RVCELC-RVC",
+     "label": "Vallecano wins 1st Half",
+     "yes_ask": "0.4100",
+     "yes_bid": "0.4000",
+     "status": "active",
+     "model_key": null
+    },
+    {
+     "ticker": "KXLALIGA1H-26OCT24RVCELC-TIE",
+     "label": "Tie 1st Half",
+     "yes_ask": "0.4100",
+     "yes_bid": "0.4000",
+     "status": "active",
+     "model_key": null
+    }
+   ]
+  },
+  {
+   "key": "h1_total",
+   "label": "1st half \u00b7 total",
+   "event_ticker": "KXLALIGA1HTOTAL-26OCT24RVCELC",
+   "markets": [
+    {
+     "ticker": "KXLALIGA1HTOTAL-26OCT24RVCELC-3",
+     "label": "Over 2.5 1H goals scored",
+     "yes_ask": "0.1300",
+     "yes_bid": "0.1100",
+     "status": "active",
+     "model_key": null
+    },
+    {
+     "ticker": "KXLALIGA1HTOTAL-26OCT24RVCELC-1",
+     "label": "Over 0.5 1H goals scored",
+     "yes_ask": "0.7200",
+     "yes_bid": "0.7000",
+     "status": "active",
+     "model_key": null
+    },
+    {
+     "ticker": "KXLALIGA1HTOTAL-26OCT24RVCELC-2",
+     "label": "Over 1.5 1H goals scored",
+     "yes_ask": "0.3400",
+     "yes_bid": "0.3300",
+     "status": "active",
+     "model_key": null
+    }
+   ]
+  },
+  {
+   "key": "h1_spread",
+   "label": "1st half \u00b7 spread",
+   "event_ticker": "KXLALIGA1HSPREAD-26OCT24RVCELC",
+   "markets": [
+    {
+     "ticker": "KXLALIGA1HSPREAD-26OCT24RVCELC-ELC2",
+     "label": "Elche wins the 1H by more than 1.5 goals",
+     "yes_ask": "0.0500",
+     "yes_bid": "0.0300",
+     "status": "active",
+     "model_key": null
+    },
+    {
+     "ticker": "KXLALIGA1HSPREAD-26OCT24RVCELC-RVC2",
+     "label": "Vallecano wins the 1H by more than 1.5 goals",
+     "yes_ask": "0.1400",
+     "yes_bid": "0.1200",
+     "status": "active",
+     "model_key": null
+    }
+   ]
+  },
+  {
+   "key": "h1_btts",
+   "label": "1st half \u00b7 BTTS",
+   "event_ticker": "KXLALIGA1HBTTS-26OCT24RVCELC",
+   "markets": [
+    {
+     "ticker": "KXLALIGA1HBTTS-26OCT24RVCELC-BTTS",
+     "label": "1st Half: Both Teams To Score",
+     "yes_ask": "0.1900",
+     "yes_bid": "0.1800",
+     "status": "active",
+     "model_key": null
+    }
+   ]
+  }
+ ],
+ "model": {
+  "model_version": "laliga-2026-v0",
+  "shadow": true,
+  "real_money_signals": false,
+  "primary": {
+   "run_id": "51592c8a-5258-4227-83e5-35c3649bf3dd",
+   "run_type": "scheduled",
+   "captured_at": "2026-10-24T00:51:57.838224+00:00",
+   "seed": 1174897915,
+   "n_simulations": 10000,
+   "outcomes": {
+    "home_win": 0.4813,
+    "draw": 0.2519,
+    "away_win": 0.2668
+   },
+   "tickers": {
+    "home_win": "KXLALIGAGAME-26OCT24RVCELC-RVC",
+    "draw": "KXLALIGAGAME-26OCT24RVCELC-TIE",
+    "away_win": "KXLALIGAGAME-26OCT24RVCELC-ELC"
+   },
+   "input_quality": {
+    "TEAM_DATA_FRESH": true,
+    "PLAYER_DATA_FRESH": false,
+    "AVAILABILITY_COMPLETE": false,
+    "LINEUP_CONFIRMED": false,
+    "GOALKEEPER_CONFIRMED": false
+   },
+   "xg": {
+    "home": 1.67,
+    "away": 1.214
+   },
+   "scorelines": [
+    {
+     "score": "1-1",
+     "prob": 0.1186
+    },
+    {
+     "score": "1-0",
+     "prob": 0.0994
+    },
+    {
+     "score": "2-1",
+     "prob": 0.0886
+    },
+    {
+     "score": "2-0",
+     "prob": 0.0771
+    },
+    {
+     "score": "0-1",
+     "prob": 0.0663
+    },
+    {
+     "score": "1-2",
+     "prob": 0.0653
+    },
+    {
+     "score": "0-0",
+     "prob": 0.0623
+    },
+    {
+     "score": "2-2",
+     "prob": 0.0557
+    },
+    {
+     "score": "3-1",
+     "prob": 0.055
+    },
+    {
+     "score": "3-0",
+     "prob": 0.0428
+    },
+    {
+     "score": "0-2",
+     "prob": 0.0395
+    },
+    {
+     "score": "3-2",
+     "prob": 0.0298
+    }
+   ],
+   "props": {
+    "btts": 0.5611,
+    "over_0_5": 0.9377,
+    "over_1_5": 0.772,
+    "over_2_5": 0.5368,
+    "over_3_5": 0.3223,
+    "over_4_5": 0.1613,
+    "over_5_5": 0.0764,
+    "home_margin_2": 0.2561,
+    "home_margin_3": 0.1066,
+    "away_margin_2": 0.1101,
+    "away_margin_3": 0.0367,
+    "home_first_goal": 0.5447,
+    "away_first_goal": 0.3983,
+    "no_goal": 0.057,
+    "home_team_over_0_5": 0.8075,
+    "home_team_over_1_5": 0.488,
+    "home_team_over_2_5": 0.2355,
+    "away_team_over_0_5": 0.6913,
+    "away_team_over_1_5": 0.333,
+    "away_team_over_2_5": 0.1211
+   },
+   "basis": {
+    "home_games": 41,
+    "away_games": 41,
+    "league_gpg": 1.486,
+    "venue_home": 1.13,
+    "home_attack": 0.953,
+    "home_defence": 1.003,
+    "away_attack": 0.937,
+    "away_defence": 1.044
+   }
+  },
+  "latest": {
+   "run_id": "51592c8a-5258-4227-83e5-35c3649bf3dd",
+   "run_type": "scheduled",
+   "captured_at": "2026-10-24T00:51:57.838224+00:00",
+   "seed": 1174897915,
+   "n_simulations": 10000,
+   "outcomes": {
+    "home_win": 0.4813,
+    "draw": 0.2519,
+    "away_win": 0.2668
+   },
+   "tickers": {
+    "home_win": "KXLALIGAGAME-26OCT24RVCELC-RVC",
+    "draw": "KXLALIGAGAME-26OCT24RVCELC-TIE",
+    "away_win": "KXLALIGAGAME-26OCT24RVCELC-ELC"
+   },
+   "input_quality": {
+    "TEAM_DATA_FRESH": true,
+    "PLAYER_DATA_FRESH": false,
+    "AVAILABILITY_COMPLETE": false,
+    "LINEUP_CONFIRMED": false,
+    "GOALKEEPER_CONFIRMED": false
+   },
+   "xg": {
+    "home": 1.67,
+    "away": 1.214
+   },
+   "scorelines": [
+    {
+     "score": "1-1",
+     "prob": 0.1186
+    },
+    {
+     "score": "1-0",
+     "prob": 0.0994
+    },
+    {
+     "score": "2-1",
+     "prob": 0.0886
+    },
+    {
+     "score": "2-0",
+     "prob": 0.0771
+    },
+    {
+     "score": "0-1",
+     "prob": 0.0663
+    },
+    {
+     "score": "1-2",
+     "prob": 0.0653
+    },
+    {
+     "score": "0-0",
+     "prob": 0.0623
+    },
+    {
+     "score": "2-2",
+     "prob": 0.0557
+    },
+    {
+     "score": "3-1",
+     "prob": 0.055
+    },
+    {
+     "score": "3-0",
+     "prob": 0.0428
+    },
+    {
+     "score": "0-2",
+     "prob": 0.0395
+    },
+    {
+     "score": "3-2",
+     "prob": 0.0298
+    }
+   ],
+   "props": {
+    "btts": 0.5611,
+    "over_0_5": 0.9377,
+    "over_1_5": 0.772,
+    "over_2_5": 0.5368,
+    "over_3_5": 0.3223,
+    "over_4_5": 0.1613,
+    "over_5_5": 0.0764,
+    "home_margin_2": 0.2561,
+    "home_margin_3": 0.1066,
+    "away_margin_2": 0.1101,
+    "away_margin_3": 0.0367,
+    "home_first_goal": 0.5447,
+    "away_first_goal": 0.3983,
+    "no_goal": 0.057,
+    "home_team_over_0_5": 0.8075,
+    "home_team_over_1_5": 0.488,
+    "home_team_over_2_5": 0.2355,
+    "away_team_over_0_5": 0.6913,
+    "away_team_over_1_5": 0.333,
+    "away_team_over_2_5": 0.1211
+   },
+   "basis": {
+    "home_games": 41,
+    "away_games": 41,
+    "league_gpg": 1.486,
+    "venue_home": 1.13,
+    "home_attack": 0.953,
+    "home_defence": 1.003,
+    "away_attack": 0.937,
+    "away_defence": 1.044
+   }
+  },
+  "t10_lock": null
+ },
+ "model_refusal": null,
+ "lineups": {
+  "home": {
+   "formation": null,
+   "confirmed": false,
+   "released": false,
+   "lineup_flag": {
+    "released": null,
+    "confirmed": false,
+    "named": 0,
+    "named_starters": 0,
+    "rule": "live.lineup_flag \u2014 per side, over NAMED entries: released = at least 11 named starters (None when the provider carries no named roster for the side), confirmed = released with exactly 11"
+   },
+   "starters": [],
+   "bench": [],
+   "goalkeeper": null,
+   "key_absences": null,
+   "key_absences_reason": "no player-strength feed for la-liga-2026 \u2014 absences are computed only for mls-2026"
+  },
+  "away": {
+   "formation": null,
+   "confirmed": false,
+   "released": false,
+   "lineup_flag": {
+    "released": null,
+    "confirmed": false,
+    "named": 0,
+    "named_starters": 0,
+    "rule": "live.lineup_flag \u2014 per side, over NAMED entries: released = at least 11 named starters (None when the provider carries no named roster for the side), confirmed = released with exactly 11"
+   },
+   "starters": [],
+   "bench": [],
+   "goalkeeper": null,
+   "key_absences": null,
+   "key_absences_reason": "no player-strength feed for la-liga-2026 \u2014 absences are computed only for mls-2026"
+  },
+  "strength_available": true
+ },
+ "venue_class": {
+  "class": "DOMESTIC",
+  "home_side": "home",
+  "basis": "league_countries",
+  "venue": {
+   "name": "Estadio de Vallecas",
+   "city": "Madrid",
+   "country": "Spain"
+  },
+  "rule": "picker.board.venue_class \u2014 the club board's own rule: the venue's country against the countries the league plays in (both sides' league here -> DOMESTIC, the label trusted)",
+  "neutral_site_flag_read": false,
+  "venue_country_canonical": "Spain",
+  "side_basis": "league_countries"
+ },
+ "traders_model": {
+  "title": "trader's model (tested)",
+  "tested": true,
+  "available": true,
+  "means": "What the trading agent prices this match from, read through the same interface it uses. EXPERIMENTAL, UNPROVEN: 'tested' means only that it passed a pre-registered replay of pre-seal history against the model it replaced \u2014 not a forecast of profit.",
+  "label": "experimental, unproven",
+  "fixture_key": "live:2144",
+  "source": "unified_model",
+  "model": "unified-nb-v1",
+  "verdict": "BETTER",
+  "read_at": "2026-10-24T04:31:43.915707+00:00",
+  "p_home": 0.5248260194,
+  "p_draw": 0.2484385024,
+  "p_away": 0.2267354782,
+  "lam_home": 1.617128439450205,
+  "lam_away": 0.9708478295251495,
+  "inputs_as_of": "2026-10-23T19:00:00+00:00"
+ },
+ "generated_at": "2026-10-24T04:31:43.985978+00:00",
+ "_demo": {
+  "league": "laliga",
+  "event_id": "401882830",
+  "saved_at": "2026-10-24"
+ }
+}
