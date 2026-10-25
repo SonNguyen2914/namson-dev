@@ -12,6 +12,7 @@ import { analystEnabled, isLoadError, loadMatch, runAsk } from "../../../lib/ana
 import {
   allowAsk, ASK_CAP_MESSAGE, BUDGET_MESSAGE, takeDailyCall,
 } from "../../../lib/analyst/limits";
+import { noteError } from "../../../lib/analyst/health";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
@@ -29,7 +30,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     sheet = (await loadMatch(String(body.league ?? ""), String(body.id ?? ""), body.demo ? String(body.demo) : undefined)).sheet;
   } catch (e) {
     const status = isLoadError(e) ? e.status : 502;
-    return res.status(status).json({ error: `Could not load this match: ${e instanceof Error ? e.message : String(e)}` });
+    const why = e instanceof Error ? e.message : String(e);
+    if (status >= 500) noteError("load", why);
+    return res.status(status).json({ error: `Could not load this match: ${why}` });
   }
-  return res.status(200).json(await runAsk(sheet, q));
+  const out = await runAsk(sheet, q);
+  if (!out.ok) noteError("ask", out.fallbackReason ?? "the reply could not be used");
+  return res.status(200).json(out);
 }
