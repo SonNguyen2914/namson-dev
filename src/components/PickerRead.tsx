@@ -368,9 +368,10 @@ export const SHAPE_DISPLAY_ONLY = "Display only: the shape annotates the three "
   + "model nor the trader acts on it. It is not a tested edge.";
 
 export function shapeTitle(read: ReadLike): string {
-  let line = "";
-  try { line = shapeRead(read); } catch { /* an axis without tiers: the legend alone */ }
-  return line ? `${line} ${SHAPE_DISPLAY_ONLY}` : SHAPE_DISPLAY_ONLY;
+  // the card's own sentence needs every axis's tier pair; a read missing
+  // one (an axis nobody measured) gets the legend alone, never a crash
+  const whole = (["ovr", "atk", "def"] as const).every((k) => Array.isArray(read.tiers?.[k]));
+  return whole ? `${shapeRead(read)} ${SHAPE_DISPLAY_ONLY}` : SHAPE_DISPLAY_ONLY;
 }
 
 export function ShapeChip({ read }: { read: ReadLike }) {
