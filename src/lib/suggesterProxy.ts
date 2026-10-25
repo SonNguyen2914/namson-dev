@@ -564,7 +564,13 @@ export const LEAGUE_PROXY_ALLOWED: Record<string, readonly string[]> = {
  *      shipped backend-first and could not be reached from the
  *      deployed frontend. Forwarding it exposes no class of data the
  *      mls/epl/laliga/ligamx proxies do not already forward.
- *    {key}/drift and {key}/journal  WITHHELD, with reasons, below.
+ *    {key}/drift  NOW FORWARDED (C26, 2026-10-25). Withheld until then
+ *      as expensive and unread; backend #282 serves it from the cached
+ *      series read the hubs already make, ends a settled event's window
+ *      at close and caches archived bars, and the withheld record said
+ *      the day a drift reader was wanted it moves here. One event per
+ *      request (`?event=` is required, 8–80 chars, `hours` ≤ 336).
+ *    {key}/journal  WITHHELD, with the reason, below.
  *
  *  A note on what this check still cannot see: `/api/comp` itself is a
  *  real backend route and does not start with `/api/comp/`, so
@@ -578,7 +584,7 @@ export const COMP_KEY = "[a-z][a-z-]{1,20}";
 export const HUB_MATCH_KEYS = ["bundesliga", "seriea", "ligue1", "eredivisie",
                                "unl", "cnl", "afcon"] as const;
 export const COMP_RESOURCES = ["fixtures", "markets", "ratings", "status",
-                               "tournament"] as const;
+                               "tournament", "drift"] as const;
 
 /** Per prefix, the id-bearing routes the allowlist cannot spell out.
  *  Kept beside the list rather than typed into eight handlers, so a
@@ -715,16 +721,6 @@ export const LEAGUE_PROXY_WITHHELD: Record<string, Record<string, string>> = {
       + "Positions, on a public frontend — the same reason the mls "
       + "journal is withheld above. src/pages/bet-suggester/leagues.tsx "
       + "already tells the reader the backend still serves it.",
-    "{key}/drift": "how each leg of one Kalshi event has PRICED over "
-      + "time. Withheld because it is EXPENSIVE BY CONSTRUCTION and "
-      + "unread: the backend's own docstring records that folding it "
-      + "into the fixtures payload means 100+ throttled candlestick "
-      + "calls per page load and that the exchange 429s well before "
-      + "that (measured 2026-08-10). A public proxy in front of it is "
-      + "an unauthenticated way to spend the operator's exchange "
-      + "quota. No surface in src/ reads it (checked 2026-09-07). If a "
-      + "drift chart is ever built, this record is deleted and the "
-      + "route added to COMP_RESOURCES — the two cannot both be true.",
   },
   site: {
     beacon: "the build beacon (backend #250, 2026-10-12): a local or CI "

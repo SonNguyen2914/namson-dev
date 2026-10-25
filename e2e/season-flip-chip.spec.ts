@@ -89,6 +89,26 @@ test("a sign flip draws ONE quiet chip, with the anchor's own sentence",
     await expect(page.getByTestId("season-flip")).toHaveCount(1);
   });
 
+test("the chip's hover names the GD/g gap whatever the column sorts on (C26): its numbers are always GD/g",
+  async ({ page }) => {
+    // sorted on the ppg gap, the anchor's key reads "ppg gap"; the hover
+    // used to borrow that key and said "the ppg gap is −0.25, not +1.37"
+    // about two GD/g figures
+    await page.addInitScript(() => {
+      try {
+        window.localStorage.setItem("picker.colsort.laliga",
+          JSON.stringify({ mode: "ppg", dir: "desc" }));
+      } catch { /* none */ }
+    });
+    await openBoard(page, flippedBoard());
+    const c = card(page, FLIP_EVENT);
+    await expect(c.getByTestId("anchor-key")).toHaveText(/ppg/i);
+    const chip = c.getByTestId("season-flip");
+    await expect(chip).toHaveAttribute("title",
+      /^ON THIS SEASON ALONE the GD\/g gap is −0\.25, not \+1\.37 /);
+    expect(await chip.getAttribute("title")).not.toMatch(/ppg/i);
+  });
+
 test("a material SAME-SIGN difference stays data: attribute, no chip",
   async ({ page }) => {
     await openBoard(page, flippedBoard());
