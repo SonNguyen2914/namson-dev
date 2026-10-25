@@ -94,13 +94,14 @@ test("the chip's hover names the GD/g gap whatever the column sorts on (C26): it
     // sorted on the ppg gap, the anchor's key reads "ppg gap"; the hover
     // used to borrow that key and said "the ppg gap is −0.25, not +1.37"
     // about two GD/g figures
-    await page.addInitScript(() => {
-      try {
-        window.localStorage.setItem("picker.colsort.laliga",
-          JSON.stringify({ mode: "ppg", dir: "desc" }));
-      } catch { /* none */ }
-    });
+    // the day bands' sort control is drawn from xl up
+    await page.setViewportSize({ width: 1440, height: 1000 });
     await openBoard(page, flippedBoard());
+    const bands = page.getByTestId("band-sort");
+    expect(await bands.count()).toBeGreaterThan(0);
+    for (let i = 0; i < await bands.count(); i += 1) {
+      await bands.nth(i).selectOption("ppg");
+    }
     const c = card(page, FLIP_EVENT);
     await expect(c.getByTestId("anchor-key")).toHaveText(/ppg/i);
     const chip = c.getByTestId("season-flip");
