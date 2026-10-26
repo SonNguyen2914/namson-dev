@@ -132,9 +132,10 @@ test("review screenshots (only when CUP_HUB_SHOTS is set)", async ({ page }) => 
  *  with no winner. The line reads the backend's derived `advanced` and
  *  never the score; with no derived winner it prints the backend's reason. */
 test("a cup tie decided on penalties names the side that advanced", async ({ page }) => {
-  const body = structuredClone(UCL_HUB_PAYLOAD) as typeof UCL_HUB_PAYLOAD & {
-    match: Record<string, unknown> };
-  const m = body.match as Record<string, any>;
+  type Side = { score: string | null };
+  const body = structuredClone(UCL_HUB_PAYLOAD);
+  const m = body.match as unknown as Record<string, unknown> & {
+    home: Side; away: Side; shootout?: Record<string, unknown> };
   m.state = "post"; m.detail = "FT-Pens";
   m.home.score = "1"; m.away.score = "1";
   m.shootout = {
