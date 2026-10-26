@@ -88,6 +88,38 @@ test("a 404 tournament read stays silent — the feature switch still "
     expect(await words(page)).not.toContain("could not ask");
   });
 
+test("a competition the backend flags with no tournament is never asked "
+   + "(live smoke 2026-10-26: a 404 console error on every ucl load)",
+  async ({ page }) => {
+    const asked: string[] = [];
+    page.on("request", (q) => {
+      if (q.url().includes("/tournament")) asked.push(q.url());
+    });
+    await page.route("**/api/comp/ucl/fixtures*", (r) => r.fulfill(json({
+      competition: "ucl", display: "Champions League", fixtures: [],
+      count: 0, tournament_surface: false,
+    })));
+    const listed = page.waitForResponse((r) => r.url().includes("/fixtures"));
+    await page.goto("/bet-suggester/comp/ucl");
+    await listed;
+    await page.waitForTimeout(800);
+    expect(asked).toEqual([]);
+  });
+
+test("a flagged competition is still asked — the flag gates, it does not "
+   + "switch the surface off", async ({ page }) => {
+    await compShell(page);
+    await page.route(`**/api/comp/${COMP}/fixtures*`, (r) => r.fulfill(json({
+      competition: COMP, display: "ASEAN", fixtures: [], count: 0,
+      tournament_surface: true,
+    })));
+    const answered = page.waitForRequest((q) => q.url().includes("/tournament"));
+    await page.route(TOURNAMENT_URL,
+      (r) => r.fulfill(json({ detail: "no tournament" }, 404)));
+    await page.goto(`/bet-suggester/comp/${COMP}`);
+    await answered;
+  });
+
 // ================================================================
 // THE REGISTER — every read on the owned surfaces that still ends in
 // a swallow, with the condition that closes it.

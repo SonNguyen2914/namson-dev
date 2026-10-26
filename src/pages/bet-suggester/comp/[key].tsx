@@ -86,6 +86,8 @@ type Payload = {
   model?: { state?: string; why?: string; instead?: string;
             note?: string | null };
   strength_notes?: { estimate_class?: string; estimate_meaning?: string };
+  /** whether /api/comp/{key}/tournament serves this competition */
+  tournament_surface?: boolean;
 };
 type Markets = {
   status?: string; series?: string; means?: string;
@@ -372,9 +374,16 @@ export default function CompViewer() {
         )}
 
         {/* WC26-style tournament surface — groups, bracket, champion
-            forecast. Mounts unconditionally; the backend's 404 is the
-            feature switch, so no per-competition frontend code. */}
-        {key && <TournamentView compKey={key} />}
+            forecast. Mounted once the fixtures read has settled, and asked
+            only when that payload's `tournament_surface` flag is not
+            false: the backend's registry says which competitions have
+            one, so no per-competition frontend code, and ucl and
+            leagues-cup no longer log a 404 on every load. A missing flag
+            (older backend, failed fixtures read) still asks, and the 404
+            switch decides. */}
+        {key && (d || err) && (
+          <TournamentView compKey={key} surface={d?.tournament_surface} />
+        )}
 
         <div className="mt-8 flex flex-wrap items-center gap-3 font-mono text-[10px] uppercase tracking-wide">
           {/* MISSING IS NOT ZERO. This read `{d?.count ?? 0} upcoming`

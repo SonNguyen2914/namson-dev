@@ -107,7 +107,15 @@ function StaleNotice({ reason }: { reason: string | null }) {
  *  and that does not change within a session. */
 const ABSENT_TOURNAMENTS = new Set<string>();
 
-export default function TournamentView({ compKey }: { compKey: string }) {
+/** `surface` is the fixtures payload's `tournament_surface` flag (live
+ *  smoke 2026-10-26: ucl and leagues-cup logged the 404 as a console
+ *  error on every load). `false` — the backend says there is no
+ *  tournament for this key, so nothing is asked and nothing is drawn.
+ *  `undefined` — the flag was not read (an older backend, or the
+ *  fixtures read failed), so the 404 switch below decides, as before. */
+export default function TournamentView({ compKey, surface }: {
+  compKey: string; surface?: boolean;
+}) {
   const [read, setRead] = useState<Read<Tournament>>({ s: "asking" });
   // A forecast that arrived once is KEPT when a later poll fails; the
   // poll is five minutes apart, so a stale bracket beats a vanished one.
@@ -163,7 +171,7 @@ export default function TournamentView({ compKey }: { compKey: string }) {
     setLastOk(j);
     setRead({ s: "ok", d: j });
     return "ok";
-  }, 300000, [compKey]);
+  }, 300000, [compKey], surface !== false);
 
   // NOTHING ASKED YET, and THE ANSWER WAS "no tournament for this
   // competition" — the only two states that may draw nothing at all.
