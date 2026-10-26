@@ -24,6 +24,13 @@ const COMP_PAGES = entries
   .filter((e) => e.isFile() && /^[a-z0-9-]+\.tsx$/.test(e.name) && e.name !== "index.tsx")
   .map((e) => e.name.replace(/\.tsx$/, "")).sort();
 
+const SECURITY_HEADERS = [
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+];
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 
@@ -33,6 +40,25 @@ const nextConfig: NextConfig = {
     // the landing page's Trivela VAR line, by the same switch as VAR
     // itself (ANALYST_ENABLED; the routes read it at request time)
     TRIVELA_ANALYST: process.env.ANALYST_ENABLED === "true" ? "on" : "off",
+  },
+
+  // SECURITY HEADERS ON EVERY RESPONSE (audit 2026-10-26). Until now the
+  // site sent only Vercel's own HSTS, so any other site could frame it —
+  // including the operator console, whose buttons POST halt / kill /
+  // kill-lift through /api/ops/* — and browsers were free to sniff types
+  // and send full URLs as the referrer. Framing is limited to this
+  // origin (X-Frame-Options for old browsers, CSP frame-ancestors for
+  // new ones). The CSP is frame-ancestors ONLY on purpose: a script/style
+  // policy needs nonces for Next's inline bootstrap and would have to
+  // list the Sofascore momentum iframe; it is a separate change.
+  // e2e/security-headers.spec.ts holds these.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: SECURITY_HEADERS,
+      },
+    ];
   },
 
   // /bet-suggester was the league carousel until 2026-08-30; it is the
