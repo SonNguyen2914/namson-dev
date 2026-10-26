@@ -95,9 +95,19 @@ type Markets = {
   listed_events?: number; tradeable_events?: number;
 };
 
+/** API-Football's in-play short statuses beyond the two halves: a cup
+ *  knockout in extra time (ET), at the break before it (BT) or in its
+ *  shootout (P) is live, not a kickoff still to come. */
+const LIVE_STATUS: Record<string, string> = {
+  "1H": "LIVE", "2H": "LIVE", HT: "LIVE", LIVE: "LIVE", INT: "LIVE",
+  ET: "LIVE ET", BT: "ET BREAK", P: "PENS",
+};
+
 function when(f: Fixture) {
-  if (f.status === "1H" || f.status === "2H" || f.status === "HT") {
-    return `LIVE ${f.elapsed ?? ""}'`;
+  const live = f.status ? LIVE_STATUS[f.status] : undefined;
+  if (live) {
+    return f.status === "BT" || f.status === "P"
+      ? live : `${live} ${f.elapsed ?? ""}'`;
   }
   if (!f.kickoff_utc) return "";
   const d = new Date(f.kickoff_utc);

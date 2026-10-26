@@ -350,3 +350,60 @@ test("the points-share chips sum to 100%, never 101%", async ({ page }) => {
   await expect(page.getByText(/55%\s*CAMBODIA/i).first()).toBeVisible();
   await expect(page.getByText(/56%\s*CAMBODIA/i)).toHaveCount(0);
 });
+
+test("a knockout in extra time or its shootout is live, not a kickoff to come",
+  async ({ page }) => {
+    // API-Football's ET / BT / P are in-play states; the page knew only
+    // 1H / 2H / HT, so a semi-final in extra time printed its kickoff
+    // clock time as if it had not started (round 3, 2026-10-26)
+    const body = structuredClone(PAYLOAD);
+    const fx = body.fixtures[0] as Record<string, unknown>;
+    fx.kickoff_utc = inHours(-2);
+    fx.round = "Semi-finals";
+    for (const [status, text] of [["ET", "LIVE ET 105'"], ["P", "PENS"],
+                                  ["BT", "ET BREAK"]] as const) {
+      fx.status = status; fx.elapsed = 105;
+      await page.unrouteAll();
+      await page.route("**/api/comp/asean/fixtures**", (r) =>
+        r.fulfill(json(body)));
+      await page.route("**/api/comp/asean/markets**", (r) =>
+        r.fulfill(json(MARKETS)));
+      await page.route("**/api/comp/asean/tournament", (r) =>
+        r.fulfill(json(TOURNAMENT)));
+      await page.goto("/bet-suggester/comp/asean");
+      await expect(page.getByRole("group")
+        .filter({ hasText: "Vietnam v Cambodia" }).first())
+        .toContainText(`Cambodia${text} · Semi-finals`);
+    }
+  });
+
+test("a published leg whose date is the provider's placeholder reads TBC",
+  async ({ page }) => {
+    // API-Football's TBD status: the kickoff is a placeholder, not a
+    // scheduled time — it must not print as "Dec 21, 7:00 PM"
+    const t = structuredClone(TOURNAMENT) as Record<string, unknown>;
+    t.bracket = {
+      projected: false, basis: "published knockout fixtures",
+      semifinals: [{
+        teams: [{ team: "Thailand", p_advance: 0.6 },
+                { team: "Vietnam", p_advance: 0.4 }],
+        legs: [
+          { kickoff_utc: inHours(48), status: "NS", home: "Thailand",
+            away: "Vietnam", goals: { home: null, away: null } },
+          { kickoff_utc: inHours(120), status: "TBD", home: "Vietnam",
+            away: "Thailand", goals: { home: null, away: null } }],
+        aggregate: null, legs_settled: 0 }],
+      final_ties: [],
+    };
+    await page.route("**/api/comp/asean/fixtures**", (r) =>
+      r.fulfill(json(PAYLOAD)));
+    await page.route("**/api/comp/asean/markets**", (r) =>
+      r.fulfill(json(MARKETS)));
+    await page.route("**/api/comp/asean/tournament", (r) =>
+      r.fulfill(json(t)));
+    await page.goto("/bet-suggester/comp/asean");
+    await expect(page.getByText("leg 2 · Vietnam v Thailand · date TBC"))
+      .toBeVisible();
+    await expect(page.getByText(/leg 1 · Thailand v Vietnam · \w{3} \d+, /))
+      .toBeVisible();
+  });

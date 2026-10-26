@@ -124,3 +124,33 @@ test("review screenshots (only when CUP_HUB_SHOTS is set)", async ({ page }) => 
     }
   }
 });
+
+/** A KNOCKOUT DECIDED ON PENALTIES NAMES WHO WENT THROUGH (round 3,
+ *  2026-10-26). The backend has served `match.shootout` on every cup hub
+ *  since 2026-09-03 (comp_match.parse_shootout) and the hub drew only the
+ *  level score, so a 1-1 tie Lille won 5-4 on penalties read as a draw
+ *  with no winner. The line reads the backend's derived `advanced` and
+ *  never the score; with no derived winner it prints the backend's reason. */
+test("a cup tie decided on penalties names the side that advanced", async ({ page }) => {
+  type Side = { score: string | null };
+  const body = structuredClone(UCL_HUB_PAYLOAD);
+  const m = body.match as unknown as Record<string, unknown> & {
+    home: Side; away: Side; shootout?: Record<string, unknown> };
+  m.state = "post"; m.detail = "FT-Pens";
+  m.home.score = "1"; m.away.score = "1";
+  m.shootout = {
+    teams: [{ team: "Arsenal", taken: 5, scored: 4 },
+            { team: "Lille", taken: 5, scored: 5 }],
+    advanced: "Lille", advanced_unavailable_reason: null,
+  };
+  await open(page, { ...UCL, body });
+  await expect(page.getByTestId("shootout")).toContainText(
+    "Lille advanced on penalties (Arsenal 4–5 Lille)");
+
+  m.shootout = { ...m.shootout, advanced: null,
+    advanced_unavailable_reason: "the provider did not send every kick" };
+  await open(page, { ...UCL, body });
+  await expect(page.getByTestId("shootout")).toContainText(
+    "the provider did not send every kick");
+  await expect(page.getByTestId("shootout")).not.toContainText("advanced on");
+});

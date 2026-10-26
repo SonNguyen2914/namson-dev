@@ -74,7 +74,14 @@ type Match = { id: string; date?: string; state?: string; detail?: string;
   /** ESPN's own flag (comp_match.enrich). NOT a measurement — false on
    *  every recorded national summary, neutral grounds included — so it
    *  is never read as "home" (see VenueLine). */
-  neutral_site?: boolean | null };
+  neutral_site?: boolean | null;
+  /** comp_match.parse_shootout: who went through on penalties, derived
+   *  from the kick list once the tie is OVER — or null with the named
+   *  reason. The score above it is level; never derive a winner from it. */
+  shootout?: Shootout | null };
+type Shootout = {
+  teams?: { team?: string; taken?: number | null; scored?: number | null }[];
+  advanced?: string | null; advanced_unavailable_reason?: string | null };
 type XiPlayer = { name?: string; position?: string; jersey?: string;
   xg90?: number | null; apps?: number | null; is_goalkeeper?: boolean };
 type Absence = { name?: string; xg90?: number; apps?: number;
@@ -574,6 +581,9 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                   </div>
                   <TeamBlock s={m.away} right form={formOf(m, m.away.abbrev)} />
                 </div>
+                {(live || post) && m.shootout && (
+                  <ShootoutLine so={m.shootout} />
+                )}
                 <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3">
                   <span className="rounded-md border border-line px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">
                     {cfg.chip(model, run)}
@@ -1004,6 +1014,25 @@ function FormStrip({ form, name }: { form?: string | null; name?: string }) {
 
 /** The scouting block's form string for one side, by abbreviation —
  *  compacted for the strip ("W L D W W" → "WLDWW"). */
+/** A knockout decided on penalties: the side the backend derived as
+ *  through, with the kicks, or the backend's reason there is none yet.
+ *  Without this a 2-2 cup tie read as a draw with no winner. */
+function ShootoutLine({ so }: { so: Shootout }) {
+  const t = so.teams ?? [];
+  const kicks = t.length === 2
+    ? `${t[0].team ?? "?"} ${t[0].scored ?? "?"}–${t[1].scored ?? "?"} ${t[1].team ?? "?"}`
+    : null;
+  return (
+    <p data-testid="shootout" data-advanced={so.advanced ?? ""}
+      className="mt-3 text-center font-mono text-[11px] text-ink-mid">
+      {so.advanced
+        ? <>{so.advanced} advanced on penalties{kicks ? ` (${kicks})` : ""}</>
+        : <>penalties{kicks ? ` ${kicks}` : ""} — {so.advanced_unavailable_reason
+            ?? "no side has advanced yet"}</>}
+    </p>
+  );
+}
+
 function formOf(m: Match, abbrev?: string): string | undefined {
   if (!abbrev) return undefined;
   return m.scouting?.last_five
