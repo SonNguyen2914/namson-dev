@@ -57,8 +57,9 @@ const c2 = (v: unknown) => {
   return n === null ? "—" : `${n >= 0 ? "+" : "−"}${Math.abs(n).toFixed(2)}c`;
 };
 const NOT_SERVED = "not served yet";
-/** a ground whose result numbers are sealed (second-seal look, until
- *  2026-11-08): counts only, never its mean, interval or wins */
+/** a ground whose result numbers are sealed (second-seal look; kickoffs
+ *  through 2026-11-08, lifted 2026-11-09 00:00 UTC — backend src/seal.py):
+ *  counts only, never its mean, interval or wins */
 export const isSealedGround = (g: string) => g.startsWith("inplay:");
 /** the gate-verdict grounds, in the backend's order
  *  (careful.MEASUREMENT_GROUNDS) */
@@ -312,8 +313,8 @@ export function TradingCareful({ d, token }: { d: Obj; token: string }) {
                     data-sealed={sealed ? "true" : undefined} className="flex flex-wrap justify-between gap-2 py-0.5">
                     <span className="text-ink-hi"><span className="font-mono text-[11.5px]">{g}</span> <span className="text-ink-low">({kind})</span></span>
                     {sealed ? (
-                      <span className="tc-num text-ink-mid" title="Its results are sealed until 8 Nov (second-seal look): counts only">
-                        n {num(s.n) ?? "—"} · {num(s.matches) ?? "—"} matches · results sealed until 8 Nov
+                      <span className="tc-num text-ink-mid" title="Its results are sealed through 8 Nov (second-seal look): counts only">
+                        n {num(s.n) ?? "—"} · {num(s.matches) ?? "—"} matches · results sealed through 8 Nov
                       </span>
                     ) : (
                       <span className="tc-num text-ink-mid">

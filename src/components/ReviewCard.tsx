@@ -1156,8 +1156,10 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
               Weight still says who won; nothing competes for it. */}
           <FavPip side="home" favSide={favSide} />
           <span className={`text-sm ${scoreTone("home")}`}>{row.home}</span>
-          <span className="font-mono text-lg font-semibold tabular-nums text-ink-hi">
-            {res ? `${res.home}–${res.away}` : "—"}
+          <span className="font-mono text-lg font-semibold tabular-nums text-ink-hi"
+            data-sealed={row.sealed ? "true" : undefined}
+            title={row.sealed ? SHOT_GAP_WORDS.sealed : undefined}>
+            {res ? `${res.home}–${res.away}` : row.sealed ? "sealed" : "—"}
           </span>
           <FavPip side="away" favSide={favSide} />
           <span className={`text-sm ${scoreTone("away")}`}>{row.away}</span>
@@ -1350,8 +1352,9 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
         {gap ? (
           <p data-testid="shot-gap" data-gap={gap}
             className="mt-2 rounded-md border border-dashed border-line px-2 py-1.5 font-mono text-[10px] leading-relaxed text-ink-low">
-            {SHOT_GAP_WORDS[gap]}. The score above is the scoreboard&apos;s,
-            and it stands on its own.
+            {SHOT_GAP_WORDS[gap]}.{gap === "sealed" ? null : (
+              <> The score above is the scoreboard&apos;s, and it stands on
+              its own.</>)}
           </p>
         ) : shotFailure ? (
           <p data-testid="shot-error"

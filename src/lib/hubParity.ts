@@ -494,7 +494,7 @@ export const VENUE_SOURCE_WORDS: Record<"hub_route" | "frozen_read",
  *  its failure in `error`, and the card still draws that as a failure. */
 export const SHOT_NOT_KNOWN_CODES = ["not_requested",
   "no_play_by_play_published", "empty_play_by_play",
-  "team_ids_missing"] as const;
+  "team_ids_missing", "sealed"] as const;
 export type ShotNotKnown = (typeof SHOT_NOT_KNOWN_CODES)[number];
 export type ShotGap = ShotNotKnown | "unrecognised";
 
@@ -517,6 +517,14 @@ export const SHOT_GAP_WORDS: Record<ShotGap, string> = {
     "the two sides' ESPN team ids are missing or identical in the match "
     + "archive, so a play cannot be credited to either side. Not known — "
     + "not a goalless tape",
+  /* THE RESEARCH SEAL (backend src/seal.py, 2026-10-25): a match kicking
+     off 28 Sep – 8 Nov has its result, shot state and verdicts withheld
+     by the review routes until the look (`sealed: true`,
+     `result_missing_reason: "sealed"`). */
+  sealed:
+    "this match kicked off inside the research seal (28 Sep – 8 Nov), so "
+    + "its score, shot state and verdicts are hidden until the look on "
+    + "9 Nov. Withheld on purpose — not a failed read",
   unrecognised:
     "the backend says this match's shot state is not known, for a reason "
     + "this page has no words for. Not known — not a goalless tape, and "
