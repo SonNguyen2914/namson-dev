@@ -227,6 +227,11 @@ export interface ReviewRow {
   /** Which outcome happened and whether each side's top outcome at the
    *  lock was it. PER MATCH ONLY: nothing on the site tallies these. */
   result_lean?: ResultLean | null;
+  /** THE RESEARCH SEAL (backend src/seal.py): true on a row whose outcome
+   *  the backend withholds until the look; `result` is then null with
+   *  `result_missing_reason: "sealed"`. Absent on every other row. */
+  sealed?: boolean;
+  result_missing_reason?: string | null;
 }
 
 /** The frozen block: the board's `ModelVsMarket` shape, plus where and
