@@ -31,5 +31,23 @@ export function cacheSet<T>(key: string, value: T, now = Date.now()) {
 
 export const cacheStats = () => ({ hits, misses, size: store.size });
 
+// ONE PREVIEW IN FLIGHT PER KEY (review finding 4, 2026-10-25). Before
+// this, every visitor who opened an uncached match while its first preview
+// was still being written started another LLM run for the same key. A
+// request that finds one in flight waits for it instead.
+const inflight = new Map<string, Promise<unknown>>();
+
+export function inflightGet<T>(key: string): Promise<T> | null {
+  return (inflight.get(key) as Promise<T> | undefined) ?? null;
+}
+
+/** Runs `make` as the one in-flight read for `key`, and forgets it when it
+ *  settles (either way). */
+export function inflightRun<T>(key: string, make: () => Promise<T>): Promise<T> {
+  const p = make().finally(() => { if (inflight.get(key) === p) inflight.delete(key); });
+  inflight.set(key, p);
+  return p;
+}
+
 /** Test hook. */
-export function cacheClear() { store.clear(); hits = 0; misses = 0; }
+export function cacheClear() { store.clear(); inflight.clear(); hits = 0; misses = 0; }

@@ -25,6 +25,7 @@ import type { KeyboardEvent, PointerEvent, ReactNode } from "react";
 import ErrorBoundary from "./ErrorBoundary";
 import { failureOf, NEVER_ANSWERED } from "../lib/httpFailure";
 import { usePoll } from "../lib/usePoll";
+import { TZ } from "../lib/matchday";
 
 export type Tri = { home: number; draw: number; away: number };
 type O = keyof Tri;
@@ -122,11 +123,17 @@ function wall(iso?: string | null) {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  // the site's one zone (lib/matchday.ts TZ), never the viewer's
+  return d.toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" });
 }
 
-/** Everything the chart and rows read, built once per payload. */
-function buildSeries(series: Series, match: MvmMatch, nowMs: number) {
+/** Everything the chart and rows read, built once per payload and again
+ *  as the clock ticks. `nowMs` is the WALL CLOCK, not the time of the last
+ *  successful read: a feed that stops answering must age into "held"
+ *  (review finding 3, 2026-10-25 — it used to stay "● live" for as long as
+ *  the reads kept failing). `readAtMs` is when this payload arrived, for
+ *  ageing a payload-relative `age_seconds`. */
+function buildSeries(series: Series, match: MvmMatch, nowMs: number, readAtMs = nowMs) {
   const minutes = (series.minutes ?? []).filter((r) => Number.isFinite(r?.m));
   const state = match.state ?? series.state ?? "";
   const kick = series.kickoff_utc ? new Date(series.kickoff_utc).getTime() : NaN;
@@ -145,8 +152,11 @@ function buildSeries(series: Series, match: MvmMatch, nowMs: number) {
   else {
     const at = series.latest?.captured_at
       ? new Date(series.latest.captured_at).getTime() : NaN;
+    const rel = series.latest?.age_seconds;
+    // no tape clock at all (latest: null) is not evidence of a live feed
     const age = Number.isFinite(at) ? (nowMs - at) / 1000
-      : (series.latest?.age_seconds ?? 0);
+      : typeof rel === "number" && Number.isFinite(rel) ? rel + Math.max(0, nowMs - readAtMs) / 1000
+      : Infinity;
     mode = age > HELD_AFTER_S ? "held" : "live";
   }
 
@@ -465,10 +475,11 @@ function Absent({ why, state }: { why: string; state: string }) {
   );
 }
 
-function Board({ series, match, readAtMs }: {
-  series: Series; match: MvmMatch; readAtMs: number }) {
-  const b = useMemo(() => buildSeries(series, match, readAtMs),
-    [series, match, readAtMs]);
+function Board({ series, match, readAtMs, nowMs, staleErr }: {
+  series: Series; match: MvmMatch; readAtMs: number; nowMs: number;
+  staleErr?: string | null }) {
+  const b = useMemo(() => buildSeries(series, match, nowMs, readAtMs),
+    [series, match, nowMs, readAtMs]);
   const [pinned, setPinned] = useState<number | null>(null);
   const cursor = pinned != null && b.steps.includes(pinned) ? pinned : b.lastStep;
   const atNow = cursor === b.lastStep;
@@ -571,6 +582,13 @@ function Board({ series, match, readAtMs }: {
             </button>
           </div>
         </div>
+        {staleErr && (
+          <p data-testid="mvm-stale" role="status"
+            className="mt-2 rounded-lg border border-warn/50 px-3 py-2 font-mono text-[12px] leading-relaxed text-warn">
+            The last refresh failed: {staleErr}. What is drawn is the read
+            received {wall(new Date(readAtMs).toISOString()) ?? "earlier"}, not a current one.
+          </p>
+        )}
         {!live && (
           <span data-testid="mvm-pill" className={`mt-2 inline-block whitespace-nowrap rounded-md border px-1.5 py-0.5 font-mono text-[11px] uppercase tracking-[0.08em] ${pill.cls}`}>
             {pill.text}
@@ -725,6 +743,13 @@ function Section({ api, eventId, match }: { api: string; eventId: string; match:
   const [series, setSeries] = useState<Series | Refused | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [readAtMs, setReadAtMs] = useState(0);
+  // THE CLOCK TICKS ON ITS OWN, so "live" is judged against now and not
+  // against the last read that happened to succeed
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 15_000);
+    return () => clearInterval(t);
+  }, []);
   usePoll(async (signal) => {
     let r: Response;
     try {
@@ -738,7 +763,9 @@ function Section({ api, eventId, match }: { api: string; eventId: string; match:
     const d = await r.json();
     if (signal.aborted) return "stop";
     setSeries(d && typeof d === "object" ? d : null);
-    setReadAtMs(Date.now());
+    const t = Date.now();
+    setReadAtMs(t);
+    setNowMs(t);
     setErr(null);
     if (!d?.available) return "stop";
     return d.state === "post" || match.state === "post" ? "stop" : "ok";
@@ -764,7 +791,8 @@ function Section({ api, eventId, match }: { api: string; eventId: string; match:
       ? "The state tape holds no reading for it, so there is nothing to draw — not a flat line."
       : "Nothing was recorded for it yet."} />;
   }
-  return <Board series={series} match={match} readAtMs={readAtMs} />;
+  return <Board series={series} match={match} readAtMs={readAtMs}
+    nowMs={Math.max(nowMs, readAtMs)} staleErr={err} />;
 }
 
 export default function ModelVsMarket(props: { api: string; eventId: string; match: MvmMatch }) {

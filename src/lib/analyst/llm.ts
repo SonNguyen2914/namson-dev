@@ -76,7 +76,7 @@ export class MockClient implements LlmClient {
       risks: ["The away side still wins {{F3}} of simulations."],
       market_view: "The market prices are on the fact sheet; compare them with the model's numbers.",
       confidence: "medium",
-    }) : "Trivela's model has the draw at {{F2}}, roughly one game in four. Confidence: medium";
+    }) : "Trivela's model has the draw at {{F2}}, a real chance. Confidence: medium";
     return { text, provider: "mock", model: "mock" };
   }
 }

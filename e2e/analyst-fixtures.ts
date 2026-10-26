@@ -33,7 +33,7 @@ export const failedPreviewFor = (slug: string): Promise<PreviewOut> => {
   return runPreview(sheetOf(slug), down);
 };
 export const askFor = (slug: string): Promise<AskOut> =>
-  runAsk(sheetOf(slug), "How likely is a draw?", new MockClient(["The draw lands in {{F2}} of Trivela's simulations, roughly one game in four. Confidence: medium"]));
+  runAsk(sheetOf(slug), "How likely is a draw?", new MockClient(["The draw lands in {{F2}} of Trivela's simulations, a real chance. Confidence: medium"]));
 
 /** VAR v2: the backend's saved pre-kickoff rung for the same match, in
  *  the shape /api/epl/match/<id>/saved-rung serves (var-saved-rung-v1).

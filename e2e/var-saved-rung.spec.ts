@@ -75,13 +75,24 @@ test.describe("which sheet VAR reads", () => {
     expect(sheet.basis?.label).toBe(LABEL);
   });
 
-  test("no rung saved: the live read, unlabelled", () => {
+  test("no rung saved, after kickoff: the live read WITHOUT its in-play prices", () => {
+    // review finding 2 (2026-10-25): this used to hand VAR the live
+    // read's in-play model and book, unlabelled (0.5076 here)
     for (const rung of [ok({ available: false, reason: "no_saved_rung" }), failed(), null]) {
       const { sheet, runId } = chooseSheet("epl", EPL_EVENT, ok(EPL_PAYLOAD_IN_PLAY), rung);
       expect(sheet.basis).toBeUndefined();
-      expect(sheet.facts.find((x) => x.label === "Arsenal win probability")?.value).toBe(0.5076);
+      expect(sheet.frozenUnavailable).toMatch(/frozen pre-kickoff read is unavailable/);
+      expect(sheet.facts.find((x) => x.label === "Arsenal win probability")).toBeUndefined();
+      expect(sheet.facts.some((x) => x.kind === "prob" || x.kind === "price")).toBe(false);
       expect(runId).not.toContain("saved");
     }
+  });
+
+  test("no rung needed before kickoff: the live read, priced and unlabelled", () => {
+    const { sheet } = chooseSheet("epl", EPL_EVENT, ok(EPL_PAYLOAD), null);
+    expect(sheet.basis).toBeUndefined();
+    expect(sheet.frozenUnavailable).toBeUndefined();
+    expect(sheet.facts.find((x) => x.label === "Arsenal win probability")?.value).toBe(0.5076);
   });
 
   test("neither: the live read's own error, unchanged", () => {
@@ -107,7 +118,7 @@ test.describe("which sheet VAR reads", () => {
   });
 });
 
-test.describe("the verifier, unchanged, on a rung sheet", () => {
+test.describe("the verifier on a rung sheet", () => {
   const sheet = buildRungSheet("epl", EPL_EVENT, EPL_SAVED_RUNG, EPL_PAYLOAD_IN_PLAY);
   test("a placeholder renders the rung's number; an invented one is flagged", () => {
     expect(checkText("Arsenal at {{F1}}.", sheet).segments.find((s) => s.type === "fact")?.text).toBe("54%");

@@ -34,11 +34,26 @@ function worstCaseBoard() {
   return board;
 }
 
+/** THE BOARD AT REST (review finding 9, 2026-10-25). The league ribbon
+ *  seats the board on a whole column after load, and while it travels a
+ *  card measured mid-slide fails the geometry by a fraction of a column —
+ *  the flake on the Leagues test. Its strip says where it is in `data-pos`
+ *  (LeagueRibbon.tsx, a real number); measuring waits for a whole one. */
+async function boardAtRest(page: Page) {
+  await page.waitForFunction(() => {
+    const el = document.querySelector<HTMLElement>("[data-pos]");
+    if (!el) return true;               // no ribbon on this board: nothing travels
+    const p = Number(el.dataset.pos);
+    return Number.isFinite(p) && Math.abs(p - Math.round(p)) < 0.002;
+  }, undefined, { timeout: 15_000 });
+}
+
 async function leagues(page: Page) {
   await page.clock.install({ time: new Date(CLUB_H2H_CLOCK) });
   await routeEight(page, worstCaseBoard());
   await page.goto("/bet-suggester");
   await page.waitForSelector('[data-testid="picker-row"] [data-testid="field-ranks-open"]');
+  await boardAtRest(page);
 }
 
 async function championships(page: Page) {
@@ -85,8 +100,13 @@ async function geometry(page: Page, card: Locator) {
       vw: document.documentElement.clientWidth,
     };
   });
+  // SETTLED means unchanged across ~100 ms, not across two reads one
+  // round trip apart: a board still sliding moved by less than a read's
+  // rounding between back-to-back reads and passed as settled
+  await boardAtRest(page);
   let prev = JSON.stringify(await read());
   for (let i = 0; i < 25; i++) {
+    await page.waitForTimeout(100);
     const next = await read();
     if (JSON.stringify(next) === prev) return next;
     prev = JSON.stringify(next);
@@ -100,6 +120,7 @@ async function geometry(page: Page, card: Locator) {
  *  always among those measured. */
 async function onScreen(page: Page) {
   await page.waitForTimeout(300);
+  await boardAtRest(page);
   return page.locator('[data-testid="picker-row"]').evaluateAll((els) => {
     const vw = document.documentElement.clientWidth;
     return els.map((e, i) => ({ i, b: e.getBoundingClientRect(),

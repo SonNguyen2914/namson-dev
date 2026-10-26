@@ -1124,7 +1124,23 @@ function ActRecord({ result }: { result: ActResult }) {
       </p>
     );
   }
-  const w = result.res.watchlist;
+  const w = result.res?.watchlist;
+  // AN ANSWER THAT CARRIES NO DECLARATION IS NOT ONE (review finding 5,
+  // 2026-10-25). A 2xx whose body is an error (or anything without a
+  // `watchlist`) used to crash the board here; it is drawn as the failure
+  // it is, in its own words when it has any.
+  if (!w || typeof w !== "object") {
+    const b = result.res as unknown as { detail?: unknown; error?: unknown } | null;
+    const said = typeof b?.detail === "string" ? b.detail
+      : typeof b?.error === "string" ? b.error : null;
+    return (
+      <p data-testid="watch-error"
+        className="basis-full font-mono text-[10px] leading-relaxed text-warn">
+        the answer carried no declaration record{said ? `: ${said}` : ""} —
+        nothing here says whether anything was recorded
+      </p>
+    );
+  }
   if (w.dormant) {
     return (
       <p data-testid="watch-result" data-code="dormant"
@@ -1143,8 +1159,8 @@ function ActRecord({ result }: { result: ActResult }) {
       {w.recorded && (
         <span className="text-ink-faint">
           {" "}— written as event {w.event_id}, actor {w.actor}, on fixture{" "}
-          {result.res.resolved_fixture.fixture_id}
-          {result.res.resolved_fixture.competition
+          {result.res.resolved_fixture?.fixture_id ?? "unknown"}
+          {result.res.resolved_fixture?.competition
             ? ` (${result.res.resolved_fixture.competition})` : ""}
         </span>
       )}

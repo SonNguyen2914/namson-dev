@@ -643,18 +643,29 @@ function FieldRanks({ block, drawn, absent, measures = false, context = [],
       const top = t.top - inset;
       const vw = document.documentElement.clientWidth;
       const { w } = size.current;
-      if (b.right + GAP + w <= vw - EDGE) {
-        setPlace({ mode: "right", left: b.right + GAP, top });
-      } else if (c.left - GAP - w >= EDGE) {
-        setPlace({ mode: "left", left: c.left - GAP - w, top });
-      } else {
-        setPlace({ mode: "drop", left: 0, top: 0 });
-      }
+      const next = b.right + GAP + w <= vw - EDGE
+        ? { mode: "right" as const, left: b.right + GAP, top }
+        : c.left - GAP - w >= EDGE
+          ? { mode: "left" as const, left: c.left - GAP - w, top }
+          : { mode: "drop" as const, left: 0, top: 0 };
+      // the same place is not a new one: no render for a box that held still
+      setPlace((p) => p && p.mode === next.mode && p.left === next.left && p.top === next.top ? p : next);
     };
     measure();
     window.addEventListener("resize", measure);
     window.addEventListener("scroll", measure, true);
+    /* AND EVERY FRAME WHILE OPEN (review finding 9, 2026-10-25). The
+       league ribbon moves the board without a scroll event — it seats a
+       column with a transform and rotates cards — so a box placed off one
+       measurement was left where the card USED to be. One box is open at
+       a time and `place` only changes when the numbers do, so the frame
+       loop costs a few rect reads. */
+    let raf = requestAnimationFrame(function tick() {
+      measure();
+      raf = requestAnimationFrame(tick);
+    });
     return () => {
+      cancelAnimationFrame(raf);
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure, true);
       // closed: the next opening measures afresh, hidden until it has
