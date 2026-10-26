@@ -52,7 +52,8 @@
 // stat that is not on the payload renders "—", never 0, and no bar is
 // drawn from a number that is missing. A live_now with no state renders
 // exactly what it rendered before this readout existed.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { usePoll } from "../lib/usePoll";
 import {
   MatchStates, STATE_ABSENT_WORDS, readMatchStates,
 } from "../lib/suggesterApi";
@@ -2750,8 +2751,9 @@ function EvidenceLine({ e, resp }: { e?: EvidenceLayer; resp: CardResponse }) {
 // the reader is told when this card is behind even while this constant
 // is not tuned for it.
 //
-// Polling runs ONLY while live_now is on the payload, and only while
-// the tab is visible.
+// Polling runs while live_now is on the payload, and while a read is
+// failing (a first read that failed must be retried), and only while
+// the tab is visible (lib/usePoll).
 const LIVE_REFRESH_MS = 60_000;
 
 const stampUtc = () => `${new Date().toISOString().slice(11, 19)}Z`;
@@ -2770,60 +2772,52 @@ export default function SuggestionCard({ competition, eventId }: {
   // the client-elapsed anchor the tick age advances from — never the
   // viewer's wall clock against a server timestamp
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
-  const alive = useRef(true);
   const held = useRef<CardResponse | null>(null);
 
-  const load = useCallback(() =>
-    fetch(`/api/card/${competition}/${eventId}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then((d: CardResponse) => {
-        if (!alive.current) return;
-        held.current = d;
-        setResp(d); setErr(null); setStale(false);
-        setUpdatedAt(stampUtc()); setFetchedAt(Date.now());
-      })
-      .catch((e) => {
-        if (!alive.current) return;
-        // only a FIRST fetch with nothing to hold becomes the error
-        // panel; a failed refresh marks the held card stale instead
-        if (held.current) setStale(true);
-        else setErr(typeof e === "number" ? e : 0);
-      }), [competition, eventId]);
+  /* ONE READ AT A TIME, THROUGH lib/usePoll (2026-10-25). This was a
+     mount-time `load()` plus a bare `setInterval` that ran ONLY while
+     `live_now` was on the payload, with a visibility handler that fired
+     another `load()` beside it. Two defects followed:
+       - a failed FIRST read has no payload, so it never broadcast and
+         was never retried: one 503 on mount kept "card unavailable" up
+         for the life of the tab;
+       - nothing stopped two reads overlapping or aborted a superseded
+         one, so an older response landing after a newer one put older
+         numbers on screen while `fetchedAt` said they were fresh.
+     usePoll never overlaps, aborts on unmount or a new fixture, pauses
+     in a hidden tab and backs off while failing. The task decides
+     whether to keep going: retry while the read fails (with or without
+     a held card), keep polling while the card broadcasts, and stop once
+     a pre or post card has been read — it cannot change on its own. */
+  usePoll(async (signal) => {
+    const fail = (status: number) => {
+      if (signal.aborted) return;
+      // only a FIRST fetch with nothing to hold becomes the error
+      // panel; a failed refresh marks the held card stale instead
+      if (held.current) setStale(true);
+      else setErr(status);
+    };
+    let d: CardResponse;
+    try {
+      const r = await fetch(`/api/card/${competition}/${eventId}`, { signal });
+      if (!r.ok) { fail(r.status); return "failed"; }
+      d = await r.json();
+    } catch {
+      if (signal.aborted) return "stop";
+      fail(0);
+      return "failed";
+    }
+    if (signal.aborted) return "stop";
+    held.current = d;
+    setResp(d); setErr(null); setStale(false);
+    setUpdatedAt(stampUtc()); setFetchedAt(Date.now());
+    // the broadcast switch: present only while the fixture is in play
+    return d?.card?.layers?.inplay_plan?.live_now != null ? "ok" : "stop";
+  }, LIVE_REFRESH_MS, [competition, eventId]);
 
   // No synchronous reset here: the mount sites key this component by
   // eventId, so a different fixture remounts it with fresh state.
-  useEffect(() => {
-    alive.current = true;
-    load();
-    return () => { alive.current = false; };
-  }, [load]);
-
   const card = resp?.card;
-  // the broadcast switch: present only while the fixture is in play
-  const broadcasting = card?.layers?.inplay_plan?.live_now != null;
-
-  useEffect(() => {
-    if (!broadcasting) return;            // pre/post: no timer at all
-    let timer: ReturnType<typeof setInterval> | null = null;
-    const stop = () => {
-      if (timer !== null) { clearInterval(timer); timer = null; }
-    };
-    const start = () => {
-      if (timer === null) timer = setInterval(() => { load(); },
-                                              LIVE_REFRESH_MS);
-    };
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") { load(); start(); }
-      else stop();                        // hidden tab polls nothing
-    };
-    if (document.visibilityState === "visible") start();
-    document.addEventListener("visibilitychange", onVisibility);
-    // unmount, or live_now disappearing at full time, clears the timer
-    return () => {
-      stop();
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [broadcasting, load]);
 
   const layers = card?.layers;
   const id = layers?.identity;

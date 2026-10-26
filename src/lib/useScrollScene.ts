@@ -168,8 +168,7 @@ export function useMediaQuery(query: string, fallback = false): boolean {
    recomputed on a resize only when the width changed or the height moved
    by 120px or more (a rotation, a window drag, a keyboard). */
 const gate = { w: 0, h: 0, on: true };
-const gateOpen = () => {
-  const w = window.innerWidth, h = window.innerHeight;
+const gateOpen = (w = window.innerWidth, h = window.innerHeight) => {
   return !window.matchMedia(RM).matches && h >= 540 && !(w >= 1024 && h < 620);
 };
 function gateRead() {
@@ -179,6 +178,23 @@ function gateRead() {
 }
 function gateSubscribe(fn: () => void) {
   const mq = window.matchMedia(RM);
+  /* RE-READ ON ATTACH. The gate is module state and the listeners below
+     live only while a page that reads it is mounted. A reader who leaves
+     for another page, rotates the phone (or drags the window short, or
+     flips reduced motion) there, and comes back by client-side
+     navigation would otherwise get the gate computed for the OLD screen.
+     The same hysteresis applies: an address-bar wobble does not re-flip
+     it; a width change, a 120px height change or a motion preference
+     does. */
+  if (gate.w !== 0) {
+    const w = window.innerWidth, h = window.innerHeight;
+    const moved = w !== gate.w || Math.abs(h - gate.h) >= 120;
+    const before = gate.on;
+    if (moved) { gate.w = w; gate.h = h; }
+    // against the RECORDED size, so a wobble under 120px changes nothing
+    gate.on = gateOpen(gate.w, gate.h);
+    if (gate.on !== before) fn();
+  }
   const onChange = () => { gate.w = window.innerWidth; gate.h = window.innerHeight; gate.on = gateOpen(); fn(); };
   const onResize = () => {
     const w = window.innerWidth, h = window.innerHeight;

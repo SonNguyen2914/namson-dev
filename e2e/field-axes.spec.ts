@@ -518,3 +518,30 @@ test("a hub read without the block draws no as-of label", async ({ page }) => {
   await expect(page.getByTestId("axis-table")).toBeVisible();
   await expect(page.getByTestId("ratings-as-of")).toHaveCount(0);
 });
+
+// NO PRESENT AXIS IS NOT A CRASH (2026-10-25). `active` was
+// `data.axes[tab] || axes[0]`, which is undefined when `axes` is an
+// object carrying none of the known axes — and `active.rows` then threw
+// in render. There was no boundary around the field, so React unmounted
+// the WHOLE viewer: title, fixtures and all, a blank page.
+test("an axes object with no known axis is the absent field, not a blank page",
+  async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(String(e)));
+    await open(page, { ...RATINGS, axes: {},
+      why_not: "no axis was measured for this field" });
+    await expect(page.getByTestId("field-axes-absent")).toBeVisible();
+    await expect(page.getByTestId("field-axes-absent"))
+      .toContainText("no axis was measured for this field");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+test("a field that throws in render takes down the field, not the viewer",
+  async ({ page }) => {
+    // an axis with no rows: a shape nobody sent, which still throws
+    await open(page, { ...RATINGS, axes: { ovr: { cuts: null } } });
+    await expect(page.getByTestId("field-axes-crashed")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 }))
+      .toHaveText("UEFA Champions League");
+  });
