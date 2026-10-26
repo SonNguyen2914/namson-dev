@@ -907,6 +907,35 @@ test.describe("suggestion card (recorded payloads)", () => {
       await expect(page.getByText(/fee floor/)).toHaveCount(0);
     });
 
+  test("a failed FIRST read is retried — the card does not stay "
+    + "unavailable for the life of the tab", async ({ page }) => {
+      // 2026-10-25: the card polled only while `live_now` was on the
+      // payload, and a failed first read has no payload — so one 503 on
+      // mount left "card unavailable" up until a reload. A pre or post
+      // card, once read, is NOT polled again.
+      await page.clock.install();
+      await serveMatch(page);
+      let hit = 0;
+      await page.route(`**/api/card/mls-2026/${EVENT}`, (r) => {
+        hit += 1;
+        return hit === 1
+          ? r.fulfill({ status: 503, contentType: "application/json",
+                        body: JSON.stringify({ error: "card unavailable" }) })
+          : r.fulfill({ status: 200, contentType: "application/json",
+                        body: JSON.stringify(CARD_PAYLOAD) });
+      });
+      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await expect(page.getByText(/http 503/i).first()).toBeVisible();
+      await page.clock.fastForward("01:05");
+      await expect(page.getByText("REFUSED").first()).toBeVisible();
+      await expect(page.getByText(/card unavailable/i)).toHaveCount(0);
+      // read once and not live: no further reads
+      const after = hit;
+      await page.clock.fastForward("03:00");
+      await page.clock.fastForward("03:00");
+      expect(hit).toBe(after);
+    });
+
   test("a card WITH live_now broadcasts the minute, the score and all "
     + "three probabilities, first in the in-play section",
     async ({ page }) => {

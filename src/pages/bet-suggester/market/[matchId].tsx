@@ -204,13 +204,18 @@ export default function MatchDetail({ m }: { m: FrozenMatch }) {
         <header className="hero-ambient mt-8 mb-12 rounded-3xl pb-2 text-center">
           <Eyebrow className="mb-4">{matchId}</Eyebrow>
           {/* each flag+name is an unbreakable unit, so a narrow screen wraps
-              between teams — never orphaning a flag onto its own line */}
-          <h1 className="text-4xl font-semibold tracking-tight text-ink-hi sm:text-5xl">
+              between teams — never orphaning a flag onto its own line.
+              THE {" "} BETWEEN THE UNITS IS THE WRAP: JSX drops the
+              newlines between sibling elements, so without them the
+              matchup was ONE unbreakable line and "Egypt 🇪🇬" ran off a
+              390px screen. text-3xl below sm keeps "Switzerland" or
+              "United States" plus a flag inside a phone's width. */}
+          <h1 className="text-3xl font-semibold tracking-tight text-ink-hi sm:text-5xl">
             <span className="whitespace-nowrap">
               <span className="mr-3">{flag(home)}</span>
               {home}
-            </span>
-            <span className="mx-3 text-xl font-normal text-ink-faint sm:text-2xl">vs</span>
+            </span>{" "}
+            <span className="mx-1 text-xl font-normal text-ink-faint sm:mx-3 sm:text-2xl">vs</span>{" "}
             <span className="whitespace-nowrap">
               {away}
               <span className="ml-3">{flag(away)}</span>
@@ -254,7 +259,9 @@ export default function MatchDetail({ m }: { m: FrozenMatch }) {
           </div>
           <p className="mx-auto mt-4 max-w-md font-mono text-[11px] leading-relaxed text-ink-faint"
              data-testid="match-frozen">
-            Archived {manifest.frozen_on} from the backend&apos;s last answer.
+            {/* the {" "} is explicit: the production build dropped the
+                literal space after the date ("2026-10-21from") */}
+            Archived {manifest.frozen_on}{" "}from the backend&apos;s last answer.
             Nothing on this page is fetched or refreshed.
           </p>
           {pred.archive_note && (

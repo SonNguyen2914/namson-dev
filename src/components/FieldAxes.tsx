@@ -528,7 +528,13 @@ export default function FieldAxes(
   // NOT MEASURED IS NOT EMPTY. A competition nobody has measured says so;
   // it does not render a table with no rows, which would read as "this
   // field has no clubs in it".
-  if (!data.axes) {
+  /* AND AN AXES OBJECT CARRYING NONE OF THE KNOWN AXES IS THE SAME FACT.
+     `active` below would be undefined and its `.rows` threw in render,
+     blanking the page around it. */
+  const axes = data.axes
+    ? ORDER.filter((k) => data.axes![k]).map((k) => data.axes![k])
+    : [];
+  if (!data.axes || axes.length === 0) {
     return (
       <section data-testid="field-axes-absent"
         className="mt-8 rounded-2xl border border-line bg-elev p-5">
@@ -536,13 +542,13 @@ export default function FieldAxes(
           no cross-league field
         </p>
         <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-ink-low">
-          {data.why_not}
+          {data.why_not
+            || "this read carried no measured axis for this field."}
         </p>
       </section>
     );
   }
 
-  const axes = ORDER.filter((k) => data.axes![k]).map((k) => data.axes![k]);
   const active = data.axes[tab] || axes[0];
 
   return (

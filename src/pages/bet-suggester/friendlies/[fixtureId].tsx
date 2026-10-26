@@ -460,6 +460,17 @@ export default function FriendlyMatchPage() {
             this fixture. Retrying — less often while it keeps failing.
           </p>
         )}
+        {/* A REFRESH THAT FAILED IS NOT A PAGE THAT IS UP TO DATE — the
+            match hub's rule (MatchHub `feed-stale`): the poll keeps the
+            last good payload, and this line says it is held. */}
+        {err && d && (
+          <p data-testid="feed-stale"
+            className="mb-4 rounded-xl border border-warn/40 px-4 py-2.5 font-mono text-[10px] leading-relaxed text-warn">
+            the last refresh FAILED ({err}) — every number below is held
+            from the previous successful fetch, not current. Retrying —
+            less often while it keeps failing.
+          </p>
+        )}
         {f && (
           <Reveal>
             <section className="rounded-2xl border border-line bg-elev p-4">

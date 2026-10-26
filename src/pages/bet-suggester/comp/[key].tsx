@@ -24,6 +24,7 @@ import { useEffect, useState } from "react";
 import { usePoll } from "../../../lib/usePoll";
 import { failureOf, NEVER_ANSWERED } from "../../../lib/httpFailure";
 import FieldAxes, { Ratings } from "../../../components/FieldAxes";
+import ErrorBoundary from "../../../components/ErrorBoundary";
 import { fetchRatings } from "../../../lib/fieldApi";
 import { RatingsAsOfLine } from "../../../components/RatingsAsOf";
 
@@ -141,9 +142,22 @@ function Read({ s, home, away }: {
   );
 }
 
+/* ONE MOUNT PER COMPETITION (2026-10-25). Next keeps this page mounted
+   across a client-side change of `[key]` — the Archive menu's Link from
+   `/comp/ucl` to `/comp/asean` is exactly that — so every piece of state
+   below used to carry over: the last competition's payload drawn under
+   the new URL (its title, fixtures and Kalshi count), its failed ratings
+   read named as this one's, and a retired key's "not served" page that
+   followed the reader to a served one. Keying the body by the
+   competition makes a new key a new page, every state with it, instead
+   of listing resets that the next added state would forget. */
 export default function CompViewer() {
   const router = useRouter();
   const key = typeof router.query.key === "string" ? router.query.key : null;
+  return <CompViewerBody key={key ?? ""} compKey={key} />;
+}
+
+function CompViewerBody({ compKey: key }: { compKey: string | null }) {
   // A finished competition served by this page (ASEAN) lives in the
   // Archive dropdown — so the dropdown must be HERE too, marking it
   // current, or the archive is a door that locks behind you.
@@ -244,7 +258,7 @@ export default function CompViewer() {
        ever say "answered 503". `readFailure` in the component is written
        against those sentences. */
     void fetchRatings(key, ac.signal)
-      .then((j) => { if (alive) setRat(j); })
+      .then((j) => { if (alive) { setRat(j); setRatErr(null); } })
       .catch((e) => {
         if (!alive || (e instanceof DOMException && e.name === "AbortError")) {
           return;
@@ -333,6 +347,18 @@ export default function CompViewer() {
             often while it keeps failing.
           </p>
         )}
+        {/* A REFRESH THAT FAILED IS NOT A PAGE THAT IS UP TO DATE — the
+            match hub's rule (MatchHub `feed-stale`). The 60s poll keeps
+            the last good payload when it fails, which is right, and this
+            line is what says the fixtures below are held. */}
+        {err && d && (
+          <p data-testid="feed-stale"
+            className="mt-4 rounded-xl border border-warn/40 px-4 py-2.5 font-mono text-[10px] leading-relaxed text-warn">
+            the last refresh FAILED ({err}) — every fixture and count below
+            is held from the previous successful fetch, not current.
+            Retrying — less often while it keeps failing.
+          </p>
+        )}
 
         {/* The missing model, with the reason — and the two reasons are
             NOT the same claim. A cup can never support one; a league
@@ -363,7 +389,24 @@ export default function CompViewer() {
             the competition has no rating of its own, and this is the
             strength read used in its place. Above the fixtures, so a
             reader meets the field before the individual ties. */}
-        <FieldAxes data={rat} error={ratErr} />
+        {/* ITS OWN BOUNDARY: a shape the field cannot draw takes down
+            the field, never the viewer around it (React unmounts the
+            whole tree when a render throws). */}
+        <ErrorBoundary resetKey={rat} fallback={() => (
+          <section data-testid="field-axes-crashed"
+            className="mt-8 rounded-2xl border border-warn/40 bg-warn/5 p-5">
+            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-warn">
+              the field could not be drawn
+            </p>
+            <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-ink-low">
+              The ratings read answered in a shape this page cannot draw.
+              That is a fault in this page or the payload, not a claim
+              that this competition has no cross-league rating.
+            </p>
+          </section>
+        )}>
+          <FieldAxes data={rat} error={ratErr} />
+        </ErrorBoundary>
         {/* AS OF THE LAST FINISHED MATCH the field includes, live or
             frozen (Son, 2026-10-14). Nothing when the read sent no
             block — never a guessed date. */}

@@ -160,7 +160,10 @@ export default function FriendliesDashboard() {
         return j(r);
       })
       .then((d) => { if (alive && d) { setToday(d.fixtures); setUnreachable(false); } })
-      .catch(() => { if (alive && today === null) setUnreachable(true); });
+      // set on EVERY failed read, held fixtures or not: with nothing
+      // held it is the unreachable notice, with fixtures held it is the
+      // `feed-stale` line, and the next good read clears it either way
+      .catch(() => { if (alive) setUnreachable(true); });
     get("/api/friendlies/markets").then(j)
       .then((d) => {
         if (!alive) return;
@@ -283,6 +286,18 @@ export default function FriendliesDashboard() {
               · ESPN club.friendly feed, 60s poll
             </span>
           </h3>
+          {/* A REFRESH THAT FAILED IS NOT A PAGE THAT IS UP TO DATE —
+              the match hub's rule (MatchHub `feed-stale`). The fixtures
+              below are the last good scoreboard, and this says so. */}
+          {unreachable && today !== null && (
+            <p data-testid="feed-stale"
+              className="mb-4 rounded-xl border border-warn/40 px-4 py-2.5 font-mono text-[10px] leading-relaxed text-warn">
+              the last refresh FAILED (the scoreboard read failed)
+              — every fixture and score below is held from the previous
+              successful fetch, not current. Retrying — less often while
+              it keeps failing.
+            </p>
+          )}
           {(maps.s === "error" || xg.s === "error") && (
             <Empty>
               {maps.s === "error" && xg.s === "error"
