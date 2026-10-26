@@ -14,6 +14,7 @@ import { useState } from "react";
 import { usePoll } from "../lib/usePoll";
 
 import { flag } from "../lib/suggesterApi";
+import { TZ } from "../lib/matchday";
 import { Eyebrow, Reveal } from "./ui";
 
 type TableRow = {
@@ -521,11 +522,13 @@ function RealTieCard({ tie, emphasis = false }: {
             leg {i + 1} · {l.home} v {l.away} ·{" "}
             {l.status && l.status !== "NS" && l.goals?.home != null
               ? `${l.goals.home}-${l.goals.away} (${l.status})`
-              : l.kickoff_utc
+              // API-Football's TBD: the date is the provider's
+              // placeholder, not a scheduled kickoff (round 3, 2026-10-26)
+              : l.kickoff_utc && l.status !== "TBD"
                 ? new Date(l.kickoff_utc).toLocaleString("en-US", {
-                    month: "short", day: "numeric", hour: "numeric",
-                    minute: "2-digit" })
-                : "TBD"}
+                    timeZone: TZ, month: "short", day: "numeric",
+                    hour: "numeric", minute: "2-digit" })
+                : "date TBC"}
           </p>
         ))}
       </div>
