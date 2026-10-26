@@ -56,7 +56,7 @@ test("picker, demo match, panel and Ask", async ({ page }) => {
   // Ask, and a verified answer
   await page.getByLabel("Your question about this match").fill("How likely is a draw?");
   await page.getByRole("button", { name: "Ask", exact: true }).click();
-  await expect(page.getByTestId("ask-answer")).toContainText("roughly one game in four");
+  await expect(page.getByTestId("ask-answer")).toContainText("a real chance");
   await expect(page.getByTestId("ask-answer").getByTestId("analyst-fact")).toHaveAttribute("title", /^VAR-checked: Draw probability · Trivela model/);
   expect(sent).toMatchObject({ demo: "rayo-elche", question: "How likely is a draw?" });
   // a league with no reachable schedule says so, and the demos still work

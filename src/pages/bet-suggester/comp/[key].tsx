@@ -35,6 +35,7 @@ import MarketVsRead, { MarketVsReadInline, type MarketVsReadData }
 import TournamentView from "../../../components/TournamentView";
 import { hueOf } from "../../../components/PickerColumn";
 import { shortClub } from "../../../lib/clubName";
+import { shareChips } from "../../../lib/pointsShare";
 import { TZ, dayLabel, groupByDay } from "../../../lib/matchday";
 
 type SideRating = {
@@ -120,15 +121,16 @@ function Read({ s, home, away }: {
     );
   }
   const hi = e.home >= e.away;
+  const pct = shareChips(e.home, e.away);
   const d = s?.rating_difference ?? s?.elo_difference;
   return (
     <span className="whitespace-nowrap font-mono text-[10px]">
       <span className={hi ? "text-accent" : "text-ink-low"}>
-        {shortClub(s?.home?.club || home)} {(e.home * 100).toFixed(0)}%
+        {shortClub(s?.home?.club || home)} {pct.home}%
       </span>
       <span className="px-1 text-ink-faint">·</span>
       <span className={!hi ? "text-accent" : "text-ink-low"}>
-        {(e.away * 100).toFixed(0)}% {shortClub(s?.away?.club || away)}
+        {pct.away}% {shortClub(s?.away?.club || away)}
       </span>
       {typeof d === "number" && (
         <span className="pl-1.5 text-ink-faint">

@@ -14,6 +14,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { useState } from "react";
 import { usePoll } from "../../../lib/usePoll";
+import { TZ } from "../../../lib/matchday";
 import { failureOf, NEVER_ANSWERED } from "../../../lib/httpFailure";
 
 import { RouteProgress, TopBar } from "../../../components/chrome";
@@ -463,9 +464,12 @@ export default function FriendlyMatchPage() {
           <Reveal>
             <section className="rounded-2xl border border-line bg-elev p-4">
               <div className="flex flex-wrap justify-between gap-2 font-mono text-[10px] uppercase tracking-wide text-ink-faint">
-                <span>
+                <span data-testid="fixture-kickoff">
+                  {/* the site's one zone (lib/matchday.ts), never the viewer's */}
                   {f.kickoff_utc
-                    ? new Date(f.kickoff_utc).toLocaleString()
+                    ? new Date(f.kickoff_utc).toLocaleString("en-US", {
+                      timeZone: TZ, weekday: "short", month: "short", day: "numeric",
+                      hour: "numeric", minute: "2-digit", timeZoneName: "short" })
                     : ""}
                 </span>
                 <span className="truncate">

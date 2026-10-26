@@ -14,6 +14,9 @@ import {
 } from "../../../lib/analyst/limits";
 import { noteError } from "../../../lib/analyst/health";
 
+/** See preview.ts: the LLM's own 55 s timeout under the site's 60 s ceiling. */
+export const config = { maxDuration: 60 };
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
   if (!analystEnabled()) return res.status(404).json({ error: "not found" });
@@ -22,9 +25,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const q = String(body.question ?? "").trim();
   if (!q) return res.status(400).json({ error: "Type a question first." });
   if (q.length > 300) return res.status(400).json({ error: "Keep questions under 300 characters." });
-  const ip = String(req.headers["x-forwarded-for"] ?? req.socket.remoteAddress ?? "?").split(",")[0].trim();
+  const ip = String(req.headers["x-forwarded-for"] ?? req.socket?.remoteAddress ?? "?").split(",")[0].trim();
   if (!allowAsk(ip)) return res.status(429).json({ error: ASK_CAP_MESSAGE });
-  if (!takeDailyCall()) return res.status(429).json({ error: BUDGET_MESSAGE });
   let sheet;
   try {
     sheet = (await loadMatch(String(body.league ?? ""), String(body.id ?? ""), body.demo ? String(body.demo) : undefined)).sheet;
@@ -34,7 +36,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (status >= 500) noteError("load", why);
     return res.status(status).json({ error: `Could not load this match: ${why}` });
   }
-  const out = await runAsk(sheet, q);
+  // the daily budget is charged per LLM call, AFTER the match loaded: a
+  // bad id or a backend that did not answer spends nothing (finding 4)
+  const out = await runAsk(sheet, q, undefined, { charge: () => takeDailyCall() });
+  if (out.budgetSpent) return res.status(429).json({ error: BUDGET_MESSAGE });
   if (!out.ok) noteError("ask", out.fallbackReason ?? "the reply could not be used");
   return res.status(200).json(out);
 }

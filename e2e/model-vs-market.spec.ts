@@ -316,6 +316,53 @@ for (const width of [375, 1280]) {
   });
 }
 
+// REVIEW FINDING 3 (2026-10-25): "● live" on stale data. The age of the
+// tape was judged against the time of the last SUCCESSFUL read, so a feed
+// that stopped answering stayed "live" for as long as it kept failing,
+// and a series with no tape clock at all (latest: null) read as fresh.
+test.describe("a feed that stops is not live", () => {
+  test("failing reads age the tape into held, with a stale banner", async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.clock.install({ time: Date.now() });
+    let calls = 0;
+    const first = liveSeries({ last: 63, tapeAgeS: 12 });
+    await serve(page, { state: "in", minute: "63'", series: (r: Route) => {
+      calls += 1;
+      return calls === 1 ? r.fulfill({ json: first })
+        : r.fulfill({ status: 503, json: { detail: "the feed stopped" } });
+    } });
+    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    await expect(page.getByTestId("mvm-root")).toHaveAttribute("data-mode", "live");
+    await page.clock.runFor(180_000);
+    await expect.poll(() => calls).toBeGreaterThan(1);
+    await expect(page.getByTestId("mvm-root")).toHaveAttribute("data-mode", "held");
+    await expect(page.getByTestId("mvm-live")).not.toHaveText(/● live/);
+    await expect(page.getByTestId("mvm-stale")).toContainText("The last refresh failed");
+    expect(errors).toEqual([]);
+  });
+
+  test("a series with no tape clock (latest: null) is held, not live", async ({ page }) => {
+    await serve(page, { state: "in", minute: "63'",
+      series: { ...liveSeries({ last: 63, tapeAgeS: 12 }), latest: null } });
+    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    await expect(page.getByTestId("mvm-root")).toHaveAttribute("data-mode", "held");
+    await expect(page.getByTestId("mvm-live")).not.toHaveText(/● live/);
+  });
+});
+
+// REVIEW FINDING 6 (2026-10-25): the chart's clock is the site's zone.
+test.describe("the clock in Los Angeles time", () => {
+  test.use({ timezoneId: "Asia/Tokyo", locale: "en-US" });
+  test("the tape time is printed in America/Los_Angeles, not the viewer's zone", async ({ page }) => {
+    const s = liveSeries({ last: 63, tapeAgeS: 12 });
+    await serve(page, { state: "in", minute: "63'", series: s });
+    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    const la = new Date(s.latest.captured_at).toLocaleTimeString("en-US",
+      { timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit" });
+    await expect(page.getByTestId("mvm-fresh")).toHaveText(new RegExp(`^tape ${la.replace(/\s/g, "\\s")}$`));
+  });
+});
+
 test.describe("named absences, never a crash", () => {
   test("refused by the backend", async ({ page }) => {
     const errors = watchErrors(page);

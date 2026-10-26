@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import watchlistHandler from "../src/pages/api/bet-suggester/live-watchlist/index";
 import {
   closingConditionsLabel, SYNC_PREVIEW_OPEN, SYNC_PREVIEW_RETIRED,
   syncPreviewHolesClosed,
@@ -1019,4 +1020,51 @@ test("a pasted token is still exactly one authentication", async ({ page }) => {
     await page.waitForTimeout(1200);
     expect(seen.stateTokens.length).toBe(1);
     expect(seen.stateTokens[0]).toBe("operator-token");
+  });
+
+// REVIEW FINDING 5 (2026-10-25). The proxy relayed the resolver's own 2xx
+// when that answer was not JSON, so the panel got a 200 whose body was an
+// error and crashed reading `.watchlist` off it.
+test("a 2xx that carries no declaration is drawn as a failure, not a crash",
+  async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(String(e)));
+    await serve(page, { declare: {
+      error: "resolver_response_not_json", reason: "backend_response_not_json",
+      upstream_status: 200, detail: "the answer was not JSON" } });
+    await page.goto("/bet-suggester");
+    await arm(page);
+    await toggle(page, "401000002").getByRole("button").click();
+    await expect(toggle(page, "401000002").getByTestId("watch-error"))
+      .toContainText("carried no declaration record: the answer was not JSON");
+    await expect(page.getByTestId("picker-row")).toHaveCount(3);
+    expect(errors).toEqual([]);
+  });
+
+test("the declare proxy answers an unreadable 2xx resolver as 502, not 200",
+  async () => {
+    const real = globalThis.fetch;
+    const handler = watchlistHandler;
+    const asked: string[] = [];
+    globalThis.fetch = (async (u: string) => {
+      asked.push(String(u));
+      return new Response("<html>not json</html>", { status: 200, headers: { "content-type": "text/html" } });
+    }) as typeof fetch;
+    try {
+      const out: { status?: number; body?: Record<string, unknown> } = {};
+      const res = {
+        status(c: number) { out.status = c; return res; },
+        json(b: Record<string, unknown>) { out.body = b; return res; },
+        setHeader() { /* none */ }, send() { return res; },
+      };
+      await handler({ method: "POST", headers: {},
+        query: { event_id: "401000002", action: "add", actor: "son" } } as never, res as never);
+      expect(out.status).toBe(502);
+      expect(out.body?.upstream_status).toBe(200);
+      expect(out.body?.reason).toBe("backend_response_not_json");
+      // and nothing was declared on an id the route could not read
+      expect(asked.some((u) => u.includes("/admin/live/watchlist"))).toBe(false);
+    } finally {
+      globalThis.fetch = real;
+    }
   });

@@ -18,13 +18,14 @@
 // sheet is built from the backend's SAVED pre-kickoff rung
 // (/api/<league>/match/<id>/saved-rung, forwarded by the same allowlist),
 // labelled "frozen pre-kickoff read (captured HH:MM UTC)"; without one it
-// falls back to the live read, and an LLM failure still falls back to the
-// raw numbers. The verifier is unchanged: it checks against whichever
-// sheet was built.
+// falls back to the live read — with its priced reads taken out once the
+// match has started (see chooseSheet) — and an LLM failure still falls
+// back to the raw numbers. The verifier checks against whichever sheet
+// was built.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { buildFactSheet, buildRungSheet, rungUsable, sheetForPrompt, type FactSheet } from "./factSheet";
-import { checkText, type Segment, type Violation } from "./verify";
+import { buildFactSheet, buildRungSheet, rungUsable, sheetForPrompt, unpriced, type FactSheet } from "./factSheet";
+import { checkText, type CheckOptions, type Segment, type Violation } from "./verify";
 import { getClient, PREVIEW_REQUEST, type ChatMessage, type LlmClient } from "./llm";
 import { ASK, FEW_SHOT, PERSONA, TEMPLATE, VERIFICATION_LADDER } from "./prompts";
 import { ANALYST_LEAGUES, DEMO_MATCHES, isAnalystLeague } from "./demos";
@@ -122,9 +123,28 @@ export function chooseSheet(
       runId: `saved-${r.rung ?? "rung"}-${r.model?.run_id ?? "no-run"}`,
     };
   }
-  if (live.ok) return { sheet: buildFactSheet(league, eventId, live.body), runId: runIdOf(live.body) };
+  if (live.ok) {
+    // AFTER KICKOFF WITHOUT A RUNG (review finding 2, 2026-10-25): the live
+    // read's model, trading model and book are in-play by now, and a sheet
+    // built from them would hand VAR in-play prices, unlabelled, as if they
+    // were the pre-match read (backend main has no saved-rung route until
+    // TRIVELA #341). So the priced reads are taken out and the sheet says
+    // why; what is left is the pre-match context the live read still owns.
+    const state = String(live.body?.match?.state ?? "").toLowerCase();
+    if (state === "in" || state === "post") {
+      const sheet = buildFactSheet(league, eventId, unpriced(live.body));
+      sheet.frozenUnavailable = FROZEN_UNAVAILABLE;
+      sheet.notes = [`${FROZEN_UNAVAILABLE[0].toUpperCase()}${FROZEN_UNAVAILABLE.slice(1)}.`, ...sheet.notes];
+      return { sheet, runId: `unpriced-${state}` };
+    }
+    return { sheet: buildFactSheet(league, eventId, live.body), runId: runIdOf(live.body) };
+  }
   throw live.error;
 }
+
+/** What VAR says when a started match has no saved pre-kickoff read. */
+export const FROZEN_UNAVAILABLE =
+  "the frozen pre-kickoff read is unavailable for this match, and VAR does not read in-play prices";
 
 export async function loadMatch(league: string, eventId: string, demo?: string): Promise<Loaded> {
   if (demo) {
@@ -151,10 +171,20 @@ export async function loadSheet(league: string, eventId: string, demo?: string):
 export type Trace = { attempt: number; raw: string; violations: Violation[] }[];
 export type Rendered = { segments: Segment[]; flagged: number };
 
-const render = (text: string, sheet: FactSheet): Rendered => {
-  const { segments, violations } = checkText(text, sheet);
+const render = (text: string, sheet: FactSheet, opts?: CheckOptions): Rendered => {
+  const { segments, violations } = checkText(text, sheet, opts);
   return { segments, flagged: violations.length };
 };
+
+/** The preview's contract: every value is a {{F#}} placeholder. */
+const PREVIEW_CHECK: CheckOptions = { placeholderOnly: true };
+
+/** How a run pays for its LLM calls: asked once BEFORE each call (a retry
+ *  is a second call and is charged as one). False means the budget is
+ *  spent and the call is not made. Absent, nothing is charged. */
+export type RunOpts = { charge?: () => boolean };
+
+export const BUDGET_SPENT = "today's analyst budget is used up";
 
 function parseJson(text: string): any | null {
   const s = text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1);
@@ -175,37 +205,46 @@ export type PreviewOut = {
   system: string;
   fallbackReason?: string;
   cached?: boolean;
+  /** true when a call was refused for budget, so the route can say so */
+  budgetSpent?: boolean;
 };
 
 export const PREVIEW_MAX_TOKENS = 4000;
 export const ASK_MAX_TOKENS = 2500;
 
-export async function runPreview(sheet: FactSheet, client: LlmClient = getClient()): Promise<PreviewOut> {
+export async function runPreview(sheet: FactSheet, client: LlmClient = getClient(), opts: RunOpts = {}): Promise<PreviewOut> {
   const system = systemPrompt("preview", sheet);
   const messages: ChatMessage[] = [{ role: "user", content: PREVIEW_REQUEST }];
   const trace: Trace = [];
   let provider = client.name, model = "";
+  const done = (p: any): PreviewOut => ({
+    ok: true, sheet, trace, provider, model, system,
+    preview: {
+      headline: render(p.headline ?? "", sheet, PREVIEW_CHECK),
+      why: (p.why ?? []).map((s: string) => render(s, sheet, PREVIEW_CHECK)),
+      risks: (p.risks ?? []).map((s: string) => render(s, sheet, PREVIEW_CHECK)),
+      market_view: render(p.market_view ?? "", sheet, PREVIEW_CHECK),
+      confidence: ["low", "medium", "high"].includes(p.confidence) ? p.confidence : "low",
+    },
+  });
+  let last: any = null;
   try {
     for (let attempt = 1; attempt <= 2; attempt++) {
+      if (opts.charge && !opts.charge()) {
+        // the retry could not be paid for: the first reply, stripped and
+        // flagged, is still a reply
+        if (last) return done(last);
+        return { ok: false, sheet, trace, provider, model, system, fallbackReason: BUDGET_SPENT, budgetSpent: true };
+      }
       const res = await client.complete(system, messages, PREVIEW_MAX_TOKENS);
       provider = res.provider; model = res.model;
       const p = parseJson(res.text);
       const violations: Violation[] = p
-        ? previewStrings(p).flatMap((s) => checkText(s, sheet).violations)
+        ? previewStrings(p).flatMap((s) => checkText(s, sheet, PREVIEW_CHECK).violations)
         : [{ text: res.text.slice(0, 80), reason: "reply was not the required JSON object" }];
       trace.push({ attempt, raw: res.text, violations });
-      if (p && (violations.length === 0 || attempt === 2)) {
-        return {
-          ok: true, sheet, trace, provider, model, system,
-          preview: {
-            headline: render(p.headline ?? "", sheet),
-            why: (p.why ?? []).map((s: string) => render(s, sheet)),
-            risks: (p.risks ?? []).map((s: string) => render(s, sheet)),
-            market_view: render(p.market_view ?? "", sheet),
-            confidence: ["low", "medium", "high"].includes(p.confidence) ? p.confidence : "low",
-          },
-        };
-      }
+      if (p) last = p;
+      if (p && (violations.length === 0 || attempt === 2)) return done(p);
       // Iterative refinement: one retry, listing exactly what failed.
       messages.push({ role: "assistant", content: res.text });
       messages.push({
@@ -221,17 +260,23 @@ export async function runPreview(sheet: FactSheet, client: LlmClient = getClient
   }
 }
 
-export type AskOut = { ok: boolean; answer?: Rendered; trace: Trace; provider: string; model: string; fallbackReason?: string };
+export type AskOut = { ok: boolean; answer?: Rendered; trace: Trace; provider: string; model: string; fallbackReason?: string; budgetSpent?: boolean };
 
-export async function runAsk(sheet: FactSheet, question: string, client: LlmClient = getClient()): Promise<AskOut> {
+export async function runAsk(sheet: FactSheet, question: string, client: LlmClient = getClient(), opts: RunOpts = {}): Promise<AskOut> {
   const system = systemPrompt("ask", sheet);
   const messages: ChatMessage[] = [{ role: "user", content: question.slice(0, 300) }];
   const trace: Trace = [];
   let provider = client.name, model = "";
+  let last: string | null = null;
   try {
     for (let attempt = 1; attempt <= 2; attempt++) {
+      if (opts.charge && !opts.charge()) {
+        if (last !== null) return { ok: true, answer: render(last, sheet), trace, provider, model };
+        return { ok: false, trace, provider, model, fallbackReason: BUDGET_SPENT, budgetSpent: true };
+      }
       const res = await client.complete(system, messages, ASK_MAX_TOKENS);
       provider = res.provider; model = res.model;
+      last = res.text;
       const { violations } = checkText(res.text, sheet);
       trace.push({ attempt, raw: res.text, violations });
       if (violations.length === 0 || attempt === 2) return { ok: true, answer: render(res.text, sheet), trace, provider, model };

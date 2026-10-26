@@ -33,6 +33,12 @@ export type FactSheet = {
    *  read: the archive's frozen pre-kickoff rung (VAR v2). Absent on a
    *  live or demo sheet. */
   basis?: SheetBasis;
+  /** Set when the match has kicked off and no saved pre-kickoff rung could
+   *  be read: every PRICED fact was taken out (the live read is in-play by
+   *  then, and VAR never reads in-play prices as if they were the pre-match
+   *  read). The sentence says why; the preview does not ask the model and
+   *  is never cached. */
+  frozenUnavailable?: string;
 };
 
 export type SheetBasis = {
@@ -175,7 +181,7 @@ export function rungUsable(r: Json): boolean {
 /** A live payload with every PRICED read taken out: what is left (the
  *  match identity, form and head-to-head) is pre-match context that the
  *  live read still owns after kickoff. */
-const unpriced = (d: Json): Json => {
+export const unpriced = (d: Json): Json => {
   if (!d || typeof d !== "object") return {};
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { model, traders_model, book, model_refusal, ...rest } = d;

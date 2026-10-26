@@ -335,3 +335,18 @@ test("no tournament backend leaves the page intact", async ({ page }) => {
   await expect(page.getByText("ASEAN Championship").first()).toBeVisible();
   await expect(page.getByText(/Road to the title/)).toHaveCount(0);
 });
+
+// REVIEW FINDING 7 (2026-10-25): the two points-share chips are one whole.
+// Each side rounded on its own printed 45% · 56% for 0.445 / 0.555; the
+// away chip is now the complement of the printed home chip.
+test("the points-share chips sum to 100%, never 101%", async ({ page }) => {
+  const p = JSON.parse(JSON.stringify(PAYLOAD));
+  p.fixtures[0].strength.expected_points_share = { home: 0.445, away: 0.555 };
+  await page.route("**/api/comp/asean/fixtures**", (r) => r.fulfill(json(p)));
+  await page.route("**/api/comp/asean/markets**", (r) => r.fulfill(json(MARKETS)));
+  await page.route("**/api/comp/asean/tournament", (r) => r.fulfill(json(TOURNAMENT)));
+  await page.goto("/bet-suggester/comp/asean");
+  await expect(page.getByText(/VIETNAM\s*45%/i).first()).toBeVisible();
+  await expect(page.getByText(/55%\s*CAMBODIA/i).first()).toBeVisible();
+  await expect(page.getByText(/56%\s*CAMBODIA/i)).toHaveCount(0);
+});

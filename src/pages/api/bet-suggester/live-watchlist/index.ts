@@ -142,8 +142,12 @@ export default async function handler(
     if (!rp.ok) {
       // AN ANSWER WE COULD NOT READ IS NOT "no such fixture", and it is
       // not an unreachable backend either. The resolver's status is
-      // relayed so the surface can tell the three apart.
-      return res.status(rr.status).json({
+      // relayed so the surface can tell the three apart — in
+      // `upstream_status`, NOT as this answer's status: `rr.ok` holds on
+      // this branch, so relaying it shipped a 2xx carrying an error body,
+      // which the panel then read as a declaration (review finding 5,
+      // 2026-10-25). Computed exactly as the card route does.
+      return res.status(statusForUnreadableAnswer(rr.status)).json({
         error: "resolver_response_not_json",
         reason: "backend_response_not_json",
         upstream_status: rr.status,

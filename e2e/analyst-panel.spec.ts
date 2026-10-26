@@ -117,3 +117,23 @@ test("the kill switch on the server: off, the Analyst routes answer 404", async 
   expect((await request.get("/api/analyst/preview?demo=arsenal-everton")).status()).toBe(404);
   expect((await request.post("/api/analyst/ask", { data: { demo: "arsenal-everton", question: "draw?" } })).status()).toBe(404);
 });
+
+// REVIEW FINDING 8 (2026-10-25): one failed status read used to be kept
+// as "off" for the whole session. A failure is now asked again.
+test("a status read that failed is asked again, and the panel comes back", async ({ page }) => {
+  let statusCalls = 0;
+  await hermetic(page);
+  await page.route("**/api/card/**", (r) => r.fulfill(json({ error: "none" }, 404)));
+  await page.route("**/api/analyst/status", (r) => {
+    statusCalls += 1;
+    return statusCalls === 1
+      ? r.fulfill(json({ detail: "a dropped read" }, 503))
+      : r.fulfill(json({ enabled: true, leagues: ["epl", "laliga", "mls", "ligamx"] }));
+  });
+  await page.route("**/api/analyst/preview**", async (r) => r.fulfill(json(await previewFor("arsenal-everton"))));
+  await page.route(`**/api/epl/match/${EPL_EVENT}`, (r) => r.fulfill(json(EPL_PAYLOAD)));
+  await page.goto(`/bet-suggester/epl/${EPL_EVENT}`);
+  await page.waitForSelector("#markets");
+  await expect(page.getByTestId("analyst-panel")).toHaveAttribute("data-state", "preview", { timeout: 15_000 });
+  expect(statusCalls).toBeGreaterThanOrEqual(2);
+});
