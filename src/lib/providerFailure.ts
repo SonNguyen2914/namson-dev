@@ -215,7 +215,10 @@ const TIMEOUT_WORDS = /\btimed?\s*out\b|\btimeout\b/i;
  *  worse, name the wrong one. */
 function classify(status: number | null, raw: string): string {
   if (status === 429) return "too many requests too quickly";
-  if (status === 401 || status === 403) return "our credentials were refused";
+  if (status === 401) return "our credentials were refused";
+  /* 403 is not a credential verdict: ESPN takes none and answered 403 on
+     2026-11-10. Same words as the backend's `_BY_STATUS`. */
+  if (status === 403) return "access was refused";
   if (status === 404) return "nothing at the address we asked for";
   if (status === 408 || status === 504) return "no answer in time";
   if (status != null && status >= 500) return "the provider's own service failed";
