@@ -221,7 +221,9 @@ export const PROXY_TIMEOUT_MS = 15_000;
  *  throttling. At 03:45 PT that day the 15s clock failed the
  *  Championships board on a healthy backend that finished moments later.
  *  45s covers the throttled rebuild and stays under the functions'
- *  `maxDuration` (60s, set in each board's route file). */
+ *  `maxDuration` (60s, set in each board's route file). (corrected
+ *  2026-11-15) That 60s now holds for the championships route only; the
+ *  picker route sets 120s — see the picker entries below. */
 export const PROXY_TIMEOUT_BY_ROUTE: Readonly<Record<string, number>> = {
   "championships/board": 45_000,
   /* THE PICKER BOARD AND ITS TAIL WAIT 110s (2026-11-15). A cold club
@@ -239,8 +241,11 @@ export const PROXY_TIMEOUT_BY_ROUTE: Readonly<Record<string, number>> = {
      `/api/championships/review` twice — each a review the backend was
      still building. The backend's cold review is faster since TRIVELA
      #260, but it still reads every competition's scoreboard, so it gets
-     the board's budget, under the same 60s `maxDuration` both route
-     files already set. */
+     the board's budget. (corrected 2026-11-15) The two route files no
+     longer share one `maxDuration`: pages/api/picker/[...path].ts sets
+     120s, which the 110s here sits under, and
+     pages/api/championships/[...path].ts sets 60s, which the 45s here
+     sits under. */
   "picker/review": 110_000,
   "championships/review": 45_000,
 };
