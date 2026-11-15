@@ -46,7 +46,7 @@ import {
 // WHERE THE STRIP IS DRAWN — READ OUT OF THE TREE, NEVER TYPED HERE
 // (2026-09-15).
 //
-// `<WatchedStrip />` came off /bet-suggester. The read is
+// `<WatchedStrip />` came off /trivela. The read is
 // operator-gated, and with no token held in an ordinary tab it could
 // only ever draw its own refusal — permanently, to a reader who cannot
 // fix it. `components/WatchedStrip.tsx` is UNTOUCHED, and so is every
@@ -111,7 +111,7 @@ const STRIP_ROUTE = watchedStripRoute();
  *  test leaves nothing in flight. */
 function stripSurface(): string {
   test.skip(STRIP_ROUTE === null,
-    "no page mounts <WatchedStrip />: the read came off /bet-suggester on "
+    "no page mounts <WatchedStrip />: the read came off /trivela on "
     + "2026-09-15 and was not remounted anywhere. This claim is still true "
     + "of the component and is KEPT, not deleted — it re-arms at whatever "
     + "route mounts the strip next, with no edit to this file.");
@@ -128,7 +128,7 @@ function omit<T extends object>(o: T, key: string): Record<string, unknown> {
 }
 
 // The watched strip — the HOLD/EXIT stage's surface. It was drawn above
-// the league columns on /bet-suggester until 2026-09-15; the route it is
+// the league columns on /trivela until 2026-09-15; the route it is
 // drawn on now is found in the tree (see WHERE THE STRIP IS DRAWN
 // above), never written down here, and today there is none.
 //
@@ -3281,7 +3281,7 @@ test("an open position on a fixture nobody declared renders even with no "
 // section's document position against `[data-testid="league-col"]`. Of
 // everything in this file it was the ONE claim genuinely about THE
 // LANDING PAGE CARRYING THE STRIP rather than about the strip: the
-// operator took the read off /bet-suggester on 2026-09-15, so a guard
+// operator took the read off /trivela on 2026-09-15, so a guard
 // pinning where it sits among the league columns pins a layout that has
 // been decided against. Nothing else covered that ordering and nothing
 // else needs to — it no longer exists to be got wrong.
@@ -3300,7 +3300,7 @@ test("the landing page draws the DECLARATION panel and not the "
     "a page mounts <WatchedStrip /> again — if that page is the board, "
     + "the 2026-09-15 removal has been reversed and this guard is the "
     + "conversation about it")
-    .not.toBe("/bet-suggester");
+    .not.toBe("/trivela");
 
   // AND ON THE PAGE ITSELF, against a payload with plenty to draw. The
   // panel's own reads are served too, so nothing here reaches a real
@@ -3308,7 +3308,7 @@ test("the landing page draws the DECLARATION panel and not the "
   await watchlistRoutes(page);
   await routes(page, STRIP);
   const settled = page.waitForResponse((r) => r.url().includes(STRIP_URL));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   // THE TOKEN IS HELD (since audit F4, 2026-09-25): the read is
   // operator-only and the page no longer makes it without one.
   const panel = page.getByTestId("watch-panel");

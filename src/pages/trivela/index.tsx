@@ -1,4 +1,4 @@
-// The picker board — namson.dev/bet-suggester
+// The picker board — namson.dev/trivela
 //
 // The landing surface: every upcoming fixture across the four in-season
 // leagues, one COLUMN per league (MLS · EPL · La Liga · Liga MX), plus a
@@ -143,7 +143,7 @@ const etDate = (d: string) =>
 
 /** THE BOARD, OPTIONALLY NARROWED TO ONE COLUMN.
  *
- *  `/bet-suggester` renders every column. `/bet-suggester/ucl` renders
+ *  `/trivela` renders every column. `/trivela/ucl` renders
  *  the SAME COMPONENT with `only={["ucl"]}` — not a copy of it, which is
  *  the whole point: the operator asked for "the exact layout of the
  *  landing page, for UCL only", and a second page that merely resembled
@@ -198,7 +198,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      e2e/board-holdout.mjs). The read is in an effect — the server has no
      storage, and the first client render must match it.
 
-     A NARROWED ROUTE HAS NO SWITCH. `/bet-suggester/ucl` is the club
+     A NARROWED ROUTE HAS NO SWITCH. `/trivela/ucl` is the club
      board narrowed to one column; it is Leagues by construction and
      starts there without waiting on storage. */
   const [mode, setMode] = useState<BoardMode | null>(only ? "leagues" : null);
@@ -295,7 +295,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   const [reviewError, setReviewError] = useState("");
   const [reviewLoading, setReviewLoading] = useState(true);
 
-  // Deep-link guard. /bet-suggester?league=<id> was the carousel's own
+  // Deep-link guard. /trivela?league=<id> was the carousel's own
   // URL until 2026-08-30 and is all over the match hubs' back links and
   // anyone's bookmarks. next.config.ts redirects the HARD loads; a config
   // redirect never sees a client-side <Link> transition, so the same
@@ -312,14 +312,14 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   useEffect(() => {
     if (!router.isReady || deepLink === null) return;
     router.replace(
-      deepLink === "wc26" ? "/bet-suggester/wc26"
-      : deepLink === "" ? "/bet-suggester/leagues"
-      : `/bet-suggester/leagues?league=${encodeURIComponent(deepLink)}`);
+      deepLink === "wc26" ? "/trivela/wc26"
+      : deepLink === "" ? "/trivela/leagues"
+      : `/trivela/leagues?league=${encodeURIComponent(deepLink)}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, deepLink]);
 
   /* A NARROWED ROUTE ASKS FOR ITS COLUMNS BY NAME (backend fc9bc55,
-     2026-09-09). `/bet-suggester/ucl` used to render whatever the
+     2026-09-09). `/trivela/ucl` used to render whatever the
      DECLARED board happened to hold and filter it down to one slug —
      which worked exactly as long as the Champions League WAS a declared
      column, and drew an empty page the day it stopped being one.
@@ -329,7 +329,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      it by name".
 
      THE LANDING PAGE PASSES NOTHING HERE, and that is what keeps the
-     Champions League off it: `only` is undefined on `/bet-suggester`,
+     Champions League off it: `only` is undefined on `/trivela`,
      so the request URL, the backend's cache key and the payload are all
      the strings they have always been, and the answer carries no
      `narrowed_to` to be mistaken for a declaration.
@@ -399,7 +399,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
 
   /* THE FINISHED TAIL ASKS THE SAME QUESTION THE BOARD ABOVE IT DOES
      (2026-09-10). It used to ask none: `fetchReview(back)` fetched the
-     DECLARED sweep on every route, so `/bet-suggester/ucl` drew its
+     DECLARED sweep on every route, so `/trivela/ucl` drew its
      upper half from `?leagues=ucl` and its finished tail from four
      other competitions' matches. On the night six Champions League
      ties finished, that endpoint served 54 finished fixtures — 28 MLS,
@@ -965,7 +965,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   /** IS THERE A CHOICE TO OFFER AT ALL? A fact about the DECLARATION:
    *  the board carries more columns than the widest scrollport can draw,
    *  so which of them are in front of you is a question with more than
-   *  one answer. Four columns and every narrowed page (`/bet-suggester/
+   *  one answer. Four columns and every narrowed page (`/trivela/
    *  ucl`) build no chooser, exactly as they build no ribbon. */
   /* …AND SINCE 2026-09-24 A DECLARED BOARD WHOSE COLUMNS ALL FIT OFFERS
      THE CHOICE TOO ("4 of 4 drawn"). The operator read the Championships
@@ -976,7 +976,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   const chooseable = offeredSlugs.length > VIEW
     || (!only && offeredSlugs.length > 1);
   /* THE LOOP IS A NO-OP AT FOUR COLUMNS OR FEWER, which is what keeps
-     every narrowed page (`/bet-suggester/ucl`) exactly as it is: nothing
+     every narrowed page (`/trivela/ucl`) exactly as it is: nothing
      is built to page through and no ribbon draws.
      …AND IS THE TRACK A SCROLLER? A fact about what is DRAWN, which
      until 2026-09-22 was the same question — the board always drew its
@@ -1156,7 +1156,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   /* AND THE BOARD BODY ANSWERS A SWIPE (operator, 2026-09-16, with the
      loop: "add it"). The same step function the strip's arrow keys use,
      so the two cannot come to disagree about which league is next, and
-     the same threshold `/bet-suggester/leagues` has read since it
+     the same threshold `/trivela/leagues` has read since it
      shipped.
      GATED ON `showTabs`, WHICH IS THE PHONE. The tablet and the desktop
      steer with the ribbon over a track that reads horizontal drags
@@ -1324,15 +1324,15 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
       <RouteProgress />
       <TopBar left={backTo ? undefined : <ArchiveMenu />} back={backTo}
         title={pageTitle ? pageTitle.toLowerCase() : "picker board"}>
-        <NavChip href="/bet-suggester/leagues" active={false}>Leagues</NavChip>
-        <NavChip href="/bet-suggester/friendlies" active={false}>Friendlies</NavChip>
+        <NavChip href="/trivela/leagues" active={false}>Leagues</NavChip>
+        <NavChip href="/trivela/friendlies" active={false}>Friendlies</NavChip>
         {/* Trivela VAR's own page; only while it is switched on */}
         <AnalystNavChip />
         {/* Live viewer competitions, and — since 2026-09-09 — WHEN each
             of them next plays: the chip glows for a fixture today or
             tomorrow. The rail moved to components/CompRail.tsx because
             it was two identical literals, here and on
-            /bet-suggester/leagues, and a glow added to one of them would
+            /trivela/leagues, and a glow added to one of them would
             have left the other with a chip that could not.
             THE RAIL IS NOT THE BOARD'S COLUMN SET. The Champions League
             left BOARD_COLUMNS on 2026-09-09 and kept this chip: removing
@@ -1934,7 +1934,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   </p>
                   <p className="mt-2 flex flex-wrap gap-3">
                     {undeclared.map((s) => CUP_COMP_KEY[s] ? (
-                      <a key={s} href={`/bet-suggester/comp/${CUP_COMP_KEY[s]}`}
+                      <a key={s} href={`/trivela/comp/${CUP_COMP_KEY[s]}`}
                         className="rounded-md border border-line px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-low transition-colors hover:border-line-strong hover:text-ink-hi">
                         {leagueLabel(s)} fixtures &amp; prices →
                       </a>
@@ -1974,7 +1974,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   by name. It is
                   not the picker board&rsquo;s declared column set, and
                   nothing here puts the competition back on{" "}
-                  <Link href="/bet-suggester"
+                  <Link href="/trivela"
                     className="text-ink-mid underline decoration-line-strong underline-offset-2 hover:text-accent">
                     the board
                   </Link>

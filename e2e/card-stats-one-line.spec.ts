@@ -96,7 +96,7 @@ test("every card whose stats fit one line keeps them on one line — league "
     });
     await routeEight(page);
     await page.route("**/api/championships/board**", (r) => r.fulfill(json(CHAMP_BOARD)));
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await page.waitForSelector('[data-testid="league-col"][data-league="unl"]');
     expect(await page.getByTestId("stats-row").count()).toBeGreaterThan(0);
     expect(await check()).toEqual([]);

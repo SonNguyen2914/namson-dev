@@ -30,9 +30,9 @@ import { COMPETITIONS, LIVE_COMPETITION_COUNT } from "./liveCompetitions";
  * exists to protect — it prints whatever the payload names.
  *
  * ONE BOARD PAGE OR ALL OF THEM (2026-09-15). Every test below opened
- * `/bet-suggester/ucl` and typed `ucl` into the payload it served it.
+ * `/trivela/ucl` and typed `ucl` into the payload it served it.
  * The EFL Cup landed the same week with the same narrowed board at
- * `/bet-suggester/efl-cup` — the same component, the same off-board
+ * `/trivela/efl-cup` — the same component, the same off-board
  * strip, and not one assertion reaching it. The competition now comes
  * from the registry and the registry's LENGTH is asserted, so the page
  * that ships next is walked by this file on the day it ships rather
@@ -108,7 +108,7 @@ test("every competition page this file walks is in the registry",
        without this count moving turns this red rather than silently
        leaving its board unguarded. */
     expect(COMPETITIONS.length).toBe(LIVE_COMPETITION_COUNT);
-    for (const c of COMPETITIONS) expect(c.href).toMatch(/^\/bet-suggester\//);
+    for (const c of COMPETITIONS) expect(c.href).toMatch(/^\/trivela\//);
   });
 
 for (const comp of COMPETITIONS) {

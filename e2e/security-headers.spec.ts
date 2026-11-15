@@ -14,7 +14,7 @@ const EXPECTED: Record<string, string> = {
   "referrer-policy": "strict-origin-when-cross-origin",
 };
 
-for (const path of ["/", "/ops/trading", "/bet-suggester/var", "/api/ops/trading-status"]) {
+for (const path of ["/", "/ops/trading", "/trivela/var", "/api/ops/trading-status"]) {
   test(`${path} carries the security headers`, async ({ request }) => {
     const r = await request.get(path, { maxRedirects: 0 });
     const h = r.headers();

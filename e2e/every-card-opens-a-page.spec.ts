@@ -1,7 +1,7 @@
 /** EVERY CARD OPENS A PAGE THAT EXISTS — OR SAYS IT HAS NONE.
  *
  *  Frontend audit F2 (2026-09-25): a card's link was the typed pattern
- *  `/bet-suggester/<league>/<event_id>`, and only four leagues have a
+ *  `/trivela/<league>/<event_id>`, and only four leagues have a
  *  match hub. Measured on the landing page, 9 of 22 links opened the
  *  site's 404 (every Bundesliga, Serie A, Ligue 1 and Eredivisie card),
  *  and by the same path every EFL Cup card, every national card and every
@@ -30,7 +30,7 @@ const EMPTY_REVIEW = { rows: [], refusals: [], leagues: {} };
 
 type Board = { rows: readonly { league: string }[]; refusals?: readonly unknown[] };
 /** A recorded board with every row and refusal drawn in one column, as
- *  the narrowed `/bet-suggester/ucl` route asks for it. */
+ *  the narrowed `/trivela/ucl` route asks for it. */
 function oneColumn(b: { rows: readonly object[]; refusals: readonly object[] }) {
   const into = <T extends object>(r: T) => ({ ...r, column: "ucl", columns: ["ucl"] });
   const meta = (CAMPEONES_BOARD.leagues as Record<string, unknown>).mls;
@@ -40,22 +40,22 @@ function oneColumn(b: { rows: readonly object[]; refusals: readonly object[] }) 
 
 const BOARDS: Array<{ name: string; path: string; board: unknown; review?: unknown;
                       clock?: string; champ?: boolean }> = [
-  { name: "the eight-column board + its finished tail", path: "/bet-suggester",
+  { name: "the eight-column board + its finished tail", path: "/trivela",
     board: BOARD_EIGHT, review: REVIEW_EIGHT, clock: "2026-09-15T11:32:30Z" },
-  { name: "the club board with its head-to-head", path: "/bet-suggester",
+  { name: "the club board with its head-to-head", path: "/trivela",
     board: CLUB_H2H_BOARD, clock: CLUB_H2H_CLOCK },
-  { name: "the Championships board", path: "/bet-suggester",
+  { name: "the Championships board", path: "/trivela",
     board: CHAMP_BOARD, clock: CHAMP_CLOCK, champ: true },
-  { name: "the EFL Cup page", path: "/bet-suggester/efl-cup", board: rebased() },
+  { name: "the EFL Cup page", path: "/trivela/efl-cup", board: rebased() },
   /* THE CAMPEONES CUP, ON A COLUMN OF ITS OWN (2026-10-12). Its tie used
      to be folded into the MLS and Liga MX columns; cup ties no longer
      are (e2e/board-cups-tab.spec.ts), so the recording is served on the
      narrowed board with every row re-columned there. It is the one board
      here whose cards have no page to open, which is what keeps the
      "says it has none" half of this test from being vacuous. */
-  { name: "the Campeones Cup", path: "/bet-suggester/ucl", board: oneColumn(CAMPEONES_BOARD),
+  { name: "the Campeones Cup", path: "/trivela/ucl", board: oneColumn(CAMPEONES_BOARD),
     clock: "2026-12-10T12:00:00Z" },
-  { name: "the Campeones Cup field", path: "/bet-suggester/ucl",
+  { name: "the Campeones Cup field", path: "/trivela/ucl",
     board: oneColumn(CAMPEONES_FIELD_BOARD), clock: "2026-12-10T12:00:00Z" },
 ];
 

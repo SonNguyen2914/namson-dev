@@ -61,7 +61,7 @@ const json = (b: unknown, status = 200) => ({
   status, contentType: "application/json", body: JSON.stringify(b),
 });
 
-const PAGES = join(__dirname, "..", "src", "pages", "bet-suggester");
+const PAGES = join(__dirname, "..", "src", "pages", "trivela");
 /** Every hub page on disk: a directory holding `[eventId].tsx`. */
 const HUBS = readdirSync(PAGES, { withFileTypes: true })
   .filter((e) => e.isDirectory()
@@ -343,7 +343,7 @@ async function open(page: Page, slug: string, s: Serve,
     await page.route(`**/api/news/fixture/${EVENT}`,
       (r) => r.fulfill(json(n.body, n.status)));
   }
-  await page.goto(`/bet-suggester/${slug}/${EVENT}`);
+  await page.goto(`/trivela/${slug}/${EVENT}`);
   // the hero drew (the top bar's "NTH vs STH" is hidden on a phone)
   await expect(page.getByTestId("venue-class")).toBeVisible();
   return errors;
@@ -1097,7 +1097,7 @@ async function openChampionships(page: Page, review: unknown) {
   await routeEight(page);
   await page.route("**/api/championships/board**", (r) => r.fulfill(json(CHAMP_BOARD)));
   await page.route("**/api/championships/review**", (r) => r.fulfill(json(review)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await page.waitForSelector('[data-testid="league-col"][data-league="unl"]');
 }
 

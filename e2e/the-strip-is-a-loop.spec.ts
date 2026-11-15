@@ -73,7 +73,7 @@ async function open(browser: Browser, device: keyof typeof devices) {
   await page.route("**/api/picker/board**", (r) => r.fulfill(json(BOARD_EIGHT)));
   await page.route("**/api/picker/review**",
     (r) => r.fulfill(json(REVIEW_EIGHT)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await page.waitForSelector('[data-testid="league-col"]');
   return { ctx, page };
 }
@@ -350,7 +350,7 @@ test.describe("the board body answers a swipe", () => {
       const cdp = await cdpFor(ctx, page);
       const p = await boardPoint(page);
 
-      /* THE DIRECTION CONVENTION, which is `/bet-suggester/leagues`'s:
+      /* THE DIRECTION CONVENTION, which is `/trivela/leagues`'s:
          dragging leftward (`dx < 0`) carries the next league in from
          the right, the way the content appears to move under a finger. */
       expect(await showing(page)).toBe(FIRST);
@@ -560,7 +560,7 @@ test.describe("the swipe is the phone's, and only the phone's", () => {
     await page.route("**/api/picker/board**", (r) => r.fulfill(json(BOARD_EIGHT)));
     await page.route("**/api/picker/review**",
       (r) => r.fulfill(json(REVIEW_EIGHT)));
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await expect(page.locator('[data-testid="league-col"]'))
       .toHaveCount(COLUMNS.length);
     await expect(page.getByTestId("league-tabs")).toHaveCount(0);

@@ -86,7 +86,7 @@ async function words(page: Page): Promise<string> {
 // fails loudly rather than quietly skipping it.
 const BUILT_LEAGUES: string[] = (() => {
   const src = readFileSync(
-    join(__dirname, "..", "src", "pages", "bet-suggester", "leagues.tsx"),
+    join(__dirname, "..", "src", "pages", "trivela", "leagues.tsx"),
     "utf8");
   const m = src.match(/const BUILT_LEAGUES = new Set\(\[([\s\S]*?)\]\)/);
   if (!m) {
@@ -105,7 +105,7 @@ const BUILT_LEAGUES: string[] = (() => {
 
 const HUBS: { league: string; url: string; name: string }[] =
   BUILT_LEAGUES.map((league) => ({
-    league, url: `/bet-suggester?league=${league}`, name: league,
+    league, url: `/trivela?league=${league}`, name: league,
   }));
 
 for (const h of HUBS) {
@@ -218,7 +218,7 @@ async function friendlies(page: Page, dead: string[] = []) {
 test("friendlies: a dead market read is named — the cards do not read as "
    + "'no book matched'", async ({ page }) => {
     await friendlies(page, ["/api/friendlies/markets"]);
-    await page.goto("/bet-suggester/friendlies");
+    await page.goto("/trivela/friendlies");
     await expect
       .poll(async () => (await words(page)).includes("KALSHI MARKET READ FAILED"),
             { timeout: 10000 }).toBe(true);
@@ -227,7 +227,7 @@ test("friendlies: a dead market read is named — the cards do not read as "
 test("friendlies: a dead xG read is named — the cards do not read as "
    + "'no xG form'", async ({ page }) => {
     await friendlies(page, ["/api/xg/friendlies**"]);
-    await page.goto("/bet-suggester/friendlies");
+    await page.goto("/trivela/friendlies");
     await expect
       .poll(async () => (await words(page)).includes("XG FORM READ FAILED"),
             { timeout: 10000 }).toBe(true);
@@ -236,7 +236,7 @@ test("friendlies: a dead xG read is named — the cards do not read as "
 test("friendlies: healthy reads print no failure line at all",
   async ({ page }) => {
     await friendlies(page);
-    await page.goto("/bet-suggester/friendlies");
+    await page.goto("/trivela/friendlies");
     await expect(page.locator("body"))
       .toContainText(/no club friendlies/i);
     const w = await words(page);

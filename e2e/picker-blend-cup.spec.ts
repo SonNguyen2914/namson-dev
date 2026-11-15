@@ -240,7 +240,7 @@ async function open(page: import("@playwright/test").Page,
   await page.route("**/api/picker/board**", (r) => r.fulfill(json(body)));
   await page.route("**/api/picker/review**", (r) =>
     r.fulfill(json(EMPTY_REVIEW)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
 }
 
 const col = (page: import("@playwright/test").Page, slug: string) =>
@@ -277,7 +277,7 @@ const orderOf = (c: ReturnType<typeof col>) =>
    than dragging the target to the front. At four or fewer declared it
    is a no-op, because the window is. */
 const COLUMNS = ["mls", "epl", "laliga", "ligamx", "leaguescup"];
-const VIEW = 4;                       // src/pages/bet-suggester/index.tsx
+const VIEW = 4;                       // src/pages/trivela/index.tsx
 
 /** THE COLUMNS IN THE SCROLLPORT — RESTATED 2026-09-15.
  *
@@ -1174,7 +1174,7 @@ test("form strips draw last results per side; absent form draws nothing", async 
 // ------------------------------------------ the way in, per competition
 
 // A card is the way INTO a fixture, and every card links to
-// /bet-suggester/<league>/<event_id>. That is a real page for the four
+// /trivela/<league>/<event_id>. That is a real page for the four
 // leagues and nothing at all for the cup: `leaguescup` has no hub, the
 // backend serves no per-match route for it, so the link landed on the
 // site's 404 (reported 2026-09-03, clicking a Leagues Cup card on the
@@ -1186,7 +1186,7 @@ const wayIn = (row: import("@playwright/test").Locator) =>
   row.getByRole("link", { name: /^open / });
 
 // SINCE 2026-10-13 THE CUP HAS ITS HUB (Son: "all matches should have a
-// match hub"): bet-suggester/leaguescup/[eventId], the league hub template
+// match hub"): trivela/leaguescup/[eventId], the league hub template
 // over the generic /api/comp/leaguescup/match route. The card opens it —
 // a page that exists (e2e/every-card-opens-a-hub.spec.ts walks them all).
 test("a Leagues Cup card opens its match hub, the same template as a league's",
@@ -1195,7 +1195,7 @@ test("a Leagues Cup card opens its match hub, the same template as a league's",
     await show(page, "leaguescup");
     const cup = col(page, "leaguescup").getByTestId("picker-row").first();
     await expect(wayIn(cup)).toHaveAttribute(
-      "href", /^\/bet-suggester\/leaguescup\/[^/]+$/);
+      "href", /^\/trivela\/leaguescup\/[^/]+$/);
   });
 
 test("a league column claims no cup's settlement note — the cup ties it "
@@ -1218,7 +1218,7 @@ test("a league card keeps its hub link", async ({ page }) => {
     const rows = col(page, slug).getByTestId("picker-row");
     if ((await rows.count()) === 0) continue;
     await expect(wayIn(rows.first())).toHaveAttribute(
-      "href", new RegExp(`^/bet-suggester/${slug}/[^/]+$`));
+      "href", new RegExp(`^/trivela/${slug}/[^/]+$`));
   }
 });
 

@@ -14,7 +14,7 @@
 // So these are the same skeleton with every model slot worded as absent,
 // keyed by the SAME slug the board's columns use: the build reads the
 // page directory into the card-link table (next.config.ts ->
-// lib/pickerApi.rowHref), so a page at bet-suggester/<slug>/[eventId] is
+// lib/pickerApi.rowHref), so a page at trivela/<slug>/[eventId] is
 // what links a board card to it. No column is added or changed here.
 //
 // Words: a read, not a signal; shadow · not advice. No copy here calls
@@ -53,7 +53,7 @@ export function noModelHubCfg(slug: NoModelHub): HubCfg {
     api: `/api/comp/${slug}`,
     tag,
     boardLabel: board === "nations" ? "nations board" : "board",
-    back: { href: "/bet-suggester",
+    back: { href: "/trivela",
             label: board === "nations" ? "nations board" : "board" },
     accentVars: {
       "--accent": hex,
@@ -134,7 +134,7 @@ export function cupHubCfg(key: string): HubCfg {
     api: `/api/comp/${key}`,
     tag,
     boardLabel: "cups board",
-    back: { href: "/bet-suggester", label: "cups board" },
+    back: { href: "/trivela", label: "cups board" },
     version: "no shadow model",
     howTheyPlayNote:
       `no fitted ratings exist for ${tag} itself; each side is rated on ` +

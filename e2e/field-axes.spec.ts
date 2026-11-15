@@ -215,7 +215,7 @@ async function open(page: import("@playwright/test").Page, ratings: unknown = RA
   await page.route("**/api/comp/ucl/fixtures**", (r) => r.fulfill(json(FIXTURES)));
   await page.route("**/api/comp/ucl/markets**", (r) => r.fulfill(json({ events: [] })));
   await page.route("**/api/comp/ucl/ratings**", (r) => r.fulfill(json(ratings)));
-  await page.goto("/bet-suggester/comp/ucl");
+  await page.goto("/trivela/comp/ucl");
 }
 
 test("the field draws every club on the opening axis", async ({ page }) => {
@@ -458,7 +458,7 @@ test("a failed ratings read is NAMED, never drawn as an absent field",
     await page.route("**/api/comp/ucl/fixtures**", (r) => r.fulfill(json(FIXTURES)));
     await page.route("**/api/comp/ucl/markets**", (r) => r.fulfill(json({ events: [] })));
     await page.route("**/api/comp/ucl/ratings**", (r) => r.abort());
-    await page.goto("/bet-suggester/comp/ucl");
+    await page.goto("/trivela/comp/ucl");
     // the failure is drawn, in its own words
     await expect(page.getByTestId("field-axes-error")).toBeVisible();
     /* THE VOCABULARY IS `fetchRatings`'S, NOT THIS PAGE'S (2026-09-22).
@@ -491,7 +491,7 @@ test("a 404 from the field read carries its status into the words",
     await page.route("**/api/comp/ucl/markets**", (r) => r.fulfill(json({ events: [] })));
     await page.route("**/api/comp/ucl/ratings**",
       (r) => r.fulfill({ status: 404, contentType: "application/json", body: "{}" }));
-    await page.goto("/bet-suggester/comp/ucl");
+    await page.goto("/trivela/comp/ucl");
     await expect(page.getByTestId("field-axes-error")).toContainText("404");
   });
 

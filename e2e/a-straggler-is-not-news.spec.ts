@@ -19,7 +19,7 @@ const asV2 = (b: unknown): unknown =>
 // WHERE THE STRIP IS DRAWN — READ OUT OF THE TREE, NEVER TYPED HERE
 // (2026-09-15).
 //
-// `<WatchedStrip />` came off /bet-suggester. The read is
+// `<WatchedStrip />` came off /trivela. The read is
 // operator-gated, and with no token held in an ordinary tab it could
 // only ever draw its own refusal — permanently, to a reader who cannot
 // fix it. `components/WatchedStrip.tsx` is UNTOUCHED, and so is every
@@ -84,7 +84,7 @@ const STRIP_ROUTE = watchedStripRoute();
  *  test leaves nothing in flight. */
 function stripSurface(): string {
   test.skip(STRIP_ROUTE === null,
-    "no page mounts <WatchedStrip />: the read came off /bet-suggester on "
+    "no page mounts <WatchedStrip />: the read came off /trivela on "
     + "2026-09-15 and was not remounted anywhere. This claim is still true "
     + "of the component and is KEPT, not deleted — it re-arms at whatever "
     + "route mounts the strip next, with no edit to this file.");
@@ -475,7 +475,7 @@ test("a shape the strip cannot draw stops the STRIP and nothing else",
     // The ranked board is still named on the route that carries it,
     // because that is the surface the harm was reported on.
     await expect(page.locator("main")).toHaveCount(1, { timeout: 30_000 });
-    if (STRIP_ROUTE === "/bet-suggester") {
+    if (STRIP_ROUTE === "/trivela") {
       await expect(page.getByTestId("board-rank-heading")).toBeVisible();
     }
     const chars = await page.evaluate(() => document.body.innerText.length);
@@ -512,7 +512,7 @@ test("one read per cadence, however many surfaces draw it",
     //
     // RETARGETED 2026-09-15, AND THE CLAIM IS UNCHANGED. This used to
     // read "the TWO SURFACES that draw this read share one poll" and
-    // named the strip and the live section, both on /bet-suggester.
+    // named the strip and the live section, both on /trivela.
     // The strip came off that page, so the pair is no longer there —
     // but sharing was never a property of those two components. It is a
     // property of the feed, and this page still holds more than one
@@ -538,7 +538,7 @@ test("one read per cadence, however many surfaces draw it",
       + "count below stops being evidence of sharing").toBeGreaterThan(1);
 
     const hits = await serve(page, () => ({ body: NEW }));
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     // operator-only since audit F4: no token, no strip read, no section
     await armToken(page);
 
@@ -547,7 +547,7 @@ test("one read per cadence, however many surfaces draw it",
     await expect(page.getByTestId("live-section"))
       .toBeVisible({ timeout: 30_000 });
     // AND THE STRIP TOO, ON THE DAY IT IS MOUNTED HERE AGAIN.
-    if (STRIP_ROUTE === "/bet-suggester") {
+    if (STRIP_ROUTE === "/trivela") {
       await expect(section(page)).toBeVisible();
     }
 
@@ -560,7 +560,7 @@ test("one read per cadence, however many surfaces draw it",
 
     // AND THE SURFACES ARE DRAWING THAT READ, which is the half of this
     // that is not about bandwidth.
-    if (STRIP_ROUTE === "/bet-suggester") {
+    if (STRIP_ROUTE === "/trivela") {
       await expect(section(page))
         .toHaveAttribute("data-generated-at", NEW.generated_at);
     }

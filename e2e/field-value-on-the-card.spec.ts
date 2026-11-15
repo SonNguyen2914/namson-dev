@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 //    to rank is not consistent and doesnt make sense"
 //                                       (operator, 2026-09-16)
 //
-// WHAT HE WAS COMPARING. Two surfaces of ONE fit. `/bet-suggester/
+// WHAT HE WAS COMPARING. Two surfaces of ONE fit. `/trivela/
 // ratings` has always drawn `value ± half_width_95` for these clubs;
 // the board card drew the RANK and the TIER that are computed from
 // them and could not draw the numbers themselves — because
@@ -192,7 +192,7 @@ async function openBoard(page: import("@playwright/test").Page,
   await page.route("**/api/picker/board**", (r) => r.fulfill(json(board)));
   await page.route("**/api/picker/review**", (r) => r.fulfill(json(review)));
   await page.route("**/api/comp/*/ratings", (r) => r.fulfill(json(ratings)));
-  await page.goto("/bet-suggester/ucl");
+  await page.goto("/trivela/ucl");
   await expect(page.getByTestId("picker-row").first()).toBeAttached();
   /* THE FIGURES ARE IN THE CARD'S `#` PANEL since the one-card rule
      (AGENTS.md §8.4, Son 2026-10-13: "± bands … live in the (#)/(i)

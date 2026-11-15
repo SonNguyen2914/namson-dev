@@ -1,4 +1,4 @@
-// Match detail — namson.dev/bet-suggester/market/BRA_SRB
+// Match detail — namson.dev/trivela/market/BRA_SRB
 // Apple-Sports treatment: the matchup is the hero, outcome probabilities as
 // thin horizontal stat bars, everything else glanceable and subordinate.
 // On-demand predictions: cached by default, "Refresh" forces a fresh
@@ -191,7 +191,7 @@ export default function MatchDetail({ m }: { m: FrozenMatch }) {
 
       <RouteProgress />
       <Toaster />
-      <TopBar back={{ href: "/bet-suggester/wc26", label: "wc26" }}
+      <TopBar back={{ href: "/trivela/wc26", label: "wc26" }}
         title={`${home} vs ${away}`}>
         <NavChip href="#prediction" active={activeSection === "prediction"}>Prediction</NavChip>
         <NavChip href="#strategy" active={activeSection === "strategy"}>Strategy</NavChip>

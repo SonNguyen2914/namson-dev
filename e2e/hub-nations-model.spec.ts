@@ -214,7 +214,7 @@ const NATIONS = ["unl", "cnl", "afcon"] as const;
 
 for (const key of NATIONS) {
   test(`${key} hub shows the trader's model, names Kalshi, and never denies either`, async ({ page }) => {
-    const errors = await open(page, `/bet-suggester/${key}/${EVENT}`, {
+    const errors = await open(page, `/trivela/${key}/${EVENT}`, {
       [`**/api/comp/${key}/match/${EVENT}`]: nationsHub(key),
       [`**/api/minutes/${key}/${EVENT}`]: anchoredSeries(key),
     });
@@ -260,7 +260,7 @@ for (const key of NATIONS) {
 }
 
 test("a series from before market_source still names Kalshi as the market", async ({ page }) => {
-  const errors = await open(page, `/bet-suggester/cnl/${EVENT}`, {
+  const errors = await open(page, `/trivela/cnl/${EVENT}`, {
     [`**/api/comp/cnl/match/${EVENT}`]: nationsHub("cnl"),
     [`**/api/minutes/cnl/${EVENT}`]: anchoredSeries("cnl", false),
   });
@@ -274,7 +274,7 @@ test("an untested trader with no read is named, and the markets card says both a
   const absent = { title: "trader's model (untested)", tested: false, available: false,
     means: "…", label: "experimental, unproven", why: "fixture_not_keyed",
     detail: "the trader has no fixture for this match" };
-  const errors = await open(page, `/bet-suggester/afcon/${EVENT}`, {
+  const errors = await open(page, `/trivela/afcon/${EVENT}`, {
     [`**/api/comp/afcon/match/${EVENT}`]: nationsHub("afcon", { traders_model: absent }),
     [`**/api/minutes/afcon/${EVENT}`]: { available: false, code: "no_fixture",
       reason: "this match is not on the live plane, so no minute-by-minute read was recorded for it" },
@@ -290,7 +290,7 @@ test("an untested trader with no read is named, and the markets card says both a
 test("a payload without traders_model says the line was not served", async ({ page }) => {
   const body = nationsHub("unl") as Record<string, unknown>;
   delete body.traders_model;
-  const errors = await open(page, `/bet-suggester/unl/${EVENT}`, {
+  const errors = await open(page, `/trivela/unl/${EVENT}`, {
     [`**/api/comp/unl/match/${EVENT}`]: body,
     [`**/api/minutes/unl/${EVENT}`]: anchoredSeries("unl"),
   });
@@ -299,7 +299,7 @@ test("a payload without traders_model says the line was not served", async ({ pa
 });
 
 test("a league with a shadow model keeps 'model' on the chart and its own bar in the card", async ({ page }) => {
-  const errors = await open(page, `/bet-suggester/mls/${EVENT}`, {
+  const errors = await open(page, `/trivela/mls/${EVENT}`, {
     [`**/api/mls/match/${EVENT}`]: mlsHub(),
     [`**/api/minutes/mls/${EVENT}`]: modelSeries(),
   });
@@ -319,11 +319,11 @@ test("screenshots: nations and league hubs at 1440 and 400", async ({ browser })
   test.skip(!dir, "HUB_SHOT_DIR not set");
   test.setTimeout(180_000);
   const cases: Array<[string, string, Record<string, unknown>]> = [
-    ...NATIONS.map((k) => [k, `/bet-suggester/${k}/${EVENT}`, {
+    ...NATIONS.map((k) => [k, `/trivela/${k}/${EVENT}`, {
       [`**/api/comp/${k}/match/${EVENT}`]: nationsHub(k),
       [`**/api/minutes/${k}/${EVENT}`]: anchoredSeries(k),
     }] as [string, string, Record<string, unknown>]),
-    ["mls", `/bet-suggester/mls/${EVENT}`, {
+    ["mls", `/trivela/mls/${EVENT}`, {
       [`**/api/mls/match/${EVENT}`]: mlsHub(),
       [`**/api/minutes/mls/${EVENT}`]: modelSeries(),
     }],

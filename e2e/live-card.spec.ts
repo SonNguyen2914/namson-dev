@@ -13,7 +13,7 @@ import { CLOCK_ABSENT_WORDS } from "../src/lib/suggesterApi";
 import { toV2 } from "./standing";
 
 // THE LIVE SECTION — the cards for matches under way, above the ranked
-// board on /bet-suggester (components/LiveCard.tsx).
+// board on /trivela (components/LiveCard.tsx).
 //
 // Hermetic: every test serves a recorded SHAPE of
 // GET /api/bet-suggester/watched-strip plus the board and review reads
@@ -484,7 +484,7 @@ async function openAsSent(page: Page, strip: unknown, board = BOARD) {
   await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW)));
   await page.route("**/api/bet-suggester/watched-strip**",
     (r) => r.fulfill(json(strip)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   // operator-only since audit F4: no token, no strip read, no section
   await armToken(page);
   await page.getByTestId("live-section").waitFor({ timeout: 15_000 });
@@ -495,7 +495,7 @@ async function open(page: Page, strip: unknown, board = BOARD) {
   await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW)));
   await page.route("**/api/bet-suggester/watched-strip**",
     (r) => r.fulfill(json(isObj(strip) ? toV2(strip) : strip)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   // operator-only since audit F4: no token, no strip read, no section
   await armToken(page);
   await page.getByTestId("live-section").waitFor({ timeout: 15_000 });
@@ -628,7 +628,7 @@ test("a read that RAN and measured nothing is never reported as a read "
 test("the card's clock is the payload's own field, and it says WHICH "
    + "field answered", async ({ page }) => {
   /* THE DEFECT, EXACTLY AS IT SHIPPED. Two surfaces mounted on
-     /bet-suggester and both were fed by api.watchedStrip(). WatchedStrip
+     /trivela and both were fed by api.watchedStrip(). WatchedStrip
      preferred `state.minute` with `clock_display` as its fallback;
      LiveCard preferred `clock_display`. In stoppage time that was 45'
      in the strip and 45'+5' on the card below it — the same match, two
@@ -1443,7 +1443,7 @@ test("a ninth live match starts a second page, ordered by kickoff, and "
   await page.route("**/api/picker/board**",
     (r) => r.fulfill(json({ ...BOARD, rows })));
   await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   // operator-only since audit F4: no token, no strip read, no section
   await armToken(page);
   await page.getByTestId("live-section").waitFor({ timeout: 15_000 });
@@ -1502,7 +1502,7 @@ test("nothing is drawn at all when no declared match is under way",
     await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW)));
     await page.route("**/api/bet-suggester/watched-strip**", (r) =>
       r.fulfill(json({ ...ENVELOPE, matches: [] })));
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await expect(page.getByTestId("picker-row").first()).toBeVisible();
     // the token is held, so the read is made and it said: nothing
     await armToken(page);

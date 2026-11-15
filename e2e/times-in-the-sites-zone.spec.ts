@@ -23,7 +23,7 @@ test("the friendly match page prints its kickoff in Los Angeles time", async ({ 
     },
     books: { status: "unmapped" },
   })));
-  await page.goto("/bet-suggester/friendlies/1234567");
+  await page.goto("/trivela/friendlies/1234567");
   const k = page.getByText(/11:00\s?AM PDT/);
   await expect(k).toBeVisible();
   // and not Tokyo's 3:00 the next morning

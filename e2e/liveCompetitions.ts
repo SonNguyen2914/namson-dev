@@ -58,9 +58,9 @@ export const LIVE_COMPETITION_COUNT = 2;
  *  and the day one of them gained the glow the other had a chip that
  *  could not. */
 export const RAIL_PAGES: readonly string[] = [
-  "/bet-suggester",
-  "/bet-suggester/leagues",
-  "/bet-suggester/ratings",
+  "/trivela",
+  "/trivela/leagues",
+  "/trivela/ratings",
   ...COMPETITIONS.map((c) => c.href),
 ];
 

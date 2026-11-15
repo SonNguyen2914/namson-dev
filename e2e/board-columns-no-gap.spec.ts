@@ -97,7 +97,7 @@ async function open(page: Page, mode: string, boards: Boards) {
     return r.fulfill(json(asked ? CUPS_RULES_REVIEW : LEAGUES_RULES_REVIEW));
   });
   await page.route("**/api/championships/**", (r) => r.fulfill(json(boards.nations)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await page.waitForSelector('[data-testid="league-col"]');
 }
 

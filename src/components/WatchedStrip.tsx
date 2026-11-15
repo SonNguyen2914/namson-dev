@@ -1447,7 +1447,7 @@ function MatchBlock({ m, registry, policyCodes, inPlayStates, stateTaped,
   // ONE CLOCK READER, SHARED WITH THE LIVE CARD. This file used to
   // prefer `state.minute` and keep `clock_display` as a fallback, which
   // is the OPPOSITE precedence to LiveCard's — and both are drawn on
-  // /bet-suggester off the same api.watchedStrip() response, so on
+  // /trivela off the same api.watchedStrip() response, so on
   // 2026-09-11 the strip printed 45' over a card printing 45'+5' for one
   // match. lib/suggesterApi.readMatchClock is now the only place either
   // surface learns what the clock says.

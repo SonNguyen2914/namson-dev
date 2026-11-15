@@ -37,7 +37,7 @@ async function openCups(page: Page) {
   }, 503)));
   await page.route("**/api/field/leagues", (r) => r.fulfill(json(LEAGUES)));
   await page.route("**/api/field/cups", (r) => r.fulfill(json(CUPS)));
-  await page.goto("/bet-suggester/ratings");
+  await page.goto("/trivela/ratings");
   await expect(page.getByTestId("field-table").first()).toBeVisible();
   await page.getByTestId("mode-cups").click();
   await expect(page.getByTestId("cup-table")).toBeVisible();
@@ -69,7 +69,7 @@ test("no cup key is typed in the files that draw the Cups view — the "
     path.join(SRC, "components", "PinnedPassField.tsx"),
     path.join(SRC, "components", "FieldPills.tsx"),
     path.join(SRC, "lib", "fieldPageApi.ts"),
-    path.join(SRC, "pages", "bet-suggester", "ratings.tsx"),
+    path.join(SRC, "pages", "trivela", "ratings.tsx"),
   ];
   /* EVERY key and alias the recording carries, read off it — a list
      typed here would be the second copy that goes stale. */

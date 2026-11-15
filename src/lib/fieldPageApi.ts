@@ -11,7 +11,7 @@
 //                            all cut from ONE corpus at ONE pass count
 //
 // Served by backend src/picker/field_page.py from committed bytes: no
-// board, no capture, no write. The page at /bet-suggester/ratings reads
+// board, no capture, no write. The page at /trivela/ratings reads
 // both; nothing else does. The national field also has a BAKED fallback
 // (`nationsSnapshot`, below), shown only when its live read fails.
 // `fieldApi.ts` stays what it was — the board card and the competition

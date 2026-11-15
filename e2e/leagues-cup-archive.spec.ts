@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import raw from "../src/data/leagues-cup-brackets.json";
 
-// The archived Leagues Cup bracket at /bet-suggester/leagues-cup.
+// The archived Leagues Cup bracket at /trivela/leagues-cup.
 //
 // Hermetic by construction: the page imports its data, so this spec
 // touches no backend and nothing here can be flaky because a live read
@@ -41,7 +41,7 @@ const bracketTies = (s: Season): Tie[] =>
   [...s.rounds.flatMap((r) => r.ties), ...s.third_place.ties];
 
 async function open(page: Page) {
-  await page.goto("/bet-suggester/leagues-cup");
+  await page.goto("/trivela/leagues-cup");
   await expect(page.getByRole("heading", { name: "Leagues Cup", level: 1 }))
     .toBeVisible();
 }

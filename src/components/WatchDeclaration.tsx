@@ -729,7 +729,7 @@ function SyncConfirm() {
  *  credential twice would be this page inventing a second secret. The
  *  strip therefore reads it from HERE rather than holding one of its
  *  own — components/WatchedStrip.tsx is mounted inside this provider by
- *  pages/bet-suggester/index.tsx.
+ *  pages/trivela/index.tsx.
  *
  *  IT ADDS NO STORAGE AND NO WRITE. This returns the state the panel
  *  already keeps for the life of the tab (held app-wide since

@@ -941,7 +941,7 @@ export const STATE_ABSENT_WORDS =
 // TWO READERS WITH OPPOSITE PRECEDENCE, ON ONE SCREEN, OFF ONE RESPONSE
 // (found live 2026-09-11). WatchedStrip preferred `state.minute` and
 // kept `clock_display` as a fallback; LiveCard preferred
-// `clock_display`. Both mount on /bet-suggester and both are fed by the
+// `clock_display`. Both mount on /trivela and both are fed by the
 // SAME api.watchedStrip() call, so a fixture in stoppage time printed
 // `45'` in the strip and `45'+5'` on the card below it — the same match,
 // two clocks, one screen, neither of them wrong on its own terms.

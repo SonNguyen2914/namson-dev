@@ -1,4 +1,4 @@
-// THE CHAMPIONS LEAGUE BOARD — namson.dev/bet-suggester/ucl
+// THE CHAMPIONS LEAGUE BOARD — namson.dev/trivela/ucl
 //
 // The operator asked for "the exact layout of the landing page, for
 // UEFA Champions League matches only". So this is not a page that looks
@@ -10,7 +10,7 @@
 // component, not a copy that would drift from it on the first change
 // made to either.
 //
-// WHY NOT /bet-suggester/comp/ucl. That route exists and is a different
+// WHY NOT /trivela/comp/ucl. That route exists and is a different
 // product: the competition VIEWER, which centres a market's prices and
 // the model's share of them. It is the right page for "what does the
 // book say about this tie" and the wrong one for "rank these ties by
@@ -23,7 +23,7 @@ export default function UclBoard() {
     <PickerBoard
       only={["ucl"]}
       pageTitle="Champions League"
-      backTo={{ href: "/bet-suggester", label: "board" }}
+      backTo={{ href: "/trivela", label: "board" }}
     />
   );
 }

@@ -260,7 +260,7 @@ function CompViewerBody({ compKey: key }: { compKey: string | null }) {
        "nobody has measured this competition", just an absence where a
        table was, which is indistinguishable from a page that never had
        one.
-       IT IS THE SAME PANEL AS THE PAGE NEXT DOOR. `/bet-suggester/ratings`
+       IT IS THE SAME PANEL AS THE PAGE NEXT DOOR. `/trivela/ratings`
        draws this component off this endpoint through this function; a
        viewer that reached it by a weaker route was one surface of one
        read holding itself to a lower standard than the other.
@@ -314,7 +314,7 @@ function CompViewerBody({ compKey: key }: { compKey: string | null }) {
         <Head><title>Not served · market viewer · namson.dev</title></Head>
         <RouteProgress />
         <TopBar left={<ArchiveMenu current={archiveKey} />}
-          back={{ href: "/bet-suggester", label: "board" }}
+          back={{ href: "/trivela", label: "board" }}
           title="market viewer" />
         <main className="mx-auto max-w-5xl px-5 pb-24 pt-10">
           <Eyebrow>not served here</Eyebrow>
@@ -340,7 +340,7 @@ function CompViewerBody({ compKey: key }: { compKey: string | null }) {
       </Head>
       <RouteProgress />
       <TopBar left={<ArchiveMenu current={archiveKey} />}
-        back={{ href: "/bet-suggester", label: "board" }}
+        back={{ href: "/trivela", label: "board" }}
         title={d?.display || "Competition"} />
       <main className="mx-auto max-w-5xl px-5 pb-24 pt-10">
         <Eyebrow>{(d?.display || String(key || "competition")).toLowerCase()} · viewer</Eyebrow>

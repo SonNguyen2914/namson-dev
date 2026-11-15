@@ -1,4 +1,4 @@
-// THE FIELD PAGE — /bet-suggester/ratings, rebuilt 2026-09-23 to the
+// THE FIELD PAGE — /trivela/ratings, rebuilt 2026-09-23 to the
 // design the operator approved ("The Pinned-Pass Field").
 //
 // HERMETIC. Both reads are served from `field-page-recorded.ts`, which is
@@ -68,7 +68,7 @@ async function serve(page: Page, leagues: unknown = LEAGUES,
 }
 
 async function open(page: Page, leagues: unknown = LEAGUES,
-                    cups: unknown = CUPS, url = "/bet-suggester/ratings") {
+                    cups: unknown = CUPS, url = "/trivela/ratings") {
   await serve(page, leagues, cups);
   await page.goto(url);
   await expect(page.getByTestId("field-table").first()).toBeVisible();
@@ -629,7 +629,7 @@ test("the Leagues/Cups choice is remembered, and ?comp= opens a cup",
     await page.reload();
     await expect(page.getByTestId("field-table")).toBeVisible();
     // an alias opens the field it shares
-    await page.goto("/bet-suggester/ratings?comp=leaguescup");
+    await page.goto("/trivela/ratings?comp=leaguescup");
     await expect(page.getByTestId("cup-section")).toHaveCount(1);
     await expect(page.getByTestId("cup-section")).toHaveAttribute("data-cup", "campeones");
     // EXACTLY that cup is lit — not it and the default
@@ -693,7 +693,7 @@ test("a failed read is NAMED — the backend's sentence, or its status",
   async ({ page }) => {
     await serve(page, { detail: "league field unavailable: bytes refused" },
                 CUPS, { leaguesStatus: 503 });
-    await page.goto("/bet-suggester/ratings");
+    await page.goto("/trivela/ratings");
     await expect(page.getByTestId("field-read-error"))
       .toContainText("league field unavailable: bytes refused");
     await expect(page.getByTestId("field-table")).toHaveCount(0);
@@ -702,7 +702,7 @@ test("a failed read is NAMED — the backend's sentence, or its status",
 test("…and a failure with nothing to say still says its status",
   async ({ page }) => {
     await serve(page, null, CUPS, { leaguesStatus: 502, raw: "<h1>bad</h1>" });
-    await page.goto("/bet-suggester/ratings");
+    await page.goto("/trivela/ratings");
     await expect(page.getByTestId("field-read-error")).toContainText("502");
     await expect(page.getByTestId("field-table")).toHaveCount(0);
   });

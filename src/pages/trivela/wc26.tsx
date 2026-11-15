@@ -1,4 +1,4 @@
-// World Cup 26 — namson.dev/bet-suggester/wc26
+// World Cup 26 — namson.dev/trivela/wc26
 //
 // The tournament finished on 2026-07-19 (Spain, 1-0 AET). Until
 // 2026-08-30 this view was index 0 of the league carousel, which meant
@@ -156,10 +156,10 @@ export default function WC26Archive() {
 
       <RouteProgress />
       <TopBar left={<ArchiveMenu current="wc26" />}
-        back={{ href: "/bet-suggester", label: "board" }}
+        back={{ href: "/trivela", label: "board" }}
         title={WC26.top}>
         <NavChip href="#bracket" active>Bracket</NavChip>
-        <NavChip href="/bet-suggester/bots" active={false}>Bots</NavChip>
+        <NavChip href="/trivela/bots" active={false}>Bots</NavChip>
       </TopBar>
 
       {fxOn && <WC26FX />}

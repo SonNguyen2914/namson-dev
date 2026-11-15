@@ -12,7 +12,7 @@ import { DEFAULT_BACK, MAX_BACK, REVIEW_WINDOWS } from "../src/lib/pickerReview"
  * the rule since the tail was built.
  *
  * WHAT IT WAS ENFORCED BY UNTIL 2026-09-16: a comment. `DEFAULT_DAYS = 8`
- * was a private constant of pages/bet-suggester/index.tsx and
+ * was a private constant of pages/trivela/index.tsx and
  * `DEFAULT_BACK = 8` was a second literal in lib/pickerReview.ts, three
  * lines under a comment reading
  *
@@ -72,7 +72,7 @@ test("the forward window is declared ONCE, in the lib, and the page reads it",
        it imported. */
     const lib = SRC("lib/pickerApi.ts");
     expect(lib).toMatch(/^export const DEFAULT_DAYS\s*=\s*\d+;\s*$/m);
-    const page = SRC("pages/bet-suggester/index.tsx");
+    const page = SRC("pages/trivela/index.tsx");
     expect(page, "the landing page declares a forward window of its own")
       .not.toMatch(/^\s*const DEFAULT_DAYS\s*=/m);
     expect(page, "the landing page must import the one constant")

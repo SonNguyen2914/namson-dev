@@ -125,7 +125,7 @@ test("no file under src/ builds a --lg-* token name from a value — the "
      for, would pass the assertion below without reading a line. */
   expect(files.length).toBeGreaterThan(20);
   const rel = files.map((f) => relative(SRC, f));
-  expect(rel).toContain(join("pages", "bet-suggester", "index.tsx"));
+  expect(rel).toContain(join("pages", "trivela", "index.tsx"));
   expect(rel).toContain(join("components", "LeagueTabs.tsx"));
   expect(rel).toContain(join("components", "PickerColumn.tsx"));
   expect(rel).toContain(join("lib", "leagueHue.ts"));

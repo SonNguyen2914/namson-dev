@@ -186,7 +186,7 @@ async function open(page: import("@playwright/test").Page) {
     r.fulfill(json(MARKETS)));
   await page.route("**/api/comp/asean/tournament", (r) =>
     r.fulfill(json(TOURNAMENT)));
-  await page.goto("/bet-suggester/comp/asean");
+  await page.goto("/trivela/comp/asean");
 }
 
 test("a national-team competition renders from the registry alone", async ({
@@ -297,7 +297,7 @@ test("a withheld forecast renders its reason, never a stale board", async ({
   await page.route("**/api/comp/asean/tournament", (r) =>
     r.fulfill(json({ available: false,
                      reason: "unrated teams: Atlantis: name_unmapped" })));
-  await page.goto("/bet-suggester/comp/asean");
+  await page.goto("/trivela/comp/asean");
   await expect(page.getByText(/forecast withheld/).first()).toBeVisible();
   await expect(page.getByText(/Group A/)).toHaveCount(0);
 });
@@ -331,7 +331,7 @@ test("no tournament backend leaves the page intact", async ({ page }) => {
   await page.route("**/api/comp/asean/tournament", (r) =>
     r.fulfill({ status: 404, contentType: "application/json",
                 body: JSON.stringify({ detail: "no tournament surface" }) }));
-  await page.goto("/bet-suggester/comp/asean");
+  await page.goto("/trivela/comp/asean");
   await expect(page.getByText("ASEAN Championship").first()).toBeVisible();
   await expect(page.getByText(/Road to the title/)).toHaveCount(0);
 });
@@ -345,7 +345,7 @@ test("the points-share chips sum to 100%, never 101%", async ({ page }) => {
   await page.route("**/api/comp/asean/fixtures**", (r) => r.fulfill(json(p)));
   await page.route("**/api/comp/asean/markets**", (r) => r.fulfill(json(MARKETS)));
   await page.route("**/api/comp/asean/tournament", (r) => r.fulfill(json(TOURNAMENT)));
-  await page.goto("/bet-suggester/comp/asean");
+  await page.goto("/trivela/comp/asean");
   await expect(page.getByText(/VIETNAM\s*45%/i).first()).toBeVisible();
   await expect(page.getByText(/55%\s*CAMBODIA/i).first()).toBeVisible();
   await expect(page.getByText(/56%\s*CAMBODIA/i)).toHaveCount(0);
@@ -370,7 +370,7 @@ test("a knockout in extra time or its shootout is live, not a kickoff to come",
         r.fulfill(json(MARKETS)));
       await page.route("**/api/comp/asean/tournament", (r) =>
         r.fulfill(json(TOURNAMENT)));
-      await page.goto("/bet-suggester/comp/asean");
+      await page.goto("/trivela/comp/asean");
       await expect(page.getByRole("group")
         .filter({ hasText: "Vietnam v Cambodia" }).first())
         .toContainText(`Cambodia${text} · Semi-finals`);
@@ -401,7 +401,7 @@ test("a published leg whose date is the provider's placeholder reads TBC",
       r.fulfill(json(MARKETS)));
     await page.route("**/api/comp/asean/tournament", (r) =>
       r.fulfill(json(t)));
-    await page.goto("/bet-suggester/comp/asean");
+    await page.goto("/trivela/comp/asean");
     await expect(page.getByText("leg 2 · Vietnam v Thailand · date TBC"))
       .toBeVisible();
     await expect(page.getByText(/leg 1 · Thailand v Vietnam · \w{3} \d+, /))

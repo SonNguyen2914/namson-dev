@@ -170,7 +170,7 @@ test.describe("the board page on a slow rebuild", () => {
         if (resp.status() === 200) return r.fulfill(json(CHAMP_BOARD));
         return r.fulfill({ response: resp });
       });
-      await page.goto("/bet-suggester");
+      await page.goto("/trivela");
       await page.locator('[data-testid="league-col"][data-league="unl"]')
         .waitFor({ timeout: 70_000 });
       expect(upstream[0], "the proxy stopped waiting on a 20s board").toBe(200);
@@ -197,7 +197,7 @@ test.describe("the board page on a slow rebuild", () => {
             return asked === 1 ? r.fulfill(TIMEOUT_504) : r.fallback();
           });
         }
-        await page.goto("/bet-suggester");
+        await page.goto("/trivela");
         const building = page.getByTestId("board-building");
         await expect(building).toBeVisible();
         await expect(building).toContainText("Building the board");
@@ -217,7 +217,7 @@ test.describe("the board page on a slow rebuild", () => {
       asked += 1;
       return r.fulfill(TIMEOUT_504);
     });
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await expect(page.getByTestId("board-building")).toBeVisible();
     await expect(page.getByTestId("board-error")).toHaveCount(0);
     const card = page.getByTestId("board-error");

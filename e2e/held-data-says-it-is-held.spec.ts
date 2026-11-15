@@ -41,7 +41,7 @@ test("the competition viewer says its fixtures are held after a failed refresh",
         status: "NS", home: { name: "Arsenal" }, away: { name: "Inter" } }],
       model: { state: "no_model_by_design", why: "UCL WHY", instead: "x" },
     });
-    await page.goto("/bet-suggester/comp/ucl");
+    await page.goto("/trivela/comp/ucl");
     await expect(page.locator("main h1")).toHaveText("UEFA Champions League");
     await expect(page.getByTestId("feed-stale")).toHaveCount(0);
     await page.clock.runFor("01:05");
@@ -61,7 +61,7 @@ test("a friendly's page says its feed is held after a failed refresh",
         status: "NS", status_long: "Not Started",
         home: { name: "Liverpool" }, away: { name: "Wrexham" } },
     });
-    await page.goto("/bet-suggester/friendlies/55");
+    await page.goto("/trivela/friendlies/55");
     await expect(page.getByText("Liverpool").first()).toBeVisible();
     await expect(page.getByTestId("feed-stale")).toHaveCount(0);
     await page.clock.runFor("00:35");
@@ -82,7 +82,7 @@ test("the friendlies dashboard says its scoreboard is held after a failed refres
       "**/api/friendlies/schedule**", "**/api/xg/friendlies**"]) {
       await page.route(glob, (r) => r.fulfill(json({ fixtures: [] })));
     }
-    await page.goto("/bet-suggester/friendlies");
+    await page.goto("/trivela/friendlies");
     await expect(page.getByText("Liverpool").first()).toBeVisible();
     await expect(page.getByTestId("feed-stale")).toHaveCount(0);
     await page.clock.runFor("01:05");

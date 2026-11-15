@@ -87,7 +87,7 @@ const shapes = (marks: Mark[]) => new Set(marks.map((m) => `${m.tag}.${strip(m.c
 async function clubBoard(page: Page, board: unknown = CLUB_H2H_BOARD) {
   await page.clock.install({ time: new Date(CLUB_H2H_CLOCK) });
   await routeEight(page, board);
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await page.waitForSelector('[data-testid="picker-row"]');
   return anatomy(page);
 }
@@ -99,7 +99,7 @@ async function nationalBoard(page: Page) {
   });
   await routeEight(page);
   await page.route("**/api/championships/board**", (r) => r.fulfill(json(CHAMP_BOARD)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await page.waitForSelector('[data-testid="league-col"][data-league="unl"] [data-testid="picker-row"]');
   return anatomy(page);
 }
@@ -243,7 +243,7 @@ test.describe("a club card carries the head-to-head, as a national card does", (
     // a board built before the key: no item anywhere, never a blank one
     await page.goto("about:blank");
     await routeEight(page, BOARD_EIGHT);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await page.waitForSelector('[data-testid="picker-row"]');
     await expect(page.locator('[data-testid="picker-row"] [data-testid="h2h"]')).toHaveCount(0);
   });

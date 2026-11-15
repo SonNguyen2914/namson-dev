@@ -58,7 +58,7 @@ test.describe("MLS match page — team news", { tag: LIVE_TAG }, () => {
       if (!body?.lineups) return;
       const lineups = body.lineups;
 
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       // WAIT FOR THE PAGE TO HAVE ITS DATA BEFORE READING AN ABSENCE.
       //
       // `TeamNews` returns null until the match payload carries a lineup
@@ -173,7 +173,7 @@ test.describe("MLS match page — team news", { tag: LIVE_TAG }, () => {
       }
     }
 
-    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    await page.goto(`/trivela/mls/${EVENT}`);
     const absent = (lineups.home?.key_absences ?? [])[0];
     if (absent?.name) {
       await expect(page.getByText(absent.name, { exact: false }).first())

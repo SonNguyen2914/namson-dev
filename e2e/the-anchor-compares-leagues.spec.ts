@@ -78,7 +78,7 @@ async function open(page: import("@playwright/test").Page, rows: unknown[]) {
     r.fulfill(json({ finished: [], refusals: [], leagues: {}, store: null })));
   await page.route("**/api/comp/*/ratings", (r) =>
     r.fulfill(json({ detail: "not needed here" }, 503)));
-  await page.goto("/bet-suggester/ucl");
+  await page.goto("/trivela/ucl");
   await expect(page.getByTestId("picker-row").first()).toBeVisible();
 }
 

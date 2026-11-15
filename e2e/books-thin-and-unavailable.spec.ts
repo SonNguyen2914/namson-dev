@@ -45,7 +45,7 @@ const UNAV = { event_ticker: "KXMLSGAME-26OCT21CINDCU", title: "FC Cincinnati vs
 async function mls(page: Page, markets: unknown) {
   await page.route("**/api/**", (r) => r.fulfill(json({ detail: "hermetic" }, 503)));
   await page.route("**/api/mls/markets", (r) => r.fulfill(json(markets)));
-  await page.goto("/bet-suggester/leagues?league=mls");
+  await page.goto("/trivela/leagues?league=mls");
 }
 
 test.describe("league BookCards", () => {
@@ -117,7 +117,7 @@ async function friendly(page: Page, books: unknown) {
   await page.route("**/api/**", (r) => r.fulfill(json({ detail: "hermetic" }, 503)));
   await page.route("**/api/friendlies/fixtures/1234567**", (r) =>
     r.fulfill(json({ fixture: FIXTURE, books })));
-  await page.goto("/bet-suggester/friendlies/1234567");
+  await page.goto("/trivela/friendlies/1234567");
 }
 
 test.describe("the friendly match page", () => {

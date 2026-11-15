@@ -358,7 +358,7 @@ export function useBoardLoop({ trackRef, stripRef, railRef, slugs, view,
     // ── geometry ───────────────────────────────────────────────────────
     /** The track's inline padding — the gutter that keeps the end
      *  columns' borders inside the clip (see the track's note in
-     *  pages/bet-suggester/index.tsx). `clientWidth` includes it, so it
+     *  pages/trivela/index.tsx). `clientWidth` includes it, so it
      *  comes off before the columns share what is left. */
     const padX = () => {
       const cs = getComputedStyle(track);

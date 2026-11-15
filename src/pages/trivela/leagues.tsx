@@ -1,19 +1,19 @@
-// League carousel — namson.dev/bet-suggester/leagues
+// League carousel — namson.dev/trivela/leagues
 //
 // The four leagues that are actually in season, each with its own drive
 // mode: crest colour, wordmark face, entrance effect, dashboard.
 //
-// MOVED HERE 2026-08-30, from /bet-suggester. Two things changed with the
+// MOVED HERE 2026-08-30, from /trivela. Two things changed with the
 // address, and they are separate decisions:
 //
-//  1. /bet-suggester is now the PICKER BOARD. This carousel is a place
+//  1. /trivela is now the PICKER BOARD. This carousel is a place
 //     you choose, not the thing you land on.
 //  2. WC26 IS NO LONGER IN THE CAROUSEL. It was index 0, which made a
 //     finished tournament the default view of the whole site. It lives at
-//     /bet-suggester/wc26 now, reached from the Archive dropdown, and
+//     /trivela/wc26 now, reached from the Archive dropdown, and
 //     every piece of index arithmetic below counts FOUR leagues.
 //
-// Old deep links keep working: /bet-suggester?league=<id> is redirected
+// Old deep links keep working: /trivela?league=<id> is redirected
 // here by next.config.ts (and ?league=wc26 to the archive page), and the
 // guard below catches the client-side navigations a config redirect does
 // not see.
@@ -231,7 +231,7 @@ export default function LeagueCarousel() {
     const qLeague = typeof router.query.league === "string"
       ? router.query.league.toLowerCase() : null;
     if (qLeague === "wc26") {
-      router.replace("/bet-suggester/wc26");
+      router.replace("/trivela/wc26");
       return;
     }
     didIntro.current = true;
@@ -303,12 +303,12 @@ export default function LeagueCarousel() {
       <RouteProgress />
       <Toaster />
       <TopBar left={<ArchiveMenu />}
-        back={{ href: "/bet-suggester", label: "board" }}
+        back={{ href: "/trivela", label: "board" }}
         title={league.top}>
         {/* Not a league mode: friendlies are a viewer-only surface (no
             model, ever), so they get a chip off the board rather than a
             place in the league carousel. */}
-        <NavChip href="/bet-suggester/friendlies" active={false}>Friendlies</NavChip>
+        <NavChip href="/trivela/friendlies" active={false}>Friendlies</NavChip>
         {/* Viewer competitions: fixtures + Kalshi + strength read, no
             model — and, since 2026-09-09, a chip that glows when the
             competition plays today or tomorrow.

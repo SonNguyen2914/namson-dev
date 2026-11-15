@@ -11,7 +11,7 @@ import { expect, test } from "@playwright/test";
 // route did not offer it.
 //
 // WHAT THAT DOOR MAKES POSSIBLE, AND WHAT IT MAKES DANGEROUS. Possible:
-// /bet-suggester/ucl is the landing page's own component and card, drawn
+// /trivela/ucl is the landing page's own component and card, drawn
 // over Champions League fixtures, which is what the operator asked for
 // ("where is my UCL match cards using the same layout of the landing
 // page?"). Dangerous: the narrowed payload's `leagues` key set now holds
@@ -137,7 +137,7 @@ test("the landing page asks for NOTHING by name — its request carries no "
        is also its backend CACHE KEY — the declared read keeps the exact
        string it has always had, so this surface takes no cold cache on
        deploy. */
-    const urls = await open(page, "/bet-suggester", DECLARED);
+    const urls = await open(page, "/trivela", DECLARED);
     await expect(cols(page).first()).toBeAttached();
     expect(urls.length).toBeGreaterThan(0);
     for (const u of urls) expect(u).not.toContain("leagues=");
@@ -145,7 +145,7 @@ test("the landing page asks for NOTHING by name — its request carries no "
 
 test("the board draws exactly the columns the payload DECLARES — the set "
    + "and its length, read off the payload", async ({ page }) => {
-    await open(page, "/bet-suggester", DECLARED);
+    await open(page, "/trivela", DECLARED);
     const declared = Object.keys(DECLARED.leagues);
     /* DERIVED, NOT TYPED. `declared` is the fixture's own key set, so a
        column added to or removed from the payload moves this expectation
@@ -167,7 +167,7 @@ test("a NARROWED payload handed to the landing page declares nothing — it "
        Zero columns is the safe direction — the unsafe one is reading an
        answer to somebody's question as the operator's declaration — and
        it is NAMED rather than left as a blank. */
-    await open(page, "/bet-suggester", NARROWED_UCL);
+    await open(page, "/trivela", NARROWED_UCL);
     await expect(page.getByTestId("board-not-a-declaration")).toBeVisible();
     await expect(cols(page)).toHaveCount(0);
     await expect(cols(page).filter({ hasText: /./ })).toHaveCount(0);
@@ -177,7 +177,7 @@ test("and the DECLARED payload says none of that — the control",
   async ({ page }) => {
     /* Without this the test above would pass against a page that drew no
        columns at all, which is the same defect pointing the other way. */
-    await open(page, "/bet-suggester", DECLARED);
+    await open(page, "/trivela", DECLARED);
     await expect(page.getByTestId("board-not-a-declaration")).toHaveCount(0);
     await expect(cols(page))
       .toHaveCount(Object.keys(DECLARED.leagues).length);
@@ -185,8 +185,8 @@ test("and the DECLARED payload says none of that — the control",
 
 // ──────────────────────────────────── 2. the narrowed route's request
 
-test("/bet-suggester/ucl asks for its competition BY NAME", async ({ page }) => {
-    const urls = await open(page, "/bet-suggester/ucl", NARROWED_UCL);
+test("/trivela/ucl asks for its competition BY NAME", async ({ page }) => {
+    const urls = await open(page, "/trivela/ucl", NARROWED_UCL);
     await expect(cols(page)).toHaveCount(1);
     expect(urls.length).toBeGreaterThan(0);
     for (const u of urls) expect(u).toContain("leagues=ucl");
@@ -194,7 +194,7 @@ test("/bet-suggester/ucl asks for its competition BY NAME", async ({ page }) => 
 
 test("it draws the landing page's own card over those rows — the same "
    + "component, not a copy", async ({ page }) => {
-    await open(page, "/bet-suggester/ucl", NARROWED_UCL);
+    await open(page, "/trivela/ucl", NARROWED_UCL);
     const ucl = cols(page).filter({ has: page.locator("[data-league]") });
     await expect(ucl).toHaveCount(1);
     /* THE BOARD'S OWN FURNITURE, reached here because this route IS the
@@ -220,7 +220,7 @@ test("it draws the landing page's own card over those rows — the same "
 
 test("the narrowed page SAYS it was asked for, so the reader is never left "
    + "to read a narrowed board as the board", async ({ page }) => {
-    await open(page, "/bet-suggester/ucl", NARROWED_UCL);
+    await open(page, "/trivela/ucl", NARROWED_UCL);
     const note = page.getByTestId("board-narrowed");
     await expect(note).toBeVisible();
     await expect(note).toHaveAttribute("data-narrowed-to", "ucl");
@@ -246,7 +246,7 @@ test("a 200 that IGNORED the ask is not read as a competition with no "
        empty column, and an empty column that says "0 fixtures in the
        next 7 days" is a measured absence invented out of a question
        nobody answered. */
-    await open(page, "/bet-suggester/ucl", ASK_IGNORED);
+    await open(page, "/trivela/ucl", ASK_IGNORED);
     const ucl = cols(page);
     await expect(ucl).toHaveCount(1);
     await expect(ucl.getByTestId("picker-row")).toHaveCount(0);
@@ -267,7 +267,7 @@ test("and none of the other competitions' rows leak into the column",
        "the page drew somebody else's fixtures under a Champions League
        heading" is the worst outcome available here and the cheapest one
        to leave untested. */
-    await open(page, "/bet-suggester/ucl", ASK_IGNORED);
+    await open(page, "/trivela/ucl", ASK_IGNORED);
     await expect(cols(page)).toHaveCount(1);
     await expect(page.getByTestId("picker-row")).toHaveCount(0);
     for (const slug of Object.keys(ASK_IGNORED.leagues)) {
@@ -283,7 +283,7 @@ test("an answer narrowed to something ELSE is an unanswered ask, not a "
        is a server answering a question we did not ask — verifying the
        field is present but not what it says would let that reply light
        up the "you asked for this" note over rows from somewhere else. */
-    await open(page, "/bet-suggester/ucl",
+    await open(page, "/trivela/ucl",
               { ...ASK_IGNORED, narrowed_to: ["mls"] });
     await expect(page.getByTestId("board-narrowed")).toHaveCount(0);
     await expect(page.getByTestId("board-undeclared")).toBeVisible();

@@ -44,7 +44,7 @@ async function open(page: Page, mode: string) {
   });
   await page.route("**/api/championships/**",
     (r) => r.fulfill(json(RETURN_NATIONS_BOARD)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await page.waitForSelector('[data-testid="league-col"]');
 }
 

@@ -1,5 +1,5 @@
 // HOW THE ANALYST WORKS — the prompt-engineering view, on
-// /bet-suggester/var only: the five steps, the fact sheet the model was
+// /trivela/var only: the five steps, the fact sheet the model was
 // given (Source A), each attempt it made and what the verifier said about
 // it, and the system prompt exactly as it was sent.
 import type { PreviewOut } from "../../lib/analyst/analyst";

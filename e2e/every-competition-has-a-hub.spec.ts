@@ -97,7 +97,7 @@ async function openHub(page: Page, key: string, body: unknown, clock: string) {
   await page.clock.install({ time: new Date(clock) });
   await page.route("**/api/**", (r) => r.fulfill(json({ detail: "hermetic" }, 503)));
   await page.route(`**/api/comp/${key}/match/990001`, (r) => r.fulfill(json(body)));
-  await page.goto(`/bet-suggester/${key}/990001`);
+  await page.goto(`/trivela/${key}/990001`);
   return errors;
 }
 
@@ -237,7 +237,7 @@ async function openBoard(page: Page, champ: boolean) {
     r.fulfill(json({ rows: [], refusals: [], leagues: {} })));
   await page.route("**/api/championships/board**", (r) =>
     r.fulfill(json(champ ? CHAMP_BOARD : {}, champ ? 200 : 503)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await page.waitForSelector('[data-testid="picker-row"]');
 }
 
@@ -257,7 +257,7 @@ for (const champ of [false, true]) {
     expect([...new Set(cards.map((c) => c.league))].sort()).toEqual([...want].sort());
     for (const c of cards) {
       expect(c.href, `${c.league} card is unlinked`).toMatch(
-        new RegExp(`^/bet-suggester/${c.league}/\\d{1,12}$`));
+        new RegExp(`^/trivela/${c.league}/\\d{1,12}$`));
     }
   });
 }
@@ -287,7 +287,7 @@ test("the board's own declarations name eleven competitions, and each card opens
   for (const key of declared) {
     const h = href.get(key);
     expect(h, `${key}: no card on its board links anywhere`).toMatch(
-      new RegExp(`^/bet-suggester/${key}/(\\d{1,12})$`));
+      new RegExp(`^/trivela/${key}/(\\d{1,12})$`));
     const id = h!.split("/").pop()!;
     const ctx = await browser.newContext();
     const p = await ctx.newPage();

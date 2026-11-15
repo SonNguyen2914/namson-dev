@@ -179,7 +179,7 @@ async function open(page: Page, board: unknown, strip: unknown = null) {
       ? { status: 401, contentType: "application/json",
           body: JSON.stringify({ detail: "no token" }) }
       : json(toV2(strip))));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await page.getByTestId("picker-row").first().waitFor({ timeout: 15_000 });
   // operator-only since audit F4: the strip is read only with a token
   if (strip != null) await armToken(page);

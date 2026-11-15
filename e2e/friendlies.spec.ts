@@ -159,7 +159,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
         scoreboard: { fixtures: [
           fixture("1", NOW(), "Liverpool", "Wrexham")] },
       });
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       await expect(page.getByText("Liverpool").first()).toBeVisible();
       const body = await page.locator("body").innerText();
       // the honest framing block
@@ -179,11 +179,11 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
       markets: { fixtures: [],
                  listed: { count: 200, truncated: true, complete: true } },
     });
-    await page.goto("/bet-suggester/friendlies");
+    await page.goto("/trivela/friendlies");
     // the census renders (where the link used to sit)...
     await expect(page.getByText(/club-friendly match events/i)).toBeVisible();
     // ...and no hunter link anywhere
-    await expect(page.locator('a[href="/bet-suggester/hunter"]'))
+    await expect(page.locator('a[href="/trivela/hunter"]'))
       .toHaveCount(0);
   });
 
@@ -193,7 +193,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
         scoreboard: { fixtures: [
           fixture("1", NOW(), "Liverpool", "Wrexham")] },
       });
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       await expect(page.getByText(/today's friendlies/i)).toBeVisible();
     });
 
@@ -203,7 +203,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
         scoreboard: { fixtures: [
           fixture("1", inDays(2), "Cerezo Osaka", "Borussia Dortmund")] },
       });
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       await expect(page.getByText(/next friendlies/i)).toBeVisible();
       await expect(page.getByText(/today's friendlies/i)).toHaveCount(0);
       // and the group carries its real day label
@@ -226,7 +226,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
           row("11", "Al Nassr", "Mérida", "unmapped"),
         ], listed: { count: 200, truncated: true, complete: true } },
       });
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       // mapped: prices render in cents, labelled ask/bid
       await expect(page.getByText("69¢").first()).toBeVisible();
       await expect(page.getByText(/ask \/ bid/i).first()).toBeVisible();
@@ -249,7 +249,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
                              "KXCLUBFGAME-26JUL31ALBRMA"] }),
         ], listed: null },
       });
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       const card = page.locator("div.rounded-xl", { hasText: "Albacete" });
       await expect(card.getByText(/ambiguous kalshi match/i)).toBeVisible();
       await expect(card.getByText(/not\s+guessing/i)).toBeVisible();
@@ -269,7 +269,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
               { candidates: ["KXCLUBFGAME-26JUL31ALBRMA"] }),
         ], listed: null },
       });
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       const card = page.locator("div.rounded-xl", { hasText: "Albacete" });
       await expect(card.getByText(/name not exact/i)).toBeVisible();
       await expect(card.getByText(/not pricing/i)).toBeVisible();
@@ -290,7 +290,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
               { candidates: [BOOK.event_ticker] }),
         ], listed: null },
       });
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       const card = page.locator("div.rounded-xl", { hasText: "Liverpool" });
       await expect(card.getByText(/book unavailable/i)).toBeVisible();
       await expect(card.getByText(/fetch failed/i)).toBeVisible();
@@ -307,7 +307,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
         row("15", "Al Nassr", "Mérida", "registry_incomplete"),
       ], listed: { count: 118, truncated: false, complete: false } },
     });
-    await page.goto("/bet-suggester/friendlies");
+    await page.goto("/trivela/friendlies");
     const card = page.locator("div.rounded-xl", { hasText: "Al Nassr" });
     await expect(card.getByText(/registry incomplete/i)).toBeVisible();
     await expect(card.getByText(/couldn't check/i)).toBeVisible();
@@ -326,7 +326,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
               freshness: { state: "stale", age_seconds: 42 } }),
       ], listed: null },
     });
-    await page.goto("/bet-suggester/friendlies");
+    await page.goto("/trivela/friendlies");
     const card = page.locator("div.rounded-xl", { hasText: "Liverpool" });
     await expect(card.getByText("69¢").first()).toBeVisible();
     await expect(card.getByText(/stale/i)).toBeVisible();
@@ -345,7 +345,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
             away: { name: "FC Eindhoven", score: "1" },
           })] },
       });
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       const card = page.locator("div.rounded-xl", { hasText: "PSV Eindhoven" });
       await expect(card.getByText("LIVE 61'")).toBeVisible();
       const txt = await card.innerText();
@@ -357,7 +357,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
 
   test("empty bucket is an explicit empty state", async ({ page }) => {
     await serve(page);           // fixtures: []
-    await page.goto("/bet-suggester/friendlies");
+    await page.goto("/trivela/friendlies");
     await expect(page.getByText(/no club friendlies in espn's bucket/i))
       .toBeVisible();
     const body = await page.locator("body").innerText();
@@ -370,7 +370,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
     await page.route("**/api/friendlies/scoreboard", (r) => r.fulfill(nf));
     await page.route("**/api/friendlies/markets", (r) => r.fulfill(nf));
     await page.route("**/api/friendlies/schedule**", (r) => r.fulfill(nf));
-    await page.goto("/bet-suggester/friendlies");
+    await page.goto("/trivela/friendlies");
     await expect(page.getByText(/does not serve the friendlies api yet/i))
       .toBeVisible();
     const body = await page.locator("body").innerText();
@@ -388,7 +388,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
       await page.route("**/api/friendlies/fixtures/1234567**", (r) =>
         r.fulfill({ status: 404, contentType: "application/json",
           body: JSON.stringify({ detail: "fixture 1234567 is not in the window" }) }));
-      await page.goto("/bet-suggester/friendlies/1234567");
+      await page.goto("/trivela/friendlies/1234567");
       const failed = page.getByTestId("feed-failed");
       await expect(failed).toContainText("the match feed read failed");
       await expect(failed).toContainText("HTTP 404");
@@ -397,7 +397,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
 
   test("unreachable backend states it in words", async ({ page }) => {
     await page.route("**/api/friendlies/**", (r) => r.abort());
-    await page.goto("/bet-suggester/friendlies");
+    await page.goto("/trivela/friendlies");
     await expect(page.getByText(/backend unreachable/i)).toBeVisible();
   });
 
@@ -418,7 +418,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
                 implied: IMPLIED_PRICED }),
         ], listed: null },
       });
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       const block = page.getByTestId("market-implied");
       await expect(block).toBeVisible();
       const txt = await block.innerText();
@@ -448,7 +448,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
                 implied: IMPLIED_PRICED }),
         ], listed: null },
       });
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       const txt = await page.getByTestId("market-implied").innerText();
       expect(txt).toMatch(/6¢ of margin removed from 106¢ of asks/i);
       expect(txt).toMatch(/spreads 1–6¢/);
@@ -475,7 +475,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
                 implied: IMPLIED_PRICED }),
         ], listed: null },
       });
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       const block = page.getByTestId("market-implied");
       await expect(block).toBeVisible();
       expect(await block.innerText()).not.toMatch(FORECAST_WORDS);
@@ -492,7 +492,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
   test("the framing block adds whose view these numbers are",
     async ({ page }) => {
       await serve(page);
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       const body = await page.locator("body").innerText();
       // both claims, together: no model here, AND the numbers are the
       // market's rather than ours
@@ -514,7 +514,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
                 implied: IMPLIED_STALE }),
         ], listed: null },
       });
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       const txt = await page.getByTestId("market-implied").innerText();
       // the staleness is INSIDE the implied block, not only on the book
       expect(txt).toMatch(/stale book/i);
@@ -533,7 +533,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
                 implied: IMPLIED_INCOMPLETE }),
         ], listed: null },
       });
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       const txt = await page.getByTestId("market-implied").innerText();
       expect(txt).toMatch(/book incomplete/i);
       expect(txt).toMatch(/not three legs/i);
@@ -554,7 +554,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
                 implied: IMPLIED_BELOW_ONE }),
         ], listed: null },
       });
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       const txt = await page.getByTestId("market-implied").innerText();
       expect(txt).toMatch(/asks sum to 92¢/i);
       expect(txt).toMatch(/under \$1/i);
@@ -579,7 +579,7 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
           row("26", "Al Nassr", "Mérida", "unmapped", { implied: null }),
         ], listed: null },
       });
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       await expect(page.getByText(/no kalshi book matched/i)).toBeVisible();
       await expect(page.getByTestId("market-implied")).toHaveCount(0);
     });
@@ -589,8 +589,8 @@ test.describe("club friendlies viewer (recorded payloads)", () => {
     // stays hermetic (an aborted fetch takes the board's catch paths —
     // a `{}` stub instead feeds .map() undefined and crashes the page)
     await page.route("**/api/**", (r) => r.abort());
-    await page.goto("/bet-suggester");
-    const chip = page.locator('a[href="/bet-suggester/friendlies"]').first();
+    await page.goto("/trivela");
+    const chip = page.locator('a[href="/trivela/friendlies"]').first();
     await expect(chip).toBeVisible();
   });
 });
@@ -672,7 +672,7 @@ test.describe("league-derived xG form on friendlies", () => {
           fixture("70", NOW(), "Cerezo Osaka", "Borussia Dortmund")] },
         xg: { fixtures: [xgFixture("70", XG_CEREZO, XG_DORTMUND)] },
       });
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       const card = page.locator("div.rounded-xl",
                                 { hasText: "Borussia Dortmund" });
       // The xG feed is a SEPARATE async fetch, so every assertion about it
@@ -700,7 +700,7 @@ test.describe("league-derived xG form on friendlies", () => {
           fixture("71", NOW(), "Cerezo Osaka", "Borussia Dortmund")] },
         xg: { fixtures: [xgFixture("71", XG_CEREZO, XG_DORTMUND)] },
       });
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       // the card note proves the feed landed; assert it FIRST so the body
       // read below cannot race the async xG fetch
       await expect(page.getByTestId("xg-not-comparable")).toBeVisible();
@@ -731,7 +731,7 @@ test.describe("league-derived xG form on friendlies", () => {
           fixture("72", NOW(), "Al Sadd", "Borussia Dortmund")] },
         xg: { fixtures: [xgFixture("72", XG_NO_LEAGUE_DATA, XG_DORTMUND)] },
       });
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       const card = page.locator("div.rounded-xl", { hasText: "Al Sadd" });
       // Wait for the fetch to LAND before asserting the note is absent —
       // otherwise the absence is trivially true and proves nothing. Asserted
@@ -751,7 +751,7 @@ test.describe("league-derived xG form on friendlies", () => {
           fixture("73", NOW(), "Al Sadd", "Al Nassr")] },
         xg: { fixtures: [xgFixture("73", XG_NO_LEAGUE_DATA, XG_NOT_INDEXED)] },
       });
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       const card = page.locator("div.rounded-xl", { hasText: "Al Sadd" });
       await expect(card.getByTestId("xg-form").first())
         .toContainText(/no xG data for this club's league/i);
@@ -772,7 +772,7 @@ test.describe("league-derived xG form on friendlies", () => {
           fixture("74", NOW(), "Newport County", "Al Nassr")] },
         xg: { fixtures: [xgFixture("74", XG_THIN_SAMPLE, XG_NOT_INDEXED)] },
       });
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       const card = page.locator("div.rounded-xl", { hasText: "Newport County" });
       await expect(card.getByTestId("xg-form").first())
         .toContainText(/not enough xG fixtures/i);
@@ -791,7 +791,7 @@ test.describe("league-derived xG form on friendlies", () => {
           fixture("75", NOW(), "Liverpool", "Wrexham")] },
         xg: { fixtures: [] },
       });
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       // the fixture itself must have rendered, so the absence below is an
       // absence of xG rows rather than an absence of the whole page
       await expect(page.getByText("Liverpool").first()).toBeVisible();
@@ -809,7 +809,7 @@ test.describe("league-derived xG form on friendlies", () => {
       await page.route("**/api/xg/friendlies**", (r) =>
         r.fulfill({ status: 503, contentType: "application/json",
                     body: JSON.stringify({ error: "unavailable" }) }));
-      await page.goto("/bet-suggester/friendlies");
+      await page.goto("/trivela/friendlies");
       await expect(page.getByText("Liverpool").first()).toBeVisible();
       await expect(page.getByTestId("xg-form")).toHaveCount(0);
       const body = await page.locator("body").innerText();

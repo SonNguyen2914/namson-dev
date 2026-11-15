@@ -509,7 +509,7 @@ export const pct = (v: number | null | undefined) =>
  *  about somebody else's week.
  *
  *  OMITTING IT IS WHAT KEEPS A REMOVED COMPETITION OFF THE LANDING
- *  PAGE. `/bet-suggester` passes nothing, so the request URL, the
+ *  PAGE. `/trivela` passes nothing, so the request URL, the
  *  backend's cache key and the payload are the strings they have always
  *  been, and the answer carries no `narrowed_to` to be mistaken for a
  *  declaration.

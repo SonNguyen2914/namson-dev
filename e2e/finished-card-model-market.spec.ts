@@ -170,7 +170,7 @@ async function open(page: Page, width = 1440, spacing?: string) {
       for (const s of slugs) window.localStorage.setItem(`picker.reviewopen.${s}`, "1");
     } catch { /* storage refused: the tails stay shut and the test says so */ }
   }, SLUGS);
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await page.waitForSelector('[data-testid="league-col"]');
   await expect(page.getByTestId("review-row")).toHaveCount(8);
   if (spacing) {
@@ -395,7 +395,7 @@ test.describe("the archive's T−10 book beside a lock", () => {
         for (const sl of slugs) window.localStorage.setItem(`picker.reviewopen.${sl}`, "1");
       } catch { /* the count below says so */ }
     }, SLUGS);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await expect(page.getByTestId("review-row")).toHaveCount(8);
   }
 
@@ -656,7 +656,7 @@ test.describe("the board card at full time", () => {
     await page.setViewportSize({ width, height: 1000 });
     await page.route("**/api/picker/board**", (r) => r.fulfill(json(board())));
     await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW_EIGHT)));
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await page.waitForSelector('[data-testid="league-col"]');
     if (spacing) {
       await page.addStyleTag({ content: `[data-testid="picker-row"],

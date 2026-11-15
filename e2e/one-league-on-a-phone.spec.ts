@@ -63,7 +63,7 @@ async function open(browser: Browser, device: keyof typeof devices) {
   await page.route("**/api/picker/board**", (r) => r.fulfill(json(BOARD_EIGHT)));
   await page.route("**/api/picker/review**",
     (r) => r.fulfill(json(REVIEW_EIGHT)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await page.waitForSelector('[data-testid="league-col"]');
   return { ctx, page };
 }
@@ -466,7 +466,7 @@ test.describe("the desktop board is exactly what shipped", () => {
         (r) => r.fulfill(json(BOARD_EIGHT)));
       await page.route("**/api/picker/review**",
         (r) => r.fulfill(json(REVIEW_EIGHT)));
-      await page.goto("/bet-suggester");
+      await page.goto("/trivela");
       await expect(page.locator('[data-testid="league-col"]'))
         .toHaveCount(COLUMNS.length);
       await expect(page.getByTestId("board-head-rail")).toBeVisible();

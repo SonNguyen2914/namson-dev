@@ -186,7 +186,7 @@ export default function MlsDashboard() {
           ) : (
             <div className="divide-y divide-line rounded-2xl border border-line">
               {week.d.slice(0, 30).map((f) => (
-                <Link key={f.id} href={`/bet-suggester/mls/${f.id}`}
+                <Link key={f.id} href={`/trivela/mls/${f.id}`}
                   className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-accent/5">
                   <span className="w-28 shrink-0 font-mono text-[11px] uppercase tracking-wide text-ink-faint">
                     {fmtDate(f.date)}
@@ -330,7 +330,7 @@ function FixtureCard({ f, o }: { f: Fixture; o?: OddsRow }) {
     ? f.detail
     : (fmtDate(f.date, "short") || f.detail);
   return (
-    <Link href={`/bet-suggester/mls/${f.id}`}
+    <Link href={`/trivela/mls/${f.id}`}
       className={`block cursor-pointer rounded-xl border p-3 transition-colors hover:border-accent/50 ${
       live ? "glow glow-accent border-accent/40 bg-elev" : "border-line"}`}>
       <TeamLine s={f.home} live={live} />

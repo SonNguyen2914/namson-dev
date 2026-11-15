@@ -25,13 +25,13 @@ const json = (b: unknown, status = 200) => ({
 
 type Hub = { name: string; path: string; api: string; body: unknown;
              minutesKey: string; event: string };
-const UCL: Hub = { name: "ucl", path: `/bet-suggester/ucl/${UCL_HUB_EVENT}`,
+const UCL: Hub = { name: "ucl", path: `/trivela/ucl/${UCL_HUB_EVENT}`,
   api: `/api/comp/ucl/match/${UCL_HUB_EVENT}`, body: UCL_HUB_PAYLOAD,
   minutesKey: "ucl", event: UCL_HUB_EVENT };
-const EFL: Hub = { name: "eflcup", path: `/bet-suggester/eflcup/${EFL_HUB_EVENT}`,
+const EFL: Hub = { name: "eflcup", path: `/trivela/eflcup/${EFL_HUB_EVENT}`,
   api: `/api/comp/eflcup/match/${EFL_HUB_EVENT}`, body: EFL_HUB_PAYLOAD,
   minutesKey: "eflcup", event: EFL_HUB_EVENT };
-const MLS: Hub = { name: "league-mls", path: `/bet-suggester/mls/${MLS_HUB_EVENT}`,
+const MLS: Hub = { name: "league-mls", path: `/trivela/mls/${MLS_HUB_EVENT}`,
   api: `/api/mls/match/${MLS_HUB_EVENT}`, body: MLS_HUB_PAYLOAD,
   minutesKey: "mls", event: MLS_HUB_EVENT };
 

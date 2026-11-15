@@ -51,7 +51,7 @@ async function boardAtRest(page: Page) {
 async function leagues(page: Page) {
   await page.clock.install({ time: new Date(CLUB_H2H_CLOCK) });
   await routeEight(page, worstCaseBoard());
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await page.waitForSelector('[data-testid="picker-row"] [data-testid="field-ranks-open"]');
   await boardAtRest(page);
 }
@@ -63,7 +63,7 @@ async function championships(page: Page) {
   });
   await routeEight(page);
   await page.route("**/api/championships/board**", (r) => r.fulfill(json(CHAMP_BOARD)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await page.waitForSelector('[data-testid="picker-row"] [data-testid="field-ranks-open"]');
 }
 

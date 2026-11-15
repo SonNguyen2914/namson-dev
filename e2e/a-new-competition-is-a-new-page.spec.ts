@@ -1,6 +1,6 @@
 /** A NEW COMPETITION IS A NEW PAGE (2026-10-25).
  *
- *  `/bet-suggester/comp/[key]` is one page for every viewer competition,
+ *  `/trivela/comp/[key]` is one page for every viewer competition,
  *  and Next keeps it MOUNTED across a client-side change of `[key]` — the
  *  Archive menu's Link from `/comp/ucl` to `/comp/asean` is exactly that.
  *  Every piece of per-key state used to survive the move: the previous
@@ -67,7 +67,7 @@ test("a client-side move to another competition draws nothing of the last one",
       (r) => r.fulfill(json({ detail: "ucl ratings down" }, 502)));
     const release = await routeAsean(page);
 
-    await page.goto("/bet-suggester/comp/ucl");
+    await page.goto("/trivela/comp/ucl");
     const h1 = page.locator("main h1");
     await expect(h1).toHaveText("UEFA Champions League");
     await expect(page.getByText("33 tradeable on kalshi", { exact: false }))
@@ -99,7 +99,7 @@ test("a retired key's 'not served' page does not follow the reader to a served o
       detail: "the viewer was retired on 2026-08-24" }, 404)));
     const release = await routeAsean(page);
     release();
-    await page.goto("/bet-suggester/comp/ecl");
+    await page.goto("/trivela/comp/ecl");
     await expect(page.getByText("not served here")).toBeVisible();
     await toAsean(page);
     await expect(page.locator("main h1")).toHaveText("ASEAN Championship");

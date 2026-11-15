@@ -25,7 +25,7 @@ async function open(page: Page, mode: string, refusal: unknown) {
   await page.route("**/api/picker/review**", (r) => r.fulfill(body(refusal, 422)));
   await page.route("**/api/championships/**", (r) => r.fulfill(body(CHAMP_BOARD, 200)));
   await page.route("**/api/comp/**", (r) => r.fulfill(body(refusal, 422)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
 }
 
 test.describe("the board's failure card", () => {

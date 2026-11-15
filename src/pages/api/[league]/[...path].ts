@@ -22,7 +22,7 @@
 // added, with no file to remember.
 //
 // Next resolves a static segment ahead of a dynamic one, so every
-// existing directory — bet-suggester, card, comp, epl, friendlies,
+// existing directory — trivela, card, comp, epl, friendlies,
 // laliga, ligamx, mls, picker, xg — still answers for itself
 // and this file is reached only by a prefix none of them claims.
 //

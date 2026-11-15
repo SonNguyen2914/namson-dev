@@ -121,7 +121,7 @@ async function serve(page: Pg, overrides: {
 test.describe("Liga MX board", () => {
   test("standings tables carry the tournament label", async ({ page }) => {
     await serve(page);
-    await page.goto("/bet-suggester?league=ligamx");
+    await page.goto("/trivela?league=ligamx");
     await expect(page.getByText("2026 Torneo Apertura")).toBeVisible();
     // and the split-season explainer names both tournaments
     await expect(page.getByText(/Apertura \(Jul–Dec\)/)).toBeVisible();
@@ -129,7 +129,7 @@ test.describe("Liga MX board", () => {
 
   test("two tournaments are two tables — never merged", async ({ page }) => {
     await serve(page);
-    await page.goto("/bet-suggester?league=ligamx");
+    await page.goto("/trivela?league=ligamx");
     await expect(page.getByText("2026 Torneo Apertura")).toBeVisible();
     await expect(page.getByText("2027 Torneo Clausura")).toBeVisible();
     // the same club appears once PER TOURNAMENT TABLE (here: both)
@@ -141,7 +141,7 @@ test.describe("Liga MX board", () => {
   test("no tournament played yet is an honest empty, not a table",
     async ({ page }) => {
       await serve(page, { standings: { tables: [] } });
-      await page.goto("/bet-suggester?league=ligamx");
+      await page.goto("/trivela?league=ligamx");
       await expect(
         page.getByText(/no tournament has produced a result yet/i)
       ).toBeVisible();
@@ -150,7 +150,7 @@ test.describe("Liga MX board", () => {
   test("the dark model is stated in words and no odds render",
     async ({ page }) => {
       await serve(page);
-      await page.goto("/bet-suggester?league=ligamx");
+      await page.goto("/trivela?league=ligamx");
       await expect(page.getByText(/liga-mx-2026-v0 is/).first()).toBeVisible();
       const body = (await page.locator("body").innerText());
       expect(body).toMatch(/dark/i);
@@ -164,7 +164,7 @@ test.describe("Liga MX board", () => {
   test("real Kalshi books render with both sides (ask / bid)",
     async ({ page }) => {
       await serve(page);
-      await page.goto("/bet-suggester?league=ligamx");
+      await page.goto("/trivela?league=ligamx");
       await expect(page.getByText("Puebla vs Guadalajara")).toBeVisible();
       await expect(page.getByText("59¢ / 58¢")).toBeVisible();
     });
@@ -172,7 +172,7 @@ test.describe("Liga MX board", () => {
   test("a future matchday is not labelled Today's slate", async ({ page }) => {
     await serve(page, { scoreboard: { tournament: TOURNAMENT, fixtures: [
       fixture("f1", inDays(3), "Toluca", "Necaxa")] } });
-    await page.goto("/bet-suggester?league=ligamx");
+    await page.goto("/trivela?league=ligamx");
     const sec = page.locator("section")
       .filter({ hasText: "ESPN live feed" }).first();
     await expect(sec.getByText("Toluca")).toBeVisible();
@@ -184,7 +184,7 @@ test.describe("Liga MX board", () => {
   test("today's fixtures keep the Today's slate heading", async ({ page }) => {
     await serve(page, { scoreboard: { tournament: TOURNAMENT, fixtures: [
       fixture("f1", new Date().toISOString(), "Toluca", "Necaxa")] } });
-    await page.goto("/bet-suggester?league=ligamx");
+    await page.goto("/trivela?league=ligamx");
     const sec = page.locator("section")
       .filter({ hasText: "ESPN live feed" }).first();
     await expect(sec.getByText("Toluca")).toBeVisible();
@@ -217,7 +217,7 @@ test.describe("Liga MX board", () => {
           r.fulfill({ status: 404, contentType: "application/json",
                       body: JSON.stringify({ error: "unknown ligamx route" }) }));
       }
-      await page.goto("/bet-suggester?league=ligamx");
+      await page.goto("/trivela?league=ligamx");
       await expect(page.getByText(/liga mx fixture feed unavailable/i))
         .toBeVisible();
       await expect(page.getByText(/standings feed unavailable/i)).toBeVisible();
@@ -268,7 +268,7 @@ test.describe("Liga MX match hub (model dark)", () => {
       await page.route("**/api/ligamx/match/401877027", (r) =>
         r.fulfill({ status: 200, contentType: "application/json",
                     body: JSON.stringify(MATCH) }));
-      await page.goto("/bet-suggester/ligamx/401877027");
+      await page.goto("/trivela/ligamx/401877027");
       await expect(page.getByText(/liga-mx-2026-v0 · dark/)).toBeVisible();
       await expect(
         page.getByText(/liga-mx-2026-v0 is dark — unapproved/)
@@ -287,7 +287,7 @@ test.describe("Liga MX match hub (model dark)", () => {
     await page.route("**/api/ligamx/match/999999", (r) =>
       r.fulfill({ status: 404, contentType: "application/json",
                   body: JSON.stringify({ detail: "unknown event" }) }));
-    await page.goto("/bet-suggester/ligamx/999999");
+    await page.goto("/trivela/ligamx/999999");
     // THE FAILURE IS NAMED (2026-09-25): the status and the backend's own
     // sentence, not a bare "unavailable" — the hub used to throw both away
     const failed = page.getByTestId("feed-failed");

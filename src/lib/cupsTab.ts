@@ -40,8 +40,8 @@ export const CUPS: Record<CupScope, readonly CupEntry[]> = {
   continental: [
     { key: "ucl", name: "Champions League", region: "UEFA · Europe",
       links: [
-        { href: "/bet-suggester/ucl", label: "board" },
-        { href: "/bet-suggester/comp/ucl", label: "viewer" },
+        { href: "/trivela/ucl", label: "board" },
+        { href: "/trivela/comp/ucl", label: "viewer" },
       ] },
     { key: "uel", name: "Europa League", region: "UEFA · Europe" },
     { key: "uecl", name: "Conference League", region: "UEFA · Europe" },
@@ -49,14 +49,14 @@ export const CUPS: Record<CupScope, readonly CupEntry[]> = {
       region: "Concacaf · North and Central America" },
     { key: "leaguescup", name: "Leagues Cup", region: "MLS v Liga MX",
       links: [
-        { href: "/bet-suggester/comp/leagues-cup", label: "viewer" },
-        { href: "/bet-suggester/leagues-cup", label: "brackets" },
+        { href: "/trivela/comp/leagues-cup", label: "viewer" },
+        { href: "/trivela/leagues-cup", label: "brackets" },
       ], over: "2026" },
   ],
   finals: [
     { key: "campeones", name: "Campeones Cup", region: "MLS v Liga MX champions",
       links: [
-        { href: "/bet-suggester/ratings?comp=campeones", label: "field" },
+        { href: "/trivela/ratings?comp=campeones", label: "field" },
       ], over: "2026" },
     { key: "uefasuper", name: "UEFA Super Cup", region: "UEFA · Europe" },
     { key: "communityshield", name: "FA Community Shield", region: "England" },
@@ -70,7 +70,7 @@ export const CUPS: Record<CupScope, readonly CupEntry[]> = {
   domestic: [
     { key: "facup", name: "FA Cup", region: "England" },
     { key: "eflcup", name: "EFL Cup", region: "England",
-      links: [{ href: "/bet-suggester/efl-cup", label: "board" }] },
+      links: [{ href: "/trivela/efl-cup", label: "board" }] },
     { key: "copadelrey", name: "Copa del Rey", region: "Spain" },
     { key: "dfbpokal", name: "DFB-Pokal", region: "Germany" },
     { key: "coppaitalia", name: "Coppa Italia", region: "Italy" },

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { RECORDED, rebased } from "./efl-cup-recorded";
 
-// THE EFL CUP COLUMN — namson.dev/bet-suggester/efl-cup.
+// THE EFL CUP COLUMN — namson.dev/trivela/efl-cup.
 //
 // The operator asked for the EFL Cup with "exactly every detail of what
 // UCL having, the only difference is the theme color", so almost
@@ -68,7 +68,7 @@ const EMPTY_REVIEW = {
  *  can ask for is answered from this file. */
 async function open(page: import("@playwright/test").Page,
                     body: unknown = rebased(),
-                    where = "/bet-suggester/efl-cup") {
+                    where = "/trivela/efl-cup") {
   await page.route("**/api/**", (r) => r.fulfill(json({}, 503)));
   await page.route("**/api/picker/board**", (r) => r.fulfill(json(body)));
   await page.route("**/api/picker/review**", (r) =>
@@ -389,8 +389,8 @@ test("IT SHOWS; IT DOES NOT DECIDE — no verb the reader could act on",
 
 test("the rail chip points at this page and wears the cup's own hue",
   async ({ page }) => {
-    await open(page, rebased(), "/bet-suggester");
-    const chip = page.locator('a[href="/bet-suggester/efl-cup"]').first();
+    await open(page, rebased(), "/trivela");
+    const chip = page.locator('a[href="/trivela/efl-cup"]').first();
     await expect(chip).toBeVisible();
     await expect(chip).toHaveText(/EFL Cup/);
     /* AND IT IS UNLIT, WHICH IS A STATE AND NOT A FAILURE. The glow

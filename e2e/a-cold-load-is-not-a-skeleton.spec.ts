@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 // A COLD LOAD IS NOT A SKELETON (2026-09-10).
 //
-// WHAT HAPPENED. `/bet-suggester/ucl` was seen on production rendering
+// WHAT HAPPENED. `/trivela/ucl` was seen on production rendering
 // its full chrome — header, sort control, finished-window control,
 // legend — over skeleton placeholders that never resolved. Thirty
 // seconds in: no cards, and `performance.getEntriesByType("resource")`
@@ -57,8 +57,8 @@ import { expect, test } from "@playwright/test";
  *  which asks for nothing by name and must keep the request string, and
  *  the backend cache slot, it has always had. */
 const BOARDS = [
-  { path: "/bet-suggester", ask: null },
-  { path: "/bet-suggester/ucl", ask: "ucl" },
+  { path: "/trivela", ask: null },
+  { path: "/trivela/ucl", ask: "ucl" },
 ] as const;
 
 // board-live-read: this test's whole claim is that the BUILT app and the
@@ -91,7 +91,7 @@ for (const { path, ask } of BOARDS) {
           rows = Array.isArray(b?.rows) ? b.rows.length : null;
           /* WHICH COLUMNS THE PAYLOAD DECLARED. The board DRAWS four of
              them at a time once there are more than four (see the window
-             in bet-suggester/index.tsx), so the payload's total row count
+             in trivela/index.tsx), so the payload's total row count
              stopped being the number of cards on screen the day an eight
              league board shipped. Counting the rows that belong to the
              DRAWN columns is the same claim — "it drew what it held" —

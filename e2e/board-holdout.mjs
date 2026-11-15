@@ -27,7 +27,7 @@
 //
 // WHY THIS IS A SERVER AND NOT A RULE ABOUT SPECS. A `page.route` mock
 // lives in one spec and protects one spec. The board can be reached
-// without any spec meaning to reach it: `/bet-suggester/mls/<id>` carries
+// without any spec meaning to reach it: `/trivela/mls/<id>` carries
 // a "MLS board" link, and a CLICK navigates exactly like a `goto` that no
 // static reading of the spec files will ever see. The only place that
 // catches every route to the board — browser fetch, server render, a

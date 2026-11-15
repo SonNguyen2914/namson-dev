@@ -11,7 +11,7 @@ import { OperatorTokenProvider } from "@/components/OperatorToken";
 // Fonts come from the official `geist` npm package (files bundled — no
 // build-time Google Fonts fetch, so Vercel builds can't fail on it).
 // Loaded app-wide so the design tokens' --font-geist-sans / --font-geist-mono
-// resolve on every route (the bet-suggester pages depend on them).
+// resolve on every route (the trivela pages depend on them).
 //
 // `data-tap-floor` — THE 44px TOUCH FLOOR IS ON THE APP SHELL, so it is on
 // every page by construction (2026-09-25, audit F11). It was set page by

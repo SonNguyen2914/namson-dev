@@ -303,7 +303,7 @@ async function open(page: import("@playwright/test").Page,
   await page.route("**/api/picker/board**", (r) => r.fulfill(json(body)));
   await page.route("**/api/picker/review**", (r) =>
     r.fulfill(json(EMPTY_REVIEW)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
 }
 
 /** The same payload, on the board narrowed to the one column.
@@ -344,7 +344,7 @@ async function openUcl(page: import("@playwright/test").Page,
     r.fulfill(json(EMPTY_REVIEW)));
   await page.route("**/api/comp/*/ratings", (r) =>
     r.fulfill(json(field.body, field.status)));
-  await page.goto("/bet-suggester/ucl");
+  await page.goto("/trivela/ucl");
 }
 
 const col = (page: import("@playwright/test").Page, slug: string) =>
@@ -379,16 +379,16 @@ const orderOf = async (c: ReturnType<typeof col>, n: number) => {
    (`league-ribbon`, `ribbon-pill`); a pill jumps the window so its
    league is the LEFTMOST drawn column. This fixture declares six, and
    the Champions League is the sixth, so every test that reads its
-   column off `/bet-suggester` has to bring it on screen first.
+   column off `/trivela` has to bring it on screen first.
 
    THE NARROWED PAGE IS THE OTHER HALF OF THIS AND IS UNTOUCHED:
-   `/bet-suggester/ucl` declares ONE column, the window is a no-op there,
+   `/trivela/ucl` declares ONE column, the window is a no-op there,
    and no ribbon is built at all — pinned by its own test below.
 
    `show` jumps to the leftmost column that still leaves `slug` inside
    the four, so the columns around it keep the order they are DRAWN in. */
 const COLUMNS = ["mls", "epl", "laliga", "ligamx", "leaguescup", "ucl"];
-const VIEW = 4;                       // src/pages/bet-suggester/index.tsx
+const VIEW = 4;                       // src/pages/trivela/index.tsx
 
 /* DECLARED IS NOT DRAWN. `COLUMNS` above is this fixture's DECLARATION —
    the keys of `board.leagues`, which is what the payload carries and the
@@ -1056,7 +1056,7 @@ test("every cup column the board serves opens somewhere that exists",
       // hub page must exist, which is the 404 this test was written for.
       for (const href of hrefs) {
         expect(href, `${slug} card opens its match hub`)
-          .toMatch(new RegExp(`^/bet-suggester/${slug}/[^/]+$`));
+          .toMatch(new RegExp(`^/trivela/${slug}/[^/]+$`));
         const res = await page.request.get(href!, { maxRedirects: 0 });
         expect(res.status(), `${href} exists`).toBe(200);
       }
@@ -1067,7 +1067,7 @@ test("every cup column the board serves opens somewhere that exists",
 
 // THE PAGE IS THE BOARD, NOT A PAGE THAT RESEMBLES IT. The operator
 // asked for "the exact layout of the landing page, for UCL only", so
-// /bet-suggester/ucl renders the SAME component with its column set
+// /trivela/ucl renders the SAME component with its column set
 // narrowed. These assert the identity holds — a copy would pass the
 // first of them and start failing the rest as the two drifted.
 
@@ -1076,7 +1076,7 @@ test("the UCL route draws the board's own furniture, with one column",
     await page.route("**/api/picker/board**", (r) => r.fulfill(json(BOARD)));
     await page.route("**/api/picker/review**", (r) =>
       r.fulfill(json(EMPTY_REVIEW)));
-    await page.goto("/bet-suggester/ucl");
+    await page.goto("/trivela/ucl");
 
     // one column, and it is the Champions League
     const cols = page.getByTestId("league-col");
@@ -1117,7 +1117,7 @@ test("the four league columns are absent from it, not merely empty",
     await page.route("**/api/picker/board**", (r) => r.fulfill(json(BOARD)));
     await page.route("**/api/picker/review**", (r) =>
       r.fulfill(json(EMPTY_REVIEW)));
-    await page.goto("/bet-suggester/ucl");
+    await page.goto("/trivela/ucl");
     for (const slug of ["mls", "epl", "laliga", "ligamx", "leaguescup"]) {
       await expect(col(page, slug)).toHaveCount(0);
     }
@@ -1128,7 +1128,7 @@ test("the framing names the sort this board actually runs, and keeps every "
     await page.route("**/api/picker/board**", (r) => r.fulfill(json(BOARD)));
     await page.route("**/api/picker/review**", (r) =>
       r.fulfill(json(EMPTY_REVIEW)));
-    await page.goto("/bet-suggester/ucl");
+    await page.goto("/trivela/ucl");
     const intro = page.getByTestId("board-framing");
     // NOT the table gap — this board withholds it on nearly every row,
     // and a page that named it would be printing the one number it
@@ -1172,7 +1172,7 @@ test("the default board is UNCHANGED by any of this", async ({ page }) => {
 // `xl:grid-cols-6` off the DOM would pass on a grid whose six tracks had
 // collapsed to 0px — which is not hypothetical here: the four league
 // columns once measured `0px 0px 0px 0px 1304px` at 1440 with every class
-// in the file correct (see the track-count note in pages/bet-suggester).
+// in the file correct (see the track-count note in pages/trivela).
 // Only a measured box can tell "six columns" from "six columns of
 // nothing".
 //
@@ -1313,7 +1313,7 @@ test("the grid steps down as the viewport narrows, and never scrolls the "
 test("the DEFAULT board is not laid out this way — one card per row inside "
    + "a league column", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await openWide(page, GRID_BOARD);      // /bet-suggester, every column
+    await openWide(page, GRID_BOARD);      // /trivela, every column
     // it is many columns, and the UCL one holds the same eight fixtures
     await expect(page.getByTestId("league-col").first()).toBeAttached();
     expect(await page.getByTestId("league-col").count()).toBeGreaterThan(1);
@@ -1462,8 +1462,8 @@ test("a long club name is drawn WHOLE in a narrow track, not ellipsised",
 // card's top-right ink, moved 84-88px inboard to make room for it. The
 // arrangement below is the one that shipped before that, restored.
 //
-// TWO BOARDS, ONE CARD. `/bet-suggester` draws its columns WIDE and
-// `/bet-suggester/ucl` draws one column's matchday four abreast, off the
+// TWO BOARDS, ONE CARD. `/trivela` draws its columns WIDE and
+// `/trivela/ucl` draws one column's matchday four abreast, off the
 // same component with `dense` flipped — and the operator has now asked
 // for them to agree. So each of these runs against BOTH, because "the
 // same card" is a claim about two pages and a test on one of them proves
@@ -1864,7 +1864,7 @@ test("the FULL board draws both live matches — the control", async ({ page }) 
   // Without this the narrowing test below passes against a section that
   // draws nothing at all, which is a different bug wearing the same
   // green tick.
-  await openBoard(page, "/bet-suggester");
+  await openBoard(page, "/trivela");
   await expect(page.getByTestId("live-card")).toHaveCount(2);
   await expect(liveCard(page, 101)).toBeVisible();
   await expect(liveCard(page, 102)).toBeVisible();
@@ -1872,7 +1872,7 @@ test("the FULL board draws both live matches — the control", async ({ page }) 
 
 test("the narrowed board's live strip draws only ITS OWN column's "
   + "matches", async ({ page }) => {
-  await openBoard(page, "/bet-suggester/ucl");
+  await openBoard(page, "/trivela/ucl");
   // the board really is narrowed to one column
   await expect(page.getByTestId("league-col")).toHaveCount(1);
   await expect(col(page, "ucl")).toBeVisible();
@@ -1909,7 +1909,7 @@ test("a live match this board cannot place is NAMED, not dropped",
     // not drawn — that would claim it belongs here — and it is not
     // silently dropped either, because the section would then read as
     // the complete list of what is under way.
-    await openBoard(page, "/bet-suggester/ucl", {
+    await openBoard(page, "/trivela/ucl", {
       ...STRIP_ENVELOPE,
       matches: [liveOn(101, "ucl-clean", "Real Madrid", "Feyenoord"),
                 liveOn(909, "not-on-this-board", "Someone", "Else")],
@@ -1920,7 +1920,7 @@ test("a live match this board cannot place is NAMED, not dropped",
     await expect(said).toHaveAttribute("data-count", "1");
     await expect(said).toContainText("cannot place in a column");
     // and the FULL board still draws it, which is what the line says
-    await openBoard(page, "/bet-suggester", {
+    await openBoard(page, "/trivela", {
       ...STRIP_ENVELOPE,
       matches: [liveOn(101, "ucl-clean", "Real Madrid", "Feyenoord"),
                 liveOn(909, "not-on-this-board", "Someone", "Else")],
@@ -1943,7 +1943,7 @@ test("the season basis is said by a column, so it can only ever name a "
        now holds, by construction: every season chip on the page belongs
        to a column the page draws, on both boards, and the banner is
        pinned ABSENT so it cannot come back and reintroduce the gap. */
-    await openBoard(page, "/bet-suggester");
+    await openBoard(page, "/trivela");
     await expect(page.getByTestId("prior-banner")).toHaveCount(0);
     await expect(page.getByText(/of 4 leagues/)).toHaveCount(0);
 
@@ -1988,7 +1988,7 @@ test("the season basis is said by a column, so it can only ever name a "
        does not RATE a league is not a page that hides it. So this
        matches the shape of a basis claim ("Liga MX 6 GP"), not the
        club's name on its own. */
-    await openBoard(page, "/bet-suggester/ucl");
+    await openBoard(page, "/trivela/ucl");
     await expect(page.getByTestId("league-col")).toHaveCount(1);
     await expect(page.getByTestId("prior-banner")).toHaveCount(0);
     await expect(page.getByText(/Liga MX \d+ GP/)).toHaveCount(0);
@@ -2004,7 +2004,7 @@ test("the season basis is said by a column, so it can only ever name a "
 // `ucl` from `tables.BOARD_COLUMNS`, and /api/picker/board then carries
 // no UCL row, no UCL refusal and no UCL entry in `leagues`.
 //
-// THIS PAGE STILL EXISTS. It is /bet-suggester with `only={["ucl"]}`, so
+// THIS PAGE STILL EXISTS. It is /trivela with `only={["ucl"]}`, so
 // it names its own column and gets one whether or not the board declares
 // it — deliberately, because rendering nothing at all reads as broken.
 // What it must NOT do is let that column speak as though the board had
@@ -2077,7 +2077,7 @@ test("and it names the page the competition DOES have — removing a column is n
     await expect(note).not.toContainText("ucl");
     // a way out, rather than a dead end: `CUP_COMP_KEY` still maps the
     // competition to its viewer, and that viewer still serves it
-    await expect(note.locator('a[href="/bet-suggester/comp/ucl"]'))
+    await expect(note.locator('a[href="/trivela/comp/ucl"]'))
       .toHaveCount(1);
   });
 

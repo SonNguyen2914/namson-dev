@@ -5,7 +5,7 @@
  *  Leagues, Cups (both recorded cup boards, so the continental cups, the
  *  EFL Cup and the Finals & Super Cups column are all drawn) and Nations:
  *  every card on the board and in its finished tail carries a link of the
- *  hub shape `/bet-suggester/<competition>/<event id>`, and the running app
+ *  hub shape `/trivela/<competition>/<event id>`, and the running app
  *  answers 200 for every one. A competition page is not a hub, and a card
  *  drawn unlinked fails here.
  *
@@ -49,7 +49,7 @@ async function open(page: Page, t: Tab) {
   await page.route("**/api/picker/review**", (r) => r.fulfill(json(t.review)));
   await page.route("**/api/championships/board**", (r) =>
     r.fulfill(json(t.mode === "nations" ? t.board : {}, t.mode === "nations" ? 200 : 503)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await page.waitForSelector('[data-testid="picker-row"]');
   const toggles = page.locator('[data-testid="review-toggle"]');
   if (await toggles.count()) {
@@ -57,7 +57,7 @@ async function open(page: Page, t: Tab) {
   }
 }
 
-const HUB = /^\/bet-suggester\/([a-z0-9]+)\/(\d{1,12})$/;
+const HUB = /^\/trivela\/([a-z0-9]+)\/(\d{1,12})$/;
 
 test("every card on the Leagues, Cups and Nations tabs links to a match hub that resolves",
   async ({ browser, page }) => {
@@ -99,11 +99,11 @@ test("every card on the Leagues, Cups and Nations tabs links to a match hub that
     }
   });
 
-test("all 22 cups have a hub page at /bet-suggester/<cup>/<event id>", async ({ page }) => {
+test("all 22 cups have a hub page at /trivela/<cup>/<event id>", async ({ page }) => {
   expect(ALL_CUPS.length).toBe(22);
   const dead: string[] = [];
   for (const c of ALL_CUPS) {
-    const res = await page.request.get(`/bet-suggester/${c.key}/401915417`, { maxRedirects: 0 });
+    const res = await page.request.get(`/trivela/${c.key}/401915417`, { maxRedirects: 0 });
     if (res.status() !== 200) dead.push(`${res.status()} ${c.key}`);
   }
   expect(dead).toEqual([]);

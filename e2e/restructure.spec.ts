@@ -49,7 +49,7 @@ const BOARD = {
 
 async function openBoard(page: import("@playwright/test").Page) {
   await page.route("**/api/picker/board**", (r) => r.fulfill(json(BOARD)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await expect(page.getByTestId("picker-row")).toHaveCount(2);
 }
 
@@ -59,7 +59,7 @@ test("each row's fixture line is a link into its match page", async ({ page }) =
   await openBoard(page);
   const top = page.getByTestId("picker-row").first();
   const link = top.getByRole("link", { name: /open Barcelona versus Rayo/i });
-  await expect(link).toHaveAttribute("href", "/bet-suggester/laliga/401882903");
+  await expect(link).toHaveAttribute("href", "/trivela/laliga/401882903");
   await link.focus();
   await expect(link).toBeFocused();
 });
@@ -101,7 +101,7 @@ test("a board still in flight shows skeletons and NO header line, then "
       await new Promise((res) => setTimeout(res, 1200));
       await r.fulfill(json(BOARD));
     });
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
 
     // one skeleton stack per DECLARED column, counted off the payload
     const columns = Object.keys(BOARD.leagues).length;
@@ -123,7 +123,7 @@ test("a board still in flight shows skeletons and NO header line, then "
 test("a dead network renders a sentence, not the browser's raw string",
   async ({ page }) => {
     await page.route("**/api/picker/board**", (r) => r.abort());
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     const err = page.getByTestId("board-error");
     await expect(err).toBeVisible();
     await expect(err).toContainText("the request never reached the server");
@@ -158,8 +158,8 @@ test("the legend toggle's accessible name is its title, nothing glued on",
 
 test("an EMPTY ?league= hard load lands on the carousel, not a dead param on the board",
   async ({ page }) => {
-    await page.goto("/bet-suggester?league=");
-    await expect(page).toHaveURL(/\/bet-suggester\/leagues/);
+    await page.goto("/trivela?league=");
+    await expect(page).toHaveURL(/\/trivela\/leagues/);
     await expect(page.getByRole("heading", { name: "MLS" }).first())
       .toBeVisible();
   });
@@ -172,9 +172,9 @@ test("a client-side ?league= transition in any CASE is caught by the board's gua
     await page.evaluate(() => {
       (window as unknown as {
         next: { router: { push: (u: string) => void } };
-      }).next.router.push("/bet-suggester?league=EPL");
+      }).next.router.push("/trivela?league=EPL");
     });
-    await page.waitForURL(/\/bet-suggester\/leagues\?league=epl/);
+    await page.waitForURL(/\/trivela\/leagues\?league=epl/);
     await expect(page.getByRole("heading", { name: "Premier League" }).first())
       .toBeVisible();
   });
@@ -182,9 +182,9 @@ test("a client-side ?league= transition in any CASE is caught by the board's gua
 test("?league=WC26 in the wrong case still means the archive page, never MLS",
   async ({ page }) => {
     /* THE HOP THIS ASSERTS IS A CLIENT-SIDE ONE, AND IT WAITS FOR
-       HYDRATION (2026-09-22/23). `/bet-suggester?league=WC26` redirects
-       to `/bet-suggester/leagues?league=WC26`, and the second hop —
-       the one under test — is `router.replace("/bet-suggester/wc26")`
+       HYDRATION (2026-09-22/23). `/trivela?league=WC26` redirects
+       to `/trivela/leagues?league=WC26`, and the second hop —
+       the one under test — is `router.replace("/trivela/wc26")`
        inside an effect gated on `router.isReady`. Nothing about it
        touches data; it cannot run before the page's JS has loaded and
        hydrated.
@@ -200,7 +200,7 @@ test("?league=WC26 in the wrong case still means the archive page, never MLS",
 
        So the reads this test does not use are answered here. The claim
        is untouched and is still the whole of it: the URL must end at
-       /bet-suggester/wc26 and the archive page's own heading must be on
+       /trivela/wc26 and the archive page's own heading must be on
        it, both of which are true or false regardless of what any feed
        says — and a page that could only redirect once its data arrived
        would still fail this, as it should. */
@@ -214,14 +214,14 @@ test("?league=WC26 in the wrong case still means the archive page, never MLS",
         reason: "e2e_deep_link_no_live_reads",
       }),
     }));
-    await page.goto("/bet-suggester?league=WC26");
+    await page.goto("/trivela?league=WC26");
     /* AND THE WAIT IS FOR THE HOP, BECAUSE THE HOP IS THE CLAIM
        (2026-09-23). `waitForURL` defaults to `waitUntil: "load"`, so
-       this line did not finish when the URL became /bet-suggester/wc26.
+       this line did not finish when the URL became /trivela/wc26.
        It finished when the DOCUMENT the hop landed in had fetched its
        last subresource — a condition this test names nowhere and reads
        nothing off. On run 35793175865 it spent the whole 45s having
-       ALREADY taken the first hop to /bet-suggester/leagues?league=WC26,
+       ALREADY taken the first hop to /trivela/leagues?league=WC26,
        and the budget was printed against a test whose sentence is "the
        wrong case still means the archive page": a page that had not
        finished loading, reported as a deep link resolving to the wrong
@@ -252,7 +252,7 @@ test("?league=WC26 in the wrong case still means the archive page, never MLS",
        a condition this test does not assert, so it cannot be held
        hostage by subresources again if these mocks are ever narrowed or
        the page gains a slow one. */
-    await page.waitForURL(/\/bet-suggester\/wc26/, { waitUntil: "commit" });
+    await page.waitForURL(/\/trivela\/wc26/, { waitUntil: "commit" });
     await expect(page.getByRole("heading", { name: /World Cup 26/ }).first())
       .toBeVisible();
   });
@@ -268,7 +268,7 @@ test("a finished competition's own page still has the Archive control, marked cu
     await page.route("**/api/comp/asean/markets**", (r) => r.fulfill(json({})));
     await page.route("**/api/comp/asean/tournament**", (r) =>
       r.fulfill(json({ detail: "no tournament surface" }, 404)));
-    await page.goto("/bet-suggester/comp/asean");
+    await page.goto("/trivela/comp/asean");
     const btn = page.getByRole("button", { name: /archive/i });
     await expect(btn).toBeVisible();
     await btn.click();
@@ -284,7 +284,7 @@ test("even the not-served comp page keeps the Archive control", async ({ page })
     r.fulfill(json({ detail: "retired by operator decision" }, 404)));
   await page.route("**/api/comp/gone-comp/markets**", (r) =>
     r.fulfill(json({ detail: "retired" }, 404)));
-  await page.goto("/bet-suggester/comp/gone-comp");
+  await page.goto("/trivela/comp/gone-comp");
   await expect(page.getByText(/retired by operator decision/)).toBeVisible();
   await expect(page.getByRole("button", { name: /archive/i })).toBeVisible();
 });
@@ -292,11 +292,11 @@ test("even the not-served comp page keeps the Archive control", async ({ page })
 // ----------------------- SSR titles exist (five pages) -----------------------
 
 for (const path of [
-  "/bet-suggester/leagues",
-  "/bet-suggester/wc26",
-  "/bet-suggester/comp/asean",
-  "/bet-suggester/market/FINAL",
-  "/bet-suggester/friendlies/12345",
+  "/trivela/leagues",
+  "/trivela/wc26",
+  "/trivela/comp/asean",
+  "/trivela/market/FINAL",
+  "/trivela/friendlies/12345",
 ]) {
   test(`SSR HTML carries a real <title> for ${path}`, async ({ request }) => {
     // next/head silently DROPS a multi-child <title> at SSR; the client
@@ -314,12 +314,12 @@ for (const path of [
 
 test("bots and market pages both point back to the wc26 archive page",
   async ({ page }) => {
-    await page.goto("/bet-suggester/bots");
+    await page.goto("/trivela/bots");
     await expect(page.getByRole("link", { name: "wc26" }))
-      .toHaveAttribute("href", "/bet-suggester/wc26");
-    await page.goto("/bet-suggester/market/FINAL");
+      .toHaveAttribute("href", "/trivela/wc26");
+    await page.goto("/trivela/market/FINAL");
     await expect(page.getByRole("link", { name: "wc26" }))
-      .toHaveAttribute("href", "/bet-suggester/wc26");
+      .toHaveAttribute("href", "/trivela/wc26");
   });
 
 // ------------------------- chips ride the client router -------------------------
@@ -331,7 +331,7 @@ test("a top-bar chip navigates client-side, not with a full document load",
       (window as unknown as { __spa_marker?: number }).__spa_marker = 1;
     });
     await page.getByRole("link", { name: "Leagues", exact: true }).click();
-    await page.waitForURL(/\/bet-suggester\/leagues/);
+    await page.waitForURL(/\/trivela\/leagues/);
     // a hard load would have wiped the marker with the JS heap
     expect(await page.evaluate(() =>
       (window as unknown as { __spa_marker?: number }).__spa_marker)).toBe(1);
@@ -341,11 +341,11 @@ test("a top-bar chip navigates client-side, not with a full document load",
 
 test("an unknown address gets the app's own 404, with a way back",
   async ({ page, request }) => {
-    const r = await request.get("/bet-suggester/no-such-page");
+    const r = await request.get("/trivela/no-such-page");
     expect(r.status()).toBe(404);
-    await page.goto("/bet-suggester/no-such-page");
+    await page.goto("/trivela/no-such-page");
     await expect(page.getByRole("heading",
       { name: /There is nothing at this address/ })).toBeVisible();
     await expect(page.getByRole("link", { name: /go to the picker board/i }))
-      .toHaveAttribute("href", "/bet-suggester");
+      .toHaveAttribute("href", "/trivela");
   });

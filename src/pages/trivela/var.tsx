@@ -1,5 +1,5 @@
-// /bet-suggester/var — TRIVELA VAR'S OWN PAGE (2026-10-24; renamed from
-// the Trivela Analyst and /bet-suggester/analyst on 2026-10-25. The old
+// /trivela/var — TRIVELA VAR'S OWN PAGE (2026-10-24; renamed from
+// the Trivela Analyst and /trivela/analyst on 2026-10-25. The old
 // address is a permanent redirect in next.config.ts, query string kept).
 //
 // The page used in class: a league picker with the three saved demo
@@ -105,7 +105,7 @@ export default function VarPage() {
         <title>Trivela VAR · namson.dev</title>
         <meta name="description" content="Trivela VAR (Verified Analyst Read): an AI soccer analyst that explains Trivela's match predictions in plain English. Every number goes to VAR: each one is checked against Trivela's data." />
       </Head>
-      <TopBar back={{ href: "/bet-suggester", label: "board" }} title="var" />
+      <TopBar back={{ href: "/trivela", label: "board" }} title="var" />
 
       <main className="mx-auto max-w-5xl px-5 pb-24 pt-10">
         <Eyebrow tone="accent">AI · shadow · not advice</Eyebrow>
@@ -130,7 +130,7 @@ export default function VarPage() {
           <div data-testid="analyst-off" className="mt-8 rounded-xl border border-dashed border-line px-4 py-4">
             <p className="text-sm text-ink-mid">VAR is switched off right now.</p>
             <p className="mt-3">
-              <Link href="/bet-suggester" className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">
+              <Link href="/trivela" className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">
                 go to the picker board →
               </Link>
             </p>

@@ -101,7 +101,7 @@ for (const width of [320, 390, 1440]) {
 
 test("it goes home — from a page deep in the app to the landing page",
   async ({ page }) => {
-    await page.goto("/bet-suggester/ratings");
+    await page.goto("/trivela/ratings");
     await page.getByTestId("home-logo").click();
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByTestId("landing")).toBeVisible();
@@ -114,7 +114,7 @@ test("the mark is the brand's gold on a page that re-themes its accent",
   async ({ page }) => {
     /* Nine pages set --accent to their league's colour; the mark reads
        --brand, so it stays gold on La Liga's red page too. */
-    await page.goto("/bet-suggester/laliga/761439");
+    await page.goto("/trivela/laliga/761439");
     const fill = await page.getByTestId("home-logo").locator("circle")
       .evaluate((c) => getComputedStyle(c).fill);
     expect(fill).toBe("rgb(245, 197, 66)");
@@ -130,7 +130,7 @@ test("on a phone the chip rail is a full-width row under the logo, and the bar's
        the taller bar's height from the first paint (globals.css). The
        home page's one chip stays beside the logo. */
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto("/bet-suggester/laliga/761439");
+    await page.goto("/trivela/laliga/761439");
     await page.evaluate(() => document.fonts.ready);
     const rail = page.locator('header.topbar [data-testid="topbar-right"] nav');
     // five chips in 350px run on past the edge, and the edge says so

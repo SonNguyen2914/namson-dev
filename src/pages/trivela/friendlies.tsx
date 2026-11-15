@@ -11,7 +11,7 @@ export default function FriendliesPage() {
     <div className="min-h-screen bg-bs font-sans text-ink-mid">
       <Head><title>Club Friendlies · market viewer · namson.dev</title></Head>
       <RouteProgress />
-      <TopBar back={{ href: "/bet-suggester", label: "board" }}
+      <TopBar back={{ href: "/trivela", label: "board" }}
         title="Club friendlies" />
       <main className="mx-auto max-w-5xl px-5 pb-24 pt-10">
         <Eyebrow>club friendlies · viewer</Eyebrow>

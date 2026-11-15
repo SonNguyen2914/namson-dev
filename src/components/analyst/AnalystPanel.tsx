@@ -1,6 +1,6 @@
 // THE TRIVELA VAR PANEL (Verified Analyst Read; the code keeps its
 // Analyst names): an AI-written read of one match, under the model's
-// win/draw/loss on the match hub and at the centre of /bet-suggester/var.
+// win/draw/loss on the match hub and at the centre of /trivela/var.
 //
 // IT NEVER HOLDS THE PAGE UP. Nothing is fetched until the page has drawn
 // (an effect, after an idle tick), the switch is read first and the panel
@@ -157,7 +157,7 @@ export default function AnalystPanel({ league, eventId, demo, defaultOpen = fals
           <p className="mt-4 flex flex-wrap items-center justify-between gap-2 font-mono text-[9px] uppercase leading-relaxed tracking-[0.12em] text-ink-faint">
             <span data-testid="analyst-footer">{ANALYST_FOOTER} · ✓ = VAR-checked against Trivela&apos;s data{out?.cached ? " · cached" : ""}</span>
             {askLink && !demo && eventId && (
-              <Link href={`/bet-suggester/var?league=${encodeURIComponent(league)}&id=${encodeURIComponent(eventId)}`}
+              <Link href={`/trivela/var?league=${encodeURIComponent(league)}&id=${encodeURIComponent(eventId)}`}
                 className="text-ink-low transition-colors hover:text-accent">ask VAR about this match →</Link>
             )}
           </p>

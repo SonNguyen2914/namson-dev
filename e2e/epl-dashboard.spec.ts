@@ -70,7 +70,7 @@ test.describe("EPL hub", () => {
   test("preseason standings render the explicit empty state, never a zero table",
     async ({ page }) => {
       await serve(page);
-      await page.goto("/bet-suggester?league=epl");
+      await page.goto("/trivela?league=epl");
       await expect(page.getByText(/season not started/i)).toBeVisible();
       // no standings table exists — and in particular no club sits at #1
       await expect(page.getByText("AFC Bournemouth")).toHaveCount(0);
@@ -87,7 +87,7 @@ test.describe("EPL hub", () => {
           wins: 2, losses: 0, ties: 1, points: 7, goal_diff: 4 },
       ],
     }] });
-    await page.goto("/bet-suggester?league=epl");
+    await page.goto("/trivela?league=epl");
     await expect(page.getByText("Liverpool").first()).toBeVisible();
     await expect(page.getByText(/season not started/i)).toHaveCount(0);
     // rank order INSIDE the table (the page also shows Arsenal in a
@@ -101,7 +101,7 @@ test.describe("EPL hub", () => {
   test("the dark model is stated in words and paints no odds chip",
     async ({ page }) => {
       await serve(page);
-      await page.goto("/bet-suggester?league=epl");
+      await page.goto("/trivela?league=epl");
       await expect(page.getByText(/epl-2026-v0 — dark/i)).toBeVisible();
       // dark = no model numbers anywhere: no H/D/A chip renders
       await expect(page.getByText(/H \d+ · D \d+ · A \d+/)).toHaveCount(0);
@@ -120,7 +120,7 @@ test.describe("EPL hub", () => {
       await serve(page, { odds: { odds: [], shadow: true,
                                   model_dark: false,
                                   model_state: "approved_no_runs" } });
-      await page.goto("/bet-suggester?league=epl");
+      await page.goto("/trivela?league=epl");
       await expect(
         page.getByTestId("model-status-approved_no_runs")).toBeVisible();
       await expect(page.getByText(/approved \/ no runs/i)).toBeVisible();
@@ -130,7 +130,7 @@ test.describe("EPL hub", () => {
   test("a REJECTED odds fetch says unavailable — never 'dark'",
     async ({ page }) => {
       await serve(page, { oddsStatus: 503 });
-      await page.goto("/bet-suggester?league=epl");
+      await page.goto("/trivela?league=epl");
       await expect(
         page.getByTestId("model-status-unavailable")).toBeVisible();
       await expect(page.getByText(/model status · unavailable/i))
@@ -141,7 +141,7 @@ test.describe("EPL hub", () => {
   test("only an explicit unapproved answer paints the dark block",
     async ({ page }) => {
       await serve(page);            // model_state: "dark"
-      await page.goto("/bet-suggester?league=epl");
+      await page.goto("/trivela?league=epl");
       await expect(page.getByTestId("model-status-dark")).toBeVisible();
       await expect(
         page.getByTestId("model-status-unavailable")).toHaveCount(0);
@@ -156,7 +156,7 @@ test.describe("EPL hub", () => {
         odds: [{ espn_event_id: "401879301", run_type: "scheduled",
                  outcomes: { home_win: 0.5, draw: 0.25,
                              away_win: 0.25 } }] } });
-      await page.goto("/bet-suggester?league=epl");
+      await page.goto("/trivela?league=epl");
       await expect(page.getByText(/H 50 · D 25 · A 25/)).toBeVisible();
       await expect(page.getByText(/model status ·/i)).toHaveCount(0);
     });
@@ -164,7 +164,7 @@ test.describe("EPL hub", () => {
   test("an upcoming fixture shows WHEN it kicks off, not 'Scheduled'",
     async ({ page }) => {
       await serve(page);
-      await page.goto("/bet-suggester?league=epl");
+      await page.goto("/trivela?league=epl");
       await expect(page.getByText("Coventry City").first()).toBeVisible();
       await expect(page.getByText(/^scheduled$/i)).toHaveCount(0);
     });
@@ -177,7 +177,7 @@ test.describe("EPL hub", () => {
   test("a future matchday is not labelled Today's slate", async ({ page }) => {
     await serve(page, { scoreboard: { fixtures: [
       fixture("f1", inDays(24), "Arsenal", "Coventry City")] } });
-    await page.goto("/bet-suggester?league=epl");
+    await page.goto("/trivela?league=epl");
     const sec = slate(page);
     await expect(sec.getByText("Arsenal")).toBeVisible();
     await expect(sec.locator("h3")).toContainText("Next matchday");
@@ -188,7 +188,7 @@ test.describe("EPL hub", () => {
   test("today's fixtures keep the Today's slate heading", async ({ page }) => {
     await serve(page, { scoreboard: { fixtures: [
       fixture("f1", new Date().toISOString(), "Arsenal", "Chelsea")] } });
-    await page.goto("/bet-suggester?league=epl");
+    await page.goto("/trivela?league=epl");
     const sec = slate(page);
     await expect(sec.getByText("Arsenal")).toBeVisible();
     await expect(sec.locator("h3")).toContainText("Today's slate");
@@ -200,7 +200,7 @@ test.describe("EPL hub", () => {
       await serve(page, { scoreboard: { fixtures: [
         fixture("f1", inDays(3, 12), "Arsenal", "Chelsea"),
         fixture("f2", inDays(3, 13), "Everton", "Fulham")] } });
-      await page.goto("/bet-suggester?league=epl");
+      await page.goto("/trivela?league=epl");
       const sec = slate(page);
       await expect(sec.getByText("Arsenal")).toBeVisible();
       await expect(sec.getByText("Everton")).toBeVisible();
@@ -211,7 +211,7 @@ test.describe("EPL hub", () => {
     await serve(page, { scoreboard: { fixtures: [
       fixture("f1", inDays(3), "Arsenal", "Chelsea"),
       fixture("f2", inDays(5), "Everton", "Fulham")] } });
-    await page.goto("/bet-suggester?league=epl");
+    await page.goto("/trivela?league=epl");
     const sec = slate(page);
     await expect(sec.getByText("Arsenal")).toBeVisible();
     await expect(sec.locator("h4")).toHaveCount(2);

@@ -8,10 +8,10 @@ import { routeEight } from "./eight-columns";
 // UEL / UECL: VIEWER RETIRED, HUB LIVE (cleanup D8, 2026-10-21). Their
 // VIEWERS stay retired, but both competitions came back as CUPS on the
 // Cups tab (backend `tables.CUPS`, Son 2026-10-07), and every fixture has
-// a match hub (`/bet-suggester/uel/<event>`, `/bet-suggester/uecl/<event>`;
+// a match hub (`/trivela/uel/<event>`, `/trivela/uecl/<event>`;
 // backend `/api/comp/{cup}/match/{event_id}`). The backend names the
 // pairing in `competitions.RETIRED_VIEWER_HUBS` (`uel` -> `uel`, `ecl` ->
-// `uecl`). So "retired" below means the VIEWER at `/bet-suggester/comp/
+// `uecl`). So "retired" below means the VIEWER at `/trivela/comp/
 // <key>`, never the competition: `uel` is also a cup key and its
 // `/api/comp/uel/*` routes answer as that cup, and the bookmarked page
 // this spec reads is `ecl`'s, whose refusal now says where the hub went.
@@ -35,7 +35,7 @@ const RETIRED = ["ecl", "uel", "brasileirao", "argentina", "usl"];
 // KEY -> THE HREF ITS RAIL CHIP ACTUALLY POINTS AT.
 //
 // AND IT IS `/comp/<key>` AGAIN (2026-09-09). On 2026-09-08 the
-// Champions League got a picker BOARD of its own — `/bet-suggester/ucl`,
+// Champions League got a picker BOARD of its own — `/trivela/ucl`,
 // the landing page's own component narrowed to one column — and the chip
 // was repointed there. On 2026-09-09 the operator took the competition
 // off the board: "remove UCL from the landing page, we have it in its
@@ -49,7 +49,7 @@ const RETIRED = ["ecl", "uel", "brasileirao", "argentina", "usl"];
 // and `BOARD_COLUMNS` cannot empty it, so that is where the chip points
 // and this is the assertion that keeps it there.
 const KEPT_CHIPS: [string, string][] = [
-  ["ucl", "/bet-suggester/ucl"],
+  ["ucl", "/trivela/ucl"],
 ];
 // KEPT, BUT FILED. ASEAN FINISHED (0 upcoming, 28 played) and moved into
 // the Archive dropdown at the top-left on 2026-08-30, with WC26. THE
@@ -69,8 +69,8 @@ const KEPT_CHIPS: [string, string][] = [
 // its own archive page. Filing a competition never retired a route:
 // `/comp/leagues-cup` still answers, it is simply not offered in the rail.
 const KEPT_IN_ARCHIVE: [string, string][] = [
-  ["asean", "/bet-suggester/comp/asean"],
-  ["leagues-cup", "/bet-suggester/leagues-cup"],
+  ["asean", "/trivela/comp/asean"],
+  ["leagues-cup", "/trivela/leagues-cup"],
 ];
 
 // The backend's `_comp_404` refusal for `ecl`, verbatim (TRIVELA
@@ -94,10 +94,10 @@ test("the board offers none of the five, and still offers the three",
     // turned "the rail does not offer these five" into "there is no
     // rail". The rail is drawn from a payload this file controls.
     await routeEight(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     for (const k of RETIRED) {
       await expect(
-        page.locator(`a[href="/bet-suggester/comp/${k}"]`),
+        page.locator(`a[href="/trivela/comp/${k}"]`),
         `${k} must not be linked from the board`,
       ).toHaveCount(0);
     }
@@ -165,7 +165,7 @@ test("a competition read that FAILED names the failure — not 'Loading' for "
       status: 503, contentType: "application/json",
       body: JSON.stringify({ detail: "the fixtures provider is rate-limited" }),
     }));
-    await page.goto("/bet-suggester/comp/ucl");
+    await page.goto("/trivela/comp/ucl");
     const failed = page.getByTestId("comp-read-failed");
     await expect(failed).toContainText("The competition read failed");
     await expect(failed).toContainText("HTTP 503");
@@ -195,7 +195,7 @@ test("a bookmarked retired viewer says it was retired, that its hub is live, "
         body: JSON.stringify({ detail: GONE_DETAIL }),
       }));
 
-    await page.goto("/bet-suggester/comp/ecl");
+    await page.goto("/trivela/comp/ecl");
 
     // the reason, in the backend's own words — not a spinner
     await expect(page.getByText(/retired on 2026-08-24/).first())

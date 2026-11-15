@@ -48,7 +48,7 @@ test("form + H2H rows: result letter agrees with the scoreline shown",
     }
 
     // DOM-level: read the rendered rows and re-check the same invariant
-    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    await page.goto(`/trivela/mls/${EVENT}`);
     await page.getByText(/ESPN form \+ H2H/i).first().click();
     const rows = await page.locator("div.font-mono.text-\\[11px\\]").all();
     let checked = 0;
@@ -72,7 +72,7 @@ test("the hero form strips mirror the scouting form, cell for cell",
     const sc = body.match?.scouting;
     test.skip(!sc?.last_five?.length, "no scouting from this backend");
 
-    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    await page.goto(`/trivela/mls/${EVENT}`);
     const strips = page.getByTestId("hero-form");
     // one strip per side that HAS a form string — same source as the
     // scouting chips, so the two surfaces can never disagree
