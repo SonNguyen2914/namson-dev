@@ -131,12 +131,12 @@ test("a read still in flight is never stacked on, and a hidden tab does "
   + "not read at all", async ({ page }) => {
     let asked = 0;
     // the first answer is withheld: the backend has hung
-    const hung: Array<() => void> = [];
+    const hung: Array<() => Promise<void>> = [];
     await quietFriendlies(page);
     await page.route("**/api/friendlies/scoreboard", (r) => {
       asked += 1;
       if (asked === 1) {
-        hung.push(() => { void r.fulfill(json({ fixtures: [] })); });
+        hung.push(() => r.fulfill(json({ fixtures: [] })));
         return;
       }
       return r.fulfill(json({ fixtures: [] }));
@@ -149,8 +149,25 @@ test("a read still in flight is never stacked on, and a hidden tab does "
     await page.clock.runFor(300_000);
     expect(asked, "a new read was stacked on one still in flight").toBe(1);
 
-    // it answers; the chain resumes
-    hung[0]();
+    // non-vacuity: the hung read is what the page is still waiting on
+    await expect(page.getByText("loading fixtures…")).toBeVisible();
+
+    // it answers; the chain resumes.
+    //
+    // THE ANSWER MUST HAVE LANDED BEFORE THE CLOCK MOVES (audit C-06,
+    // 2026-11-15). The poller arms its next 60s timer only once this read
+    // has settled in the page. Firing `fulfill` without waiting for the
+    // page to receive it let `runFor(61_000)` run first on a slow CI
+    // runner: the timer was then armed AFTER the 61s had passed, nothing
+    // moved the fake clock again, and the poll saw 1 read, not 2 (≈5 of
+    // 30 CI runs). Awaiting `fulfill` only means Playwright handed the
+    // response over; the rendered empty state means the page has
+    // processed it — and the poll's settle, which arms the timer, runs
+    // in the same turn as the fetch resolving, before the body that
+    // feeds this text is read.
+    await hung[0]();
+    await expect(page.getByText("no club friendlies in ESPN's bucket"))
+      .toBeVisible();
     await page.clock.runFor(61_000);
     await expect.poll(() => asked).toBe(2);
 
