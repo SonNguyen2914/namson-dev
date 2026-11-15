@@ -1642,7 +1642,7 @@ function LiveSection({ rows, leagues, columns }: {
   /** THE COLUMN SET THIS BOARD IS NARROWED TO, or undefined on the full
    *  board where there is nothing to be narrower than.
    *
-   *  `/bet-suggester/ucl` renders the same component with the column set
+   *  `/trivela/ucl` renders the same component with the column set
    *  cut to one, and until 2026-09-08 `only` narrowed the COLUMNS and
    *  nothing else — so this section, sitting above them, went on drawing
    *  every live match anywhere. A Liga MX match under way appeared on a
@@ -1762,7 +1762,7 @@ function LiveSection({ rows, leagues, columns }: {
             ? "it joined" : "they joined"} no row on this board, so
           whether {unplaceable === 1 ? "it belongs" : "they belong"} here
           is unknown rather than answered. The full board at
-          /bet-suggester draws every declared match.
+          /trivela draws every declared match.
         </p>
       )}
       {pages > 1 && (

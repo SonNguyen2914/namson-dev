@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { analystOn, askFor, hermetic, json, previewFor } from "./analyst-fixtures";
 
-// /bet-suggester/var (Trivela VAR): the league picker, the three saved demo matches,
+// /trivela/var (Trivela VAR): the league picker, the three saved demo matches,
 // the panel, Ask and "How it works". Hermetic: previews and answers are the
 // Analyst pipeline's own output with the mock model; the live fixture
 // lists are refused by name (the demo matches never need them).
@@ -24,7 +24,7 @@ async function open(page: Page, ask?: (body: Record<string, unknown>) => { statu
       return r.fulfill(json(a.body, a.status));
     });
   }
-  await page.goto("/bet-suggester/var");
+  await page.goto("/trivela/var");
   return asked;
 }
 
@@ -89,7 +89,7 @@ test("switched off, the page says so and reads nothing else", async ({ page }) =
   await hermetic(page);
   await analystOn(page, false);
   await page.route("**/api/analyst/preview**", (r) => { asked.push(r.request().url()); return r.fulfill(json({})); });
-  await page.goto("/bet-suggester/var");
+  await page.goto("/trivela/var");
   await expect(page.getByTestId("analyst-off")).toContainText("switched off");
   await expect(page.getByTestId("analyst-panel")).toHaveCount(0);
   expect(asked).toEqual([]);
@@ -98,8 +98,8 @@ test("switched off, the page says so and reads nothing else", async ({ page }) =
 test("the board's top bar links to VAR while it is switched on", async ({ page }) => {
   await hermetic(page);
   await analystOn(page);
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   const chip = page.getByRole("link", { name: "VAR", exact: true });
-  await expect(chip).toHaveAttribute("href", "/bet-suggester/var");
+  await expect(chip).toHaveAttribute("href", "/trivela/var");
   await expect(page.getByRole("link", { name: "Analyst", exact: true })).toHaveCount(0);
 });

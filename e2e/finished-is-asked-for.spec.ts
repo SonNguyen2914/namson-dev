@@ -20,7 +20,7 @@ import { DEFAULT_BACK } from "../src/lib/pickerReview";
 //
 // The parameter was ignored because it did not exist, and the page never
 // sent it: `fetchReview(back)` asked for the DECLARED sweep on every
-// route, so `/bet-suggester/ucl` drew its board half from `?leagues=ucl`
+// route, so `/trivela/ucl` drew its board half from `?leagues=ucl`
 // and its finished half from four other competitions' matches.
 //
 // AND IT WAS NOT A BACKEND BUG. `review_competitions()` returns
@@ -281,7 +281,7 @@ async function askedLeagues(asked: string[]): Promise<string | null> {
 
 test.describe("the page asks the review the question it asks the board", () => {
   test("the Champions League page asks for the Champions League", async ({ page }) => {
-    const asked = await open(page, "/bet-suggester/ucl",
+    const asked = await open(page, "/trivela/ucl",
                              UCL_BOARD, REVIEW_ASKED_SIX);
     expect(await askedLeagues(asked)).toBe("ucl");
   });
@@ -291,7 +291,7 @@ test.describe("the page asks the review the question it asks the board", () => {
       // THE OMISSION IS THE MECHANISM. Pass a `leagues` here and the
       // backend's cache key changes, the answer carries `narrowed_to`,
       // and the payload stops being the operator's declaration.
-      const asked = await open(page, "/bet-suggester",
+      const asked = await open(page, "/trivela",
                                DECLARED_BOARD, REVIEW_NEVER_ASKED);
       expect(await askedLeagues(asked)).toBeNull();
     });
@@ -315,7 +315,7 @@ test.describe("the page asks the review the question it asks the board", () => {
         reviewAsked.push(r.request().url());
         return r.fulfill(json(REVIEW_ASKED_SIX));
       });
-      await page.goto("/bet-suggester/ucl");
+      await page.goto("/trivela/ucl");
       await expect.poll(() => boardAsked.length).toBeGreaterThan(0);
       await expect.poll(() => reviewAsked.length).toBeGreaterThan(0);
       expect(new URL(reviewAsked[0]).searchParams.get("leagues"))
@@ -327,7 +327,7 @@ test.describe("the page asks the review the question it asks the board", () => {
 
 test("the six finished Champions League fixtures reach the finished section",
   async ({ page }) => {
-    await open(page, "/bet-suggester/ucl", UCL_BOARD, REVIEW_ASKED_SIX);
+    await open(page, "/trivela/ucl", UCL_BOARD, REVIEW_ASKED_SIX);
     const t = tail(page, "ucl");
     // the collapsed header reports the count WITHOUT being opened —
     // that is the whole point of a collapsed section
@@ -356,7 +356,7 @@ test("the six finished Champions League fixtures reach the finished section",
 test.describe("three states, and no two of them render alike", () => {
   test("1 · asked, and none finished — a measurement, and it says so",
     async ({ page }) => {
-      await open(page, "/bet-suggester/ucl", UCL_BOARD, REVIEW_ASKED_EMPTY);
+      await open(page, "/trivela/ucl", UCL_BOARD, REVIEW_ASKED_EMPTY);
       const t = tail(page, "ucl");
       await expect(t.getByTestId("review-toggle"))
         .toHaveAttribute("data-has", "none");
@@ -377,7 +377,7 @@ test.describe("three states, and no two of them render alike", () => {
       // rendered `review-empty`: "No Champions League fixtures finished
       // in the last 7 days", with a header reading "0 matches", over a
       // window nobody measured.
-      await open(page, "/bet-suggester/ucl", UCL_BOARD, REVIEW_NEVER_ASKED);
+      await open(page, "/trivela/ucl", UCL_BOARD, REVIEW_NEVER_ASKED);
       const t = tail(page, "ucl");
       await expect(t.getByTestId("review-toggle"))
         .toHaveAttribute("data-has", "unasked");
@@ -400,7 +400,7 @@ test.describe("three states, and no two of them render alike", () => {
 
   test("2 · …and it names WHY, because an unexplained blank is what this surface refuses",
     async ({ page }) => {
-      await open(page, "/bet-suggester/ucl", UCL_BOARD, REVIEW_NEVER_ASKED);
+      await open(page, "/trivela/ucl", UCL_BOARD, REVIEW_NEVER_ASKED);
       const t = tail(page, "ucl");
       await t.getByTestId("review-toggle").click();
       await expect(t.getByTestId("review-unasked-why"))
@@ -411,7 +411,7 @@ test.describe("three states, and no two of them render alike", () => {
 
   test("3a · asked, and the whole request failed — the backend's own words",
     async ({ page }) => {
-      await open(page, "/bet-suggester/ucl", UCL_BOARD,
+      await open(page, "/trivela/ucl", UCL_BOARD,
                  { detail: "picker review unavailable" }, 503);
       const t = tail(page, "ucl");
       await expect(t.getByTestId("review-toggle"))
@@ -425,7 +425,7 @@ test.describe("three states, and no two of them render alike", () => {
 
   test("3b · asked, and THIS competition's read failed — named, not emptied",
     async ({ page }) => {
-      await open(page, "/bet-suggester/ucl", UCL_BOARD, REVIEW_ASKED_FAILED);
+      await open(page, "/trivela/ucl", UCL_BOARD, REVIEW_ASKED_FAILED);
       const t = tail(page, "ucl");
       await expect(t.getByTestId("review-toggle"))
         .toHaveAttribute("data-has", "unread");
@@ -453,7 +453,7 @@ test.describe("three states, and no two of them render alike", () => {
     for (const body of [REVIEW_ASKED_EMPTY, REVIEW_NEVER_ASKED,
                         REVIEW_ASKED_FAILED]) {
       const p2 = await page.context().newPage();
-      await open(p2, "/bet-suggester/ucl", UCL_BOARD, body);
+      await open(p2, "/trivela/ucl", UCL_BOARD, body);
       const toggle = tail(p2, "ucl").getByTestId("review-toggle");
       await expect(toggle).toBeVisible();
       await expect(toggle).not.toHaveAttribute("data-has", "");
@@ -473,7 +473,7 @@ test("a narrowed review does not put a column on the landing page",
     // Leagues Cup once walked back through after being removed from the
     // board. A narrowed answer holds the slug that was ASKED ABOUT, in
     // exactly the shape a declaration has.
-    const asked = await open(page, "/bet-suggester", DECLARED_BOARD, {
+    const asked = await open(page, "/trivela", DECLARED_BOARD, {
       ...reviewBase, narrowed_to: ["ucl"],
       leagues: { ucl: uclMeta({ finished: 6, unavailable: 6 }) },
       finished: UCL_FINISHED.map(finishedRow),

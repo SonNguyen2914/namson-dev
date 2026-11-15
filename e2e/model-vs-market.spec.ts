@@ -170,7 +170,7 @@ for (const width of [375, 1280]) {
       const errors = watchErrors(page);
       await serve(page, { state: "in", minute: "63'",
         series: liveSeries({ last: 63, tapeAgeS: 12 }) });
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const root = page.getByTestId("mvm-root");
       await expect(root).toHaveAttribute("data-mode", "live");
       await expect(page.getByTestId("mvm-minute")).toHaveText("63′");
@@ -203,7 +203,7 @@ for (const width of [375, 1280]) {
       const errors = watchErrors(page);
       await serve(page, { state: "in", minute: "63'",
         series: liveSeries({ last: 63, tapeAgeS: 12 }) });
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const root = page.getByTestId("mvm-root");
       await expect(root).toHaveAttribute("data-cursor", "63");
       // stepper
@@ -258,7 +258,7 @@ for (const width of [375, 1280]) {
     test("a missed tape minute is held and names its minute", async ({ page }) => {
       await serve(page, { state: "in", minute: "63'",
         series: liveSeries({ last: 63, tapeAgeS: 12 }) });
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       await page.getByTestId("mvm-chart").focus();
       await page.keyboard.press("Home");
       for (let i = 0; i < 27; i++) await page.keyboard.press("ArrowRight");
@@ -272,7 +272,7 @@ for (const width of [375, 1280]) {
       const errors = watchErrors(page);
       await serve(page, { state: "in", minute: "63'",
         series: liveSeries({ last: 60, tapeAgeS: 600 }) });
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       await expect(page.getByTestId("mvm-root")).toHaveAttribute("data-mode", "held");
       await expect(page.getByTestId("mvm-pill")).toHaveText(`held · 60′, not current`);
       await expect(page.getByTestId("mvm-live")).toHaveText(/held 60/i);
@@ -286,7 +286,7 @@ for (const width of [375, 1280]) {
     test("pre-kickoff: steps, padlock, fee floor", async ({ page }) => {
       const errors = watchErrors(page);
       await serve(page, { state: "pre", series: preSeries() });
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const root = page.getByTestId("mvm-root");
       await expect(root).toHaveAttribute("data-mode", "pre");
       await expect(page.getByTestId("mvm-minute")).toHaveText(new RegExp(`^T${MINUS}\\d+$`));
@@ -331,7 +331,7 @@ test.describe("a feed that stops is not live", () => {
       return calls === 1 ? r.fulfill({ json: first })
         : r.fulfill({ status: 503, json: { detail: "the feed stopped" } });
     } });
-    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    await page.goto(`/trivela/mls/${EVENT}`);
     await expect(page.getByTestId("mvm-root")).toHaveAttribute("data-mode", "live");
     await page.clock.runFor(180_000);
     await expect.poll(() => calls).toBeGreaterThan(1);
@@ -344,7 +344,7 @@ test.describe("a feed that stops is not live", () => {
   test("a series with no tape clock (latest: null) is held, not live", async ({ page }) => {
     await serve(page, { state: "in", minute: "63'",
       series: { ...liveSeries({ last: 63, tapeAgeS: 12 }), latest: null } });
-    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    await page.goto(`/trivela/mls/${EVENT}`);
     await expect(page.getByTestId("mvm-root")).toHaveAttribute("data-mode", "held");
     await expect(page.getByTestId("mvm-live")).not.toHaveText(/● live/);
   });
@@ -356,7 +356,7 @@ test.describe("the clock in Los Angeles time", () => {
   test("the tape time is printed in America/Los_Angeles, not the viewer's zone", async ({ page }) => {
     const s = liveSeries({ last: 63, tapeAgeS: 12 });
     await serve(page, { state: "in", minute: "63'", series: s });
-    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    await page.goto(`/trivela/mls/${EVENT}`);
     const la = new Date(s.latest.captured_at).toLocaleTimeString("en-US",
       { timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit" });
     await expect(page.getByTestId("mvm-fresh")).toHaveText(new RegExp(`^tape ${la.replace(/\s/g, "\\s")}$`));
@@ -369,7 +369,7 @@ test.describe("named absences, never a crash", () => {
     await serve(page, { state: "in", minute: "63'", series: {
       available: false, code: "no_fixture",
       reason: "this match is not on the live plane, so no minute-by-minute read was recorded for it" } });
-    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    await page.goto(`/trivela/mls/${EVENT}`);
     await expect(page.getByTestId("mvm-absent")).toContainText(
       "No minute-by-minute read for this match.");
     await expect(page.getByTestId("mvm-absent")).toContainText("not on the live plane");
@@ -379,7 +379,7 @@ test.describe("named absences, never a crash", () => {
   test("a live match whose tape is empty", async ({ page }) => {
     const s = { ...liveSeries({ last: 10, tapeAgeS: 5 }), minutes: [] };
     await serve(page, { state: "in", minute: "63'", series: s });
-    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    await page.goto(`/trivela/mls/${EVENT}`);
     await expect(page.getByTestId("mvm")).toHaveAttribute("data-state", "empty");
     await expect(page.getByTestId("mvm-absent")).toContainText("not a flat line");
   });
@@ -387,7 +387,7 @@ test.describe("named absences, never a crash", () => {
   test("a failed read is named, not empty", async ({ page }) => {
     await serve(page, { state: "in", minute: "63'", series: (r: Route) =>
       r.fulfill({ status: 503, json: { detail: "busy" } }) });
-    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    await page.goto(`/trivela/mls/${EVENT}`);
     await expect(page.getByTestId("mvm")).toHaveAttribute("data-state", "failed");
     await expect(page.getByTestId("mvm-absent")).toContainText("The read failed");
   });
@@ -395,7 +395,7 @@ test.describe("named absences, never a crash", () => {
   test("a malformed series costs this section only", async ({ page }) => {
     await serve(page, { state: "in", minute: "63'", series: {
       ...liveSeries({ last: 10, tapeAgeS: 5 }), events: "not a list" } });
-    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    await page.goto(`/trivela/mls/${EVENT}`);
     await expect(page.getByTestId("mvm")).toHaveAttribute("data-state", "crashed");
     await expect(page.getByTestId("mvm-absent")).toContainText(
       "No minute-by-minute read for this match.");

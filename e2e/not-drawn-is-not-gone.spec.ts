@@ -374,7 +374,7 @@ test.describe("the board draws the columns the operator chooses", () => {
         contentType: "application/json", body: JSON.stringify(body) });
       await page.route("**/api/picker/board**", (r) => r.fulfill(json(BOARD_EIGHT)));
       await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW_EIGHT)));
-      await page.goto("/bet-suggester");
+      await page.goto("/trivela");
       await page.waitForSelector('[data-testid="league-col"]');
 
       const shut = await auditFloor(page);

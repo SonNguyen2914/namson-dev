@@ -1,4 +1,4 @@
-// THE PINNED-PASS FIELD — the three views of /bet-suggester/ratings.
+// THE PINNED-PASS FIELD — the three views of /trivela/ratings.
 //
 // Approved by the operator on 2026-09-23 as the artifact "The Pinned-Pass
 // Field", and ported here in the repo's own idiom. Every rule below was

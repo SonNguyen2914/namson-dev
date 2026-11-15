@@ -97,7 +97,7 @@ test.describe("EPL scenario fee policy", () => {
       await page.route(`**/api/epl/match/${EVENT}`, (r) =>
         r.fulfill({ status: 200, contentType: "application/json",
                     body: JSON.stringify(MATCH_PAYLOAD) }));
-      await page.goto(`/bet-suggester/epl/${EVENT}`);
+      await page.goto(`/trivela/epl/${EVENT}`);
       // the scenario engine ships collapsed
       await page.getByRole("button", { name: /betting strategy/i })
         .click();
@@ -119,7 +119,7 @@ test.describe("EPL scenario fee policy", () => {
       await page.route(`**/api/epl/match/${EVENT}`, (r) =>
         r.fulfill({ status: 200, contentType: "application/json",
                     body: JSON.stringify(MATCH_PAYLOAD) }));
-      await page.goto(`/bet-suggester/epl/${EVENT}`);
+      await page.goto(`/trivela/epl/${EVENT}`);
       // the scenario engine ships collapsed
       await page.getByRole("button", { name: /betting strategy/i })
         .click();
@@ -152,7 +152,7 @@ async function openHub(page: Hub, patch: Record<string, unknown> = {},
   await page.route(`**/api/epl/match/${EVENT}`, (r) =>
     r.fulfill({ status: 200, contentType: "application/json",
                 body: JSON.stringify(body) }));
-  await page.goto(`/bet-suggester/epl/${EVENT}`);
+  await page.goto(`/trivela/epl/${EVENT}`);
   return body;
 }
 
@@ -353,7 +353,7 @@ test.describe("a failed refresh is not an up-to-date page", () => {
       // interval is created during mount, and a clock installed after
       // that does not own it.
       await page.clock.install();
-      await page.goto(`/bet-suggester/epl/${EVENT}`);
+      await page.goto(`/trivela/epl/${EVENT}`);
       await expect(page.getByText("Arsenal").first()).toBeVisible();
       await expect(page.getByTestId("feed-stale")).toHaveCount(0);
       await page.clock.runFor("00:35");
@@ -386,7 +386,7 @@ test.describe("a finished match is read, not watched", () => {
                          body: JSON.stringify(body) });
     });
     await page.clock.install();
-    await page.goto(`/bet-suggester/epl/${EVENT}`);
+    await page.goto(`/trivela/epl/${EVENT}`);
     await expect(page.getByText("Arsenal").first()).toBeVisible();
     expect(calls).toBe(1);
     await page.clock.runFor(180_000);   // six 30s cadences
@@ -406,7 +406,7 @@ test.describe("a finished match is read, not watched", () => {
                            body: JSON.stringify(MATCH_PAYLOAD) });
       });
       await page.clock.install();
-      await page.goto(`/bet-suggester/epl/${EVENT}`);
+      await page.goto(`/trivela/epl/${EVENT}`);
       await expect(page.getByText("Arsenal").first()).toBeVisible();
       await page.clock.runFor(95_000);
       await expect.poll(() => calls).toBeGreaterThan(1);

@@ -1,6 +1,6 @@
 /** THE CHAMPIONSHIPS BOARD — the landing page's second board.
  *
- *  `/bet-suggester` carries two boards behind one switch: the club board
+ *  `/trivela` carries two boards behind one switch: the club board
  *  it has always been (GET /api/picker/board) and the four national-team
  *  competitions (GET /api/championships/board). Everything here runs on
  *  a RECORDED payload off the real route (e2e/championships-recorded.ts),
@@ -52,7 +52,7 @@ async function openChampionships(page: Page, champ: unknown = CHAMP_BOARD,
     try { window.localStorage.setItem("board-mode", "championships"); } catch { /* none */ }
   });
   const calls = await routeBoth(page, champ);
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await page.waitForSelector('[data-testid="league-col"][data-league="unl"]');
   return calls;
 }
@@ -63,7 +63,7 @@ test.describe("the Championships board", () => {
   test("the Leagues board makes no call to the championships route",
     async ({ page }) => {
       const calls = await routeBoth(page);
-      await page.goto("/bet-suggester");
+      await page.goto("/trivela");
       await page.waitForSelector('[data-testid="league-col"]');
       await expect(page.locator('[data-testid="board-mode-leagues"]'))
         .toHaveAttribute("aria-pressed", "true");
@@ -86,7 +86,7 @@ test.describe("the Championships board", () => {
   test("the switch flips the board, each way, one route per mode",
     async ({ page }) => {
       const calls = await routeBoth(page);
-      await page.goto("/bet-suggester");
+      await page.goto("/trivela");
       await page.waitForSelector('[data-testid="league-col"][data-league="epl"]');
       const boardBefore = calls.board;
       await page.click('[data-testid="board-mode-nations"]');
@@ -103,7 +103,7 @@ test.describe("the Championships board", () => {
 
   test("the choice is remembered across a reload", async ({ page }) => {
     await routeBoth(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await page.waitForSelector('[data-testid="league-col"]');
     await page.click('[data-testid="board-mode-nations"]');
     await page.waitForSelector('[data-testid="league-col"][data-league="unl"]');
@@ -526,7 +526,7 @@ test.describe("the sort menu offers only keys the rows carry", () => {
 
   test("the Leagues menu is the club menu, verbatim", async ({ page }) => {
     await routeBoth(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await page.waitForSelector('[data-testid="league-col"]');
     expect(await bandOptions(page)).toEqual(
       SORT_MODES.map((m) => ({ value: m.id, label: m.label })));
@@ -621,7 +621,7 @@ test.describe("the Championships board wears the Leagues board's chrome", () => 
   test("the Leagues board draws no national slot at all",
     async ({ page }) => {
       await routeBoth(page);
-      await page.goto("/bet-suggester");
+      await page.goto("/trivela");
       await page.waitForSelector('[data-testid="league-col"]');
       for (const id of ["national-pts", "national-gp", "xi-chip",
                         "group-chip", "price-side", "col-stage", "col-floor"]) {

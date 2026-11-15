@@ -22,7 +22,7 @@ test("a screen that changed while the landing was away is re-read on return",
     await expect(landing).toHaveAttribute("data-motion", "on");
 
     await page.getByTestId("landing-cta").click();
-    await page.waitForURL("**/bet-suggester");
+    await page.waitForURL("**/trivela");
     // the rotation happens while the landing page is not mounted
     await page.setViewportSize({ width: 900, height: 400 });
     await page.goBack();

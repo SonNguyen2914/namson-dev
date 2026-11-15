@@ -1,4 +1,4 @@
-// Small presentational primitives for the bet-suggester redesign.
+// Small presentational primitives for the trivela redesign.
 //
 // Reveal    — fade-up on scroll (IntersectionObserver, fires once).
 // RevealRow — same idea for <tr>, opacity-only (transforms on table rows

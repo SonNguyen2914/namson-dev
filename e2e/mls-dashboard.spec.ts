@@ -87,7 +87,7 @@ test.describe("MLS hub", () => {
   test("an upcoming fixture shows WHEN it kicks off, not 'Scheduled'",
     async ({ page }) => {
       await serve(page);
-      await page.goto("/bet-suggester?league=mls");
+      await page.goto("/trivela?league=mls");
       await expect(page.getByText("MLS All-Stars").first()).toBeVisible();
       // the bare provider string must be gone from the card
       await expect(page.getByText(/^scheduled$/i)).toHaveCount(0);
@@ -101,7 +101,7 @@ test.describe("MLS hub", () => {
 
   test("no club is listed in two conferences", async ({ page }) => {
     await serve(page);
-    await page.goto("/bet-suggester?league=mls");
+    await page.goto("/trivela?league=mls");
     await expect(page.getByText("Nashville SC").first()).toBeVisible();
     // the exact defect: a Western club rendered in BOTH tables
     await expect(page.getByText("Vancouver Whitecaps")).toHaveCount(1);
@@ -112,7 +112,7 @@ test.describe("MLS hub", () => {
   test("each conference ranks its clubs 1..n with no repeats",
     async ({ page }) => {
       await serve(page);
-      await page.goto("/bet-suggester?league=mls");
+      await page.goto("/trivela?league=mls");
       await expect(page.getByText("Nashville SC").first()).toBeVisible();
       const body = (await page.locator("body").innerText())
         .replace(/\s+/g, " ");
@@ -136,7 +136,7 @@ test.describe("MLS hub", () => {
   test("a future matchday is not labelled Today's slate", async ({ page }) => {
     await serve(page, { fixtures: [
       fixture("f1", inDays(3), "Austin FC", "St. Louis CITY")] });
-    await page.goto("/bet-suggester?league=mls");
+    await page.goto("/trivela?league=mls");
     const sec = tonight(page);
     await expect(sec.getByText("Austin FC")).toBeVisible();
     await expect(sec.locator("h3")).toContainText("Next matchday");
@@ -148,7 +148,7 @@ test.describe("MLS hub", () => {
   test("today's fixtures keep the Today's slate heading", async ({ page }) => {
     await serve(page, { fixtures: [
       fixture("f1", new Date().toISOString(), "Austin FC", "St. Louis CITY")] });
-    await page.goto("/bet-suggester?league=mls");
+    await page.goto("/trivela?league=mls");
     const sec = tonight(page);
     await expect(sec.getByText("Austin FC")).toBeVisible();
     await expect(sec.locator("h3")).toContainText("Today's slate");
@@ -161,7 +161,7 @@ test.describe("MLS hub", () => {
       await serve(page, { fixtures: [
         fixture("f1", inDays(3, 12), "Austin FC", "St. Louis CITY"),
         fixture("f2", inDays(3, 13), "LA Galaxy", "Portland Timbers")] });
-      await page.goto("/bet-suggester?league=mls");
+      await page.goto("/trivela?league=mls");
       const sec = tonight(page);
       await expect(sec.getByText("Austin FC")).toBeVisible();
       await expect(sec.getByText("LA Galaxy")).toBeVisible();
@@ -172,7 +172,7 @@ test.describe("MLS hub", () => {
     await serve(page, { fixtures: [
       fixture("f1", inDays(3), "Austin FC", "St. Louis CITY"),
       fixture("f2", inDays(5), "LA Galaxy", "Portland Timbers")] });
-    await page.goto("/bet-suggester?league=mls");
+    await page.goto("/trivela?league=mls");
     const sec = tonight(page);
     await expect(sec.getByText("Austin FC")).toBeVisible();
     await expect(sec.locator("h4")).toHaveCount(2);

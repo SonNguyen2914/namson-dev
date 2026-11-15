@@ -35,7 +35,7 @@ async function openChampionships(page: Page) {
   await routeEight(page);
   await page.route("**/api/championships/board**",
     (r) => r.fulfill(json(withModelMarket(CHAMP_BOARD as never))));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await page.waitForSelector('[data-testid="league-col"][data-league="unl"]');
 }
 

@@ -140,7 +140,7 @@ test.describe("the match-hub panel", () => {
     await analystOn(page);
     await page.route("**/api/analyst/preview**", (r) => r.fulfill(json(preview)));
     await page.route(`**/api/epl/match/${EPL_EVENT}`, (r) => r.fulfill(json(EPL_PAYLOAD)));
-    await page.goto(`/bet-suggester/epl/${EPL_EVENT}`);
+    await page.goto(`/trivela/epl/${EPL_EVENT}`);
     await page.waitForSelector("#markets");
     const panel = page.getByTestId("analyst-panel");
     await expect(panel).toHaveAttribute("data-state", "preview");
@@ -158,7 +158,7 @@ test.describe("the match-hub panel", () => {
     await analystOn(page);
     await page.route("**/api/analyst/preview**", (r) => r.fulfill(json(preview)));
     await page.route(`**/api/epl/match/${EPL_EVENT}`, (r) => r.fulfill(json(EPL_PAYLOAD)));
-    await page.goto(`/bet-suggester/epl/${EPL_EVENT}`);
+    await page.goto(`/trivela/epl/${EPL_EVENT}`);
     await expect(page.getByTestId("analyst-panel")).toHaveAttribute("data-state", "preview");
     await expect(page.getByTestId("analyst-basis")).toHaveCount(0);
   });

@@ -138,7 +138,7 @@ async function open(
   page: import("@playwright/test").Page,
   comp: Comp,
   served: unknown | number,
-  where = "/bet-suggester",
+  where = "/trivela",
 ) {
   /* ORDER MATTERS AND IT IS BACKWARDS. Playwright tries the MOST
      RECENTLY registered handler first, so the catch-all goes on FIRST
@@ -502,7 +502,7 @@ for (const comp of COMPETITIONS) {
     test("...and it is unlit on the board when nothing is in the window",
       async ({ page }) => {
         await open(page, comp, feed(comp.key, LATER),
-                   "/bet-suggester/leagues");
+                   "/trivela/leagues");
         await expect(await settled(page, comp))
           .toHaveAttribute("data-soon", "none");
       });

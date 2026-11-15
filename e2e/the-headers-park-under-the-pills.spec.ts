@@ -415,9 +415,9 @@ test.describe("nothing is done to a board that fits", () => {
         (r) => r.fulfill({ status: 200, contentType: "application/json",
           body: JSON.stringify({ competition: "ucl", axes: null,
             why_not: "no field is fitted for this competition" }) }));
-      await page.goto("/bet-suggester/ucl");
+      await page.goto("/trivela/ucl");
       await expect(page.locator('[data-testid="league-col"]')).toHaveCount(1);
       await page.waitForTimeout(400);
-      await staysSticky(page, "/bet-suggester/ucl");
+      await staysSticky(page, "/trivela/ucl");
     });
 });

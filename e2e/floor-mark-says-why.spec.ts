@@ -260,7 +260,7 @@ async function openBoard(
     ratings === null
       ? r.fulfill(json({ detail: "field unavailable" }, 503))
       : r.fulfill(json(ratings)));
-  await page.goto("/bet-suggester/ucl");
+  await page.goto("/trivela/ucl");
   await expect(page.getByTestId("picker-row").first()).toBeAttached();
   /* THE DAGGERS ARE IN THE CARD'S `#` PANEL since the one-card rule
      (AGENTS.md §8.4, 2026-10-13): the face is the league card's compact

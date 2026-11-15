@@ -1,4 +1,4 @@
-// Leagues Cup — namson.dev/bet-suggester/leagues-cup
+// Leagues Cup — namson.dev/trivela/leagues-cup
 //
 // The competition finished on 2026-09-07: Toluca 2-0 Monterrey. It is
 // archived here, reached from the Archive dropdown at the top-left
@@ -7,7 +7,7 @@
 // whose header records the date each competition's state was CHECKED
 // rather than assumed.
 //
-// THIS IS NOT `/bet-suggester/comp/leagues-cup`, AND BOTH STILL EXIST.
+// THIS IS NOT `/trivela/comp/leagues-cup`, AND BOTH STILL EXIST.
 // That route is the live competition viewer — fixtures, Kalshi markets,
 // a cross-league strength read — and it is still linked from the board's
 // rail. This route is the finished tournament's record: three seasons of
@@ -71,7 +71,7 @@ export default function LeaguesCupArchive() {
       </Head>
       <RouteProgress />
       <TopBar left={<ArchiveMenu current="leagues-cup" />}
-        back={{ href: "/bet-suggester", label: "board" }}
+        back={{ href: "/trivela", label: "board" }}
         title="Leagues Cup" />
 
       <main className="mx-auto max-w-5xl px-5 pb-24 pt-10 sm:pt-14">

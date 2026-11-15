@@ -12,7 +12,7 @@ import { RECORDED } from "./efl-cup-recorded";
 // suite did.
 //
 // ONE COLUMN OR EVERY COLUMN (2026-09-15). This file then hard-coded
-// `/bet-suggester/ucl` and asserted about `ucl` four times. The EFL Cup
+// `/trivela/ucl` and asserted about `ucl` four times. The EFL Cup
 // arrived the same week with three member tiers whose names had never
 // been rendered anywhere — `championship`, `leagueone`, `leaguetwo` —
 // and this guard had nothing to say about it, because it was pointed at

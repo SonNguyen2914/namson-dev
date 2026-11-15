@@ -9,7 +9,7 @@ import { errorStats, noteError, resetErrors } from "../src/lib/analyst/health";
  *
  *   1. "ASK VAR" ON THE BOARD CARD — the four VAR leagues only (epl,
  *      laliga, mls, ligamx), only while VAR is on, linking to
- *      /bet-suggester/var?league=&id= for that card's own event. The
+ *      /trivela/var?league=&id= for that card's own event. The
  *      switch is the one /api/analyst/status read the top bar already
  *      makes, so the board sends it once, however many cards carry it.
  *   2. VAR HEALTH IN THE OPS VIEW — budget, cache hits/misses and errors
@@ -22,7 +22,7 @@ const VAR_LEAGUES = new Set(["epl", "laliga", "mls", "ligamx"]);
 const rows = (BOARD_EIGHT as unknown as { rows: { league: string; event_id: string }[] }).rows;
 
 test.describe("the Ask VAR chip on the board", () => {
-  test("on: every card in a VAR league links to its own match on /bet-suggester/var, and no other card has one",
+  test("on: every card in a VAR league links to its own match on /trivela/var, and no other card has one",
     async ({ page }) => {
       let reads = 0;
       await page.route("**/api/analyst/status", (r) => {
@@ -43,7 +43,7 @@ test.describe("the Ask VAR chip on the board", () => {
         const chip = c.getByTestId("ask-var-chip");
         if (VAR_LEAGUES.has(league)) {
           await expect(chip, `${league} ${id}`).toHaveCount(1);
-          await expect(chip).toHaveAttribute("href", `/bet-suggester/var?league=${league}&id=${id}`);
+          await expect(chip).toHaveAttribute("href", `/trivela/var?league=${league}&id=${id}`);
           await expect(chip).toHaveText(/ask VAR/i);
           withChip += 1;
         } else {

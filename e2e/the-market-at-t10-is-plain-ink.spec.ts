@@ -119,7 +119,7 @@ async function open(page: Page, rows: unknown[]) {
   await page.addInitScript(() => {
     try { window.localStorage.setItem("picker.reviewopen.ucl", "1"); } catch {}
   });
-  await page.goto("/bet-suggester/ucl");
+  await page.goto("/trivela/ucl");
   await expect(page.getByTestId("review-row")).toHaveCount(rows.length);
 }
 

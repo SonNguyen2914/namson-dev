@@ -1,4 +1,4 @@
-// THE EFL CUP BOARD — namson.dev/bet-suggester/efl-cup
+// THE EFL CUP BOARD — namson.dev/trivela/efl-cup
 //
 // The operator asked for the EFL Cup with "exactly every detail of what
 // UCL having, the only difference is the theme color". The Champions
@@ -8,7 +8,7 @@
 // with their reasons. Not a page that looks like the board — the board.
 // A copy would drift from it on the first change made to either.
 //
-// WHY /bet-suggester/efl-cup AND NOT /bet-suggester/eflcup. The slug is
+// WHY /trivela/efl-cup AND NOT /trivela/eflcup. The slug is
 // `eflcup` everywhere a registry speaks (it is the CupSpec key, the
 // column key and the `leagues=` value), and the URL is the one place a
 // human reads it. `/ucl` needed no hyphen because nobody writes "u-c-l".
@@ -48,7 +48,7 @@ export default function EflCupBoard() {
     <PickerBoard
       only={["eflcup"]}
       pageTitle="EFL Cup"
-      backTo={{ href: "/bet-suggester", label: "board" }}
+      backTo={{ href: "/trivela", label: "board" }}
     />
   );
 }

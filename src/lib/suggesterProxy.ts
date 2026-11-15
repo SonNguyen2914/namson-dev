@@ -1,4 +1,4 @@
-// Shared proxy helper for all bet-suggester API routes, and the one
+// Shared proxy helper for all trivela API routes, and the one
 // place the league allowlists are written down.
 //
 // A REACHED BACKEND IS NEVER REPORTED AS AN UNREACHED ONE. Until
@@ -726,7 +726,7 @@ export const LEAGUE_PROXY_WITHHELD: Record<string, Record<string, string>> = {
     "{key}/journal": "the personal journal for one viewer competition, "
       + "with its denominator: entries considered, taken and passed. "
       + "Positions, on a public frontend — the same reason the mls "
-      + "journal is withheld above. src/pages/bet-suggester/leagues.tsx "
+      + "journal is withheld above. src/pages/trivela/leagues.tsx "
       + "already tells the reader the backend still serves it.",
   },
   site: {

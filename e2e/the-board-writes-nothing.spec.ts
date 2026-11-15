@@ -45,11 +45,11 @@ import { HOLDOUT_URL, BOARD_HOLDOUT, UPSTREAM_URL } from "./backend";
 const E2E_DIR = __dirname;
 
 // WHICH NAVIGATIONS ACTUALLY FETCH A BOARD. Two conditions, both read
-// off `src/pages/bet-suggester/index.tsx`, which is the only caller of
+// off `src/pages/trivela/index.tsx`, which is the only caller of
 // `fetchBoard` in the whole app:
 //
-//   1. the pathname is exactly /bet-suggester. A match page under
-//      /bet-suggester/mls/<id>, or /bet-suggester/leagues, fetches none.
+//   1. the pathname is exactly /trivela. A match page under
+//      /trivela/mls/<id>, or /trivela/leagues, fetches none.
 //
 //   2. there is NO `league` query parameter. `?league=<anything>` — an
 //      empty value and a wrong-case "WC26" included — is the legacy
@@ -64,7 +64,7 @@ const E2E_DIR = __dirname;
 // WITH THE HOLD-OUT TAKEN OUT OF THE PATH: the board counter stayed at
 // zero, which is not a hold-out working, it is a probe that never asked
 // for a board. A control that cannot go red measures nothing.
-const BOARD_PATHNAME = "/bet-suggester";
+const BOARD_PATHNAME = "/trivela";
 
 /** Does this query string carry a `league` parameter at all? PRESENCE,
  *  not truthiness — index.tsx is explicit that "?league=" with an empty
@@ -152,7 +152,7 @@ function navTargetIsBoard(
   if (ts.isStringLiteralLike(arg)) {
     text = arg.text;
   } else if (ts.isTemplateExpression(arg)) {
-    // Only the static head is knowable. `/bet-suggester/mls/${id}` is
+    // Only the static head is knowable. `/trivela/mls/${id}` is
     // decided by it; `${base}/x` is not.
     text = arg.head.text || null;
     if (text === "") text = null;
@@ -168,7 +168,7 @@ function navTargetIsBoard(
   const query = withoutHash.includes("?")
     ? withoutHash.slice(withoutHash.indexOf("?") + 1) : "";
   if (hasLeagueParam(query)) return false;  // deep link: redirects, no fetch
-  // A template whose static head stops at "/bet-suggester" may still be
+  // A template whose static head stops at "/trivela" may still be
   // interpolating "?league=..." after it, and this guard cannot know.
   // Unreadable resolves to "reaches the board", as everywhere else here.
   if (ts.isTemplateExpression(arg) && query === "") return true;

@@ -45,7 +45,7 @@ async function openCups(page: Page, board?: unknown) {
   await remember(page, "cups");
   await routeCups(page, board);
   await page.route("**/api/championships/**", (r) => r.fulfill(json(CHAMP_BOARD)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await page.waitForSelector('[data-testid="league-col"]');
 }
 
@@ -207,7 +207,7 @@ test.describe("the same rule on the Leagues tab", () => {
     await remember(page, "leagues");
     await routeEight(page, b);
     await page.route("**/api/championships/**", (r) => r.fulfill(json(CHAMP_BOARD)));
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await page.waitForSelector('[data-testid="league-col"]');
     await expect(col(page, "eredivisie")).toHaveCount(0);
     await expect(page.getByTestId("off-season-line"))

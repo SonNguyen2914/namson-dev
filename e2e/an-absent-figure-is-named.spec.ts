@@ -69,7 +69,7 @@ test.describe("a 200 is not a payload, on the viewer as on the page", () => {
   test("a literal null body is NAMED, not rendered as an absent field",
     async ({ page }) => {
       await serveComp(page, null);
-      await page.goto("/bet-suggester/comp/ucl");
+      await page.goto("/trivela/comp/ucl");
 
       // The page itself still renders — this is about one panel.
       await expect(page.getByText("UEFA Champions League").first())
@@ -109,7 +109,7 @@ test.describe("a 200 is not a payload, on the viewer as on the page", () => {
         },
       },
     });
-    await page.goto("/bet-suggester/comp/ucl");
+    await page.goto("/trivela/comp/ucl");
     await expect(page.getByTestId("field-axes")).toBeVisible();
     await expect(page.getByTestId("field-axes-error")).toHaveCount(0);
   });
@@ -123,7 +123,7 @@ test.describe("a 200 is not a payload, on the viewer as on the page", () => {
           + "competition — that is a gap in the evidence, not a claim "
           + "that its clubs have no rating",
       });
-      await page.goto("/bet-suggester/comp/ucl");
+      await page.goto("/trivela/comp/ucl");
       await expect(page.getByTestId("field-axes-absent")).toBeVisible();
       await expect(page.getByTestId("field-axes-absent"))
         .toContainText("nobody has measured");
@@ -144,7 +144,7 @@ test.describe("a 200 is not a payload, on the viewer as on the page", () => {
     await page.route("**/api/comp/ucl/ratings**", (r) => r.fulfill({
       status: 200, contentType: "text/html", body: "<html>nope</html>",
     }));
-    await page.goto("/bet-suggester/comp/ucl");
+    await page.goto("/trivela/comp/ucl");
     await expect(page.getByTestId("field-axes-error")).toBeVisible();
   });
 });
@@ -206,7 +206,7 @@ async function serveFriendlies(
 
 /** Open the fixture's disclosure so the card body is in the DOM. */
 async function openCard(page: Page) {
-  await page.goto("/bet-suggester/friendlies");
+  await page.goto("/trivela/friendlies");
   const summary = page.locator("details summary").first();
   await expect(summary).toBeVisible();
   await summary.click();
@@ -311,7 +311,7 @@ test.describe("an absent strength read is named", () => {
        grid otherwise carries its own read row and showing both put the
        RAW read beside the CALIBRATED one, both labelled ours. */
     await serveFriendlies(page, undefined, null);
-    await page.goto("/bet-suggester/friendlies");
+    await page.goto("/trivela/friendlies");
     const cell = page.getByTestId("strength-unattached").first();
     await expect(cell).toBeVisible();
     // NAMED, not marked. The old branch returned exactly "—".
@@ -326,7 +326,7 @@ test.describe("an absent strength read is named", () => {
         reason_words: "this name matches more than one club" },
       away: { club: "Kawasaki", rated: true },
     }, null);
-    await page.goto("/bet-suggester/friendlies");
+    await page.goto("/trivela/friendlies");
     await expect(page.getByText("ambiguous name").first()).toBeVisible();
     // and it is NOT the unattached case — the two are kept apart
     await expect(page.getByTestId("strength-unattached")).toHaveCount(0);

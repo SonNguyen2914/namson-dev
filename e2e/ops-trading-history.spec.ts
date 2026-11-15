@@ -31,10 +31,10 @@ async function token(page: Page) {
  *  a history entry behind — the case history.back() used to take) */
 async function fromTheBoard(page: Page, hash = "") {
   await routes(page);
-  await page.goto("/bet-suggester");
-  await expect(page).toHaveURL(/\/bet-suggester$/);
+  await page.goto("/trivela");
+  await expect(page).toHaveURL(/\/trivela$/);
   const origin = new URL(page.url()).origin;
-  await page.goto(`/ops/trading${hash}`, { referer: `${origin}/bet-suggester` });
+  await page.goto(`/ops/trading${hash}`, { referer: `${origin}/trivela` });
   await token(page);
 }
 async function tour(page: Page) {
@@ -48,13 +48,13 @@ async function tour(page: Page) {
 test.describe("leaving the console", () => {
   test("after several views, ← board lands on the board in one click", async ({ page }) => {
     await fromTheBoard(page);
-    expect(await page.evaluate(() => document.referrer)).toContain("/bet-suggester");
+    expect(await page.evaluate(() => document.referrer)).toContain("/trivela");
     const before = await page.evaluate(() => history.length);
     await tour(page);
     // the tour added no history entry
     expect(await page.evaluate(() => history.length)).toBe(before);
-    await page.locator('[data-testid="topbar-left"] a[href="/bet-suggester"]').click();
-    await expect(page).toHaveURL(/\/bet-suggester$/);
+    await page.locator('[data-testid="topbar-left"] a[href="/trivela"]').click();
+    await expect(page).toHaveURL(/\/trivela$/);
     await expect(page.getByTestId("ops-console")).toHaveCount(0);
   });
 
@@ -65,12 +65,12 @@ test.describe("leaving the console", () => {
     await page.getByTestId("rail-learning").click();
     await expect(page.getByTestId("nav-model")).toHaveAttribute("aria-current", "page");
     await page.goBack();
-    await expect(page).toHaveURL(/\/bet-suggester$/);
+    await expect(page).toHaveURL(/\/trivela$/);
   });
 
   test("the BOARD, LEAGUES and FIELD chips go to their pages directly", async ({ page }) => {
-    for (const [href, re] of [["/bet-suggester", /\/bet-suggester$/], ["/bet-suggester/leagues", /\/bet-suggester\/leagues$/],
-      ["/bet-suggester/ratings", /\/bet-suggester\/ratings$/]] as const) {
+    for (const [href, re] of [["/trivela", /\/trivela$/], ["/trivela/leagues", /\/trivela\/leagues$/],
+      ["/trivela/ratings", /\/trivela\/ratings$/]] as const) {
       await fromTheBoard(page);
       await tour(page);
       await page.locator(`header nav a[href="${href}"]`).first().click();

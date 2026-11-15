@@ -140,7 +140,7 @@ async function open(page: Page, opts: {
     opts.ratingsStatus ?? 200)));
   await page.route("**/api/comp/*/fixtures**", (r) => r.abort());
   await page.route("**/api/bet-suggester/**", (r) => r.abort());
-  await page.goto("/bet-suggester/ucl");
+  await page.goto("/trivela/ucl");
 }
 
 const column = (page: Page) =>

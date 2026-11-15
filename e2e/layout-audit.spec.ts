@@ -8,19 +8,19 @@ import {
    list of them.
  *
  * It was one, and the list said so out loud: "ADDED 2026-09-08, and it
- * was missing from the day it shipped" over /bet-suggester/ucl, then
+ * was missing from the day it shipped" over /trivela/ucl, then
  * "ADDED 2026-09-09 with the route, not after it — this list is the
  * hand-typed subset the note above already confesses to". Both notes
  * were right and neither could fix the shape. On 2026-09-15 the EFL
- * Cup shipped a board at /bet-suggester/efl-cup and this sweep never
+ * Cup shipped a board at /trivela/efl-cup and this sweep never
  * saw it, exactly as the Champions League had not been seen the week
  * before.
  *
  * THE COMPETITION HALF IS DERIVED NOW, from the app's own two
  * declarations of which competitions have a page: LIVE_COMPETITIONS in
  * the chip rail and ARCHIVE in the menu. Deriving it added two routes
- * nobody had listed — /bet-suggester/efl-cup, and
- * /bet-suggester/comp/asean, which has been in the Archive dropdown
+ * nobody had listed — /trivela/efl-cup, and
+ * /trivela/comp/asean, which has been in the Archive dropdown
  * since 2026-08-30 and had never been walked at any width.
  *
  * THE REST ARE STILL DECLARED, because they are not competitions and
@@ -31,9 +31,9 @@ import {
  * The count is asserted below, so a competition joining either registry
  * changes what this walks and says so. */
 const STATIC_ROUTES = [
-  "/", "/bet-suggester", "/bet-suggester/leagues", "/bet-suggester/bots",
-  "/bet-suggester/friendlies",
-  "/bet-suggester/ratings", "/ops/trading",
+  "/", "/trivela", "/trivela/leagues", "/trivela/bots",
+  "/trivela/friendlies",
+  "/trivela/ratings", "/ops/trading",
 ];
 
 const ROUTES = [...STATIC_ROUTES, ...COMPETITION_PAGES];
@@ -168,7 +168,7 @@ test("no route scrolls sideways, hides a sticky header, or cuts text",
          sweep must not go red for one. Every route here is walked
          UNMOCKED — that is the point, it is the real chrome — so they
          reach a live backend, and on 2026-09-08 a slow
-         /bet-suggester/friendlies ate the whole test's budget and this
+         /trivela/friendlies ate the whole test's budget and this
          spec failed for a reason it does not measure. A guard that goes
          red for something it is not about teaches its reader to ignore
          it, which costs more than the defect it would have caught.

@@ -1,4 +1,4 @@
-// THE FIELD — namson.dev/bet-suggester/ratings
+// THE FIELD — namson.dev/trivela/ratings
 //
 // "create a stat page on the web, put in on the left upper side of the
 //  web for me to check rankings and tier rankings anytime i need"
@@ -309,8 +309,8 @@ export default function FieldPage() {
       <RouteProgress />
       <TopBar left={<ArchiveMenu />} title="the field">
         <CompRail />
-        <NavChip href="/bet-suggester">board</NavChip>
-        <NavChip href="/bet-suggester/ratings" active>ratings</NavChip>
+        <NavChip href="/trivela">board</NavChip>
+        <NavChip href="/trivela/ratings" active>ratings</NavChip>
       </TopBar>
 
       <main className="mx-auto max-w-5xl px-5 pb-24 pt-8">

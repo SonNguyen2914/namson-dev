@@ -297,7 +297,7 @@ export default function AllFriendlies() {
                   </p>
                 )}
                 <MarketVsRead d={r.market_vs_read} s={r.strength} />
-                <Link href={`/bet-suggester/friendlies/${r.fixture_id}`}
+                <Link href={`/trivela/friendlies/${r.fixture_id}`}
                   className="mt-3 inline-block font-mono text-[10px] uppercase tracking-wide text-accent hover:underline">
                   full match page →
                 </Link>

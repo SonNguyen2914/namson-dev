@@ -26,7 +26,7 @@ import { COMPETITION_PAGES } from "./liveCompetitions";
 const PAGES = join(__dirname, "..", "src", "pages");
 
 /** An address no page answers, for the 404 page. */
-export const NOWHERE = "/bet-suggester/no-such-page-touch-floor";
+export const NOWHERE = "/trivela/no-such-page-touch-floor";
 
 /** A fixture id for a match page that has no registry to draw from. */
 const SAMPLE_ID = "761439";
@@ -70,13 +70,13 @@ export function pageRoutes(): PageRoute[] {
  *  this, and the count is what makes a walk that silently shrinks — a
  *  directory renamed, a filter too eager — fail instead of covering
  *  less. A page added or removed moves this number on purpose. */
-// 27 -> 49 on 2026-10-13: the 22 cup match hubs (bet-suggester/<cup>/
+// 27 -> 49 on 2026-10-13: the 22 cup match hubs (trivela/<cup>/
 // [eventId], Son: "all matches should have a match hub").
 // 49 -> 48 on 2026-10-22: the hunter page removed (backend cleanup C2/C3).
-// 48 -> 49 on 2026-10-24: /bet-suggester/analyst, the Trivela Analyst's
-// own page (src/pages/bet-suggester/analyst.tsx; derived above, so the
+// 48 -> 49 on 2026-10-24: /trivela/analyst, the Trivela Analyst's
+// own page (src/pages/trivela/analyst.tsx; derived above, so the
 // route list needs no hand edit).
 // 49 -> 49 on 2026-10-25: renamed to Trivela VAR — analyst.tsx became
-// src/pages/bet-suggester/var.tsx. /bet-suggester/analyst is now a
+// src/pages/trivela/var.tsx. /trivela/analyst is now a
 // next.config.ts redirect, not a page, so the count does not move.
 export const PAGE_COUNT = 49;

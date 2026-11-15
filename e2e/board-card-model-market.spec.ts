@@ -280,7 +280,7 @@ test("the Championships board's cards carry the same bottom", async ({ page }) =
   await routeEight(page);
   const champ = withModelMarket(CHAMP_BOARD as never, {}) as never;
   await page.route("**/api/championships/board**", (r) => r.fulfill(json(champ)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await page.waitForSelector('[data-testid="league-col"][data-league="unl"]');
   for (const lg of ["unl", "cnl", "afcon"]) {
     const col = page.locator(`[data-testid="league-col"][data-league="${lg}"]`);

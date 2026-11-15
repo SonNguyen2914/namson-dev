@@ -10,7 +10,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 # Trivela — frontend rules
 
 This repo is **namson.dev**, Son's personal site. It also serves the
-Trivela bet-suggester at `/bet-suggester`. Both things are true; changes
+Trivela bet suggester at `/trivela` (it was `/bet-suggester` until
+2026-11-14; the old paths redirect). Both things are true; changes
 here can affect a portfolio site as well as a research platform.
 
 Shared cross-agent rules (evidence classes, the real-money lock, WC26

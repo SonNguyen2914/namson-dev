@@ -126,7 +126,7 @@ test.describe("La Liga hub", () => {
       // and this test is what makes the file's header a construction
       // rather than a sentence.
       const escaped = await serve(page);
-      await page.goto("/bet-suggester?league=laliga");
+      await page.goto("/trivela?league=laliga");
       await expect(page.getByText("Alavés").first()).toBeVisible();
       expect(escaped, "these La Liga reads left for the live backend — "
         + "record them here, or this spec is only hermetic on a good day")
@@ -136,7 +136,7 @@ test.describe("La Liga hub", () => {
   test("preseason standings show the explicit reason, never a zero table",
     async ({ page }) => {
       await serve(page);
-      await page.goto("/bet-suggester?league=laliga");
+      await page.goto("/trivela?league=laliga");
       await expect(
         page.getByText(/no standings yet.*season kicks off/i)
       ).toBeVisible();
@@ -150,7 +150,7 @@ test.describe("La Liga hub", () => {
   test("dark model: no odds chip, the dark state is stated, no bare TAKE",
     async ({ page }) => {
       await serve(page);
-      await page.goto("/bet-suggester?league=laliga");
+      await page.goto("/trivela?league=laliga");
       await expect(page.getByText("Alavés").first()).toBeVisible();
       // the dark posture is stated in words on the markets section
       await expect(page.getByText(/laliga-2026-v0 is\s+dark/i))
@@ -164,7 +164,7 @@ test.describe("La Liga hub", () => {
   test("books empty state carries the probe's verified answer",
     async ({ page }) => {
       await serve(page);
-      await page.goto("/bet-suggester?league=laliga");
+      await page.goto("/trivela?league=laliga");
       await expect(
         page.getByText(/kalshi lists the KXLALIGAGAME series but no 2026-27 events yet/i)
       ).toBeVisible();
@@ -173,7 +173,7 @@ test.describe("La Liga hub", () => {
   test("fixture card shows WHEN it kicks off and accented names intact",
     async ({ page }) => {
       await serve(page);
-      await page.goto("/bet-suggester?league=laliga");
+      await page.goto("/trivela?league=laliga");
       await expect(page.getByText("Alavés").first()).toBeVisible();
       // the derived kickoff (Aug 15/16 depending on viewer TZ), never
       // the provider's bare detail string
@@ -204,7 +204,7 @@ test.describe("La Liga match page", () => {
       await page.route("**/api/laliga/match/401882926", (r) =>
         r.fulfill({ status: 200, contentType: "application/json",
                     body: JSON.stringify(MATCH) }));
-      await page.goto("/bet-suggester/laliga/401882926");
+      await page.goto("/trivela/laliga/401882926");
       await expect(
         page.getByText(/dark — no approval, no prediction/i)
       ).toBeVisible();

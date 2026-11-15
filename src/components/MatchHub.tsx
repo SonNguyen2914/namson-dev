@@ -508,7 +508,7 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
       </title></Head>
 
       <TopBar back={cfg.back ?? {
-          href: `/bet-suggester/leagues?league=${cfg.boardQuery}`,
+          href: `/trivela/leagues?league=${cfg.boardQuery}`,
           label: cfg.boardLabel }}
         title={m ? `${m.home.abbrev} vs ${m.away.abbrev}` : cfg.tag}>
         {live && (

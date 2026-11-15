@@ -50,7 +50,7 @@ async function remember(page: Page, mode: string) {
 test.describe("the board's three tabs", () => {
   test("the switch reads Leagues | Cups | Nations", async ({ page }) => {
     await routeAll(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     const group = page.getByRole("group", { name: "which board this page shows" });
     await expect(group.getByRole("button")).toHaveText(["Leagues", "Cups", "Nations"]);
     await expect(group.getByRole("button", { name: "Championships" })).toHaveCount(0);
@@ -60,7 +60,7 @@ test.describe("the board's three tabs", () => {
     await page.clock.install({ time: new Date(CHAMP_CLOCK) });
     await remember(page, "championships");
     const calls = await routeAll(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await page.waitForSelector('[data-testid="league-col"][data-league="unl"]');
     await expect(page.getByTestId("board-mode-nations")).toHaveAttribute("aria-pressed", "true");
     expect(calls.board).toBe(0);
@@ -70,7 +70,7 @@ test.describe("the board's three tabs", () => {
     await page.clock.install({ time: new Date(CHAMP_CLOCK) });
     await remember(page, "nations");
     await routeAll(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await page.waitForSelector('[data-testid="league-col"][data-league="afcon"]');
     await expect(page.getByText("AFCON Qualifiers").first()).toBeAttached();
     await expect(page.getByText("Africa Cup of Nations", { exact: true })).toHaveCount(0);
@@ -96,7 +96,7 @@ test.describe("the Cups tab is the board (2026-10-12)", () => {
     const seen = watch(page);
     await routeCups(page);
     await page.route("**/api/championships/**", (r) => r.fulfill(json(CHAMP_BOARD)));
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await page.waitForSelector('[data-testid="league-col"][data-league="ucl"]');
     return seen;
   }
@@ -165,7 +165,7 @@ test.describe("the Cups tab is the board (2026-10-12)", () => {
       await expect(line).toHaveText("Off season · Leagues Cup \u2014 date not announced");
       // its pages stay reachable from the line
       await expect(line.getByRole("link", { name: "Leagues Cup \u2014 date not announced" }))
-        .toHaveAttribute("href", "/bet-suggester/comp/leagues-cup");
+        .toHaveAttribute("href", "/trivela/comp/leagues-cup");
     });
 
   test("a cup with nothing to draw cannot be drawn, and asks for nothing",
@@ -206,7 +206,7 @@ test.describe("the Cups tab is the board (2026-10-12)", () => {
       await page.route("**/api/picker/**", (r) => r.fulfill({
         status: 422, contentType: "application/json",
         body: JSON.stringify({ detail: "not a board competition: ucl" }) }));
-      await page.goto("/bet-suggester");
+      await page.goto("/trivela");
       await expect(page.getByTestId("board-error")).toBeVisible();
       await expect(page.locator('[data-testid="picker-row"]')).toHaveCount(0);
     });
@@ -236,7 +236,7 @@ test.describe("cup ties leave the league columns", () => {
   test("a folded cup tie is not drawn in the league column", async ({ page }) => {
     const { b, epl } = withFoldedTie();
     await routeAll(page, b);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await page.waitForSelector('[data-testid="league-col"]');
     await expect(page.locator('[data-testid="picker-row"][data-event="999000111"]')).toHaveCount(0);
     await expect(page.locator(`[data-testid="picker-row"][data-event="${epl.event_id}"]`).first())
@@ -246,7 +246,7 @@ test.describe("cup ties leave the league columns", () => {
 
   test("with no cup tie on the board, the note is absent, not '0'", async ({ page }) => {
     await routeAll(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await page.waitForSelector('[data-testid="league-col"]');
     await expect(page.getByTestId("cup-ties-left")).toHaveCount(0);
   });
@@ -260,7 +260,7 @@ for (const width of [1440, 390]) {
       await page.clock.install({ time: new Date(CUPS_CLOCK) });
       await remember(page, "cups");
       await routeCups(page);
-      await page.goto("/bet-suggester");
+      await page.goto("/trivela");
       await page.waitForSelector('[data-testid="league-col"]');
       const over = await page.evaluate(() =>
         document.documentElement.scrollWidth - document.documentElement.clientWidth);

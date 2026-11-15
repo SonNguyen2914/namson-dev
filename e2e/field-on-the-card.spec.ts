@@ -366,7 +366,7 @@ async function openBoard(page: import("@playwright/test").Page,
   await page.route("**/api/comp/*/ratings", (r) =>
     r.fulfill(json(status === 200 ? ratings : { detail: "field unavailable" },
                    status)));
-  await page.goto("/bet-suggester/ucl");
+  await page.goto("/trivela/ucl");
   await expect(page.getByTestId("picker-row").first()).toBeAttached();
 }
 
@@ -689,7 +689,7 @@ test("when the board serves its OWN field block, that block wins — and "
     await page.route("**/api/picker/board**", (r) => r.fulfill(json(board)));
     await page.route("**/api/picker/review**", (r) => r.fulfill(json(review)));
     await page.route("**/api/comp/*/ratings", (r) => r.fulfill(json(RATINGS)));
-    await page.goto("/bet-suggester/ucl");
+    await page.goto("/trivela/ucl");
     const c = card(page, "ucl-1");
     await expect(c.getByTestId("rank-pair")).toHaveText("#7 v #33");
     // the block's shape, not the row's, and not the ratings join's
@@ -1203,7 +1203,7 @@ test("the link to it sits in the TOP-LEFT of every page that carries the "
     // sentence above was right and stopped one route short of its own
     // reasoning. The other nine each fetch their own live data through
     // the proxy, none of which this test reads: on run 35793175865 the
-    // walk reached `/bet-suggester/bots` with its 90s budget already
+    // walk reached `/trivela/bots` with its 90s budget already
     // spent on the routes before it, died inside `page.goto`, and
     // reported THE NAV LINK as missing from a page it never rendered.
     //
@@ -1234,21 +1234,21 @@ test("the link to it sits in the TOP-LEFT of every page that carries the "
     }));
     await routeEight(page);
     const routes = [
-      "/bet-suggester",
-      "/bet-suggester/ucl",
-      "/bet-suggester/ratings",
-      "/bet-suggester/leagues",
-      "/bet-suggester/bots",
-      "/bet-suggester/friendlies",
-      "/bet-suggester/wc26",
-      "/bet-suggester/leagues-cup",
-      "/bet-suggester/comp/ucl",
+      "/trivela",
+      "/trivela/ucl",
+      "/trivela/ratings",
+      "/trivela/leagues",
+      "/trivela/bots",
+      "/trivela/friendlies",
+      "/trivela/wc26",
+      "/trivela/leagues-cup",
+      "/trivela/comp/ucl",
     ];
     /* `domcontentloaded`, NOT `load`, and the distinction is the whole
        reason this went red on CI while passing locally. The claim here
        is about the CHROME — a link that ships with the shell of every
        page. Waiting for `load` waits for every image and deferred asset
-       on the route as well, so `/bet-suggester/bots` (the twelve-bot
+       on the route as well, so `/trivela/bots` (the twelve-bot
        leaderboard) blew the 45s budget on a slower runner and the test
        failed for page weight, which is a thing it does not test.
 
@@ -1268,7 +1268,7 @@ test("the link to it sits in the TOP-LEFT of every page that carries the "
                            timeout: NAV_MS });
       const link = page.getByTestId("field-link");
       await expect(link, `no field link on ${r}`).toHaveCount(1);
-      await expect(link).toHaveAttribute("href", "/bet-suggester/ratings");
+      await expect(link).toHaveAttribute("href", "/trivela/ratings");
       /* UPPER LEFT, MEASURED rather than asserted from the markup order:
          it is inside the header, and it is the leftmost interactive
          thing in it. */
@@ -1286,7 +1286,7 @@ test("it names a page and nothing else — no count, no glow, no state",
     /* A chip in this bar that changed with the data would become a
        signal about what is worth looking at, which is a thing this
        surface never says. */
-    await page.goto("/bet-suggester/ratings");
+    await page.goto("/trivela/ratings");
     const link = page.getByTestId("field-link");
     await expect(link).toHaveAttribute("aria-current", "page");
     await expect(link).not.toHaveAttribute("data-soon", /.*/);
@@ -1374,7 +1374,7 @@ const DIM_WORD: Record<string, string> = {
  *  is served; an unmatched `/api/` answers 599 rather than reaching a
  *  live backend.
  *
- *  WHY /bet-suggester/ucl AND NOT THE LANDING PAGE (2026-10-12). Until
+ *  WHY /trivela/ucl AND NOT THE LANDING PAGE (2026-10-12). Until
  *  then these cards were drawn on the landing page, folded into the MLS
  *  and Liga MX columns. Son's 2026-10-07 decision took cup ties OUT of
  *  the league columns (e2e/board-cups-tab.spec.ts), so the landing page
@@ -1401,7 +1401,7 @@ async function openFolded(page: import("@playwright/test").Page,
   await page.route("**/api/comp/**", (r) => r.fulfill(json({ fixtures: [] })));
   await page.route("**/api/bet-suggester/watched-strip**", (r) =>
     r.fulfill(json(STRIP_EMPTY)));
-  await page.goto("/bet-suggester/ucl");
+  await page.goto("/trivela/ucl");
   await expect(page.getByTestId("picker-row").first()).toBeVisible();
 }
 

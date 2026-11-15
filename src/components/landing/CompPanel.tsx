@@ -51,7 +51,7 @@ function inplayOf(c: Comp): ReactNode {
 function Foot({ what }: { what: string }) {
   return (
     <div className={s.cpFoot}>
-      <Link className={s.go} href="/bet-suggester">
+      <Link className={s.go} href="/trivela">
         Open the board <span aria-hidden>→</span>
         <span className="sr-only"> ({what})</span>
       </Link>

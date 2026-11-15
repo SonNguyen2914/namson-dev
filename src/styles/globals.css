@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ================================================================
-   Design tokens — bet-suggester visual system (July 2026 redesign)
+   Design tokens — trivela visual system (July 2026 redesign)
    Direction: Apple-grade showcase at the top of the page, Linear-
    grade calm density in the tool zone. Near-black, one accent,
    gray does the talking, white is scarce. Semantic colors are
@@ -509,7 +509,7 @@ body {
   overflow-x: clip;
 }
 
-/* The whole app is the near-black bet-suggester. Give the ROOT element
+/* The whole app is the near-black trivela. Give the ROOT element
    the same ground: once html has its own background it (not body's
    propagated --background, which is WHITE under a light
    prefers-color-scheme) paints the canvas, so overscroll rubber-banding

@@ -35,7 +35,7 @@ async function openHub(page: Page, body: unknown = MLS_HUB_PAYLOAD) {
     { error: "no live-plane fixture in this recorded world" }, 404)));
   await page.route(`**/api/mls/match/${MLS_HUB_EVENT}`,
     (r) => r.fulfill(json(body)));
-  await page.goto(`/bet-suggester/mls/${MLS_HUB_EVENT}`);
+  await page.goto(`/trivela/mls/${MLS_HUB_EVENT}`);
 }
 
 const scoutingButton = (page: Page) =>

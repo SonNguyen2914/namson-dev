@@ -29,7 +29,7 @@ async function openCard(page: Page, s: Source) {
   await routeCups(page);
   if (s.board) await page.route("**/api/picker/board**", (r) => r.fulfill(json(s.board)));
   await page.route("**/api/championships/**", (r) => r.fulfill(json(CHAMP_BOARD)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   const sel = s.event
     ? `[data-testid="picker-row"][data-event="${s.event}"]`
     : '[data-testid="picker-row"]';

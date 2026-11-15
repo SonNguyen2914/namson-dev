@@ -234,7 +234,7 @@ async function open(page: import("@playwright/test").Page,
   await page.route("**/api/picker/board**", (r) => r.fulfill(json(board)));
   await page.route("**/api/picker/review**", (r) =>
     r.fulfill(json(review, reviewStatus)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
 }
 
 const col = (page: import("@playwright/test").Page, slug: string) =>

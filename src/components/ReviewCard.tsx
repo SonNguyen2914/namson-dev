@@ -1125,7 +1125,7 @@ export function ReviewCard({ row, rank }: { row: ReviewRow; rank: number }) {
       {/* The way IN — the same affordance the upcoming card has, into the
           same id space. A finished match you cannot open is a line of text. */}
       {/* THROUGH `rowHref`, THE BOARD CARD'S OWN ROUTE (audit F2, 2026-09-25).
-          This built `/bet-suggester/<league>/<event_id>` itself, so every
+          This built `/trivela/<league>/<event_id>` itself, so every
           finished Champions League, Leagues Cup and hub-less league match
           opened the 404. A match with no page to open is drawn unlinked,
           with the reason on hover. */}

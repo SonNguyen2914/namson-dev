@@ -33,7 +33,7 @@ async function openWith(page: Page, refusals: unknown[]) {
   });
   await routeCups(page, board);
   await page.route("**/api/championships/**", (r) => r.fulfill(json(CHAMP_BOARD)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await page.waitForSelector('[data-testid="league-col"]');
 }
 

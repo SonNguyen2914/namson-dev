@@ -44,7 +44,7 @@ async function serve(page: Page, leagues: unknown, cups: unknown,
 test("the league view says as of which match, and that it is live", async ({ page }) => {
   await serve(page, { ...clone(LEAGUES), ratings_as_of: LIVE },
               clone(CUPS), clone(NATIONS));
-  await page.goto("/bet-suggester/ratings");
+  await page.goto("/trivela/ratings");
   await expect(page.getByTestId("field-table").first()).toBeVisible();
   const line = page.getByTestId("ratings-as-of");
   await expect(line).toHaveText("as of 12 Oct 2026 · live");
@@ -56,7 +56,7 @@ test("the league view says as of which match, and that it is live", async ({ pag
 test("a frozen view says frozen, and why, on hover", async ({ page }) => {
   await serve(page, clone(LEAGUES),
               { ...clone(CUPS), ratings_as_of: FROZEN }, clone(NATIONS));
-  await page.goto("/bet-suggester/ratings");
+  await page.goto("/trivela/ratings");
   await expect(page.getByTestId("field-table").first()).toBeVisible();
   await page.getByTestId("mode-cups").click();
   const line = page.getByTestId("ratings-as-of");
@@ -68,7 +68,7 @@ test("no block, no label — never a guessed date", async ({ page }) => {
   const leagues = clone(LEAGUES) as Record<string, unknown>;
   delete leagues.ratings_as_of;
   await serve(page, leagues, clone(CUPS), clone(NATIONS));
-  await page.goto("/bet-suggester/ratings");
+  await page.goto("/trivela/ratings");
   await expect(page.getByTestId("field-table").first()).toBeVisible();
   await expect(page.getByTestId("ratings-as-of")).toHaveCount(0);
 });

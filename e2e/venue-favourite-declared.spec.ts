@@ -179,7 +179,7 @@ async function open(page: import("@playwright/test").Page,
   await page.route("**/api/picker/board**", (r) => r.fulfill(json(board)));
   await page.route("**/api/picker/review**", (r) =>
     r.fulfill(json(EMPTY_REVIEW)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
 }
 
 const card = (page: import("@playwright/test").Page, event: string) =>

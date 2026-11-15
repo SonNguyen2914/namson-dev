@@ -58,7 +58,7 @@ async function openChampionships(page: Page, review: unknown) {
     (r) => r.fulfill(json(CHAMP_BOARD)));
   await page.route("**/api/championships/review**",
     (r) => r.fulfill(json(review)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await page.waitForSelector('[data-testid="league-col"][data-league="unl"]');
   return errors;
 }

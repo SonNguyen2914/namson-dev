@@ -265,12 +265,12 @@ async function viewer(page: Page, ratings: unknown) {
         why: "a cup with qualifying rounds", note: null } })));
   await page.route("**/api/comp/ucl/markets**", (r) =>
     r.fulfill(json({ markets: [] })));
-  await page.goto("/bet-suggester/comp/ucl");
+  await page.goto("/trivela/comp/ucl");
 }
 
 test.describe("a narrow bar is not confidence", () => {
   /* RETIRED 2026-09-23: "the field page: every zero-bridge row names its
-     absence". `/bet-suggester/ratings` no longer renders `FieldAxes` —
+     absence". `/trivela/ratings` no longer renders `FieldAxes` —
      it was rebuilt to the operator's approved design over
      `/api/field/leagues` — so this was the test below run a second time
      against a component the page no longer holds. The rule it guarded
@@ -289,7 +289,7 @@ test.describe("a narrow bar is not confidence", () => {
             why: "a cup with qualifying rounds", note: null } })));
       await page.route("**/api/comp/ucl/markets**", (r) =>
         r.fulfill(json({ markets: [] })));
-      await page.goto("/bet-suggester/comp/ucl");
+      await page.goto("/trivela/comp/ucl");
       await expect(page.getByTestId("field-axes")).toBeVisible();
       await everyRowOnEveryAxis(page);
     });

@@ -10,7 +10,7 @@ import { localDay as localDayOf } from "../src/lib/matchday";
    (`PICKER_COLUMN_ORDER`) with what the payload declares. */
 import { boardColumns } from "../src/lib/pickerApi";
 
-// The picker board (/bet-suggester) and the archive dropdown.
+// The picker board (/trivela) and the archive dropdown.
 //
 // Hermetic: every test below serves a RECORDED shape of
 // GET /api/picker/board, so none of it depends on the weather. The one
@@ -283,7 +283,7 @@ async function open(page: import("@playwright/test").Page,
       catch { /* a spec that disables storage still gets the default */ }
     }
   }, TAIL_LEAGUES);
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
 }
 
 /** Navigate WITHOUT seeding the tail open — for the tests that are about
@@ -293,7 +293,7 @@ async function openShut(page: import("@playwright/test").Page,
                         reviewBody: unknown = REVIEW) {
   await serveBoard(page, body, 200);
   await serveReview(page, reviewBody, 200);
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
 }
 
 const col = (page: import("@playwright/test").Page, slug: string) =>
@@ -1047,7 +1047,7 @@ test("a card's header is the way into its match page", async ({ page }) => {
   await open(page);
   await page.getByRole("link", { name: /open Barcelona versus Rayo Vallecano/i })
     .click();
-  await expect(page).toHaveURL(/\/bet-suggester\/laliga\/401882903/);
+  await expect(page).toHaveURL(/\/trivela\/laliga\/401882903/);
 });
 
 // ------------------------------------------------------- archive menu
@@ -1107,7 +1107,7 @@ test("WC26 is reachable from the dropdown and nowhere in the carousel",
     await open(page);
     await page.getByRole("button", { name: /archive/i }).click();
     await page.getByRole("menuitem", { name: /World Cup 26/ }).click();
-    await expect(page).toHaveURL(/\/bet-suggester\/wc26$/);
+    await expect(page).toHaveURL(/\/trivela\/wc26$/);
     await expect(page.getByRole("heading", { name: /World Cup 26/ }).first())
       .toBeVisible();
   });
@@ -1116,7 +1116,7 @@ test("ASEAN is reachable from the dropdown", async ({ page }) => {
   await open(page);
   await page.getByRole("button", { name: /archive/i }).click();
   await page.getByRole("menuitem", { name: /ASEAN Championship/ }).click();
-  await expect(page).toHaveURL(/\/bet-suggester\/comp\/asean$/);
+  await expect(page).toHaveURL(/\/trivela\/comp\/asean$/);
 });
 
 // FILED IN THE ARCHIVE, AND NOWHERE ELSE (2026-09-09).
@@ -1144,7 +1144,7 @@ test("the Leagues Cup archive is reachable from the dropdown, and is NOT "
   ).toHaveCount(0);
   await page.getByRole("button", { name: /archive/i }).click();
   await page.getByRole("menuitem", { name: /Leagues Cup/ }).click();
-  await expect(page).toHaveURL(/\/bet-suggester\/leagues-cup$/);
+  await expect(page).toHaveURL(/\/trivela\/leagues-cup$/);
   await expect(page.getByRole("heading", { name: "Leagues Cup", level: 1 }))
     .toBeVisible();
 });
@@ -1153,7 +1153,7 @@ test("the Leagues Cup archive is reachable from the dropdown, and is NOT "
 
 test("the carousel is the four live leagues, and lands on MLS",
   async ({ page }) => {
-    await page.goto("/bet-suggester/leagues");
+    await page.goto("/trivela/leagues");
     // four dots, four leagues — WC26 is not among them
     await expect(page.getByRole("button", { name: /^switch to /i }))
       .toHaveCount(4);
@@ -1164,20 +1164,20 @@ test("the carousel is the four live leagues, and lands on MLS",
   });
 
 test("an old ?league= deep link still lands on its league", async ({ page }) => {
-  await page.goto("/bet-suggester?league=laliga");
-  await expect(page).toHaveURL(/\/bet-suggester\/leagues\?league=laliga/);
+  await page.goto("/trivela?league=laliga");
+  await expect(page).toHaveURL(/\/trivela\/leagues\?league=laliga/);
   await expect(page.getByRole("heading", { name: "La Liga" }).first())
     .toBeVisible();
 });
 
 test("an old ?league=wc26 link lands on the archive page, not on a league",
   async ({ page }) => {
-    await page.goto("/bet-suggester?league=wc26");
+    await page.goto("/trivela?league=wc26");
     // Next carries the source query through a config redirect, so the
-    // landing URL is /bet-suggester/wc26?league=wc26. Harmless — the
+    // landing URL is /trivela/wc26?league=wc26. Harmless — the
     // archive page reads no query — but the PATH is the claim, so match
     // the path and let the leftover param be.
-    await expect(page).toHaveURL(/\/bet-suggester\/wc26(\?|$)/);
+    await expect(page).toHaveURL(/\/trivela\/wc26(\?|$)/);
     await expect(page.getByRole("heading", { name: /World Cup 26/ }).first())
       .toBeVisible();
   });
@@ -1204,7 +1204,7 @@ test("the site root is TRIVELA's home page, and it leads to the board",
     await expect(page.getByRole("heading", { level: 1 }))
       .toHaveText(/every match,\s*made readable/i);
     const cta = page.getByTestId("landing-cta");
-    await expect(cta).toHaveAttribute("href", "/bet-suggester");
+    await expect(cta).toHaveAttribute("href", "/trivela");
     // the model numbers on it travel with the board's own label
     await expect(page.getByText("shadow · not advice").first()).toBeVisible();
     const body = (await page.textContent("body")) || "";
@@ -2417,7 +2417,7 @@ test("both windows open at 8 days, asked for once each, with no control to "
         catch { /* default is closed */ }
       }
     }, TAIL_LEAGUES);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await expect(page.getByTestId("review-row").first()).toBeVisible();
     expect(asked, "the tail opens at 8 days, matching the forward window")
       .toEqual(["8"]);
@@ -2451,7 +2451,7 @@ test("a finished card is the way back into its match page", async ({ page }) => 
   await open(page);
   await page.getByRole("link",
     { name: /review Sporting Kansas City versus Vancouver Whitecaps/i }).click();
-  await expect(page).toHaveURL(/\/bet-suggester\/mls\/761762/);
+  await expect(page).toHaveURL(/\/trivela\/mls\/761762/);
 });
 
 test("the finished tail keeps no score of its own", async ({ page }) => {

@@ -26,8 +26,8 @@
 // FINISHED and it is filed. That is the whole test this list applies,
 // and the answer changed because the world did.
 //
-// It goes to `/bet-suggester/leagues-cup`, its own archive page, and NOT
-// to `/bet-suggester/comp/leagues-cup` the way ASEAN points at its
+// It goes to `/trivela/leagues-cup`, its own archive page, and NOT
+// to `/trivela/comp/leagues-cup` the way ASEAN points at its
 // viewer. Three seasons of bracket do not fit a fixtures-and-markets
 // viewer, and that viewer is still linked from the board's rail. Filing
 // the competition did not retire the route.
@@ -78,19 +78,19 @@ export type ArchiveEntry = {
 export const ARCHIVE: ArchiveEntry[] = [
   {
     key: "wc26",
-    href: "/bet-suggester/wc26",
+    href: "/trivela/wc26",
     label: "World Cup 26",
     meta: "complete · españa",
   },
   {
     key: "asean",
-    href: "/bet-suggester/comp/asean",
+    href: "/trivela/comp/asean",
     label: "ASEAN Championship",
     meta: "complete · viewer",
   },
   {
     key: "leagues-cup",
-    href: "/bet-suggester/leagues-cup",
+    href: "/trivela/leagues-cup",
     label: "Leagues Cup",
     meta: "complete · toluca",
   },

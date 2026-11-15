@@ -73,7 +73,7 @@ async function open(page: import("@playwright/test").Page) {
   await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW)));
   await page.route("**/api/bet-suggester/watched-strip**", (r) =>
     r.fulfill(json({ error: "not found" }, 404)));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await expect(page.getByTestId("picker-row").first()).toBeVisible();
 }
 

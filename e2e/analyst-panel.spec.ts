@@ -20,7 +20,7 @@ async function openEpl(page: Page, preview: unknown, opts: { on?: boolean } = {}
     return r.fulfill(json(preview));
   });
   await page.route(`**/api/epl/match/${EPL_EVENT}`, (r) => r.fulfill(json(EPL_PAYLOAD)));
-  await page.goto(`/bet-suggester/epl/${EPL_EVENT}`);
+  await page.goto(`/trivela/epl/${EPL_EVENT}`);
   await page.waitForSelector("#markets");
   return asked;
 }
@@ -53,7 +53,7 @@ test("the panel renders on an EPL match, collapsed, under the model's 3-way", as
     /Trivela VAR\s*· verified analyst read · shadow · not advice/i);
   await expect(panel.getByTestId("analyst-footer")).toContainText("✓ = VAR-checked against Trivela's data");
   const ask = body.getByRole("link", { name: "ask VAR about this match →" });
-  await expect(ask).toHaveAttribute("href", `/bet-suggester/var?league=epl&id=${EPL_EVENT}`);
+  await expect(ask).toHaveAttribute("href", `/trivela/var?league=epl&id=${EPL_EVENT}`);
 });
 
 test("✓ badges carry their source in a tooltip", async ({ page }) => {
@@ -83,7 +83,7 @@ test("a preview that never answers does not hold the page up", async ({ page }) 
   await analystOn(page);
   await page.route("**/api/analyst/preview**", () => { /* left hanging on purpose */ });
   await page.route(`**/api/epl/match/${EPL_EVENT}`, (r) => r.fulfill(json(EPL_PAYLOAD)));
-  await page.goto(`/bet-suggester/epl/${EPL_EVENT}`);
+  await page.goto(`/trivela/epl/${EPL_EVENT}`);
   await expect(page.locator("#markets")).toContainText(/model outcome probabilities/i);
   await expect(page.getByTestId("analyst-panel")).toHaveAttribute("data-state", "loading");
   await expect(page.getByTestId("analyst-headline")).toContainText("VAR is checking Trivela");
@@ -96,7 +96,7 @@ test("the panel is hidden on a cup match", async ({ page }) => {
   await analystOn(page);
   await page.route("**/api/analyst/preview**", (r) => { asked.push(r.request().url()); return r.fulfill(json({})); });
   await page.route(`**/api/comp/eflcup/match/${EFL_HUB_EVENT}`, (r) => r.fulfill(json(EFL_HUB_PAYLOAD)));
-  await page.goto(`/bet-suggester/eflcup/${EFL_HUB_EVENT}`);
+  await page.goto(`/trivela/eflcup/${EFL_HUB_EVENT}`);
   await page.waitForSelector("#markets");
   await page.waitForTimeout(800);
   await expect(page.getByTestId("analyst-panel")).toHaveCount(0);
@@ -132,7 +132,7 @@ test("a status read that failed is asked again, and the panel comes back", async
   });
   await page.route("**/api/analyst/preview**", async (r) => r.fulfill(json(await previewFor("arsenal-everton"))));
   await page.route(`**/api/epl/match/${EPL_EVENT}`, (r) => r.fulfill(json(EPL_PAYLOAD)));
-  await page.goto(`/bet-suggester/epl/${EPL_EVENT}`);
+  await page.goto(`/trivela/epl/${EPL_EVENT}`);
   await page.waitForSelector("#markets");
   await expect(page.getByTestId("analyst-panel")).toHaveAttribute("data-state", "preview", { timeout: 15_000 });
   expect(statusCalls).toBeGreaterThanOrEqual(2);

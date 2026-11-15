@@ -144,7 +144,7 @@ async function open(page: Page, matches: unknown[]) {
   await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW)));
   await page.route("**/api/bet-suggester/watched-strip**",
     (r) => r.fulfill(json(toV2({ ...ENVELOPE, matches }))));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   // operator-only since audit F4: no token, no strip read, no section
   await armToken(page);
   await page.getByTestId("live-section").waitFor({ timeout: 15_000 });

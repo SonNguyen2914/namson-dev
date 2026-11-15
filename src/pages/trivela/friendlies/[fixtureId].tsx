@@ -450,7 +450,7 @@ export default function FriendlyMatchPage() {
       {/* one expression — next/head drops multi-child <title> at SSR */}
       <Head><title>{`${title} · club friendly · namson.dev`}</title></Head>
       <RouteProgress />
-      <TopBar back={{ href: "/bet-suggester/friendlies", label: "friendlies" }}
+      <TopBar back={{ href: "/trivela/friendlies", label: "friendlies" }}
         title="Club friendly" />
       <main className="mx-auto max-w-2xl px-5 pb-24 pt-10">
         {err && !d && (

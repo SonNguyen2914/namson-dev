@@ -42,7 +42,7 @@ import { CAMPEONES_BOARD } from "./campeones-board";
  * one card per declared column, its `+1` chip, "also in", the same event
  * twice — went with it. Properties 3 and 4 are about the CARD, which is
  * still drawn wherever a cup row has a column of its own, so they run on
- * the narrowed board (`/bet-suggester/ucl`) with the recorded refusal
+ * the narrowed board (`/trivela/ucl`) with the recorded refusal
  * re-columned into that one column; the refusal itself is the
  * recording's.
  *
@@ -107,7 +107,7 @@ async function open(page: import("@playwright/test").Page,
   // backend); answered off, so the bar is the one this spec recorded
   await page.route("**/api/analyst/status", (r) =>
     r.fulfill(json({ enabled: false })));
-  await page.goto(landing ? "/bet-suggester" : "/bet-suggester/ucl");
+  await page.goto(landing ? "/trivela" : "/trivela/ucl");
   // the board has rendered before anything is asserted about it
   await expect(page.getByTestId("picker-row").first()).toBeVisible();
   return () => stray;

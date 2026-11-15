@@ -110,7 +110,7 @@ async function openHub(page: Page,
   await page.route(`**/api/epl/match/${EVENT}`, (r) => r.fulfill(json(MATCH)));
   await page.route(`**/api/live-performance/${EVENT}`, (r) =>
     r.fulfill(json(answer.body, answer.status)));
-  await page.goto(`/bet-suggester/epl/${EVENT}`);
+  await page.goto(`/trivela/epl/${EVENT}`);
   const block = page.getByTestId("ratings-block");
   await expect(block).toBeVisible();
   return { block, errors };
@@ -277,7 +277,7 @@ test("the block is not on a hub before kickoff", async ({ page }) => {
     asked = true;
     return r.fulfill(json({}, 404));
   });
-  await page.goto(`/bet-suggester/epl/${EVENT}`);
+  await page.goto(`/trivela/epl/${EVENT}`);
   await expect(page.getByText("Arsenal").first()).toBeVisible();
   await expect(page.getByTestId("ratings-block")).toHaveCount(0);
   expect(asked).toBe(false);

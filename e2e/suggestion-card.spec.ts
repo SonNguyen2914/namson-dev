@@ -842,9 +842,9 @@ test.describe("suggestion card (recorded payloads)", () => {
       await serveBoard(page);
       await serveMatch(page);
       await serveCard(page);
-      await page.goto("/bet-suggester?league=mls");
+      await page.goto("/trivela?league=mls");
       await page.getByText("Columbus Crew").first().click();
-      await expect(page).toHaveURL(new RegExp(`/bet-suggester/mls/${EVENT}`));
+      await expect(page).toHaveURL(new RegExp(`/trivela/mls/${EVENT}`));
       await expect(page.getByText(/suggestion card/i).first())
         .toBeVisible();
       // headline first and dominant: the word REFUSED is on screen
@@ -855,7 +855,7 @@ test.describe("suggestion card (recorded payloads)", () => {
     + "blocks stay visible", async ({ page }) => {
       await serveMatch(page);
       await serveCard(page);
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       // the one number that orders action — here the word and its reason
       await expect(page.getByText(/below the fee floor \+0\.03/).first())
         .toBeVisible();
@@ -882,7 +882,7 @@ test.describe("suggestion card (recorded payloads)", () => {
     + "display-only label", async ({ page }) => {
       await serveMatch(page);
       await serveCard(page);
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       await expect(
         page.getByText(/measured non-predictive to date/i).first())
         .toBeVisible();
@@ -898,7 +898,7 @@ test.describe("suggestion card (recorded payloads)", () => {
     + "panel, never invented content", async ({ page }) => {
       await serveMatch(page);
       await serveCard(page, { error: "card unavailable" }, 503);
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       await expect(page.getByText(/card unavailable/i).first())
         .toBeVisible();
       await expect(page.getByText(/http 503/i).first()).toBeVisible();
@@ -924,7 +924,7 @@ test.describe("suggestion card (recorded payloads)", () => {
           : r.fulfill({ status: 200, contentType: "application/json",
                         body: JSON.stringify(CARD_PAYLOAD) });
       });
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       await expect(page.getByText(/http 503/i).first()).toBeVisible();
       await page.clock.fastForward("01:05");
       await expect(page.getByText("REFUSED").first()).toBeVisible();
@@ -941,7 +941,7 @@ test.describe("suggestion card (recorded payloads)", () => {
     async ({ page }) => {
       await serveMatch(page);
       await serveCard(page, withLiveNow(LIVE_NOW));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const live = page.getByTestId("live-now");
       await expect(live).toBeVisible();
       // the state on the tape
@@ -972,7 +972,7 @@ test.describe("suggestion card (recorded payloads)", () => {
     + "no numbers behind it", async ({ page }) => {
       await serveMatch(page);
       await serveCard(page, withLiveNow(LIVE_NOW_REFUSED));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const live = page.getByTestId("live-now");
       await expect(live).toBeVisible();
       await expect(live).toContainText(LIVE_REFUSAL);
@@ -988,7 +988,7 @@ test.describe("suggestion card (recorded payloads)", () => {
     + "post cards are untouched", async ({ page }) => {
       await serveMatch(page);
       await serveCard(page);          // the recorded settled-fixture card
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       // the in-play section is there, exactly as it always rendered
       await expect(
         page.getByText(/a red card VOIDS every grid number/i).first())
@@ -1005,7 +1005,7 @@ test.describe("suggestion card (recorded payloads)", () => {
     + "match state per side", async ({ page }) => {
       await serveMatch(page);
       await serveCard(page, withLiveNow(withState(LIVE_NOW, LIVE_STATE)));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const live = page.getByTestId("live-now");
       const st = page.getByTestId("live-state");
       await expect(st).toBeVisible();
@@ -1082,7 +1082,7 @@ test.describe("suggestion card (recorded payloads)", () => {
     async ({ page }) => {
       await serveMatch(page);
       await serveCard(page, withLiveNow(withState(LIVE_NOW, LIVE_STATE)));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
 
       const threat = page.getByTestId("live-stat-threat");
       await expect(threat).toBeVisible();
@@ -1131,7 +1131,7 @@ test.describe("suggestion card (recorded payloads)", () => {
       await serveMatch(page);
       await serveCard(page,
         withLiveNow(withState(LIVE_NOW, LIVE_STATE_GAPS)));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
 
       const threat = page.getByTestId("live-stat-threat");
       await expect(threat).toBeVisible();
@@ -1152,7 +1152,7 @@ test.describe("suggestion card (recorded payloads)", () => {
       await serveMatch(page);
       await serveCard(page,
         withLiveNow(withState(LIVE_NOW, LIVE_STATE_GAPS)));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       await expect(page.getByTestId("live-state")).toBeVisible();
 
       // possession unknown on both sides: dashes, no invented 50/50,
@@ -1211,7 +1211,7 @@ test.describe("suggestion card (recorded payloads)", () => {
     + "no readout, no empty rows", async ({ page }) => {
       await serveMatch(page);
       await serveCard(page, withLiveNow(LIVE_NOW));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const live = page.getByTestId("live-now");
       await expect(live).toBeVisible();
       // the block that shipped before the readout existed, intact
@@ -1236,7 +1236,7 @@ test.describe("suggestion card (recorded payloads)", () => {
       await serveMatch(page);
       await serveCard(page,
         withLiveNow(withState(LIVE_NOW_REFUSED, LIVE_STATE)));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const live = page.getByTestId("live-now");
       await expect(live).toContainText(LIVE_REFUSAL);
       // no probability bar and no triple behind the refusal
@@ -1267,7 +1267,7 @@ test.describe("suggestion card (recorded payloads)", () => {
           body: JSON.stringify(withLiveNow(
             hit === 1 ? LIVE_NOW : LIVE_NOW_LATER)) });
       });
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const live = page.getByTestId("live-now");
       await expect(live).toContainText("63'");
       await expect(live).toContainText("64.1%");
@@ -1313,7 +1313,7 @@ test.describe("the ladder: exposure, tick age, and the position", () => {
       await serveMatch(page);
       await serveCard(page, withLadder({
         live: withState(LIVE_NOW, LIVE_STATE_GAPS) }));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       // the card is ON SCREEN — this is the assertion that would have
       // caught it
       await expect(page.getByTestId("live-now")).toBeVisible();
@@ -1332,7 +1332,7 @@ test.describe("the ladder: exposure, tick age, and the position", () => {
       page.on("pageerror", (e) => errors.push(String(e)));
       await serveMatch(page);
       await serveCard(page, withLadder());
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       await expect(page.getByTestId("live-states-home"))
         .toHaveText("SIEGE");
       await expect(page.getByTestId("live-states-away"))
@@ -1346,7 +1346,7 @@ test.describe("the ladder: exposure, tick age, and the position", () => {
     + "is a property of the match", async ({ page }) => {
       await serveMatch(page);
       await serveCard(page, withLadder());   // no `positions` key at all
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const exp = page.getByTestId("exposure");
       await expect(exp).toBeVisible();
       // the state the cell conditions on
@@ -1372,7 +1372,7 @@ test.describe("the ladder: exposure, tick age, and the position", () => {
     async ({ page }) => {
       await serveMatch(page);
       await serveCard(page, withLadder());
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       // verbatim, not paraphrased — this sentence is the constraint
       await expect(page.getByTestId("no-safe-window"))
         .toContainText(HONESTY);
@@ -1388,7 +1388,7 @@ test.describe("the ladder: exposure, tick age, and the position", () => {
       await serveMatch(page);
       await serveCard(page, withLadder({
         positions: positionsBlock([heldPosition()]) }));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       // not vacuous: the position IS on screen before the scan runs
       await expect(page.getByTestId("held-position")).toBeVisible();
       const text = (await page.locator("#card").innerText()).toLowerCase();
@@ -1408,7 +1408,7 @@ test.describe("the ladder: exposure, tick age, and the position", () => {
     async ({ page }) => {
       await serveMatch(page);
       await serveCard(page, withLadder());
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       await expect(page.getByTestId("exposure")).toContainText(FT_REFUSAL);
       // the band-free fact is stated rather than a band being invented
       await expect(page.getByTestId("exposure"))
@@ -1420,7 +1420,7 @@ test.describe("the ladder: exposure, tick age, and the position", () => {
       await serveMatch(page);
       await serveCard(page, withLadder({
         positions: positionsBlock([heldPosition()]) }));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const held = page.getByTestId("held-position");
       await expect(held).toBeVisible();
       // the position itself, named
@@ -1453,7 +1453,7 @@ test.describe("the ladder: exposure, tick age, and the position", () => {
               + "holding is worth at the current read",
             not_a_recommendation: "Which way the arithmetic points is "
               + "not what to do." } })]) }));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const line = page.getByTestId("hold-vs-exit");
       await expect(line).toContainText("MORE");
       // decision safety: the colour the eye reads as "take this" is
@@ -1466,7 +1466,7 @@ test.describe("the ladder: exposure, tick age, and the position", () => {
       await serveMatch(page);
       await serveCard(page, withLadder({
         positions: positionsBlock([NO_BID_POSITION]) }));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       await expect(page.getByTestId("no-bid")).toContainText(NO_BID_FINDING);
       // a null value is a DASH, never a zero — 0¢ would read as "this
       // position is worthless", which is a different claim entirely
@@ -1497,7 +1497,7 @@ test.describe("the ladder: exposure, tick age, and the position", () => {
               + "UP to the centicent, so an exit dripped out in clips "
               + "pays that round-up once per clip",
           } })]) }));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const thin = page.getByTestId("thin-bid");
       await expect(thin).toContainText("THIN BID: 3 contract(s)");
       await expect(thin).toContainText(/once per clip/);
@@ -1509,7 +1509,7 @@ test.describe("the ladder: exposure, tick age, and the position", () => {
       await serveCard(page, withLadder({
         exposure: EXPOSURE_RED_CARD,
         positions: positionsBlock([RED_CARD_POSITION]) }));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       // the public block refuses in the backend's words...
       await expect(page.getByTestId("exposure"))
         .toContainText(RED_CARD_EXPOSURE_REFUSAL);
@@ -1536,7 +1536,7 @@ test.describe("the ladder: exposure, tick age, and the position", () => {
         positions: positionsBlock([], {
           refused: "no journal entry on fixture 1 is still on. "
             + HELD_DEFINITION }) }));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       await expect(page.getByTestId("positions"))
         .toContainText("no journal entry on fixture 1 is still on");
       await expect(page.getByTestId("positions"))
@@ -1549,7 +1549,7 @@ test.describe("the ladder: exposure, tick age, and the position", () => {
       await page.clock.install();
       await serveMatch(page);
       await serveCard(page, withLadder());
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const age = page.getByTestId("tick-age");
       await expect(age).toContainText("state captured 47s ago");
       // the collector's own interval, quoted — this file picks no cadence
@@ -1563,7 +1563,7 @@ test.describe("the ladder: exposure, tick age, and the position", () => {
     + "missed", async ({ page }) => {
       await serveMatch(page);
       await serveCard(page, withLadder({ tick: LIVE_TICK_LATE }));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const age = page.getByTestId("tick-age");
       await expect(age).toContainText("state captured 402s ago");
       await expect(age).toContainText("a tick has not landed");
@@ -1576,7 +1576,7 @@ test.describe("the ladder: exposure, tick age, and the position", () => {
       const c = withLadder();
       delete c.live_tick;
       await serveCard(page, c);
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       await expect(page.getByTestId("tick-age")).toHaveCount(0);
       await expect(page.getByText(/state captured/)).toHaveCount(0);
     });
@@ -1585,7 +1585,7 @@ test.describe("the ladder: exposure, tick age, and the position", () => {
     async ({ page }) => {
       await serveMatch(page);
       await serveCard(page);      // the recorded settled-fixture card
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       await expect(page.getByTestId("exposure")).toHaveCount(0);
       await expect(page.getByTestId("positions")).toHaveCount(0);
       await expect(page.getByTestId("tick-age")).toHaveCount(0);
@@ -1615,7 +1615,7 @@ test.describe("the disagreement rail is visible, not just present", () => {
         ledger_row: 8,
         meaning: "fee-inclusive edge on away_win — non-lead outcome",
       }));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const w = page.getByTestId("headline-warning");
       await expect(w).toBeVisible();
       await expect(w).toContainText("measured WORSE");
@@ -1636,7 +1636,7 @@ test.describe("the disagreement rail is visible, not just present", () => {
         value: 0.0412,
         meaning: "fee-inclusive edge on home_win",
       }));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       await expect(page.getByTestId("headline-warning")).toHaveCount(0);
       const cls = await page.getByText("+0.0412").getAttribute("class");
       expect(cls).toContain("text-accent");
@@ -1677,7 +1677,7 @@ test.describe("entry cost: what crossing costs and what resting costs",
       + "effective rate", async ({ page }) => {
         await serveMatch(page);
         await serveCard(page);
-        await page.goto(`/bet-suggester/mls/${EVENT}`);
+        await page.goto(`/trivela/mls/${EVENT}`);
 
         const home = page.getByTestId("exec-home");
         await expect(home).toBeVisible();
@@ -1724,7 +1724,7 @@ test.describe("entry cost: what crossing costs and what resting costs",
       + "warning, not a footnote", async ({ page }) => {
         await serveMatch(page);
         await serveCard(page);
-        await page.goto(`/bet-suggester/mls/${EVENT}`);
+        await page.goto(`/trivela/mls/${EVENT}`);
         const fr = page.getByTestId("fill-risk");
         await expect(fr).toBeVisible();
         await expect(fr).toContainText(
@@ -1741,7 +1741,7 @@ test.describe("entry cost: what crossing costs and what resting costs",
     test("the not-an-edge sentence renders verbatim", async ({ page }) => {
       await serveMatch(page);
       await serveCard(page);
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const ne = page.getByTestId("not-an-edge");
       await expect(ne).toContainText(
         "PAYING LESS TO ENTER IS NOT INFORMATION ABOUT THE OUTCOME");
@@ -1754,7 +1754,7 @@ test.describe("entry cost: what crossing costs and what resting costs",
       async ({ page }) => {
         await serveMatch(page);
         await serveCard(page);
-        await page.goto(`/bet-suggester/mls/${EVENT}`);
+        await page.goto(`/trivela/mls/${EVENT}`);
         const block = page.getByTestId("execution");
 
         // THE SCOPE STRING. It used to say "a quarter of the fee",
@@ -1788,7 +1788,7 @@ test.describe("entry cost: what crossing costs and what resting costs",
     test("nothing in the block reads as an instruction", async ({ page }) => {
       await serveMatch(page);
       await serveCard(page);
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       // the comparison gets no accent colour — MORE and LESS are
       // statements about two dollar figures, never a recommendation
       const cls = await page.getByTestId("exec-diff-home")
@@ -1809,7 +1809,7 @@ test.describe("entry cost: what crossing costs and what resting costs",
       + "and still prices crossing", async ({ page }) => {
         await serveMatch(page);
         await serveCard(page);
-        await page.goto(`/bet-suggester/mls/${EVENT}`);
+        await page.goto(`/trivela/mls/${EVENT}`);
         // asserted on the REST CELL ITSELF, not on the row: the same
         // sentence also reaches the difference note, so a row-level
         // assertion stays green while this cell renders a dash
@@ -1833,7 +1833,7 @@ test.describe("entry cost: what crossing costs and what resting costs",
       + "rather than reporting a saving", async ({ page }) => {
         await serveMatch(page);
         await serveCard(page);
-        await page.goto(`/bet-suggester/mls/${EVENT}`);
+        await page.goto(`/trivela/mls/${EVENT}`);
         const awayRest = page.getByTestId("exec-away-rest");
         await expect(awayRest).toContainText(
           "SPREAD 20.00c IS WIDER THAN 8c");
@@ -1854,7 +1854,7 @@ test.describe("entry cost: what crossing costs and what resting costs",
             + "trade that cannot be made, which is worse than no "
             + "number at all.",
         }));
-        await page.goto(`/bet-suggester/mls/${EVENT}`);
+        await page.goto(`/trivela/mls/${EVENT}`);
         await expect(page.getByTestId("execution-refused"))
           .toContainText("NO EXECUTION COST IS QUOTED FOR A SETTLED BOOK");
         await expect(page.getByTestId("execution-refused"))
@@ -1868,7 +1868,7 @@ test.describe("entry cost: what crossing costs and what resting costs",
       + "before the block existed", async ({ page }) => {
         await serveMatch(page);
         await serveCard(page, withExecution(undefined));
-        await page.goto(`/bet-suggester/mls/${EVENT}`);
+        await page.goto(`/trivela/mls/${EVENT}`);
         await expect(page.getByTestId("execution")).toHaveCount(0);
         await expect(page.getByTestId("execution-refused")).toHaveCount(0);
         await expect(page.getByTestId("fill-risk")).toHaveCount(0);
@@ -2065,7 +2065,7 @@ test.describe("a failed read is not an empty one", () => {
       await serveCard(page, withInplay({
         tape_history: { unavailable: true,
                         consequence: TAPE_HISTORY_WORDS } }));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const note = page.getByTestId("tape-history-unreadable");
       await expect(note).toBeVisible();
       // the words, not a paraphrase — this is the distinction the whole
@@ -2083,7 +2083,7 @@ test.describe("a failed read is not an empty one", () => {
     + "absence is the finding", async ({ page }) => {
       await serveMatch(page);
       await serveCard(page);              // the recorded settled card
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       // the card rendered (the recorded settled card's in-play words)
       await expect(
         page.getByText(/a red card VOIDS every grid number/i).first())
@@ -2101,7 +2101,7 @@ test.describe("a failed read is not an empty one", () => {
       await serveMatch(page);
       await serveCard(page, withInplay({
         some_new_block: { note: "unrecorded" } }));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const un = page.getByTestId("inplay-unaccounted-key");
       await expect(un).toHaveCount(1);
       await expect(un).toHaveAttribute("data-key", "some_new_block");
@@ -2113,7 +2113,7 @@ test.describe("a failed read is not an empty one", () => {
       await serveMatch(page);
       await serveCard(page, withLiveNow(
         withState(LIVE_NOW, { ...LIVE_STATE, another_axis: { p: 1 } })));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const un = page.getByTestId("live-state-unaccounted-key");
       await expect(un).toHaveCount(1);
       await expect(un).toHaveAttribute("data-key", "another_axis");
@@ -2178,7 +2178,7 @@ test.describe("a failed read is not an empty one", () => {
       }
       await serveMatch(page);
       await serveCard(page, withLiveNow(withState(LIVE_NOW, asEmitted)));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
 
       // the block DID render — without this the assertion below would
       // pass against a card that drew no state at all
@@ -2206,7 +2206,7 @@ test.describe("a failed read is not an empty one", () => {
       await serveMatch(page);
       await serveCard(page, withLiveNow(withState(LIVE_NOW,
         { ...LIVE_STATE, window: { share: { refused: "n/a" } } })));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const w = page.getByTestId("live-window-registered");
       await expect(w).toBeVisible();
       await expect(w).toContainText("cumulative over the whole match");
@@ -2236,7 +2236,7 @@ test.describe("gold is brand, never a verdict", () => {
       // says in words it is not an invitation.
       await serveMatch(page);
       await serveCard(page, withGate("WARNED — not an invitation"));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const v = page.getByTestId("gate-verdict");
       await expect(v).toHaveText("WARNED — not an invitation");
       await expect(v).toHaveAttribute("data-ink", "warn");
@@ -2250,7 +2250,7 @@ test.describe("gold is brand, never a verdict", () => {
       // that reads as an invitation.
       await serveMatch(page);
       await serveCard(page, withGate("SOMETHING_NEW"));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       await expect(page.getByTestId("gate-verdict"))
         .toHaveAttribute("data-ink", "warn");
     });
@@ -2260,7 +2260,7 @@ test.describe("gold is brand, never a verdict", () => {
     // component that paints everything amber, which proves nothing.
     await serveMatch(page);
     await serveCard(page, withGate("PLAYABLE"));
-    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    await page.goto(`/trivela/mls/${EVENT}`);
     await expect(page.getByTestId("gate-verdict"))
       .toHaveAttribute("data-ink", "accent");
   });
@@ -2276,7 +2276,7 @@ test.describe("missing is never zero, on the bar as well as the digits", () => {
       await serveMatch(page);
       await serveCard(page, withLiveNow({ ...LIVE_NOW,
         p_win: { home: 0.6412, away: 0.1177 } }));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const segs = page.getByTestId("live-prob-bar").locator("div");
       await expect(segs).toHaveCount(2);
       await expect(segs.nth(0)).toHaveAttribute("data-side", "home");
@@ -2291,7 +2291,7 @@ test.describe("missing is never zero, on the bar as well as the digits", () => {
     async ({ page }) => {
       await serveMatch(page);
       await serveCard(page, withLiveNow(LIVE_NOW));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       await expect(page.getByTestId("live-prob-bar").locator("div"))
         .toHaveCount(3);
       await expect(page.getByTestId("live-prob-incomplete"))
@@ -2309,7 +2309,7 @@ test.describe("missing is never zero, on the bar as well as the digits", () => {
       await serveMatch(page);
       await serveCard(page, withLiveNow(withState(LIVE_NOW,
         { possession: { home: 0.62, away: null } })));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const row = page.getByTestId("live-stat-possession");
       await expect(row).toContainText("0.62");
       await expect(row).not.toContainText("%");
@@ -2321,7 +2321,7 @@ test.describe("missing is never zero, on the bar as well as the digits", () => {
   test("both sides present still read as percentages", async ({ page }) => {
     await serveMatch(page);
     await serveCard(page, withLiveNow(withState(LIVE_NOW, LIVE_STATE)));
-    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    await page.goto(`/trivela/mls/${EVENT}`);
     await expect(page.getByTestId("live-stat-possession"))
       .toContainText("61.4%");
     await expect(page.getByTestId("possession-unscaled")).toHaveCount(0);
@@ -2342,7 +2342,7 @@ test.describe("a caveat lives in the accessible tree, not on a title", () => {
       await serveMatch(page);
       await serveCard(page, withLiveNow(
         withState(LIVE_NOW, { ...LIVE_STATE, basis: BASIS })));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const b = page.getByTestId("live-state-basis");
       await expect(b).toBeVisible();
       await expect(b).toContainText("missing is never zero");
@@ -2354,7 +2354,7 @@ test.describe("a caveat lives in the accessible tree, not on a title", () => {
     + "tooltip", async ({ page }) => {
       await serveMatch(page);
       await serveCard(page, withLiveNow(withState(LIVE_NOW, LIVE_STATE)));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const b = page.getByTestId("threat-basis");
       await expect(b).toBeVisible();
       await expect(b).toContainText("share of shots + on-target + corners");
@@ -2369,7 +2369,7 @@ test.describe("a caveat lives in the accessible tree, not on a title", () => {
       // They define the two words the whole block compares.
       await serveMatch(page);
       await serveCard(page);              // the recorded card carries EXECUTION
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       await expect(page.getByTestId("exec-route-cross"))
         .toContainText("lifts the ask and fills now");
       await expect(page.getByTestId("exec-route-rest"))
@@ -2385,7 +2385,7 @@ test.describe("a caveat lives in the accessible tree, not on a title", () => {
     async ({ page }) => {
       await serveMatch(page);
       await serveCard(page);
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       await expect(page.getByTestId("content-hash-basis"))
         .toContainText("sha256");
     });
@@ -2404,7 +2404,7 @@ test.describe("a label followed by nothing is not an absence", () => {
         status: "post" };
       await serveMatch(page);
       await serveCard(page, c);
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       const id = page.getByTestId("identity");
       await expect(id).toContainText("venue class: — (not on the payload)");
       await expect(id).toContainText("kickoff —");
@@ -2434,7 +2434,7 @@ test.describe("the MLS hub's team news", () => {
       r.fulfill({ status: 200, contentType: "application/json",
                   body: JSON.stringify(body) }));
     await serveCard(page);
-    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    await page.goto(`/trivela/mls/${EVENT}`);
   }
 
   test("key_absences [] is a MEASURED zero and says so; null keeps its "

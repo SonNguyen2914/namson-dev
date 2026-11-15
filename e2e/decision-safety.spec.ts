@@ -7,7 +7,7 @@ import { liveGet, unanswered } from "./live-read";
 // present model output as advice, and must label shadow/paper state.
 
 test("MLS board loads in league mode with the shadow framing", async ({ page }) => {
-  await page.goto("/bet-suggester?league=mls");
+  await page.goto("/trivela?league=mls");
   // the league carousel lands on MLS (deep-link), not WC26
   await expect(page.getByRole("heading", { name: /MLS/i }).first())
     .toBeVisible();
@@ -84,7 +84,7 @@ test("match hub shows the model as shadow, never as advice",
       "no upcoming MLS fixture currently has both an open book and a " +
       "model run — nothing to assert the market table against");
 
-    await page.goto(`/bet-suggester/mls/${priced}`);
+    await page.goto(`/trivela/mls/${priced}`);
     await expect(page).toHaveTitle(/MLS/i);
 
     // the match-info card and the model/market comparison render
@@ -106,7 +106,7 @@ test("match hub shows the model as shadow, never as advice",
   });
 
 test("back from a match returns to the MLS board, not WC26", async ({ page }) => {
-  await page.goto("/bet-suggester/mls/761680");
+  await page.goto("/trivela/mls/761680");
   await page.getByRole("link", { name: /mls board/i }).click();
   await expect(page).toHaveURL(/league=mls/);
 });

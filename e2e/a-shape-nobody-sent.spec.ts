@@ -18,7 +18,7 @@ const asV2 = (b: unknown): unknown =>
 // WHERE THE STRIP IS DRAWN — READ OUT OF THE TREE, NEVER TYPED HERE
 // (2026-09-15).
 //
-// `<WatchedStrip />` came off /bet-suggester. The read is
+// `<WatchedStrip />` came off /trivela. The read is
 // operator-gated, and with no token held in an ordinary tab it could
 // only ever draw its own refusal — permanently, to a reader who cannot
 // fix it. `components/WatchedStrip.tsx` is UNTOUCHED, and so is every
@@ -83,7 +83,7 @@ const STRIP_ROUTE = watchedStripRoute();
  *  test leaves nothing in flight. */
 function stripSurface(): string {
   test.skip(STRIP_ROUTE === null,
-    "no page mounts <WatchedStrip />: the read came off /bet-suggester on "
+    "no page mounts <WatchedStrip />: the read came off /trivela on "
     + "2026-09-15 and was not remounted anywhere. This claim is still true "
     + "of the component and is KEPT, not deleted — it re-arms at whatever "
     + "route mounts the strip next, with no edit to this file.");
@@ -252,7 +252,7 @@ async function open(page: Page, body: unknown) {
  *  assertion there would be this file giving something up. */
 async function boardSurvives(page: Page) {
   await expect(page.locator("main")).toHaveCount(1);
-  if (STRIP_ROUTE === "/bet-suggester") {
+  if (STRIP_ROUTE === "/trivela") {
     await expect(page.getByTestId("board-rank-heading")).toBeVisible();
   }
   const body = await page.locator("body").innerText();

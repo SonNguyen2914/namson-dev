@@ -26,7 +26,7 @@
 // to the competition's own page where one exists.
 //
 // This applies to every tab (Leagues, Cups, Nations). A narrowed route
-// (`/bet-suggester/ucl`) is the competition's own page and keeps its
+// (`/trivela/ucl`) is the competition's own page and keeps its
 // column regardless.
 
 import { TZ } from "./matchday";

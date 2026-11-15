@@ -1,6 +1,6 @@
 /** THE FROZEN MATCH HERO FITS A PHONE (2026-10-25).
  *
- *  `/bet-suggester/market/<id>` is statically generated from
+ *  `/trivela/market/<id>` is statically generated from
  *  src/data/wc26/matches/*.json, so nothing here is fetched. Two defects
  *  in its hero at 390px:
  *
@@ -20,7 +20,7 @@ for (const id of ["ARG_EGY", "ARG_SUI", "SUI_COL", "USA_BEL"]) {
   test(`${id}: the matchup stays on screen at 390px`, async ({ page }) => {
     await page.route("**/api/**", (r) => r.fulfill({ status: 503,
       contentType: "application/json", body: '{"detail":"stub"}' }));
-    await page.goto(`/bet-suggester/market/${id}`);
+    await page.goto(`/trivela/market/${id}`);
     const h1 = page.locator("header h1");
     await expect(h1).toBeVisible();
     const box = await h1.evaluate((el) => {
@@ -37,7 +37,7 @@ for (const id of ["ARG_EGY", "ARG_SUI", "SUI_COL", "USA_BEL"]) {
 }
 
 test("the archive line keeps the space after its date", async ({ page }) => {
-  await page.goto("/bet-suggester/market/ARG_EGY");
+  await page.goto("/trivela/market/ARG_EGY");
   const line = page.getByTestId("match-frozen");
   await expect(line).toBeVisible();
   expect(await line.innerText()).toMatch(/Archived \d{4}-\d\d-\d\d from /);

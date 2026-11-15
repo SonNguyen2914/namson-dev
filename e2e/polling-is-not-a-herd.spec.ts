@@ -57,7 +57,7 @@ test("an anonymous tab never asks for the operator-only watched strip",
     });
     await page.clock.install();
     await routeEight(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await page.waitForSelector('[data-testid="league-col"]');
     // four 15s cadences, and then some: the old feed asked 5+ times here
     await page.clock.runFor(70_000);
@@ -76,7 +76,7 @@ test("with the operator token the strip is read — and not while the tab is "
       (r) => r.fulfill(json({ detail: "operator token refused" }, 403)));
     await page.clock.install();
     await routeEight(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await page.waitForSelector('[data-testid="league-col"]');
     expect(asked).toBe(0);
 
@@ -118,7 +118,7 @@ test("a failing read backs off instead of retrying at full cadence",
       return r.fulfill(json({ detail: "the scoreboard is down" }, 503));
     });
     await page.clock.install();
-    await page.goto("/bet-suggester/friendlies");
+    await page.goto("/trivela/friendlies");
     await expect.poll(() => asked).toBe(1);
     // ten minutes at a 60s cadence was eleven reads; with the backoff
     // (60s, 60s, 60-120s, 120-240s, 240-300s…) it is at most six
@@ -142,7 +142,7 @@ test("a read still in flight is never stacked on, and a hidden tab does "
       return r.fulfill(json({ fixtures: [] }));
     });
     await page.clock.install();
-    await page.goto("/bet-suggester/friendlies");
+    await page.goto("/trivela/friendlies");
     await expect.poll(() => asked).toBe(1);
     // five cadences while the first read hangs: the old setInterval asked
     // five more times on top of it
@@ -194,7 +194,7 @@ test("the tournament read stops for the session after the backend says "
       return r.fulfill(json({ detail: "no tournament for ucl" }, 404));
     });
     await page.clock.install();
-    await page.goto("/bet-suggester/comp/ucl");
+    await page.goto("/trivela/comp/ucl");
     await expect.poll(() => asked).toBe(1);
     for (let i = 0; i < 4; i += 1) await page.clock.runFor(300_000);
     expect(asked, "a 404 that means 'absent' was asked again").toBe(1);

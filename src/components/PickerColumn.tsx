@@ -2,7 +2,7 @@
 // below them the FINISHED TAIL.
 //
 // The card and its chips moved here verbatim from
-// pages/bet-suggester/index.tsx when the board went four-up (2026-08-31);
+// pages/trivela/index.tsx when the board went four-up (2026-08-31);
 // the honesty rules travelled with them:
 //
 //  - RANKS, NEVER CUTS: every row this column is handed is drawn, under
@@ -2288,7 +2288,7 @@ function RefusalCard({ r, col, dated = true, dense = false, rank }: {
 /** THE MATCHES OF ONE MATCHDAY, LAID ACROSS THE BAND (operator,
  *  2026-09-08).
  *
- *  A board narrowed to ONE column — /bet-suggester/ucl — was drawing one
+ *  A board narrowed to ONE column — /trivela/ucl — was drawing one
  *  tall stack of full-width cards: a Champions League matchday is ~18
  *  fixtures, so the reader got 18 screens of 1,400px-wide card holding
  *  200px of ink. The landing board's density comes from laying columns
@@ -2545,7 +2545,7 @@ export function columnNotes(
  *  (the 2026-09-07 bug in TierGaps).
  *
  *  AND IT LEADS THE ROW, rather than trailing it on `ml-auto`. Two
- *  widths have to work: this column full-width on /bet-suggester/ucl,
+ *  widths have to work: this column full-width on /trivela/ucl,
  *  and ~230px on the six-column landing board. Trailing, the trigger
  *  was pushed onto a line of its own and sat 500px from the chips it
  *  belongs to — and a left-anchored panel would then open nowhere near
@@ -2967,7 +2967,7 @@ export function LeagueColumn({
    *
    *  The page hands it over only for a board whose track is a real
    *  horizontal scroller, which is the one case where sticking inside
-   *  the column cannot work (see pages/bet-suggester/index.tsx). */
+   *  the column cannot work (see pages/trivela/index.tsx). */
   headSlot?: HTMLElement | null;
 }) {
   /* THE SEASON BASIS, DERIVED ONCE FOR THE WHOLE COLUMN. Off the rows
@@ -3338,7 +3338,7 @@ export function LeagueColumn({
               WHEN IT CAN STILL HAPPEN, since 2026-09-09. The full board
               draws exactly the columns the payload DECLARES, so on that
               route this chip is unreachable by construction. It survives
-              for the narrowed routes — /bet-suggester/ucl names its
+              for the narrowed routes — /trivela/ucl names its
               column itself — and it is the honest answer there: the
               competition left BOARD_COLUMNS, the board ranks none of its
               fixtures, and the page says so instead of printing a zero
@@ -3673,7 +3673,7 @@ export function LeagueColumn({
                   declared this competition, nothing was measured over
                   any window: there is no ranking, no rating table and
                   no fixture list here to be empty. Printing the
-                  measured sentence anyway is how /bet-suggester/ucl
+                  measured sentence anyway is how /trivela/ucl
                   would have said "no Champions League fixtures in the
                   next 7 days" over a week holding eighteen of them, the
                   moment the competition left BOARD_COLUMNS. */}

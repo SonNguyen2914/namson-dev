@@ -52,7 +52,7 @@ test.describe("deterministic contract tests (recorded payloads)", () => {
                 key_absences: [] },
       },
     }));
-    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    await page.goto(`/trivela/mls/${EVENT}`);
     await page.getByText(/team news/i).first().click();
     await expect(page.getByText(/awaiting team news/i).first()).toBeVisible();
     // the section must not claim anyone is out when no XI exists
@@ -85,7 +85,7 @@ test.describe("deterministic contract tests (recorded payloads)", () => {
         away: null,
       },
     }));
-    await page.goto(`/bet-suggester/mls/${EVENT}`);
+    await page.goto(`/trivela/mls/${EVENT}`);
     // the reason is shown...
     await expect(page.getByText(/no player-strength feed for liga-mx-2026/i)
       .first()).toBeVisible();
@@ -110,7 +110,7 @@ test.describe("deterministic contract tests (recorded payloads)", () => {
           away: null,
         },
       }));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       // a RELEASED lineup opens the section by default — clicking here
       // would close it
       await expect(page.getByText(/frozen at t-10/i).first()).toBeVisible();
@@ -122,7 +122,7 @@ test.describe("deterministic contract tests (recorded payloads)", () => {
   test("no model run: explicit empty state, never fabricated numbers",
     async ({ page }) => {
       await serve(page, payload());          // model: null
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       // wait for the fixture to actually render before reading the body
       await expect(page.getByText("Alpha FC").first()).toBeVisible();
       const body = await page.locator("body").innerText();
@@ -161,7 +161,7 @@ test.describe("deterministic contract tests (recorded payloads)", () => {
           },
         },
       }));
-      await page.goto(`/bet-suggester/mls/${EVENT}`);
+      await page.goto(`/trivela/mls/${EVENT}`);
       await page.getByText(/ESPN form/i).first().click();
       const rows = await page.locator('div.font-mono.text-\\[11px\\]').all();
       let checked = 0;

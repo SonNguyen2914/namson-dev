@@ -3714,6 +3714,6 @@ export async function routeEight(page: Page, board: unknown = BOARD_EIGHT) {
  *  read that HAPPENED rather than one the page is still waiting on. */
 export async function serveEight(page: Page, board: unknown = BOARD_EIGHT) {
   await routeEight(page, board);
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await page.waitForSelector('[data-testid="league-col"]');
 }

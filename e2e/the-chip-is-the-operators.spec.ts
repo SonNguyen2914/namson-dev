@@ -66,7 +66,7 @@ async function serveStatus(page: Page) {
  *  watch panel — the one place a visitor to the board could type it. */
 async function boardWithToken(page: Page) {
   await routeEight(page);
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await armToken(page);
 }
 
@@ -112,7 +112,7 @@ test("a token typed on the board draws the chip, and pressing it opens the "
     await serveStatus(page);
     const reads = statusReads(page);
     await routeEight(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     const chip = page.getByTestId("trading-chip");
     // the board itself, before anything is typed: no chip
     await expect(page.getByTestId("watch-panel")).toBeVisible();
@@ -192,28 +192,28 @@ test("from the console: the logo goes home, the back arrow and chips go to "
     // a direct visit, no token: the way out is there, the chip is not
     await expect(page.getByTestId("trading-chip")).toHaveCount(0);
     const rail = page.locator('header.topbar [data-testid="topbar-right"] nav');
-    await expect(rail.locator('a[href="/bet-suggester"]')).toHaveCount(1);
-    await expect(rail.locator('a[href="/bet-suggester/leagues"]')).toHaveCount(1);
-    await expect(rail.locator('a[href="/bet-suggester/ratings"]')).toHaveCount(1);
+    await expect(rail.locator('a[href="/trivela"]')).toHaveCount(1);
+    await expect(rail.locator('a[href="/trivela/leagues"]')).toHaveCount(1);
+    await expect(rail.locator('a[href="/trivela/ratings"]')).toHaveCount(1);
     const back = page.getByRole("link", { name: "board", exact: true })
       .and(page.locator('[data-testid="topbar-left"] a'));
-    await expect(back).toHaveAttribute("href", "/bet-suggester");
+    await expect(back).toHaveAttribute("href", "/trivela");
 
     await page.getByTestId("home-logo").click();
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByTestId("landing")).toBeVisible();
 
     await page.goto("/ops/trading");
-    await rail.locator('a[href="/bet-suggester/ratings"]').click();
-    await expect(page).toHaveURL(/\/bet-suggester\/ratings$/);
+    await rail.locator('a[href="/trivela/ratings"]').click();
+    await expect(page).toHaveURL(/\/trivela\/ratings$/);
 
     await page.goto("/ops/trading");
-    await rail.locator('a[href="/bet-suggester/leagues"]').click();
-    await expect(page).toHaveURL(/\/bet-suggester\/leagues$/);
+    await rail.locator('a[href="/trivela/leagues"]').click();
+    await expect(page).toHaveURL(/\/trivela\/leagues$/);
 
     await page.goto("/ops/trading");
     await back.click();
-    await expect(page).toHaveURL(/\/bet-suggester$/);
+    await expect(page).toHaveURL(/\/trivela$/);
     await expect(page.getByTestId("watch-panel")).toBeVisible();
   });
 
@@ -227,9 +227,9 @@ test("the token survives the hop back to the board, and every hop after it",
     await expect(page.getByTestId("ops-console")).toBeVisible();
 
     // back to the board by the back arrow: the field still holds it
-    await page.locator('[data-testid="topbar-left"] a[href="/bet-suggester"]')
+    await page.locator('[data-testid="topbar-left"] a[href="/trivela"]')
       .click();
-    await expect(page).toHaveURL(/\/bet-suggester$/);
+    await expect(page).toHaveURL(/\/trivela$/);
     await expect(chip).toBeVisible();
     const panel = page.getByTestId("watch-panel");
     await panel.locator("summary").click();
@@ -239,7 +239,7 @@ test("the token survives the hop back to the board, and every hop after it",
 
     // to the field and home: the chip rides along on every page
     await page.getByTestId("field-link").click();
-    await expect(page).toHaveURL(/\/bet-suggester\/ratings$/);
+    await expect(page).toHaveURL(/\/trivela\/ratings$/);
     await expect(chip).toBeVisible();
     await page.getByTestId("home-logo").click();
     await expect(page).toHaveURL(/\/$/);
@@ -266,7 +266,7 @@ test("on a phone the chip is in the rail's own row, in view, and every "
     const page = await ctx.newPage();
     await serveStatus(page);
     await routeEight(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await page.waitForSelector('[data-testid="league-col"]');
     await armToken(page);
     const chip = page.getByTestId("trading-chip");

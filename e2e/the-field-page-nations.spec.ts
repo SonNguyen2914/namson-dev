@@ -73,7 +73,7 @@ async function toNations(page: Page) {
 
 async function openNations(page: Page, nations: unknown = NATIONS) {
   const asked = await serve(page, nations);
-  await page.goto("/bet-suggester/ratings");
+  await page.goto("/trivela/ratings");
   await expect(page.getByTestId("field-table").first()).toBeVisible();
   await toNations(page);
   return asked;
@@ -106,7 +106,7 @@ const leftOf = (page: Page, k: string, team: string) =>
 test("THREE SEGMENTS: Leagues | Cups | National teams, and the third draws "
    + "the national field", async ({ page }) => {
   await serve(page);
-  await page.goto("/bet-suggester/ratings");
+  await page.goto("/trivela/ratings");
   await expect(page.getByTestId("field-table").first()).toBeVisible();
   const seg = page.locator('[role="group"][aria-label="what the page rates"] button');
   await expect(seg).toHaveCount(3);
@@ -138,7 +138,7 @@ test("the National teams choice is REMEMBERED across a reload", async ({ page })
 test("the Leagues and Cups views NEVER call /api/field/nations; the first "
    + "visit to National teams calls it once", async ({ page }) => {
   const asked = await serve(page);
-  await page.goto("/bet-suggester/ratings");
+  await page.goto("/trivela/ratings");
   await expect(page.getByTestId("field-table").first()).toBeVisible();
   await page.getByTestId("mode-cups").click();
   await expect(page.getByTestId("cup-table").first()).toBeVisible();
@@ -420,7 +420,7 @@ test("a failed national read is NAMED, and the other two views still draw",
   async ({ page }) => {
     await serve(page, { detail: "national-team field unavailable: bytes refused" },
                 { nationsStatus: 503 });
-    await page.goto("/bet-suggester/ratings");
+    await page.goto("/trivela/ratings");
     await page.getByTestId("mode-nations").click();
     await expect(page.getByTestId("nations-read-error"))
       .toContainText("national-team field unavailable: bytes refused");

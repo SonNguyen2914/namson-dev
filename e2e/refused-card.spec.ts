@@ -304,7 +304,7 @@ async function open(page: import("@playwright/test").Page,
   // backend); answered off, so the bar is the one this spec recorded
   await page.route("**/api/analyst/status", (r) =>
     r.fulfill(json({ enabled: false })));
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await expect(page.getByTestId("picker-refusal")).toHaveCount(1);
   return () => stray;
 }

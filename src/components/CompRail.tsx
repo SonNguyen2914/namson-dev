@@ -11,7 +11,7 @@
 // different questions and this file is the second one.
 //
 // It lives here rather than as a literal in each page because it was a
-// literal in each page: /bet-suggester and /bet-suggester/leagues carried
+// literal in each page: /trivela and /trivela/leagues carried
 // the same one-entry array with the same comment, and the day one of them
 // gained the glow the other would have kept a chip that could not.
 //
@@ -71,7 +71,7 @@ export type LiveCompetition = {
    played.
 
    THE CHIP POINTED AT THE VIEWER FOR ONE DAY, and this records why it
-   came back. `/bet-suggester/ucl` is the BOARD narrowed to one column
+   came back. `/trivela/ucl` is the BOARD narrowed to one column
    (`only={["ucl"]}`). When the operator took the Champions League off
    the board, `/api/picker/board` stopped serving its rows and that page
    held ZERO — a live link to an empty shell — so the chip was moved to
@@ -130,9 +130,9 @@ export type LiveCompetition = {
    an ORDINARY chip, which asserts nothing. That is a supported state,
    not a broken one; see `SoonRead` and `NavChip`'s `data-soon`. */
 export const LIVE_COMPETITIONS: readonly LiveCompetition[] = [
-  { key: "ucl", href: "/bet-suggester/ucl", label: "UCL",
+  { key: "ucl", href: "/trivela/ucl", label: "UCL",
     hue: "--lg-ucl" },
-  { key: "eflcup", href: "/bet-suggester/efl-cup", label: "EFL Cup",
+  { key: "eflcup", href: "/trivela/efl-cup", label: "EFL Cup",
     hue: "--lg-eflcup" },
 ];
 

@@ -285,7 +285,7 @@ const typeToken = armToken;
  *  — every anonymous tab used to poll it every 15s for a certain 403 —
  *  so there is no live section to wait for until one is held. */
 async function openBoard(page: Page, token = E2E_OPERATOR_TOKEN) {
-  await page.goto("/bet-suggester");
+  await page.goto("/trivela");
   await typeToken(page, token);
   await page.getByTestId("live-section").waitFor({ timeout: 15_000 });
   await expect(readout(page)).toHaveText("tape 12s");
@@ -302,7 +302,7 @@ test("with no token held there is no button — and no read to press on",
     // longer makes it, so with no credential there is no card, no age
     // and no control, and the strip is never asked.
     const hits = await serve(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await page.getByTestId("picker-row").first().waitFor({ timeout: 15_000 });
     await page.waitForTimeout(1_000);
     await expect(button(page)).toHaveCount(0);

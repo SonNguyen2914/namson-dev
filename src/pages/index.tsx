@@ -108,7 +108,7 @@ export default function Home() {
 
   const analystLine = ANALYST_ON ? (
     <span className={s.heroAside}>
-      <Link href="/bet-suggester/var" data-testid="landing-analyst">Now with Trivela VAR →</Link>
+      <Link href="/trivela/var" data-testid="landing-analyst">Now with Trivela VAR →</Link>
     </span>
   ) : null;
 
@@ -129,7 +129,7 @@ export default function Home() {
       <TopBar inner="max-w-[calc(1240px+7rem)] px-4 sm:px-8 lg:px-14" rail="inline"
         left={<LandingIndex />}>
         {/* below 340px the beside-the-logo track is ~118px: "board" */}
-        <NavChip href="/bet-suggester"><span className="max-[340px]:hidden">open the </span>board</NavChip>
+        <NavChip href="/trivela"><span className="max-[340px]:hidden">open the </span>board</NavChip>
       </TopBar>
 
       <main>
@@ -208,7 +208,7 @@ export default function Home() {
             <span ref={sweep} className={s.sweep} data-text="Every match, made readable.">Every match, made readable.</span>
           </h2>
           <p className={s.body} data-rise>A place to look, not a thing to do.</p>
-          <Link href="/bet-suggester" className={s.cta} data-rise data-testid="landing-cta">
+          <Link href="/trivela" className={s.cta} data-rise data-testid="landing-cta">
             Open the board <span aria-hidden>→</span>
           </Link>
           {contacts.length > 0 && (
@@ -229,8 +229,8 @@ export default function Home() {
       <footer className={`${s.wrap} ${s.footer}`}>
         <span><Mark size={12} /> TRIVELA · namson.dev</span>
         <ul className={s.footIndex} aria-label="Elsewhere on namson.dev">
-          <li><Link href="/bet-suggester">the board</Link></li>
-          <li><Link href="/bet-suggester/ratings">the ratings field</Link></li>
+          <li><Link href="/trivela">the board</Link></li>
+          <li><Link href="/trivela/ratings">the ratings field</Link></li>
           <li><a href="#door">contact</a></li>
         </ul>
         <span>shadow · not advice</span>

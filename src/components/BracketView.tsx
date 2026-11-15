@@ -203,7 +203,7 @@ function BracketCard({ m, emphasis = false, small = false }: {
   );
 
   return tbd ? inner : (
-    <Link href={`/bet-suggester/market/${m.match_id}`} className="block">{inner}</Link>
+    <Link href={`/trivela/market/${m.match_id}`} className="block">{inner}</Link>
   );
 }
 

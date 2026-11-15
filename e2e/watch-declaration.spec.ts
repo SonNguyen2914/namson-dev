@@ -297,7 +297,7 @@ async function arm(page: import("@playwright/test").Page,
 test("with no token every row still carries the control, and it says what it needs",
   async ({ page }) => {
     await serve(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await expect(page.getByTestId("picker-row")).toHaveCount(3);
     // one control per row — the board hides none of them
     await expect(page.getByTestId("watch-toggle")).toHaveCount(3);
@@ -322,7 +322,7 @@ test("with no token every row still carries the control, and it says what it nee
 test("pressing an unarmed control opens the panel and asks for the token — never a silent no-op",
   async ({ page }) => {
     await serve(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     const panel = page.getByTestId("watch-panel");
     await expect(panel).not.toHaveAttribute("open", /.*/);
     await toggle(page, "401000002").getByRole("button").click();
@@ -333,7 +333,7 @@ test("pressing an unarmed control opens the panel and asks for the token — nev
 test("no token means no read: nothing is fetched and no set is implied",
   async ({ page }) => {
     const seen = await serve(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await expect(page.getByTestId("watch-toggle").first()).toBeVisible();
     expect(seen.stateTokens).toEqual([]);
     // no "0 declared" anywhere — an unread set is not an empty one
@@ -345,7 +345,7 @@ test("no token means no read: nothing is fetched and no set is implied",
 test("the declared set is read with the operator's own token and marks the rows it names",
   async ({ page }) => {
     const seen = await serve(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await arm(page);
     await expect(page.getByTestId("watch-panel-chip")).toHaveText("1 declared");
     expect(seen.stateTokens).toContain("operator-token");
@@ -362,7 +362,7 @@ test("the declared set is read with the operator's own token and marks the rows 
 test("a reference that resolves to no fixture says so, and is not shown as undeclared",
   async ({ page }) => {
     await serve(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await arm(page);
     const t = toggle(page, "401000003");
     await expect(t).toHaveAttribute("data-state", "no-fixture");
@@ -382,7 +382,7 @@ test("a reference that resolves to no fixture says so, and is not shown as undec
 test("the operator's name rides as actor, and the token as one header",
   async ({ page }) => {
     const seen = await serve(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await arm(page, "operator-token", "son");
     await toggle(page, "401000002").getByRole("button").click();
     await expect(toggle(page, "401000002").getByTestId("watch-result"))
@@ -405,7 +405,7 @@ test("the operator's name rides as actor, and the token as one header",
 test("a token with no name cannot declare anything, and the control says which sentence says why",
   async ({ page }) => {
     const seen = await serve(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await arm(page, "operator-token", "");
     // the set is still READ — the name is required to declare, not to look
     await expect(page.getByTestId("watch-panel-chip")).toHaveText("1 declared");
@@ -440,7 +440,7 @@ test("a token with no name cannot declare anything, and the control says which s
 test("a refused removal renders the backend's words verbatim and is not an error",
   async ({ page }) => {
     await serve(page, { declare: REMOVE_REFUSED });
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await arm(page);
     await toggle(page, "401000001")
       .getByRole("button", { name: /ask for .* to leave/i }).click();
@@ -488,7 +488,7 @@ test("pressing what-am-I-holding ASKS NOTHING — it opens a step that "
    + "says what the read is for, and how many this panel can already "
    + "count", async ({ page }) => {
     const seen = await serve(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await arm(page);
     await expect(page.getByTestId("watch-sync-confirm")).toHaveCount(0);
     await page.getByTestId("watch-sync").click();
@@ -532,7 +532,7 @@ test("pressing what-am-I-holding ASKS NOTHING — it opens a step that "
 test("not one sentence in the step claims this press writes anything",
   async ({ page }) => {
     await serve(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await arm(page);
 
     // the control that OPENS it — label and accessible name both
@@ -592,7 +592,7 @@ test("not one sentence in the step claims this press writes anything",
 test("the step counts what this panel can already read, and cancelling "
    + "asks nothing either", async ({ page }) => {
     const seen = await serve(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await arm(page);
     await page.getByTestId("watch-sync").click();
     const c = page.getByTestId("watch-sync-confirm");
@@ -621,7 +621,7 @@ test("a count the payload does not carry is NOT ZERO on the confirmation",
     const thin: Record<string, unknown> = { ...STATE };
     delete thin.open_positions_not_monitored;
     await serve(page, { state: thin });
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await arm(page);
     await page.getByTestId("watch-sync").click();
     const counts = page.getByTestId("watch-sync-confirm")
@@ -633,7 +633,7 @@ test("a count the payload does not carry is NOT ZERO on the confirmation",
 test("with the set unread the confirmation says it can count nothing — "
    + "not zero", async ({ page }) => {
     await serve(page, { state: { error: "boom" }, stateStatus: 503 });
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await arm(page);
     await page.getByTestId("watch-sync").click();
     const c = page.getByTestId("watch-sync-confirm");
@@ -677,7 +677,7 @@ test("with the set unread the confirmation says it can count nothing — "
 test("the open register is drawn exactly, and nothing is drawn from an "
    + "empty one", async ({ page }) => {
     await serve(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await arm(page);
     await page.getByTestId("watch-sync").click();
     const c = page.getByTestId("watch-sync-confirm");
@@ -803,7 +803,7 @@ test("the closing-condition label names every branch, not the first",
 test("what am I holding reaches the wire only from the step, and reports "
    + "the answer in the answer's own numbers", async ({ page }) => {
     const seen = await serve(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await arm(page);
     await page.getByTestId("watch-sync").click();
     await page.getByTestId("watch-sync-confirm")
@@ -837,7 +837,7 @@ test("an answer that does not carry writes_nothing does not read as "
     const quiet: Record<string, unknown> = { ...HELD };
     delete quiet.writes_nothing;
     await serve(page, { sync: quiet });
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await arm(page);
     await page.getByTestId("watch-sync").click();
     await page.getByTestId("watch-sync-confirm")
@@ -858,7 +858,7 @@ test("a dormant live plane is words, never a plausible empty set",
     await serve(page, {
       state: { dormant: true, detail, version: "watchlist-v1" },
     });
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await arm(page);
     await expect(page.getByTestId("watch-dormant")).toContainText(detail);
     // and no counts are drawn beside it
@@ -887,7 +887,7 @@ test("a payload that carries no set is not an empty set",
     await serve(page, { state: {
       version: "watchlist-v1", generated_at: new Date().toISOString(),
     } });
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await arm(page);
     await expect(page.getByTestId("watch-panel-chip"))
       .toHaveText("set not on the payload");
@@ -909,7 +909,7 @@ test("a failed read drops the set rather than leaving a stale one beside live ro
   async ({ page }) => {
     await serve(page, {
       state: { detail: "operator credentials required" }, stateStatus: 403 });
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await arm(page);
     await expect(page.getByTestId("watch-state-error"))
       .toContainText("operator credentials required");
@@ -958,7 +958,7 @@ test("a watchlist payload with NO source split says so, rather than "
     const noSplit: Record<string, unknown> = { ...STATE };
     delete noSplit.monitored_by_source;
     await serve(page, { state: noSplit });
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await arm(page);
     const absent = page.getByTestId("watch-sources-absent");
     await expect(absent).toBeVisible();
@@ -985,7 +985,7 @@ test("typing the token by hand authenticates ONCE, with the whole token "
        server before the next character lands. Only a real debounce
        fixes it, so only the request count can test it. */
     const seen = await serve(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await expect(page.getByTestId("picker-row")).toHaveCount(3);
 
     await page.getByTestId("watch-panel").locator("summary").click();
@@ -1012,7 +1012,7 @@ test("a pasted token is still exactly one authentication", async ({ page }) => {
        too — it is the control that says the fix did not buy the
        keystroke case by breaking the paste case. */
     const seen = await serve(page);
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await expect(page.getByTestId("picker-row")).toHaveCount(3);
     await arm(page, "operator-token", "son");
     await expect.poll(() => seen.stateTokens.length, { timeout: 5000 })
@@ -1032,7 +1032,7 @@ test("a 2xx that carries no declaration is drawn as a failure, not a crash",
     await serve(page, { declare: {
       error: "resolver_response_not_json", reason: "backend_response_not_json",
       upstream_status: 200, detail: "the answer was not JSON" } });
-    await page.goto("/bet-suggester");
+    await page.goto("/trivela");
     await arm(page);
     await toggle(page, "401000002").getByRole("button").click();
     await expect(toggle(page, "401000002").getByTestId("watch-error"))

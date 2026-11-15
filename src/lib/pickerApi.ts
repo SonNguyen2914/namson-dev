@@ -143,7 +143,7 @@ export interface FieldSide {
      dont have the actual number to rank is not consistent and doesnt
      make sense". He is comparing two surfaces — this card printed the
      rank and the band and could not print 1964, while
-     /bet-suggester/ratings printed the value and its half-width for
+     /trivela/ratings printed the value and its half-width for
      the same clubs off the same fit.
 
      ALL THREE OPTIONAL, AND ABSENT IS NOT ZERO. A board served by a
@@ -1691,7 +1691,7 @@ export const liveCompLabel = (slug: string) => {
 };
 
 /** Where a card goes when opened. The four leagues have a match hub at
- *  /bet-suggester/<slug>/<event_id>; a cup does not — there is no hub
+ *  /trivela/<slug>/<event_id>; a cup does not — there is no hub
  *  page for `leaguescup` and the backend serves no per-match route for
  *  it — so its card opens the competition page that already exists.
  *  Keyed by the picker's column slug; the value is the comp viewer's
@@ -1707,7 +1707,7 @@ export const CUP_COMP_KEY: Record<string, string> = {
 };
 
 /** THE ROUTE TABLE, AS THE BUILD READ IT — see next.config.ts. Two
- *  lists of page names that exist under /bet-suggester: the match hubs
+ *  lists of page names that exist under /trivela: the match hubs
  *  (`<slug>/[eventId]`) and the static competition pages. */
 const listEnv = (v: string | undefined) => new Set((v ?? "").split(",").filter(Boolean));
 export const MATCH_HUBS = listEnv(process.env.TRIVELA_MATCH_HUBS);
@@ -1723,12 +1723,12 @@ export const COMP_PAGES = listEnv(process.env.TRIVELA_COMP_PAGES);
  *  the pattern sent Bundesliga, Serie A, Ligue 1, Eredivisie, the EFL Cup
  *  and every national card to the 404. */
 export const rowHref = (row: { league: string; event_id: string }): string | null => {
-  if (MATCH_HUBS.has(row.league)) return `/bet-suggester/${row.league}/${row.event_id}`;
+  if (MATCH_HUBS.has(row.league)) return `/trivela/${row.league}/${row.event_id}`;
   const comp = CUP_COMP_KEY[row.league];
-  if (comp) return `/bet-suggester/comp/${comp}`;
+  if (comp) return `/trivela/comp/${comp}`;
   const bare = (x: string) => x.replace(/[-_]/g, "");
   const page = [...COMP_PAGES].find((p) => bare(p) === bare(row.league));
-  return page ? `/bet-suggester/${page}` : null;
+  return page ? `/trivela/${page}` : null;
 };
 
 /** The sentence an unlinked card carries: there is no page to open. */
@@ -1889,7 +1889,7 @@ export const THIN_ASK_SIZE = 100;  // ask size < 100
  *  length.
  *
  *  IT LIVES HERE, IN THE LIB, SINCE 2026-09-16, and that move is the
- *  point. It was a private constant of pages/bet-suggester/index.tsx,
+ *  point. It was a private constant of pages/trivela/index.tsx,
  *  and `pickerReview.DEFAULT_BACK` was a SECOND literal with a comment
  *  saying it matched this one. The comment had already gone false — it
  *  read "7 is the default because it MATCHES THE BOARD'S FORWARD WINDOW"

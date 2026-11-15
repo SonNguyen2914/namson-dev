@@ -1,5 +1,5 @@
 // "ASK VAR" on a board card (C7, 2026-10-25): a link to this match on
-// /bet-suggester/var?league=&id=, in the card's footer beside the WATCH box
+// /trivela/var?league=&id=, in the card's footer beside the WATCH box
 // and the model box, in the WATCH box's own shape (WATCH_BOX).
 //
 // Drawn only for the four leagues VAR reads (epl, laliga, mls, ligamx),
@@ -17,7 +17,7 @@ function Chip({ league, eventId, label }: { league: string; eventId: string; lab
   if (useAnalystStatus() !== "on") return null;
   return (
     <Link data-testid="ask-var-chip" data-league={league} data-event={eventId}
-      href={`/bet-suggester/var?league=${encodeURIComponent(league)}&id=${encodeURIComponent(eventId)}`}
+      href={`/trivela/var?league=${encodeURIComponent(league)}&id=${encodeURIComponent(eventId)}`}
       aria-label={`ask Trivela VAR about ${label}`}
       title="Ask Trivela VAR about this match: a verified read of Trivela's numbers. Analysis, not advice."
       className={`${WATCH_BOX} ml-2 inline-flex flex-none items-center whitespace-nowrap border-line text-ink-low hover:border-line-strong hover:text-ink-hi`}>

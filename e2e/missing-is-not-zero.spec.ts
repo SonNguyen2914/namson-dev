@@ -65,7 +65,7 @@ test("a tournament read that answered 500 is named — a competition with no "
     await compShell(page);
     await page.route(TOURNAMENT_URL,
       (r) => r.fulfill(json({ error: "sim crashed" }, 500)));
-    await page.goto(`/bet-suggester/comp/${COMP}`);
+    await page.goto(`/trivela/comp/${COMP}`);
     const notice = page.getByTestId("tournament-read-failed");
     await expect(notice).toBeVisible();
     await expect(notice).toContainText("answers 404, and this did not");
@@ -80,7 +80,7 @@ test("a 404 tournament read stays silent — the feature switch still "
     const answered = page.waitForResponse((r) => r.url().includes("/tournament"));
     await page.route(TOURNAMENT_URL,
       (r) => r.fulfill(json({ detail: "no tournament" }, 404)));
-    await page.goto(`/bet-suggester/comp/${COMP}`);
+    await page.goto(`/trivela/comp/${COMP}`);
     await answered;
     await page.waitForTimeout(500);
     await expect(page.getByTestId("tournament-read-failed")).toHaveCount(0);
@@ -100,7 +100,7 @@ test("a competition the backend flags with no tournament is never asked "
       count: 0, tournament_surface: false,
     })));
     const listed = page.waitForResponse((r) => r.url().includes("/fixtures"));
-    await page.goto("/bet-suggester/comp/ucl");
+    await page.goto("/trivela/comp/ucl");
     await listed;
     await page.waitForTimeout(800);
     expect(asked).toEqual([]);
@@ -116,7 +116,7 @@ test("a flagged competition is still asked — the flag gates, it does not "
     const answered = page.waitForRequest((q) => q.url().includes("/tournament"));
     await page.route(TOURNAMENT_URL,
       (r) => r.fulfill(json({ detail: "no tournament" }, 404)));
-    await page.goto(`/bet-suggester/comp/${COMP}`);
+    await page.goto(`/trivela/comp/${COMP}`);
     await answered;
   });
 
@@ -569,7 +569,7 @@ test("the ownership exclusion is a record, not a habit", () => {
 // the last time a guard hand-listed three of four.
 
 const LEAGUES_TSX = readFileSync(
-  join(SRC, "pages", "bet-suggester", "leagues.tsx"), "utf8");
+  join(SRC, "pages", "trivela", "leagues.tsx"), "utf8");
 
 const REGISTERED_LEAGUES: string[] = (() => {
   const m = LEAGUES_TSX.match(/const BUILT_LEAGUES = new Set\(\[([\s\S]*?)\]\)/);
@@ -653,7 +653,7 @@ for (const h of HUB_DASHBOARDS) {
   test(`${h.league}: an outcome the backend did not send is a dash, not 0`,
     async ({ page }) => {
       await hubWithOdds(page, h.league, PARTIAL);
-      await page.goto(`/bet-suggester?league=${h.league}`);
+      await page.goto(`/trivela?league=${h.league}`);
       const chip = page.getByTestId("week-odds").first();
       await expect(chip).toBeVisible();
       const text = (await chip.innerText()).replace(/\s+/g, " ");
@@ -669,7 +669,7 @@ for (const h of HUB_DASHBOARDS) {
       // THE NON-VACUITY HALF. A chip that printed a dash for everything
       // would pass the test above and say nothing true.
       await hubWithOdds(page, h.league, WHOLE);
-      await page.goto(`/bet-suggester?league=${h.league}`);
+      await page.goto(`/trivela?league=${h.league}`);
       const chip = page.getByTestId("week-odds").first();
       await expect(chip).toBeVisible();
       const text = (await chip.innerText()).replace(/\s+/g, " ");
@@ -687,7 +687,7 @@ for (const h of HUB_DASHBOARDS) {
       // attribute and nothing else; three bare numbers reached a screen
       // reader with no owner and no disclaimer.
       await hubWithOdds(page, h.league, WHOLE);
-      await page.goto(`/bet-suggester?league=${h.league}`);
+      await page.goto(`/trivela?league=${h.league}`);
       const chip = page.getByTestId("week-odds").first();
       await expect(chip).toBeVisible();
       // innerText excludes `title` attributes and includes sr-only text
@@ -742,7 +742,7 @@ for (const dead of [["status"], ["odds"], ["status", "odds"]]) {
   test(`la liga: a dead ${dead.join(" + ")} read is named, not drawn as a `
      + "model with nothing to say", async ({ page }) => {
       await laliga(page, dead);
-      await page.goto("/bet-suggester?league=laliga");
+      await page.goto("/trivela?league=laliga");
       const notice = page.getByTestId("model-state-read-failed");
       await expect(notice).toBeVisible();
       await expect(notice).toContainText("did not land");
@@ -757,7 +757,7 @@ test("la liga: two healthy model-state reads print no failure line, and the "
     // THE NON-VACUITY HALF. A page that always printed the warning would
     // pass all three tests above and mean nothing.
     await laliga(page);
-    await page.goto("/bet-suggester?league=laliga");
+    await page.goto("/trivela?league=laliga");
     await expect(page.locator("body")).toContainText("no approval decision");
     await expect(page.getByTestId("model-state-read-failed")).toHaveCount(0);
     await expect(page.locator("body")).toContainText("needs-results");

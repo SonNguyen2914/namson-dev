@@ -14,7 +14,7 @@
 // eighteen league-phase fixtures.
 //
 // So the source is GET /api/comp/{key}/fixtures, which is what
-// /bet-suggester/comp/{key} already reads and what `src.competitions`
+// /trivela/comp/{key} already reads and what `src.competitions`
 // serves from `VIEWERS` — a registry that has nothing to do with
 // BOARD_COLUMNS. It survives the removal because it never depended on it.
 //

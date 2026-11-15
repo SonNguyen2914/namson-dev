@@ -72,7 +72,7 @@ import { hueOf } from "./PickerColumn";
  *  was a dead key, and the reader's only route to the eighth column was
  *  seven presses the other way. That is the "one sided" in the request.
  *
- *  Modular, in exactly the shape `/bet-suggester/leagues` has used since
+ *  Modular, in exactly the shape `/trivela/leagues` has used since
  *  it shipped — `(i + delta + n) % n` — because a second, differently
  *  written answer to "what is the league after the last one" is the kind
  *  of copy this tree keeps paying for. ONE STEP FUNCTION, and the arrow
@@ -139,7 +139,7 @@ function carriesTheGesture(target: EventTarget | null, stop: Element): boolean {
  *  board-level swipe there would be a second, invisible switcher over a
  *  track that already reads horizontal drags itself.
  *
- *  THE THRESHOLD IS THE ONE `/bet-suggester/leagues` HAS RUN SINCE IT
+ *  THE THRESHOLD IS THE ONE `/trivela/leagues` HAS RUN SINCE IT
  *  SHIPPED, to the constant: past 48px, and horizontal by half again
  *  over the vertical. The second half is what keeps a phone usable — the
  *  board is a tall column of cards and nearly every gesture on it is a

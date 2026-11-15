@@ -1,4 +1,4 @@
-// App chrome for the bet-suggester: a sticky glass top bar with wayfinding
+// App chrome for the trivela: a sticky glass top bar with wayfinding
 // chips, skeleton loaders so data-heavy sections show structure (never a
 // bare "Loading…"), fold-away sections, quiet toasts for silent actions,
 // a route-change progress sweep, and a scroll-spy so the chip for the
@@ -36,9 +36,9 @@ import { useOperatorTokenHeld } from "./OperatorToken";
  *  signal about what is worth looking at. */
 function FieldLink() {
   const router = useRouter();
-  const here = router.pathname === "/bet-suggester/ratings";
+  const here = router.pathname === "/trivela/ratings";
   return (
-    <Link href="/bet-suggester/ratings" data-testid="field-link"
+    <Link href="/trivela/ratings" data-testid="field-link"
       aria-label="the field — rankings and tier rankings"
       aria-current={here ? "page" : undefined}
       className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] transition-colors sm:px-2 ${

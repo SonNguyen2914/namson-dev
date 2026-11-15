@@ -111,11 +111,11 @@ export default function TradingConsole() {
       {/* "← board" goes TO THE BOARD, the BOARD chip's own target — never
           history.back() (Son, 2026-10-07: it stepped back through every
           console view he had visited before reaching the board) */}
-      <TopBar back={{ href: "/bet-suggester", label: "board", direct: true }}
+      <TopBar back={{ href: "/trivela", label: "board", direct: true }}
         title="trading console" inner="max-w-[1760px] px-4 sm:px-6">
-        <NavChip href="/bet-suggester">board</NavChip>
-        <NavChip href="/bet-suggester/leagues">leagues</NavChip>
-        <NavChip href="/bet-suggester/ratings">field</NavChip>
+        <NavChip href="/trivela">board</NavChip>
+        <NavChip href="/trivela/leagues">leagues</NavChip>
+        <NavChip href="/trivela/ratings">field</NavChip>
       </TopBar>
 
       {last ? (
