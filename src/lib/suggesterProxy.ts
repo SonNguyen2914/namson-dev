@@ -224,7 +224,13 @@ export const PROXY_TIMEOUT_MS = 15_000;
  *  `maxDuration` (60s, set in each board's route file). */
 export const PROXY_TIMEOUT_BY_ROUTE: Readonly<Record<string, number>> = {
   "championships/board": 45_000,
-  "picker/board": 45_000,
+  /* THE PICKER BOARD AND ITS TAIL WAIT 110s (2026-11-15). A cold club
+     board build took 75-157s in prod that night (TRIVELA #451 stops the
+     duplicate builds; one build alone is still ~80s), so at 45s the first
+     visitor after a quiet spell always got "the board could not be
+     built". 110s sits under the 120s `maxDuration` that
+     pages/api/picker/[...path].ts sets for it. */
+  "picker/board": 110_000,
   /* THE TWO FINISHED TAILS TOO (2026-10-13). They are asked beside their
      board on every load and rebuild on the request path past their own
      cache (300s), and the 15s clock was cutting them off: production's
@@ -235,7 +241,7 @@ export const PROXY_TIMEOUT_BY_ROUTE: Readonly<Record<string, number>> = {
      #260, but it still reads every competition's scoreboard, so it gets
      the board's budget, under the same 60s `maxDuration` both route
      files already set. */
-  "picker/review": 45_000,
+  "picker/review": 110_000,
   "championships/review": 45_000,
 };
 

@@ -71,6 +71,23 @@ test.describe("the proxy's clock, per route", () => {
       expect(took).toBeGreaterThanOrEqual(19_000);
     });
 
+  test("the picker's finished tail that takes 60s is answered, not timed out",
+    async ({ request }) => {
+      // 2026-11-15: a cold club board build took ~80s in prod and the old
+      // 45s clock showed "the board could not be built" every time. The
+      // board itself is refused by the hold-out (it writes), so its tail,
+      // which shares the board's 110s clock and proxy file, stands in.
+      test.setTimeout(90_000);
+      const started = Date.now();
+      const r = await request.get(
+        "/api/picker/review?back=8&__standin_delay_ms=60000",
+        { timeout: 80_000 });
+      const took = Date.now() - started;
+      expect(r.status(), await r.text()).toBe(200);
+      expect((await r.json()).delayed_ms).toBe(60_000);
+      expect(took).toBeGreaterThanOrEqual(59_000);
+    });
+
   test("a competition fixture list that takes 20s is answered, not timed out",
     async ({ request }) => {
       test.setTimeout(60_000);
@@ -113,7 +130,7 @@ test.describe("the proxy's clock, per route", () => {
     expect(took).toBeLessThan(19_000);
   });
 
-  test("the table gives 45s to the two boards, their finished tails, every comp fixture list and every comp match hub, 15s to everything else",
+  test("the table gives 110s to the picker board and its tail, 45s to the championships board and tail, every comp fixture list and every comp match hub, 15s to everything else",
     () => {
       // Read through the namespace so this file still loads — and this
       // test fails by name — on a tree that has no table.
@@ -122,8 +139,8 @@ test.describe("the proxy's clock, per route", () => {
       expect(typeof at, "no per-route timeout table").toBe("function");
       if (!at) return;
       expect(at("championships/board")).toBe(45_000);
-      expect(at("picker/board")).toBe(45_000);
-      expect(at("picker/review")).toBe(45_000);
+      expect(at("picker/board")).toBe(110_000);
+      expect(at("picker/review")).toBe(110_000);
       expect(at("championships/review")).toBe(45_000);
       // every competition's fixture list, by key (2026-10-14: prod cut
       // comp/ucl/fixtures at 15s on a cold load)
