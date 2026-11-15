@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { runOutRetries } from "./retry-clock";
 import { BOARD_EIGHT, REVIEW_EIGHT, serveEight } from "./eight-columns";
 import { assertNoMachineText } from "./machine-text";
 import { openDetails } from "./review-details";
@@ -240,8 +241,10 @@ test("a failed FIELD read is named in the column's notes without its "
 
 test("the whole board failing renders a sentence, not the backend's "
    + "exception", async ({ page }) => {
+    await page.clock.install();
     await open(page, { board: { detail: ESPN_404 }, boardStatus: 503 });
     const box = page.getByTestId("board-error");
+    await runOutRetries(page, box);
     await expect(box).toBeVisible();
     await expect(box).toContainText("the board could not be built");
     await expect(box).toContainText("404");
@@ -264,7 +267,10 @@ test("a league whose finished tail failed is named without its endpoint",
   });
 
 test("a failed review under every column renders a sentence", async ({ page }) => {
+    await page.clock.install();
     await open(page, { review: { detail: POOL_TIMEOUT }, reviewStatus: 503 });
+    await runOutRetries(page,
+      page.getByTestId("review-count").filter({ hasText: "not read" }));
     await openTail(page);
     const box = column(page).getByTestId("review-error");
     await expect(box).toBeVisible();

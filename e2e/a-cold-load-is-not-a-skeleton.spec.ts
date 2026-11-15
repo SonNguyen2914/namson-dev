@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { runOutRetries } from "./retry-clock";
 
 // A COLD LOAD IS NOT A SKELETON (2026-09-10).
 //
@@ -105,6 +106,9 @@ for (const { path, ask } of BOARDS) {
         answered.push({ status: r.status(), rows, rowCols });
       });
 
+      // audit C-19: a refused read is retried on a backoff before it is
+      // named, so the clock is driven through that (see retry-clock.ts)
+      await page.clock.install();
       await page.goto(path);
 
       /* ── 1. THE REQUEST WENT OUT, WITH NO HELP FROM ANYBODY ──────────
@@ -137,6 +141,9 @@ for (const { path, ask } of BOARDS) {
          "still loading" is a state this can ask about by name rather
          than inferring from an absence — and "chrome over skeletons
          forever" is exactly the reading that was reverted. */
+      if (last.status !== 200) {
+        await runOutRetries(page, page.getByTestId("board-error"));
+      }
       const skeletons = page.getByRole("status", { name: "loading" });
       await expect(skeletons, `${path} is still drawing skeletons after `
         + "its board answered — the read landed and the page did not")

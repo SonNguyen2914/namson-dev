@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { runOutRetries } from "./retry-clock";
 
 // The 2026-08-30 restructure (board landing / leagues carousel / archive)
 // — coverage the two audit lanes found missing, plus pins on every fix
@@ -123,8 +124,10 @@ test("a board still in flight shows skeletons and NO header line, then "
 test("a dead network renders a sentence, not the browser's raw string",
   async ({ page }) => {
     await page.route("**/api/picker/board**", (r) => r.abort());
+    await page.clock.install();
     await page.goto("/trivela");
     const err = page.getByTestId("board-error");
+    await runOutRetries(page, err);
     await expect(err).toBeVisible();
     await expect(err).toContainText("the request never reached the server");
     await expect(err).not.toContainText("Failed to fetch");

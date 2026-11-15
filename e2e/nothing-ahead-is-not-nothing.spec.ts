@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { runOutRetries } from "./retry-clock";
 
 /* THE WINDOW THE PAGE ASKS FOR, from the page's own constant. Both
    windows opened at 8 days on 2026-09-15 and the chips that used to set
@@ -380,7 +381,10 @@ test("a review that FAILED is not a column with nothing finished",
        request; when it fails the finished count is UNKNOWN, and
        `review.rows.length` is 0 for exactly the same reason a hundred
        real matches would be. The header must not report that zero. */
+    await page.clock.install();
     await open(page, { detail: "review unavailable" }, 503);
+    await runOutRetries(page,
+      page.getByTestId("review-count").filter({ hasText: "not read" }));
     /* THE BOARD ITSELF IS UNHARMED — the two payloads fail apart. Every
        row the board served is still drawn, counted ACROSS THE WINDOW
        rather than in one four-column view: the UCL row rides a column
