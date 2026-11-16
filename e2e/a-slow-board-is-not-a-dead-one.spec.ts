@@ -10,8 +10,9 @@
  *
  *  So: the two board routes wait 45s and every other route keeps 15s,
  *  and the page asks ONCE more after a proxy timeout, showing a quiet
- *  building state instead of the red card. The red card only follows a
- *  second timeout, and a stale board is never drawn in the meantime.
+ *  building state instead of the red card. Since audit C-19 a second
+ *  timeout is asked again on a bounded backoff under a retrying line
+ *  before the red card, and a stale board is never drawn in the meantime.
  *
  *  HERMETIC. The slow backend is the stand-in (`__standin_delay_ms`,
  *  e2e/stand-in-backend.mjs) reached through the app's REAL proxy; the
@@ -227,7 +228,11 @@ test.describe("the board page on a slow rebuild", () => {
       });
   }
 
-  test("two proxy timeouts show the red card, and only then", async ({ page }) => {
+  test("two proxy timeouts become a bounded retry, then the red card, and only then",
+    async ({ page }) => {
+    // audit C-19 (2026-11-15): after the one quiet re-ask, a retryable
+    // failure with no board yet is asked again on REFRESH_BACKOFF_MS
+    // (15s, 30s, 60s) under a retrying line — and only then the card.
     await onChampionships(page);
     let asked = 0;
     await page.route("**/api/championships/board**", (r) => {
@@ -237,15 +242,23 @@ test.describe("the board page on a slow rebuild", () => {
     await page.goto("/trivela");
     await expect(page.getByTestId("board-building")).toBeVisible();
     await expect(page.getByTestId("board-error")).toHaveCount(0);
+    await expect(page.getByTestId("board-retrying")).toBeVisible();
+    expect(asked).toBe(2);
+    await expect(page.getByTestId("board-error")).toHaveCount(0);
+    for (const [i, wait] of [15_000, 30_000, 60_000].entries()) {
+      await page.clock.fastForward(wait + 1_000);
+      await expect.poll(() => asked).toBe(3 + i);
+    }
     const card = page.getByTestId("board-error");
     await expect(card).toBeVisible();
     await expect(card).toContainText(/the board could not be built/i);
     await expect(card).toContainText(
       "Nothing is being shown from an earlier request");
     await expect(page.locator('[data-testid="league-col"]')).toHaveCount(0);
-    expect(asked).toBe(2);
-    // one retry, not a loop
-    await page.waitForTimeout(3_000);
-    expect(asked).toBe(2);
+    expect(asked).toBe(5);
+    // bounded, not a loop
+    await page.clock.fastForward(120_000);
+    await page.waitForTimeout(1_000);
+    expect(asked).toBe(5);
   });
 });

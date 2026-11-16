@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { runOutRetries } from "./retry-clock";
 import { expectForwarded } from "./proxy-forwarding";
 
 /* THE WINDOW THE PAGE ASKS FOR, off the page's own constant. Both
@@ -411,9 +412,12 @@ test.describe("three states, and no two of them render alike", () => {
 
   test("3a · asked, and the whole request failed — the backend's own words",
     async ({ page }) => {
+      await page.clock.install();
       await open(page, "/trivela/ucl", UCL_BOARD,
                  { detail: "picker review unavailable" }, 503);
       const t = tail(page, "ucl");
+      await runOutRetries(page,
+        t.getByTestId("review-count").filter({ hasText: "not read" }));
       await expect(t.getByTestId("review-toggle"))
         .toHaveAttribute("data-has", "unread");
       await t.getByTestId("review-toggle").click();

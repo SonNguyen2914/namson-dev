@@ -26,7 +26,8 @@
 // count over a handful of matches reads as evidence it is not.
 
 import {
-  BlendWeights, DEFAULT_DAYS, KalshiQuote, ModelVsMarket, Shape, Src,
+  BlendWeights, DEFAULT_DAYS, KalshiQuote, ModelVsMarket, RetryableRead,
+  Shape, Src,
   TierPair,
 } from "./pickerApi";
 import { detailText } from "./httpFailure";
@@ -560,7 +561,7 @@ async function readReview(url: string, signal?: AbortSignal): Promise<Review> {
     // cancellation and is rethrown untouched; anything else is the
     // browser's raw network vocabulary, which is not a message.
     if (e instanceof DOMException && e.name === "AbortError") throw e;
-    throw new Error(
+    throw new RetryableRead(
       "the request never reached the server — check the connection and try again");
   }
   if (!r.ok) {
@@ -569,7 +570,8 @@ async function readReview(url: string, signal?: AbortSignal): Promise<Review> {
       const body = await r.json();
       detail = detailText(body, r.status);
     } catch { /* non-JSON body; the status is all we have */ }
-    throw new Error(detail || `review request failed (${r.status})`);
+    const message = detail || `review request failed (${r.status})`;
+    throw r.status >= 500 ? new RetryableRead(message) : new Error(message);
   }
   // A 200 IS NOT A PAYLOAD. `return r.json()` folded three findings
   // into one: a SyntaxError in the browser's own vocabulary for a 204

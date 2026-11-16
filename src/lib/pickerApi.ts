@@ -1928,11 +1928,40 @@ export async function fetchBoard(
  *  board rebuilds on the request path when its cache expires, and a
  *  rebuild that outran the clock has usually landed by the second ask.
  *  Any other 504, or any other failure, is not this. */
-export class BoardTimeout extends Error {
+/** A READ THAT FAILED IN A WAY ASKING AGAIN CAN FIX (audit C-19,
+ *  2026-11-15): the request never reached the server, or the server
+ *  answered 5xx. Carried so the page can keep the board it already shows
+ *  and ask again on a backoff, instead of blanking to the red card on a
+ *  503 the backend recovers from a minute later. A 4xx, a non-JSON 200
+ *  or a `null` payload is NOT this — asking again would get the same. */
+export class RetryableRead extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RetryableRead";
+  }
+}
+
+export class BoardTimeout extends RetryableRead {
   constructor(message: string) {
     super(message);
     this.name = "BoardTimeout";
   }
+}
+
+/** How long the page waits before each further ask after a retryable
+ *  failure, and — by its length — how many it makes before it stops. */
+export const REFRESH_BACKOFF_MS: readonly number[] = [15_000, 30_000, 60_000];
+
+/** Wait `ms`, or less if `signal` aborts first. True when it aborted. */
+export function waitOrAbort(ms: number, signal: AbortSignal): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    if (signal.aborted) return resolve(true);
+    const t = setTimeout(() => resolve(false), ms);
+    signal.addEventListener("abort", () => {
+      clearTimeout(t);
+      resolve(true);
+    }, { once: true });
+  });
 }
 
 /** How long the page waits before asking a timed-out board once more. */
@@ -1953,7 +1982,7 @@ async function readBoard(path: string, signal?: AbortSignal): Promise<Board> {
     // browser's raw network failure ("Failed to fetch", "Load failed"…),
     // which is debugging vocabulary, not a message: name the situation.
     if (e instanceof DOMException && e.name === "AbortError") throw e;
-    throw new Error(
+    throw new RetryableRead(
       "the request never reached the server — check the connection and try again");
   }
   if (!r.ok) {
@@ -1968,7 +1997,8 @@ async function readBoard(path: string, signal?: AbortSignal): Promise<Board> {
       timedOut = r.status === 504 && body?.reason === "backend_timeout";
     } catch { /* non-JSON body; the status is all we have */ }
     const message = detail || `board request failed (${r.status})`;
-    throw timedOut ? new BoardTimeout(message) : new Error(message);
+    throw timedOut ? new BoardTimeout(message)
+      : r.status >= 500 ? new RetryableRead(message) : new Error(message);
   }
   // A 200 IS NOT A PAYLOAD. `return r.json()` folded three findings
   // into one: a SyntaxError in the browser's own vocabulary for a 204

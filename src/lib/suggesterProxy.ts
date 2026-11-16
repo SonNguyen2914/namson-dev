@@ -315,6 +315,8 @@ export async function proxy(
   backendPath: string,
   within: string,
   timeoutMs: number = PROXY_TIMEOUT_MS,
+  /** Set on a 200 ONLY — see EDGE_CACHE_CONTROL. Never on an error. */
+  cacheControl?: string,
 ) {
   // WALL 2 — see the block above. Checked BEFORE any socket opens, so a
   // refused path never reaches a backend at all.
@@ -394,7 +396,41 @@ export async function proxy(
       body_truncated: raw.length > RELAYED_BODY_CHARS,
     });
   }
+  if (cacheControl && r.status === 200) {
+    res.setHeader("Cache-Control", cacheControl);
+  }
   res.status(r.status).json(parsed);
+}
+
+/** THE PUBLIC BOARD READS MAY BE HELD AT THE EDGE (audit C-19,
+ *  2026-11-15). Visitors saw 503s while a cold board was rebuilt; the
+ *  backend now answers from a stale copy (TRIVELA #463), and this lets
+ *  Vercel's CDN do the same: a 200 is fresh for 60s and may be served
+ *  stale for 10 more minutes while ONE request revalidates it.
+ *
+ *  ONLY THESE FOUR, ONLY UNDATED, ONLY ANONYMOUS, ONLY A 200. A `date`
+ *  board is a different question; a request carrying a cookie, an
+ *  Authorization or an operator token is never cached even though this
+ *  proxy forwards none of them; an error is never cached, so a 503 is
+ *  not replayed for a minute after the backend recovered. Admin, ops,
+ *  operator and card routes never pass through here with this set. */
+export const EDGE_CACHED_ROUTES: ReadonlySet<string> = new Set([
+  "picker/board", "picker/review", "championships/board",
+  "championships/review",
+]);
+export const EDGE_CACHE_CONTROL =
+  "public, s-maxage=60, stale-while-revalidate=600";
+
+/** The Cache-Control a 200 on this request may carry, or undefined. */
+export function edgeCacheControl(
+  route: string, query: string, headers: NextApiRequest["headers"],
+): string | undefined {
+  if (!EDGE_CACHED_ROUTES.has(route)) return undefined;
+  if (new URLSearchParams(query).has("date")) return undefined;
+  if (headers.cookie || headers.authorization || headers["x-admin-token"]) {
+    return undefined;
+  }
+  return EDGE_CACHE_CONTROL;
 }
 
 // --------------------------------------------------------------------
@@ -1098,7 +1134,8 @@ export function proxyLeague(
     });
   }
   return proxy(req, res, `/api/${prefix}/${segs}${qs}`, `/api/${prefix}/`,
-               proxyTimeoutMs(`${prefix}/${segs}`));
+               proxyTimeoutMs(`${prefix}/${segs}`),
+               edgeCacheControl(`${prefix}/${segs}`, qs.slice(1), req.headers));
 }
 
 /** A response body, parsed, or a NAMED reason it could not be. `raw` is

@@ -74,7 +74,8 @@ import { FieldRead, fetchRatings } from "../../lib/fieldApi";
 import { TZ, dayLabel, localDay } from "../../lib/matchday";
 import {
   BOARD_RETRY_DELAY_MS, Board, BoardTimeout, CUP_COMP_KEY, DEFAULT_DAYS,
-  SEASON_BLEND_K, THIN_ASK_SIZE,
+  REFRESH_BACKOFF_MS, RetryableRead, SEASON_BLEND_K, THIN_ASK_SIZE,
+  waitOrAbort,
   WIDE_SPREAD_C, askHonoured, boardColumns, columnsOf, declarationOf,
   isFoldedCupTie,
   LeagueMeta, fetchBoard, fetchChampionships, leagueLabel,
@@ -140,6 +141,12 @@ const BOARD_MODE_KEY = "board-mode";
 
 const etDate = (d: string) =>
   /^\d{8}$/.test(d) ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}` : d;
+
+/** "HH:MM" in the site's zone, for "showing data from …" (audit C-19). */
+const hhmm = (iso: string) =>
+  new Date(iso).toLocaleTimeString("en-US", {
+    timeZone: TZ, hour: "numeric", minute: "2-digit",
+  });
 
 /** THE BOARD, OPTIONALLY NARROWED TO ONE COLUMN.
  *
@@ -258,6 +265,21 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   /* The first read timed out at the proxy and the second is on its way:
      a quiet line over the skeleton, never the red card. */
   const [building, setBuilding] = useState(false);
+  /* A REFRESH THAT FAILED IS NOT A BOARD THAT VANISHED (audit C-19,
+     2026-11-15). Visitors saw 503s while a cold board was rebuilt.
+     When the board on screen answers THE SAME QUESTION (`heldBoardKey`:
+     mode, window, ask) and a re-read fails in a way asking again can fix
+     (RetryableRead), that board stays, SAID to be the last good one with
+     the time it was built, and the page asks again on REFRESH_BACKOFF_MS.
+     With no board yet, the skeleton says it is retrying — bounded by the
+     same list — before the red card. A board for a DIFFERENT question is
+     still never drawn in the meantime. */
+  const heldBoardKey = useRef<string | null>(null);
+  const [staleBoard, setStaleBoard] = useState<{ retrying: boolean } | null>(null);
+  const [retrying, setRetrying] = useState<
+    { attempt: number; of: number; inS: number } | null>(null);
+  const heldReviewKey = useRef<string | null>(null);
+  const [staleReview, setStaleReview] = useState<{ retrying: boolean } | null>(null);
   const [nonce, setNonce] = useState(0);
   // The finished tail rides on its OWN state, its own request and its own
   // window. A dead review must not blank the board, and a slow one must
@@ -339,51 +361,72 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   const ask = asked ? [...asked].join(",") : "";
   const load = useCallback(async (signal: AbortSignal) => {
     if (mode === null) return;
-    setLoading(true);
+    const key = `${mode}|${days}|${ask}`;
+    const holding = heldBoardKey.current === key;
+    // a held board stays on screen while it is asked again
+    if (!holding) setLoading(true);
     setBuilding(false);
+    setRetrying(null);
     /* ONE ROUTE PER MODE, NEVER BOTH. The Leagues read is the string it
        has always been; the Championships read is its own route, which
        writes nothing. e2e/championships-board.spec.ts counts both. */
     const read = () => mode === "nations"
       ? fetchChampionships(days, signal)
       : fetchBoard(days, signal, ask === "" ? undefined : ask.split(","));
-    try {
-      let b: Board;
+    for (let attempt = 0; ; attempt += 1) {
       try {
-        b = await read();
-      } catch (e) {
-        /* A PROXY TIMEOUT IS ASKED ONCE MORE, NOT SHOWN. The board is
-           rebuilt on the request path whenever its cache expires, and a
-           rebuild that outran the proxy's clock has usually landed by
-           the second ask. Only the proxy's own named 504 earns this —
-           every other failure goes straight to the card — and it is
-           ONE retry: a second timeout is the card, as before. Nothing
-           from an earlier board is drawn while it waits (`loading`
-           stays true). e2e/a-slow-board-is-not-a-dead-one.spec.ts. */
-        if (!(e instanceof BoardTimeout) || signal.aborted) throw e;
-        setBuilding(true);
-        await new Promise<void>((resolve) => {
-          const t = setTimeout(resolve, BOARD_RETRY_DELAY_MS);
-          signal.addEventListener("abort", () => {
-            clearTimeout(t);
-            resolve();
-          }, { once: true });
-        });
+        let b: Board;
+        try {
+          b = await read();
+        } catch (e) {
+          /* A PROXY TIMEOUT IS ASKED ONCE MORE, NOT SHOWN. The board is
+             rebuilt on the request path whenever its cache expires, and a
+             rebuild that outran the proxy's clock has usually landed by
+             the second ask. Only the proxy's own named 504 earns this,
+             and only on the first ask: after it, the backoff below.
+             Nothing from an earlier board is drawn while it waits
+             (`loading` stays true). e2e/a-slow-board-is-not-a-dead-one.spec.ts. */
+          if (!(e instanceof BoardTimeout) || signal.aborted || attempt > 0
+              || holding) throw e;
+          setBuilding(true);
+          if (await waitOrAbort(BOARD_RETRY_DELAY_MS, signal)) return;
+          b = await read();
+        }
         if (signal.aborted) return;
-        b = await read();
+        heldBoardKey.current = key;
+        setBoard(b);
+        setError("");
+        setStaleBoard(null);
+      } catch (e) {
+        if (signal.aborted) return;
+        if (e instanceof RetryableRead && attempt < REFRESH_BACKOFF_MS.length) {
+          const wait = REFRESH_BACKOFF_MS[attempt];
+          if (holding) {
+            setStaleBoard({ retrying: true });
+          } else {
+            setBuilding(false);
+            setRetrying({ attempt: attempt + 1, of: REFRESH_BACKOFF_MS.length,
+                          inS: wait / 1000 });
+          }
+          if (await waitOrAbort(wait, signal)) return;
+          continue;
+        }
+        if (holding && e instanceof RetryableRead) {
+          // asked enough: the last good board stays, said, with a button
+          setStaleBoard({ retrying: false });
+        } else {
+          heldBoardKey.current = null;
+          setBoard(null);
+          setStaleBoard(null);
+          setError(e instanceof Error ? e.message : String(e));
+        }
       }
-      if (signal.aborted) return;
-      setBoard(b);
-      setError("");
-    } catch (e) {
-      if (signal.aborted) return;
-      setBoard(null);
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
       if (!signal.aborted) {
         setLoading(false);
         setBuilding(false);
+        setRetrying(null);
       }
+      return;
     }
   }, [days, ask, mode]);
 
@@ -411,29 +454,48 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      and the landing page passes nothing here for the same reason it
      passes nothing there. */
   const loadReview = useCallback(async (signal: AbortSignal) => {
-    setReviewLoading(true);
-    try {
-      /* THE CHAMPIONSHIPS BOARD ASKS ITS OWN REVIEW (2026-09-27): the
-         national finished tail, read from the match archive. It is not
-         the club board's route and it writes nothing. */
-      const r = mode === "nations"
-        ? await fetchChampionshipsReview(back, signal)
-        : await fetchReview(back, signal,
-                            ask === "" ? undefined : ask.split(","));
-      if (signal.aborted) return;
-      setReview(r);
-      setReviewFor(mode);
-      setReviewError("");
-    } catch (e) {
-      if (signal.aborted) return;
-      // Same contract as the board: on failure the previous payload is
-      // DROPPED. A finished tail from an older window standing under a
-      // fresh board is stale dressed as current.
-      setReview(null);
-      setReviewFor(mode);
-      setReviewError(e instanceof Error ? e.message : String(e));
-    } finally {
+    /* The board's rule (audit C-19): a held review for THE SAME question
+       stays through a retryable failure, said, while it is asked again. */
+    const key = `${mode}|${back}|${ask}`;
+    const holding = heldReviewKey.current === key;
+    if (!holding) setReviewLoading(true);
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        /* THE CHAMPIONSHIPS BOARD ASKS ITS OWN REVIEW (2026-09-27): the
+           national finished tail, read from the match archive. It is not
+           the club board's route and it writes nothing. */
+        const r = mode === "nations"
+          ? await fetchChampionshipsReview(back, signal)
+          : await fetchReview(back, signal,
+                              ask === "" ? undefined : ask.split(","));
+        if (signal.aborted) return;
+        heldReviewKey.current = key;
+        setReview(r);
+        setReviewFor(mode);
+        setReviewError("");
+        setStaleReview(null);
+      } catch (e) {
+        if (signal.aborted) return;
+        if (e instanceof RetryableRead && attempt < REFRESH_BACKOFF_MS.length) {
+          if (holding) setStaleReview({ retrying: true });
+          if (await waitOrAbort(REFRESH_BACKOFF_MS[attempt], signal)) return;
+          continue;
+        }
+        if (holding && e instanceof RetryableRead) {
+          setStaleReview({ retrying: false });
+        } else {
+          // Same contract as the board: on failure the previous payload is
+          // DROPPED. A finished tail from an older window standing under a
+          // fresh board is stale dressed as current.
+          heldReviewKey.current = null;
+          setReview(null);
+          setReviewFor(mode);
+          setReviewError(e instanceof Error ? e.message : String(e));
+          setStaleReview(null);
+        }
+      }
       if (!signal.aborted) setReviewLoading(false);
+      return;
     }
   }, [back, ask, mode]);
 
@@ -747,6 +809,8 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
    *  length of a request is stale dressed as current. */
   const chooseMode = useCallback((m: BoardMode) => {
     if (m === mode) return;
+    heldBoardKey.current = null;
+    setStaleBoard(null);
     setBoard(null);
     setLoading(true);
     setShown(null);
@@ -1756,6 +1820,13 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                   this can take a few seconds.
                 </p>
               )}
+              {retrying && (
+                <p data-testid="board-retrying" role="status"
+                  className="mb-4 text-sm text-ink-low">
+                  The board could not be loaded yet — asking again
+                  in {retrying.inS}s (try {retrying.attempt} of {retrying.of}).
+                </p>
+              )}
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
                 {[0, 1, 2, 3].map((i) => (
                   <SkeletonRows key={i} rows={3} height="h-40" />
@@ -1786,6 +1857,30 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             </div>
           ) : (
             <>
+              {/* THE LAST GOOD BOARD, SAID TO BE ONE (audit C-19). */}
+              {board && staleBoard && (
+                <p data-testid="board-stale" role="status"
+                  className="mb-4 font-mono text-[11px] text-ink-low">
+                  couldn&apos;t refresh — showing data from {hhmm(board.generated_at)}
+                  {staleBoard.retrying ? " · asking again shortly" : (
+                    <>
+                      {" · "}
+                      <button onClick={() => setNonce((n) => n + 1)}
+                        className="underline hover:text-ink-hi">
+                        try again
+                      </button>
+                    </>
+                  )}
+                </p>
+              )}
+              {reviewHere && staleReview && (
+                <p data-testid="review-stale" role="status"
+                  className="mb-4 font-mono text-[11px] text-ink-low">
+                  couldn&apos;t refresh the finished matches — showing data
+                  from {hhmm(reviewHere.generated_at)}
+                  {staleReview.retrying ? " · asking again shortly" : ""}
+                </p>
+              )}
               {/* THE BOARD DOES NOT CARRY THIS COMPETITION, SAID OUT
                   LOUD. A page narrowed to a column the board's own
                   `leagues` never declares has no rows to draw and no

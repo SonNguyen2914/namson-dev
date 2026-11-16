@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { runOutRetries } from "./retry-clock";
 import { openDetails } from "./review-details";
 import { expectForwarded } from "./proxy-forwarding";
 // the SAME day-key function the board groups by, so a test can never
@@ -839,8 +840,10 @@ test("an empty window says so in every column that IS empty, and keeps the refus
 
 test("a failed backend names itself and shows no stale board",
   async ({ page }) => {
+    await page.clock.install();
     await open(page, { detail: "picker board unavailable" }, 503);
     const err = page.getByTestId("board-error");
+    await runOutRetries(page, err);
     await expect(err).toBeVisible();
     await expect(err).toContainText("picker board unavailable");
     await expect(page.getByTestId("picker-row")).toHaveCount(0);
@@ -2332,7 +2335,9 @@ test("an empty tail in every column when nothing at all finished",
 
 test("a failed review names itself under every column and shows no stale tail",
   async ({ page }) => {
+    await page.clock.install();
     await open(page, BOARD, 200, { detail: "picker review unavailable" }, 503);
+    await runOutRetries(page, page.getByTestId("review-error"));
     await expect(page.getByTestId("review-error")).toHaveCount(4);
     await expect(page.getByTestId("review-error").first())
       .toContainText("picker review unavailable");
