@@ -17,7 +17,8 @@ import { failureOf, NEVER_ANSWERED } from "../lib/httpFailure";
 
 import MarketVsRead, { MarketVsReadInline, type MarketVsReadData }
   from "./MarketVsRead";
-import { shortClub } from "../lib/clubName";
+import { shortClubPair } from "../lib/clubName";
+import { shareChips } from "../lib/pointsShare";
 import { TZ, dayLabel, groupByDay } from "../lib/matchday";
 import { Eyebrow } from "./ui";
 
@@ -114,14 +115,18 @@ function StrengthCell({ s, home, away }: {
   }
   const e = s.expected_points_share;
   const hi = e.home >= e.away;
+  // whole percents that sum to 100, and two labels that can be told
+  // apart (audit W8-FE-04 / W8-FE-05) — the comp page's rules
+  const pct = shareChips(e.home, e.away);
+  const label = shortClubPair(s.home?.club || home, s.away?.club || away);
   return (
-    <span className="whitespace-nowrap font-mono text-[10px]">
+    <span data-testid="strength-chips" className="whitespace-nowrap font-mono text-[10px]">
       <span className={hi ? "text-accent" : "text-ink-low"}>
-        {shortClub(s.home?.club || home)} {(e.home * 100).toFixed(0)}%
+        {label.home} {pct.home}%
       </span>
       <span className="px-1 text-ink-faint">·</span>
       <span className={!hi ? "text-accent" : "text-ink-low"}>
-        {(e.away * 100).toFixed(0)}% {shortClub(s.away?.club || away)}
+        {pct.away}% {label.away}
       </span>
     </span>
   );

@@ -35,7 +35,7 @@ import MarketVsRead, { MarketVsReadInline, type MarketVsReadData }
   from "../../../components/MarketVsRead";
 import TournamentView from "../../../components/TournamentView";
 import { hueOf } from "../../../components/PickerColumn";
-import { shortClub } from "../../../lib/clubName";
+import { shortClubPair } from "../../../lib/clubName";
 import { shareChips } from "../../../lib/pointsShare";
 import { TZ, dayLabel, groupByDay } from "../../../lib/matchday";
 
@@ -135,15 +135,16 @@ function Read({ s, home, away }: {
   }
   const hi = e.home >= e.away;
   const pct = shareChips(e.home, e.away);
+  const label = shortClubPair(s?.home?.club || home, s?.away?.club || away);
   const d = s?.rating_difference ?? s?.elo_difference;
   return (
     <span className="whitespace-nowrap font-mono text-[10px]">
       <span className={hi ? "text-accent" : "text-ink-low"}>
-        {shortClub(s?.home?.club || home)} {pct.home}%
+        {label.home} {pct.home}%
       </span>
       <span className="px-1 text-ink-faint">·</span>
       <span className={!hi ? "text-accent" : "text-ink-low"}>
-        {pct.away}% {shortClub(s?.away?.club || away)}
+        {pct.away}% {label.away}
       </span>
       {typeof d === "number" && (
         <span className="pl-1.5 text-ink-faint">
@@ -556,10 +557,10 @@ function CompViewerBody({ compKey: key }: { compKey: string | null }) {
                           };
                           return (
                             <p className="font-mono text-[11px] leading-relaxed text-ink-low">
-                              group phase · {shortClub(f.home?.name)}{" "}
+                              group phase · {shortClubPair(f.home?.name, f.away?.name).home}{" "}
                               {rec(f.meaning?.stakes?.home)}
                               <span className="px-1.5 text-ink-faint">·</span>
-                              {shortClub(f.away?.name)}{" "}
+                              {shortClubPair(f.home?.name, f.away?.name).away}{" "}
                               {rec(f.meaning?.stakes?.away)}
                             </p>
                           );

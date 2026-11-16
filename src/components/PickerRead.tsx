@@ -28,7 +28,7 @@ import {
   AXIS_ORDER, axesPresent, axisDecimals, measurementOf, tierSet,
   unitLabel, writeMeasurement,
 } from "../lib/fieldApi";
-import { fmtDate } from "../lib/matchday";
+import { TZ, fmtDate } from "../lib/matchday";
 import { readMatchClock } from "../lib/suggesterApi";
 
 /** The word for a gap that was never measured. It is NOT "0", NOT "—"
@@ -215,12 +215,53 @@ export function SeasonWeight({ w, alt, departure }: {
  *  is absent is the backend's to state, and rides in the title. */
 export const BOARD_CLOCK_ABSENT = "clock unavailable";
 
+/** A LIVE MINUTE HAS AN AGE (audit W8-FE-01, 2026-11-15). The board is
+ *  a cached read: the edge and the backend may serve it minutes old, and
+ *  a tab left open holds whatever it last drew. "LIVE 23'" with no age
+ *  read as the match being at 23' NOW, long after it ended. Past this
+ *  age the cell says when the minute was read ("· as of 3:42 PM"), in
+ *  the warn tone — never a bare minute. */
+export const CLOCK_STALE_AFTER_MS = 3 * 60_000;
+
+/** WHEN THE CLOCK ON THIS ROW WAS READ: the tape row's own
+ *  `captured_at`, else the board's tape read (`read_at`) less the row's
+ *  stated age. null when there is no clock to date. */
+export function clockReadAt(live?: BoardRowLive | null): number | null {
+  if (!live?.clock) return null;
+  const at = live.clock.captured_at ? Date.parse(live.clock.captured_at) : NaN;
+  if (Number.isFinite(at)) return at;
+  const read = live.read_at ? Date.parse(live.read_at) : NaN;
+  if (!Number.isFinite(read)) return null;
+  return read - (live.row_age_seconds ?? 0) * 1000;
+}
+
+/** The viewer's clock, read in an effect (never during render: the
+ *  server's first paint and the rehydration would disagree) and moved
+ *  on every 30 s while `on`, so an open tab ages its own minute. */
+function useNow(on: boolean): number | null {
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    if (!on) return;
+    const tick = () => setNow(Date.now());
+    const t0 = setTimeout(tick, 0);
+    const t = setInterval(tick, 30_000);
+    return () => { clearTimeout(t0); clearInterval(t); };
+  }, [on]);
+  return now;
+}
+
+const clockHhmm = (ms: number) =>
+  new Date(ms).toLocaleTimeString("en-US", {
+    timeZone: TZ, hour: "numeric", minute: "2-digit",
+  });
+
 export function KickoffCell({ kickoff, inPlay, live, className = "" }: {
   kickoff: string | null | undefined;
   inPlay: boolean;
   live?: BoardRowLive | null;
   className?: string;
 }) {
+  const now = useNow(inPlay);
   if (!inPlay) {
     return (
       <span data-testid="row-kickoff" data-in-play="false"
@@ -250,6 +291,18 @@ export function KickoffCell({ kickoff, inPlay, live, className = "" }: {
         className={unread ? "text-warn" : "text-live"}>
         {unread ? BOARD_CLOCK_ABSENT : clock.text}
       </span>
+      {!unread && (() => {
+        const at = clockReadAt(live);
+        if (at == null || now == null || now - at <= CLOCK_STALE_AFTER_MS) {
+          return null;
+        }
+        return (
+          <span data-testid="row-clock-asof" className="text-warn"
+            title="the minute beside this was read at this time and has not been refreshed since">
+            · as of {clockHhmm(at)}
+          </span>
+        );
+      })()}
       <span className="sr-only">
         {" — this match is under way. Every figure on this card is a "}
         {"pre-kickoff read and was not recomputed when it kicked off."}

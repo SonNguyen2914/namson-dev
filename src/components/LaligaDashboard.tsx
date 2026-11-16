@@ -25,13 +25,17 @@ import { useState } from "react";
 import { pollReads, usePoll } from "../lib/usePoll";
 
 import { dayKeyOf, dayLabel, fmtDate, groupByDay, localDay } from "../lib/matchday";
+import { NO_SCORE, POSTPONED_NO_RESULT, isNotPlayed } from "../lib/notPlayed";
 import { Eyebrow, Reveal } from "./ui";
 import { BookGrid, unavailableOf, type GameBook, type UnavailableBook } from "./BookCard";
 
 type Side = { name?: string; short?: string; abbrev?: string; logo?: string;
   score?: string; record?: string };
 type Fixture = { id: string; date: string; state: "pre" | "in" | "post" | null;
-  detail?: string; minute?: string; venue?: string; home: Side; away: Side };
+  detail?: string;
+  /** the backend's not-played tag: the scores beside it are NOT a
+   *  result (lib/notPlayed, audit W8-FE-02) */
+  postponed?: boolean; minute?: string; venue?: string; home: Side; away: Side };
 type StandingEntry = { team: string; abbrev?: string; rank?: number;
   played?: number; wins?: number; losses?: number; ties?: number;
   points?: number; goal_diff?: number };
@@ -336,7 +340,7 @@ export default function LaligaDashboard() {
                 <Link key={f.id} href={`/trivela/laliga/${f.id}`}
                   className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-accent/5">
                   <span className="w-28 shrink-0 font-mono text-[11px] uppercase tracking-wide text-ink-faint">
-                    {fmtDate(f.date)}
+                    {isNotPlayed(f) ? "postponed" : fmtDate(f.date)}
                   </span>
                   <span className="flex-1 truncate text-ink-hi">
                     {f.home.short || f.home.name}
@@ -401,7 +405,8 @@ function Empty({ children }: { children: React.ReactNode }) {
   );
 }
 
-function TeamLine({ s, live }: { s: Side; live: boolean }) {
+function TeamLine({ s, live, notPlayed = false }: {
+  s: Side; live: boolean; notPlayed?: boolean }) {
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="flex min-w-0 items-center gap-2">
@@ -415,7 +420,7 @@ function TeamLine({ s, live }: { s: Side; live: boolean }) {
         )}
       </span>
       <span className={`font-mono text-sm tabular-nums ${
-        live ? "text-accent" : "text-ink-hi"}`}>{s.score}</span>
+        live ? "text-accent" : "text-ink-hi"}`}>{notPlayed ? NO_SCORE : s.score}</span>
     </div>
   );
 }
@@ -482,20 +487,22 @@ function OddsChip({ o }: { o?: OddsRow }) {
 }
 
 function FixtureCard({ f, o }: { f: Fixture; o?: OddsRow }) {
-  const live = f.state === "in";
+  const notPlayed = isNotPlayed(f);
+  const live = f.state === "in" && !notPlayed;
   // A finished match keeps its result detail (FT); anything not under
   // way shows WHEN it kicks off — never the provider's bare "Scheduled"
   // (the card can be days away when ESPN serves the next matchday).
-  const when = f.state === "post"
+  const when = notPlayed ? POSTPONED_NO_RESULT
+    : f.state === "post"
     ? f.detail
     : (fmtDate(f.date, "short") || f.detail);
   return (
-    <Link href={`/trivela/laliga/${f.id}`}
+    <Link data-testid="fixture-card" data-postponed={notPlayed ? "true" : undefined} href={`/trivela/laliga/${f.id}`}
       className={`block cursor-pointer rounded-xl border p-3 transition-colors hover:border-accent/50 ${
       live ? "glow glow-accent border-accent/40 bg-elev" : "border-line"}`}>
-      <TeamLine s={f.home} live={live} />
+      <TeamLine s={f.home} live={live} notPlayed={notPlayed} />
       <div className="my-1.5 h-px bg-line" />
-      <TeamLine s={f.away} live={live} />
+      <TeamLine s={f.away} live={live} notPlayed={notPlayed} />
       <div className="mt-2 flex justify-between font-mono text-[10px] uppercase tracking-wide text-ink-faint">
         <span className={live ? "text-accent" : undefined}>
           {live ? `LIVE ${f.minute ?? ""}` : when}

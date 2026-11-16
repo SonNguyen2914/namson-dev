@@ -1,4 +1,5 @@
-import { TZ } from "../lib/matchday";
+import { dayKeyOf, dayLabel, fmtDate, groupByDay, localDay } from "../lib/matchday";
+import { NO_SCORE, POSTPONED_NO_RESULT, isNotPlayed } from "../lib/notPlayed";
 // Liga MX dashboard — split-season league surface (Jul 29, 2026).
 // Live ESPN fixtures/scores/standings for mex.1, Kalshi's real
 // KXLIGAMXGAME 3-way books (both sides shown — ask to buy, bid to
@@ -17,7 +18,10 @@ import { BookGrid, unavailableOf, type GameBook, type UnavailableBook } from "./
 type Side = { name?: string; short?: string; abbrev?: string; logo?: string;
   score?: string; record?: string };
 type Fixture = { id: string; date: string; state: "pre" | "in" | "post" | null;
-  detail?: string; minute?: string; venue?: string; tournament?: string | null;
+  detail?: string;
+  /** the backend's not-played tag: the scores beside it are NOT a
+   *  result (lib/notPlayed, audit W8-FE-02) */
+  postponed?: boolean; minute?: string; venue?: string; tournament?: string | null;
   home: Side; away: Side };
 type StandingEntry = { team: string; abbrev?: string; rank?: number;
   played?: number; wins?: number; losses?: number; ties?: number;
@@ -95,9 +99,9 @@ export default function LigamxDashboard() {
   // nothing is on today it returns the next one instead. So the heading
   // is derived from the fixtures rather than asserted — the same rule as
   // deriving a result letter from the score beside it. Grouping is by
-  // LOCAL day: an evening slate straddles two UTC dates (Liga MX
-  // kickoffs routinely cross midnight UTC) but is one evening to the
-  // viewer, and splitting it would be an artefact of the wire format.
+  // LA day (lib/matchday): an evening slate straddles two UTC dates (Liga
+  // MX kickoffs routinely cross midnight UTC) but is one evening, and
+  // splitting it would be an artefact of the wire format.
   const days = today.s === "ok" ? groupByDay(today.d) : [];
   // A FAILED ODDS READ IS NOT AN ABSENT PREDICTION — handed down only
   // when it was actually read, and the failure stated once.
@@ -199,7 +203,7 @@ export default function LigamxDashboard() {
                 <Link key={f.id} href={`/trivela/ligamx/${f.id}`}
                   className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-accent/5">
                   <span className="w-28 shrink-0 font-mono text-[11px] uppercase tracking-wide text-ink-faint">
-                    {fmtDate(f.date)}
+                    {isNotPlayed(f) ? "postponed" : fmtDate(f.date)}
                   </span>
                   <span className="flex-1 truncate text-ink-hi">
                     {f.home.short || f.home.name}
@@ -257,49 +261,14 @@ function Empty({ children }: { children: React.ReactNode }) {
   );
 }
 
-// One date formatter for the whole dashboard, in the VIEWER's timezone.
-// Local calendar-day identity. Deliberately not the ISO date: the wire
-// format is UTC, and Liga MX's 01:00Z/03:00Z kickoffs are the previous
-// evening everywhere in the Americas.
-const dayKeyOf = (d: Date) =>
-  `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+// THE DAY RULES ARE lib/matchday's (audit W8-FE-03, 2026-11-15). This
+// file kept a private copy that keyed days by the VIEWER's calendar
+// (getDate) and labelled them in LA, so east of LA one LA day split
+// in two under two identical headings and Sunday games sat under
+// "Saturday". MLS, LaLiga and the friendlies already import these.
 
-function localDay(iso: string) {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "" : dayKeyOf(d);
-}
-
-function dayLabel(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-US", {
-    timeZone: TZ,
-    weekday: "long", month: "short", day: "numeric",
-  });
-}
-
-function groupByDay(fixtures: Fixture[]) {
-  const groups = new Map<string, Fixture[]>();
-  for (const f of [...fixtures].sort((a, b) => a.date.localeCompare(b.date))) {
-    const list = groups.get(localDay(f.date));
-    if (list) list.push(f);
-    else groups.set(localDay(f.date), [f]);
-  }
-  return [...groups.entries()].map(([key, list]) => ({ key, list }));
-}
-
-function fmtDate(iso?: string, month: "short" | "numeric" = "numeric") {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleString("en-US", {
-    timeZone: TZ,
-    weekday: "short", month, day: "numeric",
-    hour: "numeric", minute: "2-digit",
-  });
-}
-
-function TeamLine({ s, live }: { s: Side; live: boolean }) {
+function TeamLine({ s, live, notPlayed = false }: {
+  s: Side; live: boolean; notPlayed?: boolean }) {
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="flex min-w-0 items-center gap-2">
@@ -313,7 +282,7 @@ function TeamLine({ s, live }: { s: Side; live: boolean }) {
         )}
       </span>
       <span className={`font-mono text-sm tabular-nums ${
-        live ? "text-accent" : "text-ink-hi"}`}>{s.score}</span>
+        live ? "text-accent" : "text-ink-hi"}`}>{notPlayed ? NO_SCORE : s.score}</span>
     </div>
   );
 }
@@ -378,22 +347,24 @@ function OddsChip({ o }: { o?: OddsRow }) {
 }
 
 function FixtureCard({ f, o }: { f: Fixture; o?: OddsRow }) {
-  const live = f.state === "in";
+  const notPlayed = isNotPlayed(f);
+  const live = f.state === "in" && !notPlayed;
   // A finished match keeps its result detail (FT); anything not yet
   // under way shows WHEN it kicks off — the derived-heading rule's card
   // twin ("Scheduled" said nothing). Local time is safe here: every
   // fixture is fetched in useEffect, so these cards only ever render
   // client-side and cannot mismatch SSR.
-  const when = f.state === "post"
+  const when = notPlayed ? POSTPONED_NO_RESULT
+    : f.state === "post"
     ? f.detail
     : (fmtDate(f.date, "short") || f.detail);
   return (
-    <Link href={`/trivela/ligamx/${f.id}`}
+    <Link data-testid="fixture-card" data-postponed={notPlayed ? "true" : undefined} href={`/trivela/ligamx/${f.id}`}
       className={`block cursor-pointer rounded-xl border p-3 transition-colors hover:border-accent/50 ${
       live ? "glow glow-accent border-accent/40 bg-elev" : "border-line"}`}>
-      <TeamLine s={f.home} live={live} />
+      <TeamLine s={f.home} live={live} notPlayed={notPlayed} />
       <div className="my-1.5 h-px bg-line" />
-      <TeamLine s={f.away} live={live} />
+      <TeamLine s={f.away} live={live} notPlayed={notPlayed} />
       <div className="mt-2 flex justify-between font-mono text-[10px] uppercase tracking-wide text-ink-faint">
         <span className={live ? "text-accent" : undefined}>
           {live ? `LIVE ${f.minute ?? ""}` : when}
