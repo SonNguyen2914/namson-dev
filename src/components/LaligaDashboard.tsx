@@ -191,7 +191,7 @@ export default function LaligaDashboard() {
               confirmed on this poll.
             </p>
           )}
-          <h3 className="mb-2 text-lg font-medium text-ink-hi">
+          <h2 className="mb-2 text-lg font-medium text-ink-hi">
             {dark
               ? "Dark — no approval decision exists"
               : model?.model_state === "approved_no_runs"
@@ -199,7 +199,7 @@ export default function LaligaDashboard() {
                 : model?.model_state === "approved"
                   ? "Approved · shadow"
                   : "State unavailable"}
-          </h3>
+          </h2>
           <p className="max-w-2xl text-sm leading-relaxed text-ink-low">
             {status?.model_dark_note
               || "No odds render until an approval is earned through the "
@@ -246,12 +246,12 @@ export default function LaligaDashboard() {
       <Reveal>
         <section>
           <Eyebrow className="mb-2" tone="accent">fixtures · live data</Eyebrow>
-          <h3 className="mb-6 text-lg font-medium text-ink-hi">
+          <h2 className="mb-6 text-lg font-medium text-ink-hi">
             {allToday ? "Today's slate" : "Next matchday"}{" "}
             <span className="text-sm font-normal text-ink-low">
               · ESPN live feed, 60s poll
             </span>
-          </h3>
+          </h2>
           {odds.s === "error" && (
             <Empty>
               la liga shadow-odds read failed — no model number is shown on
@@ -269,9 +269,9 @@ export default function LaligaDashboard() {
               {days.map((g) => (
                 <div key={g.key}>
                   {showDayLabels && (
-                    <h4 className="mb-3 font-mono text-[11px] uppercase tracking-wide text-ink-faint">
+                    <h3 className="mb-3 font-mono text-[11px] uppercase tracking-wide text-ink-faint">
                       {dayLabel(g.list[0].date)}
-                    </h4>
+                    </h3>
                   )}
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {g.list.map((f) => (
@@ -288,12 +288,12 @@ export default function LaligaDashboard() {
       <Reveal>
         <section>
           <Eyebrow className="mb-2" tone="accent">kalshi · real books</Eyebrow>
-          <h3 className="mb-2 text-lg font-medium text-ink-hi">
+          <h2 className="mb-2 text-lg font-medium text-ink-hi">
             Match markets{" "}
             <span className="text-sm font-normal text-ink-low">
               · KXLALIGAGAME three-way, ask / bid
             </span>
-          </h3>
+          </h2>
           <p className="mb-6 max-w-2xl text-xs leading-relaxed text-ink-low">
             {/* JSX strips the leading space of a text chunk that follows
                 an element, so the dash needs an explicit one or it renders
@@ -324,7 +324,7 @@ export default function LaligaDashboard() {
       <Reveal>
         <section>
           <Eyebrow className="mb-2" tone="accent">next seven days</Eyebrow>
-          <h3 className="mb-6 text-lg font-medium text-ink-hi">Fixtures</h3>
+          <h2 className="mb-6 text-lg font-medium text-ink-hi">Fixtures</h2>
           {week.s === "loading" ? (
             <Empty>loading schedule…</Empty>
           ) : week.s === "error" ? (
@@ -361,7 +361,7 @@ export default function LaligaDashboard() {
       <Reveal>
         <section>
           <Eyebrow className="mb-2" tone="accent">the table</Eyebrow>
-          <h3 className="mb-6 text-lg font-medium text-ink-hi">Standings</h3>
+          <h2 className="mb-6 text-lg font-medium text-ink-hi">Standings</h2>
           {standings.s === "loading" ? (
             <Empty>loading standings…</Empty>
           ) : standings.s === "error" ? (
@@ -521,16 +521,19 @@ function LeagueTableView({ t }: { t: LeagueTable }) {
         {t.conference}
       </p>
       <table className="w-full text-sm">
+        {/* the table's name, for a screen reader (audit W10-A11Y-14);
+            the drawn title above stays as it was */}
+        <caption className="sr-only">standings — {t.conference}</caption>
         <thead>
           <tr className="font-mono text-[10px] uppercase text-ink-faint">
-            <th className="px-3 py-1.5 text-left">#</th>
+            <th className="px-3 py-1.5 text-left"><abbr title="rank" className="no-underline">#</abbr></th>
             <th className="px-3 py-1.5 text-left">club</th>
-            <th className="px-2 py-1.5 text-right">gp</th>
-            <th className="px-2 py-1.5 text-right">w</th>
-            <th className="px-2 py-1.5 text-right">d</th>
-            <th className="px-2 py-1.5 text-right">l</th>
-            <th className="px-2 py-1.5 text-right">gd</th>
-            <th className="px-3 py-1.5 text-right">pts</th>
+            <th className="px-2 py-1.5 text-right"><abbr title="games played" className="no-underline">gp</abbr></th>
+            <th className="px-2 py-1.5 text-right"><abbr title="won" className="no-underline">w</abbr></th>
+            <th className="px-2 py-1.5 text-right"><abbr title="drawn" className="no-underline">d</abbr></th>
+            <th className="px-2 py-1.5 text-right"><abbr title="lost" className="no-underline">l</abbr></th>
+            <th className="px-2 py-1.5 text-right"><abbr title="goal difference" className="no-underline">gd</abbr></th>
+            <th className="px-3 py-1.5 text-right"><abbr title="points" className="no-underline">pts</abbr></th>
           </tr>
         </thead>
         <tbody>

@@ -122,7 +122,7 @@ test.describe("Liga MX board", () => {
   test("standings tables carry the tournament label", async ({ page }) => {
     await serve(page);
     await page.goto("/trivela?league=ligamx");
-    await expect(page.getByText("2026 Torneo Apertura")).toBeVisible();
+    await expect(page.getByText("2026 Torneo Apertura", { exact: true })).toBeVisible();
     // and the split-season explainer names both tournaments
     await expect(page.getByText(/Apertura \(Jul–Dec\)/)).toBeVisible();
   });
@@ -130,8 +130,8 @@ test.describe("Liga MX board", () => {
   test("two tournaments are two tables — never merged", async ({ page }) => {
     await serve(page);
     await page.goto("/trivela?league=ligamx");
-    await expect(page.getByText("2026 Torneo Apertura")).toBeVisible();
-    await expect(page.getByText("2027 Torneo Clausura")).toBeVisible();
+    await expect(page.getByText("2026 Torneo Apertura", { exact: true })).toBeVisible();
+    await expect(page.getByText("2027 Torneo Clausura", { exact: true })).toBeVisible();
     // the same club appears once PER TOURNAMENT TABLE (here: both)
     await expect(page.getByRole("cell", { name: "Tijuana" })).toHaveCount(2);
     await expect(page.getByRole("cell", { name: "América" })).toHaveCount(2);
@@ -176,9 +176,9 @@ test.describe("Liga MX board", () => {
     const sec = page.locator("section")
       .filter({ hasText: "ESPN live feed" }).first();
     await expect(sec.getByText("Toluca")).toBeVisible();
-    await expect(sec.locator("h3")).toContainText("Next matchday");
-    await expect(sec.locator("h3")).not.toContainText("Today's slate");
-    await expect(sec.locator("h4")).toHaveCount(1);
+    await expect(sec.locator("h2")).toContainText("Next matchday");
+    await expect(sec.locator("h2")).not.toContainText("Today's slate");
+    await expect(sec.locator("h3")).toHaveCount(1);
   });
 
   test("today's fixtures keep the Today's slate heading", async ({ page }) => {
@@ -188,8 +188,8 @@ test.describe("Liga MX board", () => {
     const sec = page.locator("section")
       .filter({ hasText: "ESPN live feed" }).first();
     await expect(sec.getByText("Toluca")).toBeVisible();
-    await expect(sec.locator("h3")).toContainText("Today's slate");
-    await expect(sec.locator("h4")).toHaveCount(0);
+    await expect(sec.locator("h2")).toContainText("Today's slate");
+    await expect(sec.locator("h3")).toHaveCount(0);
   });
 
   // THIS TEST PINNED THE DEFECT, AND IT IS SAID LOUDLY (2026-09-07).

@@ -45,6 +45,7 @@ import ErrorBoundary from "./ErrorBoundary";
 import HubTeamNews from "./HubTeamNews";
 import { sofascoreIdFor, sofascoreMomentumUrl } from "../lib/sofascore";
 import { NO_SCORE, POSTPONED_NO_RESULT, isNotPlayed } from "../lib/notPlayed";
+import { ScoreAnnouncer } from "./ScoreAnnouncer";
 import {
   ARCHIVE_READ_UNKNOWN, ARCHIVE_READ_WORDS, FAMILY_REASON_ORDER,
   FAMILY_REASON_WORDS, VENUE_BASIS_WORDS, VENUE_CLASSES, VENUE_GAP_WORDS,
@@ -536,7 +537,7 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
         <NavChip href="#stats" active={activeSection === "stats"}>Live</NavChip>
       </TopBar>
 
-      <div className="mx-auto max-w-6xl px-4 py-8 lg:px-6">
+      <main className="mx-auto max-w-6xl px-4 py-8 lg:px-6">
         {err && !m && (
           <p data-testid="feed-failed" role="status"
             className="mt-10 rounded-2xl border border-dashed border-warn/40 px-4 py-8 text-center font-mono text-[11px] leading-relaxed text-warn">
@@ -568,6 +569,19 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
             <Guard name="match" k={fetchedAt}>
             <Reveal>
               <section className="mt-4 rounded-3xl border border-line bg-elev p-6">
+                {/* THE PAGE'S HEADING, FOR A READER WHO NAVIGATES BY THEM
+                    (audit W10-A11Y-10). The names are drawn below as two
+                    team blocks; this says them once, as the h1, and is
+                    not drawn. */}
+                <h1 data-testid="hub-title" className="sr-only">
+                  {m.home.name ?? m.home.abbrev} v {m.away.name ?? m.away.abbrev}
+                </h1>
+                {/* score and state changes, spoken (audit W10-A11Y-06) */}
+                <ScoreAnnouncer home={m.home.name ?? m.home.abbrev ?? "home"}
+                  away={m.away.name ?? m.away.abbrev ?? "away"}
+                  homeScore={m.home.score} awayScore={m.away.score}
+                  state={notPlayed ? "off" : m.state}
+                  minute={live ? m.minute : null} />
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <span className="flex items-baseline gap-3">
                     <Eyebrow tone="accent">
@@ -807,7 +821,7 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
               <Reveal>
                 <div className="rounded-2xl border border-line bg-elev p-5">
                   <div className="mb-1 flex items-center justify-between">
-                    <Eyebrow tone="accent">market · kalshi three-way · open book now</Eyebrow>
+                    <Eyebrow as="h2" tone="accent">market · kalshi three-way · open book now</Eyebrow>
                     {cfg.marketPill && (
                       <span className="rounded-full border border-line px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.15em] text-ink-faint">
                         {cfg.marketPill(run)}
@@ -930,7 +944,7 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
             <Guard name="model prediction" k={fetchedAt}>
             {run?.scorelines && run.scorelines.length > 0 && (
               <Reveal>
-                <Collapse id="prediction" eyebrow="pure model · shadow"
+                <Collapse heading={2} id="prediction" eyebrow="pure model · shadow"
                   title="Model prediction" className="mt-10 mb-0">
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
                     {run.scorelines.slice(0, 6).map((s, i) => (
@@ -970,7 +984,7 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
             {/* ===== scenario engine ===== */}
             <Guard name="scenario engine" k={fetchedAt}>
             <Reveal>
-              <Collapse id="strategy" eyebrow="scenario engine"
+              <Collapse heading={2} id="strategy" eyebrow="scenario engine"
                 title="Betting strategy" className="mt-10 mb-0" defaultOpen={false}>
                 <ScenarioSection book={book} />
               </Collapse>
@@ -987,7 +1001,7 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
             </p>
           </>
         )}
-      </div>
+      </main>
     </div>
   );
 }
@@ -1367,7 +1381,7 @@ function HowTheyPlay({ m, run, note }: {
   ];
   return (
     <Reveal>
-      <Collapse eyebrow="scouting" title="How they play"
+      <Collapse heading={2} eyebrow="scouting" title="How they play"
         defaultOpen={false} className="mt-8 mb-0">
         <div className="grid gap-3">
           {cards.map((c) => (
@@ -1574,9 +1588,9 @@ function MarketsTable({ m, run, book, families, cfg, familyReport }: {
               const fold = closed.has(f.key);
               return (
                 <div key={f.key}>
-                  <button onClick={() => toggle(f.key)}
+                  <button onClick={() => toggle(f.key)} aria-expanded={!fold}
                     className="flex w-full items-center gap-2.5 border-b border-line bg-elev/40 px-4 py-2.5 text-left transition-colors hover:bg-elev">
-                    <span className={`text-ink-faint transition-transform ${
+                    <span aria-hidden className={`text-ink-faint transition-transform ${
                       fold ? "" : "rotate-90"}`}>▸</span>
                     <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-mid">
                       {f.label}
@@ -1714,6 +1728,7 @@ function ScenarioSection({ book }: { book: Book | null }) {
             <input
               inputMode="decimal"
               placeholder="$0"
+              aria-label={`stake on ${l.label}, in dollars`}
               value={stakes[l.ticker] ?? ""}
               onChange={(e) => setStakes((s) => ({ ...s, [l.ticker]: e.target.value }))}
               className="rounded-lg border border-line bg-transparent px-2 py-1.5 text-right font-mono text-sm text-ink-hi outline-none focus:border-accent/60"
@@ -1762,7 +1777,7 @@ function LiveBlock({ m, promoted, hex }: {
   return (
     <section id="stats" className={promoted ? "mt-8" : "mt-10"}>
       <Reveal>
-        <Collapse eyebrow={live ? "espn live · in play" : "espn live"}
+        <Collapse heading={2} eyebrow={live ? "espn live · in play" : "espn live"}
           title="Match stats" defaultOpen={live || post} className="mb-0">
           {m.stats.length === 0 ? (
             <Empty>stats populate after kickoff</Empty>
@@ -2008,7 +2023,7 @@ function LineupSection({ lu, m, run, cfg }: {
   const post = m.state === "post";
   return (
     <Reveal>
-      <Collapse eyebrow="team news" title={cfg.title}
+      <Collapse heading={2} eyebrow="team news" title={cfg.title}
         defaultOpen={anyReleased} className="mt-8 mb-0">
         {/* V9.3 eval F19: this block is CURRENT team news, fetched now —
             it is NOT the lineup evidence frozen into the T-10 lock. A
@@ -2090,7 +2105,7 @@ function ScoutingSection({ m, note }: { m: Match; note: string }) {
           title rather than a `title=` hover, so it is in the button's
           accessible name too. A national hub's label says it was never
           measured there (`HubCfg.scoutingNote`). */}
-      <Collapse eyebrow="scouting"
+      <Collapse heading={2} eyebrow="scouting"
         title={<>
           ESPN form + H2H{" "}
           <span data-testid="scouting-display-only"

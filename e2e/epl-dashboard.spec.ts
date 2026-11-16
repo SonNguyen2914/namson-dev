@@ -180,9 +180,9 @@ test.describe("EPL hub", () => {
     await page.goto("/trivela?league=epl");
     const sec = slate(page);
     await expect(sec.getByText("Arsenal")).toBeVisible();
-    await expect(sec.locator("h3")).toContainText("Next matchday");
-    await expect(sec.locator("h3")).not.toContainText("Today's slate");
-    await expect(sec.locator("h4")).toHaveCount(1);
+    await expect(sec.locator("h2")).toContainText("Next matchday");
+    await expect(sec.locator("h2")).not.toContainText("Today's slate");
+    await expect(sec.locator("h3")).toHaveCount(1);
   });
 
   test("today's fixtures keep the Today's slate heading", async ({ page }) => {
@@ -191,8 +191,8 @@ test.describe("EPL hub", () => {
     await page.goto("/trivela?league=epl");
     const sec = slate(page);
     await expect(sec.getByText("Arsenal")).toBeVisible();
-    await expect(sec.locator("h3")).toContainText("Today's slate");
-    await expect(sec.locator("h4")).toHaveCount(0);
+    await expect(sec.locator("h2")).toContainText("Today's slate");
+    await expect(sec.locator("h3")).toHaveCount(0);
   });
 
   test("one evening stays one group, even across two UTC dates",
@@ -204,7 +204,7 @@ test.describe("EPL hub", () => {
       const sec = slate(page);
       await expect(sec.getByText("Arsenal")).toBeVisible();
       await expect(sec.getByText("Everton")).toBeVisible();
-      await expect(sec.locator("h4")).toHaveCount(1);
+      await expect(sec.locator("h3")).toHaveCount(1);
     });
 
   test("fixtures on different days are separated", async ({ page }) => {
@@ -214,6 +214,6 @@ test.describe("EPL hub", () => {
     await page.goto("/trivela?league=epl");
     const sec = slate(page);
     await expect(sec.getByText("Arsenal")).toBeVisible();
-    await expect(sec.locator("h4")).toHaveCount(2);
+    await expect(sec.locator("h3")).toHaveCount(2);
   });
 });

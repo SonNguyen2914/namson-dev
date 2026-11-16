@@ -19,6 +19,7 @@ import { failureOf, NEVER_ANSWERED } from "../../../lib/httpFailure";
 
 import { RouteProgress, TopBar } from "../../../components/chrome";
 import { Eyebrow, Reveal } from "../../../components/ui";
+import { ScoreAnnouncer } from "../../../components/ScoreAnnouncer";
 import MarketVsRead, { type MarketVsReadData }
   from "../../../components/MarketVsRead";
 import { unitFeeDollars } from "../../../lib/fee";
@@ -408,6 +409,9 @@ function ClubProfile({ r, label }: { r?: SideRating; label: string }) {
 /** API-Football's finished statuses: full time, after extra time, after
  *  penalties. A fixture in one of them is not polled again. */
 const FINISHED = new Set(["FT", "AET", "PEN"]);
+/** API-Football's not-played statuses: postponed, cancelled, abandoned,
+ *  suspended — said once, never as a score. */
+const NOT_PLAYED = new Set(["PST", "CANC", "ABD", "SUSP"]);
 
 export default function FriendlyMatchPage() {
   const router = useRouter();
@@ -474,6 +478,17 @@ export default function FriendlyMatchPage() {
         {f && (
           <Reveal>
             <section className="rounded-2xl border border-line bg-elev p-4">
+              {/* the page's heading, not drawn: the names are the two team
+                  rows below (audit W10-A11Y-10) */}
+              <h1 data-testid="fixture-title" className="sr-only">{title}</h1>
+              {/* score and state changes, spoken — never the minute
+                  (audit W10-A11Y-06) */}
+              <ScoreAnnouncer home={f.home?.name ?? "home"}
+                away={f.away?.name ?? "away"}
+                homeScore={f.goals?.home} awayScore={f.goals?.away}
+                state={live ? "in" : FINISHED.has(f.status ?? "") ? "post"
+                  : NOT_PLAYED.has(f.status ?? "") ? "off" : "pre"}
+                minute={live && f.elapsed != null ? `${f.elapsed}'` : null} />
               <div className="flex flex-wrap justify-between gap-2 font-mono text-[10px] uppercase tracking-wide text-ink-faint">
                 <span data-testid="fixture-kickoff">
                   {/* the site's one zone (lib/matchday.ts), never the viewer's */}

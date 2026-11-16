@@ -216,7 +216,13 @@ export default function AllFriendlies() {
           {bookNoRead
             ? ` · ${bookNoRead} priced but unrated` : ""}
         </span>
+        {/* TOGGLE STATE IS SAID, NOT ONLY COLOURED (audit W10-A11Y-08):
+            aria-pressed on the filter and on the window buttons, which
+            are spoken as "8 days" rather than "8 d". */}
         <button onClick={() => setOnlyRated((v) => !v)}
+          aria-pressed={onlyRated}
+          aria-label={`rated or priced only — showing ${onlyRated
+            ? `rated or priced · ${shown.length}` : `all ${meta.count ?? 0}`}`}
           className={`rounded-md border px-2 py-1 ${onlyRated
             ? "border-accent/50 text-accent" : "border-line text-ink-faint"}`}>
           {onlyRated
@@ -225,6 +231,8 @@ export default function AllFriendlies() {
         </button>
         {[1, 2, 4, 8].map((d) => (
           <button key={d} onClick={() => setDays(d)}
+            aria-pressed={days === d}
+            aria-label={`${d} day${d === 1 ? "" : "s"}`}
             className={`rounded-md border px-2 py-1 ${days === d
               ? "border-accent/50 text-accent" : "border-line text-ink-faint"}`}>
             {d}d

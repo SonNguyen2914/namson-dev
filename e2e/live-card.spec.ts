@@ -1741,3 +1741,42 @@ test("a payload with no exit lines says so rather than drawing nothing",
       .getByTestId("live-exit-lines-absent"))
       .toContainText("nothing is held on this match");
   });
+
+// ======================================================= spoken changes
+
+/* A GOAL IS SPOKEN; THE MINUTE IS NOT (audit W10-A11Y-06). The card's
+   score and minute are redrawn in place on every poll; a screen-reader
+   user heard nothing when the score changed. Each card now carries one
+   polite live region that speaks a score or state change once — and
+   stays silent when only the minute moves. */
+test("a goal on a live card is spoken once; the ticking minute is not",
+  async ({ page }) => {
+    const at = (minute: number, h: number, a: number) => ({
+      ...STRIP, matches: [liveMatch({ state: {
+        ...liveMatch().state, minute, clock_display: `${minute}'`,
+        score_home: h, score_away: a } })] });
+    let cur: unknown = at(65, 2, 1);
+    await page.clock.install();
+    await page.route("**/api/picker/board**", (r) => r.fulfill(json(BOARD)));
+    await page.route("**/api/picker/review**", (r) => r.fulfill(json(REVIEW)));
+    await page.route("**/api/bet-suggester/watched-strip**",
+      (r) => r.fulfill(json(toV2(cur as object))));
+    await page.goto("/trivela");
+    await armToken(page);
+    await page.getByTestId("live-section").waitFor({ timeout: 15_000 });
+    const card = liveCard(page, 101);
+    const region = card.getByRole("status")
+      .and(card.locator('[aria-live="polite"]'));
+    await expect(region).toHaveCount(1);
+    await expect(region).toHaveText("");
+
+    cur = at(66, 2, 1);
+    await page.clock.runFor(16_000);
+    await expect(card.getByTestId("live-minute")).toHaveText("66'");
+    await expect(region).toHaveText("");
+
+    cur = at(67, 3, 1);
+    await page.clock.runFor(16_000);
+    await expect(region).toHaveText(
+      "Goal Austin FC — Austin FC 3, St. Louis City SC 1, 67'");
+  });

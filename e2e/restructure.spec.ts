@@ -59,7 +59,7 @@ async function openBoard(page: import("@playwright/test").Page) {
 test("each row's fixture line is a link into its match page", async ({ page }) => {
   await openBoard(page);
   const top = page.getByTestId("picker-row").first();
-  const link = top.getByRole("link", { name: /open Barcelona versus Rayo/i });
+  const link = top.getByRole("link", { name: /^open Barcelona\b.*\bversus Rayo/i });
   await expect(link).toHaveAttribute("href", "/trivela/laliga/401882903");
   await link.focus();
   await expect(link).toBeFocused();

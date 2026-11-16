@@ -802,9 +802,9 @@ export function seasonDeparture(
  *  same block is drawn as plain content with the reason on hover, rather
  *  than as a link into the site's 404. Same classes either way, less the
  *  hover ink a thing you cannot click must not wear. */
-export function CardLink({ row, className, children, label }: {
+export function CardLink({ row, className, children }: {
   row: { league: string; event_id: string; favourite?: string; opponent?: string };
-  className: string; children: ReactNode; label?: string;
+  className: string; children: ReactNode;
 }) {
   const href = rowHref(row);
   if (!href) {
@@ -815,9 +815,17 @@ export function CardLink({ row, className, children, label }: {
     );
   }
   return (
+    /* THE CONTENT NAMES THE LINK (audit W10-A11Y-01). An aria-label here
+       REPLACED everything inside it, so a screen reader heard "open X
+       versus Y" and never the two form strips or the headline figure and
+       its key — the number the board ranks on. Now the name is computed
+       from the content: a hidden "open" first, the names, a hidden
+       "versus" on the opponent's line (the drawn "vs" is aria-hidden so it
+       is not read twice), each strip's own label, then the figure and its
+       key. Hidden spans are `sr-only`: out of flow, so nothing moves. */
     <Link href={href}
-      aria-label={label ?? `open ${row.favourite} versus ${row.opponent}`}
       className={`${className} hover:text-accent`}>
+      <span className="sr-only">open </span>
       {children}
     </Link>
   );
@@ -1022,9 +1030,10 @@ export function RowRead({ row, modeId, clubCount, dense = false, hoisted,
             dense ? " md:flex-wrap" : ""}`}>
             <span aria-hidden
               className="h-[7px] w-[7px] flex-none rounded-full border border-ink-low bg-bs" />
+            <span className="sr-only">versus </span>
             <span className={`text-[12.5px] text-ink-low [font-family:var(--font-archivo)] [font-stretch:96%] ${
               dense ? "min-w-0 [overflow-wrap:anywhere]" : "truncate"}`}>
-              <span className="text-ink-faint">vs </span>{row.opponent}
+              <span aria-hidden className="text-ink-faint">vs </span>{row.opponent}
             </span>
             <FormStrip form={row.form?.opp} name={row.opponent}
               scope={row.form?.scope} cupScope={row.form?.scope_is_cup}
@@ -1550,9 +1559,10 @@ function RefusalMatchup({ r, children }: {
   const href = r.event_id ? rowHref({ league: r.league, event_id: r.event_id }) : null;
   if (!href) return <span className="min-w-0 flex-1">{children}</span>;
   return (
+    /* named by its content, not over it (audit W10-A11Y-01; CardLink) */
     <Link href={href} data-testid="refusal-hub-link"
-      aria-label={`open ${r.home} versus ${r.away}`}
       className="block min-w-0 flex-1 hover:text-accent">
+      <span className="sr-only">open </span>
       {children}
     </Link>
   );
@@ -1938,9 +1948,10 @@ function RefusalCard({ r, col, dated = true, dense = false, rank }: {
             dense ? " md:flex-wrap" : ""}`}>
             <span aria-hidden
               className="h-[7px] w-[7px] flex-none rounded-full border border-ink-low bg-bs" />
+            <span className="sr-only">versus </span>
             <span className={`text-[12.5px] text-ink-low [font-family:var(--font-archivo)] [font-stretch:96%] ${
               dense ? "min-w-0 [overflow-wrap:anywhere]" : "truncate"}`}>
-              <span className="text-ink-faint">vs </span>{r.away}
+              <span aria-hidden className="text-ink-faint">vs </span>{r.away}
             </span>
             <FormStrip form={awayForm} name={r.away}
               scope={r.form?.scope} cupScope={r.form?.scope_is_cup}
@@ -3582,8 +3593,13 @@ export function LeagueColumn({
           <div key={key} data-testid="day-track" data-day={key}
             style={{ ["--r" as string]: String(3 + 2 * di) }}
             className="mt-3 space-y-3 xl:mt-0 xl:self-start xl:pb-4 xl:[grid-row:var(--r)]">
+            {/* `xl:sr-only`, NOT `xl:hidden` (audit W10-A11Y-02): at xl the
+                date is drawn once in the full-width day band, which sits
+                AFTER every column in the DOM — hidden here, a screen
+                reader met every card with no date. Out of sight, still in
+                reading order. */}
             <div data-testid="day-divider"
-              className="flex items-center gap-2 xl:hidden">
+              className="flex items-center gap-2 xl:sr-only">
               <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-low">
                 {dayLabel((dayRows[0] ?? refused[0]).kickoff!)}
               </span>

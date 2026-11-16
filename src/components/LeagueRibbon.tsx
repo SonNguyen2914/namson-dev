@@ -931,9 +931,22 @@ export function useBoardLoop({ trackRef, stripRef, railRef, slugs, view,
 
     const onKey = (e: KeyboardEvent) => {
       if (STATIC) return;
+      if (e.defaultPrevented) return;
       const t = e.target as HTMLElement | null;
       if (t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      /* THE ARROWS ARE THE RIBBON'S ONLY WHILE NOTHING ELSE HOLDS FOCUS
+         (audit W10-A11Y-12). This listener is on the document, and it
+         used to take ArrowLeft/Right from ANY focused element bar a form
+         field: a focused card link, a button, a scrollable table — the
+         ribbon rotated instead of the control or the scroller doing its
+         own thing. Now it steps only when focus is on the page itself
+         (body / html — the arrival state, and where a click on plain
+         content leaves it), on the ribbon strip, or on the track. */
+      const free = !t || t === document.body
+        || t === document.documentElement || t === track
+        || strip.contains(t);
+      if (!free) return;
       if (e.key === "ArrowRight") { e.preventDefault(); step(1); }
       else if (e.key === "ArrowLeft") { e.preventDefault(); step(-1); }
     };
