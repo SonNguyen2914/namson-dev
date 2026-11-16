@@ -1265,10 +1265,11 @@ function StrategySection({ markets, summary, scorelines, home, away }: {
       <p className="mb-4 text-xs text-ink-low">{tierMeta[tier]}</p>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <span className="text-sm text-ink-mid">Fund to divide</span>
+        {/* the visible words ARE the input's label (audit W10-A11Y-09) */}
+        <label htmlFor="market-fund" className="text-sm text-ink-mid">Fund to divide</label>
         <div className="flex items-center gap-1">
           <span className="font-mono text-sm text-ink-low">$</span>
-          <input type="number" min={1} max={1000000} value={fundStr}
+          <input id="market-fund" type="number" min={1} max={1000000} value={fundStr}
             onChange={(e) => setFundStr(e.target.value)}
             onBlur={() => setFundStr(String(fund))}
             className="w-24 rounded-lg border border-line bg-bs px-2.5 py-1.5 font-mono text-sm tabular-nums text-ink-hi outline-none focus:border-accent/60" />

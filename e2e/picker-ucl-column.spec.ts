@@ -1494,8 +1494,10 @@ async function topRegion(card: ReturnType<typeof col>) {
     const chip = rank.parentElement!;
     const date = chip.lastElementChild!;
     // the FAVOURITE's name — the span whose whole text is the club
-    const fav = (el.querySelector("a[href]")?.getAttribute("aria-label") ?? "")
-      .replace(/^open /, "").replace(/ versus .*$/, "");
+    // (the link is named by its content since audit W10-A11Y-01, so the
+    // favourite is read off its own name span — the first titled span)
+    const fav = (el.querySelector("a[href] span[title]")?.textContent ?? "")
+      .trim();
     const name = Array.from(el.querySelectorAll("span")).find(
       (s) => (s.textContent ?? "").trim() === fav) as HTMLElement | undefined;
     const pip = name?.previousElementSibling ?? null;

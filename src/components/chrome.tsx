@@ -461,17 +461,24 @@ export function SkeletonRows({ rows = 5, height = "h-11" }: {
   );
 }
 
-export function Collapse({ id, eyebrow, title, defaultOpen = true, className = "mb-10", children }: {
+export function Collapse({ id, eyebrow, title, defaultOpen = true, className = "mb-10", heading, children }: {
   id?: string;
   eyebrow?: string;
   title: ReactNode;
   defaultOpen?: boolean;
   className?: string;
+  /** THE TITLE AS A HEADING (audit W10-A11Y-10): the disclosure button
+   *  sits INSIDE an h2/h3, the ARIA-recommended accordion shape, so the
+   *  section is reachable by heading navigation and still toggles. The
+   *  heading is a plain block box (preflight zeroes its margin, size and
+   *  weight) around a button that was already full-width block-level, so
+   *  nothing moves. Omitted, the markup is exactly as before. */
+  heading?: 2 | 3;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div id={id} className={className}>
+  const H = heading === 2 ? "h2" : heading === 3 ? "h3" : null;
+  const toggle = (
       <button onClick={() => setOpen((o) => !o)} aria-expanded={open}
         className="group flex w-full items-baseline gap-3 border-b border-line pb-2.5 text-left">
         <span aria-hidden
@@ -489,6 +496,10 @@ export function Collapse({ id, eyebrow, title, defaultOpen = true, className = "
           <span aria-hidden className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">show</span>
         )}
       </button>
+  );
+  return (
+    <div id={id} className={className}>
+      {H ? <H>{toggle}</H> : toggle}
       {open && <div className="pt-5">{children}</div>}
     </div>
   );

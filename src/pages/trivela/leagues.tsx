@@ -383,6 +383,9 @@ export default function LeagueCarousel() {
               style={{ ["--tap-ink" as string]: "0.625rem" }}>
               {LEAGUES.map((l, i) => (
                 <button key={l.id} aria-label={`switch to ${l.name}`}
+                  /* the shown league said, not only drawn wider
+                     (audit W10-A11Y-08) */
+                  aria-current={i === leagueIdx ? "true" : undefined}
                   onClick={() => goLeague(i)}
                   className={`h-1.5 rounded-full transition-all duration-300 ${
                     i === leagueIdx ? "w-9 bg-accent shadow-[0_0_12px_var(--accent-dim)]"

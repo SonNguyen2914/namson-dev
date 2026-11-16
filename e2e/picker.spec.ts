@@ -1048,7 +1048,7 @@ test("one league on a phone: the tab strip, and no horizontal scroll",
 
 test("a card's header is the way into its match page", async ({ page }) => {
   await open(page);
-  await page.getByRole("link", { name: /open Barcelona versus Rayo Vallecano/i })
+  await page.getByRole("link", { name: /^open Barcelona\b.*\bversus Rayo Vallecano\b/i })
     .click();
   await expect(page).toHaveURL(/\/trivela\/laliga\/401882903/);
 });

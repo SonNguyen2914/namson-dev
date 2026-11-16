@@ -231,6 +231,10 @@ test.describe("the board draws the columns the operator chooses", () => {
           .sort((a, z) => Math.abs(a.x) - Math.abs(z.x))[0].s;
       });
       const before = await lead();
+      /* Focus is dropped first: the last chip clicked above still holds
+         it, and since audit W10-A11Y-12 the board's arrows are its own
+         only while no other control has focus. */
+      await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
       await page.keyboard.press("ArrowRight");
       await expect.poll(lead, { message: "a step moved the board" })
         .not.toBe(before);

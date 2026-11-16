@@ -459,7 +459,11 @@ function CompViewerBody({ compKey: key }: { compKey: string | null }) {
               fixture counts not read
             </span>
           )}
+          {/* state said, not only coloured (audit W10-A11Y-08) */}
           <button onClick={() => setOnlyRated((v) => !v)}
+            aria-pressed={onlyRated}
+            aria-label={`rated only — showing ${onlyRated
+              ? `rated only · ${ratedCount}` : d ? `all ${d.count}` : "all"}`}
             className={`rounded-md border px-2 py-1 ${onlyRated
               ? "border-accent/50 text-accent" : "border-line text-ink-faint"}`}>
             {onlyRated ? `rated only · ${ratedCount}`
@@ -467,6 +471,8 @@ function CompViewerBody({ compKey: key }: { compKey: string | null }) {
           </button>
           {[3, 7, 14, 30].map((n) => (
             <button key={n} onClick={() => setDays(n)}
+              aria-pressed={days === n}
+              aria-label={`${n} days`}
               className={`rounded-md border px-2 py-1 ${days === n
                 ? "border-accent/50 text-accent" : "border-line text-ink-faint"}`}>
               {n}d

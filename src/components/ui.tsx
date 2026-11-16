@@ -101,11 +101,15 @@ export function Flash({
 }
 
 export function Eyebrow({
-  children, tone = "low", className = "",
+  children, tone = "low", className = "", as: Tag = "p",
 }: {
   children: ReactNode;
   tone?: "accent" | "live" | "warn" | "sky" | "low";
   className?: string;
+  /** A SECTION TITLE IS A HEADING (audit W10-A11Y-10). Same classes on
+   *  either element — preflight zeroes a heading's margin, size and
+   *  weight exactly as it does a <p>'s — so only the outline changes. */
+  as?: "p" | "h2" | "h3";
 }) {
   const color =
     tone === "accent" ? "text-accent"
@@ -114,8 +118,8 @@ export function Eyebrow({
     : tone === "sky" ? "text-skylive"
     : "text-ink-low";
   return (
-    <p className={`font-mono text-[11px] uppercase tracking-[0.22em] ${color} ${className}`}>
+    <Tag className={`font-mono text-[11px] uppercase tracking-[0.22em] ${color} ${className}`}>
       {children}
-    </p>
+    </Tag>
   );
 }

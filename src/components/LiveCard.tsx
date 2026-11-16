@@ -98,6 +98,7 @@ import {
 import { useWatchedStrip } from "../lib/watchedStripFeed";
 import { clubColors } from "../lib/teamColors";
 import ErrorBoundary from "./ErrorBoundary";
+import { ScoreAnnouncer } from "./ScoreAnnouncer";
 import { RowRead, hueOf } from "./PickerColumn";
 import { KalshiCell } from "./PickerRead";
 import { useWatchToken } from "./WatchDeclaration";
@@ -1476,6 +1477,13 @@ export function LiveCard({ m, generatedAt, row, clubCount, registry,
             className="mt-px text-[23px] font-semibold tracking-[-0.02em] text-ink-hi">
             {score}
           </div>
+          {/* score and state changes, spoken — never the ticking minute
+              (audit W10-A11Y-06) */}
+          <ScoreAnnouncer home={m.home} away={m.away}
+            homeScore={st?.score_home} awayScore={st?.score_away}
+            state={st?.match_state ?? (st?.in_play === true ? "in" : null)}
+            minute={st?.in_play === true && clock.source !== "unstated"
+              ? clock.text : null} />
         </div>
         <div className="flex min-w-0 items-center justify-end gap-2">
           <span className="truncate text-right text-[14.5px] font-semibold tracking-[-0.01em] text-ink-hi [font-family:var(--font-archivo)]"

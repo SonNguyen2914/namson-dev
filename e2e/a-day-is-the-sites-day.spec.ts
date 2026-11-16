@@ -59,7 +59,7 @@ for (const lg of ["epl", "ligamx"]) {
       const sec = page.locator("section")
         .filter({ hasText: "ESPN live feed" }).first();
       await expect(sec.getByText("Home a")).toBeVisible();
-      const headings = sec.locator("h4");
+      const headings = sec.locator("h3");
       await expect(headings).toHaveCount(2);
       await expect(headings.nth(0)).toContainText("Saturday, Nov 20");
       await expect(headings.nth(1)).toContainText("Sunday, Nov 21");

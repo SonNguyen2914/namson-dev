@@ -2391,6 +2391,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
                         {overridden ? "this day" : "sort"}
                       </span>
                       <select data-testid="band-sort" data-day={k}
+                        aria-label={`sort order for ${dayLabelFor[k] ?? k}`}
                         value={ds.mode}
                         onChange={(e) => {
                           const m = modeById(e.target.value)
