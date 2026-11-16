@@ -14,9 +14,9 @@ import { expect, test, type Page } from "@playwright/test";
  *
  *   1. past CLOCK_STALE_AFTER_MS the kickoff cell says when its minute
  *      was read ("· as of 1:15 PM", LA time), and a fresh minute does not;
- *   2. while a row is in play the board is asked again on its own clock
- *      — never while the tab is hidden, never when nothing is in play,
- *      and a refresh that fails keeps the board on screen (audit C-19).
+ *   2. the page does NOT re-read the board on its own, in play or not:
+ *      a board read captures snapshots (W8-FE-fix2), so an open tab
+ *      ages its minute instead of asking again.
  *
  * Hermetic: the board and the review are served from here.
  */
@@ -157,45 +157,40 @@ test("a fresh minute carries no age", async ({ page }) => {
   await expect(cell.getByTestId("row-clock-asof")).toHaveCount(0);
 });
 
-// ================================== 2. an in-play board is asked again
+// ============== 2. an in-play board is NOT asked again (W8-FE-fix2)
 
-test("while a match is in play the board is asked again — and not while "
-  + "the tab is hidden", async ({ page }) => {
+/* A board read is a CAPTURING read: GET /api/picker/board refreshes
+ * through snapshots.capture_rows, which freezes every pre-kickoff row on
+ * the board (first write wins per lead band). An in-play poll here made
+ * one lone open tab trigger a capturing build every few minutes, and
+ * froze other fixtures' rows earlier in their band — a change to the
+ * board's snapshot capture rate, which is pinned. So the page does not
+ * re-read the board on its own; the minute ages on screen instead. */
+
+test("an in-play board is read once: time passing makes no further board "
+  + "read, and the minute says its age instead", async ({ page }) => {
     const asks = await open(page, CAPTURED_MS + 60_000,
       () => json(BOARD([LIVE_ROW, PRE_ROW])));
     expect(asks.n).toBe(1);
-    // the minute moves on: the board is re-read on its own clock
-    await advance(page, 90_000);
-    await expect.poll(() => asks.n).toBe(2);
-    // …but never as a herd: a minute and a half more is one more read
-    await advance(page, 90_000);
-    expect(asks.n).toBeLessThanOrEqual(3);
-
-    const before = asks.n;
-    await setHidden(page, true);
+    const cell = liveCell(page);
+    await expect(cell.getByTestId("row-clock-asof")).toHaveCount(0);
+    // ten minutes on: the open tab ages its own minute…
     await advance(page, 600_000);
-    expect(asks.n, "a hidden tab kept re-reading the board").toBe(before);
-    // the read that fell due while hidden is made on return
+    await expect(cell.getByTestId("row-clock-asof")).toHaveText(/as of 1:15\s?PM/);
+    // …and asks the board for nothing
+    expect(asks.n, "the page re-read the board on its own").toBe(1);
+    // a hide and a return do not ask either
+    await setHidden(page, true);
+    await advance(page, 120_000);
     await setHidden(page, false);
-    await expect.poll(() => asks.n).toBe(before + 1);
+    await advance(page, 120_000);
+    expect(asks.n, "returning to the tab re-read the board").toBe(1);
   });
 
 test("a board with nothing in play is not asked again", async ({ page }) => {
-  // CONTROL: without it a page that simply polled everything would pass
+  // CONTROL: the same rule with no match under way
   const asks = await open(page, CAPTURED_MS + 60_000,
     () => json(BOARD([PRE_ROW])));
   await advance(page, 300_000);
   expect(asks.n).toBe(1);
 });
-
-test("a re-read that fails keeps the live board on screen, said",
-  async ({ page }) => {
-    const asks = await open(page, CAPTURED_MS + 60_000, (n) => n === 1
-      ? json(BOARD([LIVE_ROW, PRE_ROW]))
-      : json({ detail: "the board is being rebuilt" }, 503));
-    await advance(page, 90_000);
-    await expect.poll(() => asks.n).toBeGreaterThanOrEqual(2);
-    await expect(page.getByTestId("board-stale")).toBeVisible();
-    await expect(liveCell(page).getByTestId("row-clock")).toHaveText("45'+5'");
-    await expect(page.getByTestId("board-error")).toHaveCount(0);
-  });

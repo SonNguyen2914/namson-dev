@@ -790,7 +790,7 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
             {eventId && (
               <HubTeamNews eventId={eventId} slug={cfg.boardQuery}
                 home={m.home.name ?? ""} away={m.away.name ?? ""}
-                post={post} />
+                post={m.state === "post"} />
             )}
             </Guard>
 

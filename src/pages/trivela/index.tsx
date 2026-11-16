@@ -72,7 +72,6 @@ const useIsoLayoutEffect =
   typeof window === "undefined" ? useEffect : useLayoutEffect;
 import { FieldRead, fetchRatings } from "../../lib/fieldApi";
 import { TZ, dayLabel, localDay } from "../../lib/matchday";
-import { type PollOutcome, usePoll } from "../../lib/usePoll";
 import {
   BOARD_RETRY_DELAY_MS, Board, BoardTimeout, CUP_COMP_KEY, DEFAULT_DAYS,
   REFRESH_BACKOFF_MS, RetryableRead, SEASON_BLEND_K, THIN_ASK_SIZE,
@@ -80,7 +79,7 @@ import {
   WIDE_SPREAD_C, askHonoured, boardColumns, columnsOf, declarationOf,
   isFoldedCupTie,
   LeagueMeta, fetchBoard, fetchChampionships, leagueLabel,
-  nationalColumn, rowIsInPlay, venueAdjusted,
+  nationalColumn, venueAdjusted,
 } from "../../lib/pickerApi";
 import {
   DEFAULT_BACK, Review, fetchChampionshipsReview, fetchReview, readHere,
@@ -142,9 +141,6 @@ const BOARD_MODE_KEY = "board-mode";
 
 const etDate = (d: string) =>
   /^\d{8}$/.test(d) ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}` : d;
-
-/** How often a board with a match under way is asked again (W8-FE-01). */
-const LIVE_REFRESH_MS = 75_000;
 
 /** "HH:MM" in the site's zone, for "showing data from …" (audit C-19). */
 const hhmm = (iso: string) =>
@@ -279,8 +275,6 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      same list — before the red card. A board for a DIFFERENT question is
      still never drawn in the meantime. */
   const heldBoardKey = useRef<string | null>(null);
-  /* when the board on screen was last read, for the in-play refresh */
-  const boardAt = useRef(0);
   const [staleBoard, setStaleBoard] = useState<{ retrying: boolean } | null>(null);
   const [retrying, setRetrying] = useState<
     { attempt: number; of: number; inS: number } | null>(null);
@@ -365,8 +359,8 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      Joined to a stable string so the callback's identity — and with it
      the fetch — does not change on every render. */
   const ask = asked ? [...asked].join(",") : "";
-  const load = useCallback(async (signal: AbortSignal): Promise<PollOutcome> => {
-    if (mode === null) return "ok";
+  const load = useCallback(async (signal: AbortSignal) => {
+    if (mode === null) return;
     const key = `${mode}|${days}|${ask}`;
     const holding = heldBoardKey.current === key;
     // a held board stays on screen while it is asked again
@@ -379,7 +373,6 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
     const read = () => mode === "nations"
       ? fetchChampionships(days, signal)
       : fetchBoard(days, signal, ask === "" ? undefined : ask.split(","));
-    let failed = false;
     for (let attempt = 0; ; attempt += 1) {
       try {
         let b: Board;
@@ -396,18 +389,16 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
           if (!(e instanceof BoardTimeout) || signal.aborted || attempt > 0
               || holding) throw e;
           setBuilding(true);
-          if (await waitOrAbort(BOARD_RETRY_DELAY_MS, signal)) return "ok";
+          if (await waitOrAbort(BOARD_RETRY_DELAY_MS, signal)) return;
           b = await read();
         }
-        if (signal.aborted) return "ok";
+        if (signal.aborted) return;
         heldBoardKey.current = key;
-        boardAt.current = Date.now();
         setBoard(b);
         setError("");
         setStaleBoard(null);
       } catch (e) {
-        if (signal.aborted) return "ok";
-        failed = true;
+        if (signal.aborted) return;
         if (e instanceof RetryableRead && attempt < REFRESH_BACKOFF_MS.length) {
           const wait = REFRESH_BACKOFF_MS[attempt];
           if (holding) {
@@ -417,8 +408,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
             setRetrying({ attempt: attempt + 1, of: REFRESH_BACKOFF_MS.length,
                           inS: wait / 1000 });
           }
-          if (await waitOrAbort(wait, signal)) return "ok";
-          failed = false;
+          if (await waitOrAbort(wait, signal)) return;
           continue;
         }
         if (holding && e instanceof RetryableRead) {
@@ -436,7 +426,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
         setBuilding(false);
         setRetrying(null);
       }
-      return failed ? "failed" : "ok";
+      return;
     }
   }, [days, ask, mode]);
 
@@ -449,25 +439,6 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
     const t = setTimeout(() => { void load(ac.signal); }, 0);
     return () => { clearTimeout(t); ac.abort(); };
   }, [load, nonce, deepLink, mode]);
-
-  /* A LIVE MINUTE IS RE-ASKED, NOT FROZEN (audit W8-FE-01, 2026-11-15).
-     The board was read once per mount, so an in-play row kept the minute
-     it was first drawn with for as long as the tab stayed open. While any
-     row on the board is under way, the board is asked again every
-     LIVE_REFRESH_MS through lib/usePoll: never while the tab is hidden,
-     never on top of a read still in flight, backing off after failures.
-     The refresh goes through `load`, so a failed one keeps the board on
-     screen, said, as any held board is (audit C-19). It reads ONLY the
-     board — the finished tail and the field do not move with a minute.
-     The poll's first turn, which fires the moment it is enabled, makes
-     no request: the board was just read. Nor does any turn while the
-     page is asking a different question than the board it holds. */
-  const anyInPlay = !loading && board != null && board.rows.some(rowIsInPlay);
-  usePoll(async (signal) => {
-    if (mode === null || heldBoardKey.current !== `${mode}|${days}|${ask}`) return "ok";
-    if (Date.now() - boardAt.current < LIVE_REFRESH_MS - 5_000) return "ok";
-    return load(signal);
-  }, LIVE_REFRESH_MS, [load], anyInPlay && deepLink === null);
 
   /* THE FINISHED TAIL ASKS THE SAME QUESTION THE BOARD ABOVE IT DOES
      (2026-09-10). It used to ask none: `fetchReview(back)` fetched the
