@@ -44,6 +44,7 @@ import RatingsBlock from "./RatingsBlock";
 import ErrorBoundary from "./ErrorBoundary";
 import HubTeamNews from "./HubTeamNews";
 import { sofascoreIdFor, sofascoreMomentumUrl } from "../lib/sofascore";
+import { NO_SCORE, POSTPONED_NO_RESULT, isNotPlayed } from "../lib/notPlayed";
 import {
   ARCHIVE_READ_UNKNOWN, ARCHIVE_READ_WORDS, FAMILY_REASON_ORDER,
   FAMILY_REASON_WORDS, VENUE_BASIS_WORDS, VENUE_CLASSES, VENUE_GAP_WORDS,
@@ -68,6 +69,10 @@ type LastFive = { team?: string; abbrev?: string; form?: string;
 type H2H = { perspective?: string; result?: string; home_score?: string;
   away_score?: string; at_vs?: string; opponent?: string; date?: string };
 type Match = { id: string; date?: string; state?: string; detail?: string;
+  /** the backend's not-played tag (postponed, cancelled, abandoned,
+   *  suspended): the scores beside it are NOT a result — lib/notPlayed,
+   *  audit W8-FE-02 */
+  postponed?: boolean | null;
   minute?: string; venue?: string; home: Side; away: Side;
   stats: StatRow[]; events: Ev[];
   scouting?: { last_five: LastFive[]; head_to_head: H2H[] };
@@ -488,8 +493,11 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
     return d.match?.state === "post" ? "stop" : "ok";
   }, 30000, [eventId, cfg.api]);
 
-  const live = m?.state === "in";
-  const post = m?.state === "post";
+  // A MATCH THAT WAS NOT PLAYED HAS NO SCORE, NO COUNTDOWN AND NO
+  // "LIVE" (audit W8-FE-02): ESPN sends "0" beside it.
+  const notPlayed = isNotPlayed(m);
+  const live = m?.state === "in" && !notPlayed;
+  const post = m?.state === "post" && !notPlayed;
   // the canonical T-10 lock is the fixture's model once it exists —
   // a later scheduled run must never silently supersede it (V8 eval F9)
   const run = model?.primary ?? model?.latest;
@@ -502,7 +510,7 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
   return (
     <div style={cfg.accentVars} className="min-h-screen bg-bs font-sans text-ink-mid">
       <Head><title>
-        {m ? (m.home.score != null && m.away.score != null
+        {m ? (!notPlayed && m.home.score != null && m.away.score != null
           ? `${m.home.abbrev} ${m.home.score}–${m.away.score} ${m.away.abbrev} · ${cfg.tag}`
           : `${m.home.abbrev} vs ${m.away.abbrev} · ${cfg.tag}`) : `${cfg.tag} match`}
       </title></Head>
@@ -565,7 +573,8 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                     <Eyebrow tone="accent">
                       {live ? `live · ${m.minute ?? ""}` : m.detail}
                     </Eyebrow>
-                    {m.date && !live && !post && <KickCountdown at={m.date} />}
+                    {m.date && !live && !post && !notPlayed
+                      && <KickCountdown at={m.date} />}
                   </span>
                   <span className="truncate font-mono text-[10px] uppercase tracking-wide text-ink-faint">
                     {m.venue}
@@ -575,10 +584,23 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
                   slug={cfg.boardQuery} />
                 <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
                   <TeamBlock s={m.home} form={formOf(m, m.home.abbrev)} />
-                  <div className={`text-center font-mono text-3xl tabular-nums ${
+                  {notPlayed ? (
+                    <div data-testid="hub-score" data-postponed="true"
+                      className="text-center">
+                      <p className="font-mono text-3xl tabular-nums text-ink-hi">
+                        {NO_SCORE}
+                      </p>
+                      <p className="mt-1 font-mono text-[10px] uppercase tracking-wide text-warn">
+                        {POSTPONED_NO_RESULT}
+                      </p>
+                    </div>
+                  ) : (
+                  <div data-testid="hub-score"
+                    className={`text-center font-mono text-3xl tabular-nums ${
                     live ? "text-accent" : "text-ink-hi"}`}>
                     {(live || post) ? `${m.home.score}–${m.away.score}` : "–"}
                   </div>
+                  )}
                   <TeamBlock s={m.away} right form={formOf(m, m.away.abbrev)} />
                 </div>
                 {(live || post) && m.shootout && (
@@ -768,7 +790,7 @@ export default function MatchHub({ cfg }: { cfg: HubCfg }) {
             {eventId && (
               <HubTeamNews eventId={eventId} slug={cfg.boardQuery}
                 home={m.home.name ?? ""} away={m.away.name ?? ""}
-                post={post} />
+                post={m.state === "post"} />
             )}
             </Guard>
 

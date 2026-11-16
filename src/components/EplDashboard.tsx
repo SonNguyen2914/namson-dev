@@ -1,4 +1,5 @@
-import { TZ } from "../lib/matchday";
+import { dayKeyOf, dayLabel, fmtDate, groupByDay, localDay } from "../lib/matchday";
+import { NO_SCORE, POSTPONED_NO_RESULT, isNotPlayed } from "../lib/notPlayed";
 // EPL dashboard — the Premier League hub (Jul 28, 2026), mirroring the
 // MLS skeleton: live ESPN eng.1 fixtures/scores, Kalshi books where
 // they exist, the single league table, and shadow odds — which are
@@ -15,7 +16,10 @@ import { BookGrid, unavailableOf, type GameBook, type UnavailableBook } from "./
 type Side = { name?: string; short?: string; abbrev?: string; logo?: string;
   score?: string; record?: string };
 type Fixture = { id: string; date: string; state: "pre" | "in" | "post" | null;
-  detail?: string; minute?: string; venue?: string; home: Side; away: Side };
+  detail?: string;
+  /** the backend's not-played tag: the scores beside it are NOT a
+   *  result (lib/notPlayed, audit W8-FE-02) */
+  postponed?: boolean; minute?: string; venue?: string; home: Side; away: Side };
 type StandingEntry = { team: string; abbrev?: string; rank?: number;
   played?: number; wins?: number; losses?: number; ties?: number;
   points?: number; goal_diff?: number };
@@ -118,7 +122,7 @@ export default function EplDashboard() {
   // ESPN's scoreboard bucket is a MATCHDAY, not a calendar day (same
   // rule as the MLS hub, and it matters MORE preseason: today's bucket
   // is Aug 21). The heading is derived from the fixtures, never
-  // asserted; grouping is by the viewer's LOCAL day.
+  // asserted; grouping is by the LA day (lib/matchday).
   const days = today.s === "ok" ? groupByDay(today.d) : [];
   // A FAILED ODDS READ IS NOT AN ABSENT PREDICTION — the map is handed
   // down only when it was read, and the failure is stated once.
@@ -242,7 +246,7 @@ export default function EplDashboard() {
                 <Link key={f.id} href={`/trivela/epl/${f.id}`}
                   className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-accent/5">
                   <span className="w-28 shrink-0 font-mono text-[11px] uppercase tracking-wide text-ink-faint">
-                    {fmtDate(f.date)}
+                    {isNotPlayed(f) ? "postponed" : fmtDate(f.date)}
                   </span>
                   <span className="flex-1 truncate text-ink-hi">
                     {f.home.short || f.home.name}
@@ -341,47 +345,14 @@ function Empty({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Local calendar-day identity — deliberately NOT the ISO date: the wire
-// format is UTC and one evening can straddle two UTC dates.
-const dayKeyOf = (d: Date) =>
-  `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+// THE DAY RULES ARE lib/matchday's (audit W8-FE-03, 2026-11-15). This
+// file kept a private copy that keyed days by the VIEWER's calendar
+// (getDate) and labelled them in LA, so east of LA one LA day split
+// in two under two identical headings and Sunday games sat under
+// "Saturday". MLS, LaLiga and the friendlies already import these.
 
-function localDay(iso: string) {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "" : dayKeyOf(d);
-}
-
-function dayLabel(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-US", {
-    timeZone: TZ,
-    weekday: "long", month: "short", day: "numeric",
-  });
-}
-
-function groupByDay(fixtures: Fixture[]) {
-  const groups = new Map<string, Fixture[]>();
-  for (const f of [...fixtures].sort((a, b) => a.date.localeCompare(b.date))) {
-    const list = groups.get(localDay(f.date));
-    if (list) list.push(f);
-    else groups.set(localDay(f.date), [f]);
-  }
-  return [...groups.entries()].map(([key, list]) => ({ key, list }));
-}
-
-function fmtDate(iso?: string, month: "short" | "numeric" = "numeric") {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleString("en-US", {
-    timeZone: TZ,
-    weekday: "short", month, day: "numeric",
-    hour: "numeric", minute: "2-digit",
-  });
-}
-
-function TeamLine({ s, live }: { s: Side; live: boolean }) {
+function TeamLine({ s, live, notPlayed = false }: {
+  s: Side; live: boolean; notPlayed?: boolean }) {
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="flex min-w-0 items-center gap-2">
@@ -395,7 +366,7 @@ function TeamLine({ s, live }: { s: Side; live: boolean }) {
         )}
       </span>
       <span className={`font-mono text-sm tabular-nums ${
-        live ? "text-accent" : "text-ink-hi"}`}>{s.score}</span>
+        live ? "text-accent" : "text-ink-hi"}`}>{notPlayed ? NO_SCORE : s.score}</span>
     </div>
   );
 }
@@ -460,20 +431,22 @@ function OddsChip({ o }: { o?: OddsRow }) {
 }
 
 function FixtureCard({ f, o }: { f: Fixture; o?: OddsRow }) {
-  const live = f.state === "in";
+  const notPlayed = isNotPlayed(f);
+  const live = f.state === "in" && !notPlayed;
   // A finished match keeps its result detail (FT); anything not under
   // way shows WHEN it kicks off — never the bare provider "Scheduled",
   // least of all preseason when the default bucket is weeks away.
-  const when = f.state === "post"
+  const when = notPlayed ? POSTPONED_NO_RESULT
+    : f.state === "post"
     ? f.detail
     : (fmtDate(f.date, "short") || f.detail);
   return (
-    <Link href={`/trivela/epl/${f.id}`}
+    <Link data-testid="fixture-card" data-postponed={notPlayed ? "true" : undefined} href={`/trivela/epl/${f.id}`}
       className={`block cursor-pointer rounded-xl border p-3 transition-colors hover:border-accent/50 ${
       live ? "glow glow-accent border-accent/40 bg-elev" : "border-line"}`}>
-      <TeamLine s={f.home} live={live} />
+      <TeamLine s={f.home} live={live} notPlayed={notPlayed} />
       <div className="my-1.5 h-px bg-line" />
-      <TeamLine s={f.away} live={live} />
+      <TeamLine s={f.away} live={live} notPlayed={notPlayed} />
       <div className="mt-2 flex justify-between font-mono text-[10px] uppercase tracking-wide text-ink-faint">
         <span className={live ? "text-accent" : undefined}>
           {live ? `LIVE ${f.minute ?? ""}` : when}

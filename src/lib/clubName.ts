@@ -58,3 +58,34 @@ export function shortClub(name?: string, max = 9): string {
   return (words.sort((a, b) => b.length - a.length)[0] || name)
     .slice(0, max).toUpperCase();
 }
+
+const words = (name: string) => name.split(/[\s.]+/).filter((w) => w
+  && !NOISE.has(w.toLowerCase().replace(/[^a-z]/g, "")));
+
+/** TWO SIDES OF ONE FIXTURE, LABELLED SO THEY CAN BE TOLD APART (audit
+ *  W8-FE-05, 2026-11-15). `shortClub` alone gives "Manchester United"
+ *  and "Manchester City" the same label — MANCHESTE — because each is
+ *  cut from its own longest word, and the city is the longest word of
+ *  both. A derby then read "MANCHESTE 45% · 55% MANCHESTE", so the one
+ *  thing the chip exists to say, whose percentage is whose, was gone.
+ *
+ *  When the two labels collide, each side is labelled from its longest
+ *  word the OTHER name does not carry (UNITED / CITY, CP / KANSAS,
+ *  UNITED / JETS). A side with no such word keeps its plain label. Two
+ *  labels that do not collide are exactly `shortClub`'s. */
+export function shortClubPair(
+  home?: string, away?: string, max = 9,
+): { home: string; away: string } {
+  const h = shortClub(home, max);
+  const a = shortClub(away, max);
+  if (!home || !away || h !== a) return { home: h, away: a };
+  const hw = words(home);
+  const aw = words(away);
+  const lower = (ws: string[]) => new Set(ws.map((w) => w.toLowerCase()));
+  const pick = (own: string[], other: Set<string>, plain: string) => {
+    const diff = own.filter((w) => !other.has(w.toLowerCase()))
+      .sort((x, y) => y.length - x.length)[0];
+    return diff ? diff.slice(0, max).toUpperCase() : plain;
+  };
+  return { home: pick(hw, lower(aw), h), away: pick(aw, lower(hw), a) };
+}
