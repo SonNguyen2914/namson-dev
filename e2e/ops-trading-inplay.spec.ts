@@ -88,10 +88,19 @@ const SERVED = withInPlay({
   },
 });
 
+// EVERY OPEN IS A FRESH PAGE (W10-FLAKE-FE, 2026-11-16). A second
+// `goto` to the SAME url with a hash is a same-document (fragment)
+// navigation: no reload, so the console kept the first open's token and
+// status, and the new status was drawn only when the 15 s status poll
+// (STATUS_POLL_MS) happened to land inside the 15 s expect deadline — the
+// "v1 alone" test passed in 15.9 s, by under a second, and failed once in
+// a full run with "inplay-maker-v1". Leaving for about:blank first makes
+// every open a real load that reads THIS call's status.
 async function openConsole(page: Page, status: unknown) {
   await page.route(STATUS, (r) => r.fulfill(json(200, status)));
   await page.route(BOOK, (r) => r.fulfill(json(200, BOOK_RECORDED)));
   await page.route(CANDIDATES, (r) => r.fulfill(json(200, CANDIDATES_RECORDED)));
+  await page.goto("about:blank");
   await page.goto("/ops/trading#trading?tab=inplay");
   await hydrated(page);
   await page.locator("#watch-token").fill(TOKEN);
