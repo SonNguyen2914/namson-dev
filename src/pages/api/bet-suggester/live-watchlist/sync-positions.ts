@@ -32,6 +32,9 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  // operator data relayed on the caller's token: never cacheable, on
+  // every status, the same as ops/* (audit W5-FE-07)
+  res.setHeader("Cache-Control", "private, no-store");
   if (req.method !== "POST") {
     return res.status(405).json({ error: "unknown watchlist method" });
   }

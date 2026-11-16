@@ -153,7 +153,11 @@ export async function loadMatch(league: string, eventId: string, demo?: string):
     return { sheet: buildFactSheet(d._demo.league, d._demo.event_id, d), runId: runIdOf(d) };
   }
   if (!isAnalystLeague(league)) throw new LoadError("VAR is not available for this competition", 400);
-  if (!/^\d{1,12}$/.test(eventId)) throw new LoadError("bad match id", 400);
+  // one match, one id (audit W5-FE-03): a leading zero would make a
+  // second spelling of the same event, a second preview cache key and
+  // a second uncached backend read + LLM call. ESPN ids never start
+  // with 0, so a padded id is refused rather than canonicalised.
+  if (!/^[1-9]\d{0,11}$/.test(eventId)) throw new LoadError("bad match id", 400);
   const live = await readBackend(league, `match/${eventId}`, MATCH_TIMEOUT_MS);
   if (!live.ok && live.error.status === 400) throw live.error;
   // the rung is a small cached archive read; a failure here only means

@@ -67,6 +67,9 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  // operator data relayed on the caller's token: never cacheable, on
+  // every status, the same as ops/* (audit W5-FE-07)
+  res.setHeader("Cache-Control", "private, no-store");
   if (req.method === "GET") {
     const log = typeof req.query.log === "string" && /^\d{1,4}$/.test(req.query.log)
       ? req.query.log : "200";
