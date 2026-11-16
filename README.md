@@ -24,6 +24,15 @@ The `pages/api` directory is mapped to `/api/*`. Files in this directory are tre
 
 This project uses [`next/font`](https://nextjs.org/docs/pages/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+> (corrected 2026-11-16, audit W8-DOCS-11: the paths above are the
+> create-next-app boilerplate and do not match this tree. Pages live under
+> `src/pages/` — the home page is `src/pages/index.tsx` and the API routes
+> mapped to `/api/*` are in `src/pages/api/`. Geist is loaded through the
+> `geist` package (`geist/font/sans` and `geist/font/mono` in
+> `src/pages/_app.tsx`), not by a direct `next/font` call. Repo-specific
+> rules, test commands (`npm run test:e2e`, `npm run test:e2e:live`) and the
+> push/deploy policy are in `AGENTS.md`.)
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

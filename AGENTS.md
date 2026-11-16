@@ -47,6 +47,14 @@ advice:
   zero bar that reads as a real forecast
 - never let copy call a point estimate an established edge. The standing
   result is +0.0269, n=177, CI [−0.0043, +0.0605] — **not significant**
+  (corrected 2026-11-16, audit W8-DOCS-10: that interval is stale. The
+  current standing figure is +0.0269, n=177, CI **[−0.0050, +0.0596]**,
+  still not significant — decision 204's interval, per the backend
+  `AGENTS.md` §6 and `src/live/ladder_replay.py` docstring on
+  `SonNguyen2914/TRIVELA` origin/main. The backend replaced
+  [−0.0043, +0.0605], the pre-slate-fold interval, in commit `48ee55d4e`
+  on 2026-07-28; this copy was never refreshed. Quote the backend
+  figure, not this one.)
 
 Enforcement is split, and is **not** complete:
 
