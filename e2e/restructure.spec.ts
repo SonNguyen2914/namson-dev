@@ -333,8 +333,10 @@ test("a top-bar chip navigates client-side, not with a full document load",
     await page.evaluate(() => {
       (window as unknown as { __spa_marker?: number }).__spa_marker = 1;
     });
-    await page.getByRole("link", { name: "Leagues", exact: true }).click();
-    await page.waitForURL(/\/trivela\/leagues/);
+    // Leagues and the cup chips left the top bar (the switch and the column
+    // headers carry them now); Friendlies is the chip that stays.
+    await page.getByRole("link", { name: "Friendlies", exact: true }).click();
+    await page.waitForURL(/\/trivela\/friendlies/);
     // a hard load would have wiped the marker with the JS heap
     expect(await page.evaluate(() =>
       (window as unknown as { __spa_marker?: number }).__spa_marker)).toBe(1);
