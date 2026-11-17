@@ -17,26 +17,30 @@
 // guard's coverage.
 //
 // ─── WHERE THE SET COMES FROM ────────────────────────────────────────
-// `components/CompRail.LIVE_COMPETITIONS`, which is the app's own
-// answer to "which competitions are live enough to put in front of the
-// reader". It is not re-listed here; it is imported. Each entry already
-// carries everything these guards need and nothing they would have to
-// derive by string surgery:
+// Until 2026-11-16 it was imported from `components/CompRail
+// .LIVE_COMPETITIONS`, the top-bar chip rail. Son removed that rail
+// ("UCL and EFL can be removed entirely because we have them in the
+// cups"): the chips went, the PAGES stayed, and the Cups tab reaches
+// them. The app no longer holds a list of "live competitions with a
+// page" anywhere else, so the two pages are declared here, with the
+// count below still pinning the size.
 //
 //   key   the column slug AND the key `/api/comp/{key}/fixtures` is
-//         asked for — so a spec mocks the right route without building
-//         a URL out of guesses
+//         asked for
 //   href  the competition's own page
-//   label the chip's visible text, for an accessible-name assertion
-//   hue   the CSS custom property NAME of its light. Read through this
-//         field, never spelled `--lg-` + slug: a concatenated token
-//         shipped a colourless pill on 2026-09-15 and resolves to
-//         nothing at all for a competition whose token is named
-//         differently.
-import { LIVE_COMPETITIONS } from "../src/components/CompRail";
+//   label the competition's short name, for test titles
+//   hue   the CSS custom property NAME of its light
 import { ARCHIVE } from "../src/components/ArchiveMenu";
 
-export const COMPETITIONS = LIVE_COMPETITIONS;
+export type LiveCompetition = {
+  key: string; href: string; label: string; hue: string;
+};
+
+export const COMPETITIONS: readonly LiveCompetition[] = [
+  { key: "ucl", href: "/trivela/ucl", label: "UCL", hue: "--lg-ucl" },
+  { key: "eflcup", href: "/trivela/efl-cup", label: "EFL Cup",
+    hue: "--lg-eflcup" },
+];
 
 /** HOW MANY THERE ARE, IN ONE PLACE.
  *
@@ -50,19 +54,6 @@ export const COMPETITIONS = LIVE_COMPETITIONS;
  *  be the second copy of the registry this file exists to avoid; the
  *  keys come from `COMPETITIONS`, and only the size is pinned. */
 export const LIVE_COMPETITION_COUNT = 2;
-
-/** The competition pages, plus the two other surfaces that draw the
- *  rail. `index.tsx` renders it (so every `only=`-narrowed competition
- *  page does too), and `leagues.tsx` and `ratings.tsx` import it
- *  directly — the rail was the same literal typed into two pages once,
- *  and the day one of them gained the glow the other had a chip that
- *  could not. */
-export const RAIL_PAGES: readonly string[] = [
-  "/trivela",
-  "/trivela/leagues",
-  "/trivela/ratings",
-  ...COMPETITIONS.map((c) => c.href),
-];
 
 /** EVERY COMPETITION SURFACE IN THE TREE, live and archived.
  *
@@ -78,9 +69,3 @@ export const COMPETITION_PAGES: readonly string[] = [
 ];
 
 export const ARCHIVED_COUNT = 3;
-
-/** The chip for one competition, on whatever page is open. */
-export const chipFor = (
-  page: import("@playwright/test").Page,
-  comp: { href: string },
-) => page.locator(`a[href="${comp.href}"]`).first();

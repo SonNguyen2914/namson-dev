@@ -713,7 +713,9 @@ html {
    like its neighbours. The outline carries the distinction in the one
    property that survives — and the chip writes the day out in words for
    assistive tech anyway (see components/CompRail.tsx), because a fact
-   carried only by a hue is a fact some readers never get. */
+   carried only by a hue is a fact some readers never get.
+   2026-11-16: CompRail is gone and nothing uses this glow any more; it
+   is kept for the next chip that needs to say WHEN. */
 .chip-soon {
   border-color: color-mix(in srgb, var(--chip-hue) 60%, transparent);
   background: color-mix(in srgb, var(--chip-hue) 12%, transparent);

@@ -51,6 +51,9 @@
 // had kicked off. So the EFL Cup is REACHED THE WAY A LIVE COMPETITION
 // IS REACHED: by its chip in the rail, which since that day glows when
 // it plays today or tomorrow (components/CompRail.tsx).
+// 2026-11-16: the chip rail was removed (Son). The EFL Cup is reached
+// through the board's Cups tab, whose box is drawn whenever a cup plays
+// within three days (components/BoardModeSwitch.tsx).
 //
 // IT WILL BELONG HERE, and the test that decides when is the one above:
 // when its own fixture feed has nothing upcoming left. That feed is

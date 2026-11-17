@@ -29,6 +29,7 @@
 import { asOfLabel, type RatingsAsOf } from "../lib/ratingsAsOf";
 import { hueOf } from "../lib/leagueHue";
 import Link from "next/link";
+import { leaguePageHref } from "../lib/leaguePages";
 import {
   ReactNode, createContext, useContext, useEffect, useId, useState,
 } from "react";
@@ -3308,8 +3309,27 @@ export function LeagueColumn({
             same whatever it is called, and the name gets the whole track
             before it has to truncate. */}
         <div className="flex flex-col items-center gap-y-0.5">
-          <h3 className="w-full truncate text-center text-base font-bold uppercase tracking-[0.03em] text-ink-hi [font-family:var(--font-archivo)] [font-stretch:106%]">
-            {leagueLabel(slug)}
+          {/* `tap-floor-room` WHEN THE NAME IS A LINK: the h3 truncates,
+              so it clips, and a 17px-tall link's 44px hit area was cut
+              back to 17px on a touch screen (the floor guards measured a
+              press 18px off centre answering nothing). The room grows on
+              coarse pointers only; the desktop header is unchanged. */}
+          <h3 className={`w-full truncate text-center text-base font-bold uppercase tracking-[0.03em] text-ink-hi [font-family:var(--font-archivo)] [font-stretch:106%] ${
+            leaguePageHref(slug) ? "tap-floor-room justify-center" : ""}`}>
+            {/* THE LEAGUE'S OWN PAGE, FROM ITS NAME (Son, 2026-11-16) —
+                the top bar's "Leagues" chip was removed in favour of
+                this. Only leagues that have a page are links; see
+                lib/leaguePages. */}
+            {leaguePageHref(slug) ? (
+              <Link href={leaguePageHref(slug)!} data-testid="col-head-link"
+                aria-label={`${leagueLabel(slug)} page`}
+                className="group/lp rounded-sm decoration-1 underline-offset-4 outline-none hover:underline focus-visible:underline focus-visible:ring-2 focus-visible:ring-accent">
+                {leagueLabel(slug)}
+                {/* the ↗ appears on hover (and keyboard focus) only */}
+                <span aria-hidden data-testid="col-head-link-arrow"
+                  className="ml-1 hidden text-ink-mid group-hover/lp:inline group-focus-visible/lp:inline">↗</span>
+              </Link>
+            ) : leagueLabel(slug)}
           </h3>
           {/* THE COUNT COUNTS WHAT THIS COLUMN HOLDS — see
               columnCountLabel. `data-counts` says WHICH of the three it

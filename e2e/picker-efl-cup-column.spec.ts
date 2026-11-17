@@ -387,18 +387,7 @@ test("IT SHOWS; IT DOES NOT DECIDE — no verb the reader could act on",
 
 // ══ 6. THE DOOR ══════════════════════════════════════════════════════
 
-test("the rail chip points at this page and wears the cup's own hue",
-  async ({ page }) => {
-    await open(page, rebased(), "/trivela");
-    const chip = page.locator('a[href="/trivela/efl-cup"]').first();
-    await expect(chip).toBeVisible();
-    await expect(chip).toHaveText(/EFL Cup/);
-    /* AND IT IS UNLIT, WHICH IS A STATE AND NOT A FAILURE. The glow
-       reads /api/comp/eflcup/fixtures, which is the competition VIEWER's
-       route; this cup deliberately has none, the catch-all above answers
-       503, and `fetchSoon` reads every failure as UNKNOWN. An unlit chip
-       is silence — it must never render as the CLAIM that nothing is on,
-       which is what `data-soon="none"` would mean. */
-    await page.waitForLoadState("networkidle");
-    await expect(chip).toHaveAttribute("data-soon", "unknown");
-  });
+/* "THE RAIL CHIP POINTS AT THIS PAGE" was retired 2026-11-16: Son removed
+   the UCL and EFL Cup top-bar chips. This page's door is now the EFL Cup
+   column's name on the Cups tab (lib/leaguePages.CUP_PAGES), asserted in
+   e2e/board-boxes-say-when.spec.ts. */

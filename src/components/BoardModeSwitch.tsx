@@ -39,14 +39,21 @@ export function boardModeFrom(stored: string | null): BoardMode {
   return "leagues";
 }
 
-export function BoardModeSwitch({ mode, onChange }: {
+export function BoardModeSwitch({ mode, onChange, shown = BOARD_MODES }: {
   mode: BoardMode; onChange: (m: BoardMode) => void;
+  /** WHICH BOXES TO DRAW (Son, 2026-11-16): a box appears only when its
+   *  board has a game today, tomorrow or the day after. The page decides
+   *  (see pages/trivela/index.tsx `boxesShown`): a failed or pending read
+   *  shows every box, the selected box is always drawn, and when only one
+   *  board plays the page hides the switch altogether. Order is always
+   *  Leagues, Cups, Nations. */
+  shown?: readonly BoardMode[];
 }) {
   return (
     <div data-testid="board-mode" className="mt-4 flex justify-center max-md:mt-3">
       <div role="group" aria-label="which board this page shows"
         className="inline-flex gap-[3px] rounded-[10px] border border-line bg-bs-elev2 p-[3px]">
-        {BOARD_MODES.map((m) => (
+        {BOARD_MODES.filter((m) => shown.includes(m)).map((m) => (
           <button key={m} type="button" data-testid={`board-mode-${m}`}
             data-mode={m} aria-pressed={mode === m} onClick={() => onChange(m)}
             className={`rounded-[7px] border px-[18px] py-[9px] font-mono text-[11px] uppercase tracking-[0.14em] transition-colors ${

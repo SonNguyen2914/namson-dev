@@ -298,6 +298,10 @@ async function open(page: import("@playwright/test").Page,
   // the competition rail asks each declared column for its fixtures
   await page.route("**/api/comp/**", (r) =>
     r.fulfill(json({ fixtures: [] })));
+  // which switch boxes to draw (2026-11-16): failed on purpose, so every
+  // box is drawn, as this spec recorded the page
+  await page.route("**/api/board/soon**", (r) =>
+    r.fulfill(json({ detail: "not served" }, 503)));
   await page.route("**/api/bet-suggester/watched-strip**", (r) =>
     r.fulfill(json(asV2(STRIP))));
   // the top bar's "Analyst" chip reads its switch (a site route, no

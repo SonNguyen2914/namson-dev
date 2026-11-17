@@ -94,8 +94,11 @@ import { failureSentence, readFailure } from "../../lib/providerFailure";
 import { Eyebrow } from "../../components/ui";
 import { ArchiveMenu } from "../../components/ArchiveMenu";
 import {
-  BoardMode, BoardModeSwitch, boardModeFrom,
+  BOARD_MODES, BoardMode, BoardModeSwitch, boardModeFrom,
 } from "../../components/BoardModeSwitch";
+import {
+  BoardSoonRead, UNKNOWN as SOON_UNKNOWN, boxShown, fetchBoardSoon,
+} from "../../lib/boardSoon";
 import {
   ALL_CUPS, CUPS_WITH_PAGES, CUP_BOARD_COLUMNS, FINALS, FINALS_MEMBERS,
   OWN_COLUMN_CUPS,
@@ -105,7 +108,6 @@ import {
   offSeasonWhen, restLine, returnKickoff, slugsInWindow,
 } from "../../lib/offSeason";
 import { ColumnChooser } from "../../components/ColumnChooser";
-import { CompRail } from "../../components/CompRail";
 import LiveSection from "../../components/LiveCard";
 import { LeagueColumn, NotesPanel, hueOf } from "../../components/PickerColumn";
 import {
@@ -221,18 +223,57 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
      otherwise nothing, which is the declaration. */
   const asked: readonly string[] | undefined = only
     ?? (cups ? CUP_BOARD_COLUMNS : undefined);
+  /* WAS THIS MODE CHOSEN, or merely remembered? A click on a box, or a
+     `?mode=` deep link, is a choice and is never overridden by the boxes
+     appearing and disappearing below; a remembered mode is a default and
+     falls back to the first box that is drawn (Son, 2026-11-16). */
+  const [modeChosen, setModeChosen] = useState(false);
+  const rawMode = router.query.mode;
+  const linkedMode: BoardMode | null = typeof rawMode === "string"
+    && (BOARD_MODES as readonly string[]).includes(rawMode.toLowerCase())
+    ? rawMode.toLowerCase() as BoardMode : null;
   useEffect(() => {
-    if (only) return;
+    if (only || !router.isReady) return;
     let remembered: string | null = null;
     try { remembered = window.localStorage.getItem(BOARD_MODE_KEY); } catch {
       /* SWALLOWED(board:mode-read) — registered in
          e2e/missing-is-not-zero.spec.ts with its closes_when. */
     }
+    /* `?mode=` OPENS THAT BOARD whether or not its box is drawn, and does
+       not overwrite the remembered choice: a link is the sender's choice
+       for this visit, not the reader's preference. */
     const t = setTimeout(() => {
-      setMode(boardModeFrom(remembered));
+      if (linkedMode) setModeChosen(true);
+      setMode(linkedMode ?? boardModeFrom(remembered));
     }, 0);
     return () => clearTimeout(t);
+  }, [only, router.isReady, linkedMode]);
+  /* WHICH BOXES THE SWITCH DRAWS (Son, 2026-11-16): a box appears only
+     when its board has a kickoff today, tomorrow or the day after
+     (lib/boardSoon, ONE read for all three, once per mount, no polling).
+     It starts UNKNOWN — every box drawn — so the first paint is the
+     switch it always was, on the server and the client alike. A failed
+     read, or a mode the read could not measure, keeps its box: only a
+     measured quiet window hides one. */
+  const [soonRead, setSoonRead] = useState<BoardSoonRead>(SOON_UNKNOWN);
+  useEffect(() => {
+    if (only) return;
+    const ac = new AbortController();
+    let alive = true;
+    void fetchBoardSoon(ac.signal).then((r) => { if (alive) setSoonRead(r); });
+    return () => { alive = false; ac.abort(); };
   }, [only]);
+  /* ONE BOARD PLAYING HIDES THE WHOLE SWITCH (Son, 2026-11-16): a
+     switch with one box switches nothing, so the page simply shows that
+     board. NONE playing — every mode measured quiet, which should not
+     happen in practice — also hides it and shows Leagues. Two or more
+     draw a switch of those boxes, plus the box of the board on screen
+     (a `?mode=` link to a quiet board), so the reader can see where
+     they are. */
+  const playing = BOARD_MODES.filter((m) => boxShown(soonRead[m]));
+  const switchShown = playing.length >= 2;
+  const boxesShown: readonly BoardMode[] =
+    BOARD_MODES.filter((m) => playing.includes(m) || m === mode);
   /* HOW MANY COLUMNS ARE ON SCREEN AT ONCE — `VIEW`, in
      components/LeagueRibbon.tsx beside the loop that is built on it.
      Four is measured, not chosen: the board's track is `max-w-[96rem]`,
@@ -807,7 +848,7 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
   /** The switch. The previous board is DROPPED before the next is asked
    *  for: a Leagues column standing under a Championships header for the
    *  length of a request is stale dressed as current. */
-  const chooseMode = useCallback((m: BoardMode) => {
+  const switchMode = useCallback((m: BoardMode, remember: boolean) => {
     if (m === mode) return;
     heldBoardKey.current = null;
     setStaleBoard(null);
@@ -816,11 +857,32 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
     setShown(null);
     setPicked(null);
     setMode(m);
+    if (!remember) return;
     try { window.localStorage.setItem(BOARD_MODE_KEY, m); } catch {
       /* SWALLOWED(board:mode-write) — registered in
          e2e/missing-is-not-zero.spec.ts with its closes_when. */
     }
   }, [mode]);
+  /** A reader's choice: remembered, and never overridden by the boxes. */
+  const chooseMode = useCallback((m: BoardMode) => {
+    setModeChosen(true);
+    switchMode(m, true);
+  }, [switchMode]);
+  /* A REMEMBERED BOARD WHOSE BOX IS NOT DRAWN falls back to the first box
+     that is, in the switch's order — without writing storage, so the
+     preference comes back the day that board plays again. A chosen board
+     (a click, a `?mode=` link) stays put. */
+  const fallbackTo: BoardMode | null = only || mode === null || modeChosen
+    ? null
+    : playing.length === 0 ? (mode === "leagues" ? null : "leagues")
+    : playing.includes(mode) ? null : playing[0];
+  useEffect(() => {
+    if (!fallbackTo) return;
+    // deferred like the remembered-mode read above: the read that moves
+    // the board is an external event, and the switch resets four states
+    const t = setTimeout(() => switchMode(fallbackTo, false), 0);
+    return () => clearTimeout(t);
+  }, [fallbackTo, switchMode]);
   /** Has the reader opened the framing disclosure? Phone-only in effect
    *  — at every other width the paragraph is open regardless. */
   const [introOpen, setIntroOpen] = useState(false);
@@ -1388,20 +1450,16 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
       <RouteProgress />
       <TopBar left={backTo ? undefined : <ArchiveMenu />} back={backTo}
         title={pageTitle ? pageTitle.toLowerCase() : "picker board"}>
-        <NavChip href="/trivela/leagues" active={false}>Leagues</NavChip>
+        {/* THE TOP BAR, 2026-11-16 (Son): the Leagues, UCL and EFL Cup
+            chips are gone. UCL and the EFL Cup live in the Cups tab, and
+            the Leagues | Cups | Nations switch now draws a box only when
+            its board plays within three days (components/BoardModeSwitch).
+            Each league's own page is reached from its column header's
+            name (components/PickerColumn). Friendlies has no other door
+            yet, and VAR is the Analyst, so both stay. */}
         <NavChip href="/trivela/friendlies" active={false}>Friendlies</NavChip>
         {/* Trivela VAR's own page; only while it is switched on */}
         <AnalystNavChip />
-        {/* Live viewer competitions, and — since 2026-09-09 — WHEN each
-            of them next plays: the chip glows for a fixture today or
-            tomorrow. The rail moved to components/CompRail.tsx because
-            it was two identical literals, here and on
-            /trivela/leagues, and a glow added to one of them would
-            have left the other with a chip that could not.
-            THE RAIL IS NOT THE BOARD'S COLUMN SET. The Champions League
-            left BOARD_COLUMNS on 2026-09-09 and kept this chip: removing
-            a column is not deleting a competition. */}
-        <CompRail />
       </TopBar>
 
       {/* ── THE PILLS BAR, AT THE TOP OF THE PAGE (operator,
@@ -1616,8 +1674,9 @@ export default function PickerBoard({ only, pageTitle, backTo }: {
               landing page, and only once the remembered board is read —
               a switch drawn before that would show a choice the page has
               not made yet. */}
-          {!only && mode !== null && (
-            <BoardModeSwitch mode={mode} onChange={chooseMode} />
+          {!only && mode !== null && switchShown && (
+            <BoardModeSwitch mode={mode} onChange={chooseMode}
+              shown={boxesShown} />
           )}
         </div>
 

@@ -281,9 +281,15 @@ export const COMP_FIXTURES_TIMEOUT_MS = 45_000;
  *  not admit (`ligue1`), exactly as the allowlist below matches them. */
 export const COMP_HUB_TIMEOUT_MS = 45_000;
 
+/** `board/soon` sweeps every board competition's schedule; cold, that is
+ *  many provider reads on the backend's request path, so it gets the
+ *  boards' 45s under the 60s `maxDuration` in pages/api/board/[...path].ts. */
+export const BOARD_SOON_TIMEOUT_MS = 45_000;
+
 /** How long the proxy waits on `route` (`<prefix>/<sub-path>`). */
 export const proxyTimeoutMs = (route: string): number =>
   PROXY_TIMEOUT_BY_ROUTE[route]
+  ?? (route === "board/soon" ? BOARD_SOON_TIMEOUT_MS : undefined)
   // built here, not at module load: COMP_KEY is declared further down
   ?? (new RegExp(`^comp/${COMP_KEY}/fixtures$`).test(route)
     ? COMP_FIXTURES_TIMEOUT_MS
@@ -416,7 +422,7 @@ export async function proxy(
  *  operator and card routes never pass through here with this set. */
 export const EDGE_CACHED_ROUTES: ReadonlySet<string> = new Set([
   "picker/board", "picker/review", "championships/board",
-  "championships/review",
+  "championships/review", "board/soon",
 ]);
 export const EDGE_CACHE_CONTROL =
   "public, s-maxage=60, stale-while-revalidate=600";
@@ -538,6 +544,13 @@ export const LEAGUE_PROXY_ALLOWED: Record<string, readonly string[]> = {
   // `review` (2026-09-27): the national finished tail, read from the
   // backend's match archive — GET-only and it writes nothing either.
   championships: ["board", "review"],
+  // WHICH SWITCH BOXES ARE DRAWN (2026-11-16, Son): `board/soon` — for each of
+  // Leagues | Cups | Nations, every competition's kickoff times in the
+  // next few days, in ONE read, cached on the backend and shared by every
+  // visitor. Kickoff times only: no price, no model, no market. It
+  // replaced the UCL and EFL Cup top-bar chips, which each read their own
+  // competition's fixture list.
+  board: ["soon"],
   // THE HOME PAGE'S RECORD NUMBERS (2026-10-12): `site/stats`, schema
   // site-stats-v1 — four counts (matches studied, competitions, Kalshi
   // markets, backend test functions) each as `raw` and a `display` floor.
@@ -653,6 +666,7 @@ export const LEAGUE_PROXY_ID_ROUTES: Record<string, readonly RegExp[]> = {
   picker: [],
   field: [],
   championships: [],
+  board: [],
   minutes: [new RegExp(`^${COMP_KEY}/\\d{1,12}$`)],
   "live-performance": [/^\d{1,12}$/],
   // the backend accepts a provider reference of up to 20 digits
@@ -694,6 +708,13 @@ export const LEAGUE_PROXY_AHEAD: Record<string, Record<string, string>> = {
   // /api/championships/board and /api/field/nations; the national finished
   // tail's `review` record retired 2026-10-01, when the deployed backend
   // (Oct-1 merge queue) listed /api/championships/review.
+  board: {
+    soon: "the board switch's which-boxes read (2026-11-16). Ships with the "
+      + "TRIVELA PR that adds GET /api/board/soon; until that deploys the "
+      + "backend answers 404, which each box reads as UNKNOWN — an "
+      + "ordinary unlit box, never 'nothing soon'. Retire this record when "
+      + "the backend's /openapi.json lists the route.",
+  },
 };
 
 /** ROUTES THE BACKEND SERVES THAT THIS PROXY DELIBERATELY DOES NOT
@@ -1083,6 +1104,8 @@ export const QUERY_BOUNDS: ReadonlyArray<
   [/^championships\/board$/, { days: [1, 14] }],
   [/^championships\/review$/, { back: [1, 30] }],
   [/^xg\/friendlies$/, { days: [1, 8] }],
+  // the boxes ask for 4; 7 is a week, the most a "soon" question needs
+  [/^board\/soon$/, { days: [1, 7] }],
 ];
 
 /** Parameters that are integers wherever they appear, bounded or not. */
