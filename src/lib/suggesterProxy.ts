@@ -708,13 +708,7 @@ export const LEAGUE_PROXY_AHEAD: Record<string, Record<string, string>> = {
   // /api/championships/board and /api/field/nations; the national finished
   // tail's `review` record retired 2026-10-01, when the deployed backend
   // (Oct-1 merge queue) listed /api/championships/review.
-  board: {
-    soon: "the board switch's which-boxes read (2026-11-16). Ships with the "
-      + "TRIVELA PR that adds GET /api/board/soon; until that deploys the "
-      + "backend answers 404, which each box reads as UNKNOWN — an "
-      + "ordinary unlit box, never 'nothing soon'. Retire this record when "
-      + "the backend's /openapi.json lists the route.",
-  },
+  // `board/soon` retired 2026-11-17: TRIVELA PR 481 deployed GET /api/board/soon.
 };
 
 /** ROUTES THE BACKEND SERVES THAT THIS PROXY DELIBERATELY DOES NOT
