@@ -40,7 +40,6 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ArchiveMenu } from "../../components/ArchiveMenu";
-import { CompRail } from "../../components/CompRail";
 import {
   CupsView, FLIP, FieldMode, LeaguesView, ModeSwitch, NationsView,
   sameClubTwoFields,
@@ -308,7 +307,6 @@ export default function FieldPage() {
       </Head>
       <RouteProgress />
       <TopBar left={<ArchiveMenu />} title="the field">
-        <CompRail />
         <NavChip href="/trivela">board</NavChip>
         <NavChip href="/trivela/ratings" active>ratings</NavChip>
       </TopBar>

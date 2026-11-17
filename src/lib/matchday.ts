@@ -78,24 +78,6 @@ export function nextDayKey(key: string) {
   return `${t.getUTCFullYear()}-${p(t.getUTCMonth() + 1)}-${p(t.getUTCDate())}`;
 }
 
-/** THE TWO DAYS A FIXTURE CAN BE "SOON" ON, in the board's own terms:
- *  [today, the next day] as local-day keys, taken from ONE instant so
- *  the pair cannot be read a millisecond apart across a midnight.
- *
- *  The board buckets every matchday with `localDay`, so anything asking
- *  "is this today?" has to ask it the same way — a second notion of
- *  today drifts from the day bands the reader is looking at, which is
- *  the whole reason `TZ` is fixed at the top of this file.
- *
- *  `now` is a parameter so a test can name the instant instead of racing
- *  the clock, and so a caller can read the wall clock inside an effect
- *  rather than during render: a render-time `new Date()` makes the
- *  server's first paint and the browser's rehydration disagree. */
-export function soonDayKeys(now: Date = new Date()): [string, string] {
-  const today = dayKeyOf(now);
-  return [today, nextDayKey(today)];
-}
-
 export function groupByDay<T extends { id: string; date: string }>(
   fixtures: T[],
 ) {

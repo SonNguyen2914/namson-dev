@@ -27,7 +27,6 @@ import LaligaDashboard from "../../components/LaligaDashboard";
 import LigamxDashboard from "../../components/LigamxDashboard";
 import { Eyebrow, Reveal } from "../../components/ui";
 import { ArchiveMenu } from "../../components/ArchiveMenu";
-import { CompRail } from "../../components/CompRail";
 import { NavChip, RouteProgress, Toaster, TopBar } from "../../components/chrome";
 
 // Wordmark-adjacent faces: Exo 2 heavy italic for MLS's slanted crest
@@ -309,23 +308,8 @@ export default function LeagueCarousel() {
             model, ever), so they get a chip off the board rather than a
             place in the league carousel. */}
         <NavChip href="/trivela/friendlies" active={false}>Friendlies</NavChip>
-        {/* Viewer competitions: fixtures + Kalshi + strength read, no
-            model — and, since 2026-09-09, a chip that glows when the
-            competition plays today or tomorrow.
-            THE RAIL ITSELF MOVED to components/CompRail.tsx, where the
-            entries, the reasoning for each and the glow live once. It
-            was the same literal here and on the board, which is how a
-            rail acquires two behaviours; the record of who left it and
-            why went with it.
-            RETIRED 2026-08-24 by operator decision, and dropped from
-            this rail entirely: Conference (ecl), Europa (uel),
-            Brasileirão, Argentina, USL. The backend stopped collecting
-            them the same day; nothing recorded was deleted. The BACKEND
-            still serves GET /api/comp/{key}/journal, but this app's comp
-            proxy deliberately exposes only fixtures/markets/status/
-            tournament — whether to open journal to readers is an
-            operator call, not a comment's. */}
-        <CompRail />
+        {/* The UCL and EFL Cup chips left the top bar on 2026-11-16
+            (Son): both are in the board's Cups tab. */}
       </TopBar>
 
       {fxOn && <LeagueFX key={fxKey} id={league.id} />}

@@ -101,26 +101,20 @@ test("the board offers none of the five, and still offers the three",
         `${k} must not be linked from the board`,
       ).toHaveCount(0);
     }
-    // SCOPED TO THE RAIL, WHICH IS WHAT THIS TEST CLAIMS.
+    // THE KEPT ONES ARE REACHED FROM THEIR COLUMN NAME NOW (2026-11-16).
     //
-    // It used to search the WHOLE PAGE for `a[href="/comp/<k>"]`, and
-    // that is how it went on passing after the ucl chip was repointed on
-    // 2026-09-08: every Champions League CARD on the board links to
-    // `/comp/ucl` through `pickerApi.rowHref`, so the selector kept
-    // finding one. The rail link was gone and the assertion could not
-    // see it. It failed in CI, where that day's live board happened to
-    // carry no UCL row — so the guard was reporting the presence of
-    // FIXTURES as the presence of NAVIGATION.
-    //
-    // The nav is the rail (`components/chrome.tsx` TopBar), so the
-    // locator lives there. A card link now proves nothing here, which is
-    // the point.
+    // Son removed the UCL and EFL Cup chips from the top bar ("we have
+    // them in the cups"). The claim this test exists for — a competition
+    // that was KEPT must still have a door — is not dropped; the door
+    // moved to the column header's name on the Cups tab
+    // (lib/leaguePages.CUP_PAGES), asserted from that header in
+    // e2e/board-boxes-say-when.spec.ts. Here: it is not in the rail.
     const rail = page.locator("header.topbar nav");
     for (const [k, href] of KEPT_CHIPS) {
       await expect(
-        rail.locator(`a[href="${href}"]`).first(),
-        `${k} must still be reachable from the rail, at ${href}`,
-      ).toBeVisible();
+        rail.locator(`a[href="${href}"]`),
+        `${k} is no longer a top-bar chip`,
+      ).toHaveCount(0);
     }
     // and the retired ones must not be in the rail either — the check
     // above for the whole page stands, this adds the narrower claim
