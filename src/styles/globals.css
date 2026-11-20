@@ -118,9 +118,10 @@
      which they could only do by hiding in a shadow: a four-wide window
      over eight columns makes four pairs impossible. THE EFL CUP HAS NO
      SHADOW — it is not a column at all (see tables.OFF_BOARD_BY_DECISION
-     in the backend), it reaches the reader as a CompRail chip in the top
-     bar, and a chip can sit above any column the board happens to be
-     scrolled to. So it was measured against all ten, and the honest bar
+     in the backend), it reached the reader as a CompRail chip in the top
+     bar, and a chip could sit above any column the board happened to be
+     scrolled to (2026-11-16: the rail is gone; the EFL Cup is a column on
+     the Cups tab now, and the measurement below still holds). So it was measured against all ten, and the honest bar
      is the one the existing rail chip actually meets: --lg-ucl, the chip
      it sits NEXT TO, clears the eight columns by only 30.6 (its nearest
      is ligue1). That is the precedent for a hue in this position, and
@@ -714,8 +715,9 @@ html {
    property that survives — and the chip writes the day out in words for
    assistive tech anyway (see components/CompRail.tsx), because a fact
    carried only by a hue is a fact some readers never get.
-   2026-11-16: CompRail is gone and nothing uses this glow any more; it
-   is kept for the next chip that needs to say WHEN. */
+   2026-11-16: CompRail is gone and no NavChip passes `soon` any more
+   (Son chose no glow on the board switch); the rule and NavChip's `soon`
+   prop are kept for the next chip that needs to say WHEN. */
 .chip-soon {
   border-color: color-mix(in srgb, var(--chip-hue) 60%, transparent);
   background: color-mix(in srgb, var(--chip-hue) 12%, transparent);
