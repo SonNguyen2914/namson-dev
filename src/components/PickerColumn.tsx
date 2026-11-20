@@ -110,7 +110,8 @@ import { Eyebrow } from "./ui";
 // 24-39 and kept stacking greens.
 // THE EFL CUP (2026-09-15) IS THE FIRST ENTRY HERE THAT IS NOT A BOARD
 // COLUMN, and the reasoning above does not reach it. It has no shadow to
-// hide in — a CompRail chip can sit above whatever the board is scrolled
+// hide in — a CompRail chip could sit above whatever the board was scrolled
+// (2026-11-16: the chip rail is gone; the EFL Cup is now a Cups-tab column)
 // to — so its blue was measured against all ten lights at once and
 // clears 34.3 (nearest epl), against the 30.6 that --lg-ucl, the chip
 // beside it, manages against those same columns. Its clearance from the
