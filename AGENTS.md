@@ -89,16 +89,9 @@ unset, so the bare command is not the local-only run it reads as. The
 results depend on a live service and on volatile data, which is
 precisely the rot §6 below warns about.
 
-**And one of those GETs was never a read.** `GET /api/picker/board`
-calls `snapshots.capture_rows` on every assembly: it freezes a
-pre-kickoff row for every fixture on the board, first-write-wins, on a
-table with no delete path. A capture taken at the wrong moment is that
-fixture's pre-kickoff read for ever — three stray requests once froze
-Champions League matchday 2 twenty-nine days out and it took a migration
-to correct. Measured on 2026-09-17, three spec files alone sent 23 of
-them per run.
-
-So the suite no longer talks to the backend directly. It talks to
+**Tests must never request `GET /api/picker/board`.** It is not a
+side-effect-free read, and test traffic to it has caused data problems
+before. So the suite no longer talks to the backend directly. It talks to
 `e2e/board-holdout.mjs`, which forwards every path upstream untouched
 and refuses that one. Nothing about live reads changes; the one route
 that writes cannot be reached. `e2e/the-board-writes-nothing.spec.ts`
@@ -109,9 +102,8 @@ it booted with, and that is the way this protection fails silently.
 **Superseded 2026-09-25: the default run is now hermetic.** The
 paragraph below was the reasoning until then. Measured that day against a
 counting stand-in, the "hermetic" suite still sent ~2,400 GETs per run
-upstream (578 + 578 CompRail cup-fixture reads alone), and the frontend
-suite hitting `/api/comp/ucl/fixtures` about twice a second was the herd
-that filled the production backend's worker pool when it hung. So:
+upstream (578 + 578 CompRail cup-fixture reads alone), which is far
+too much load to send at a shared backend. So:
 
 - `npx playwright test` / `npm run test:e2e` is **hermetic**. The app's
   backend is `e2e/stand-in-backend.mjs` (a named 503 for everything,
